@@ -7,4 +7,25 @@ Pulse is the PATCH Teams Vulnerability Management Platform (VMP).
 
 ## Getting Started
 
-TBD
+Install `mprocs` to run the multiple services:
+
+```
+npm install -g mprocs
+```
+
+Install dependencies:
+
+```
+npm i
+```
+
+Run mprocs:
+
+```
+mprocs
+```
+
+## Tech Stack
+
+- Queue: inngest
+- ORM: prisma

@@ -10,7 +10,8 @@
     "format": "biome format --write",
     "inngest:dev": "inngest-cli dev",
     "dev:all": "mprocs",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -6,33 +6,13 @@ import {
 } from "@/features/emulators/components/emulators";
 import { emulatorsParamsLoader } from "@/features/emulators/server/params-loader";
 import { prefetchEmulators } from "@/features/emulators/server/prefetch";
-import { requireAuth } from "@/lib/auth-utils";
-import { HydrateClient } from "@/trpc/server";
-import type { SearchParams } from "nuqs/server";
-import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
+import { createListPage } from "@/lib/page-factory";
 
-type Props = {
-  searchParams: Promise<SearchParams>;
-}
-
-const Page = async ({ searchParams }: Props) => {
-  await requireAuth();
-
-  const params = await emulatorsParamsLoader(searchParams);
-  await prefetchEmulators(params);
-
-  return (
-    <EmulatorsContainer>
-      <HydrateClient>
-        <ErrorBoundary fallback={<EmulatorsError />}>
-          <Suspense fallback={<EmulatorsLoading />}>
-            <EmulatorsList />
-          </Suspense>
-        </ErrorBoundary>
-      </HydrateClient>
-    </EmulatorsContainer>
-  )
-};
-
-export default Page;
+export default createListPage({
+  paramsLoader: emulatorsParamsLoader,
+  prefetch: prefetchEmulators,
+  Container: EmulatorsContainer,
+  List: EmulatorsList,
+  Loading: EmulatorsLoading,
+  Error: EmulatorsError,
+});

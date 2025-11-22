@@ -8,10 +8,12 @@ import { PAGINATION } from "@/config/constants";
 export const paginationInputSchema = z.object({
   page: z
     .number()
+    .int()
     .min(PAGINATION.DEFAULT_PAGE)
     .default(PAGINATION.DEFAULT_PAGE),
   pageSize: z
     .number()
+    .int()
     .min(PAGINATION.MIN_PAGE_SIZE)
     .max(PAGINATION.MAX_PAGE_SIZE)
     .default(PAGINATION.DEFAULT_PAGE_SIZE),

@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import prisma from "@/lib/db";
+import { formatResourceName } from "@/lib/string-utils";
 
 /**
  * Verifies that a resource belongs to the current user
@@ -27,11 +28,11 @@ export async function requireOwnership(
   if (!resource) {
     throw new TRPCError({
       code: "NOT_FOUND",
-      message: `${String(modelName).charAt(0).toUpperCase() + String(modelName).slice(1)} not found`,
+      message: `${formatResourceName(String(modelName))} not found`,
     });
   }
 
-  // TODO: Is this secure? Double check. 
+  // TODO: Is this secure? Double check.
   if (resource.userId !== userId) {
     throw new TRPCError({
       code: "FORBIDDEN",

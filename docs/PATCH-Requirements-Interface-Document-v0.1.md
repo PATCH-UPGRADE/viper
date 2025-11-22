@@ -14,7 +14,7 @@
 
 **Living Document:** The specifications defined herein represent our current understanding of integration requirements based on initial performer consultations and program kickoff discussions. As the ARPA-H UPGRADE program progresses and TA performers (TA2, TA3, TA4) advance their technical approaches, this document will also revolve.
 
-**Version Control:** This document is version controlled in git, and available at https://github.com/PATCH-UPGRADE/requirements-interface-document
+**Version Control:** This document is version controlled in git, and available at https://github.com/PATCH-UPGRADE/pulse/blob/main/docs/PATCH-Requirements-Interface-Document-v0.1.md
 
 ### At a glance
 
@@ -89,10 +89,55 @@ Instead of baking every possible analytic or reporting workflow into the core, P
 
 - QA other components. PULSE assumes, for example, when TA3 says there is a vulnerability that it must check that to be true. Instead, PULSE maintains a reference to the TA3 exploit, which it assumes works as intended.
 
-### API-Centric
+### Anchor story and walk-through
 
-- PULSE exposes APIs for integration. All references in this document are
-  nested under `/api` on the server.
+**Anchor User Story:**
+
+> If I deploy this patch in the ICU monitor today, how many patient systems
+> will be offline and for how long? How will treatments be affected?
+> What security risk remains if I delay it 24 hours? How do these choices
+> affect compliance, safety, and cost?
+
+**Mindset:**
+Rather than thinking of the VMP as a raw network simulator, think of it as
+hospital digital twin, where each system is a node representing a _clinical
+function_, not just an IP address.
+
+- **Nodes:** ICU monitors, infusion pumps, lab analyzers, pharmacy servers,
+  nurse electronic medical record (EMR) workstations.
+- **Edges:** Data or work flow dependencies ("Lab -> EMR -> Nurse Station ->
+  Infusion pump")
+- **Attributes:** Vulnerability score, patch status, uptime requirement,
+  regulatory criticality.
+
+A core component of the VMP is to enable users to perform hospital
+simulations to understand outcomes.
+
+**Example Answer to Anchor Story:**
+
+Consider the workflow:
+
+> Lab -> EMR -> Nurse Station -> Infusion pump
+
+When a downstream TA proposes a change (e.g., TA-4 asks to apply patch to all
+infusion pumps running InsecureOS4.1), the VMP:
+
+- Highlights _affects device nodes_ for the security engineer and _affected
+  clinical nodes_ for the clinician.
+- Gathers data from the WHS on hospital impact.
+- Generates _summary metrics_ for application to the real hospital: downtime,
+  risk reduction, clinical impact, regulatory delta.
+
+- Impact summary produced, e.g., "patching now reduces exploit risk 92%
+  (determined by CVSS score) on 15 machines, causing 0.5 hours downtime in
+  radiology with affected machines."
+- Produces recommendation: "Apply to radiology systems at midnight; schedule remaining
+  across network for low-load hours."
+
+### API-Centric Design
+
+- PULSE exposes APIs for integration. (All references in this document are
+  nested under `/api` on the server.)
 
 - Every request to the REST API includes an HTTP method and a path, and a bearer token for authenticcated endpoints.
 
@@ -100,7 +145,11 @@ Instead of baking every possible analytic or reporting workflow into the core, P
 
 - Endpoints are RESTful, supporting POST, GET, DELETE, and UPDATE.
 
-- HTTP status codes reflect API success, e.g., 2xx reflects a successful API request.
+- HTTP status codes reflect API success, e.g., 2xx reflects a successful API
+  request.
+
+- Field names are spinal-case, not camelCase and not snake_case. Because
+  snake_case requires the shift key, and camelCase is less readable.
 
 ### Data formats
 
@@ -168,32 +217,21 @@ Non-goals:
 
 - Provide WHS environment for POV validation. TA1 does not QA TA3 results.
 - Store POV. Instead, PULSE stores a reference to the POV, identified by a
-  URI.
+  URI. Anyone can pull the POV from that URL, and this allows flexibility for
+  both TA3 and TA1 in the short term. We envision eventually there will be a
+  standardized exploit invocation, e.g., `./exploit`, but for now we just
+  reference where the associated code is at.
 
 **Additional Textual Fields:**
 
 TA3 MUST provide comprehensive textual descriptions to enable clinical risk assessment and LLM-based analysis:
 
 - **`description`** (required): Human-readable explanation of the vulnerability (2-3 sentences)
-- **`exploitNarrative`** (required): How the vulnerability can be exploited (attack vector, prerequisites)
-- **`clinicalImpact`** (required): Potential clinical consequences if
+- **`narrative`** (required): How the vulnerability can be exploited (attack vector, prerequisites)
+- **`impact`** (required): Potential clinical consequences if
   exploited in hospital environment
 
-- **`pov_uri`** (optional): The URI where the POV resides.
-
-**SARIF ruleId vs CVE Distinction:**
-
-Per SARIF 2.1.0 specification, `ruleId` identifies the scanning rule used for detection, NOT the vulnerability itself:
-
-- **`ruleId`**: TA3's internal scanning rule identifier (e.g., "PATCH-SCAN-RULE-WIN-PRIVESC-001" for Windows privilege escalation detection rules)
-- **`properties.cve`**: Official CVE identifier (if assigned; may be `null` for zero-day vulnerabilities without CVE)
-- **`properties.internalVulnId`**: TA3's internal tracking ID (required for all vulnerabilities)
-
-This distinction is critical for:
-
-- **Zero-day vulnerabilities**: No CVE exists at discovery time, but `ruleId` and `internalVulnId` still provide tracking
-- **Multiple detection methods**: Same CVE may be detected by different scanning rules
-- **SARIF compliance**: Proper use of `ruleId` enables standard SARIF tooling integration
+- **`exploit_uri`** (optional): The URI where the POV resides.
 
 **Batch Submission Guidelines:**
 

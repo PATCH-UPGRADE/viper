@@ -10,6 +10,8 @@ import {
   HistoryIcon,
   KeyIcon,
   LogOutIcon,
+  BookIcon,
+  ExternalLink,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -62,9 +64,9 @@ const menuItems = [
         url: "/remediations",
       },   
       {
-        title: "Credentials",
+        title: "Integrations",
         icon: KeyIcon,
-        url: "/credentials",
+        url: "/integrations",
       },
     ],
   }
@@ -110,6 +112,7 @@ export const AppSidebar = () => {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
+
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -117,6 +120,31 @@ export const AppSidebar = () => {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <a
+                      href="/api/openapi-ui"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <span>OpenAPI UI</span>
+                      <ExternalLink className="ml-auto h-4 w-4 opacity-50" />
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>              
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <a
+                      href="/api/openapi.json"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <span>OpenAPI Spec</span>
+                      <ExternalLink className="ml-auto h-4 w-4 opacity-50" />
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>                
+
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Sign out"

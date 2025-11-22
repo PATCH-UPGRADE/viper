@@ -209,12 +209,12 @@ function AssetDrawer({ asset }: { asset: Asset }) {
             <div>
               <div className="text-xs font-medium text-muted-foreground mb-1">Upstream API</div>
               <a
-                href={asset.upstream_api}
+                href={asset.upstreamApi}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
               >
-                {asset.upstream_api}
+                {asset.upstreamApi}
                 <ExternalLinkIcon className="size-3 flex-shrink-0" />
               </a>
             </div>

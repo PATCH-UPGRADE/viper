@@ -43,6 +43,7 @@ npm run db:seed
 ```
 
 The seed script will:
+
 1. Check if the seed user exists (creates if needed)
 2. Seed 20 realistic hospital assets owned by the seed user
 
@@ -57,8 +58,9 @@ SEED_CLEAR_DB=true npm run db:seed
 ### Login after seeding
 
 After seeding, you can log in with:
+
 - Email: `user@example.com`
-- Password: `abcd1234`
+- Password: <read the seed script>
 
 ## Tech Stack
 

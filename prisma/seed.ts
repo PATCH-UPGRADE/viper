@@ -17,25 +17,25 @@ const SAMPLE_ASSETS = [
     ip: '10.20.1.101',
     cpe: 'cpe:2.3:h:philips:intellivue_mp70:*:*:*:*:*:*:*:*',
     role: 'ICU Patient Monitor',
-    upstream_api: 'https://api.philips.com/devices/monitor',
+    upstreamApi: 'https://api.philips.com/devices/monitor',
   },
   {
     ip: '10.20.1.102',
     cpe: 'cpe:2.3:h:baxter:infusion_pump:sigma_spectrum:*:*:*:*:*:*:*',
     role: 'Infusion Pump',
-    upstream_api: 'https://api.baxter.com/devices/pump',
+    upstreamApi: 'https://api.baxter.com/devices/pump',
   },
   {
     ip: '10.20.1.103',
     cpe: 'cpe:2.3:h:ge_healthcare:dash_4000:*:*:*:*:*:*:*:*',
     role: 'Vital Signs Monitor',
-    upstream_api: 'https://api.gehealthcare.com/devices/vitals',
+    upstreamApi: 'https://api.gehealthcare.com/devices/vitals',
   },
   {
     ip: '10.20.1.104',
     cpe: 'cpe:2.3:h:draeger:evita_v500:*:*:*:*:*:*:*:*',
     role: 'Ventilator',
-    upstream_api: 'https://api.draeger.com/devices/ventilator',
+    upstreamApi: 'https://api.draeger.com/devices/ventilator',
   },
 
   // Laboratory Equipment
@@ -43,19 +43,19 @@ const SAMPLE_ASSETS = [
     ip: '10.30.2.201',
     cpe: 'cpe:2.3:h:roche:cobas_6000:*:*:*:*:*:*:*:*',
     role: 'Laboratory Analyzer',
-    upstream_api: 'https://api.roche.com/lab/analyzer',
+    upstreamApi: 'https://api.roche.com/lab/analyzer',
   },
   {
     ip: '10.30.2.202',
     cpe: 'cpe:2.3:h:abbott:architect_i2000sr:*:*:*:*:*:*:*:*',
     role: 'Immunoassay Analyzer',
-    upstream_api: 'https://api.abbott.com/lab/immunoassay',
+    upstreamApi: 'https://api.abbott.com/lab/immunoassay',
   },
   {
     ip: '10.30.2.203',
     cpe: 'cpe:2.3:h:sysmex:xs-1000i:*:*:*:*:*:*:*:*',
     role: 'Hematology Analyzer',
-    upstream_api: 'https://api.sysmex.com/lab/hematology',
+    upstreamApi: 'https://api.sysmex.com/lab/hematology',
   },
 
   // Imaging Equipment
@@ -63,19 +63,19 @@ const SAMPLE_ASSETS = [
     ip: '10.40.3.301',
     cpe: 'cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*',
     role: 'MRI Scanner',
-    upstream_api: 'https://api.siemens-healthineers.com/imaging/mri',
+    upstreamApi: 'https://api.siemens-healthineers.com/imaging/mri',
   },
   {
     ip: '10.40.3.302',
     cpe: 'cpe:2.3:h:ge_healthcare:optima_ct660:*:*:*:*:*:*:*:*',
     role: 'CT Scanner',
-    upstream_api: 'https://api.gehealthcare.com/imaging/ct',
+    upstreamApi: 'https://api.gehealthcare.com/imaging/ct',
   },
   {
     ip: '10.40.3.303',
     cpe: 'cpe:2.3:h:fujifilm:fcr_xg-1:*:*:*:*:*:*:*:*',
     role: 'X-Ray System',
-    upstream_api: 'https://api.fujifilm.com/imaging/xray',
+    upstreamApi: 'https://api.fujifilm.com/imaging/xray',
   },
 
   // IT Infrastructure
@@ -83,25 +83,25 @@ const SAMPLE_ASSETS = [
     ip: '10.10.4.401',
     cpe: 'cpe:2.3:a:epic:emr:2023:*:*:*:*:*:*:*',
     role: 'EMR Server',
-    upstream_api: 'https://api.epic.com/emr/server',
+    upstreamApi: 'https://api.epic.com/emr/server',
   },
   {
     ip: '10.10.4.402',
     cpe: 'cpe:2.3:a:cerner:millennium:*:*:*:*:*:*:*:*',
     role: 'Clinical Information System',
-    upstream_api: 'https://api.cerner.com/cis/server',
+    upstreamApi: 'https://api.cerner.com/cis/server',
   },
   {
     ip: '10.10.4.403',
     cpe: 'cpe:2.3:a:meditech:expanse:*:*:*:*:*:*:*:*',
     role: 'Pharmacy System',
-    upstream_api: 'https://api.meditech.com/pharmacy/server',
+    upstreamApi: 'https://api.meditech.com/pharmacy/server',
   },
   {
     ip: '10.10.4.404',
     cpe: 'cpe:2.3:h:cisco:unified_communications:*:*:*:*:*:*:*:*',
     role: 'Nurse Call System',
-    upstream_api: 'https://api.cisco.com/communications/nurse',
+    upstreamApi: 'https://api.cisco.com/communications/nurse',
   },
 
   // Surgical Equipment
@@ -109,13 +109,13 @@ const SAMPLE_ASSETS = [
     ip: '10.50.5.501',
     cpe: 'cpe:2.3:h:stryker:surgical_navigation:*:*:*:*:*:*:*:*',
     role: 'Surgical Navigation System',
-    upstream_api: 'https://api.stryker.com/surgical/navigation',
+    upstreamApi: 'https://api.stryker.com/surgical/navigation',
   },
   {
     ip: '10.50.5.502',
     cpe: 'cpe:2.3:h:intuitive:da_vinci_xi:*:*:*:*:*:*:*:*',
     role: 'Robotic Surgical System',
-    upstream_api: 'https://api.intuitive.com/surgical/robot',
+    upstreamApi: 'https://api.intuitive.com/surgical/robot',
   },
 
   // Workstations
@@ -123,19 +123,19 @@ const SAMPLE_ASSETS = [
     ip: '10.60.6.601',
     cpe: 'cpe:2.3:h:dell:optiplex_7090:*:*:*:*:*:*:*:*',
     role: 'Clinical Workstation',
-    upstream_api: 'https://api.dell.com/workstation/clinical',
+    upstreamApi: 'https://api.dell.com/workstation/clinical',
   },
   {
     ip: '10.60.6.602',
     cpe: 'cpe:2.3:h:hp:elitedesk_800:*:*:*:*:*:*:*:*',
     role: 'Nurse Station Workstation',
-    upstream_api: 'https://api.hp.com/workstation/nurse',
+    upstreamApi: 'https://api.hp.com/workstation/nurse',
   },
   {
     ip: '10.60.6.603',
     cpe: 'cpe:2.3:h:lenovo:thinkcentre_m90a:*:*:*:*:*:*:*:*',
     role: 'Administrative Workstation',
-    upstream_api: 'https://api.lenovo.com/workstation/admin',
+    upstreamApi: 'https://api.lenovo.com/workstation/admin',
   },
 
   // Network Infrastructure
@@ -143,13 +143,13 @@ const SAMPLE_ASSETS = [
     ip: '10.70.7.701',
     cpe: 'cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*',
     role: 'Network Switch',
-    upstream_api: 'https://api.cisco.com/network/switch',
+    upstreamApi: 'https://api.cisco.com/network/switch',
   },
   {
     ip: '10.70.7.702',
     cpe: 'cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*',
     role: 'Firewall',
-    upstream_api: 'https://api.fortinet.com/network/firewall',
+    upstreamApi: 'https://api.fortinet.com/network/firewall',
   },
 ];
 
@@ -290,11 +290,65 @@ const SAMPLE_VULNERABILITIES = [
   },
 ];
 
+// Sample remediation data
+const SAMPLE_REMEDIATIONS = [
+  {
+    cpe: 'cpe:2.3:h:philips:intellivue_mp70:*:*:*:*:*:*:*:*',
+    fixUri: 'https://github.com/philips-healthcare/intellivue-firmware-v8.2.1',
+    description: 'Firmware update v8.2.1 patches buffer overflow vulnerability (CVE-2024-1234) by implementing input validation and bounds checking in network packet processing.',
+    narrative: 'Download firmware v8.2.1 from Philips ServiceNow portal. Schedule 30-minute maintenance window per ICU monitor. Backup current configuration via service menu. Apply firmware via USB in service mode. Verify patient monitoring resumes correctly. Update requires monitor reboot - coordinate with clinical staff to ensure backup monitoring during update.',
+    upstreamApi: 'https://www.philips.com/healthcare/product/HC865350/intellivue-mp70-patient-monitor',
+  },
+  {
+    cpe: 'cpe:2.3:h:baxter:infusion_pump:sigma_spectrum:*:*:*:*:*:*:*',
+    fixUri: 'https://github.com/baxter-medical/sigma-spectrum-patch-2024-001',
+    description: 'Security patch adds multi-factor authentication and encrypted credential storage to drug library access controls.',
+    narrative: 'Deploy patch via Baxter Infusion Pump Manager software. Pumps auto-update during nightly sync window (2-4 AM). Biomedical engineering must verify drug library integrity post-patch. Clinical pharmacy validates dose limits unchanged. Requires nursing staff re-training on new authentication workflow - expect 5 min additional time for first library update.',
+    upstreamApi: 'https://www.baxter.com/healthcare-professionals/infusion-systems/sigma-spectrum-infusion-system',
+  },
+  {
+    cpe: 'cpe:2.3:h:ge_healthcare:optima_ct660:*:*:*:*:*:*:*:*',
+    fixUri: 'https://github.com/ge-healthcare/pacs-security-update-q1-2024',
+    description: 'PACS interface security update implements parameterized SQL queries and input sanitization to prevent injection attacks.',
+    narrative: 'IT must apply SQL patch during imaging system maintenance window (typically Sunday 6-10 AM). PACS workstation will be offline for approximately 2 hours. Radiology workflow switches to offline worklist during update. After update, run PACS connectivity test with 5 sample exams. Verify DICOM query/retrieve functions correctly. Coordinate with radiology manager to reschedule non-urgent imaging.',
+    upstreamApi: 'https://www.gehealthcare.com/products/computed-tomography/optima-ct660',
+  },
+  {
+    cpe: 'cpe:2.3:a:epic:emr:2023:*:*:*:*:*:*:*',
+    fixUri: 'https://github.com/epic-systems/hl7-encryption-upgrade-2024',
+    description: 'HL7 interface upgrade replaces deprecated DES encryption with AES-256-GCM for all patient data transmissions.',
+    narrative: 'Epic technical team must schedule upgrade during EMR maintenance window (quarterly, usually Sunday midnight-6 AM). All HL7 interfaces (lab, pharmacy, radiology) will be offline during 4-hour upgrade. Clinical systems revert to downtime procedures. After upgrade, validate all interface transactions for 24 hours. Monitor HL7 error logs. Test critical workflows: lab orders, medication orders, radiology results.',
+    upstreamApi: 'https://www.epic.com/software',
+  },
+  {
+    cpe: 'cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*',
+    fixUri: 'https://github.com/siemens-healthineers/magnetom-syngo-patch-VE11C',
+    description: 'Syngo MR VE11C software patch adds DICOM message validation and input sanitization to prevent stack overflow exploits.',
+    narrative: 'Siemens field service engineer required for installation. Schedule 4-hour service visit during low-volume imaging time. MRI scanner offline during patch application. Backup magnet scheduling to other scanners. After patch, engineer performs image quality validation and safety interlock tests. Radiologist reviews test images for artifacts. 48-hour monitoring period for any scan quality issues.',
+    upstreamApi: 'https://www.siemens-healthineers.com/magnetic-resonance-imaging/1-5t-mri-scanner/magnetom-aera',
+  },
+  {
+    cpe: 'cpe:2.3:h:roche:cobas_6000:*:*:*:*:*:*:*:*',
+    fixUri: 'https://github.com/roche-diagnostics/cobas-credential-update-2024',
+    description: 'Security update enables custom password configuration and removes hardcoded administrative credentials.',
+    narrative: 'Lab IT and biomedical engineering coordinate update during low-volume period (typically weekends). Analyzer offline for 1 hour. Lab workflows switch to backup analyzer or reference lab for urgent tests. Post-update: set unique admin password per hospital security policy, document in asset management system, update runbooks. Lab manager validates QC results unchanged. Clinical staff training on new login procedures.',
+    upstreamApi: 'https://diagnostics.roche.com/global/en/products/instruments/cobas-6000.html',
+  },
+  {
+    cpe: 'cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*',
+    fixUri: 'https://github.com/cisco/ios-xe-security-patch-2024',
+    description: 'IOS-XE software update fixes privilege escalation vulnerability through CLI parser hardening and command authorization improvements.',
+    narrative: 'Network team applies patch via centralized management (Cisco DNA Center). Staged rollout: test VLAN first, then non-clinical switches, finally clinical network. Each switch requires 10-minute reboot - plan for brief network interruptions. Update during change control window (typically Tuesday/Thursday 10 PM-2 AM). Monitor syslog for errors. Verify VLAN connectivity and medical device network access post-patch. Critical systems (OR, ICU) updated last with anesthesia/nursing present.',
+    upstreamApi: 'https://www.cisco.com/c/en/us/products/switches/catalyst-9300-series-switches/index.html',
+  },
+];
+
 
 async function clearDatabase() {
   console.log('🗑️  Clearing database...');
 
   // Delete in order of dependencies (child tables first)
+  await prisma.remediation.deleteMany();
   await prisma.vulnerability.deleteMany();
   await prisma.assetSettings.deleteMany();
   await prisma.asset.deleteMany();
@@ -376,6 +430,40 @@ async function seedVulnerabilities(userId: string) {
   return vulnerabilities;
 }
 
+async function seedRemediations(userId: string) {
+  console.log('\n🌱 Seeding remediations...');
+
+  const remediations = await Promise.all(
+    SAMPLE_REMEDIATIONS.map(async (remediation) => {
+      // Find the vulnerability by CPE to get its ID
+      const vulnerability = await prisma.vulnerability.findFirst({
+        where: { cpe: remediation.cpe },
+      });
+
+      if (!vulnerability) {
+        console.warn(`⚠️  No vulnerability found for CPE: ${remediation.cpe}`);
+        return null;
+      }
+
+      return prisma.remediation.create({
+        data: {
+          fixUri: remediation.fixUri,
+          cpe: remediation.cpe,
+          description: remediation.description,
+          narrative: remediation.narrative,
+          upstreamApi: remediation.upstreamApi,
+          vulnerabilityId: vulnerability.id,
+          userId,
+        },
+      });
+    })
+  );
+
+  const successfulRemediations = remediations.filter((r) => r !== null);
+  console.log(`✅ Seeded ${successfulRemediations.length} remediations`);
+  return successfulRemediations;
+}
+
 async function main() {
   console.log('🌱 Starting database seed...\n');
 
@@ -392,9 +480,7 @@ async function main() {
     // Seed data
     await seedAssets(user.id);
     await seedVulnerabilities(user.id);
-
-    // Future seeds will go here:
-    // await seedRemediations(user.id);
+    await seedRemediations(user.id);
 
     console.log('\n✅ Database seeding completed successfully!');
     console.log(`\n📧 Login with: ${SEED_USER.email} / ${SEED_USER.password}`);

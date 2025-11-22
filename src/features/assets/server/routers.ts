@@ -26,7 +26,7 @@ const assetInputSchema = z.object({
   ip: z.string().min(1),
   cpe: z.string().regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format"),
   role: z.string().min(1),
-  upstream_api: safeUrlSchema,
+  upstreamApi: safeUrlSchema,
 });
 
 const assetSettingsInputSchema = z.object({
@@ -40,7 +40,7 @@ const assetResponseSchema = z.object({
   ip: z.string(),
   cpe: z.string(),
   role: z.string(),
-  upstream_api: z.string(),
+  upstreamApi: z.string(),
   userId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),

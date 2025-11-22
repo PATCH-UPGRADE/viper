@@ -290,6 +290,70 @@ const SAMPLE_VULNERABILITIES = [
   },
 ];
 
+// Sample emulator data (for asset emulation)
+const SAMPLE_EMULATORS = [
+  {
+    role: 'Philips IntelliVue MP70 Monitor Emulator',
+    cpe: 'cpe:2.3:h:philips:intellivue_mp70:*:*:*:*:*:*:*:*',
+    dockerUrl: 'https://hub.docker.com/r/icsemu/philips-mp70-emulator:v1.2',
+    description: 'Docker-based emulator for Philips IntelliVue MP70 patient monitor. Simulates vital sign data streams, alarm conditions, and network protocols (HL7, proprietary Philips protocol). Useful for security testing, integration testing, and staff training without requiring physical hardware.',
+  },
+  {
+    role: 'Baxter Sigma Spectrum Infusion Pump Emulator',
+    cpe: 'cpe:2.3:h:baxter:infusion_pump:sigma_spectrum:*:*:*:*:*:*:*',
+    downloadUrl: 'https://github.com/medical-device-emulators/baxter-pump-vm/releases/download/v2.1/baxter-sigma-spectrum-vm.ova',
+    description: 'VirtualBox/VMware OVA containing a software emulation of the Baxter Sigma Spectrum infusion pump. Includes drug library interface, dosing calculations, and alarm mechanisms. Supports security research and clinical workflow testing in safe sandbox environment.',
+  },
+  {
+    role: 'GE DASH 4000 Vital Signs Monitor Emulator',
+    cpe: 'cpe:2.3:h:ge_healthcare:dash_4000:*:*:*:*:*:*:*:*',
+    dockerUrl: 'https://hub.docker.com/r/healthemu/ge-dash-4000:latest',
+    description: 'Containerized emulator of GE DASH 4000 patient monitor. Generates realistic ECG waveforms, SpO2 trends, and NIBP readings. Exposes network services for remote monitoring and alarm integration. Ideal for vulnerability assessment and penetration testing of patient monitoring networks.',
+  },
+  {
+    role: 'Dräger Evita V500 Ventilator Simulator',
+    cpe: 'cpe:2.3:h:draeger:evita_v500:*:*:*:*:*:*:*:*',
+    downloadUrl: 'https://github.com/critical-care-sims/draeger-ventilator/releases/download/v1.0/draeger-evita-v500.qcow2',
+    description: 'QEMU disk image running Dräger Evita V500 ventilator firmware emulation. Simulates respiratory mechanics, pressure/volume ventilation modes, and alarm systems. Used for clinical engineering training and security analysis of critical respiratory support systems.',
+  },
+  {
+    role: 'Roche Cobas 6000 Laboratory Analyzer Emulator',
+    cpe: 'cpe:2.3:h:roche:cobas_6000:*:*:*:*:*:*:*:*',
+    dockerUrl: 'https://hub.docker.com/r/labemu/roche-cobas-6000:v3.0',
+    description: 'Docker container emulating Roche Cobas 6000 chemistry and immunoassay analyzer. Simulates LIS (Laboratory Information System) interface, result transmission protocols, and QC workflows. Enables security testing of lab analyzers without disrupting actual patient testing.',
+  },
+  {
+    role: 'Siemens Magnetom Aera MRI Scanner Emulator',
+    cpe: 'cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*',
+    downloadUrl: 'https://github.com/radiology-emulators/siemens-mri/releases/download/v2.3/magnetom-aera-sim.vmdk',
+    description: 'VMware disk image containing Siemens Syngo MR software emulator. Simulates DICOM services, imaging protocols, and scanner control interfaces. Supports penetration testing of radiology PACS networks and MRI security assessments without access to multi-million dollar scanners.',
+  },
+  {
+    role: 'Epic EMR Test Environment',
+    cpe: 'cpe:2.3:a:epic:emr:2023:*:*:*:*:*:*:*',
+    downloadUrl: 'https://github.com/ehr-test-envs/epic-sandbox/releases/download/2023.1/epic-emr-sandbox.ova',
+    description: 'Complete Epic EMR sandbox environment in OVA format. Includes patient records, HL7 interfaces, and FHIR APIs. Used for integration testing, security assessments, and clinical workflow validation. Pre-populated with synthetic patient data (HIPAA-compliant test data).',
+  },
+  {
+    role: 'GE Optima CT660 Scanner Emulator',
+    cpe: 'cpe:2.3:h:ge_healthcare:optima_ct660:*:*:*:*:*:*:*:*',
+    dockerUrl: 'https://hub.docker.com/r/imagingemu/ge-ct-scanner:v1.5',
+    description: 'Containerized CT scanner emulator with DICOM worklist (MWL) support, image acquisition simulation, and PACS connectivity. Generates synthetic CT image series for testing. Useful for assessing DICOM security vulnerabilities and radiation dose reporting integrations.',
+  },
+  {
+    role: 'Cisco Catalyst 9300 Network Switch Emulator',
+    cpe: 'cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*',
+    dockerUrl: 'https://hub.docker.com/r/networkemu/cisco-catalyst-9300:ios-xe-17',
+    description: 'GNS3/EVE-NG compatible Cisco IOS-XE emulator for Catalyst 9300 switches. Simulates VLAN configuration, port security, and hospital network segmentation. Allows penetration testers to practice network attacks against medical device networks in isolated lab environment.',
+  },
+  {
+    role: 'Abbott Architect i2000SR Immunoassay Analyzer Emulator',
+    cpe: 'cpe:2.3:h:abbott:architect_i2000sr:*:*:*:*:*:*:*:*',
+    downloadUrl: 'https://github.com/lab-device-emus/abbott-architect/releases/download/v1.1/abbott-i2000sr.ova',
+    description: 'VirtualBox VM running Abbott Architect immunoassay analyzer software stack. Simulates sample processing, result calculations, and LIS bi-directional interface. Enables security researchers to test lab analyzer vulnerabilities without impacting patient testing workflows.',
+  },
+];
+
 // Sample remediation data
 const SAMPLE_REMEDIATIONS = [
   {
@@ -350,6 +414,7 @@ async function clearDatabase() {
   // Delete in order of dependencies (child tables first)
   await prisma.remediation.deleteMany();
   await prisma.vulnerability.deleteMany();
+  await prisma.emulator.deleteMany();
   await prisma.assetSettings.deleteMany();
   await prisma.asset.deleteMany();
   // Don't delete users - we'll handle the seed user separately
@@ -464,6 +529,39 @@ async function seedRemediations(userId: string) {
   return successfulRemediations;
 }
 
+async function seedEmulators(userId: string) {
+  console.log('\n🌱 Seeding emulators...');
+
+  const emulators = await Promise.all(
+    SAMPLE_EMULATORS.map(async (emulator) => {
+      // Find the asset by CPE to get its ID
+      const asset = await prisma.asset.findFirst({
+        where: { cpe: emulator.cpe },
+      });
+
+      if (!asset) {
+        console.warn(`⚠️  No asset found for CPE: ${emulator.cpe}`);
+        return null;
+      }
+
+      return prisma.emulator.create({
+        data: {
+          role: emulator.role,
+          downloadUrl: emulator.downloadUrl || null,
+          dockerUrl: emulator.dockerUrl || null,
+          description: emulator.description,
+          assetId: asset.id,
+          userId,
+        },
+      });
+    })
+  );
+
+  const successfulEmulators = emulators.filter((e) => e !== null);
+  console.log(`✅ Seeded ${successfulEmulators.length} emulators`);
+  return successfulEmulators;
+}
+
 async function main() {
   console.log('🌱 Starting database seed...\n');
 
@@ -481,6 +579,7 @@ async function main() {
     await seedAssets(user.id);
     await seedVulnerabilities(user.id);
     await seedRemediations(user.id);
+    await seedEmulators(user.id);
 
     console.log('\n✅ Database seeding completed successfully!');
     console.log(`\n📧 Login with: ${SEED_USER.email} / ${SEED_USER.password}`);

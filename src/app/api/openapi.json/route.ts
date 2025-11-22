@@ -9,7 +9,7 @@ export async function GET() {
     version: '1.0.0',
     baseUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000/api/trpc',
     docsUrl: 'https://github.com/PATCH-UPGRADE',
-    tags: ['Assets', 'Vulnerabilities', 'Remediations'],
+    tags: ['Assets', 'Vulnerabilities', 'Remediations', 'Emulators'],
   });
 
   return Response.json(openApiDocument);

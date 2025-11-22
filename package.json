@@ -11,6 +11,7 @@
     "inngest:dev": "inngest-cli dev",
     "dev:all": "mprocs",
     "db:seed": "prisma db seed",
+    "openapi:generate": "tsx scripts/generate-openapi.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

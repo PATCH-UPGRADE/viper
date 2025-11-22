@@ -29,6 +29,7 @@ model User {
   assetSettings   AssetSettings[]
   vulnerabilities Vulnerability[]
   remediations    Remediation[]
+  emulators       Emulator[]
 
   @@unique([email])
   @@map("user")
@@ -144,6 +145,8 @@ model Asset {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  emulators Emulator[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -163,6 +166,27 @@ model AssetSettings {
   updatedAt DateTime @updatedAt
 
   @@map("asset_settings")
+}
+
+model Emulator {
+  id          String  @id @default(cuid())
+  role        String
+  downloadUrl String? @map("download-url")
+  dockerUrl   String? @map("docker-url")
+  description String  @db.Text
+
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([assetId])
+  @@index([userId])
+  @@map("emulator")
 }
 
 model Vulnerability {

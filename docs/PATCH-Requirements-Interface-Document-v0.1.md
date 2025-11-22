@@ -16,6 +16,8 @@
 
 **Version Control:** This document is version controlled in git, and available at https://github.com/PATCH-UPGRADE/pulse/blob/main/docs/PATCH-Requirements-Interface-Document-v0.1.md
 
+**OpenAPI Spec:** At [./openapi.json](./openapi.json)
+
 ### At a glance
 
 ```

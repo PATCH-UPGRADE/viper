@@ -1,7 +1,11 @@
 "use client";
 
 import {
+  BugIcon,
+  HeartIcon,
+  ComputerIcon,
   FolderOpenIcon,
+  CpuIcon,
   HistoryIcon,
   KeyIcon,
   LogOutIcon,
@@ -32,14 +36,34 @@ const menuItems = [
         url: "/workflows",
       },
       {
+        title: "Simulations",
+        icon: HistoryIcon,
+        url: "/executions",
+      },
+      {
+        title: "Assets",
+        icon: ComputerIcon,
+        url: "/assets",
+      },
+      {
+        title: "Emulators",
+        icon: CpuIcon,
+        url: "/emulators",
+      },      
+      {
+        title: "Vulnerabilities",
+        icon: BugIcon,
+        url: "/vulnerabilities",
+      },      
+      {
+        title: "Remediations",
+        icon: HeartIcon,
+        url: "/remediations",
+      },   
+      {
         title: "Credentials",
         icon: KeyIcon,
         url: "/credentials",
-      },
-      {
-        title: "Executions",
-        icon: HistoryIcon,
-        url: "/executions",
       },
     ],
   }

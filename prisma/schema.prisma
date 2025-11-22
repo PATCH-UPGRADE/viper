@@ -25,6 +25,8 @@ model User {
   sessions      Session[]
   accounts      Account[]
   workflows     Workflow[]
+  assets        Asset[]
+  assetSettings AssetSettings[]
 
   @@unique([email])
   @@map("user")
@@ -128,4 +130,35 @@ model Connection {
   updatedAt DateTime @updatedAt
 
   @@unique([fromNodeId, toNodeId, fromOutput, toInput])
+}
+
+model Asset {
+  id String @id @default(cuid())
+  ip String
+  cpe String
+  role String
+  upstream_api String
+
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("asset")
+}
+
+model AssetSettings {
+  id String @id @default(cuid())
+  url String
+  name String
+  token String
+
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("asset_settings")
 }

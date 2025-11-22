@@ -1,9 +1,38 @@
+import {
+  AssetsContainer,
+  AssetsList,
+  AssetsLoading,
+  AssetsError,
+} from "@/features/assets/components/assets";
+import { assetsParamsLoader } from "@/features/assets/server/params-loader";
+import { prefetchAssets } from "@/features/assets/server/prefetch";
 import { requireAuth } from "@/lib/auth-utils";
+import { HydrateClient } from "@/trpc/server";
+import type { SearchParams } from "nuqs/server";
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 
-const Page = async () => {
+type Props = {
+  searchParams: Promise<SearchParams>;
+}
+
+const Page = async ({ searchParams }: Props) => {
   await requireAuth();
 
-  return <p>Assets</p>
+  const params = await assetsParamsLoader(searchParams);
+  prefetchAssets(params);
+
+  return (
+    <AssetsContainer>
+      <HydrateClient>
+        <ErrorBoundary fallback={<AssetsError />}>
+          <Suspense fallback={<AssetsLoading />}>
+            <AssetsList />
+          </Suspense>
+        </ErrorBoundary>
+      </HydrateClient>
+    </AssetsContainer>
+  )
 };
 
 export default Page;

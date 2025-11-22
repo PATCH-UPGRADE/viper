@@ -1,0 +1,5 @@
+# Database 
+DATABASE_URL=""
+
+# Secret
+BETTER_AUTH_SECRET="change_this_to_a_random_secret"

@@ -28,4 +28,6 @@ mprocs
 ## Tech Stack
 
 - Queue: inngest
-- ORM: prisma
+- ORM: prisma. Run `npx prisma studio` to view the database, usually on http://localhost:5555
+
+You can view the DB with prisma studio, usually running on port 5555.

@@ -5,6 +5,7 @@ import { useReactFlow } from "@xyflow/react";
 import {
   GlobeIcon,
   MousePointerIcon,
+  SyringeIcon
 } from "lucide-react";
 import { useCallback } from "react";
 import { toast } from "sonner";
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/sheet";
 import { NodeType } from "@/generated/prisma";
 import { Separator } from "./ui/separator";
+import { se } from "date-fns/locale";
 
 export type NodeTypeOption = {
   type: NodeType;
@@ -42,6 +44,33 @@ const executionNodes: NodeTypeOption[] = [
     description: "Makes an HTTP request",
     icon: GlobeIcon,
   },
+];
+
+const deviceNodeTypes: NodeTypeOption[] = [
+  {
+    type: NodeType.HTTP_REQUEST,
+    label: "Infusion Pump",
+    description: "Models an Infusion Pump",
+    icon: SyringeIcon,
+  },
+  {
+    type: NodeType.HTTP_REQUEST,
+    label: "EMR",
+    description: "Electronic Medical Record System",
+    icon: SyringeIcon,
+  },
+  {
+    type: NodeType.HTTP_REQUEST,
+    label: "Prepare Medication",
+    description: "Prepare medication for administration",
+    icon: SyringeIcon,
+  },  
+  {
+    type: NodeType.HTTP_REQUEST,
+    label: "Blood Draw",
+    description: "Patient blood draw procedure",
+    icon: SyringeIcon,
+  },    
 ];
 
 
@@ -87,7 +116,11 @@ export function NodeSelector({
 
       const newNode = {
         id: createId(),
-        data: {},
+        data: {
+          icon: selection.icon,
+          label: selection.label,
+          description: selection.description,
+        },
         position: flowPosition,
         type: selection.type,
       };
@@ -125,7 +158,7 @@ export function NodeSelector({
 
             return (
               <div
-                key={nodeType.type}
+                key={nodeType.label}
                 className="w-full justify-start h-auto py-5 px-4 rounded-none cursor-pointer border-l-2 border-transparent hover:border-l-primary"
                 onClick={() => handleNodeSelect(nodeType)}
               >
@@ -159,7 +192,41 @@ export function NodeSelector({
 
             return (
               <div
-                key={nodeType.type}
+                key={nodeType.label}
+                className="w-full justify-start h-auto py-5 px-4 rounded-none cursor-pointer border-l-2 border-transparent hover:border-l-primary"
+                onClick={() => handleNodeSelect(nodeType)}
+              >
+                <div className="flex items-center gap-6 w-full overflow-hidden">
+                  {typeof Icon === "string" ? (
+                    <img
+                      src={Icon}
+                      alt={nodeType.label}
+                      className="size-5 object-contain rounded-sm"
+                    />
+                  ) : (
+                    <Icon className="size-5" />
+                  )}
+                  <div className="flex flex-col items-start text-left">
+                    <span className="font-medium text-sm">
+                      {nodeType.label}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {nodeType.description}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <Separator />
+        <div>
+          {deviceNodeTypes.map((nodeType) => {
+            const Icon = nodeType.icon;
+
+            return (
+              <div
+                key={nodeType.label}
                 className="w-full justify-start h-auto py-5 px-4 rounded-none cursor-pointer border-l-2 border-transparent hover:border-l-primary"
                 onClick={() => handleNodeSelect(nodeType)}
               >

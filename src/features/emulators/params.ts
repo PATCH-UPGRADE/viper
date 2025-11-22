@@ -1,7 +1,3 @@
-import { parseAsInteger, parseAsString } from "nuqs/server";
+import { createPaginationParams } from "@/lib/url-state";
 
-export const emulatorsParams = {
-  page: parseAsInteger.withDefault(1).withOptions({ clearOnDefault: true }),
-  pageSize: parseAsInteger.withDefault(5).withOptions({ clearOnDefault: true }),
-  search: parseAsString.withDefault("").withOptions({ clearOnDefault: true }),
-};
+export const emulatorsParams = createPaginationParams();

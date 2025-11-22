@@ -3,9 +3,13 @@ import prisma from "@/lib/db";
 import type { Node, Edge } from "@xyflow/react";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import z from "zod";
-import { PAGINATION } from "@/config/constants";
 import { NodeType } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
+import {
+  paginationInputSchema,
+  buildPaginationMeta,
+  createPaginatedResponse,
+} from "@/lib/pagination";
 
 export const workflowsRouter = createTRPCRouter({
   execute: protectedProcedure
@@ -156,22 +160,9 @@ export const workflowsRouter = createTRPCRouter({
       };
     }),
   getMany: protectedProcedure
-    .input(
-      z.object({
-        page: z
-          .number()
-          .min(PAGINATION.DEFAULT_PAGE)
-          .default(PAGINATION.DEFAULT_PAGE),
-        pageSize: z
-          .number()
-          .min(PAGINATION.MIN_PAGE_SIZE)
-          .max(PAGINATION.MAX_PAGE_SIZE)
-          .default(PAGINATION.DEFAULT_PAGE_SIZE),
-        search: z.string().default(""),
-      })
-    )
+    .input(paginationInputSchema)
     .query(async ({ ctx, input }) => {
-      const { pageSize, search } = input;
+      const { search } = input;
 
       const whereFilter = {
         userId: ctx.auth.user.id,
@@ -181,37 +172,18 @@ export const workflowsRouter = createTRPCRouter({
         },
       };
 
-      // Get total count first to cap page number
-      const totalCount = await prisma.workflow.count({
-        where: whereFilter,
-      });
+      // Get total count and build pagination metadata
+      const totalCount = await prisma.workflow.count({ where: whereFilter });
+      const meta = buildPaginationMeta(input, totalCount);
 
-      // Normalize totalPages to at least 1 for better UX
-      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-
-      // Cap page to prevent expensive queries with very large page numbers
-      const page = Math.min(input.page, totalPages);
-
+      // Fetch paginated items
       const items = await prisma.workflow.findMany({
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: meta.skip,
+        take: meta.take,
         where: whereFilter,
-        orderBy: {
-          updatedAt: "desc",
-        },
+        orderBy: { updatedAt: "desc" },
       });
 
-      const hasNextPage = page < totalPages;
-      const hasPreviousPage = page > 1;
-
-      return {
-        items,
-        page,
-        pageSize,
-        totalCount,
-        totalPages,
-        hasNextPage,
-        hasPreviousPage,
-      };
+      return createPaginatedResponse(items, meta);
     }),
 });

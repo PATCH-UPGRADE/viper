@@ -1,30 +1,24 @@
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { TRPCError } from "@trpc/server";
 import z from "zod";
-import { PAGINATION } from "@/config/constants";
-import { userSchema } from "@/lib/schemas";
-
-// Reusable URL validator to prevent javascript: and other dangerous protocols
-const safeUrlSchema = z
-  .string()
-  .url()
-  .refine(
-    (url) => {
-      try {
-        const protocol = new URL(url).protocol;
-        return protocol === "http:" || protocol === "https:" || protocol === "git:";
-      } catch {
-        return false;
-      }
-    },
-    { message: "Only http(s) and git URLs allowed" },
-  );
+import {
+  userSchema,
+  userIncludeSelect,
+  safeUrlSchema,
+  cpeSchema,
+} from "@/lib/schemas";
+import {
+  paginationInputSchema,
+  buildPaginationMeta,
+  createPaginatedResponse,
+  createPaginatedResponseSchema,
+} from "@/lib/pagination";
+import { requireOwnership } from "@/trpc/middleware";
 
 // Validation schemas
 const vulnerabilityInputSchema = z.object({
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  cpe: z.string().regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format"),
+  cpe: cpeSchema,
   exploitUri: safeUrlSchema,
   upstreamApi: safeUrlSchema,
   description: z.string().min(1),
@@ -47,33 +41,12 @@ const vulnerabilityResponseSchema = z.object({
   user: userSchema,
 });
 
-const paginatedVulnerabilityResponseSchema = z.object({
-  items: z.array(vulnerabilityResponseSchema),
-  page: z.number(),
-  pageSize: z.number(),
-  totalCount: z.number(),
-  totalPages: z.number(),
-  hasNextPage: z.boolean(),
-  hasPreviousPage: z.boolean(),
-});
+const paginatedVulnerabilityResponseSchema = createPaginatedResponseSchema(vulnerabilityResponseSchema);
 
 export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/vulnerabilities - List all vulnerabilities (any authenticated user can see all)
   getMany: protectedProcedure
-    .input(
-      z.object({
-        page: z
-          .number()
-          .min(PAGINATION.DEFAULT_PAGE)
-          .default(PAGINATION.DEFAULT_PAGE),
-        pageSize: z
-          .number()
-          .min(PAGINATION.MIN_PAGE_SIZE)
-          .max(PAGINATION.MAX_PAGE_SIZE)
-          .default(PAGINATION.DEFAULT_PAGE_SIZE),
-        search: z.string().default(""),
-      })
-    )
+    .input(paginationInputSchema)
     .meta({
       openapi: {
         method: "GET",
@@ -85,7 +58,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(paginatedVulnerabilityResponseSchema)
     .query(async ({ input }) => {
-      const { pageSize, search } = input;
+      const { search } = input;
 
       // Build search filter across multiple fields
       const searchFilter = search
@@ -98,48 +71,20 @@ export const vulnerabilitiesRouter = createTRPCRouter({
           }
         : {};
 
-      // Get total count first to cap page number
-      const totalCount = await prisma.vulnerability.count({
-        where: searchFilter,
-      });
+      // Get total count and build pagination metadata
+      const totalCount = await prisma.vulnerability.count({ where: searchFilter });
+      const meta = buildPaginationMeta(input, totalCount);
 
-      // Normalize totalPages to at least 1 for better UX
-      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-
-      // Cap page to prevent expensive queries with very large page numbers
-      const page = Math.min(input.page, totalPages);
-
+      // Fetch paginated items
       const items = await prisma.vulnerability.findMany({
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: meta.skip,
+        take: meta.take,
         where: searchFilter,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
+        include: { user: userIncludeSelect },
+        orderBy: { createdAt: "desc" },
       });
 
-      const hasNextPage = page < totalPages;
-      const hasPreviousPage = page > 1;
-
-      return {
-        items,
-        page,
-        pageSize,
-        totalCount,
-        totalPages,
-        hasNextPage,
-        hasPreviousPage,
-      };
+      return createPaginatedResponse(items, meta);
     }),
 
   // GET /api/vulnerabilities/{id} - Get single vulnerability (any authenticated user can access)
@@ -158,16 +103,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       return prisma.vulnerability.findUniqueOrThrow({
         where: { id: input.id },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
+        include: { user: userIncludeSelect },
       });
     }),
 
@@ -190,16 +126,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
           ...input,
           userId: ctx.auth.user.id,
         },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
+        include: { user: userIncludeSelect },
       });
     }),
 
@@ -217,38 +144,12 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(vulnerabilityResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      // First check if the vulnerability exists and belongs to the current user
-      const vulnerability = await prisma.vulnerability.findUnique({
-        where: { id: input.id },
-        select: { userId: true },
-      });
-
-      if (!vulnerability) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Vulnerability not found",
-        });
-      }
-
-      if (vulnerability.userId !== ctx.auth.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You can only delete vulnerabilities that you created",
-        });
-      }
+      // Verify ownership
+      await requireOwnership(input.id, ctx.auth.user.id, "vulnerability");
 
       return prisma.vulnerability.delete({
         where: { id: input.id },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
+        include: { user: userIncludeSelect },
       });
     }),
 
@@ -271,39 +172,13 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(vulnerabilityResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      // First check if the vulnerability exists and belongs to the current user
-      const vulnerability = await prisma.vulnerability.findUnique({
-        where: { id: input.id },
-        select: { userId: true },
-      });
-
-      if (!vulnerability) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Vulnerability not found",
-        });
-      }
-
-      if (vulnerability.userId !== ctx.auth.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You can only update vulnerabilities that you created",
-        });
-      }
+      // Verify ownership
+      await requireOwnership(input.id, ctx.auth.user.id, "vulnerability");
 
       return prisma.vulnerability.update({
         where: { id: input.id },
         data: input.data,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
+        include: { user: userIncludeSelect },
       });
     }),
 });

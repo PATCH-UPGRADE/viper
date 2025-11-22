@@ -2,30 +2,25 @@ import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
 import z from "zod";
-import { PAGINATION } from "@/config/constants";
-import { userSchema } from "@/lib/schemas";
-
-// Reusable URL validator to prevent javascript: and other dangerous protocols
-const safeUrlSchema = z
-  .string()
-  .url()
-  .refine(
-    (url) => {
-      try {
-        const protocol = new URL(url).protocol;
-        return protocol === "http:" || protocol === "https:" || protocol === "git:";
-      } catch {
-        return false;
-      }
-    },
-    { message: "Only http(s) and git URLs allowed" },
-  );
+import {
+  userSchema,
+  userIncludeSelect,
+  safeUrlSchema,
+  cpeSchema,
+} from "@/lib/schemas";
+import {
+  paginationInputSchema,
+  buildPaginationMeta,
+  createPaginatedResponse,
+  createPaginatedResponseSchema,
+} from "@/lib/pagination";
+import { requireOwnership } from "@/trpc/middleware";
 
 // Validation schemas
 const remediationInputSchema = z.object({
   fixUri: safeUrlSchema,
   vulnerabilityId: z.string(),
-  cpe: z.string().regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format"),
+  cpe: cpeSchema,
   description: z.string().min(1),
   narrative: z.string().min(1),
   upstreamApi: safeUrlSchema,
@@ -53,33 +48,12 @@ const remediationResponseSchema = z.object({
   vulnerability: vulnerabilitySchema,
 });
 
-const paginatedRemediationResponseSchema = z.object({
-  items: z.array(remediationResponseSchema),
-  page: z.number(),
-  pageSize: z.number(),
-  totalCount: z.number(),
-  totalPages: z.number(),
-  hasNextPage: z.boolean(),
-  hasPreviousPage: z.boolean(),
-});
+const paginatedRemediationResponseSchema = createPaginatedResponseSchema(remediationResponseSchema);
 
 export const remediationsRouter = createTRPCRouter({
   // GET /api/remediations - List all remediations (any authenticated user can see all)
   getMany: protectedProcedure
-    .input(
-      z.object({
-        page: z
-          .number()
-          .min(PAGINATION.DEFAULT_PAGE)
-          .default(PAGINATION.DEFAULT_PAGE),
-        pageSize: z
-          .number()
-          .min(PAGINATION.MIN_PAGE_SIZE)
-          .max(PAGINATION.MAX_PAGE_SIZE)
-          .default(PAGINATION.DEFAULT_PAGE_SIZE),
-        search: z.string().default(""),
-      })
-    )
+    .input(paginationInputSchema)
     .meta({
       openapi: {
         method: "GET",
@@ -91,7 +65,7 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(paginatedRemediationResponseSchema)
     .query(async ({ input }) => {
-      const { pageSize, search } = input;
+      const { search } = input;
 
       // Build search filter across multiple fields
       const searchFilter = search
@@ -104,30 +78,17 @@ export const remediationsRouter = createTRPCRouter({
           }
         : {};
 
-      // Get total count first to cap page number
-      const totalCount = await prisma.remediation.count({
-        where: searchFilter,
-      });
+      // Get total count and build pagination metadata
+      const totalCount = await prisma.remediation.count({ where: searchFilter });
+      const meta = buildPaginationMeta(input, totalCount);
 
-      // Normalize totalPages to at least 1 for better UX
-      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-
-      // Cap page to prevent expensive queries with very large page numbers
-      const page = Math.min(input.page, totalPages);
-
+      // Fetch paginated items
       const items = await prisma.remediation.findMany({
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: meta.skip,
+        take: meta.take,
         where: searchFilter,
         include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
+          user: userIncludeSelect,
           vulnerability: {
             select: {
               id: true,
@@ -137,23 +98,10 @@ export const remediationsRouter = createTRPCRouter({
             },
           },
         },
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy: { createdAt: "desc" },
       });
 
-      const hasNextPage = page < totalPages;
-      const hasPreviousPage = page > 1;
-
-      return {
-        items,
-        page,
-        pageSize,
-        totalCount,
-        totalPages,
-        hasNextPage,
-        hasPreviousPage,
-      };
+      return createPaginatedResponse(items, meta);
     }),
 
   // GET /api/remediations/{id} - Get single remediation (any authenticated user can access)
@@ -173,14 +121,7 @@ export const remediationsRouter = createTRPCRouter({
       return prisma.remediation.findUniqueOrThrow({
         where: { id: input.id },
         include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
+          user: userIncludeSelect,
           vulnerability: {
             select: {
               id: true,
@@ -225,14 +166,7 @@ export const remediationsRouter = createTRPCRouter({
           userId: ctx.auth.user.id,
         },
         include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
+          user: userIncludeSelect,
           vulnerability: {
             select: {
               id: true,
@@ -259,37 +193,13 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      // First check if the remediation exists and belongs to the current user
-      const remediation = await prisma.remediation.findUnique({
-        where: { id: input.id },
-        select: { userId: true },
-      });
-
-      if (!remediation) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Remediation not found",
-        });
-      }
-
-      if (remediation.userId !== ctx.auth.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You can only delete remediations that you created",
-        });
-      }
+      // Verify ownership
+      await requireOwnership(input.id, ctx.auth.user.id, "remediation");
 
       return prisma.remediation.delete({
         where: { id: input.id },
         include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
+          user: userIncludeSelect,
           vulnerability: {
             select: {
               id: true,
@@ -321,7 +231,7 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      // First check if the remediation exists and belongs to the current user
+      // Verify ownership and get current data
       const remediation = await prisma.remediation.findUnique({
         where: { id: input.id },
         select: { userId: true, vulnerabilityId: true },
@@ -359,14 +269,7 @@ export const remediationsRouter = createTRPCRouter({
         where: { id: input.id },
         data: input.data,
         include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
+          user: userIncludeSelect,
           vulnerability: {
             select: {
               id: true,

@@ -1,30 +1,24 @@
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { TRPCError } from "@trpc/server";
 import z from "zod";
-import { PAGINATION } from "@/config/constants";
-import { userSchema } from "@/lib/schemas";
-
-// Reusable URL validator to prevent javascript: and other dangerous protocols
-const safeUrlSchema = z
-  .string()
-  .url()
-  .refine(
-    (url) => {
-      try {
-        const protocol = new URL(url).protocol;
-        return protocol === "http:" || protocol === "https:" || protocol === "git:";
-      } catch {
-        return false;
-      }
-    },
-    { message: "Only http(s) and git URLs allowed" },
-  );
+import {
+  userSchema,
+  userIncludeSelect,
+  safeUrlSchema,
+  cpeSchema,
+} from "@/lib/schemas";
+import {
+  paginationInputSchema,
+  buildPaginationMeta,
+  createPaginatedResponse,
+  createPaginatedResponseSchema,
+} from "@/lib/pagination";
+import { requireOwnership } from "@/trpc/middleware";
 
 // Validation schemas matching the FastAPI spec
 const assetInputSchema = z.object({
   ip: z.string().min(1),
-  cpe: z.string().regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format"),
+  cpe: cpeSchema,
   role: z.string().min(1),
   upstreamApi: safeUrlSchema,
 });
@@ -47,15 +41,7 @@ const assetResponseSchema = z.object({
   user: userSchema,
 });
 
-const paginatedAssetResponseSchema = z.object({
-  items: z.array(assetResponseSchema),
-  page: z.number(),
-  pageSize: z.number(),
-  totalCount: z.number(),
-  totalPages: z.number(),
-  hasNextPage: z.boolean(),
-  hasPreviousPage: z.boolean(),
-});
+const paginatedAssetResponseSchema = createPaginatedResponseSchema(assetResponseSchema);
 
 const settingsResponseSchema = z.object({
   id: z.string(),
@@ -68,33 +54,12 @@ const settingsResponseSchema = z.object({
   user: userSchema,
 });
 
-const paginatedSettingsResponseSchema = z.object({
-  items: z.array(settingsResponseSchema),
-  page: z.number(),
-  pageSize: z.number(),
-  totalCount: z.number(),
-  totalPages: z.number(),
-  hasNextPage: z.boolean(),
-  hasPreviousPage: z.boolean(),
-});
+const paginatedSettingsResponseSchema = createPaginatedResponseSchema(settingsResponseSchema);
 
 export const assetsRouter = createTRPCRouter({
   // GET /api/assets - List all assets (any authenticated user can see all)
   getMany: protectedProcedure
-    .input(
-      z.object({
-        page: z
-          .number()
-          .min(PAGINATION.DEFAULT_PAGE)
-          .default(PAGINATION.DEFAULT_PAGE),
-        pageSize: z
-          .number()
-          .min(PAGINATION.MIN_PAGE_SIZE)
-          .max(PAGINATION.MAX_PAGE_SIZE)
-          .default(PAGINATION.DEFAULT_PAGE_SIZE),
-        search: z.string().default(""),
-      })
-    )
+    .input(paginationInputSchema)
     .meta({
       openapi: {
         method: "GET",
@@ -106,7 +71,7 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(paginatedAssetResponseSchema)
     .query(async ({ input }) => {
-      const { pageSize, search } = input;
+      const { search } = input;
 
       // Build search filter across multiple fields
       const searchFilter = search
@@ -119,48 +84,20 @@ export const assetsRouter = createTRPCRouter({
           }
         : {};
 
-      // Get total count first to cap page number
-      const totalCount = await prisma.asset.count({
-        where: searchFilter,
-      });
+      // Get total count and build pagination metadata
+      const totalCount = await prisma.asset.count({ where: searchFilter });
+      const meta = buildPaginationMeta(input, totalCount);
 
-      // Normalize totalPages to at least 1 for better UX
-      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-
-      // Cap page to prevent expensive queries with very large page numbers
-      const page = Math.min(input.page, totalPages);
-
+      // Fetch paginated items
       const items = await prisma.asset.findMany({
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: meta.skip,
+        take: meta.take,
         where: searchFilter,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
+        include: { user: userIncludeSelect },
+        orderBy: { createdAt: "desc" },
       });
 
-      const hasNextPage = page < totalPages;
-      const hasPreviousPage = page > 1;
-
-      return {
-        items,
-        page,
-        pageSize,
-        totalCount,
-        totalPages,
-        hasNextPage,
-        hasPreviousPage,
-      };
+      return createPaginatedResponse(items, meta);
     }),
 
   // GET /api/assets/{asset_id} - Get single asset (any authenticated user can access)
@@ -179,16 +116,7 @@ export const assetsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       return prisma.asset.findUniqueOrThrow({
         where: { id: input.id },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
+        include: { user: userIncludeSelect },
       });
     }),
 
@@ -211,16 +139,7 @@ export const assetsRouter = createTRPCRouter({
           ...input,
           userId: ctx.auth.user.id,
         },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
+        include: { user: userIncludeSelect },
       });
     }),
 
@@ -238,38 +157,12 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      // First check if the asset exists and belongs to the current user
-      const asset = await prisma.asset.findUnique({
-        where: { id: input.id },
-        select: { userId: true },
-      });
-
-      if (!asset) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Asset not found",
-        });
-      }
-
-      if (asset.userId !== ctx.auth.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You can only delete assets that you created",
-        });
-      }
+      // Verify ownership
+      await requireOwnership(input.id, ctx.auth.user.id, "asset");
 
       return prisma.asset.delete({
         where: { id: input.id },
-         include: {  
-          user: {  
-            select: {  
-              id: true,  
-              name: true,  
-              email: true,  
-              image: true,  
-            },  
-          },
-        },  
+        include: { user: userIncludeSelect },
       });
     }),
 
@@ -279,7 +172,7 @@ export const assetsRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         ip: z.string().min(1),
-        cpe: z.string().regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format"),
+        cpe: cpeSchema,
         role: z.string().min(1),
         upstream_api: safeUrlSchema,
       })
@@ -295,56 +188,20 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      // First check if the asset exists and belongs to the current user
-      const asset = await prisma.asset.findUnique({
-        where: { id: input.id },
-        select: { userId: true },
-      });
-
-      if (!asset) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Asset not found",
-        });
-      }
-
-      if (asset.userId !== ctx.auth.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You can only update assets that you created",
-        });
-      }
+      // Verify ownership
+      await requireOwnership(input.id, ctx.auth.user.id, "asset");
 
       const { id, ...updateData } = input;
       return prisma.asset.update({
         where: { id },
         data: updateData,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
+        include: { user: userIncludeSelect },
       });
     }),
 
   // GET /api/assets/settings - List all asset settings
   getSettings: protectedProcedure
-    .input(
-      z.object({
-        page: z.number().min(PAGINATION.DEFAULT_PAGE).default(PAGINATION.DEFAULT_PAGE),
-        pageSize: z
-          .number()
-          .min(PAGINATION.MIN_PAGE_SIZE)
-          .max(PAGINATION.MAX_PAGE_SIZE)
-          .default(PAGINATION.DEFAULT_PAGE_SIZE),
-        search: z.string().default(""),
-      })
-    )
+    .input(paginationInputSchema)
     .meta({
       openapi: {
         method: "GET",
@@ -356,7 +213,7 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(paginatedSettingsResponseSchema)
     .query(async ({ input }) => {
-      const { pageSize, search } = input;
+      const { search } = input;
 
       const searchFilter = search
         ? {
@@ -367,20 +224,14 @@ export const assetsRouter = createTRPCRouter({
           }
         : {};
 
-      // Get total count first to cap page number
-      const totalCount = await prisma.assetSettings.count({
-        where: searchFilter,
-      });
+      // Get total count and build pagination metadata
+      const totalCount = await prisma.assetSettings.count({ where: searchFilter });
+      const meta = buildPaginationMeta(input, totalCount);
 
-      // Normalize totalPages to at least 1 for better UX
-      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-
-      // Cap page to prevent expensive queries with very large page numbers
-      const page = Math.min(input.page, totalPages);
-
+      // Fetch paginated items
       const rawItems = await prisma.assetSettings.findMany({
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: meta.skip,
+        take: meta.take,
         where: searchFilter,
         select: {
           id: true,
@@ -390,18 +241,9 @@ export const assetsRouter = createTRPCRouter({
           userId: true,
           createdAt: true,
           updatedAt: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
+          user: userIncludeSelect,
         },
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy: { createdAt: "desc" },
       });
 
       // Map items to exclude token and add hasToken flag
@@ -410,18 +252,7 @@ export const assetsRouter = createTRPCRouter({
         hasToken: !!token && token.length > 0,
       }));
 
-      const hasNextPage = page < totalPages;
-      const hasPreviousPage = page > 1;
-
-      return {
-        items,
-        page,
-        pageSize,
-        totalCount,
-        totalPages,
-        hasNextPage,
-        hasPreviousPage,
-      };
+      return createPaginatedResponse(items, meta);
     }),
 
   // POST /api/assets/settings - Create asset setting
@@ -451,14 +282,7 @@ export const assetsRouter = createTRPCRouter({
           userId: true,
           createdAt: true,
           updatedAt: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
+          user: userIncludeSelect,
         },
       });
 

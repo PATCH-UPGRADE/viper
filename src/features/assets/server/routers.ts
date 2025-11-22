@@ -52,7 +52,7 @@ const settingsResponseSchema = z.object({
   id: z.string(),
   url: z.string(),
   name: z.string(),
-  token: z.string(),
+  hasToken: z.boolean(),
   userId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -246,6 +246,16 @@ export const assetsRouter = createTRPCRouter({
 
       return prisma.asset.delete({
         where: { id: input.id },
+         include: {  
+          user: {  
+            select: {  
+              id: true,  
+              name: true,  
+              email: true,  
+              image: true,  
+            },  
+          },
+        },  
       });
     }),
 
@@ -312,7 +322,7 @@ export const assetsRouter = createTRPCRouter({
   getSettings: protectedProcedure
     .input(
       z.object({
-        page: z.number().default(PAGINATION.DEFAULT_PAGE),
+        page: z.number().min(PAGINATION.DEFAULT_PAGE).default(PAGINATION.DEFAULT_PAGE),
         pageSize: z
           .number()
           .min(PAGINATION.MIN_PAGE_SIZE)
@@ -343,12 +353,19 @@ export const assetsRouter = createTRPCRouter({
           }
         : {};
 
-      const [items, totalCount] = await Promise.all([
+      const [rawItems, totalCount] = await Promise.all([
         prisma.assetSettings.findMany({
           skip: (page - 1) * pageSize,
           take: pageSize,
           where: searchFilter,
-          include: {
+          select: {
+            id: true,
+            url: true,
+            name: true,
+            token: true, // Select to check if exists, but don't return
+            userId: true,
+            createdAt: true,
+            updatedAt: true,
             user: {
               select: {
                 id: true,
@@ -366,6 +383,12 @@ export const assetsRouter = createTRPCRouter({
           where: searchFilter,
         }),
       ]);
+
+      // Map items to exclude token and add hasToken flag
+      const items = rawItems.map(({ token, ...item }) => ({
+        ...item,
+        hasToken: !!token && token.length > 0,
+      }));
 
       const totalPages = Math.ceil(totalCount / pageSize);
       const hasNextPage = page < totalPages;
@@ -395,13 +418,20 @@ export const assetsRouter = createTRPCRouter({
       },
     })
     .output(settingsResponseSchema)
-    .mutation(({ ctx, input }) => {
-      return prisma.assetSettings.create({
+    .mutation(async ({ ctx, input }) => {
+      const created = await prisma.assetSettings.create({
         data: {
           ...input,
           userId: ctx.auth.user.id,
         },
-        include: {
+        select: {
+          id: true,
+          url: true,
+          name: true,
+          token: true, // Select to check if exists, but don't return
+          userId: true,
+          createdAt: true,
+          updatedAt: true,
           user: {
             select: {
               id: true,
@@ -412,5 +442,12 @@ export const assetsRouter = createTRPCRouter({
           },
         },
       });
+
+      // Exclude token from response, add hasToken flag
+      const { token, ...response } = created;
+      return {
+        ...response,
+        hasToken: !!token && token.length > 0,
+      };
     }),
 });

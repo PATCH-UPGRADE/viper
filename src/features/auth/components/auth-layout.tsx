@@ -9,6 +9,9 @@ export const AuthLayout = ({ children }: { children: React.ReactNode; }) => {
           <Image src="/logos/logo.svg" alt="Pulse" width={30} height={30} />
           Pulse
         </Link>
+        <span className="self-center">
+          Patch, Understand, Learn, Secure, Evolve.
+        </span>
         {children}
       </div>
     </div>

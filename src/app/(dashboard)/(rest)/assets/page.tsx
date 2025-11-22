@@ -20,7 +20,7 @@ const Page = async ({ searchParams }: Props) => {
   await requireAuth();
 
   const params = await assetsParamsLoader(searchParams);
-  prefetchAssets(params);
+  await prefetchAssets(params);
 
   return (
     <AssetsContainer>

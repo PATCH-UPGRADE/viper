@@ -20,7 +20,7 @@ const Page = async ({ searchParams }: Props) => {
   await requireAuth();
 
   const params = await vulnerabilitiesParamsLoader(searchParams);
-  prefetchVulnerabilities(params);
+  await prefetchVulnerabilities(params);
 
   return (
     <VulnerabilitiesContainer>

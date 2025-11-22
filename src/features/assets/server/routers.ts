@@ -3,27 +3,36 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
 import z from "zod";
 import { PAGINATION } from "@/config/constants";
+import { userSchema } from "@/lib/schemas";
+
+// Reusable URL validator to prevent javascript: and other dangerous protocols
+const safeUrlSchema = z
+  .string()
+  .url()
+  .refine(
+    (url) => {
+      try {
+        const protocol = new URL(url).protocol;
+        return protocol === "http:" || protocol === "https:" || protocol === "git:";
+      } catch {
+        return false;
+      }
+    },
+    { message: "Only http(s) and git URLs allowed" },
+  );
 
 // Validation schemas matching the FastAPI spec
 const assetInputSchema = z.object({
   ip: z.string().min(1),
   cpe: z.string().regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format"),
   role: z.string().min(1),
-  upstream_api: z.string().url(),
+  upstream_api: safeUrlSchema,
 });
 
 const assetSettingsInputSchema = z.object({
-  url: z.string().url(),
+  url: safeUrlSchema,
   name: z.string().min(1),
   token: z.string().min(1),
-});
-
-// Output schemas for OpenAPI spec generation
-const userSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string(),
-  image: z.string().nullable(),
 });
 
 const assetResponseSchema = z.object({
@@ -97,7 +106,7 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(paginatedAssetResponseSchema)
     .query(async ({ input }) => {
-      const { page, pageSize, search } = input;
+      const { pageSize, search } = input;
 
       // Build search filter across multiple fields
       const searchFilter = search
@@ -110,31 +119,36 @@ export const assetsRouter = createTRPCRouter({
           }
         : {};
 
-      const [items, totalCount] = await Promise.all([
-        prisma.asset.findMany({
-          skip: (page - 1) * pageSize,
-          take: pageSize,
-          where: searchFilter,
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-              },
+      // Get total count first to cap page number
+      const totalCount = await prisma.asset.count({
+        where: searchFilter,
+      });
+
+      // Normalize totalPages to at least 1 for better UX
+      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+      // Cap page to prevent expensive queries with very large page numbers
+      const page = Math.min(input.page, totalPages);
+
+      const items = await prisma.asset.findMany({
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        where: searchFilter,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
             },
           },
-          orderBy: {
-            createdAt: "desc",
-          },
-        }),
-        prisma.asset.count({
-          where: searchFilter,
-        }),
-      ]);
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
 
-      const totalPages = Math.ceil(totalCount / pageSize);
       const hasNextPage = page < totalPages;
       const hasPreviousPage = page > 1;
 
@@ -267,7 +281,7 @@ export const assetsRouter = createTRPCRouter({
         ip: z.string().min(1),
         cpe: z.string().regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format"),
         role: z.string().min(1),
-        upstream_api: z.string().url(),
+        upstream_api: safeUrlSchema,
       })
     )
     .meta({
@@ -342,7 +356,7 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(paginatedSettingsResponseSchema)
     .query(async ({ input }) => {
-      const { page, pageSize, search } = input;
+      const { pageSize, search } = input;
 
       const searchFilter = search
         ? {
@@ -353,36 +367,42 @@ export const assetsRouter = createTRPCRouter({
           }
         : {};
 
-      const [rawItems, totalCount] = await Promise.all([
-        prisma.assetSettings.findMany({
-          skip: (page - 1) * pageSize,
-          take: pageSize,
-          where: searchFilter,
-          select: {
-            id: true,
-            url: true,
-            name: true,
-            token: true, // Select to check if exists, but don't return
-            userId: true,
-            createdAt: true,
-            updatedAt: true,
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-              },
+      // Get total count first to cap page number
+      const totalCount = await prisma.assetSettings.count({
+        where: searchFilter,
+      });
+
+      // Normalize totalPages to at least 1 for better UX
+      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+      // Cap page to prevent expensive queries with very large page numbers
+      const page = Math.min(input.page, totalPages);
+
+      const rawItems = await prisma.assetSettings.findMany({
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        where: searchFilter,
+        select: {
+          id: true,
+          url: true,
+          name: true,
+          token: true, // Select to check if exists, but don't return
+          userId: true,
+          createdAt: true,
+          updatedAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
             },
           },
-          orderBy: {
-            createdAt: "desc",
-          },
-        }),
-        prisma.assetSettings.count({
-          where: searchFilter,
-        }),
-      ]);
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
 
       // Map items to exclude token and add hasToken flag
       const items = rawItems.map(({ token, ...item }) => ({
@@ -390,7 +410,6 @@ export const assetsRouter = createTRPCRouter({
         hasToken: !!token && token.length > 0,
       }));
 
-      const totalPages = Math.ceil(totalCount / pageSize);
       const hasNextPage = page < totalPages;
       const hasPreviousPage = page > 1;
 

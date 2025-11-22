@@ -24,8 +24,12 @@ export const useCreateWorkflow = () => {
     trpc.workflows.create.mutationOptions({
       onSuccess: (data) => {
         toast.success(`Workflow "${data.name}" created`);
+        // Invalidate all getMany queries regardless of params (page, search, etc.)
         queryClient.invalidateQueries({
-          queryKey: trpc.workflows.getMany.queryKey(),
+          predicate: (query) => {
+            const baseKey = trpc.workflows.getMany.queryKey();
+            return query.queryKey[0] === baseKey[0];
+          },
         });
       },
       onError: (error) => {
@@ -46,11 +50,13 @@ export const useRemoveWorkflow = () => {
     trpc.workflows.remove.mutationOptions({
       onSuccess: (data) => {
         toast.success(`Workflow "${data.name}" removed`);
+        // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({
-          queryKey: trpc.workflows.getMany.queryKey(),
-        });
-        queryClient.invalidateQueries({
-          queryKey: trpc.workflows.getOne.queryKey(),
+          predicate: (query) => {
+            const getManyKey = trpc.workflows.getMany.queryKey();
+            const getOneKey = trpc.workflows.getOne.queryKey();
+            return query.queryKey[0] === getManyKey[0] || query.queryKey[0] === getOneKey[0];
+          },
         });
       }
     })
@@ -76,11 +82,13 @@ export const useUpdateWorkflowName = () => {
     trpc.workflows.updateName.mutationOptions({
       onSuccess: (data) => {
         toast.success(`Workflow "${data.name}" updated`);
+        // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({
-          queryKey: trpc.workflows.getMany.queryKey(),
-        });
-        queryClient.invalidateQueries({
-          queryKey: trpc.workflows.getOne.queryKey(),
+          predicate: (query) => {
+            const getManyKey = trpc.workflows.getMany.queryKey();
+            const getOneKey = trpc.workflows.getOne.queryKey();
+            return query.queryKey[0] === getManyKey[0] || query.queryKey[0] === getOneKey[0];
+          },
         });
       },
       onError: (error) => {
@@ -101,11 +109,13 @@ export const useUpdateWorkflow = () => {
     trpc.workflows.update.mutationOptions({
       onSuccess: (data) => {
         toast.success(`Workflow "${data.name}" saved`);
+        // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({
-          queryKey: trpc.workflows.getMany.queryKey(),
-        });
-        queryClient.invalidateQueries({
-          queryKey: trpc.workflows.getOne.queryKey(),
+          predicate: (query) => {
+            const getManyKey = trpc.workflows.getMany.queryKey();
+            const getOneKey = trpc.workflows.getOne.queryKey();
+            return query.queryKey[0] === getManyKey[0] || query.queryKey[0] === getOneKey[0];
+          },
         });
       },
       onError: (error) => {

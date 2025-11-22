@@ -171,35 +171,36 @@ export const workflowsRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const { page, pageSize, search } = input;
+      const { pageSize, search } = input;
 
-      const [items, totalCount] = await Promise.all([
-        prisma.workflow.findMany({
-          skip: (page - 1) * pageSize,
-          take: pageSize,
-          where: { 
-            userId: ctx.auth.user.id,
-            name: {
-              contains: search,
-              mode: "insensitive",
-            },
-          },
-          orderBy: {
-            updatedAt: "desc",
-          },
-        }),
-        prisma.workflow.count({
-          where: {
-            userId: ctx.auth.user.id,
-            name: {
-              contains: search,
-              mode: "insensitive",
-            },
-          },
-        }),
-      ]);
+      const whereFilter = {
+        userId: ctx.auth.user.id,
+        name: {
+          contains: search,
+          mode: "insensitive" as const,
+        },
+      };
 
-      const totalPages = Math.ceil(totalCount / pageSize);
+      // Get total count first to cap page number
+      const totalCount = await prisma.workflow.count({
+        where: whereFilter,
+      });
+
+      // Normalize totalPages to at least 1 for better UX
+      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+      // Cap page to prevent expensive queries with very large page numbers
+      const page = Math.min(input.page, totalPages);
+
+      const items = await prisma.workflow.findMany({
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        where: whereFilter,
+        orderBy: {
+          updatedAt: "desc",
+        },
+      });
+
       const hasNextPage = page < totalPages;
       const hasPreviousPage = page > 1;
 

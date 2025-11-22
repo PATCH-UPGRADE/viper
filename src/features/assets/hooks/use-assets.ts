@@ -24,8 +24,12 @@ export const useCreateAsset = () => {
     trpc.assets.create.mutationOptions({
       onSuccess: (data) => {
         toast.success(`Asset "${data.role}" created`);
+        // Invalidate all getMany queries regardless of params (page, search, etc.)
         queryClient.invalidateQueries({
-          queryKey: trpc.assets.getMany.queryKey(),
+          predicate: (query) => {
+            const baseKey = trpc.assets.getMany.queryKey();
+            return query.queryKey[0] === baseKey[0];
+          },
         });
       },
       onError: (error) => {
@@ -46,11 +50,13 @@ export const useUpdateAsset = () => {
     trpc.assets.update.mutationOptions({
       onSuccess: (data) => {
         toast.success(`Asset "${data.role}" updated`);
+        // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({
-          queryKey: trpc.assets.getMany.queryKey(),
-        });
-        queryClient.invalidateQueries({
-          queryKey: trpc.assets.getOne.queryKey(),
+          predicate: (query) => {
+            const getManyKey = trpc.assets.getMany.queryKey();
+            const getOneKey = trpc.assets.getOne.queryKey();
+            return query.queryKey[0] === getManyKey[0] || query.queryKey[0] === getOneKey[0];
+          },
         });
       },
       onError: (error) => {
@@ -71,11 +77,13 @@ export const useRemoveAsset = () => {
     trpc.assets.remove.mutationOptions({
       onSuccess: (data) => {
         toast.success(`Asset "${data.role}" removed`);
+        // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({
-          queryKey: trpc.assets.getMany.queryKey(),
-        });
-        queryClient.invalidateQueries({
-          queryKey: trpc.assets.getOne.queryKey(),
+          predicate: (query) => {
+            const getManyKey = trpc.assets.getMany.queryKey();
+            const getOneKey = trpc.assets.getOne.queryKey();
+            return query.queryKey[0] === getManyKey[0] || query.queryKey[0] === getOneKey[0];
+          },
         });
       },
       onError: (error) => {

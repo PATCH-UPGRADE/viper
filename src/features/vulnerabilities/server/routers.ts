@@ -3,24 +3,33 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
 import z from "zod";
 import { PAGINATION } from "@/config/constants";
+import { userSchema } from "@/lib/schemas";
+
+// Reusable URL validator to prevent javascript: and other dangerous protocols
+const safeUrlSchema = z
+  .string()
+  .url()
+  .refine(
+    (url) => {
+      try {
+        const protocol = new URL(url).protocol;
+        return protocol === "http:" || protocol === "https:" || protocol === "git:";
+      } catch {
+        return false;
+      }
+    },
+    { message: "Only http(s) and git URLs allowed" },
+  );
 
 // Validation schemas
 const vulnerabilityInputSchema = z.object({
   sarif: z.any(), // JSON data - Prisma JsonValue type
   cpe: z.string().regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format"),
-  exploitUri: z.string().url(),
-  upstreamApi: z.string().url(),
+  exploitUri: safeUrlSchema,
+  upstreamApi: safeUrlSchema,
   description: z.string().min(1),
   narrative: z.string().min(1),
   impact: z.string().min(1),
-});
-
-// Output schemas for OpenAPI spec generation
-const userSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string(),
-  image: z.string().nullable(),
 });
 
 const vulnerabilityResponseSchema = z.object({
@@ -76,7 +85,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(paginatedVulnerabilityResponseSchema)
     .query(async ({ input }) => {
-      const { page, pageSize, search } = input;
+      const { pageSize, search } = input;
 
       // Build search filter across multiple fields
       const searchFilter = search
@@ -89,31 +98,36 @@ export const vulnerabilitiesRouter = createTRPCRouter({
           }
         : {};
 
-      const [items, totalCount] = await Promise.all([
-        prisma.vulnerability.findMany({
-          skip: (page - 1) * pageSize,
-          take: pageSize,
-          where: searchFilter,
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-              },
+      // Get total count first to cap page number
+      const totalCount = await prisma.vulnerability.count({
+        where: searchFilter,
+      });
+
+      // Normalize totalPages to at least 1 for better UX
+      const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+      // Cap page to prevent expensive queries with very large page numbers
+      const page = Math.min(input.page, totalPages);
+
+      const items = await prisma.vulnerability.findMany({
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        where: searchFilter,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
             },
           },
-          orderBy: {
-            createdAt: "desc",
-          },
-        }),
-        prisma.vulnerability.count({
-          where: searchFilter,
-        }),
-      ]);
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
 
-      const totalPages = Math.ceil(totalCount / pageSize);
       const hasNextPage = page < totalPages;
       const hasPreviousPage = page > 1;
 

@@ -174,7 +174,7 @@ export const assetsRouter = createTRPCRouter({
         ip: z.string().min(1),
         cpe: cpeSchema,
         role: z.string().min(1),
-        upstream_api: safeUrlSchema,
+        upstreamApi: safeUrlSchema,
       })
     )
     .meta({

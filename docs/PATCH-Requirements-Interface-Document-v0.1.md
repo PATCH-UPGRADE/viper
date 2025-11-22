@@ -14,7 +14,7 @@
 
 **Living Document:** The specifications defined herein represent our current understanding of integration requirements based on initial performer consultations and program kickoff discussions. As the ARPA-H UPGRADE program progresses and TA performers (TA2, TA3, TA4) advance their technical approaches, this document will also revolve.
 
-**Version Control:** This document is version controlled in git, and available at https://github.com/PATCH-UPGRADE/requirements-interface-document
+**Version Control:** This document is version controlled in git, and available at https://github.com/PATCH-UPGRADE/pulse/blob/main/docs/PATCH-Requirements-Interface-Document-v0.1.md
 
 ### At a glance
 
@@ -94,6 +94,9 @@ Instead of baking every possible analytic or reporting workflow into the core, P
 - PULSE exposes APIs for integration. All references in this document are
   nested under `/api` on the server.
 
+- Field names are spinal-case, not camelCase and not snake_case. We like
+  spinal-case because it's more readable, and doesn't require the shift key.
+
 - Every request to the REST API includes an HTTP method and a path, and a bearer token for authenticcated endpoints.
 
 - Depending on the REST API endpoint, you might also need to specify request headers, authentication information, query parameters, or body parameters.
@@ -168,32 +171,21 @@ Non-goals:
 
 - Provide WHS environment for POV validation. TA1 does not QA TA3 results.
 - Store POV. Instead, PULSE stores a reference to the POV, identified by a
-  URI.
+  URI. Anyone can pull the POV from that URL, and this allows flexibility for
+  both TA3 and TA1 in the short term. We envision eventually there will be a
+  standardized exploit invocation, e.g., `./exploit`, but for now we just
+  reference where the associated code is at.
 
 **Additional Textual Fields:**
 
 TA3 MUST provide comprehensive textual descriptions to enable clinical risk assessment and LLM-based analysis:
 
 - **`description`** (required): Human-readable explanation of the vulnerability (2-3 sentences)
-- **`exploitNarrative`** (required): How the vulnerability can be exploited (attack vector, prerequisites)
-- **`clinicalImpact`** (required): Potential clinical consequences if
+- **`narrative`** (required): How the vulnerability can be exploited (attack vector, prerequisites)
+- **`impact`** (required): Potential clinical consequences if
   exploited in hospital environment
 
-- **`pov_uri`** (optional): The URI where the POV resides.
-
-**SARIF ruleId vs CVE Distinction:**
-
-Per SARIF 2.1.0 specification, `ruleId` identifies the scanning rule used for detection, NOT the vulnerability itself:
-
-- **`ruleId`**: TA3's internal scanning rule identifier (e.g., "PATCH-SCAN-RULE-WIN-PRIVESC-001" for Windows privilege escalation detection rules)
-- **`properties.cve`**: Official CVE identifier (if assigned; may be `null` for zero-day vulnerabilities without CVE)
-- **`properties.internalVulnId`**: TA3's internal tracking ID (required for all vulnerabilities)
-
-This distinction is critical for:
-
-- **Zero-day vulnerabilities**: No CVE exists at discovery time, but `ruleId` and `internalVulnId` still provide tracking
-- **Multiple detection methods**: Same CVE may be detected by different scanning rules
-- **SARIF compliance**: Proper use of `ruleId` enables standard SARIF tooling integration
+- **`exploit_uri`** (optional): The URI where the POV resides.
 
 **Batch Submission Guidelines:**
 

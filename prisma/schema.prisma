@@ -28,6 +28,7 @@ model User {
   assets          Asset[]
   assetSettings   AssetSettings[]
   vulnerabilities Vulnerability[]
+  remediations    Remediation[]
 
   @@unique([email])
   @@map("user")
@@ -134,14 +135,14 @@ model Connection {
 }
 
 model Asset {
-  id String @id @default(cuid())
-  ip String
-  cpe String
-  role String
-  upstream_api String
+  id           String @id @default(cuid())
+  ip           String
+  cpe          String
+  role         String
+  upstreamApi  String @map("upstream-api")
 
   userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -168,11 +169,35 @@ model Vulnerability {
   id          String @id @default(cuid())
   sarif       Json
   cpe         String
-  exploitUri  String
-  upstreamApi String
+  exploitUri  String @map("exploit-uri")
+  upstreamApi String @map("upstream-api")
   description String @db.Text
   narrative   String @db.Text
   impact      String @db.Text
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  remediations Remediation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cpe])
+  @@index([userId])
+  @@map("vulnerability")
+}
+
+model Remediation {
+  id          String @id @default(cuid())
+  fixUri      String @map("fix-uri")
+  cpe         String
+  description String @db.Text
+  narrative   String @db.Text
+  upstreamApi String @map("upstream-api")
+
+  vulnerabilityId String
+  vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -181,6 +206,7 @@ model Vulnerability {
   updatedAt DateTime @updatedAt
 
   @@index([cpe])
+  @@index([vulnerabilityId])
   @@index([userId])
-  @@map("vulnerability")
+  @@map("remediation")
 }

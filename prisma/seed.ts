@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 // Seed user credentials
 const SEED_USER = {
   email: 'user@example.com',
-  password: 'abcd1234',
+  password: '1337_gone_jolene',
   name: 'Seed User',
 };
 

@@ -7,9 +7,7 @@ export default function OpenApiDocsPage() {
   return (
     <ApiReferenceReact
       configuration={{
-        spec: {
-          url: '/api/openapi.json',
-        },
+        url: '/api/openapi.json',
       }}
     />
   );

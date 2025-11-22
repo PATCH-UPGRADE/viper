@@ -66,6 +66,7 @@ export const AssetsHeader = ({ disabled }: { disabled?: boolean }) => {
     <EntityHeader
       title="Assets"
       description="Manage your hospital assets and devices"
+      newButtonLabel="New asset"
       disabled={disabled}
     />
   );

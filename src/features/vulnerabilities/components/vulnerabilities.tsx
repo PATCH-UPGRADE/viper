@@ -66,6 +66,7 @@ export const VulnerabilitiesHeader = ({ disabled }: { disabled?: boolean }) => {
     <EntityHeader
       title="Vulnerabilities"
       description="Manage security vulnerabilities and their clinical impact"
+      newButtonLabel="New vulnerability"
       disabled={disabled}
     />
   );

@@ -16,7 +16,8 @@
 
 **Version Control:** This document is version controlled in git, and available at https://github.com/PATCH-UPGRADE/pulse/blob/main/docs/PATCH-Requirements-Interface-Document-v0.1.md
 
-**OpenAPI Spec:** At [./openapi.json](./openapi.json)
+**OpenAPI Spec:** Run `npm run openapi:generate` or visit the server at
+`/api/openapi-ui` (UI) or `/api/openapi.json` (JSON file).
 
 ### At a glance
 

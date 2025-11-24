@@ -1,25 +1,34 @@
 # PATCH Requirements and Interface Document
 
 **Version:** 0.1 (November 2025 Submission)
-**Date:** November 20, 2025
+**Date:** November 23, 2025
 **Deliverable:** 2.4.1 Requirements Interface Document
 **Program:** ARPA-H UPGRADE
 **Prime Contractor:** Northeastern University (PATCH)
 
 ---
 
-## Executive Summary
+## 1. Document Introduction
+**Document Purpose:** This document defines the requirements and interface specifications for integrating the PATCH TA1 Vulnerability Management Platform (known as PULSE) with other Technical Area (TA) performers in the ARPA-H UPGRADE program. PULSE is the primary user interface and integration point for the PATCH team's contribution to the ARPA-H UPGRADE program.
 
-**PULSE**, the PATCH Vulnerability Management Platform (VMP), is the primary user interface and integration point between the PATCH team and other Technical Area (TA) performers in the ARPA-H UPGRADE program.
+**Living Document:** The specifications defined herein represent our current understanding of integration requirements based on initial performer consultations and program kickoff discussions. As the ARPA-H UPGRADE program progresses and TA performers (TA2, TA3, TA4) advance their technical approaches, this document will also evolve.
 
-**Living Document:** The specifications defined herein represent our current understanding of integration requirements based on initial performer consultations and program kickoff discussions. As the ARPA-H UPGRADE program progresses and TA performers (TA2, TA3, TA4) advance their technical approaches, this document will also revolve.
+**Document Structure:** The document is organized into the following sections:
+1. Document Introduction
+2. PULSE Overview
+3. Integration Plan
+4. Open Issues and Decisions Needed
 
 **Version Control:** This document is version controlled in git, and available at https://github.com/PATCH-UPGRADE/pulse/blob/main/docs/PATCH-Requirements-Interface-Document-v0.1.md
 
-**OpenAPI Spec:** Run `npm run openapi:generate` or visit the server at
+**OpenAPI Spec:** Detailed API specifications are not provided in this document, but may be generated at any time from a PULSE instance.
+
+Run `npm run openapi:generate` or visit the server at
 `/api/openapi-ui` (UI) or `/api/openapi.json` (JSON file).
 
-### At a glance
+---
+
+## 2. PULSE Overview 
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -30,7 +39,7 @@
 │  │ VMP Core Components                                             │  │
 │  │  • /assets: Asset Management                                    │  │
 │  │  • /vulnerabilities: Vulnerability Management (TA3 integration) │  │
-│  │  • /remediations: Remedations  (TA4 integration)                │  │
+│  │  • /remediations: Remediations  (TA4 integration)                │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │                                                                       │
 │  ┌─────────────────────────────────────────────────────────────────┐  │
@@ -60,13 +69,13 @@
 
 PULSE is designed to help hospital administrators understand the operational impact of vulnerabilities and remediations -- across systems, safety, and operational workflows. Since the hospital security ecosystem is inherently heterogeneous, PULSE serves as a system of record by integrating with downstream systems such as TA2-4, existing commercial systems, and open source tools.
 
-PULSE is API centric, and uses a hub-and-spokes architecture which:
+PULSE is API centric, and uses a hub-and-spoke architecture where:
 
 - Users view assets, vulnerabilities, remediations, simulations, and decisions.
 
 - Users create hospital-centric workflows, and use these workflows as the basis for modeling the clinical and operational impact for cybersecurity decisions.
 
-- Performers and existing tools (e.g., asset management) plug in as an information source, and register hypermedia-style API callbacks (ala github API) that users can follow for more information.
+- Performers and existing tools (e.g., asset management) plug in as an information source, and register hypermedia-style API callbacks (a la GitHub API) that users can follow for more information.
 
 - Standards-based data formats (CPE, SARIF, OpenAPI) ensure that external tools—commercial and open-source—can interoperate cleanly with the VMP and performer services.
 
@@ -88,9 +97,9 @@ Instead of baking every possible analytic or reporting workflow into the core, P
 
 **Non-goals.** The VMP keeps an inventory of assets, what network they are on, and vulnerabilities _to the extent necessary to perform decision support_. Pulse does not:
 
-- Replace existing commercial vulnerability management platforms, e.g., Qualys VMDR, Tenable Vulnerability Management, etc). Instead, it maintains a reference to those systems where users can get more information.
+- Replace existing commercial vulnerability management platforms, e.g., Qualys VMDR, Tenable Vulnerability Management, etc. Instead, it maintains a reference to those systems where users can get more information.
 
-- QA other components. PULSE assumes, for example, when TA3 says there is a vulnerability that it must check that to be true. Instead, PULSE maintains a reference to the TA3 exploit, which it assumes works as intended.
+- QA other components. PULSE assumes, for example, when TA3 says there is a vulnerability that it does not need to verify that report. Instead, PULSE maintains a reference to the TA3 exploit, which it assumes works as intended.
 
 ### Anchor story and walk-through
 
@@ -102,13 +111,11 @@ Instead of baking every possible analytic or reporting workflow into the core, P
 > affect compliance, safety, and cost?
 
 **Mindset:**
-Rather than thinking of the VMP as a raw network simulator, think of it as
-hospital digital twin, where each system is a node representing a _clinical
-function_, not just an IP address.
+Rather than thinking of the VMP as a raw network simulator, think of it as a hospital digital twin, where each system is a node representing a _clinical function_, not just an IP address.
 
 - **Nodes:** ICU monitors, infusion pumps, lab analyzers, pharmacy servers,
   nurse electronic medical record (EMR) workstations.
-- **Edges:** Data or work flow dependencies ("Lab -> EMR -> Nurse Station ->
+- **Edges:** Data or workflow dependencies ("Lab -> EMR -> Nurse Station ->
   Infusion pump")
 - **Attributes:** Vulnerability score, patch status, uptime requirement,
   regulatory criticality.
@@ -122,10 +129,10 @@ Consider the workflow:
 
 > Lab -> EMR -> Nurse Station -> Infusion pump
 
-When a downstream TA proposes a change (e.g., TA-4 asks to apply patch to all
+When a downstream TA proposes a change (e.g., TA4 asks to apply patch to all
 infusion pumps running InsecureOS4.1), the VMP:
 
-- Highlights _affects device nodes_ for the security engineer and _affected
+- Highlights _affected device nodes_ for the security engineer and _affected
   clinical nodes_ for the clinician.
 - Gathers data from the WHS on hospital impact.
 - Generates _summary metrics_ for application to the real hospital: downtime,
@@ -142,7 +149,7 @@ infusion pumps running InsecureOS4.1), the VMP:
 - PULSE exposes APIs for integration. (All references in this document are
   nested under `/api` on the server.)
 
-- Every request to the REST API includes an HTTP method and a path, and a bearer token for authenticcated endpoints.
+- Every request to the REST API includes an HTTP method and a path, and a bearer token for authenticated endpoints.
 
 - Depending on the REST API endpoint, you might also need to specify request headers, authentication information, query parameters, or body parameters.
 
@@ -170,9 +177,9 @@ We use NIST-standardized formats:
 
 ---
 
-## Integration Plan
+## 3. Integration Plan
 
-### PULSE <> Asset Management Integration
+### 3.1 PULSE <> Asset Management Integration
 
 PULSE maintains a database of assets, and a link to the upstream source where more information may be obtained.
 
@@ -180,7 +187,7 @@ PULSE maintains a database of assets, and a link to the upstream source where mo
 - Assets data is synced to PULSE periodically, and then available under the `/assets` view.
 - Each listed asset includes an `upstream_url` field with the URL of the original provider.
 
-### PULSE <> TA2 Integration
+### 3.2 PULSE <> TA2 Integration
 
 PULSE maintains a registry of emulators, and optionally a container for the emulator. When an emulator is not available as a container, TA2 performers must provide a reference location where users can download the container.
 
@@ -205,7 +212,7 @@ PULSE maintains a registry of emulators, and optionally a container for the emul
   - Update the `/emulators` endpoint and include a reference to where
     their emulator can be downloaded.
 
-### PULSE <> TA3 Integration
+### 3.3 PULSE <> TA3 Integration
 
 TA3's value proposition is discovering **unknown/novel vulnerabilities** that cannot be detected by commodity vulnerability scanning tools.
 
@@ -223,7 +230,7 @@ Non-goals:
   URI. Anyone can pull the POV from that URL, and this allows flexibility for
   both TA3 and TA1 in the short term. We envision eventually there will be a
   standardized exploit invocation, e.g., `./exploit`, but for now we just
-  reference where the associated code is at.
+  reference the associated code location.
 
 **Additional Textual Fields:**
 
@@ -238,16 +245,14 @@ TA3 MUST provide comprehensive textual descriptions to enable clinical risk asse
 
 **Batch Submission Guidelines:**
 
-- TA3 MAY NOT submit multiple vulnerabilities in a single SARIF document. Each
+- TA3 MUST submit each vulnerability in a separate SARIF document. Submitting multiple vulnerabilities in a single SARIF document is not allowed. Each
   requires a separate post.
 - Each `result` object represents one vulnerability finding
 - The response `accepted` and `rejected` counts correspond to the number of `result` objects processed
 
 ---
 
-## 5. TA1 ↔ TA4 Interface (Remediation)
-
-### 5.1 Integration Overview
+### 3.4 TA1 ↔ TA4 Interface 
 
 **TA4 Role:** Generate and provide patches/remediations for discovered vulnerabilities
 
@@ -257,9 +262,9 @@ TA3 MUST provide comprehensive textual descriptions to enable clinical risk asse
 
 ---
 
-## 9. Open Issues & Decisions Needed
+## 4. Open Issues & Decisions Needed
 
-### 9.1 Asset-to-Emulator Matching (TA2)
+### 4.1 Asset-to-Emulator Matching (TA2)
 
 - **Issue:** TA1 and TA2 have different ideas for emulators.
 - **Approach:**
@@ -268,14 +273,17 @@ TA3 MUST provide comprehensive textual descriptions to enable clinical risk asse
   - TA1 will not provide VM hosting. Creating a brand new full cyber range capability for
     all the other TA performers seems out of scope.
   - TA2 can register the location of their emulators running within their own
-    infra. This gives maximum flexibilty to emulator design -- TA1's job is
+    infra. This gives maximum flexibility to emulator design -- TA1's job is
     to redirect people to the emulator location, rather than trying to limit
     the different emulator approaches.
 - **Decision Owner:** ARPA-H on direction.
 
-### 9.2 Patch Metadata Completeness (TA4)
+### 4.2 Patch Metadata Completeness (TA4)
 
 - **Issue:** Unknown what metadata TA4 can realistically provide for
   remediation. Could be any arbitrary machine or network action.
 - **Approach:** TA4 provides a narrative on remediation, which is used in the
   WHS.
+
+## 5. Contact and Support
+For questions regarding this interface document, please contact the PATCH team.

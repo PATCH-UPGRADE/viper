@@ -33,6 +33,20 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+export const handleSocialLogin = async (provider: "github" | "google") => {
+  await authClient.signIn.social(
+    {
+      provider,
+      callbackURL: "/",
+    },
+    {
+      onError: (ctx) => {
+        toast.error(ctx.error.message);
+      },
+    },
+  );
+};
+
 export function LoginForm() {
   const router = useRouter();
 
@@ -53,10 +67,11 @@ export function LoginForm() {
       },
       {
         onSuccess: () => {
-          router.push("/");
+          //router.push("/");
         },
         onError: (ctx) => {
           toast.error(ctx.error.message);
+          console.error(ctx.error.message);
         },
       },
     );
@@ -81,6 +96,7 @@ export function LoginForm() {
                     className="w-full"
                     type="button"
                     disabled={isPending}
+                    onClick={() => handleSocialLogin("github")}
                   >
                     <Image
                       alt="GitHub"
@@ -95,6 +111,7 @@ export function LoginForm() {
                     className="w-full"
                     type="button"
                     disabled={isPending}
+                    onClick={() => handleSocialLogin("google")}
                   >
                     <Image
                       alt="Google"

@@ -1,15 +1,15 @@
-'use client';
+"use client";
 // ^-- to make sure we can mount the Provider from a server component
-import { QueryClientProvider } from '@tanstack/react-query';
-import { createTRPCClient, httpBatchLink } from '@trpc/client';
-import { createTRPCContext } from '@trpc/tanstack-react-query';
-import { useState } from 'react';
-import { createBrowserSingleton } from '@/lib/singleton';
-import { getApiUrl } from '@/lib/url-utils';
-import { TRPC_TRANSFORMER } from '@/lib/trpc-config';
-import { makeQueryClient } from './query-client';
-import type { AppRouter } from './routers/_app';
-import type { ChildrenProps } from '@/lib/page-types';
+import { QueryClientProvider } from "@tanstack/react-query";
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { createTRPCContext } from "@trpc/tanstack-react-query";
+import { useState } from "react";
+import { createBrowserSingleton } from "@/lib/singleton";
+import { getApiUrl } from "@/lib/url-utils";
+import { TRPC_TRANSFORMER } from "@/lib/trpc-config";
+import { makeQueryClient } from "./query-client";
+import type { AppRouter } from "./routers/_app";
+import type { ChildrenProps } from "@/lib/page-types";
 
 export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
 
@@ -26,7 +26,7 @@ export function TRPCReactProvider(props: Readonly<ChildrenProps>) {
       links: [
         httpBatchLink({
           transformer: TRPC_TRANSFORMER,
-          url: getApiUrl('/api/trpc'),
+          url: getApiUrl("/api/trpc"),
         }),
       ],
     }),

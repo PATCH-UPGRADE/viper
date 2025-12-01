@@ -10,13 +10,22 @@ import {
   EntityPagination,
   EntitySearch,
   ErrorView,
-  LoadingView
+  LoadingView,
 } from "@/components/entity-components";
-import { useCreateEmulator, useRemoveEmulator, useSuspenseEmulators } from "../hooks/use-emulators"
+import {
+  useCreateEmulator,
+  useRemoveEmulator,
+  useSuspenseEmulators,
+} from "../hooks/use-emulators";
 import { useEmulatorsParams } from "../hooks/use-emulators-params";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type { Emulator } from "@/generated/prisma";
-import { ServerIcon, ExternalLinkIcon, PackageIcon, DownloadIcon } from "lucide-react";
+import {
+  ServerIcon,
+  ExternalLinkIcon,
+  PackageIcon,
+  DownloadIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -58,7 +67,7 @@ export const EmulatorsList = () => {
       renderItem={(emulator) => <EmulatorItem data={emulator} />}
       emptyView={<EmulatorsEmpty />}
     />
-  )
+  );
 };
 
 export const EmulatorsHeader = ({ disabled }: { disabled?: boolean }) => {
@@ -87,7 +96,7 @@ export const EmulatorsPagination = () => {
 };
 
 export const EmulatorsContainer = ({
-  children
+  children,
 }: {
   children: React.ReactNode;
 }) => {
@@ -112,22 +121,28 @@ export const EmulatorsError = () => {
 
 export const EmulatorsEmpty = () => {
   return (
-    <EmptyView
-      message="No emulators found. Emulators are typically seeded using the database seed script."
-    />
+    <EmptyView message="No emulators found. Emulators are typically seeded using the database seed script." />
   );
 };
 
 export const EmulatorItem = ({
   data,
 }: {
-  data: Emulator & { asset: { id: string; role: string; cpe: string; ip: string; upstreamApi: string } }
+  data: Emulator & {
+    asset: {
+      id: string;
+      role: string;
+      cpe: string;
+      ip: string;
+      upstreamApi: string;
+    };
+  };
 }) => {
   const removeEmulator = useRemoveEmulator();
 
   const handleRemove = () => {
     removeEmulator.mutate({ id: data.id });
-  }
+  };
 
   // Determine distribution type
   const distributionType = data.dockerUrl ? "Docker" : "Download";
@@ -142,8 +157,8 @@ export const EmulatorItem = ({
       <div className="flex-1 min-w-0">
         <EmulatorDrawer emulator={data} />
         <div className="text-xs text-muted-foreground mt-1">
-          {distributionType} &bull; {data.asset.role}
-          {" "}&bull; Updated {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
+          {distributionType} &bull; {data.asset.role} &bull; Updated{" "}
+          {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
         </div>
       </div>
       <Button
@@ -155,20 +170,31 @@ export const EmulatorItem = ({
         {removeEmulator.isPending ? "Removing..." : "Remove"}
       </Button>
     </div>
-  )
-}
+  );
+};
 
 function EmulatorDrawer({
-  emulator
+  emulator,
 }: {
-  emulator: Emulator & { asset: { id: string; role: string; cpe: string; ip: string; upstreamApi: string } }
+  emulator: Emulator & {
+    asset: {
+      id: string;
+      role: string;
+      cpe: string;
+      ip: string;
+      upstreamApi: string;
+    };
+  };
 }) {
   const isMobile = useIsMobile();
 
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
       <DrawerTrigger asChild>
-        <Button variant="link" className="text-foreground h-auto p-0 text-left font-medium">
+        <Button
+          variant="link"
+          className="text-foreground h-auto p-0 text-left font-medium"
+        >
           {emulator.role}
         </Button>
       </DrawerTrigger>
@@ -190,7 +216,8 @@ function EmulatorDrawer({
               )}
             </Badge>
             <span className="text-xs">
-              Updated {formatDistanceToNow(emulator.updatedAt, { addSuffix: true })}
+              Updated{" "}
+              {formatDistanceToNow(emulator.updatedAt, { addSuffix: true })}
             </span>
           </DrawerDescription>
         </DrawerHeader>
@@ -199,7 +226,9 @@ function EmulatorDrawer({
           {/* Description */}
           <div className="flex flex-col gap-3">
             <h3 className="font-semibold">Description</h3>
-            <p className="text-sm text-muted-foreground">{emulator.description}</p>
+            <p className="text-sm text-muted-foreground">
+              {emulator.description}
+            </p>
           </div>
 
           <Separator />
@@ -213,14 +242,14 @@ function EmulatorDrawer({
                 {emulator.dockerUrl ? "Docker Image" : "Download URL"}
               </div>
               <a
-                  href={emulator.dockerUrl || emulator.downloadUrl || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-                >
-                  {emulator.dockerUrl || emulator.downloadUrl}
-                  <ExternalLinkIcon className="size-3 flex-shrink-0" />
-                </a>
+                href={emulator.dockerUrl || emulator.downloadUrl || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
+              >
+                {emulator.dockerUrl || emulator.downloadUrl}
+                <ExternalLinkIcon className="size-3 flex-shrink-0" />
+              </a>
             </div>
           </div>
 
@@ -232,18 +261,28 @@ function EmulatorDrawer({
 
             <div className="grid grid-cols-1 gap-3">
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Device Role</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Device Role
+                </div>
                 <div className="text-sm">{emulator.asset.role}</div>
               </div>
 
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">IP Address</div>
-                <code className="text-xs bg-muted px-2 py-1 rounded">{emulator.asset.ip}</code>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  IP Address
+                </div>
+                <code className="text-xs bg-muted px-2 py-1 rounded">
+                  {emulator.asset.ip}
+                </code>
               </div>
 
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">CPE Identifier</div>
-                <code className="text-xs bg-muted px-2 py-1 rounded break-all">{emulator.asset.cpe}</code>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  CPE Identifier
+                </div>
+                <code className="text-xs bg-muted px-2 py-1 rounded break-all">
+                  {emulator.asset.cpe}
+                </code>
               </div>
             </div>
           </div>
@@ -256,22 +295,32 @@ function EmulatorDrawer({
 
             <div className="grid grid-cols-1 gap-3">
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Created</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Created
+                </div>
                 <div className="text-xs">
-                  {formatDistanceToNow(emulator.createdAt, { addSuffix: true })} ({new Date(emulator.createdAt).toLocaleString()})
+                  {formatDistanceToNow(emulator.createdAt, { addSuffix: true })}{" "}
+                  ({new Date(emulator.createdAt).toLocaleString()})
                 </div>
               </div>
 
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Last Updated</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Last Updated
+                </div>
                 <div className="text-xs">
-                  {formatDistanceToNow(emulator.updatedAt, { addSuffix: true })} ({new Date(emulator.updatedAt).toLocaleString()})
+                  {formatDistanceToNow(emulator.updatedAt, { addSuffix: true })}{" "}
+                  ({new Date(emulator.updatedAt).toLocaleString()})
                 </div>
               </div>
 
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Emulator ID</div>
-                <code className="text-xs bg-muted px-2 py-1 rounded">{emulator.id}</code>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Emulator ID
+                </div>
+                <code className="text-xs bg-muted px-2 py-1 rounded">
+                  {emulator.id}
+                </code>
               </div>
             </div>
           </div>

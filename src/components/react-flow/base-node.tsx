@@ -5,33 +5,32 @@ import { CheckCircle2Icon, Loader2Icon, XCircleIcon } from "lucide-react";
 
 interface BaseNodeProps extends HTMLAttributes<HTMLDivElement> {
   status?: NodeStatus;
-};
+}
 
-export const BaseNode = forwardRef<
-  HTMLDivElement,
-  BaseNodeProps
->(({ className, status, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "relative rounded-sm border border-muted-foreground bg-card text-card-foreground hover:bg-accent",
-      className,
-    )}
-    tabIndex={0}
-    {...props}
-  >
-    {props.children}
-    {status === "error" && (
-      <XCircleIcon className="absolute right-0.5 bottom-0.5 size-2 text-red-700 stroke-3" />
-    )}
-    {status === "success" && (
-      <CheckCircle2Icon className="absolute right-0.5 bottom-0.5 size-2 text-green-700 stroke-3" />
-    )}
-    {status === "loading" && (
-      <Loader2Icon className="absolute -right-0.5 -bottom-0.5 size-2 text-blue-700 stroke-3 animate-spin" />
-    )}
-  </div>
-));
+export const BaseNode = forwardRef<HTMLDivElement, BaseNodeProps>(
+  ({ className, status, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        "relative rounded-sm border border-muted-foreground bg-card text-card-foreground hover:bg-accent",
+        className,
+      )}
+      tabIndex={0}
+      {...props}
+    >
+      {props.children}
+      {status === "error" && (
+        <XCircleIcon className="absolute right-0.5 bottom-0.5 size-2 text-red-700 stroke-3" />
+      )}
+      {status === "success" && (
+        <CheckCircle2Icon className="absolute right-0.5 bottom-0.5 size-2 text-green-700 stroke-3" />
+      )}
+      {status === "loading" && (
+        <Loader2Icon className="absolute -right-0.5 -bottom-0.5 size-2 text-blue-700 stroke-3 animate-spin" />
+      )}
+    </div>
+  ),
+);
 BaseNode.displayName = "BaseNode";
 
 /**

@@ -1,23 +1,23 @@
 import { useEffect, useState } from "react";
 import { PAGINATION } from "@/config/constants";
 
-interface UseEntitySearchProps<T extends { 
-  search: string; 
-  page: number 
-}> {
+interface UseEntitySearchProps<
+  T extends {
+    search: string;
+    page: number;
+  },
+> {
   params: T;
   setParams: (params: T) => void;
   debounceMs?: number;
 }
 
-export function useEntitySearch<T extends {
-  search: string;
-  page: number;
-}>({
-  params,
-  setParams,
-  debounceMs = 500
-}: UseEntitySearchProps<T>) {
+export function useEntitySearch<
+  T extends {
+    search: string;
+    page: number;
+  },
+>({ params, setParams, debounceMs = 500 }: UseEntitySearchProps<T>) {
   const [localSearch, setLocalSearch] = useState(params.search);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export function useEntitySearch<T extends {
           ...params,
           search: localSearch,
           page: PAGINATION.DEFAULT_PAGE,
-        })
+        });
       }
     }, debounceMs);
 
@@ -44,11 +44,11 @@ export function useEntitySearch<T extends {
   }, [localSearch, params, setParams, debounceMs]);
 
   useEffect(() => {
-    setLocalSearch(params.search)
+    setLocalSearch(params.search);
   }, [params.search]);
 
   return {
     searchValue: localSearch,
     onSearchChange: setLocalSearch,
   };
-};
+}

@@ -11,12 +11,9 @@ import {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-};
+}
 
-export const ManualTriggerDialog = ({
-  open,
-  onOpenChange
-}: Props) => {
+export const ManualTriggerDialog = ({ open, onOpenChange }: Props) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>

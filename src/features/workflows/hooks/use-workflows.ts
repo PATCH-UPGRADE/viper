@@ -1,5 +1,9 @@
-import { useTRPC } from "@/trpc/client"
-import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useTRPC } from "@/trpc/client";
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useWorkflowsParams } from "./use-workflows-params";
 
@@ -9,7 +13,7 @@ import { useWorkflowsParams } from "./use-workflows-params";
 export const useSuspenseWorkflows = () => {
   const trpc = useTRPC();
   const [params] = useWorkflowsParams();
-  
+
   return useSuspenseQuery(trpc.workflows.getMany.queryOptions(params));
 };
 
@@ -55,13 +59,16 @@ export const useRemoveWorkflow = () => {
           predicate: (query) => {
             const getManyKey = trpc.workflows.getMany.queryKey();
             const getOneKey = trpc.workflows.getOne.queryKey();
-            return query.queryKey[0] === getManyKey[0] || query.queryKey[0] === getOneKey[0];
+            return (
+              query.queryKey[0] === getManyKey[0] ||
+              query.queryKey[0] === getOneKey[0]
+            );
           },
         });
-      }
-    })
-  )
-}
+      },
+    }),
+  );
+};
 
 /**
  * Hook to fetch a single workflow using suspense
@@ -87,7 +94,10 @@ export const useUpdateWorkflowName = () => {
           predicate: (query) => {
             const getManyKey = trpc.workflows.getMany.queryKey();
             const getOneKey = trpc.workflows.getOne.queryKey();
-            return query.queryKey[0] === getManyKey[0] || query.queryKey[0] === getOneKey[0];
+            return (
+              query.queryKey[0] === getManyKey[0] ||
+              query.queryKey[0] === getOneKey[0]
+            );
           },
         });
       },
@@ -114,7 +124,10 @@ export const useUpdateWorkflow = () => {
           predicate: (query) => {
             const getManyKey = trpc.workflows.getMany.queryKey();
             const getOneKey = trpc.workflows.getOne.queryKey();
-            return query.queryKey[0] === getManyKey[0] || query.queryKey[0] === getOneKey[0];
+            return (
+              query.queryKey[0] === getManyKey[0] ||
+              query.queryKey[0] === getOneKey[0]
+            );
           },
         });
       },
@@ -141,5 +154,4 @@ export const useExecuteWorkflow = () => {
       },
     }),
   );
-  
 };

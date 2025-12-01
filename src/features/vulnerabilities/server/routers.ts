@@ -41,7 +41,9 @@ const vulnerabilityResponseSchema = z.object({
   user: userSchema,
 });
 
-const paginatedVulnerabilityResponseSchema = createPaginatedResponseSchema(vulnerabilityResponseSchema);
+const paginatedVulnerabilityResponseSchema = createPaginatedResponseSchema(
+  vulnerabilityResponseSchema,
+);
 
 export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/vulnerabilities - List all vulnerabilities (any authenticated user can see all)
@@ -53,7 +55,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         path: "/vulnerabilities",
         tags: ["Vulnerabilities"],
         summary: "List Vulnerabilities",
-        description: "Get all vulnerabilities. Any authenticated user can view all vulnerabilities.",
+        description:
+          "Get all vulnerabilities. Any authenticated user can view all vulnerabilities.",
       },
     })
     .output(paginatedVulnerabilityResponseSchema)
@@ -65,14 +68,18 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         ? {
             OR: [
               { cpe: { contains: search, mode: "insensitive" as const } },
-              { description: { contains: search, mode: "insensitive" as const } },
+              {
+                description: { contains: search, mode: "insensitive" as const },
+              },
               { impact: { contains: search, mode: "insensitive" as const } },
             ],
           }
         : {};
 
       // Get total count and build pagination metadata
-      const totalCount = await prisma.vulnerability.count({ where: searchFilter });
+      const totalCount = await prisma.vulnerability.count({
+        where: searchFilter,
+      });
       const meta = buildPaginationMeta(input, totalCount);
 
       // Fetch paginated items
@@ -96,7 +103,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         path: "/vulnerabilities/{id}",
         tags: ["Vulnerabilities"],
         summary: "Get Vulnerability",
-        description: "Get a single vulnerability by ID. Any authenticated user can view any vulnerability.",
+        description:
+          "Get a single vulnerability by ID. Any authenticated user can view any vulnerability.",
       },
     })
     .output(vulnerabilityResponseSchema)
@@ -116,7 +124,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         path: "/vulnerabilities",
         tags: ["Vulnerabilities"],
         summary: "Create Vulnerability",
-        description: "Create a new vulnerability. The authenticated user will be recorded as the creator.",
+        description:
+          "Create a new vulnerability. The authenticated user will be recorded as the creator.",
       },
     })
     .output(vulnerabilityResponseSchema)
@@ -139,7 +148,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         path: "/vulnerabilities/{id}",
         tags: ["Vulnerabilities"],
         summary: "Delete Vulnerability",
-        description: "Delete a vulnerability. Only the user who created the vulnerability can delete it.",
+        description:
+          "Delete a vulnerability. Only the user who created the vulnerability can delete it.",
       },
     })
     .output(vulnerabilityResponseSchema)
@@ -159,7 +169,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         data: vulnerabilityInputSchema,
-      })
+      }),
     )
     .meta({
       openapi: {
@@ -167,7 +177,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         path: "/vulnerabilities/{id}",
         tags: ["Vulnerabilities"],
         summary: "Update Vulnerability",
-        description: "Update a vulnerability. Only the user who created the vulnerability can update it.",
+        description:
+          "Update a vulnerability. Only the user who created the vulnerability can update it.",
       },
     })
     .output(vulnerabilityResponseSchema)

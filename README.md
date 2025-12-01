@@ -7,6 +7,8 @@ Pulse is the PATCH Teams Vulnerability Management Platform (VMP).
 
 ## Getting Started
 
+Follow the guide in `.env.example` to create a `.env` file.
+
 Install `mprocs` to run the multiple services:
 
 ```

@@ -48,7 +48,9 @@ const remediationResponseSchema = z.object({
   vulnerability: vulnerabilitySchema,
 });
 
-const paginatedRemediationResponseSchema = createPaginatedResponseSchema(remediationResponseSchema);
+const paginatedRemediationResponseSchema = createPaginatedResponseSchema(
+  remediationResponseSchema,
+);
 
 export const remediationsRouter = createTRPCRouter({
   // GET /api/remediations - List all remediations (any authenticated user can see all)
@@ -60,7 +62,8 @@ export const remediationsRouter = createTRPCRouter({
         path: "/remediations",
         tags: ["Remediations"],
         summary: "List Remediations",
-        description: "Get all remediations. Any authenticated user can view all remediations.",
+        description:
+          "Get all remediations. Any authenticated user can view all remediations.",
       },
     })
     .output(paginatedRemediationResponseSchema)
@@ -72,14 +75,18 @@ export const remediationsRouter = createTRPCRouter({
         ? {
             OR: [
               { cpe: { contains: search, mode: "insensitive" as const } },
-              { description: { contains: search, mode: "insensitive" as const } },
+              {
+                description: { contains: search, mode: "insensitive" as const },
+              },
               { narrative: { contains: search, mode: "insensitive" as const } },
             ],
           }
         : {};
 
       // Get total count and build pagination metadata
-      const totalCount = await prisma.remediation.count({ where: searchFilter });
+      const totalCount = await prisma.remediation.count({
+        where: searchFilter,
+      });
       const meta = buildPaginationMeta(input, totalCount);
 
       // Fetch paginated items
@@ -113,7 +120,8 @@ export const remediationsRouter = createTRPCRouter({
         path: "/remediations/{id}",
         tags: ["Remediations"],
         summary: "Get Remediation",
-        description: "Get a single remediation by ID. Any authenticated user can view any remediation.",
+        description:
+          "Get a single remediation by ID. Any authenticated user can view any remediation.",
       },
     })
     .output(remediationResponseSchema)
@@ -143,7 +151,8 @@ export const remediationsRouter = createTRPCRouter({
         path: "/remediations",
         tags: ["Remediations"],
         summary: "Create Remediation",
-        description: "Create a new remediation. The authenticated user will be recorded as the creator.",
+        description:
+          "Create a new remediation. The authenticated user will be recorded as the creator.",
       },
     })
     .output(remediationResponseSchema)
@@ -188,7 +197,8 @@ export const remediationsRouter = createTRPCRouter({
         path: "/remediations/{id}",
         tags: ["Remediations"],
         summary: "Delete Remediation",
-        description: "Delete a remediation. Only the user who created the remediation can delete it.",
+        description:
+          "Delete a remediation. Only the user who created the remediation can delete it.",
       },
     })
     .output(remediationResponseSchema)
@@ -218,7 +228,7 @@ export const remediationsRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         data: remediationInputSchema,
-      })
+      }),
     )
     .meta({
       openapi: {
@@ -226,7 +236,8 @@ export const remediationsRouter = createTRPCRouter({
         path: "/remediations/{id}",
         tags: ["Remediations"],
         summary: "Update Remediation",
-        description: "Update a remediation. Only the user who created the remediation can update it.",
+        description:
+          "Update a remediation. Only the user who created the remediation can update it.",
       },
     })
     .output(remediationResponseSchema)

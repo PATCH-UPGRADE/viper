@@ -2,11 +2,7 @@ import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
 import z from "zod";
-import {
-  userSchema,
-  userIncludeSelect,
-  safeUrlSchema,
-} from "@/lib/schemas";
+import { userSchema, userIncludeSelect, safeUrlSchema } from "@/lib/schemas";
 import {
   paginationInputSchema,
   buildPaginationMeta,
@@ -32,7 +28,8 @@ const emulatorInputSchema = z
       return hasDownloadUrl !== hasDockerUrl;
     },
     {
-      message: "Exactly one of downloadUrl or dockerUrl must be provided (not both, not neither)",
+      message:
+        "Exactly one of downloadUrl or dockerUrl must be provided (not both, not neither)",
     },
   );
 
@@ -53,7 +50,8 @@ const emulatorUpdateSchema = z
       return hasDownloadUrl !== hasDockerUrl;
     },
     {
-      message: "Exactly one of downloadUrl or dockerUrl must be provided (not both, not neither)",
+      message:
+        "Exactly one of downloadUrl or dockerUrl must be provided (not both, not neither)",
     },
   );
 
@@ -77,7 +75,9 @@ const emulatorResponseSchema = z.object({
   }),
 });
 
-const paginatedEmulatorResponseSchema = createPaginatedResponseSchema(emulatorResponseSchema);
+const paginatedEmulatorResponseSchema = createPaginatedResponseSchema(
+  emulatorResponseSchema,
+);
 
 export const emulatorsRouter = createTRPCRouter({
   // GET /api/emulators - List all emulators (any authenticated user can see all)
@@ -89,7 +89,8 @@ export const emulatorsRouter = createTRPCRouter({
         path: "/emulators",
         tags: ["Emulators"],
         summary: "List Emulators",
-        description: "Get all emulators. Any authenticated user can view all emulators.",
+        description:
+          "Get all emulators. Any authenticated user can view all emulators.",
       },
     })
     .output(paginatedEmulatorResponseSchema)
@@ -101,8 +102,12 @@ export const emulatorsRouter = createTRPCRouter({
         ? {
             OR: [
               { role: { contains: search, mode: "insensitive" as const } },
-              { description: { contains: search, mode: "insensitive" as const } },
-              { downloadUrl: { contains: search, mode: "insensitive" as const } },
+              {
+                description: { contains: search, mode: "insensitive" as const },
+              },
+              {
+                downloadUrl: { contains: search, mode: "insensitive" as const },
+              },
               { dockerUrl: { contains: search, mode: "insensitive" as const } },
             ],
           }
@@ -144,7 +149,8 @@ export const emulatorsRouter = createTRPCRouter({
         path: "/emulators/{id}",
         tags: ["Emulators"],
         summary: "Get Emulator",
-        description: "Get a single emulator by ID. Any authenticated user can view any emulator.",
+        description:
+          "Get a single emulator by ID. Any authenticated user can view any emulator.",
       },
     })
     .output(emulatorResponseSchema)
@@ -175,7 +181,8 @@ export const emulatorsRouter = createTRPCRouter({
         path: "/emulators",
         tags: ["Emulators"],
         summary: "Create Emulator",
-        description: "Create a new emulator. The authenticated user will be recorded as the creator. Exactly one of downloadUrl or dockerUrl must be provided.",
+        description:
+          "Create a new emulator. The authenticated user will be recorded as the creator. Exactly one of downloadUrl or dockerUrl must be provided.",
       },
     })
     .output(emulatorResponseSchema)
@@ -213,7 +220,8 @@ export const emulatorsRouter = createTRPCRouter({
         path: "/emulators/{id}",
         tags: ["Emulators"],
         summary: "Delete Emulator",
-        description: "Delete an emulator. Only the user who created the emulator can delete it.",
+        description:
+          "Delete an emulator. Only the user who created the emulator can delete it.",
       },
     })
     .output(emulatorResponseSchema)
@@ -247,7 +255,8 @@ export const emulatorsRouter = createTRPCRouter({
         path: "/emulators/{id}",
         tags: ["Emulators"],
         summary: "Update Emulator",
-        description: "Update an emulator. Only the user who created the emulator can update it. Exactly one of downloadUrl or dockerUrl must be provided.",
+        description:
+          "Update an emulator. Only the user who created the emulator can update it. Exactly one of downloadUrl or dockerUrl must be provided.",
       },
     })
     .output(emulatorResponseSchema)

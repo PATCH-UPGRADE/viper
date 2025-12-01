@@ -10,5 +10,19 @@ export const auth = betterAuth({
     enabled: true,
     autoSignIn: true,
   },
-  plugins: []  
+  plugins: [],
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_OAUTH_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET as string,
+    },
+    github: {
+      clientId: process.env.GITHUB_OAUTH_CLIENT_ID as string,
+      clientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET as string,
+    },
+  },
+  trustedOrigins: [
+    "http://localhost:3000",
+    process.env.PRODUCTION_URL || "http://localhost:3001",
+  ],
 });

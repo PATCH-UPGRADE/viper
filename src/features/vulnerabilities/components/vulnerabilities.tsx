@@ -10,9 +10,12 @@ import {
   EntityPagination,
   EntitySearch,
   ErrorView,
-  LoadingView
+  LoadingView,
 } from "@/components/entity-components";
-import { useRemoveVulnerability, useSuspenseVulnerabilities } from "../hooks/use-vulnerabilities"
+import {
+  useRemoveVulnerability,
+  useSuspenseVulnerabilities,
+} from "../hooks/use-vulnerabilities";
 import { useVulnerabilitiesParams } from "../hooks/use-vulnerabilities-params";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type { Vulnerability } from "@/generated/prisma";
@@ -58,7 +61,7 @@ export const VulnerabilitiesList = () => {
       renderItem={(vulnerability) => <VulnerabilityItem data={vulnerability} />}
       emptyView={<VulnerabilitiesEmpty />}
     />
-  )
+  );
 };
 
 export const VulnerabilitiesHeader = ({ disabled }: { disabled?: boolean }) => {
@@ -87,7 +90,7 @@ export const VulnerabilitiesPagination = () => {
 };
 
 export const VulnerabilitiesContainer = ({
-  children
+  children,
 }: {
   children: React.ReactNode;
 }) => {
@@ -112,22 +115,16 @@ export const VulnerabilitiesError = () => {
 
 export const VulnerabilitiesEmpty = () => {
   return (
-    <EmptyView
-      message="No vulnerabilities found. Vulnerabilities are typically seeded using the database seed script."
-    />
+    <EmptyView message="No vulnerabilities found. Vulnerabilities are typically seeded using the database seed script." />
   );
 };
 
-export const VulnerabilityItem = ({
-  data,
-}: {
-  data: Vulnerability
-}) => {
+export const VulnerabilityItem = ({ data }: { data: Vulnerability }) => {
   const removeVulnerability = useRemoveVulnerability();
 
   const handleRemove = () => {
     removeVulnerability.mutate({ id: data.id });
-  }
+  };
 
   return (
     <div className="flex items-center gap-3 p-4 border rounded-lg">
@@ -138,8 +135,8 @@ export const VulnerabilityItem = ({
         <VulnerabilityDrawer vulnerability={data} />
         <div className="text-xs text-muted-foreground mt-1">
           {data.description.substring(0, 100)}
-          {data.description.length > 100 ? "..." : ""}
-          {" "}&bull; Updated {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
+          {data.description.length > 100 ? "..." : ""} &bull; Updated{" "}
+          {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
         </div>
       </div>
       <Button
@@ -151,16 +148,23 @@ export const VulnerabilityItem = ({
         {removeVulnerability.isPending ? "Removing..." : "Remove"}
       </Button>
     </div>
-  )
-}
+  );
+};
 
-function VulnerabilityDrawer({ vulnerability }: { vulnerability: Vulnerability }) {
+function VulnerabilityDrawer({
+  vulnerability,
+}: {
+  vulnerability: Vulnerability;
+}) {
   const isMobile = useIsMobile();
 
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
       <DrawerTrigger asChild>
-        <Button variant="link" className="text-foreground h-auto p-0 text-left font-medium">
+        <Button
+          variant="link"
+          className="text-foreground h-auto p-0 text-left font-medium"
+        >
           {vulnerability.cpe}
         </Button>
       </DrawerTrigger>
@@ -173,7 +177,10 @@ function VulnerabilityDrawer({ vulnerability }: { vulnerability: Vulnerability }
               Vulnerability
             </Badge>
             <span className="text-xs">
-              Updated {formatDistanceToNow(vulnerability.updatedAt, { addSuffix: true })}
+              Updated{" "}
+              {formatDistanceToNow(vulnerability.updatedAt, {
+                addSuffix: true,
+              })}
             </span>
           </DrawerDescription>
         </DrawerHeader>
@@ -209,12 +216,18 @@ function VulnerabilityDrawer({ vulnerability }: { vulnerability: Vulnerability }
 
             <div className="grid grid-cols-1 gap-3">
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">CPE Identifier</div>
-                <code className="text-xs bg-muted px-2 py-1 rounded">{vulnerability.cpe}</code>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  CPE Identifier
+                </div>
+                <code className="text-xs bg-muted px-2 py-1 rounded">
+                  {vulnerability.cpe}
+                </code>
               </div>
 
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Exploit Repository</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Exploit Repository
+                </div>
                 <a
                   href={vulnerability.exploitUri}
                   target="_blank"
@@ -227,7 +240,9 @@ function VulnerabilityDrawer({ vulnerability }: { vulnerability: Vulnerability }
               </div>
 
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Upstream API</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Upstream API
+                </div>
                 <a
                   href={vulnerability.upstreamApi}
                   target="_blank"

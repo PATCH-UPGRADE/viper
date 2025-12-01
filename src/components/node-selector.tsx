@@ -2,11 +2,7 @@
 
 import { createId } from "@paralleldrive/cuid2";
 import { useReactFlow } from "@xyflow/react";
-import {
-  GlobeIcon,
-  MousePointerIcon,
-  SyringeIcon
-} from "lucide-react";
+import { GlobeIcon, MousePointerIcon, SyringeIcon } from "lucide-react";
 import { useCallback } from "react";
 import { toast } from "sonner";
 import {
@@ -32,7 +28,8 @@ const triggerNodes: NodeTypeOption[] = [
   {
     type: NodeType.MANUAL_TRIGGER,
     label: "Trigger manually",
-    description: "Runs the flow on clicking a button. Good for getting started quickly",
+    description:
+      "Runs the flow on clicking a button. Good for getting started quickly",
     icon: MousePointerIcon,
   },
 ];
@@ -64,90 +61,85 @@ const deviceNodeTypes: NodeTypeOption[] = [
     label: "Prepare Medication",
     description: "Prepare medication for administration",
     icon: SyringeIcon,
-  },  
+  },
   {
     type: NodeType.HTTP_REQUEST,
     label: "Blood Draw",
     description: "Patient blood draw procedure",
     icon: SyringeIcon,
-  },    
+  },
 ];
-
 
 interface NodeSelectorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
-};
+}
 
 export function NodeSelector({
   open,
   onOpenChange,
-  children
+  children,
 }: NodeSelectorProps) {
   const { setNodes, getNodes, screenToFlowPosition } = useReactFlow();
 
-  const handleNodeSelect = useCallback((selection: NodeTypeOption) => {
-    // Check if trying to add a manual trigger when one already exists
-    if (selection.type === NodeType.MANUAL_TRIGGER) {
-      const nodes = getNodes();
-      const hasManualTrigger = nodes.some(
-        (node) => node.type === NodeType.MANUAL_TRIGGER,
-      );
+  const handleNodeSelect = useCallback(
+    (selection: NodeTypeOption) => {
+      // Check if trying to add a manual trigger when one already exists
+      if (selection.type === NodeType.MANUAL_TRIGGER) {
+        const nodes = getNodes();
+        const hasManualTrigger = nodes.some(
+          (node) => node.type === NodeType.MANUAL_TRIGGER,
+        );
 
-      if (hasManualTrigger) {
-        toast.error("Only one manual trigger is allowed per workflow");
-        return;
+        if (hasManualTrigger) {
+          toast.error("Only one manual trigger is allowed per workflow");
+          return;
+        }
       }
-    }
 
-    setNodes((nodes) => {
-      const hasInitialTrigger = nodes.some(
-        (node) => node.type === NodeType.INITIAL,
-      );
+      setNodes((nodes) => {
+        const hasInitialTrigger = nodes.some(
+          (node) => node.type === NodeType.INITIAL,
+        );
 
-      const centerX = window.innerWidth / 2;
-      const centerY = window.innerHeight / 2;
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
 
-      const flowPosition = screenToFlowPosition({
-        x: centerX + (Math.random() - 0.5) * 200,
-        y: centerY + (Math.random() - 0.5) * 200,
+        const flowPosition = screenToFlowPosition({
+          x: centerX + (Math.random() - 0.5) * 200,
+          y: centerY + (Math.random() - 0.5) * 200,
+        });
+
+        const newNode = {
+          id: createId(),
+          data: {
+            icon: selection.icon,
+            label: selection.label,
+            description: selection.description,
+          },
+          position: flowPosition,
+          type: selection.type,
+        };
+
+        if (hasInitialTrigger) {
+          return [newNode];
+        }
+
+        return [...nodes, newNode];
       });
 
-      const newNode = {
-        id: createId(),
-        data: {
-          icon: selection.icon,
-          label: selection.label,
-          description: selection.description,
-        },
-        position: flowPosition,
-        type: selection.type,
-      };
-
-      if (hasInitialTrigger) {
-        return [newNode];
-      }
-
-      return [...nodes, newNode];
-    });
-
-    onOpenChange(false);
-  }, [
-    setNodes,
-    getNodes,
-    onOpenChange,
-    screenToFlowPosition,
-  ]);
+      onOpenChange(false);
+    },
+    [setNodes, getNodes, onOpenChange, screenToFlowPosition],
+  );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>
-            What triggers this workflow?
-          </SheetTitle>
+          <SheetTitle>What triggers this workflow?</SheetTitle>
           <SheetDescription>
             A trigger is a step that starts your workflow.
           </SheetDescription>
@@ -182,7 +174,7 @@ export function NodeSelector({
                   </div>
                 </div>
               </div>
-            )
+            );
           })}
         </div>
         <Separator />
@@ -216,7 +208,7 @@ export function NodeSelector({
                   </div>
                 </div>
               </div>
-            )
+            );
           })}
         </div>
         <Separator />
@@ -250,10 +242,10 @@ export function NodeSelector({
                   </div>
                 </div>
               </div>
-            )
+            );
           })}
         </div>
       </SheetContent>
     </Sheet>
   );
-};
+}

@@ -7,7 +7,10 @@ import { memo, type ReactNode } from "react";
 import { BaseNode, BaseNodeContent } from "@/components/react-flow/base-node";
 import { BaseHandle } from "@/components/react-flow/base-handle";
 import { WorkflowNode } from "@/components/workflow-node";
-import { type NodeStatus, NodeStatusIndicator } from "@/components/react-flow/node-status-indicator";
+import {
+  type NodeStatus,
+  NodeStatusIndicator,
+} from "@/components/react-flow/node-status-indicator";
 
 interface BaseTriggerNodeProps extends NodeProps {
   icon: LucideIcon | string;
@@ -17,7 +20,7 @@ interface BaseTriggerNodeProps extends NodeProps {
   status?: NodeStatus;
   onSettings?: () => void;
   onDoubleClick?: () => void;
-};
+}
 
 export const BaseTriggerNode = memo(
   ({
@@ -39,7 +42,7 @@ export const BaseTriggerNode = memo(
 
       setEdges((currentEdges) => {
         const updatedEdges = currentEdges.filter(
-          (edge) => edge.source !== id && edge.target !== id
+          (edge) => edge.source !== id && edge.target !== id,
         );
         return updatedEdges;
       });
@@ -57,15 +60,14 @@ export const BaseTriggerNode = memo(
           variant="border"
           className="rounded-l-2xl"
         >
-          <BaseNode status={status} onDoubleClick={onDoubleClick} className="rounded-l-2xl relative group">
+          <BaseNode
+            status={status}
+            onDoubleClick={onDoubleClick}
+            className="rounded-l-2xl relative group"
+          >
             <BaseNodeContent>
               {typeof Icon === "string" ? (
-                <Image 
-                  src={Icon} 
-                  alt={name} 
-                  width={16} 
-                  height={16}
-                />
+                <Image src={Icon} alt={name} width={16} height={16} />
               ) : (
                 <Icon className="size-4 text-muted-foreground" />
               )}
@@ -79,7 +81,7 @@ export const BaseTriggerNode = memo(
           </BaseNode>
         </NodeStatusIndicator>
       </WorkflowNode>
-    )
+    );
   },
 );
 

@@ -1,6 +1,12 @@
 import { requireAuth } from "@/lib/auth-utils";
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
@@ -12,10 +18,12 @@ const Page = async () => {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Integrations</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Integrations
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Connect external systems so the VMP can ingest assets, vulnerabilities, remediations,
-            and leverage LLM providers.
+            Connect external systems so the VMP can ingest assets,
+            vulnerabilities, remediations, and leverage LLM providers.
           </p>
         </div>
         <Badge variant="outline">TODO</Badge>
@@ -25,8 +33,8 @@ const Page = async () => {
 
       {/* Summary / helper blurb */}
       <p className="text-sm text-muted-foreground">
-        Configure integrations below. Each service requires an HTTP endpoint and an API key. You can
-        update or rotate credentials at any time.
+        Configure integrations below. Each service requires an HTTP endpoint and
+        an API key. You can update or rotate credentials at any time.
       </p>
 
       {/* Integrations grid */}
@@ -51,7 +59,8 @@ const Page = async () => {
               Vulnerabilities
             </CardTitle>
             <CardDescription>
-              Pull vulnerability findings from external scanners via HTTP + API key.
+              Pull vulnerability findings from external scanners via HTTP + API
+              key.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
@@ -65,11 +74,13 @@ const Page = async () => {
               Remediations
             </CardTitle>
             <CardDescription>
-              Push remediation decisions to ticketing or patch management systems.
+              Push remediation decisions to ticketing or patch management
+              systems.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
-            Configure the HTTP route and API key for your downstream workflow tool.
+            Configure the HTTP route and API key for your downstream workflow
+            tool.
           </CardContent>
         </Card>
 
@@ -79,7 +90,8 @@ const Page = async () => {
               LLM Providers
             </CardTitle>
             <CardDescription>
-              Add API keys for your preferred LLMs to power assistant and automation features.
+              Add API keys for your preferred LLMs to power assistant and
+              automation features.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">

@@ -35,10 +35,8 @@ import { Button } from "@/components/ui/button";
 const formSchema = z.object({
   endpoint: z.url({ message: "Please enter a valid URL" }),
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
-  body: z
-    .string()
-    .optional()
-    // .refine() TODO JSON5
+  body: z.string().optional(),
+  // .refine() TODO JSON5
 });
 
 export type HttpRequestFormValues = z.infer<typeof formSchema>;
@@ -48,7 +46,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: z.infer<typeof formSchema>) => void;
   defaultValues?: Partial<HttpRequestFormValues>;
-};
+}
 
 export const HttpRequestDialog = ({
   open,
@@ -141,7 +139,8 @@ export const HttpRequestDialog = ({
                     />
                   </FormControl>
                   <FormDescription>
-                    Static URL or use {"{{variables}}"} for simple values or {"{{json variable}}"} to stringify objects
+                    Static URL or use {"{{variables}}"} for simple values or{" "}
+                    {"{{json variable}}"} to stringify objects
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -152,23 +151,25 @@ export const HttpRequestDialog = ({
                 control={form.control}
                 name="body"
                 render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Request Body</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder={
-                        '{\n  "userId": "{{httpResponse.data.id}}",\n  "name": "{{httpResponse.data.name}}",\n  "items": "{{httpResponse.data.items}}"\n}'
-                      }
-                      className="min-h-[120px] font-mono text-sm"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    JSON with template variables. Use {"{{variables}}"} for simple values or {"{{json variable}}"} to stringify objects
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+                  <FormItem>
+                    <FormLabel>Request Body</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder={
+                          '{\n  "userId": "{{httpResponse.data.id}}",\n  "name": "{{httpResponse.data.name}}",\n  "items": "{{httpResponse.data.items}}"\n}'
+                        }
+                        className="min-h-[120px] font-mono text-sm"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      JSON with template variables. Use {"{{variables}}"} for
+                      simple values or {"{{json variable}}"} to stringify
+                      objects
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             )}
             <DialogFooter className="mt-4">

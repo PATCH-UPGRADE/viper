@@ -35,7 +35,9 @@ export const safeUrlSchema = z
     (url) => {
       try {
         const protocol = new URL(url).protocol;
-        return protocol === "http:" || protocol === "https:" || protocol === "git:";
+        return (
+          protocol === "http:" || protocol === "https:" || protocol === "git:"
+        );
       } catch {
         return false;
       }

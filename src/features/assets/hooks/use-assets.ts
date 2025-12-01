@@ -1,5 +1,9 @@
-import { useTRPC } from "@/trpc/client"
-import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useTRPC } from "@/trpc/client";
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAssetsParams } from "./use-assets-params";
 
@@ -55,7 +59,10 @@ export const useUpdateAsset = () => {
           predicate: (query) => {
             const getManyKey = trpc.assets.getMany.queryKey();
             const getOneKey = trpc.assets.getOne.queryKey();
-            return query.queryKey[0] === getManyKey[0] || query.queryKey[0] === getOneKey[0];
+            return (
+              query.queryKey[0] === getManyKey[0] ||
+              query.queryKey[0] === getOneKey[0]
+            );
           },
         });
       },
@@ -82,16 +89,19 @@ export const useRemoveAsset = () => {
           predicate: (query) => {
             const getManyKey = trpc.assets.getMany.queryKey();
             const getOneKey = trpc.assets.getOne.queryKey();
-            return query.queryKey[0] === getManyKey[0] || query.queryKey[0] === getOneKey[0];
+            return (
+              query.queryKey[0] === getManyKey[0] ||
+              query.queryKey[0] === getOneKey[0]
+            );
           },
         });
       },
       onError: (error) => {
         toast.error(`Failed to remove asset: ${error.message}`);
       },
-    })
-  )
-}
+    }),
+  );
+};
 
 /**
  * Hook to fetch a single asset using suspense

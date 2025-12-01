@@ -1,14 +1,14 @@
-import { getSession } from '@/lib/auth-utils';
-import { TRPC_TRANSFORMER } from '@/lib/trpc-config';
-import { initTRPC, TRPCError } from '@trpc/server';
-import { cache } from 'react';
-import type { OpenApiMeta } from 'trpc-to-openapi';
+import { getSession } from "@/lib/auth-utils";
+import { TRPC_TRANSFORMER } from "@/lib/trpc-config";
+import { initTRPC, TRPCError } from "@trpc/server";
+import { cache } from "react";
+import type { OpenApiMeta } from "trpc-to-openapi";
 
 export const createTRPCContext = cache(async () => {
   /**
    * @see: https://trpc.io/docs/server/context
    */
-  return { userId: 'user_123' };
+  return { userId: "user_123" };
 });
 
 // Avoid exporting the entire t-object

@@ -41,7 +41,8 @@ const assetResponseSchema = z.object({
   user: userSchema,
 });
 
-const paginatedAssetResponseSchema = createPaginatedResponseSchema(assetResponseSchema);
+const paginatedAssetResponseSchema =
+  createPaginatedResponseSchema(assetResponseSchema);
 
 const settingsResponseSchema = z.object({
   id: z.string(),
@@ -54,7 +55,9 @@ const settingsResponseSchema = z.object({
   user: userSchema,
 });
 
-const paginatedSettingsResponseSchema = createPaginatedResponseSchema(settingsResponseSchema);
+const paginatedSettingsResponseSchema = createPaginatedResponseSchema(
+  settingsResponseSchema,
+);
 
 export const assetsRouter = createTRPCRouter({
   // GET /api/assets - List all assets (any authenticated user can see all)
@@ -66,7 +69,8 @@ export const assetsRouter = createTRPCRouter({
         path: "/assets",
         tags: ["Assets"],
         summary: "List Assets",
-        description: "Get all assets. Any authenticated user can view all assets.",
+        description:
+          "Get all assets. Any authenticated user can view all assets.",
       },
     })
     .output(paginatedAssetResponseSchema)
@@ -109,7 +113,8 @@ export const assetsRouter = createTRPCRouter({
         path: "/assets/{id}",
         tags: ["Assets"],
         summary: "Get Asset",
-        description: "Get a single asset by ID. Any authenticated user can view any asset.",
+        description:
+          "Get a single asset by ID. Any authenticated user can view any asset.",
       },
     })
     .output(assetResponseSchema)
@@ -129,7 +134,8 @@ export const assetsRouter = createTRPCRouter({
         path: "/assets",
         tags: ["Assets"],
         summary: "Create Asset",
-        description: "Create a new asset. The authenticated user will be recorded as the creator.",
+        description:
+          "Create a new asset. The authenticated user will be recorded as the creator.",
       },
     })
     .output(assetResponseSchema)
@@ -152,7 +158,8 @@ export const assetsRouter = createTRPCRouter({
         path: "/assets/{id}",
         tags: ["Assets"],
         summary: "Delete Asset",
-        description: "Delete an asset. Only the user who created the asset can delete it.",
+        description:
+          "Delete an asset. Only the user who created the asset can delete it.",
       },
     })
     .output(assetResponseSchema)
@@ -175,7 +182,7 @@ export const assetsRouter = createTRPCRouter({
         cpe: cpeSchema,
         role: z.string().min(1),
         upstreamApi: safeUrlSchema,
-      })
+      }),
     )
     .meta({
       openapi: {
@@ -183,7 +190,8 @@ export const assetsRouter = createTRPCRouter({
         path: "/assets/{id}",
         tags: ["Assets"],
         summary: "Update Asset",
-        description: "Update an asset. Only the user who created the asset can update it.",
+        description:
+          "Update an asset. Only the user who created the asset can update it.",
       },
     })
     .output(assetResponseSchema)
@@ -208,7 +216,8 @@ export const assetsRouter = createTRPCRouter({
         path: "/assets/settings",
         tags: ["Assets"],
         summary: "Get Asset Manager Settings",
-        description: "Get all asset managers that have been set up. Any authenticated user can view all settings.",
+        description:
+          "Get all asset managers that have been set up. Any authenticated user can view all settings.",
       },
     })
     .output(paginatedSettingsResponseSchema)
@@ -225,7 +234,9 @@ export const assetsRouter = createTRPCRouter({
         : {};
 
       // Get total count and build pagination metadata
-      const totalCount = await prisma.assetSettings.count({ where: searchFilter });
+      const totalCount = await prisma.assetSettings.count({
+        where: searchFilter,
+      });
       const meta = buildPaginationMeta(input, totalCount);
 
       // Fetch paginated items
@@ -264,7 +275,8 @@ export const assetsRouter = createTRPCRouter({
         path: "/assets/settings",
         tags: ["Assets"],
         summary: "Create Asset Manager",
-        description: "Create a new asset manager to sync from. The authenticated user will be recorded as the creator.",
+        description:
+          "Create a new asset manager to sync from. The authenticated user will be recorded as the creator.",
       },
     })
     .output(settingsResponseSchema)

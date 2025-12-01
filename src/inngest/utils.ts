@@ -1,12 +1,12 @@
-import toposort from 'toposort';
-import { Connection, Node } from '@/generated/prisma';
+import toposort from "toposort";
+import { Connection, Node } from "@/generated/prisma";
 
 export const topologicalSort = (
   nodes: Node[],
-  connections: Connection[], 
-) : Node[] => {
+  connections: Connection[],
+): Node[] => {
   // If no connections, return node as-is.
-  if(connections.length === 0) {
+  if (connections.length === 0) {
     return nodes;
   }
 
@@ -18,12 +18,12 @@ export const topologicalSort = (
 
   // Add nodes with no connections as self-edges to ensure included
   const connectedNodeIds = new Set<string>();
-  for(const conn of connections) {
+  for (const conn of connections) {
     connectedNodeIds.add(conn.fromNodeId);
     connectedNodeIds.add(conn.toNodeId);
   }
-  for(const node of nodes) {
-    if(!connectedNodeIds.has(node.id)) {
+  for (const node of nodes) {
+    if (!connectedNodeIds.has(node.id)) {
       edges.push([node.id, node.id]);
     }
   }
@@ -44,5 +44,5 @@ export const topologicalSort = (
 
   // Map sorted IDs back to node objects
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-  return sortedNodeIds.map((id) => nodeMap.get(id)!).filter(Boolean); 
-}
+  return sortedNodeIds.map((id) => nodeMap.get(id)!).filter(Boolean);
+};

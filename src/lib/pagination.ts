@@ -25,7 +25,9 @@ export type PaginationInput = z.infer<typeof paginationInputSchema>;
 /**
  * Creates a paginated response schema with the given item schema
  */
-export function createPaginatedResponseSchema<T extends z.ZodTypeAny>(itemSchema: T) {
+export function createPaginatedResponseSchema<T extends z.ZodTypeAny>(
+  itemSchema: T,
+) {
   return z.object({
     items: z.array(itemSchema),
     page: z.number(),
@@ -51,7 +53,10 @@ export type PaginatedResponse<T> = {
  * Builds pagination metadata from count and input parameters
  * Handles page capping to prevent expensive queries
  */
-export function buildPaginationMeta(input: PaginationInput, totalCount: number) {
+export function buildPaginationMeta(
+  input: PaginationInput,
+  totalCount: number,
+) {
   const { pageSize } = input;
 
   // Normalize totalPages to at least 1 for better UX

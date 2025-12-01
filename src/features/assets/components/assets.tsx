@@ -10,9 +10,13 @@ import {
   EntityPagination,
   EntitySearch,
   ErrorView,
-  LoadingView
+  LoadingView,
 } from "@/components/entity-components";
-import { useCreateAsset, useRemoveAsset, useSuspenseAssets } from "../hooks/use-assets"
+import {
+  useCreateAsset,
+  useRemoveAsset,
+  useSuspenseAssets,
+} from "../hooks/use-assets";
 import { useAssetsParams } from "../hooks/use-assets-params";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type { Asset } from "@/generated/prisma";
@@ -58,7 +62,7 @@ export const AssetsList = () => {
       renderItem={(asset) => <AssetItem data={asset} />}
       emptyView={<AssetsEmpty />}
     />
-  )
+  );
 };
 
 export const AssetsHeader = ({ disabled }: { disabled?: boolean }) => {
@@ -87,7 +91,7 @@ export const AssetsPagination = () => {
 };
 
 export const AssetsContainer = ({
-  children
+  children,
 }: {
   children: React.ReactNode;
 }) => {
@@ -112,22 +116,16 @@ export const AssetsError = () => {
 
 export const AssetsEmpty = () => {
   return (
-    <EmptyView
-      message="No assets found. Assets are typically seeded using the database seed script."
-    />
+    <EmptyView message="No assets found. Assets are typically seeded using the database seed script." />
   );
 };
 
-export const AssetItem = ({
-  data,
-}: {
-  data: Asset
-}) => {
+export const AssetItem = ({ data }: { data: Asset }) => {
   const removeAsset = useRemoveAsset();
 
   const handleRemove = () => {
     removeAsset.mutate({ id: data.id });
-  }
+  };
 
   return (
     <div className="flex items-center gap-3 p-4 border rounded-lg">
@@ -137,8 +135,8 @@ export const AssetItem = ({
       <div className="flex-1 min-w-0">
         <AssetDrawer asset={data} />
         <div className="text-xs text-muted-foreground mt-1">
-          {data.ip} &bull; {data.cpe.split(':').slice(3, 5).join(' ')}
-          {" "}&bull; Updated {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
+          {data.ip} &bull; {data.cpe.split(":").slice(3, 5).join(" ")} &bull;
+          Updated {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
         </div>
       </div>
       <Button
@@ -150,8 +148,8 @@ export const AssetItem = ({
         {removeAsset.isPending ? "Removing..." : "Remove"}
       </Button>
     </div>
-  )
-}
+  );
+};
 
 function AssetDrawer({ asset }: { asset: Asset }) {
   const isMobile = useIsMobile();
@@ -159,7 +157,10 @@ function AssetDrawer({ asset }: { asset: Asset }) {
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
       <DrawerTrigger asChild>
-        <Button variant="link" className="text-foreground h-auto p-0 text-left font-medium">
+        <Button
+          variant="link"
+          className="text-foreground h-auto p-0 text-left font-medium"
+        >
           {asset.role}
         </Button>
       </DrawerTrigger>
@@ -172,7 +173,8 @@ function AssetDrawer({ asset }: { asset: Asset }) {
               Hospital Asset
             </Badge>
             <span className="text-xs">
-              Updated {formatDistanceToNow(asset.updatedAt, { addSuffix: true })}
+              Updated{" "}
+              {formatDistanceToNow(asset.updatedAt, { addSuffix: true })}
             </span>
           </DrawerDescription>
         </DrawerHeader>
@@ -184,18 +186,28 @@ function AssetDrawer({ asset }: { asset: Asset }) {
 
             <div className="grid grid-cols-1 gap-3">
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Role</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Role
+                </div>
                 <div className="text-sm">{asset.role}</div>
               </div>
 
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">IP Address</div>
-                <code className="text-xs bg-muted px-2 py-1 rounded">{asset.ip}</code>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  IP Address
+                </div>
+                <code className="text-xs bg-muted px-2 py-1 rounded">
+                  {asset.ip}
+                </code>
               </div>
 
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">CPE Identifier</div>
-                <code className="text-xs bg-muted px-2 py-1 rounded break-all">{asset.cpe}</code>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  CPE Identifier
+                </div>
+                <code className="text-xs bg-muted px-2 py-1 rounded break-all">
+                  {asset.cpe}
+                </code>
               </div>
             </div>
           </div>
@@ -207,7 +219,9 @@ function AssetDrawer({ asset }: { asset: Asset }) {
             <h3 className="font-semibold">API Integration</h3>
 
             <div>
-              <div className="text-xs font-medium text-muted-foreground mb-1">Upstream API</div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                Upstream API
+              </div>
               <a
                 href={asset.upstreamApi}
                 target="_blank"
@@ -228,22 +242,32 @@ function AssetDrawer({ asset }: { asset: Asset }) {
 
             <div className="grid grid-cols-1 gap-3">
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Created</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Created
+                </div>
                 <div className="text-xs">
-                  {formatDistanceToNow(asset.createdAt, { addSuffix: true })} ({new Date(asset.createdAt).toLocaleString()})
+                  {formatDistanceToNow(asset.createdAt, { addSuffix: true })} (
+                  {new Date(asset.createdAt).toLocaleString()})
                 </div>
               </div>
 
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Last Updated</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Last Updated
+                </div>
                 <div className="text-xs">
-                  {formatDistanceToNow(asset.updatedAt, { addSuffix: true })} ({new Date(asset.updatedAt).toLocaleString()})
+                  {formatDistanceToNow(asset.updatedAt, { addSuffix: true })} (
+                  {new Date(asset.updatedAt).toLocaleString()})
                 </div>
               </div>
 
               <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">Asset ID</div>
-                <code className="text-xs bg-muted px-2 py-1 rounded">{asset.id}</code>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Asset ID
+                </div>
+                <code className="text-xs bg-muted px-2 py-1 rounded">
+                  {asset.id}
+                </code>
               </div>
             </div>
           </div>

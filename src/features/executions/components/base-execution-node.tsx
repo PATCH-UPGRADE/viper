@@ -7,7 +7,10 @@ import { memo, type ReactNode } from "react";
 import { BaseNode, BaseNodeContent } from "@/components/react-flow/base-node";
 import { BaseHandle } from "@/components/react-flow/base-handle";
 import { WorkflowNode } from "@/components/workflow-node";
-import { type NodeStatus, NodeStatusIndicator } from "@/components/react-flow/node-status-indicator";
+import {
+  type NodeStatus,
+  NodeStatusIndicator,
+} from "@/components/react-flow/node-status-indicator";
 
 interface BaseExecutionNodeProps extends NodeProps {
   icon: LucideIcon | string;
@@ -17,7 +20,7 @@ interface BaseExecutionNodeProps extends NodeProps {
   status?: NodeStatus;
   onSettings?: () => void;
   onDoubleClick?: () => void;
-};
+}
 
 export const BaseExecutionNode = memo(
   ({
@@ -39,7 +42,7 @@ export const BaseExecutionNode = memo(
 
       setEdges((currentEdges) => {
         const updatedEdges = currentEdges.filter(
-          (edge) => edge.source !== id && edge.target !== id
+          (edge) => edge.source !== id && edge.target !== id,
         );
         return updatedEdges;
       });
@@ -52,10 +55,7 @@ export const BaseExecutionNode = memo(
         onDelete={handleDelete}
         onSettings={onSettings}
       >
-        <NodeStatusIndicator
-          status={status}
-          variant="border"
-        >
+        <NodeStatusIndicator status={status} variant="border">
           <BaseNode status={status} onDoubleClick={onDoubleClick}>
             <BaseNodeContent>
               {typeof Icon === "string" ? (
@@ -78,7 +78,7 @@ export const BaseExecutionNode = memo(
           </BaseNode>
         </NodeStatusIndicator>
       </WorkflowNode>
-    )
+    );
   },
 );
 

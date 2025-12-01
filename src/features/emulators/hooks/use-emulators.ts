@@ -1,5 +1,10 @@
-import { useTRPC } from "@/trpc/client"
-import { useMutation, useQueryClient, useSuspenseQuery, type QueryClient } from "@tanstack/react-query";
+import { useTRPC } from "@/trpc/client";
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useEmulatorsParams } from "./use-emulators-params";
 
@@ -9,7 +14,7 @@ import { useEmulatorsParams } from "./use-emulators-params";
 const invalidateEmulatorQueries = (
   queryClient: QueryClient,
   trpc: ReturnType<typeof useTRPC>,
-  options: { includeGetOne?: boolean } = {}
+  options: { includeGetOne?: boolean } = {},
 ) => {
   const { includeGetOne = false } = options;
 
@@ -96,9 +101,9 @@ export const useRemoveEmulator = () => {
       onError: (error) => {
         toast.error(`Failed to remove emulator: ${error.message}`);
       },
-    })
-  )
-}
+    }),
+  );
+};
 
 /**
  * Hook to fetch a single emulator using suspense

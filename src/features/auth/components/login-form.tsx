@@ -45,18 +45,21 @@ export function LoginForm() {
   });
 
   const onSubmit = async (values: LoginFormValues) => {
-    await authClient.signIn.email({
-      email: values.email,
-      password: values.password,
-      callbackURL: "/",
-    }, {
-      onSuccess: () => {
-        router.push("/");
+    await authClient.signIn.email(
+      {
+        email: values.email,
+        password: values.password,
+        callbackURL: "/",
       },
-      onError: (ctx) => {
-        toast.error(ctx.error.message);
+      {
+        onSuccess: () => {
+          router.push("/");
+        },
+        onError: (ctx) => {
+          toast.error(ctx.error.message);
+        },
       },
-    });
+    );
   };
 
   const isPending = form.formState.isSubmitting;
@@ -65,12 +68,8 @@ export function LoginForm() {
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader className="text-center">
-          <CardTitle>
-            Welcome back
-          </CardTitle>
-          <CardDescription>
-            Login to continue
-          </CardDescription>
+          <CardTitle>Welcome back</CardTitle>
+          <CardDescription>Login to continue</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -83,7 +82,12 @@ export function LoginForm() {
                     type="button"
                     disabled={isPending}
                   >
-                    <Image alt="GitHub" src="/logos/github.svg" width={20} height={20} />
+                    <Image
+                      alt="GitHub"
+                      src="/logos/github.svg"
+                      width={20}
+                      height={20}
+                    />
                     Continue with GitHub
                   </Button>
                   <Button
@@ -92,7 +96,12 @@ export function LoginForm() {
                     type="button"
                     disabled={isPending}
                   >
-                    <Image alt="Google" src="/logos/google.svg" width={20} height={20} />
+                    <Image
+                      alt="Google"
+                      src="/logos/google.svg"
+                      width={20}
+                      height={20}
+                    />
                     Continue with Google
                   </Button>
                 </div>
@@ -148,4 +157,4 @@ export function LoginForm() {
       </Card>
     </div>
   );
-};
+}

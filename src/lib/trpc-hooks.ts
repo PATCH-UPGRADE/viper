@@ -1,6 +1,10 @@
 "use client";
 
-import { useMutation, useQueryClient, type UseMutationOptions } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  type UseMutationOptions,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { TRPCClientError } from "@trpc/client";
 
@@ -9,7 +13,11 @@ import type { TRPCClientError } from "@trpc/client";
  * Handles success toast, error toast, and query invalidation
  */
 export function createMutationHook<TData, TVariables>(
-  mutationFn: UseMutationOptions<TData, TRPCClientError<any>, TVariables>["mutationFn"],
+  mutationFn: UseMutationOptions<
+    TData,
+    TRPCClientError<any>,
+    TVariables
+  >["mutationFn"],
   options: {
     getManyQueryKey: () => readonly unknown[];
     getOneQueryKey?: () => readonly unknown[];
@@ -32,14 +40,17 @@ export function createMutationHook<TData, TVariables>(
             const getOneKey = options.getOneQueryKey?.();
 
             const matchesGetMany = query.queryKey[0] === getManyKey[0];
-            const matchesGetOne = getOneKey ? query.queryKey[0] === getOneKey[0] : false;
+            const matchesGetOne = getOneKey
+              ? query.queryKey[0] === getOneKey[0]
+              : false;
 
             return matchesGetMany || matchesGetOne;
           },
         });
       },
       onError: (error) => {
-        const message = options.errorMessage || `Operation failed: ${error.message}`;
+        const message =
+          options.errorMessage || `Operation failed: ${error.message}`;
         toast.error(message);
       },
     });
@@ -60,7 +71,9 @@ export function createQueryInvalidator(
         const getOneKey = getOneQueryKey?.();
 
         const matchesGetMany = query.queryKey[0] === getManyKey[0];
-        const matchesGetOne = getOneKey ? query.queryKey[0] === getOneKey[0] : false;
+        const matchesGetOne = getOneKey
+          ? query.queryKey[0] === getOneKey[0]
+          : false;
 
         return matchesGetMany || matchesGetOne;
       },

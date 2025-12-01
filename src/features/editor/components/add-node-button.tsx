@@ -19,7 +19,7 @@ export const AddNodeButton = memo(() => {
         <PlusIcon />
       </Button>
     </NodeSelector>
-  )
+  );
 });
 
 AddNodeButton.displayName = "AddNodeButton";

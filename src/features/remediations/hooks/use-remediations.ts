@@ -1,5 +1,9 @@
-import { useTRPC } from "@/trpc/client"
-import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useTRPC } from "@/trpc/client";
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useRemediationsParams } from "./use-remediations-params";
 
@@ -55,7 +59,10 @@ export const useUpdateRemediation = () => {
           predicate: (query) => {
             const getManyKey = trpc.remediations.getMany.queryKey();
             const getOneKey = trpc.remediations.getOne.queryKey();
-            return query.queryKey[0] === getManyKey[0] || query.queryKey[0] === getOneKey[0];
+            return (
+              query.queryKey[0] === getManyKey[0] ||
+              query.queryKey[0] === getOneKey[0]
+            );
           },
         });
       },
@@ -82,16 +89,19 @@ export const useRemoveRemediation = () => {
           predicate: (query) => {
             const getManyKey = trpc.remediations.getMany.queryKey();
             const getOneKey = trpc.remediations.getOne.queryKey();
-            return query.queryKey[0] === getManyKey[0] || query.queryKey[0] === getOneKey[0];
+            return (
+              query.queryKey[0] === getManyKey[0] ||
+              query.queryKey[0] === getOneKey[0]
+            );
           },
         });
       },
       onError: (error) => {
         toast.error(`Failed to remove remediation: ${error.message}`);
       },
-    })
-  )
-}
+    }),
+  );
+};
 
 /**
  * Hook to fetch a single remediation using suspense

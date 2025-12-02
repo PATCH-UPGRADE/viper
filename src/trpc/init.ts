@@ -33,10 +33,10 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
     return next({ ctx: { ...ctx, auth: session } });
   }
 
-  const verifiedApiKey = await verifyApiKey(ctx.req.headers);
+  const { valid, error, key } = await verifyApiKey(ctx.req.headers);
 
-  if (verifiedApiKey) {
-    return next({ ctx: { ...ctx, auth: "TODO" } });
+  if (valid && key && !error) {
+    return next({ ctx: { ...ctx, auth: {user: {id: key.userId}} } });
   }
 
   throw new TRPCError({

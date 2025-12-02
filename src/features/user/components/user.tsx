@@ -288,13 +288,11 @@ export const ApiTokensHeader = ({ disabled }: { disabled?: boolean }) => {
   const handleCreate = (token: ApiTokenFormValues) => {
     createApiToken.mutate(token, {
       onSuccess: (data) => {
-        console.log(data);
         setKey(data);
         setOpen(false);
         setSuccessOpen(true);
       },
       onError: (error) => {
-        // TODO: Handle errors
         console.log(error);
         setOpen(true);
       },

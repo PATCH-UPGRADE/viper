@@ -19,7 +19,7 @@ async function generateOpenApiSpec() {
       "API for managing assets, vulnerabilities, and remediations in hospital environments",
     version: "1.0.0",
     baseUrl:
-      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000/api/trpc",
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/api/v1` : "http://localhost:3000/api/v1",
     docsUrl: "https://github.com/PATCH-UPGRADE",
     tags: ["Assets", "Vulnerabilities", "Remediations", "Emulators"],
   });

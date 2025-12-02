@@ -13,10 +13,9 @@ export const getSession = async () => {
 };
 
 export const verifyApiKey = async (headers) => {
-  console.log("RUNNING");
   const authHeader = headers.get("Authorization");
   if (!authHeader) {
-    return false;
+    return {valid: false, error: null, key: null};
   }
   let apiKey;
 
@@ -26,17 +25,11 @@ export const verifyApiKey = async (headers) => {
     apiKey = authHeader;
   }
 
-  const { valid, error, key } = await auth.api.verifyApiKey({
+  return await auth.api.verifyApiKey({
     body: {
       key: apiKey,
     },
   });
-
-  console.log(apiKey, valid, error, key);
-  if (!valid || error || !key) {
-    return false;
-  }
-  return true;
 };
 
 /**

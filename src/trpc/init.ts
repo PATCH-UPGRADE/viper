@@ -1,14 +1,14 @@
-import { getSession } from "@/lib/auth-utils";
+import { getSession, verifyApiKey } from "@/lib/auth-utils";
 import { TRPC_TRANSFORMER } from "@/lib/trpc-config";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { cache } from "react";
 import type { OpenApiMeta } from "trpc-to-openapi";
 
-export const createTRPCContext = cache(async () => {
+export const createTRPCContext = cache(async (opts: { req: Request }) => {
   /**
    * @see: https://trpc.io/docs/server/context
    */
-  return { userId: "user_123" };
+  return { req: opts.req };
 });
 
 // Avoid exporting the entire t-object
@@ -29,13 +29,18 @@ export const baseProcedure = t.procedure;
 
 export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
   const session = await getSession();
-
-  if (!session) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "Unathorized",
-    });
+  if (session) {
+    return next({ ctx: { ...ctx, auth: session } });
   }
 
-  return next({ ctx: { ...ctx, auth: session } });
+  const verifiedApiKey = await verifyApiKey(ctx.req.headers);
+
+  if (verifiedApiKey) {
+    return next({ ctx: { ...ctx, auth: "TODO" } });
+  }
+
+  throw new TRPCError({
+    code: "UNAUTHORIZED",
+    message: "Unathorized",
+  });
 });

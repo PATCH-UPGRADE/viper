@@ -1,19 +1,18 @@
-import { EntityContainer, EntityHeader } from "@/components/entity-components";
+import {
+  ApiTokensContainer,
+  ApiTokensList,
+  ApiTokensLoading,
+  ApiTokensError,
+} from "@/features/user/components/user";
+import { apiTokensParamsLoader } from "@/features/user/server/params-loader";
+import { prefetchApiTokens } from "@/features/user/server/prefetch";
+import { createListPage } from "@/lib/page-factory";
 
-const Page = () => {
-  return (
-    <EntityContainer
-      header={
-        <EntityHeader
-          title="User API Tokens"
-          description="Manage API tokens"
-          newButtonLabel="New token"
-        />
-      }
-    >
-      <p>TODO</p>
-    </EntityContainer>
-  );
-};
-
-export default Page;
+export default createListPage({
+  paramsLoader: apiTokensParamsLoader,
+  prefetch: prefetchApiTokens,
+  Container: ApiTokensContainer,
+  List: ApiTokensList,
+  Loading: ApiTokensLoading,
+  Error: ApiTokensError,
+});

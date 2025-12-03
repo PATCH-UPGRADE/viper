@@ -30,10 +30,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
   });
 
   it("GET /vulnerabilities/{id} - Without auth, should 401", async () => {
-
-    const res = await request(BASE_URL).get(
-      "/vulnerabilities/foo",
-    );
+    const res = await request(BASE_URL).get("/vulnerabilities/foo");
 
     expect(res.status).toBe(401);
     expect(res.body.code).toBe("UNAUTHORIZED");

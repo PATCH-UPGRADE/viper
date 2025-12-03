@@ -3,7 +3,7 @@ import { BASE_URL, AUTH_TOKEN, generateCPE } from "./test-config";
 
 describe("Assets Endpoint (/assets)", () => {
   const authHeader = { Authorization: AUTH_TOKEN };
-  let TestState: {assetId?: string;} = {}
+  let TestState: { assetId?: string } = {};
 
   const payload = {
     ip: "192.168.1.100",

@@ -1,7 +1,7 @@
 export const BASE_URL = "http://localhost:3000/api/v1";
 
 if (!process.env.API_KEY) {
-  throw new Error('API_KEY environment variable is required for tests');
+  throw new Error("API_KEY environment variable is required for tests");
 }
 export const AUTH_TOKEN = `Bearer ${process.env.API_KEY}`;
 

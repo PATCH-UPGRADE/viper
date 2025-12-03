@@ -19,33 +19,12 @@ import {
 } from "../hooks/use-user";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type { Apikey } from "@/generated/prisma";
-import {
-  AlertCircleIcon,
-  AlertTriangleIcon,
-  ExternalLinkIcon,
-  EyeIcon,
-  EyeOffIcon,
-} from "lucide-react";
+import { AlertCircleIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { useApiTokenParams } from "../hooks/use-user-params";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Copy } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Tooltip,
   TooltipTrigger,
@@ -54,8 +33,6 @@ import {
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-//import { apiTokenInputSchema } from "../server/routers";
-import z from "zod";
 import {
   Dialog,
   DialogContent,
@@ -82,7 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ApiTokenFormValues, apiTokenInputSchema } from "../types";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const ApiTokensSearch = () => {
   const [params, setParams] = useApiTokenParams();
@@ -133,7 +110,7 @@ const ApiTokenSuccessModal = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      toast.error('Failed to copy to clipboard');
+      toast.error("Failed to copy to clipboard");
     }
   };
 
@@ -382,24 +359,6 @@ export const ApiTokensError = () => {
 export const ApiTokensEmpty = () => {
   return <EmptyView message="No API tokens" />;
 };
-
-/*
- <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={handleCopy}
-                  className="font-mono text-sm px-2 py-1 bg-accent rounded-md flex items-center gap-1 cursor-pointer hover:bg-accent/70 transition"
-                >
-                  {data.key}
-                  <Copy size={14} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{copied ? "Copied!" : "Click to copy"}</TooltipContent>
-            </Tooltip>
-
-  const [copied, setCopied] = useState(false);
-
-*/
 
 export const ApiTokenItem = ({ data }: { data: Apikey }) => {
   const removeApiToken = useRemoveApiToken();

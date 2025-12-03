@@ -68,7 +68,9 @@ export function NavUser() {
                   </>
                 ) : (
                   <>
-                    <span className="truncate font-medium">{user.name ?? "User"}</span>
+                    <span className="truncate font-medium">
+                      {user.name ?? "User"}
+                    </span>
                     <span className="text-muted-foreground truncate text-xs">
                       {user.email}
                     </span>

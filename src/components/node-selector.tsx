@@ -24,22 +24,18 @@ export type NodeTypeOption = {
   icon: React.ComponentType<{ className?: string }> | string;
 };
 
-const triggerNodes: NodeTypeOption[] = [
-  {
-    type: NodeType.MANUAL_TRIGGER,
-    label: "Trigger manually",
-    description:
-      "Runs the flow on clicking a button. Good for getting started quickly",
-    icon: MousePointerIcon,
-  },
-];
-
-const executionNodes: NodeTypeOption[] = [
+const actionNodes: NodeTypeOption[] = [
   {
     type: NodeType.HTTP_REQUEST,
-    label: "HTTP Request",
-    description: "Makes an HTTP request",
-    icon: GlobeIcon,
+    label: "Prepare Medication",
+    description: "Prepare medication for administration",
+    icon: SyringeIcon,
+  },
+  {
+    type: NodeType.HTTP_REQUEST,
+    label: "Blood Draw",
+    description: "Patient blood draw procedure",
+    icon: SyringeIcon,
   },
 ];
 
@@ -56,18 +52,6 @@ const deviceNodeTypes: NodeTypeOption[] = [
     description: "Electronic Medical Record System",
     icon: SyringeIcon,
   },
-  {
-    type: NodeType.HTTP_REQUEST,
-    label: "Prepare Medication",
-    description: "Prepare medication for administration",
-    icon: SyringeIcon,
-  },
-  {
-    type: NodeType.HTTP_REQUEST,
-    label: "Blood Draw",
-    description: "Patient blood draw procedure",
-    icon: SyringeIcon,
-  },
 ];
 
 interface NodeSelectorProps {
@@ -75,6 +59,46 @@ interface NodeSelectorProps {
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
 }
+
+// TODO: migrate, get the type of node template, put that here
+// add a create form for these
+// make sure everything saves properly
+// once migrated, also create some real NodeTemplate types (seed db), instead of using
+//   above data...
+const NodeTemplateMenuItem = ({
+  nodeTemplate,
+  onClick,
+}: {
+  nodeTemplate: any;
+  onClick?: () => void;
+}) => {
+  const Icon = nodeTemplate.icon;
+  return (
+    <div
+      key={nodeTemplate.label}
+      className="w-full justify-start h-auto py-5 px-4 rounded-none cursor-pointer border-l-2 border-transparent hover:border-l-primary"
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-6 w-full overflow-hidden">
+        {typeof Icon === "string" ? (
+          <img
+            src={Icon}
+            alt={nodeTemplate.label}
+            className="size-5 object-contain rounded-sm"
+          />
+        ) : (
+          <Icon className="size-5" />
+        )}
+        <div className="flex flex-col items-start text-left">
+          <span className="font-medium text-sm">{nodeTemplate.label}</span>
+          <span className="text-xs text-muted-foreground">
+            {nodeTemplate.description}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export function NodeSelector({
   open,
@@ -139,109 +163,41 @@ export function NodeSelector({
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>What triggers this workflow?</SheetTitle>
+          <SheetTitle className="text-lg">What happens next?</SheetTitle>
           <SheetDescription>
-            A trigger is a step that starts your workflow.
+            Select a node for this clinical workflow.
           </SheetDescription>
         </SheetHeader>
+        <div className="px-4">
+          <h3 className="font-semibold">Action Nodes</h3>
+          <p className="text-sm mt-2 text-muted-foreground">
+            Represents a clinical or operational action
+          </p>
+        </div>
         <div>
-          {triggerNodes.map((nodeType) => {
-            const Icon = nodeType.icon;
-
+          {actionNodes.map((nodeType) => {
             return (
-              <div
-                key={nodeType.label}
-                className="w-full justify-start h-auto py-5 px-4 rounded-none cursor-pointer border-l-2 border-transparent hover:border-l-primary"
+              <NodeTemplateMenuItem
+                nodeTemplate={nodeType}
                 onClick={() => handleNodeSelect(nodeType)}
-              >
-                <div className="flex items-center gap-6 w-full overflow-hidden">
-                  {typeof Icon === "string" ? (
-                    <img
-                      src={Icon}
-                      alt={nodeType.label}
-                      className="size-5 object-contain rounded-sm"
-                    />
-                  ) : (
-                    <Icon className="size-5" />
-                  )}
-                  <div className="flex flex-col items-start text-left">
-                    <span className="font-medium text-sm">
-                      {nodeType.label}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {nodeType.description}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              />
             );
           })}
         </div>
         <Separator />
-        <div>
-          {executionNodes.map((nodeType) => {
-            const Icon = nodeType.icon;
-
-            return (
-              <div
-                key={nodeType.label}
-                className="w-full justify-start h-auto py-5 px-4 rounded-none cursor-pointer border-l-2 border-transparent hover:border-l-primary"
-                onClick={() => handleNodeSelect(nodeType)}
-              >
-                <div className="flex items-center gap-6 w-full overflow-hidden">
-                  {typeof Icon === "string" ? (
-                    <img
-                      src={Icon}
-                      alt={nodeType.label}
-                      className="size-5 object-contain rounded-sm"
-                    />
-                  ) : (
-                    <Icon className="size-5" />
-                  )}
-                  <div className="flex flex-col items-start text-left">
-                    <span className="font-medium text-sm">
-                      {nodeType.label}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {nodeType.description}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        <div className="px-4">
+          <h3 className="font-semibold">Device Nodes</h3>
+          <p className="text-sm mt-2 text-muted-foreground">
+            Represents the explicit use of a medical device or asset
+          </p>
         </div>
-        <Separator />
         <div>
           {deviceNodeTypes.map((nodeType) => {
-            const Icon = nodeType.icon;
-
             return (
-              <div
-                key={nodeType.label}
-                className="w-full justify-start h-auto py-5 px-4 rounded-none cursor-pointer border-l-2 border-transparent hover:border-l-primary"
+              <NodeTemplateMenuItem
+                nodeTemplate={nodeType}
                 onClick={() => handleNodeSelect(nodeType)}
-              >
-                <div className="flex items-center gap-6 w-full overflow-hidden">
-                  {typeof Icon === "string" ? (
-                    <img
-                      src={Icon}
-                      alt={nodeType.label}
-                      className="size-5 object-contain rounded-sm"
-                    />
-                  ) : (
-                    <Icon className="size-5" />
-                  )}
-                  <div className="flex flex-col items-start text-left">
-                    <span className="font-medium text-sm">
-                      {nodeType.label}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {nodeType.description}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              />
             );
           })}
         </div>

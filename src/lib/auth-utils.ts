@@ -12,6 +12,26 @@ export const getSession = async () => {
   });
 };
 
+export const verifyApiKey = async (req: Request) => {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return { valid: false, error: null, key: null };
+  }
+  let apiKey;
+
+  if (authHeader.startsWith("Bearer ")) {
+    apiKey = authHeader.substring(7);
+  } else {
+    apiKey = authHeader;
+  }
+
+  return await auth.api.verifyApiKey({
+    body: {
+      key: apiKey,
+    },
+  });
+};
+
 /**
  * Requires authentication and returns the session
  * Redirects to /login if not authenticated

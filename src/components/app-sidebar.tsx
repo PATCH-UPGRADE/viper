@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Sidebar,
   SidebarContent,
@@ -28,6 +28,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
+import { NavUser } from "./nav-user";
+import { User } from "@/generated/prisma";
 
 const menuItems = [
   {
@@ -73,7 +75,6 @@ const menuItems = [
 ];
 
 export const AppSidebar = () => {
-  const router = useRouter();
   const pathname = usePathname();
 
   return (
@@ -143,25 +144,7 @@ export const AppSidebar = () => {
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
-
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip="Sign out"
-              className="gap-x-4 h-10 px-4"
-              onClick={() =>
-                authClient.signOut({
-                  fetchOptions: {
-                    onSuccess: () => {
-                      router.push("/login");
-                    },
-                  },
-                })
-              }
-            >
-              <LogOutIcon className="h-4 w-4" />
-              <span>Sign out</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          <NavUser />
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

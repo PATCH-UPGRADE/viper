@@ -128,9 +128,9 @@ export const workflowsRouter = createTRPCRouter({
     }),
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ input }) => {
       const workflow = await prisma.workflow.findUniqueOrThrow({
-        where: { id: input.id, userId: ctx.auth.user.id },
+        where: { id: input.id },
         include: { nodes: true, connections: true },
       });
 
@@ -160,11 +160,10 @@ export const workflowsRouter = createTRPCRouter({
     }),
   getMany: protectedProcedure
     .input(paginationInputSchema)
-    .query(async ({ ctx, input }) => {
+    .query(async ({ input }) => {
       const { search } = input;
 
       const whereFilter = {
-        userId: ctx.auth.user.id,
         name: {
           contains: search,
           mode: "insensitive" as const,

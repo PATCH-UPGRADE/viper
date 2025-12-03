@@ -1,5 +1,6 @@
 import { generateOpenApiDocument } from "trpc-to-openapi";
 import { appRouter } from "@/trpc/routers/_app";
+import { getBaseUrl } from "@/lib/url-utils";
 
 // This endpoint is publicly accessible (no auth required)
 export async function GET() {
@@ -8,8 +9,7 @@ export async function GET() {
     description:
       "API for managing assets, vulnerabilities, and remediations in hospital environments",
     version: "1.0.0",
-    baseUrl:
-      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000/api/trpc",
+    baseUrl: `${getBaseUrl()}/api/v1`,
     docsUrl: "https://github.com/PATCH-UPGRADE",
     tags: ["Assets", "Vulnerabilities", "Remediations", "Emulators"],
   });

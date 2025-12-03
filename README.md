@@ -63,3 +63,7 @@ After seeding, you can log in with:
 - ORM: prisma. Run `npx prisma studio` to view the database, usually on http://localhost:5555
 
 You can view the DB with prisma studio, usually running on port 5555.
+
+## Tests
+
+Use `npm run test`. Set the `API_KEY` env variable to test the api.

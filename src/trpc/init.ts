@@ -1,21 +1,30 @@
-import { getSession } from "@/lib/auth-utils";
+import { getSession, verifyApiKey } from "@/lib/auth-utils";
 import { TRPC_TRANSFORMER } from "@/lib/trpc-config";
 import { initTRPC, TRPCError } from "@trpc/server";
-import { cache } from "react";
+import { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
+import type { CreateNextContextOptions } from "@trpc/server/adapters/next";
 import type { OpenApiMeta } from "trpc-to-openapi";
 
-export const createTRPCContext = cache(async () => {
+export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   /**
    * @see: https://trpc.io/docs/server/context
    */
-  return { userId: "user_123" };
-});
+  return { req: opts.req };
+};
+
+export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
+
+export const createOpenApiContext = async ({
+  req,
+}: FetchCreateContextFnOptions): Promise<any> => {
+  return { req };
+};
 
 // Avoid exporting the entire t-object
 // since it's not very descriptive.
 // For instance, the use of a t variable
 // is common in i18n libraries.
-const t = initTRPC.meta<OpenApiMeta>().create({
+const t = initTRPC.context<Context>().meta<OpenApiMeta>().create({
   /**
    * @see https://trpc.io/docs/server/data-transformers
    */
@@ -29,13 +38,19 @@ export const baseProcedure = t.procedure;
 
 export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
   const session = await getSession();
-
-  if (!session) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "Unathorized",
-    });
+  if (session) {
+    return next({ ctx: { ...ctx, auth: session } });
   }
 
-  return next({ ctx: { ...ctx, auth: session } });
+  // @ts-expect-error
+  const { valid, error, key } = await verifyApiKey(ctx.req as Request);
+
+  if (valid && key && !error) {
+    return next({ ctx: { ...ctx, auth: { user: { id: key.userId } } } });
+  }
+
+  throw new TRPCError({
+    code: "UNAUTHORIZED",
+    message: "Unauthorized",
+  });
 });

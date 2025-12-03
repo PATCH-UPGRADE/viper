@@ -29,7 +29,17 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(res.body.code).toBe("UNAUTHORIZED");
   });
 
-  it("POST /vulnerabilities - Should create a new vulnerability", async () => {
+  it("GET /vulnerabilities/{id} - Without auth, should 401", async () => {
+
+    const res = await request(BASE_URL).get(
+      "/vulnerabilities/foo",
+    );
+
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("UNAUTHORIZED");
+  });
+
+  it("/vulnerabilities - Integration test", async () => {
     const res = await request(BASE_URL)
       .post("/vulnerabilities")
       .set(authHeader)
@@ -37,39 +47,19 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("id");
-    TestState.vulnerabilityId = res.body.id; // Store ID
-  });
+    const vulnerabilityId = res.body.id;
 
-  it("GET /vulnerabilities/{id} - Should retrieve the vulnerability", async () => {
-    expect(TestState.vulnerabilityId).toBeDefined();
-
-    const res = await request(BASE_URL)
-      .get(`/vulnerabilities/${TestState.vulnerabilityId}`)
+    const detailRes = await request(BASE_URL)
+      .get(`/vulnerabilities/${vulnerabilityId}`)
       .set(authHeader);
 
-    expect(res.status).toBe(200);
-    expect(res.body.id).toBe(TestState.vulnerabilityId);
-  });
+    expect(detailRes.status).toBe(200);
+    expect(detailRes.body.id).toBe(vulnerabilityId);
 
-  it("GET /vulnerabilities/{id} - Without auth, should 401", async () => {
-    expect(TestState.vulnerabilityId).toBeDefined();
-
-    const res = await request(BASE_URL).get(
-      `/vulnerabilities/${TestState.vulnerabilityId}`,
-    );
-
-    expect(res.status).toBe(401);
-    expect(res.body.code).toBe("UNAUTHORIZED");
-  });
-
-  it("DELETE /vulnerabilities/{id} - Should delete the vulnerability (Cleanup)", async () => {
-    expect(TestState.vulnerabilityId).toBeDefined();
-
-    const res = await request(BASE_URL)
-      .delete(`/vulnerabilities/${TestState.vulnerabilityId}`)
+    const deleteRes = await request(BASE_URL)
+      .delete(`/vulnerabilities/${vulnerabilityId}`)
       .set(authHeader);
 
-    expect(res.status).toBe(200);
-    TestState.vulnerabilityId = undefined; // Clear state
+    expect(deleteRes.status).toBe(200);
   });
 });

@@ -1,5 +1,7 @@
 name: CI/CD Pipeline
 
+env:
+  NODE_VERSION: '20'
 on:
   push:
     branches: [main, develop]
@@ -77,7 +79,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
       - name: Install dependencies
@@ -92,12 +94,13 @@ jobs:
       - name: Seed database
         run: npm run db:seed
 
+      # TODO: eventually remove continue on error, allow for now
       - name: Run tests
         run: npm test -- --ci --coverage --maxWorkers=2
         continue-on-error: true
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         if: always()
         with:
           files: ./coverage/coverage-final.json

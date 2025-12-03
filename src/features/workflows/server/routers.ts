@@ -160,11 +160,10 @@ export const workflowsRouter = createTRPCRouter({
     }),
   getMany: protectedProcedure
     .input(paginationInputSchema)
-    .query(async ({ ctx, input }) => {
+    .query(async ({ input }) => {
       const { search } = input;
 
       const whereFilter = {
-        userId: ctx.auth.user.id,
         name: {
           contains: search,
           mode: "insensitive" as const,

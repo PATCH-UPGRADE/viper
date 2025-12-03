@@ -51,6 +51,6 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
 
   throw new TRPCError({
     code: "UNAUTHORIZED",
-    message: "Unathorized",
+    message: "Unauthorized",
   });
 });

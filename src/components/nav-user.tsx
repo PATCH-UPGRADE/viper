@@ -51,11 +51,11 @@ export function NavUser() {
                 <Skeleton className="h-8 w-8 rounded-lg" />
               ) : (
                 <Avatar className="h-8 w-8 rounded-lg">
-                  {user.image && (
+                  {user.image && user.name && (
                     <AvatarImage src={user.image} alt={user.name} />
                   )}
                   <AvatarFallback className="rounded-lg">
-                    {user.name.substring(0, 1).toUpperCase()}
+                    {user.name?.substring(0, 1).toUpperCase() ?? "U"}
                   </AvatarFallback>
                 </Avatar>
               )}
@@ -68,7 +68,7 @@ export function NavUser() {
                   </>
                 ) : (
                   <>
-                    <span className="truncate font-medium">{user.name}</span>
+                    <span className="truncate font-medium">{user.name ?? "User"}</span>
                     <span className="text-muted-foreground truncate text-xs">
                       {user.email}
                     </span>

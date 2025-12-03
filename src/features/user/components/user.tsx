@@ -132,7 +132,9 @@ const ApiTokenSuccessModal = ({
       await navigator.clipboard.writeText(apiKey.key);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {}
+    } catch (err) {
+      toast.error('Failed to copy to clipboard');
+    }
   };
 
   return (
@@ -370,11 +372,11 @@ export const ApiTokensContainer = ({
 };
 
 export const ApiTokensLoading = () => {
-  return <LoadingView message="Loading vulnerabilities..." />;
+  return <LoadingView message="Loading API tokens..." />;
 };
 
 export const ApiTokensError = () => {
-  return <ErrorView message="Error loading vulnerabilities" />;
+  return <ErrorView message="Error loading API tokens" />;
 };
 
 export const ApiTokensEmpty = () => {

@@ -15,7 +15,7 @@ export const useSuspenseApiTokens = () => {
 };
 
 /**
- * Hook to create a new vulnerability
+ * Hook to create a new API token
  */
 export const useCreateApiToken = () => {
   const queryClient = useQueryClient();
@@ -32,14 +32,14 @@ export const useCreateApiToken = () => {
         return data;
       },
       onError: (error) => {
-        toast.error(`Failed to create api token: ${error.message}`);
+        toast.error(`Failed to create API token: ${error.message}`);
       },
     }),
   );
 };
 
 /**
- * Hook to remove a vulnerability
+ * Hook to remove an API token
  */
 export const useRemoveApiToken = () => {
   const trpc = useTRPC();
@@ -56,7 +56,7 @@ export const useRemoveApiToken = () => {
         return data;
       },
       onError: (error) => {
-        toast.error(`Failed to remove vulnerability: ${error.message}`);
+        toast.error(`Failed to remove API token: ${error.message}`);
       },
     }),
   );

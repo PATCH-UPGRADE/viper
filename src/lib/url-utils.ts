@@ -14,7 +14,8 @@ export function getBaseUrl(): string {
   if (typeof window !== "undefined") return "";
 
   // Vercel deployment
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL)
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
 
   // Local development or custom deployment
   return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";

@@ -114,7 +114,7 @@ const ApiTokenSuccessModal = ({
 }: {
   open: boolean;
   setOpen: (open: boolean) => void;
-  apiKey: Apikey;
+  apiKey?: Apikey;
 }) => {
   const [copied, setCopied] = useState(false);
   const [visible, setVisible] = useState(false);

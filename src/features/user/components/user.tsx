@@ -31,7 +31,7 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
@@ -138,6 +138,7 @@ const ApiTokenSuccessModal = ({
                   <Button
                     variant="secondary"
                     onClick={() => setVisible(!visible)}
+                    aria-label={visible ? "Hide token" : "Show token"}
                   >
                     {visible ? <EyeIcon /> : <EyeOffIcon />}
                   </Button>
@@ -174,7 +175,7 @@ const ApiTokenCreateModal = ({
   open,
   setOpen,
 }: {
-  form: any;
+  form: UseFormReturn<ApiTokenFormValues>;
   handleCreate: (values: ApiTokenFormValues) => void;
   open: boolean;
   setOpen: (open: boolean) => void;
@@ -287,8 +288,10 @@ export const ApiTokensHeader = ({ disabled }: { disabled?: boolean }) => {
         setSuccessOpen(true);
       },
       onError: (error) => {
-        console.log(error);
         setOpen(true);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to create API token",
+        );
       },
     });
   };

@@ -11,7 +11,7 @@ import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 // IMPORTANT: Create a stable getter for the query client that
 //            will return the same client during the same request.
 export const getQueryClient = cache(makeQueryClient);
-export const trpc = createTRPCOptionsProxy({ 
+export const trpc = createTRPCOptionsProxy({
   // @ts-expect-error
   ctx: createTRPCContext,
   router: appRouter,

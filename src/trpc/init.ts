@@ -2,7 +2,7 @@ import { getSession, verifyApiKey } from "@/lib/auth-utils";
 import { TRPC_TRANSFORMER } from "@/lib/trpc-config";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
-import type { CreateNextContextOptions } from '@trpc/server/adapters/next';
+import type { CreateNextContextOptions } from "@trpc/server/adapters/next";
 import type { OpenApiMeta } from "trpc-to-openapi";
 
 export const createTRPCContext = async (opts: CreateNextContextOptions) => {
@@ -16,9 +16,7 @@ export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
 
 export const createOpenApiContext = async ({
   req,
-}:
-FetchCreateContextFnOptions): Promise<any> => {
-
+}: FetchCreateContextFnOptions): Promise<any> => {
   return { req };
 };
 
@@ -48,7 +46,7 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
   const { valid, error, key } = await verifyApiKey(ctx.req as Request);
 
   if (valid && key && !error) {
-    return next({ ctx: { ...ctx, auth: {user: {id: key.userId}} } });
+    return next({ ctx: { ...ctx, auth: { user: { id: key.userId } } } });
   }
 
   throw new TRPCError({

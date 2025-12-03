@@ -13,9 +13,9 @@ export const getSession = async () => {
 };
 
 export const verifyApiKey = async (req: Request) => {
-  const authHeader = req.headers.get("Authorization")
+  const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
-    return {valid: false, error: null, key: null};
+    return { valid: false, error: null, key: null };
   }
   let apiKey;
 

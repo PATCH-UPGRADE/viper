@@ -19,7 +19,13 @@ import {
 } from "../hooks/use-user";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type { Apikey } from "@/generated/prisma";
-import { AlertCircleIcon, AlertTriangleIcon, ExternalLinkIcon, EyeIcon, EyeOffIcon } from "lucide-react";
+import {
+  AlertCircleIcon,
+  AlertTriangleIcon,
+  ExternalLinkIcon,
+  EyeIcon,
+  EyeOffIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -143,31 +149,40 @@ const ApiTokenSuccessModal = ({
           <FormItem>
             <Label>Token</Label>
             <div className="flex gap-2">
-              <Input type={visible ? "text" : "password"} value={apiKey.key} readOnly={true} />
+              <Input
+                type={visible ? "text" : "password"}
+                value={apiKey.key}
+                readOnly={true}
+              />
               <Tooltip>
                 <TooltipTrigger asChild>
-                <Button variant="secondary" onClick={() => setVisible(!visible)}>
-                  {visible ? <EyeIcon /> : <EyeOffIcon />}
-                </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setVisible(!visible)}
+                  >
+                    {visible ? <EyeIcon /> : <EyeOffIcon />}
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent>Toggle Visibility</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                <Button onClick={handleCopy}>
-                  <Copy />
-                </Button>
+                  <Button onClick={handleCopy}>
+                    <Copy />
+                  </Button>
                 </TooltipTrigger>
-                <TooltipContent>{copied ? "Copied!" : "Click to copy"}</TooltipContent>
+                <TooltipContent>
+                  {copied ? "Copied!" : "Click to copy"}
+                </TooltipContent>
               </Tooltip>
             </div>
           </FormItem>
         </div>
         <Alert variant="destructive">
-           <AlertCircleIcon />
-        <AlertDescription>
+          <AlertCircleIcon />
+          <AlertDescription>
             This is the only time you will be able to view this token.
-        </AlertDescription>
+          </AlertDescription>
         </Alert>
       </DialogContent>
     </Dialog>
@@ -395,7 +410,8 @@ export const ApiTokenItem = ({ data }: { data: Apikey }) => {
     <div className="flex items-center gap-3 p-4 border rounded-lg">
       <div className="flex-1 min-w-0">
         <div className="flex gap-2">
-          <span>{data.name}</span><span>&bull;</span>
+          <span>{data.name}</span>
+          <span>&bull;</span>
           <span className="font-mono text-sm px-2 py-1 bg-accent rounded-md flex items-center gap-1">
             {data.start}
             {"*".repeat(22)}

@@ -102,8 +102,8 @@ enum NodeType {
   INITIAL
   MANUAL_TRIGGER
   HTTP_REQUEST
-  ASSET
-  STEP
+  STEP // a step in a clincial workflow
+  ASSET // linked to medical assets
 }
 
 model NodeTemplate {
@@ -111,11 +111,8 @@ model NodeTemplate {
 
   name        String
   type        NodeType
-  description String
   icon        String
-
-  assets Asset[]  @relation("NodeTemplateAssets")
-  cpes   String[]
+  data     Json          @default("{}")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -172,7 +169,6 @@ model Asset {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   emulators     Emulator[]
-  nodeTemplates NodeTemplate[] @relation("NodeTemplateAssets")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

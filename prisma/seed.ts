@@ -507,7 +507,7 @@ async function clearDatabase() {
   await prisma.remediation.deleteMany();
   await prisma.vulnerability.deleteMany();
   await prisma.emulator.deleteMany();
-  await prisma.assetSettings.deleteMany();
+  await prisma.assetCredentials.deleteMany();
   await prisma.asset.deleteMany();
   // Don't delete users - we'll handle the seed user separately
 

@@ -23,7 +23,7 @@ const assetInputSchema = z.object({
   upstreamApi: safeUrlSchema,
 });
 
-const assetSettingsInputSchema = z.object({
+const assetCredentialsInputSchema = z.object({
   url: safeUrlSchema,
   name: z.string().min(1),
   token: z.string().min(1),
@@ -44,7 +44,7 @@ const assetResponseSchema = z.object({
 const paginatedAssetResponseSchema =
   createPaginatedResponseSchema(assetResponseSchema);
 
-const settingsResponseSchema = z.object({
+const integrationsResponseSchema = z.object({
   id: z.string(),
   url: z.string(),
   name: z.string(),
@@ -55,8 +55,8 @@ const settingsResponseSchema = z.object({
   user: userSchema,
 });
 
-const paginatedSettingsResponseSchema = createPaginatedResponseSchema(
-  settingsResponseSchema,
+const paginatedIntegrationsResponseSchema = createPaginatedResponseSchema(
+  integrationsResponseSchema,
 );
 
 export const assetsRouter = createTRPCRouter({
@@ -207,20 +207,20 @@ export const assetsRouter = createTRPCRouter({
       });
     }),
 
-  // GET /api/assets/settings - List all asset settings
-  getSettings: protectedProcedure
+  // GET /api/assets/integrations - List all asset integrations
+  getIntegrations: protectedProcedure
     .input(paginationInputSchema)
     .meta({
       openapi: {
         method: "GET",
-        path: "/assets/settings",
+        path: "/assets/integrations",
         tags: ["Assets"],
-        summary: "Get Asset Manager Settings",
+        summary: "Get Asset Manager integrations",
         description:
-          "Get all asset managers that have been set up. Any authenticated user can view all settings.",
+          "Get all asset managers that have been set up. Any authenticated user can view all integrations.",
       },
     })
-    .output(paginatedSettingsResponseSchema)
+    .output(paginatedIntegrationsResponseSchema)
     .query(async ({ input }) => {
       const { search } = input;
 
@@ -234,13 +234,13 @@ export const assetsRouter = createTRPCRouter({
         : {};
 
       // Get total count and build pagination metadata
-      const totalCount = await prisma.assetSettings.count({
+      const totalCount = await prisma.assetCredentials.count({
         where: searchFilter,
       });
       const meta = buildPaginationMeta(input, totalCount);
 
       // Fetch paginated items
-      const rawItems = await prisma.assetSettings.findMany({
+      const rawItems = await prisma.assetCredentials.findMany({
         skip: meta.skip,
         take: meta.take,
         where: searchFilter,
@@ -266,22 +266,22 @@ export const assetsRouter = createTRPCRouter({
       return createPaginatedResponse(items, meta);
     }),
 
-  // POST /api/assets/settings - Create asset setting
-  createSetting: protectedProcedure
-    .input(assetSettingsInputSchema)
+  // POST /api/assets/integrations - Create asset setting
+  createIntegration: protectedProcedure
+    .input(assetCredentialsInputSchema)
     .meta({
       openapi: {
         method: "POST",
-        path: "/assets/settings",
+        path: "/assets/integrations",
         tags: ["Assets"],
         summary: "Create Asset Manager",
         description:
           "Create a new asset manager to sync from. The authenticated user will be recorded as the creator.",
       },
     })
-    .output(settingsResponseSchema)
+    .output(integrationsResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const created = await prisma.assetSettings.create({
+      const created = await prisma.assetCredentials.create({
         data: {
           ...input,
           userId: ctx.auth.user.id,

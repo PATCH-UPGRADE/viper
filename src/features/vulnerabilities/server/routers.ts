@@ -14,6 +14,7 @@ import {
   createPaginatedResponseSchema,
 } from "@/lib/pagination";
 import { requireOwnership } from "@/trpc/middleware";
+import { VulnerabilityCredentials } from "@/generated/prisma";
 
 // Validation schemas
 const vulnerabilityInputSchema = z.object({
@@ -43,6 +44,29 @@ const vulnerabilityResponseSchema = z.object({
 
 const paginatedVulnerabilityResponseSchema = createPaginatedResponseSchema(
   vulnerabilityResponseSchema,
+);
+
+
+// TODO: DRY with assets/server/routers.ts
+const vulnerabilityCredentialsInputSchema = z.object({
+  url: safeUrlSchema,
+  name: z.string().min(1),
+  token: z.string().min(1),
+});
+
+const integrationsResponseSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  name: z.string(),
+  hasToken: z.boolean(),
+  userId: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  user: userSchema,
+});
+
+const paginatedIntegrationsResponseSchema = createPaginatedResponseSchema(
+  integrationsResponseSchema,
 );
 
 export const vulnerabilitiesRouter = createTRPCRouter({
@@ -191,5 +215,108 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         data: input.data,
         include: { user: userIncludeSelect },
       });
+    }),
+
+
+  // GET /api/assets/integrations - List all vulnerability integrations
+  getIntegrations: protectedProcedure
+    .input(paginationInputSchema)
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/vulnerabilities/integrations",
+        tags: ["Vulnerabilities"],
+        summary: "Get Vulnerability Manager integrations",
+        description:
+          "Get all vulnerability managers that have been set up. Any authenticated user can view all integrations.",
+      },
+    })
+    .output(paginatedIntegrationsResponseSchema)
+    .query(async ({ input }) => {
+      const { search } = input;
+
+      const searchFilter = search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" as const } },
+              { url: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : {};
+
+      // Get total count and build pagination metadata
+      /*const totalCount = await prisma.vulnerabilityCredentials.count({
+        where: searchFilter,
+      });
+      const meta = buildPaginationMeta(input, totalCount);
+
+      // Fetch paginated items
+      const rawItems = await prisma.vulnerabilityCredentials.findMany({
+        skip: meta.skip,
+        take: meta.take,
+        where: searchFilter,
+        select: {
+          id: true,
+          url: true,
+          name: true,
+          token: true, // Select to check if exists, but don't return
+          userId: true,
+          createdAt: true,
+          updatedAt: true,
+          user: userIncludeSelect,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      // Map items to exclude token and add hasToken flag
+      const items = rawItems.map(({ token, ...item }) => ({
+        ...item,
+        hasToken: !!token && token.length > 0,
+      }));*/
+      const items:VulnerabilityCredentials[] = [];
+      const totalCount = 0;
+      const meta = buildPaginationMeta(input, totalCount);
+
+      return createPaginatedResponse(items, meta);
+    }),
+
+  // POST /api/vulnerabilities/integrations - Create vulnerability integration 
+  createIntegration: protectedProcedure
+    .input(vulnerabilityCredentialsInputSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/vulnerabilities/integrations",
+        tags: ["Vulnerabilities"],
+        summary: "Create Vulnerability Manager",
+        description:
+          "Create a new vulnerability manager to sync from. The authenticated user will be recorded as the creator.",
+      },
+    })
+    .output(integrationsResponseSchema)
+    .mutation(async ({ ctx, input }) => {
+      const created = await prisma.vulnerabilityCredentials.create({
+        data: {
+          ...input,
+          userId: ctx.auth.user.id,
+        },
+        select: {
+          id: true,
+          url: true,
+          name: true,
+          token: true, // Select to check if exists, but don't return
+          userId: true,
+          createdAt: true,
+          updatedAt: true,
+          user: userIncludeSelect,
+        },
+      });
+
+      // Exclude token from response, add hasToken flag
+      const { token, ...response } = created;
+      return {
+        ...response,
+        hasToken: !!token && token.length > 0,
+      };
     }),
 });

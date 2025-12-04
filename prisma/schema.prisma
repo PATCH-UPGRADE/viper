@@ -26,7 +26,8 @@ model User {
   accounts        Account[]
   workflows       Workflow[]
   assets          Asset[]
-  assetSettings   AssetSettings[]
+  assetCredentials   AssetCredentials[]
+  vulnerabilityCredentials   VulnerabilityCredentials[]
   vulnerabilities Vulnerability[]
   remediations    Remediation[]
   emulators       Emulator[]
@@ -158,11 +159,12 @@ model Asset {
   @@map("asset")
 }
 
-model AssetSettings {
+model AssetCredentials {
   id    String @id @default(cuid())
   url   String
   name  String
-  token String
+  token String // TODO: ideally this is encrypted with user password, or smtg like that.
+  lastUsed DateTime?
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -170,7 +172,7 @@ model AssetSettings {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("asset_settings")
+  @@map("asset_credentials")
 }
 
 model Emulator {
@@ -198,7 +200,7 @@ model Vulnerability {
   id          String @id @default(cuid())
   sarif       Json
   cpe         String
-  exploitUri  String @map("exploit-uri")
+  exploitUri  String? @map("exploit-uri")
   upstreamApi String @map("upstream-api")
   description String @db.Text
   narrative   String @db.Text
@@ -215,6 +217,22 @@ model Vulnerability {
   @@index([cpe])
   @@index([userId])
   @@map("vulnerability")
+}
+
+model VulnerabilityCredentials {
+  id    String @id @default(cuid())
+  url   String
+  name  String
+  token String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastUsed         DateTime?
+
+  @@map("vulnerability_credentials")
 }
 
 model Remediation {

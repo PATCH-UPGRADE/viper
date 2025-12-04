@@ -16,3 +16,8 @@ export const prefetchVulnerabilities = (params: Input) => {
 export const prefetchVulnerability = (id: string) => {
   return prefetch(trpc.vulnerabilities.getOne.queryOptions({ id }));
 };
+
+
+export const prefetchIntegrations = (params: Input  ) => {
+  return prefetch(trpc.vulnerabilities.getIntegrations.queryOptions(params));
+};

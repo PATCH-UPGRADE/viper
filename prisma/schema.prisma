@@ -216,7 +216,7 @@ model Vulnerability {
   id          String @id @default(cuid())
   sarif       Json
   cpe         String
-  exploitUri  String @map("exploit-uri")
+  exploitUri  String? @map("exploit-uri")
   upstreamApi String @map("upstream-api")
   description String @db.Text
   narrative   String @db.Text

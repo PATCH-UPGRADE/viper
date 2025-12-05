@@ -11,6 +11,7 @@ import {
   type NodeStatus,
   NodeStatusIndicator,
 } from "@/components/react-flow/node-status-indicator";
+import { NodeType } from "@/generated/prisma";
 
 interface BaseAssetNodeProps extends NodeProps {
   icon: LucideIcon | string;
@@ -37,6 +38,14 @@ export const BaseAssetNode = memo(
     const handleDelete = () => {
       setNodes((currentNodes) => {
         const updatedNodes = currentNodes.filter((node) => node.id !== id);
+        if (updatedNodes.length === 0) {
+          updatedNodes.push({
+            type: NodeType.INITIAL,
+            position: { x: 0, y: 0 },
+            id: "",
+            data: {},
+          });
+        }
         return updatedNodes;
       });
 

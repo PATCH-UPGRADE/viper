@@ -11,6 +11,7 @@ import {
   type NodeStatus,
   NodeStatusIndicator,
 } from "@/components/react-flow/node-status-indicator";
+import { NodeType } from "@/generated/prisma";
 
 interface BaseStepNodeProps extends NodeProps {
   icon: LucideIcon | string;
@@ -34,9 +35,18 @@ export const BaseStepNode = memo(
     onDoubleClick,
   }: BaseStepNodeProps) => {
     const { setNodes, setEdges } = useReactFlow();
+    // TODO: DRY with base-asset-node
     const handleDelete = () => {
       setNodes((currentNodes) => {
         const updatedNodes = currentNodes.filter((node) => node.id !== id);
+        if (updatedNodes.length === 0) {
+          updatedNodes.push({
+            type: NodeType.INITIAL,
+            position: { x: 0, y: 0 },
+            id: "",
+            data: {},
+          });
+        }
         return updatedNodes;
       });
 
@@ -56,7 +66,11 @@ export const BaseStepNode = memo(
         onSettings={onSettings}
       >
         <NodeStatusIndicator status={status} variant="border">
-          <BaseNode status={status} onDoubleClick={onDoubleClick}>
+          <BaseNode
+            status={status}
+            onDoubleClick={onDoubleClick}
+            className="rounded-2xl!"
+          >
             <BaseNodeContent>
               {typeof Icon === "string" ? (
                 <Image src={Icon} alt={name} width={16} height={16} />

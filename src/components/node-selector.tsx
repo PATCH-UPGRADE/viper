@@ -75,7 +75,10 @@ const NodeTemplateMenuItem = ({
   nodeTemplate: any;
   onClick?: () => void;
 }) => {
-  const Icon = typeof nodeTemplate.icon === 'string' ? getIconByType(nodeTemplate.icon) : nodeTemplate.icon;
+  const Icon =
+    typeof nodeTemplate.icon === "string"
+      ? getIconByType(nodeTemplate.icon)
+      : nodeTemplate.icon;
   return (
     <div
       key={nodeTemplate.label}
@@ -95,13 +98,22 @@ const NodeTemplateMenuItem = ({
   );
 };
 
-const NodeTemplateCreateSheet = ({nodeType, open, setOpen}: {nodeType?: NodeType; open: boolean; setOpen: (b:boolean) => void}) => {
-
+const NodeTemplateCreateSheet = ({
+  nodeType,
+  open,
+  setOpen,
+}: {
+  nodeType?: NodeType;
+  open: boolean;
+  setOpen: (b: boolean) => void;
+}) => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="text-lg">Create {nodeType === NodeType.ASSET ? "Device" : "Action"} Node</SheetTitle>
+          <SheetTitle className="text-lg">
+            Create {nodeType === NodeType.ASSET ? "Device" : "Action"} Node
+          </SheetTitle>
         </SheetHeader>
         <p>TODO</p>
       </SheetContent>
@@ -123,11 +135,15 @@ export function NodeSelector({
     setNodeType(nodeType);
     setOpenModal(true);
     return;
-  }
+  };
 
   const handleNodeSelect = useCallback(
     (selection: NodeTypeOption) => {
       setNodes((nodes) => {
+        const hasInitialTrigger = nodes.some(
+          (node) => node.type === NodeType.INITIAL,
+        );
+
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
 
@@ -147,6 +163,11 @@ export function NodeSelector({
           type: selection.type,
         };
 
+        if (hasInitialTrigger) {
+          newNode.position = { x: 0, y: 0 };
+          return [newNode];
+        }
+
         return [...nodes, newNode];
       });
 
@@ -157,54 +178,73 @@ export function NodeSelector({
 
   return (
     <>
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="text-lg">What happens next?</SheetTitle>
-          <SheetDescription>
-            Select a node for this clinical workflow.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="px-4">
-          <h3 className="font-semibold">Action Nodes</h3>
-          <p className="text-sm mt-2 text-muted-foreground">
-            Represents a clinical or operational action
-          </p>
-        </div>
-        <div>
-          {actionNodes.map((nodeType) => {
-            return (
-              <NodeTemplateMenuItem
-                nodeTemplate={nodeType}
-                onClick={() => handleNodeSelect(nodeType)}
-              />
-            );
-          })}
-          <Button className="mx-4 mt-4" onClick={() => addNodeTemplate(NodeType.STEP)}>New action node <PlusIcon /></Button>
-        </div>
-        <Separator />
-        <div className="px-4">
-          <h3 className="font-semibold">Device Nodes</h3>
-          <p className="text-sm mt-2 text-muted-foreground">
-            Represents the explicit use of a medical device or asset
-          </p>
-        </div>
-        <div>
-          {deviceNodeTypes.map((nodeType) => {
-            return (
-              <NodeTemplateMenuItem
-                nodeTemplate={nodeType}
-                onClick={() => handleNodeSelect(nodeType)}
-              />
-            );
-          })}
-          {/*TODO: this should actually be relatively easy? just re-use the form i created in `dialog.tsx`, then make a new node...*/}
-          <Button className="mx-4 mt-4" onClick={() => addNodeTemplate(NodeType.ASSET)}>New device node <PlusIcon /></Button>
-        </div>
-      </SheetContent>
-    </Sheet>
-    <NodeTemplateCreateSheet nodeType={nodeType} open={openModal} setOpen={setOpenModal}/>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetTrigger asChild>{children}</SheetTrigger>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-md overflow-y-auto"
+        >
+          <SheetHeader>
+            <SheetTitle className="text-lg">What happens next?</SheetTitle>
+            <SheetDescription>
+              Select a node for this clinical workflow.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4">
+            <h3 className="font-semibold">Action Nodes</h3>
+            <p className="text-sm mt-2 text-muted-foreground">
+              Represents a clinical or operational action
+            </p>
+          </div>
+          <div>
+            {actionNodes.map((nodeType, idx) => {
+              return (
+                <NodeTemplateMenuItem
+                  key={`node-menu-${nodeType.type}-${idx}`}
+                  nodeTemplate={nodeType}
+                  onClick={() => handleNodeSelect(nodeType)}
+                />
+              );
+            })}
+            <Button
+              className="mx-4 mt-4"
+              onClick={() => addNodeTemplate(NodeType.STEP)}
+            >
+              New action node <PlusIcon />
+            </Button>
+          </div>
+          <Separator />
+          <div className="px-4">
+            <h3 className="font-semibold">Device Nodes</h3>
+            <p className="text-sm mt-2 text-muted-foreground">
+              Represents the explicit use of a medical device or asset
+            </p>
+          </div>
+          <div>
+            {deviceNodeTypes.map((nodeType, idx) => {
+              return (
+                <NodeTemplateMenuItem
+                  key={`node-menu-${nodeType.type}-${idx}`}
+                  nodeTemplate={nodeType}
+                  onClick={() => handleNodeSelect(nodeType)}
+                />
+              );
+            })}
+            {/*TODO: this should actually be relatively easy? just re-use the form i created in `dialog.tsx`, then make a new node...*/}
+            <Button
+              className="mx-4 mt-4"
+              onClick={() => addNodeTemplate(NodeType.ASSET)}
+            >
+              New device node <PlusIcon />
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+      <NodeTemplateCreateSheet
+        nodeType={nodeType}
+        open={openModal}
+        setOpen={setOpenModal}
+      />
     </>
   );
 }

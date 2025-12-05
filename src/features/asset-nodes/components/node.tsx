@@ -1,13 +1,17 @@
 "use client";
 
 import { useReactFlow, type Node, type NodeProps } from "@xyflow/react";
-import { CircleQuestionMark } from "lucide-react";
+import { BugIcon, CircleQuestionMark, ComputerIcon } from "lucide-react";
 import { memo, useState } from "react";
 import { BaseAssetNode } from "./base-asset-node";
 import { AssetFormValues, AssetDialog } from "./dialog";
 import { DeviceIconType, getIconByType } from "../types";
+import { useSuspenseAssetsVulns } from "@/features/assets/hooks/use-assets";
+import { Badge } from "@/components/ui/badge";
 
-type AssetNodeData = {
+import { cn } from "@/lib/utils";
+
+export type AssetNodeData = {
   icon?: string;
   label?: string;
   description?: string;
@@ -32,6 +36,10 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
             data: {
               ...node.data,
               ...values,
+              // Transform data from objects (for useFieldArray to work) into array
+              cpes: values.cpes?.map(cpe => cpe.value),
+              assetIds: values.assetIds?.map(id => id.value),
+
             },
           };
         }
@@ -41,20 +49,18 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
   };
 
   const nodeData = props.data;
-  const vulnerabilities: any[] = []; // TODO;
-  const nodeStatus = vulnerabilities.length > 0 ? "error" : "initial";
-  const getDescription = () => {
-    let description = "No vulnerabilities identified";
-    if (!nodeData.assetIds && !nodeData.cpes) {
-      description = "No devices specified.";
-    } else if (vulnerabilities.length > 0) {
-      description = `${vulnerabilities.length} vulnerabilities identified!`;
-    }
-    return description;
-  }
-  const description = getDescription()
 
-  const Icon = nodeData.icon ? getIconByType(nodeData.icon as DeviceIconType) : CircleQuestionMark
+  const assetsWithVulns = useSuspenseAssetsVulns({assetIds: nodeData.assetIds ?? [], cpes: nodeData.cpes ?? []})
+  const numVulns = assetsWithVulns.data.vulnerabilitiesCount
+  const numAssets = assetsWithVulns.data.assetsCount
+
+  const nodeStatus = numVulns > 0 ? "vulnerable" : "initial";
+
+  const description = nodeData.description; 
+
+  const Icon = nodeData.icon
+    ? getIconByType(nodeData.icon as DeviceIconType)
+    : CircleQuestionMark;
 
   return (
     <>
@@ -63,6 +69,8 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
         onOpenChange={setDialogOpen}
         onSubmit={handleSubmit}
         defaultValues={nodeData}
+        assets={assetsWithVulns ? assetsWithVulns.data.assets : []}
+        vulnerabilities={assetsWithVulns ? assetsWithVulns.data.vulnerabilities : []}
       />
       <BaseAssetNode
         {...props}
@@ -73,7 +81,16 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
         description={description}
         onSettings={handleOpenSettings}
         onDoubleClick={handleOpenSettings}
-      />
+      >
+        <div className="absolute top-0 left-0 flex flex-col gap-0.5" style={{ transform: 'translate(-100%)', marginLeft: '-0.5rem' }}>
+          <Badge className={cn("text-[6px]", numAssets === 0 ? "border-red-500" : "")} variant="outline">
+            <ComputerIcon className="w-2! h-2!" />{numAssets}
+          </Badge>
+          <Badge className={cn("text-[6px]", numVulns > 0 ? "border-red-500" : "")} variant="outline">
+            <BugIcon className="w-2! h-2!" />{numVulns}
+          </Badge>
+        </div>
+      </BaseAssetNode>
     </>
   );
 });

@@ -13,9 +13,9 @@ export type NodeExecutor<TData = Record<string, unknown>> = (
 import { ComputerIcon, MonitorIcon, SyringeIcon } from "lucide-react";
 
 export enum DeviceIconType {
-  WOW = 'Workstaion on Wheels',
-  InfusionPump = 'Infusion Pump',
-  PatientMonitor = 'Patient Monitor',
+  WOW = "Workstaion on Wheels",
+  InfusionPump = "Infusion Pump",
+  PatientMonitor = "Patient Monitor",
 }
 
 export function getIconByType(iconType: DeviceIconType) {

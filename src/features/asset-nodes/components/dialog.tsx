@@ -28,17 +28,21 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DeviceIconType, getIconByType } from "../types";
+import { CircleX } from "lucide-react";
+import { cpeSchema } from "@/lib/schemas";
+import { Asset, Vulnerability } from "@/generated/prisma";
+import { AssetNodeData } from "./node";
 
 const formSchema = z.object({
-  icon: z.string().optional(),
-  label: z.string().optional(),
+  icon: z.string(),
+  label: z.string(),
   description: z.string().optional(),
-  cpes: z.array(z.string()).optional(),
-  assetIds: z.array(z.string()).optional()
+  cpes: z.array(z.object({ value: cpeSchema })).default([]).optional(),
+  assetIds: z.array(z.object({ value: z.string() })).default([]).optional(),
 });
 export type AssetFormValues = z.infer<typeof formSchema>;
 
@@ -46,7 +50,9 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: z.infer<typeof formSchema>) => void;
-  defaultValues?: Partial<AssetFormValues>;
+  defaultValues?: AssetNodeData;
+  assets: Asset[];
+  vulnerabilities: Vulnerability[];
 }
 
 export const AssetDialog = ({
@@ -54,15 +60,17 @@ export const AssetDialog = ({
   onOpenChange,
   onSubmit,
   defaultValues = {},
+  assets = [],
+  vulnerabilities = [],
 }: Props) => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      icon: defaultValues.icon || undefined,
-      label: defaultValues.label || "",
-      description: defaultValues.description || "",
-      cpes: defaultValues.cpes || [],
-      assetIds: defaultValues.assetIds || [],
+      icon: defaultValues.icon ?? "",
+      label: defaultValues.label ?? "",
+      description: defaultValues.description ?? "",
+      cpes: defaultValues.cpes?.map(cpe => ({ value: cpe })) ?? [],
+      assetIds: defaultValues.assetIds?.map(id => ({value: id})) ?? [],
     },
   });
 
@@ -70,17 +78,33 @@ export const AssetDialog = ({
   useEffect(() => {
     if (open) {
       form.reset({
-        icon: defaultValues.icon || undefined,
-        label: defaultValues.label || "",
-        description: defaultValues.description || "",
-        cpes: defaultValues.cpes || [],
-        assetIds: defaultValues.assetIds || [],
+        icon: defaultValues.icon ?? "",
+        label: defaultValues.label ?? "",
+        description: defaultValues.description ?? "",
+        cpes: defaultValues.cpes?.map(cpe => ({ value: cpe })) ?? [],
+        assetIds: defaultValues.assetIds?.map(id => ({value: id})) ?? [],
       });
     }
   }, [open, defaultValues, form]);
 
-  /*const watchMethod = form.watch("method");
-  const showBodyField = ["POST", "PUT", "PATCH"].includes(watchMethod);*/
+
+  const {
+    fields: cpeFields,
+    append: cpeAppend,
+    remove: cpeRemove,
+  } = useFieldArray({
+    name: "cpes",
+    control: form.control,
+  });
+
+  const {
+    fields: assetIdFields,
+    append: assetAppend,
+    remove: assetRemove,
+  } = useFieldArray({
+    name: "assetIds",
+    control: form.control,
+  });
 
   const handleSubmit = (values: z.infer<typeof formSchema>) => {
     onSubmit(values);
@@ -89,13 +113,14 @@ export const AssetDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="overflow-auto max-h-full max-w-[75%]!">
         <DialogHeader>
           <DialogTitle>Device Node</DialogTitle>
           <DialogDescription>
-            Configure which devices are linked to this node 
+            Configure which devices are linked to this node
           </DialogDescription>
         </DialogHeader>
+        <div className="grid grid-cols-2 gap-6">
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(handleSubmit)}
@@ -120,8 +145,10 @@ export const AssetDialog = ({
                       {Object.values(DeviceIconType).map((icon) => {
                         const Icon = getIconByType(icon);
                         return (
-                        <SelectItem value={icon}><Icon /> {icon}</SelectItem>
-                        )
+                          <SelectItem value={icon} key={icon}>
+                            <Icon /> {icon}
+                          </SelectItem>
+                        );
                       })}
                     </SelectContent>
                   </Select>
@@ -136,10 +163,7 @@ export const AssetDialog = ({
                 <FormItem>
                   <FormLabel>Label</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="Infusion Pump"
-                      {...field}
-                    />
+                    <Input placeholder="Infusion Pump" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -167,15 +191,126 @@ export const AssetDialog = ({
             />
             <div>
               <h2 className="font-semibold">Devices</h2>
-              <p className="text-sm text-muted-foreground">Match devices based on cpes, or manually specify them.</p>
+              <p className="text-sm text-muted-foreground">
+                Match devices based on cpes, or manually specify them.
+              </p>
+              <div className="mt-4">
+                <h3 className="text-sm font-medium">CPEs</h3>
+
+                {cpeFields.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Add a CPE pattern to match assets to
+                  </p>
+                )}
+
+                <div className="space-y-2 mt-2">
+                  {cpeFields.map((field, index) => (
+                    <div key={field.id} className="flex gap-2 items-start">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={() => cpeRemove(index)}
+                        aria-label={`Remove CPE ${index + 1}`}
+                      >
+                        <CircleX />
+                      </Button>
+                      <FormField
+                        control={form.control}
+                        name={`cpes.${index}.value`}
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel className="sr-only">
+                              CPE {index + 1}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="cpe:2.3:*:*:*:*:*:*:*:*:*:*:*"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  ))}
+                  <Button type="button" size="sm" onClick={() => cpeAppend({value: ""})}>
+                    Add CPE
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <h3 className="text-sm font-medium">Assets</h3>
+
+                {assetIdFields.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Add an asset id to match individual assets
+                  </p>
+                )}
+
+                <div className="space-y-2 mt-2">
+                  {assetIdFields.map((field, index) => (
+                    <div key={field.id} className="flex gap-2 items-start">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={() => assetRemove(index)}
+                        aria-label={`Remove Asset ${index + 1}`}
+                      >
+                        <CircleX />
+                      </Button>
+                      <FormField
+                        control={form.control}
+                        name={`assetIds.${index}.value`}
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel className="sr-only">
+                              Asset Id {index + 1}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="cmirwmn1f000713yojcsy2ok4"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  ))}
+                  <Button type="button" size="sm" onClick={() => assetAppend({value: ""})}>
+                    Add asset ID
+                  </Button>
+                </div>
+              </div>
+
             </div>
-            <p>TODO: list of cpe inputs, where you can choose to add more of them or not</p>
-            <p>TODO: some way to select assets from a table?</p>
             <DialogFooter className="mt-4">
               <Button type="submit">Save</Button>
             </DialogFooter>
           </form>
         </Form>
+          <div>
+            <h2 className="font-semibold text-lg">Devices</h2>
+            {assets.length > 0 ? (
+              <ul className="pl-4">
+                {assets.map((asset, idx) => (
+                  <li className="list-disc" key={idx}>{asset.role} &bull; {asset.cpe} &bull; {asset.id}</li>
+                ))}
+              </ul>
+              ) : (<p>No devices matched/specified</p>)}
+            <h2 className="font-semibold text-lg mt-4">Vulnerabilities</h2>
+            {vulnerabilities.length > 0 ? (
+              <ul className="pl-4">
+                {vulnerabilities.map((vuln, idx) => (
+                  <li className="list-disc" key={idx}>{vuln.description}</li>
+                ))}
+              </ul>
+              ) : (<p>No vulnerabilities found that affect these devices</p>)}
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

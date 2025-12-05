@@ -59,6 +59,13 @@ const paginatedSettingsResponseSchema = createPaginatedResponseSchema(
   settingsResponseSchema,
 );
 
+const assetsVulnsInputSchema = z.object({
+  assetIds: z.array(z.string()).optional(),
+  cpes: z.array(cpeSchema).optional()
+});
+export type AssetsVulnsInput = z.infer<typeof assetsVulnsInputSchema>;
+
+
 export const assetsRouter = createTRPCRouter({
   // GET /api/assets - List all assets (any authenticated user can see all)
   getMany: protectedProcedure
@@ -75,10 +82,10 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(paginatedAssetResponseSchema)
     .query(async ({ input }) => {
-      const { search } = input;
+      const { search  } = input;
 
       // Build search filter across multiple fields
-      const searchFilter = search
+      const where = search
         ? {
             OR: [
               { ip: { contains: search, mode: "insensitive" as const } },
@@ -88,21 +95,62 @@ export const assetsRouter = createTRPCRouter({
           }
         : {};
 
+
       // Get total count and build pagination metadata
-      const totalCount = await prisma.asset.count({ where: searchFilter });
+      const totalCount = await prisma.asset.count({ where: where });
       const meta = buildPaginationMeta(input, totalCount);
 
       // Fetch paginated items
       const items = await prisma.asset.findMany({
         skip: meta.skip,
         take: meta.take,
-        where: searchFilter,
+        where: where,
         include: { user: userIncludeSelect },
         orderBy: { createdAt: "desc" },
       });
 
       return createPaginatedResponse(items, meta);
     }),
+
+  // Internal API for asset vulnerability matching
+  getManyWithVulns: protectedProcedure
+    .input(assetsVulnsInputSchema)
+    .query(async ({ input }) => {
+      const { cpes, assetIds  } = input;
+
+      const where = {
+        OR: [
+          { id: {in: assetIds} },
+          { cpe: {in: cpes} }
+        // TODO:: ^this needs to be a pattern match, not just "in"
+        ]
+      }
+      const assetsCount = await prisma.asset.count({ where: where });
+
+      const assetItems = await prisma.asset.findMany({
+        where: where,
+        include: { user: userIncludeSelect },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const assetCpes = assetItems.map(asset => asset.cpe).filter(Boolean);
+      const allCpes = [...new Set([...cpes ?? [], ...assetCpes])];
+
+      const vulnsWhere = { cpe: {in: allCpes} }
+      const vulnsCount = await prisma.vulnerability.count({ where: vulnsWhere });
+      const vulnerabilities = await prisma.vulnerability.findMany({
+        where: vulnsWhere 
+      });
+
+
+      return {
+        assets: assetItems,
+        assetsCount,
+        vulnerabilities,
+        vulnerabilitiesCount: vulnsCount
+      };
+    }),
+
 
   // GET /api/assets/{asset_id} - Get single asset (any authenticated user can access)
   getOne: protectedProcedure

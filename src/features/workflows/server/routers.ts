@@ -12,6 +12,7 @@ import {
 } from "@/lib/pagination";
 
 export const workflowsRouter = createTRPCRouter({
+  // TODO: we probably don't need this code here
   execute: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
@@ -46,7 +47,6 @@ export const workflowsRouter = createTRPCRouter({
       return prisma.workflow.delete({
         where: {
           id: input.id,
-          userId: ctx.auth.user.id,
         },
       });
     }),
@@ -76,7 +76,7 @@ export const workflowsRouter = createTRPCRouter({
       const { id, nodes, edges } = input;
 
       const workflow = await prisma.workflow.findUniqueOrThrow({
-        where: { id, userId: ctx.auth.user.id },
+        where: { id },
       });
 
       // Transaction to ensure consistency

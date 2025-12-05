@@ -33,7 +33,7 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
 const formSchema = z.object({
-  icon: z.string().optional(),
+  //icon: z.string().optional(),
   label: z.string().optional(),
   description: z.string().optional(),
 });
@@ -55,7 +55,7 @@ export const StepDialog = ({
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      icon: defaultValues.icon || undefined,
+      //icon: defaultValues.icon || "",
       label: defaultValues.label || "",
       description: defaultValues.description || "",
     },
@@ -65,7 +65,7 @@ export const StepDialog = ({
   useEffect(() => {
     if (open) {
       form.reset({
-        icon: defaultValues.icon || undefined,
+        //icon: defaultValues.icon || "",
         label: defaultValues.label || "",
         description: defaultValues.description || "",
       });
@@ -91,8 +91,7 @@ export const StepDialog = ({
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-8 mt-4"
           >
-            {/*TODO: bring this back, just also add a *bunch* of icons here with generic medical purposes...
-            <FormField
+            {/* TODO: add custom icons for these guys <FormField
               control={form.control}
               name="icon"
               render={({ field }) => (
@@ -127,10 +126,7 @@ export const StepDialog = ({
                 <FormItem>
                   <FormLabel>Label</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="Draw blood"
-                      {...field}
-                    />
+                    <Input placeholder="Draw blood" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

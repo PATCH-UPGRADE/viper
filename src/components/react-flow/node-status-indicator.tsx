@@ -3,7 +3,12 @@ import { LoaderCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-export type NodeStatus = "loading" | "success" | "error" | "initial";
+export type NodeStatus =
+  | "loading"
+  | "success"
+  | "error"
+  | "initial"
+  | "vulnerable";
 
 export type NodeStatusVariant = "overlay" | "border";
 
@@ -120,6 +125,7 @@ export const NodeStatusIndicator = ({
           {children}
         </StatusBorder>
       );
+    case "vulnerable":
     case "error":
       return (
         <StatusBorder className={cn("border-red-700/50", className)}>

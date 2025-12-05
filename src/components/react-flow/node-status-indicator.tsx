@@ -3,7 +3,12 @@ import { LoaderCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-export type NodeStatus = "loading" | "success" | "error" | "initial" | "vulnerable";
+export type NodeStatus =
+  | "loading"
+  | "success"
+  | "error"
+  | "initial"
+  | "vulnerable";
 
 export type NodeStatusVariant = "overlay" | "border";
 

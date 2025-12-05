@@ -37,9 +37,8 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
               ...node.data,
               ...values,
               // Transform data from objects (for useFieldArray to work) into array
-              cpes: values.cpes?.map(cpe => cpe.value),
-              assetIds: values.assetIds?.map(id => id.value),
-
+              cpes: values.cpes?.map((cpe) => cpe.value),
+              assetIds: values.assetIds?.map((id) => id.value),
             },
           };
         }
@@ -50,13 +49,16 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
 
   const nodeData = props.data;
 
-  const assetsWithVulns = useSuspenseAssetsVulns({assetIds: nodeData.assetIds ?? [], cpes: nodeData.cpes ?? []})
-  const numVulns = assetsWithVulns.data.vulnerabilitiesCount
-  const numAssets = assetsWithVulns.data.assetsCount
+  const assetsWithVulns = useSuspenseAssetsVulns({
+    assetIds: nodeData.assetIds ?? [],
+    cpes: nodeData.cpes ?? [],
+  });
+  const numVulns = assetsWithVulns.data.vulnerabilitiesCount;
+  const numAssets = assetsWithVulns.data.assetsCount;
 
   const nodeStatus = numVulns > 0 ? "vulnerable" : "initial";
 
-  const description = nodeData.description; 
+  const description = nodeData.description;
 
   const Icon = nodeData.icon
     ? getIconByType(nodeData.icon as DeviceIconType)
@@ -70,7 +72,9 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
         onSubmit={handleSubmit}
         defaultValues={nodeData}
         assets={assetsWithVulns ? assetsWithVulns.data.assets : []}
-        vulnerabilities={assetsWithVulns ? assetsWithVulns.data.vulnerabilities : []}
+        vulnerabilities={
+          assetsWithVulns ? assetsWithVulns.data.vulnerabilities : []
+        }
       />
       <BaseAssetNode
         {...props}
@@ -82,12 +86,26 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
         onSettings={handleOpenSettings}
         onDoubleClick={handleOpenSettings}
       >
-        <div className="absolute top-0 left-0 flex flex-col gap-0.5" style={{ transform: 'translate(-100%)', marginLeft: '-0.5rem' }}>
-          <Badge className={cn("text-[6px]", numAssets === 0 ? "border-red-500" : "")} variant="outline">
-            <ComputerIcon className="w-2! h-2!" />{numAssets}
+        <div
+          className="absolute top-0 left-0 flex flex-col gap-0.5"
+          style={{ transform: "translate(-100%)", marginLeft: "-0.5rem" }}
+        >
+          <Badge
+            className={cn(
+              "text-[6px]",
+              numAssets === 0 ? "border-red-500" : "",
+            )}
+            variant="outline"
+          >
+            <ComputerIcon className="w-2! h-2!" />
+            {numAssets}
           </Badge>
-          <Badge className={cn("text-[6px]", numVulns > 0 ? "border-red-500" : "")} variant="outline">
-            <BugIcon className="w-2! h-2!" />{numVulns}
+          <Badge
+            className={cn("text-[6px]", numVulns > 0 ? "border-red-500" : "")}
+            variant="outline"
+          >
+            <BugIcon className="w-2! h-2!" />
+            {numVulns}
           </Badge>
         </div>
       </BaseAssetNode>

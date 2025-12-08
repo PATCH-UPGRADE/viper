@@ -4,7 +4,6 @@ import { createId } from "@paralleldrive/cuid2";
 import { useReactFlow } from "@xyflow/react";
 import { PlusIcon, SyringeIcon } from "lucide-react";
 import { useCallback, useState } from "react";
-import { toast } from "sonner";
 import {
   Sheet,
   SheetContent,
@@ -15,7 +14,6 @@ import {
 } from "@/components/ui/sheet";
 import { NodeType } from "@/generated/prisma";
 import { Separator } from "./ui/separator";
-import { se } from "date-fns/locale";
 import { Button } from "./ui/button";
 import { DeviceIconType, getIconByType } from "@/features/asset-nodes/types";
 
@@ -72,12 +70,12 @@ const NodeTemplateMenuItem = ({
   nodeTemplate,
   onClick,
 }: {
-  nodeTemplate: any;
+  nodeTemplate: NodeTypeOption;
   onClick?: () => void;
 }) => {
   const Icon =
     typeof nodeTemplate.icon === "string"
-      ? getIconByType(nodeTemplate.icon)
+      ? (getIconByType(nodeTemplate.icon as DeviceIconType) ?? SyringeIcon)
       : nodeTemplate.icon;
   return (
     <div

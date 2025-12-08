@@ -12,6 +12,7 @@ import {
   NodeStatusIndicator,
 } from "@/components/react-flow/node-status-indicator";
 import { NodeType } from "@/generated/prisma";
+import { createId } from "@paralleldrive/cuid2";
 
 interface BaseStepNodeProps extends NodeProps {
   icon: LucideIcon | string;
@@ -43,7 +44,7 @@ export const BaseStepNode = memo(
           updatedNodes.push({
             type: NodeType.INITIAL,
             position: { x: 0, y: 0 },
-            id: "",
+            id: createId(),
             data: {},
           });
         }

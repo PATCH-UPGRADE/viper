@@ -137,10 +137,7 @@ export const AssetDialog = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Icon</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={defaultValues.icon}
-                    >
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Select a method" />

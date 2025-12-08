@@ -102,7 +102,7 @@ enum NodeType {
   INITIAL
   MANUAL_TRIGGER
   HTTP_REQUEST
-  STEP // a step in a clincial workflow
+  STEP // a step in a clinical workflow
   ASSET // linked to medical assets
 }
 

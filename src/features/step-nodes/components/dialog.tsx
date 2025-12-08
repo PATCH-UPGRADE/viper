@@ -83,7 +83,7 @@ export const StepDialog = ({
         <DialogHeader>
           <DialogTitle>Action Node</DialogTitle>
           <DialogDescription>
-            What happens during this step of the clincial workflow?
+            What happens during this step of the clinical workflow?
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>

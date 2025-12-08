@@ -1,19 +1,7 @@
-/*export type WorkflowContext = Record<string, unknown>;
-
-export interface NodeExecutorParams<TData = Record<string, unknown>> {
-  data: TData;
-  nodeId: string;
-  context: WorkflowContext;
-}
-
-export type NodeExecutor<TData = Record<string, unknown>> = (
-  params: NodeExecutorParams<TData>,
-) => Promise<WorkflowContext>;*/
-
 import { ComputerIcon, MonitorIcon, SyringeIcon } from "lucide-react";
 
 export enum DeviceIconType {
-  WOW = "Workstaion on Wheels",
+  WOW = "Workstation on Wheels",
   InfusionPump = "Infusion Pump",
   PatientMonitor = "Patient Monitor",
 }

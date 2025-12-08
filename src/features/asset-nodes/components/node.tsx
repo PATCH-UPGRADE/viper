@@ -61,7 +61,7 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
   const description = nodeData.description;
 
   const Icon = nodeData.icon
-    ? getIconByType(nodeData.icon as DeviceIconType)
+    ? (getIconByType(nodeData.icon as DeviceIconType) ?? CircleQuestionMark)
     : CircleQuestionMark;
 
   return (

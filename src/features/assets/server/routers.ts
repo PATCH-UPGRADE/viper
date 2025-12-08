@@ -116,10 +116,23 @@ export const assetsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { cpes, assetIds } = input;
 
+      // Return empty results if no filters provided
+      if (
+        (!assetIds || assetIds.length === 0) &&
+        (!cpes || cpes.length === 0)
+      ) {
+        return {
+          assets: [],
+          assetsCount: 0,
+          vulnerabilities: [],
+          vulnerabilitiesCount: 0,
+        };
+      }
+
       const where = {
         OR: [
-          { id: { in: assetIds } },
-          { cpe: { in: cpes } },
+          ...(assetIds?.length ? [{ id: { in: assetIds } }] : []),
+          ...(cpes?.length ? [{ cpe: { in: cpes } }] : []),
           // TODO:: ^this needs to be a pattern match, not just "in"
         ],
       };

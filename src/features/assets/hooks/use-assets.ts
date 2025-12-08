@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAssetsParams } from "./use-assets-params";
+import { AssetsVulnsInput } from "../server/routers";
 
 /**
  * Hook to fetch all assets using suspense
@@ -15,6 +16,15 @@ export const useSuspenseAssets = () => {
   const [params] = useAssetsParams();
 
   return useSuspenseQuery(trpc.assets.getMany.queryOptions(params));
+};
+
+/**
+ * Hook to fetch all assets with matching vulnerabilities using suspense
+ */
+export const useSuspenseAssetsVulns = (params: AssetsVulnsInput) => {
+  const trpc = useTRPC();
+
+  return useSuspenseQuery(trpc.assets.getManyWithVulns.queryOptions(params));
 };
 
 /**

@@ -54,17 +54,13 @@ export const useRemoveWorkflow = () => {
     trpc.workflows.remove.mutationOptions({
       onSuccess: (data) => {
         toast.success(`Workflow "${data.name}" removed`);
-        // Invalidate all getMany and getOne queries regardless of params
-        queryClient.invalidateQueries({
-          predicate: (query) => {
-            const getManyKey = trpc.workflows.getMany.queryKey();
-            const getOneKey = trpc.workflows.getOne.queryKey();
-            return (
-              query.queryKey[0] === getManyKey[0] ||
-              query.queryKey[0] === getOneKey[0]
-            );
-          },
-        });
+        queryClient.invalidateQueries(trpc.workflows.getMany.queryOptions({}));
+        queryClient.invalidateQueries(
+          trpc.workflows.getOne.queryFilter({ id: data.id }),
+        );
+      },
+      onError: (error) => {
+        toast.error(`Failed to remove workflow: ${error.message}`);
       },
     }),
   );

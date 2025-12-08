@@ -10,7 +10,7 @@ export async function POST() {
         message: "Invalid or missing auth",
       },
       { status: 401 },
-    )
+    );
 
   const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
   const n8nKey = process.env.N8N_KEY;

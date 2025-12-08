@@ -62,12 +62,14 @@ export const RecommendationsPage = () => {
 
       console.log("Chunk:", chunk);
       try {
-        pushChunk(requestId, normalizeChunk(chunk));
+        const normalized = normalizeChunk(chunk);
+        if (normalized.type === "end") {
+          break;
+        }
+        pushChunk(requestId, normalized);
       } catch (error) {
         console.error(error);
       }
-      // optional: update UI
-      // setOutput(prev => prev + chunk);
     }
   }
 
@@ -109,7 +111,11 @@ export const RecommendationsPage = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="markdown">
-                        {!markdownStr ? (<Spinner />) : (<Markdown>{markdownStr}</Markdown>)}
+                        {!markdownStr ? (
+                          <Spinner />
+                        ) : (
+                          <Markdown>{markdownStr}</Markdown>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

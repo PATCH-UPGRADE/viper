@@ -2,9 +2,8 @@
 
 import { createId } from "@paralleldrive/cuid2";
 import { useReactFlow } from "@xyflow/react";
-import { GlobeIcon, MousePointerIcon, SyringeIcon } from "lucide-react";
-import { useCallback } from "react";
-import { toast } from "sonner";
+import { PlusIcon, SyringeIcon } from "lucide-react";
+import { useCallback, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -15,7 +14,8 @@ import {
 } from "@/components/ui/sheet";
 import { NodeType } from "@/generated/prisma";
 import { Separator } from "./ui/separator";
-import { se } from "date-fns/locale";
+import { Button } from "./ui/button";
+import { DeviceIconType, getIconByType } from "@/features/asset-nodes/types";
 
 export type NodeTypeOption = {
   type: NodeType;
@@ -24,49 +24,39 @@ export type NodeTypeOption = {
   icon: React.ComponentType<{ className?: string }> | string;
 };
 
-const triggerNodes: NodeTypeOption[] = [
+const actionNodes: NodeTypeOption[] = [
   {
-    type: NodeType.MANUAL_TRIGGER,
-    label: "Trigger manually",
-    description:
-      "Runs the flow on clicking a button. Good for getting started quickly",
-    icon: MousePointerIcon,
-  },
-];
-
-const executionNodes: NodeTypeOption[] = [
-  {
-    type: NodeType.HTTP_REQUEST,
-    label: "HTTP Request",
-    description: "Makes an HTTP request",
-    icon: GlobeIcon,
-  },
-];
-
-const deviceNodeTypes: NodeTypeOption[] = [
-  {
-    type: NodeType.HTTP_REQUEST,
-    label: "Infusion Pump",
-    description: "Models an Infusion Pump",
-    icon: SyringeIcon,
-  },
-  {
-    type: NodeType.HTTP_REQUEST,
-    label: "EMR",
-    description: "Electronic Medical Record System",
-    icon: SyringeIcon,
-  },
-  {
-    type: NodeType.HTTP_REQUEST,
+    type: NodeType.STEP,
     label: "Prepare Medication",
     description: "Prepare medication for administration",
     icon: SyringeIcon,
   },
   {
-    type: NodeType.HTTP_REQUEST,
+    type: NodeType.STEP,
     label: "Blood Draw",
     description: "Patient blood draw procedure",
     icon: SyringeIcon,
+  },
+];
+
+const deviceNodeTypes: NodeTypeOption[] = [
+  {
+    type: NodeType.ASSET,
+    icon: DeviceIconType.InfusionPump,
+    label: "Infusion Pump",
+    description: "Models an Infusion Pump",
+  },
+  {
+    type: NodeType.ASSET,
+    icon: DeviceIconType.PatientMonitor,
+    label: "Patient Monitor",
+    description: "Models a patient monitor",
+  },
+  {
+    type: NodeType.ASSET,
+    icon: DeviceIconType.WOW,
+    label: "Workstation on Wheels",
+    description: "Models a workstation on wheels",
   },
 ];
 
@@ -76,6 +66,59 @@ interface NodeSelectorProps {
   children: React.ReactNode;
 }
 
+const NodeTemplateMenuItem = ({
+  nodeTemplate,
+  onClick,
+}: {
+  nodeTemplate: NodeTypeOption;
+  onClick?: () => void;
+}) => {
+  const Icon =
+    typeof nodeTemplate.icon === "string"
+      ? (getIconByType(nodeTemplate.icon as DeviceIconType) ?? SyringeIcon)
+      : nodeTemplate.icon;
+  return (
+    <div
+      key={nodeTemplate.label}
+      className="w-full justify-start h-auto py-5 px-4 rounded-none cursor-pointer border-l-2 border-transparent hover:border-l-primary"
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-6 w-full overflow-hidden">
+        <Icon className="size-5" />
+        <div className="flex flex-col items-start text-left">
+          <span className="font-medium text-sm">{nodeTemplate.label}</span>
+          <span className="text-xs text-muted-foreground">
+            {nodeTemplate.description}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const NodeTemplateCreateSheet = ({
+  nodeType,
+  open,
+  setOpen,
+}: {
+  nodeType?: NodeType;
+  open: boolean;
+  setOpen: (b: boolean) => void;
+}) => {
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="text-lg">
+            Create {nodeType === NodeType.ASSET ? "Device" : "Action"} Node
+          </SheetTitle>
+        </SheetHeader>
+        <p>TODO</p>
+      </SheetContent>
+    </Sheet>
+  );
+};
+
 export function NodeSelector({
   open,
   onOpenChange,
@@ -83,21 +126,17 @@ export function NodeSelector({
 }: NodeSelectorProps) {
   const { setNodes, getNodes, screenToFlowPosition } = useReactFlow();
 
+  const [openModal, setOpenModal] = useState(false);
+  const [nodeType, setNodeType] = useState<NodeType | undefined>(undefined);
+
+  const addNodeTemplate = (nodeType: NodeType) => {
+    setNodeType(nodeType);
+    setOpenModal(true);
+    return;
+  };
+
   const handleNodeSelect = useCallback(
     (selection: NodeTypeOption) => {
-      // Check if trying to add a manual trigger when one already exists
-      if (selection.type === NodeType.MANUAL_TRIGGER) {
-        const nodes = getNodes();
-        const hasManualTrigger = nodes.some(
-          (node) => node.type === NodeType.MANUAL_TRIGGER,
-        );
-
-        if (hasManualTrigger) {
-          toast.error("Only one manual trigger is allowed per workflow");
-          return;
-        }
-      }
-
       setNodes((nodes) => {
         const hasInitialTrigger = nodes.some(
           (node) => node.type === NodeType.INITIAL,
@@ -123,6 +162,7 @@ export function NodeSelector({
         };
 
         if (hasInitialTrigger) {
+          newNode.position = { x: 0, y: 0 };
           return [newNode];
         }
 
@@ -135,117 +175,74 @@ export function NodeSelector({
   );
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>What triggers this workflow?</SheetTitle>
-          <SheetDescription>
-            A trigger is a step that starts your workflow.
-          </SheetDescription>
-        </SheetHeader>
-        <div>
-          {triggerNodes.map((nodeType) => {
-            const Icon = nodeType.icon;
-
-            return (
-              <div
-                key={nodeType.label}
-                className="w-full justify-start h-auto py-5 px-4 rounded-none cursor-pointer border-l-2 border-transparent hover:border-l-primary"
-                onClick={() => handleNodeSelect(nodeType)}
-              >
-                <div className="flex items-center gap-6 w-full overflow-hidden">
-                  {typeof Icon === "string" ? (
-                    <img
-                      src={Icon}
-                      alt={nodeType.label}
-                      className="size-5 object-contain rounded-sm"
-                    />
-                  ) : (
-                    <Icon className="size-5" />
-                  )}
-                  <div className="flex flex-col items-start text-left">
-                    <span className="font-medium text-sm">
-                      {nodeType.label}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {nodeType.description}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <Separator />
-        <div>
-          {executionNodes.map((nodeType) => {
-            const Icon = nodeType.icon;
-
-            return (
-              <div
-                key={nodeType.label}
-                className="w-full justify-start h-auto py-5 px-4 rounded-none cursor-pointer border-l-2 border-transparent hover:border-l-primary"
-                onClick={() => handleNodeSelect(nodeType)}
-              >
-                <div className="flex items-center gap-6 w-full overflow-hidden">
-                  {typeof Icon === "string" ? (
-                    <img
-                      src={Icon}
-                      alt={nodeType.label}
-                      className="size-5 object-contain rounded-sm"
-                    />
-                  ) : (
-                    <Icon className="size-5" />
-                  )}
-                  <div className="flex flex-col items-start text-left">
-                    <span className="font-medium text-sm">
-                      {nodeType.label}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {nodeType.description}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <Separator />
-        <div>
-          {deviceNodeTypes.map((nodeType) => {
-            const Icon = nodeType.icon;
-
-            return (
-              <div
-                key={nodeType.label}
-                className="w-full justify-start h-auto py-5 px-4 rounded-none cursor-pointer border-l-2 border-transparent hover:border-l-primary"
-                onClick={() => handleNodeSelect(nodeType)}
-              >
-                <div className="flex items-center gap-6 w-full overflow-hidden">
-                  {typeof Icon === "string" ? (
-                    <img
-                      src={Icon}
-                      alt={nodeType.label}
-                      className="size-5 object-contain rounded-sm"
-                    />
-                  ) : (
-                    <Icon className="size-5" />
-                  )}
-                  <div className="flex flex-col items-start text-left">
-                    <span className="font-medium text-sm">
-                      {nodeType.label}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {nodeType.description}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </SheetContent>
-    </Sheet>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetTrigger asChild>{children}</SheetTrigger>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-md overflow-y-auto"
+        >
+          <SheetHeader>
+            <SheetTitle className="text-lg">What happens next?</SheetTitle>
+            <SheetDescription>
+              Select a node for this clinical workflow.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4">
+            <h3 className="font-semibold">Action Nodes</h3>
+            <p className="text-sm mt-2 text-muted-foreground">
+              Represents a clinical or operational action
+            </p>
+          </div>
+          <div>
+            {actionNodes.map((nodeType, idx) => {
+              return (
+                <NodeTemplateMenuItem
+                  key={`node-menu-${nodeType.type}-${idx}`}
+                  nodeTemplate={nodeType}
+                  onClick={() => handleNodeSelect(nodeType)}
+                />
+              );
+            })}
+            <Button
+              className="mx-4 mt-4"
+              onClick={() => addNodeTemplate(NodeType.STEP)}
+            >
+              New action node <PlusIcon />
+            </Button>
+          </div>
+          <Separator />
+          <div className="px-4">
+            <h3 className="font-semibold">Device Nodes</h3>
+            <p className="text-sm mt-2 text-muted-foreground">
+              Represents the explicit use of a medical device or asset
+            </p>
+          </div>
+          <div>
+            {deviceNodeTypes.map((nodeType, idx) => {
+              return (
+                <NodeTemplateMenuItem
+                  key={`node-menu-${nodeType.type}-${idx}`}
+                  nodeTemplate={nodeType}
+                  onClick={() => handleNodeSelect(nodeType)}
+                />
+              );
+            })}
+            {/*TODO: this should actually be relatively easy? just re-use the form i created in `dialog.tsx`, then make a new node...*/}
+            <Button
+              className="mx-4 mt-4"
+              onClick={() => addNodeTemplate(NodeType.ASSET)}
+            >
+              New device node <PlusIcon />
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+      <NodeTemplateCreateSheet
+        nodeType={nodeType}
+        open={openModal}
+        setOpen={setOpenModal}
+      />
+    </>
   );
 }

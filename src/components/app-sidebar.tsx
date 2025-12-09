@@ -12,6 +12,7 @@ import {
   LogOutIcon,
   BookIcon,
   ExternalLink,
+  ShieldCheckIcon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -27,9 +28,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { authClient } from "@/lib/auth-client";
 import { NavUser } from "./nav-user";
-import { User } from "@/generated/prisma";
 
 const menuItems = [
   {
@@ -51,19 +50,24 @@ const menuItems = [
         url: "/assets",
       },
       {
-        title: "Emulators",
-        icon: CpuIcon,
-        url: "/emulators",
-      },
-      {
         title: "Vulnerabilities",
         icon: BugIcon,
         url: "/vulnerabilities",
       },
       {
+        title: "Emulators",
+        icon: CpuIcon,
+        url: "/emulators",
+      },
+      {
         title: "Remediations",
         icon: HeartIcon,
         url: "/remediations",
+      },
+      {
+        title: "Recommendations",
+        icon: ShieldCheckIcon,
+        url: "/recommendations",
       },
       {
         title: "Integrations",

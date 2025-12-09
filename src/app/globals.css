@@ -210,3 +210,20 @@
 .react-flow__node.selected #base-node {
   @apply ring-3 ring-muted-foreground/25 shadow-lg;
 }
+
+.markdown {
+  line-height: 1.5;
+}
+.markdown p {
+  margin: 0.5rem 0;
+}
+.markdown ul li {
+  list-style: disc;
+}
+.markdown ol li {
+  list-style: decimal;
+}
+.markdown ol,
+.markdown ul {
+  padding-left: 40px;
+}

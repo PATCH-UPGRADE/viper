@@ -26,7 +26,6 @@ export const RecommendationsPage = () => {
       ...prev,
       [reqId]: [...(prev[reqId] || []), c],
     }));
-    setLoading(false);
   };
 
   const normalizeChunk = (input: string): Chunk => {

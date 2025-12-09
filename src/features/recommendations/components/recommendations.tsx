@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import Markdown from "react-markdown";
 import { Spinner } from "@/components/ui/spinner";
+import { toast } from "sonner";
 
 type Chunk = {
   type: string;
@@ -39,7 +40,8 @@ export const RecommendationsPage = () => {
   };
 
   async function getRecommendation() {
-    setRequestId(requestId + 1);
+    const newRequestId = requestId + 1;
+    setRequestId(newRequestId);
     setLoading(true);
 
     // TODO: eventually make this use trpc...
@@ -48,7 +50,10 @@ export const RecommendationsPage = () => {
     });
 
     if (!res.ok || !res.body) {
-      throw new Error(`HTTP error! status: ${res.status}`);
+      setLoading(false);
+      toast.error("Error reaching n8n");
+      console.error(`HTTP error! status: ${res.status}`);
+      return;
     }
 
     const reader = res.body.getReader();
@@ -59,14 +64,14 @@ export const RecommendationsPage = () => {
       setLoading(false);
       if (done) break;
       const chunk = decoder.decode(value);
+      console.log(chunk);
 
-      console.log("Chunk:", chunk);
       try {
         const normalized = normalizeChunk(chunk);
         if (normalized.type === "end") {
           break;
         }
-        pushChunk(requestId, normalized);
+        pushChunk(newRequestId, normalized);
       } catch (error) {
         console.error(error);
       }

@@ -15,16 +15,45 @@ export async function POST() {
   const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
   const n8nKey = process.env.N8N_KEY;
   if (!n8nKey || !n8nWebhookUrl) {
-    throw new Error("Missing required env vars");
+    return NextResponse.json(
+      {
+        error: "Configuration error",
+        message: "N8N integration not configured",
+      },
+      { status: 500 },
+    );
   }
 
-  const res = await fetch(n8nWebhookUrl, {
-    method: "POST",
-    headers: { Authorization: n8nKey },
-  });
+  let res: Response;
+  try {
+    res = await fetch(n8nWebhookUrl, {
+      method: "POST",
+      headers: { Authorization: n8nKey },
+      signal: AbortSignal.timeout(30000), // 30s timeout
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Upstream error", message: "Failed to reach N8N webhook" },
+      { status: 502 },
+    );
+  }
+
+  if (!res.ok) {
+    return NextResponse.json(
+      { error: "Upstream error", message: `N8N returned ${res.status}` },
+      { status: 502 },
+    );
+  }
+
+  if (!res.body) {
+    return NextResponse.json(
+      { error: "Upstream error", message: "No response body from N8N" },
+      { status: 502 },
+    );
+  }
 
   const { readable, writable } = new TransformStream();
-  res.body?.pipeTo(writable);
+  res.body.pipeTo(writable);
 
   return new Response(readable, {
     headers: {

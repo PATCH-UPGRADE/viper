@@ -35,6 +35,9 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { AssetWithIssues } from "@/lib/db";
+import Link from "next/link";
+import { IssueStatusBadge } from "@/features/issues/components/issue";
 
 export const AssetsSearch = () => {
   const [params, setParams] = useAssetsParams();
@@ -120,7 +123,7 @@ export const AssetsEmpty = () => {
   );
 };
 
-export const AssetItem = ({ data }: { data: Asset }) => {
+export const AssetItem = ({ data }: { data: AssetWithIssues }) => {
   const removeAsset = useRemoveAsset();
 
   const handleRemove = () => {
@@ -137,6 +140,7 @@ export const AssetItem = ({ data }: { data: Asset }) => {
         <div className="text-xs text-muted-foreground mt-1">
           {data.ip} &bull; {data.cpe.split(":").slice(3, 5).join(" ")} &bull;
           Updated {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
+          {data.issues && data.issues.length >= 1 && (<>{" "}&bull; <span className="text-red-500">{data.issues.length} issue(s)</span></>)}
         </div>
       </div>
       <Button
@@ -151,7 +155,7 @@ export const AssetItem = ({ data }: { data: Asset }) => {
   );
 };
 
-function AssetDrawer({ asset }: { asset: Asset }) {
+function AssetDrawer({ asset }: { asset: AssetWithIssues }) {
   const isMobile = useIsMobile();
 
   return (
@@ -269,6 +273,25 @@ function AssetDrawer({ asset }: { asset: Asset }) {
                   {asset.id}
                 </code>
               </div>
+            </div>
+
+            <Separator />
+
+            {/* Issues */}
+            <div className="flex flex-col gap-3">
+              <h3 className="font-semibold">Issues</h3>
+              {asset.issues.length === 0 ? (
+                <p className="text-xs">Asset has no issues!</p>
+              ) : (
+                <ul className="list-disc pl-8">
+                  {asset.issues.map((issue) => (
+                      <li><Link className="text-xs text-primary hover:underline flex items-center gap-1" href={`issues/${issue.id}`}>
+                        <IssueStatusBadge status={issue.status} />
+                        Issue
+                      </Link></li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { vulnerabilitiesRouter } from "@/features/vulnerabilities/server/routers
 import { remediationsRouter } from "@/features/remediations/server/routers";
 import { emulatorsRouter } from "@/features/emulators/server/routers";
 import { userRouter } from "@/features/user/server/routers";
+import { issuesRouter } from "@/features/issues/server/routers";
 
 export const appRouter = createTRPCRouter({
   workflows: workflowsRouter,
@@ -13,6 +14,7 @@ export const appRouter = createTRPCRouter({
   remediations: remediationsRouter,
   emulators: emulatorsRouter,
   user: userRouter,
+  issues: issuesRouter,
 });
 // export type definition of API
 export type AppRouter = typeof appRouter;

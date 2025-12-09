@@ -30,7 +30,7 @@ import {
 type EntityHeaderProps = {
   title: string;
   description?: string;
-  newButtonLabel: string;
+  newButtonLabel?: string;
   disabled?: boolean;
   isCreating?: boolean;
 } & (
@@ -61,14 +61,14 @@ export const EntityHeader = ({
       {onNew && !newButtonHref && (
         <Button disabled={isCreating || disabled} size="sm" onClick={onNew}>
           <PlusIcon className="size-4" />
-          {newButtonLabel}
+          {newButtonLabel || "New"}
         </Button>
       )}
       {newButtonHref && !onNew && (
         <Button size="sm" asChild>
           <Link href={newButtonHref} prefetch>
             <PlusIcon className="size-4" />
-            {newButtonLabel}
+            {newButtonLabel || "New"}
           </Link>
         </Button>
       )}

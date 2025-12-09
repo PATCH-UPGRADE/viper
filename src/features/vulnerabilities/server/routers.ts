@@ -94,6 +94,43 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       return createPaginatedResponse(items, meta);
     }),
 
+
+  getManyInternal: protectedProcedure
+    .input(paginationInputSchema)
+    .query(async ({ input }) => {
+      const { search } = input;
+
+      // Build search filter across multiple fields
+      const searchFilter = search
+        ? {
+            OR: [
+              { cpe: { contains: search, mode: "insensitive" as const } },
+              {
+                description: { contains: search, mode: "insensitive" as const },
+              },
+              { impact: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : {};
+
+      // Get total count and build pagination metadata
+      const totalCount = await prisma.vulnerability.count({
+        where: searchFilter,
+      });
+      const meta = buildPaginationMeta(input, totalCount);
+
+      // Fetch paginated items
+      const items = await prisma.vulnerability.findMany({
+        skip: meta.skip,
+        take: meta.take,
+        where: searchFilter,
+        include: { user: userIncludeSelect, issues: true },
+        orderBy: { createdAt: "desc" },
+      });
+
+      return createPaginatedResponse(items, meta);
+    }),
+
   // GET /api/vulnerabilities/{id} - Get single vulnerability (any authenticated user can access)
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))

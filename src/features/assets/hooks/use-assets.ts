@@ -15,7 +15,7 @@ export const useSuspenseAssets = () => {
   const trpc = useTRPC();
   const [params] = useAssetsParams();
 
-  return useSuspenseQuery(trpc.assets.getMany.queryOptions(params));
+  return useSuspenseQuery(trpc.assets.getManyInternal.queryOptions(params));
 };
 
 /**

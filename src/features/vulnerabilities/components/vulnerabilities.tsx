@@ -122,7 +122,18 @@ export const VulnerabilitiesEmpty = () => {
   );
 };
 
-export const VulnerabilityItem = ({ data }: { data: VulnerabilityWithIssues }) => {
+function isVulnerabilityWithIssues(
+  data: Vulnerability | VulnerabilityWithIssues,
+): data is VulnerabilityWithIssues {
+  return (data as VulnerabilityWithIssues).issues !== undefined;
+}
+
+export const VulnerabilityItem = ({
+  data,
+}: {
+  data: VulnerabilityWithIssues | Vulnerability;
+}) => {
+  const hasIssues = isVulnerabilityWithIssues(data);
   const removeVulnerability = useRemoveVulnerability();
 
   const handleRemove = () => {
@@ -140,7 +151,15 @@ export const VulnerabilityItem = ({ data }: { data: VulnerabilityWithIssues }) =
           {data.description.substring(0, 100)}
           {data.description.length > 100 ? "..." : ""} &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
-          {data.issues.length >= 1 && (<>{" "}&bull; <span className="text-red-500">{data.issues.length} issue(s)</span></>)}
+          {hasIssues && data.issues.length >= 1 && (
+            <>
+              {" "}
+              &bull;{" "}
+              <span className="text-red-500">
+                {data.issues.length} issue(s)
+              </span>
+            </>
+          )}
         </div>
       </div>
       <Button
@@ -158,8 +177,9 @@ export const VulnerabilityItem = ({ data }: { data: VulnerabilityWithIssues }) =
 function VulnerabilityDrawer({
   vulnerability,
 }: {
-  vulnerability: VulnerabilityWithIssues;
+  vulnerability: VulnerabilityWithIssues | Vulnerability;
 }) {
+  const hasIssues = isVulnerabilityWithIssues(vulnerability);
   const isMobile = useIsMobile();
 
   return (
@@ -270,24 +290,33 @@ function VulnerabilityDrawer({
             </pre>
           </div>
 
-          <Separator />
-
           {/* Issues */}
-          <div className="flex flex-col gap-3">
-            <h3 className="font-semibold">Issues</h3>
-            {vulnerability.issues.length === 0 ? (
-              <p className="text-xs">Asset has no issues!</p>
-            ) : (
-              <ul className="list-disc pl-8">
-                {vulnerability.issues.map((issue) => (
-                    <li><Link className="text-xs text-primary hover:underline flex items-center gap-1" href={`issues/${issue.id}`}>
-                      <IssueStatusBadge status={issue.status} />
-                      Issue
-                    </Link></li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {hasIssues && (
+            <>
+              <Separator />
+
+              <div className="flex flex-col gap-3">
+                <h3 className="font-semibold">Issues</h3>
+                {vulnerability.issues.length === 0 ? (
+                  <p className="text-xs">Asset has no issues!</p>
+                ) : (
+                  <ul className="list-disc pl-8">
+                    {vulnerability.issues.map((issue) => (
+                      <li>
+                        <Link
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                          href={`issues/${issue.id}`}
+                        >
+                          <IssueStatusBadge status={issue.status} />
+                          Issue
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         <DrawerFooter>

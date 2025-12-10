@@ -14,7 +14,9 @@ export const useSuspenseVulnerabilities = () => {
   const trpc = useTRPC();
   const [params] = useVulnerabilitiesParams();
 
-  return useSuspenseQuery(trpc.vulnerabilities.getManyInternal.queryOptions(params));
+  return useSuspenseQuery(
+    trpc.vulnerabilities.getManyInternal.queryOptions(params),
+  );
 };
 
 /**

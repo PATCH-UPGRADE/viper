@@ -94,7 +94,6 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       return createPaginatedResponse(items, meta);
     }),
 
-
   getManyInternal: protectedProcedure
     .input(paginationInputSchema)
     .query(async ({ input }) => {

@@ -1,4 +1,9 @@
-import { IssueContainer, IssueDetailPage, IssueError, IssueLoading } from "@/features/issues/components/issue";
+import {
+  IssueContainer,
+  IssueDetailPage,
+  IssueError,
+  IssueLoading,
+} from "@/features/issues/components/issue";
 import { prefetchIssue } from "@/features/issues/server/prefetch";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
@@ -28,6 +33,6 @@ const Page = async ({ params }: PageProps) => {
         </ErrorBoundary>
       </HydrateClient>
     </IssueContainer>
-  )
+  );
 };
 export default Page;

@@ -34,6 +34,9 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { VulnerabilityWithIssues } from "@/lib/db";
+import Link from "next/link";
+import { IssueStatusBadge } from "@/features/issues/components/issue";
 
 export const VulnerabilitiesSearch = () => {
   const [params, setParams] = useVulnerabilitiesParams();
@@ -119,7 +122,18 @@ export const VulnerabilitiesEmpty = () => {
   );
 };
 
-export const VulnerabilityItem = ({ data }: { data: Vulnerability }) => {
+function isVulnerabilityWithIssues(
+  data: Vulnerability | VulnerabilityWithIssues,
+): data is VulnerabilityWithIssues {
+  return (data as VulnerabilityWithIssues).issues !== undefined;
+}
+
+export const VulnerabilityItem = ({
+  data,
+}: {
+  data: VulnerabilityWithIssues | Vulnerability;
+}) => {
+  const hasIssues = isVulnerabilityWithIssues(data);
   const removeVulnerability = useRemoveVulnerability();
 
   const handleRemove = () => {
@@ -137,6 +151,15 @@ export const VulnerabilityItem = ({ data }: { data: Vulnerability }) => {
           {data.description.substring(0, 100)}
           {data.description.length > 100 ? "..." : ""} &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
+          {hasIssues && data.issues.length >= 1 && (
+            <>
+              {" "}
+              &bull;{" "}
+              <span className="text-red-500">
+                {data.issues.length} issue(s)
+              </span>
+            </>
+          )}
         </div>
       </div>
       <Button
@@ -154,8 +177,9 @@ export const VulnerabilityItem = ({ data }: { data: Vulnerability }) => {
 function VulnerabilityDrawer({
   vulnerability,
 }: {
-  vulnerability: Vulnerability;
+  vulnerability: VulnerabilityWithIssues | Vulnerability;
 }) {
+  const hasIssues = isVulnerabilityWithIssues(vulnerability);
   const isMobile = useIsMobile();
 
   return (
@@ -265,6 +289,34 @@ function VulnerabilityDrawer({
               {JSON.stringify(vulnerability.sarif, null, 2)}
             </pre>
           </div>
+
+          {/* Issues */}
+          {hasIssues && (
+            <>
+              <Separator />
+
+              <div className="flex flex-col gap-3">
+                <h3 className="font-semibold">Issues</h3>
+                {vulnerability.issues.length === 0 ? (
+                  <p className="text-xs">Vulnerability has no issues!</p>
+                ) : (
+                  <ul className="list-disc pl-8">
+                    {vulnerability.issues.map((issue) => (
+                      <li key={issue.id}>
+                        <Link
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                          href={`/issues/${issue.id}`}
+                        >
+                          <IssueStatusBadge status={issue.status} />
+                          Issue
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         <DrawerFooter>

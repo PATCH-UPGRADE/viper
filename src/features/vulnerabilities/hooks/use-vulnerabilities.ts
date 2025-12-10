@@ -14,7 +14,9 @@ export const useSuspenseVulnerabilities = () => {
   const trpc = useTRPC();
   const [params] = useVulnerabilitiesParams();
 
-  return useSuspenseQuery(trpc.vulnerabilities.getMany.queryOptions(params));
+  return useSuspenseQuery(
+    trpc.vulnerabilities.getManyInternal.queryOptions(params),
+  );
 };
 
 /**
@@ -26,12 +28,12 @@ export const useCreateVulnerability = () => {
 
   return useMutation(
     trpc.vulnerabilities.create.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: () => {
         toast.success("Vulnerability created");
         // Invalidate all getMany queries regardless of params (page, search, etc.)
         queryClient.invalidateQueries({
           predicate: (query) => {
-            const baseKey = trpc.vulnerabilities.getMany.queryKey();
+            const baseKey = trpc.vulnerabilities.getManyInternal.queryKey();
             return query.queryKey[0] === baseKey[0];
           },
         });
@@ -57,10 +59,11 @@ export const useUpdateVulnerability = () => {
         // Invalidate all getMany queries regardless of params
         queryClient.invalidateQueries({
           predicate: (query) => {
-            const getManyKey = trpc.vulnerabilities.getMany.queryKey();
+            const getManyInternalKey =
+              trpc.vulnerabilities.getManyInternal.queryKey();
             const getOneKey = trpc.vulnerabilities.getOne.queryKey();
             return (
-              query.queryKey[0] === getManyKey[0] ||
+              query.queryKey[0] === getManyInternalKey[0] ||
               query.queryKey[0] === getOneKey[0]
             );
           },
@@ -87,10 +90,11 @@ export const useRemoveVulnerability = () => {
         // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({
           predicate: (query) => {
-            const getManyKey = trpc.vulnerabilities.getMany.queryKey();
+            const getManyInternalKey =
+              trpc.vulnerabilities.getManyInternal.queryKey();
             const getOneKey = trpc.vulnerabilities.getOne.queryKey();
             return (
-              query.queryKey[0] === getManyKey[0] ||
+              query.queryKey[0] === getManyInternalKey[0] ||
               query.queryKey[0] === getOneKey[0]
             );
           },

@@ -110,6 +110,39 @@ export const assetsRouter = createTRPCRouter({
       return createPaginatedResponse(items, meta);
     }),
 
+  // not exposed on OpenAPI
+  getManyInternal: protectedProcedure
+    .input(paginationInputSchema)
+    .query(async ({ input }) => {
+      const { search } = input;
+
+      // Build search filter across multiple fields
+      const where = search
+        ? {
+            OR: [
+              { ip: { contains: search, mode: "insensitive" as const } },
+              { cpe: { contains: search, mode: "insensitive" as const } },
+              { role: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : {};
+
+      // Get total count and build pagination metadata
+      const totalCount = await prisma.asset.count({ where: where });
+      const meta = buildPaginationMeta(input, totalCount);
+
+      // Fetch paginated items
+      const items = await prisma.asset.findMany({
+        skip: meta.skip,
+        take: meta.take,
+        where: where,
+        include: { user: userIncludeSelect, issues: true },
+        orderBy: { createdAt: "desc" },
+      });
+
+      return createPaginatedResponse(items, meta);
+    }),
+
   // Internal API for asset vulnerability matching
   getManyWithVulns: protectedProcedure
     .input(assetsVulnsInputSchema)

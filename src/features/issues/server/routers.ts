@@ -14,11 +14,11 @@ export const issuesRouter = createTRPCRouter({
     }),
 
   updateStatus: protectedProcedure
-    .input(z.object({ id: z.string(), status: z.string() }))
+    .input(z.object({ id: z.string(), status: z.nativeEnum(IssueStatus) }))
     .mutation(({ input }) => {
       return prisma.issue.update({
         where: { id: input.id },
-        data: { status: input.status as IssueStatus },
+        data: { status: input.status },
       });
     }),
 });

@@ -298,14 +298,14 @@ function VulnerabilityDrawer({
               <div className="flex flex-col gap-3">
                 <h3 className="font-semibold">Issues</h3>
                 {vulnerability.issues.length === 0 ? (
-                  <p className="text-xs">Asset has no issues!</p>
+                  <p className="text-xs">Vulnerability has no issues!</p>
                 ) : (
                   <ul className="list-disc pl-8">
                     {vulnerability.issues.map((issue) => (
-                      <li>
+                      <li key={issue.id}>
                         <Link
                           className="text-xs text-primary hover:underline flex items-center gap-1"
-                          href={`issues/${issue.id}`}
+                          href={`/issues/${issue.id}`}
                         >
                           <IssueStatusBadge status={issue.status} />
                           Issue

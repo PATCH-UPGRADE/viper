@@ -253,6 +253,11 @@ model Issue {
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
   status IssueStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([assetId, vulnerabilityId])
   @@map("issue")
 }
 

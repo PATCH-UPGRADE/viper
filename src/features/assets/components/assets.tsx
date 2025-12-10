@@ -303,10 +303,10 @@ function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
                   ) : (
                     <ul className="list-disc pl-8">
                       {asset.issues.map((issue) => (
-                        <li>
+                        <li key={issue.id}>
                           <Link
                             className="text-xs text-primary hover:underline flex items-center gap-1"
-                            href={`issues/${issue.id}`}
+                            href={`/issues/${issue.id}`}
                           >
                             <IssueStatusBadge status={issue.status} />
                             Issue

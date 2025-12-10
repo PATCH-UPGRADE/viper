@@ -1,3 +1,5 @@
+"use client";
+
 import {
   AlertTriangleIcon,
   Loader2Icon,

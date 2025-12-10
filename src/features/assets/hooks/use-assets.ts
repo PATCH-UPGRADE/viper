@@ -41,7 +41,7 @@ export const useCreateAsset = () => {
         // Invalidate all getMany queries regardless of params (page, search, etc.)
         queryClient.invalidateQueries({
           predicate: (query) => {
-            const baseKey = trpc.assets.getMany.queryKey();
+            const baseKey = trpc.assets.getManyInternal.queryKey();
             return query.queryKey[0] === baseKey[0];
           },
         });
@@ -67,10 +67,10 @@ export const useUpdateAsset = () => {
         // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({
           predicate: (query) => {
-            const getManyKey = trpc.assets.getMany.queryKey();
+            const getManyInternalKey = trpc.assets.getManyInternal.queryKey();
             const getOneKey = trpc.assets.getOne.queryKey();
             return (
-              query.queryKey[0] === getManyKey[0] ||
+              query.queryKey[0] === getManyInternalKey[0] ||
               query.queryKey[0] === getOneKey[0]
             );
           },
@@ -97,10 +97,10 @@ export const useRemoveAsset = () => {
         // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({
           predicate: (query) => {
-            const getManyKey = trpc.assets.getMany.queryKey();
+            const getManyInternalKey = trpc.assets.getManyInternal.queryKey();
             const getOneKey = trpc.assets.getOne.queryKey();
             return (
-              query.queryKey[0] === getManyKey[0] ||
+              query.queryKey[0] === getManyInternalKey[0] ||
               query.queryKey[0] === getOneKey[0]
             );
           },

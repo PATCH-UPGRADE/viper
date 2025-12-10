@@ -61,7 +61,7 @@ export const IssueStatusForm = ({ issue }: { issue: Issue | FullIssue }) => {
     try {
       await updateIssueStatus.mutateAsync({
         id: issue.id,
-        status,
+        status: status as IssueStatus,
       });
     } catch {
       setStatus(issue.status);
@@ -86,7 +86,7 @@ export const IssueStatusForm = ({ issue }: { issue: Issue | FullIssue }) => {
         <SelectGroup>
           <SelectLabel>Issue Status</SelectLabel>
           {Object.values(IssueStatus).map((s) => (
-            <SelectItem value={s}>
+            <SelectItem key={s} value={s}>
               <IssueStatusBadge status={s} />
             </SelectItem>
           ))}

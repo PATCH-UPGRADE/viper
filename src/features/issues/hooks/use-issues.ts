@@ -29,7 +29,7 @@ export const useUpdateIssueStatus = () => {
 };
 
 /**
- * Hook to fetch a single asset using suspense
+ * Hook to fetch a single issue using suspense
  */
 export const useSuspenseIssue = (id: string) => {
   const trpc = useTRPC();

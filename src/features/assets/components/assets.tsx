@@ -38,6 +38,8 @@ import { Badge } from "@/components/ui/badge";
 import { AssetWithIssues } from "@/lib/db";
 import Link from "next/link";
 import { IssueStatusBadge } from "@/features/issues/components/issue";
+import { DataTable } from "@/components/ui/data-table";
+import { columns } from "./columns";
 
 export const AssetsSearch = () => {
   const [params, setParams] = useAssetsParams();
@@ -59,13 +61,21 @@ export const AssetsList = () => {
   const assets = useSuspenseAssets();
 
   return (
+    <DataTable
+      data={assets.data.items}
+      columns={columns}
+      search={<AssetsSearch />}
+    />
+  );
+
+  /*return (
     <EntityList
       items={assets.data.items}
       getKey={(asset) => asset.id}
       renderItem={(asset) => <AssetItem data={asset} />}
       emptyView={<AssetsEmpty />}
     />
-  );
+  );*/
 };
 
 export const AssetsHeader = ({ disabled }: { disabled?: boolean }) => {
@@ -101,7 +111,6 @@ export const AssetsContainer = ({
   return (
     <EntityContainer
       header={<AssetsHeader />}
-      search={<AssetsSearch />}
       pagination={<AssetsPagination />}
     >
       {children}
@@ -171,7 +180,7 @@ export const AssetItem = ({ data }: { data: AssetWithIssues | Asset }) => {
   );
 };
 
-function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
+export function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
   const isMobile = useIsMobile();
   const hasIssues = isAssetWithIssues(asset);
 

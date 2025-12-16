@@ -20,7 +20,7 @@ export default withSentryConfig(nextConfig, {
 
   org: "enra-doo",
 
-  project: "pulse",
+  project: "viper",
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,

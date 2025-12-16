@@ -19,8 +19,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pulse VMP",
-  description: "Pulse VMP by the ARPA-H PATCH Team.",
+  title: "Viper VMP",
+  description: "Viper VMP by the ARPA-H PATCH Team.",
 };
 
 export default function RootLayout({

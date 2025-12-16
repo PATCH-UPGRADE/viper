@@ -87,8 +87,8 @@ export const AppSidebar = () => {
         <SidebarMenuItem>
           <SidebarMenuButton asChild className="gap-x-4 h-10 px-4">
             <Link href="/" prefetch>
-              <Image src="/logos/logo.svg" alt="Pulse" width={30} height={30} />
-              <span className="font-semibold text-sm">Pulse</span>
+              <Image src="/logos/logo.svg" alt="Viper" width={30} height={30} />
+              <span className="font-semibold text-sm">Viper</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>

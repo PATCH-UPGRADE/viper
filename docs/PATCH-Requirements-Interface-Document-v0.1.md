@@ -9,30 +9,30 @@
 ---
 
 ## 1. Document Introduction
-**Document Purpose:** This document defines the requirements and interface specifications for integrating the PATCH TA1 Vulnerability Management Platform (known as PULSE) with other Technical Area (TA) performers in the ARPA-H UPGRADE program. PULSE is the primary user interface and integration point for the PATCH team's contribution to the ARPA-H UPGRADE program.
+**Document Purpose:** This document defines the requirements and interface specifications for integrating the PATCH TA1 Vulnerability Management Platform (known as VIPER) with other Technical Area (TA) performers in the ARPA-H UPGRADE program. VIPER is the primary user interface and integration point for the PATCH team's contribution to the ARPA-H UPGRADE program.
 
 **Living Document:** The specifications defined herein represent our current understanding of integration requirements based on initial performer consultations and program kickoff discussions. As the ARPA-H UPGRADE program progresses and TA performers (TA2, TA3, TA4) advance their technical approaches, this document will also evolve.
 
 **Document Structure:** The document is organized into the following sections:
 1. Document Introduction
-2. PULSE Overview
+2. VIPER Overview
 3. Integration Plan
 4. Open Issues and Decisions Needed
 
-**Version Control:** This document is version controlled in git, and available at https://github.com/PATCH-UPGRADE/pulse/blob/main/docs/PATCH-Requirements-Interface-Document-v0.1.md
+**Version Control:** This document is version controlled in git, and available at https://github.com/PATCH-UPGRADE/viper/blob/main/docs/PATCH-Requirements-Interface-Document-v0.1.md
 
-**OpenAPI Spec:** Detailed API specifications are not provided in this document, but may be generated at any time from a PULSE instance.
+**OpenAPI Spec:** Detailed API specifications are not provided in this document, but may be generated at any time from a VIPER instance.
 
 Run `npm run openapi:generate` or visit the server at
 `/api/openapi-ui` (UI) or `/api/openapi.json` (JSON file).
 
 ---
 
-## 2. PULSE Overview 
+## 2. VIPER Overview 
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
-│                         PULSE VMP                                     │
+│                         VIPER VMP                                     │
 │                         (TA1 Integration Hub)                         │
 │                                                                       │
 │  ┌─────────────────────────────────────────────────────────────────┐  │
@@ -67,9 +67,9 @@ Run `npm run openapi:generate` or visit the server at
 
 ```
 
-PULSE is designed to help hospital administrators understand the operational impact of vulnerabilities and remediations -- across systems, safety, and operational workflows. Since the hospital security ecosystem is inherently heterogeneous, PULSE serves as a system of record by integrating with downstream systems such as TA2-4, existing commercial systems, and open source tools.
+VIPER is designed to help hospital administrators understand the operational impact of vulnerabilities and remediations -- across systems, safety, and operational workflows. Since the hospital security ecosystem is inherently heterogeneous, VIPER serves as a system of record by integrating with downstream systems such as TA2-4, existing commercial systems, and open source tools.
 
-PULSE is API centric, and uses a hub-and-spoke architecture where:
+VIPER is API centric, and uses a hub-and-spoke architecture where:
 
 - Users view assets, vulnerabilities, remediations, simulations, and decisions.
 
@@ -79,7 +79,7 @@ PULSE is API centric, and uses a hub-and-spoke architecture where:
 
 - Standards-based data formats (CPE, SARIF, OpenAPI) ensure that external tools—commercial and open-source—can interoperate cleanly with the VMP and performer services.
 
-Instead of baking every possible analytic or reporting workflow into the core, PULSE exposes:
+Instead of baking every possible analytic or reporting workflow into the core, VIPER exposes:
 
 - Core APIs for downstream performers to upload and retrieve information.
 
@@ -87,19 +87,19 @@ Instead of baking every possible analytic or reporting workflow into the core, P
 
 **Goals**
 
-- Loose coupling: PULSE and performers can evolve independently.
+- Loose coupling: VIPER and performers can evolve independently.
 
-- Discoverability: Clients discover more information from sources via links. For example, PULSE maintains a link to a source API where it pulls asset lists from.
+- Discoverability: Clients discover more information from sources via links. For example, VIPER maintains a link to a source API where it pulls asset lists from.
 
 - Composability: Orchestrators (e.g., AI agents, hospital IT workflows) can chain VMP + performer calls.
 
 - Replaceability: One TA2/3/4 performer can be swapped out without changing VMP or clients.
 
-**Non-goals.** The VMP keeps an inventory of assets, what network they are on, and vulnerabilities _to the extent necessary to perform decision support_. Pulse does not:
+**Non-goals.** The VMP keeps an inventory of assets, what network they are on, and vulnerabilities _to the extent necessary to perform decision support_. Viper does not:
 
 - Replace existing commercial vulnerability management platforms, e.g., Qualys VMDR, Tenable Vulnerability Management, etc. Instead, it maintains a reference to those systems where users can get more information.
 
-- QA other components. PULSE assumes, for example, when TA3 says there is a vulnerability that it does not need to verify that report. Instead, PULSE maintains a reference to the TA3 exploit, which it assumes works as intended.
+- QA other components. VIPER assumes, for example, when TA3 says there is a vulnerability that it does not need to verify that report. Instead, VIPER maintains a reference to the TA3 exploit, which it assumes works as intended.
 
 ### Anchor story and walk-through
 
@@ -146,7 +146,7 @@ infusion pumps running InsecureOS4.1), the VMP:
 
 ### API-Centric Design
 
-- PULSE exposes APIs for integration. (All references in this document are
+- VIPER exposes APIs for integration. (All references in this document are
   nested under `/api` on the server.)
 
 - Every request to the REST API includes an HTTP method and a path, and a bearer token for authenticated endpoints.
@@ -173,28 +173,28 @@ We use NIST-standardized formats:
 
 - OpenAPI (service contracts)
 
-- Docker images (emulation). Any non-container emulation (e.g., VMs) must be hosted outside PULSE.
+- Docker images (emulation). Any non-container emulation (e.g., VMs) must be hosted outside VIPER.
 
 ---
 
 ## 3. Integration Plan
 
-### 3.1 PULSE <> Asset Management Integration
+### 3.1 VIPER <> Asset Management Integration
 
-PULSE maintains a database of assets, and a link to the upstream source where more information may be obtained.
+VIPER maintains a database of assets, and a link to the upstream source where more information may be obtained.
 
 - An asset management provider is registered via the `/assets/settings/` endpoint.
-- Assets data is synced to PULSE periodically, and then available under the `/assets` view.
+- Assets data is synced to VIPER periodically, and then available under the `/assets` view.
 - Each listed asset includes an `upstream_url` field with the URL of the original provider.
 
-### 3.2 PULSE <> TA2 Integration
+### 3.2 VIPER <> TA2 Integration
 
-PULSE maintains a registry of emulators, and optionally a container for the emulator. When an emulator is not available as a container, TA2 performers must provide a reference location where users can download the container.
+VIPER maintains a registry of emulators, and optionally a container for the emulator. When an emulator is not available as a container, TA2 performers must provide a reference location where users can download the container.
 
 1. TA1 exposes asset inventory → TA2 emulators for at least some assets in
    inventory.
 2. TA2 publishes emulator to WHS registry or hosts externally.
-3. PULSE performs internal matching and deployment orchestration
+3. VIPER performs internal matching and deployment orchestration
 4. WHS integrates emulators into simulation environment for testing
 
 **Storage Limits:**
@@ -205,18 +205,18 @@ PULSE maintains a registry of emulators, and optionally a container for the emul
 
 **Phase I Implementation:**
 
-- PULSE team provisions Docker Registry during program setup
+- VIPER team provisions Docker Registry during program setup
 - TA2 performers receive registry credentials during onboarding
 - TA2 performers either:
   - Container: push to the registry and update the `/emulators` endpoint, or
   - Update the `/emulators` endpoint and include a reference to where
     their emulator can be downloaded.
 
-### 3.3 PULSE <> TA3 Integration
+### 3.3 VIPER <> TA3 Integration
 
 TA3's value proposition is discovering **unknown/novel vulnerabilities** that cannot be detected by commodity vulnerability scanning tools.
 
-PULSE maintains a registry of vulnerabilities in SARIF 2.1.0 format, which is appropriate for unknown vulnerabilities.
+VIPER maintains a registry of vulnerabilities in SARIF 2.1.0 format, which is appropriate for unknown vulnerabilities.
 
 **TA1 Role:**
 
@@ -226,7 +226,7 @@ PULSE maintains a registry of vulnerabilities in SARIF 2.1.0 format, which is ap
 Non-goals:
 
 - Provide WHS environment for POV validation. TA1 does not QA TA3 results.
-- Store POV. Instead, PULSE stores a reference to the POV, identified by a
+- Store POV. Instead, VIPER stores a reference to the POV, identified by a
   URI. Anyone can pull the POV from that URL, and this allows flexibility for
   both TA3 and TA1 in the short term. We envision eventually there will be a
   standardized exploit invocation, e.g., `./exploit`, but for now we just

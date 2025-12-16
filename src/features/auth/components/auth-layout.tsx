@@ -9,8 +9,8 @@ export const AuthLayout = ({ children }: { children: React.ReactNode }) => {
           href="/"
           className="flex items-center gap-2 self-center font-medium"
         >
-          <Image src="/logos/logo.svg" alt="Pulse" width={30} height={30} />
-          Pulse
+          <Image src="/logos/logo.svg" alt="Viper" width={30} height={30} />
+          Viper
         </Link>
         <span className="self-center">
           Patch, Understand, Learn, Secure, Evolve.

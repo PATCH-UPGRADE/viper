@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Pulse** is a **Vulnerability Management Platform (VMP)** for hospitals, funded by ARPA-H under the Resilient Systems focus area. The mission is to help hospital administrators **understand the operational impact** of vulnerabilities and remediations across systems, safety, and clinical workflows. The VMP focuses on **decisions, not graphs**.
+**Viper** is a **Vulnerability Management Platform (VMP)** for hospitals, funded by ARPA-H under the Resilient Systems focus area. The mission is to help hospital administrators **understand the operational impact** of vulnerabilities and remediations across systems, safety, and clinical workflows. The VMP focuses on **decisions, not graphs**.
 
 ### ARPA-H Mission Alignment
 

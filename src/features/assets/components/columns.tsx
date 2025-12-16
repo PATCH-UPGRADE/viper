@@ -1,7 +1,7 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreVertical, ArrowUpDown } from "lucide-react";
+import { MoreVertical, ArrowUpDown, CopyIcon, TrashIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 import { Button } from "@/components/ui/button";
@@ -24,33 +24,50 @@ import { AssetDrawer } from "./assets";
   email: string
 }*/
 
+export const SortableHeader = ({
+  header,
+  column,
+}: {
+  header: string;
+  column: any;
+}) => {
+  return (
+    <Button
+      variant="link"
+      className="text-muted-foreground px-0!"
+      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+    >
+      {header}
+      <ArrowUpDown className="ml-2 h-4 w-4" />
+    </Button>
+  );
+};
+
 export const columns: ColumnDef<AssetWithIssues>[] = [
   {
     accessorKey: "role",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Role
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: ({ column }) => <SortableHeader header="Role" column={column} />,
     cell: ({ row }) => {
       return <AssetDrawer asset={row.original} />;
     },
   },
   {
     accessorKey: "issues",
-    header: "Vulnerabilities",
+    header: ({ column }) => (
+      <SortableHeader header="Active Vulnerabilities" column={column} />
+    ),
     cell: ({ row }) => {
       const numVulns = row.original.issues.length;
       return (
         <div>
           <Badge variant={numVulns === 0 ? "outline" : "destructive"}>
-            {numVulns} Detected
+            {numVulns >= 1 ? (
+              <>
+                {numVulns} Vuln{numVulns === 1 ? "" : "s"}.
+              </>
+            ) : (
+              "None"
+            )}
           </Badge>
         </div>
       );
@@ -63,6 +80,7 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
   },
   {
     id: "Class",
+    header: ({ column }) => <SortableHeader header="Class" column={column} />,
     accessorFn: (row) => row.cpe.split(":").slice(3, 5).join(" "),
   },
   {
@@ -85,16 +103,22 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(payment.id)}
-            >
-              Copy payment ID
+          <DropdownMenuContent align="end" className="w-[200px]">
+            <DropdownMenuLabel>Quick Actions</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => console.log("TODO")}>
+              <CopyIcon strokeWidth={3} /> Copy Group ID
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => console.log("TODO")}>
+              <CopyIcon strokeWidth={3} /> Copy Asset ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>View customer</DropdownMenuItem>
-            <DropdownMenuItem>View payment details</DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => console.log("TODO")}
+              variant="destructive"
+            >
+              <TrashIcon strokeWidth={3} /> Delete Asset
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );

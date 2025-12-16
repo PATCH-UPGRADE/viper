@@ -37,9 +37,13 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { AssetWithIssues } from "@/lib/db";
 import Link from "next/link";
-import { IssueStatusBadge } from "@/features/issues/components/issue";
+import {
+  IssuesSidebarList,
+  IssueStatusBadge,
+} from "@/features/issues/components/issue";
 import { DataTable } from "@/components/ui/data-table";
 import { columns } from "./columns";
+import { CopyCode } from "@/components/ui/code";
 
 export const AssetsSearch = () => {
   const [params, setParams] = useAssetsParams();
@@ -226,21 +230,25 @@ export function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
                 <div className="text-xs font-medium text-muted-foreground mb-1">
                   IP Address
                 </div>
-                <code className="text-xs bg-muted px-2 py-1 rounded">
-                  {asset.ip}
-                </code>
+                <CopyCode>{asset.ip}</CopyCode>
               </div>
 
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1">
-                  CPE Identifier
+                  Group ID
                 </div>
-                <code className="text-xs bg-muted px-2 py-1 rounded break-all">
-                  {asset.cpe}
-                </code>
+                <CopyCode>{asset.cpe}</CopyCode>
               </div>
             </div>
           </div>
+
+          {/* Issues */}
+          {hasIssues && (
+            <>
+              <Separator />
+              <IssuesSidebarList issues={asset.issues} />
+            </>
+          )}
 
           <Separator />
 
@@ -295,38 +303,9 @@ export function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
                 <div className="text-xs font-medium text-muted-foreground mb-1">
                   Asset ID
                 </div>
-                <code className="text-xs bg-muted px-2 py-1 rounded">
-                  {asset.id}
-                </code>
+                <CopyCode>{asset.id}</CopyCode>
               </div>
             </div>
-
-            {/* Issues */}
-            {hasIssues && (
-              <>
-                <Separator />
-                <div className="flex flex-col gap-3">
-                  <h3 className="font-semibold">Issues</h3>
-                  {asset.issues.length === 0 ? (
-                    <p className="text-xs">Asset has no issues!</p>
-                  ) : (
-                    <ul className="list-disc pl-8">
-                      {asset.issues.map((issue) => (
-                        <li key={issue.id}>
-                          <Link
-                            className="text-xs text-primary hover:underline flex items-center gap-1"
-                            href={`/issues/${issue.id}`}
-                          >
-                            <IssueStatusBadge status={issue.status} />
-                            Issue
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </>
-            )}
           </div>
         </div>
 

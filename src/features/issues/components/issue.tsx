@@ -22,18 +22,27 @@ import {
 } from "@/components/ui/select";
 import { FullIssue } from "@/lib/db";
 import { useEffect, useState } from "react";
+import { BugIcon, ChevronDown, MoreVertical } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+
+const statusDetails = {
+  [IssueStatus.FALSE_POSITIVE]: {
+    name: "False Positive",
+    color: "bg-yellow-500",
+  },
+  [IssueStatus.PENDING]: { name: "Active", color: "bg-red-500" },
+  [IssueStatus.REMEDIATED]: { name: "Remediated", color: "bg-green-500" },
+};
 
 export const IssueStatusBadge = ({ status }: { status: IssueStatus }) => {
-  const statusDetails = {
-    [IssueStatus.FALSE_POSITIVE]: {
-      name: "False Positive",
-      color: "bg-red-500",
-    },
-    [IssueStatus.PENDING]: { name: "Pending", color: "bg-yellow-500" },
-    [IssueStatus.REMEDIATED]: { name: "Remediated", color: "bg-green-500" },
-  };
   const statusDetail = statusDetails[status];
-
   return <Badge className={statusDetail.color}>{statusDetail.name}</Badge>;
 };
 
@@ -50,7 +59,7 @@ export const IssueContainer = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const IssueStatusForm = ({ issue }: { issue: Issue | FullIssue }) => {
-  const [status, setStatus] = useState<string>(issue.status);
+  const [status, setStatus] = useState<IssueStatus>(issue.status);
   const updateIssueStatus = useUpdateIssueStatus();
 
   const handleSave = async () => {
@@ -61,7 +70,7 @@ export const IssueStatusForm = ({ issue }: { issue: Issue | FullIssue }) => {
     try {
       await updateIssueStatus.mutateAsync({
         id: issue.id,
-        status: status as IssueStatus,
+        status: status,
       });
     } catch {
       setStatus(issue.status);
@@ -72,27 +81,36 @@ export const IssueStatusForm = ({ issue }: { issue: Issue | FullIssue }) => {
     handleSave();
   }, [status]);
 
+  const statusDetail = statusDetails[status];
+
   return (
-    <Select
-      value={status}
-      onValueChange={(val: string) => {
-        setStatus(val);
-      }}
-    >
-      <SelectTrigger>
-        <SelectValue placeholder="Select a status" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectGroup>
-          <SelectLabel>Issue Status</SelectLabel>
-          {Object.values(IssueStatus).map((s) => (
-            <SelectItem key={s} value={s}>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        asChild
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+      >
+        <Badge className={statusDetail.color}>
+          {statusDetail.name} <ChevronDown className="ml-2" />
+        </Badge>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {Object.values(IssueStatus)
+          .filter((s) => s !== issue?.status)
+          .map((s) => (
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                setStatus(s);
+              }}
+              key={s}
+            >
               <IssueStatusBadge status={s} />
-            </SelectItem>
+            </DropdownMenuItem>
           ))}
-        </SelectGroup>
-      </SelectContent>
-    </Select>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
@@ -112,5 +130,77 @@ export const IssueDetailPage = ({ id }: { id: string }) => {
       <h2 className="text-lg font-semibold">Vulnerability</h2>
       <VulnerabilityItem data={issue.data.vulnerability} />
     </>
+  );
+};
+
+export const IssuesSidebarList = ({ issues }: { issues: Issue[] }) => {
+  const router = useRouter();
+  return (
+    <div>
+      {issues.length === 0 ? (
+        <>
+          <h3 className="font-semibold mb-2">Issues</h3>
+          <p className="text-xs text-muted-foreground">No issues detected</p>
+        </>
+      ) : (
+        <>
+          <h3 className="font-semibold mb-2 text-destructive">
+            {issues.length} active vulnerabilities detected
+          </h3>
+          <p className="text-xs text-muted-foreground my-2">
+            Vulnerabilities have been detected. Lab result integrity
+            compromised. Attackers could modify test results before transmission
+            to EMR, leading to incorrect diagnoses and treatment. Altered QC
+            data could hide equipment malfunction. False critical values could
+            trigger unnecessary interventions.
+          </p>
+          <h4 className="text-xs font-semibold text-muted-foreground mt-4 mb-2">
+            Active Issues
+          </h4>
+          <ul className="flex flex-col gap-2">
+            {issues.map((issue) => (
+              <li
+                key={issue.id}
+                className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer"
+                onClick={() => router.push(`/issues/${issue.id}`)}
+              >
+                <BugIcon
+                  className="text-destructive min-w-4 min-h-4 h-4 w-4"
+                  size={16}
+                />
+                <div className="text-xs">
+                  <p className="font-semibold mb-2">
+                    Hardcoded default credentials in Roche Cobas 600 laboratory
+                    analyzer
+                  </p>
+                  <IssueStatusForm issue={issue} />
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    asChild
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    <Button variant="ghost" className="h-8 w-8 p-0 ml-auto">
+                      <span className="sr-only">Open menu</span>
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[200px]">
+                    <DropdownMenuItem onClick={() => console.log("TODO")}>
+                      Go to Issue Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => console.log("TODO")}>
+                      Go to Vulnerability Details
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
   );
 };

@@ -116,7 +116,7 @@ export function DataTable<TData, TValue>({
                   return (
                     <TableHead
                       key={header.id}
-                      className="py-2 text-muted-foreground"
+                      className="py-4 first-of-type:pl-4 last-of-type:pr-4 text-muted-foreground"
                     >
                       {header.isPlaceholder
                         ? null

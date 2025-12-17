@@ -150,15 +150,17 @@ export const IssuesSidebarList = ({
     ids: issues.map((i) => i.id),
     type,
   });
-  const issuesMap = issuesQuery.data.reduce((accumulator, currentObject) => {
-    accumulator[currentObject.id] = currentObject;
-    return accumulator;
-  }, {});
-  console.log("HEY", issuesMap);
+  const issuesMap = issuesQuery.data.reduce<{ [key: string]: FullIssue }>(
+    (accumulator, currentObject) => {
+      accumulator[currentObject.id] = currentObject;
+      return accumulator;
+    },
+    {},
+  );
 
   if (issues.length === 0) return null;
 
-  const Icon = type === "assets" ? BugIcon : ComputerIcon;
+  const Icon = type === "vulnerabilities" ? BugIcon : ComputerIcon;
 
   return (
     <>
@@ -176,7 +178,7 @@ export const IssuesSidebarList = ({
             <Icon
               className={cn(
                 "min-w-4 min-h-4 h-4 w-4",
-                type === "assets" ? "text-destructive" : "",
+                type === "vulnerabilities" ? "text-destructive" : "",
               )}
               size={16}
             />

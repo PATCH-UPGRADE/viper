@@ -22,6 +22,9 @@ export const issuesRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       const { ids, type } = input;
+      if (ids.length === 0) {
+        return [];
+      }
       return prisma.issue.findMany({
         where: { id: { in: ids } },
         include: {

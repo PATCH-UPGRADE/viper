@@ -102,7 +102,7 @@ export function DataTable<TData, TValue>({
   search,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [params, setParams] = usePaginationParams();
+  const [_params, setParams] = usePaginationParams();
 
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -116,8 +116,8 @@ export function DataTable<TData, TValue>({
     const sortParam = sorting
       .map((s) => `${s.desc ? "-" : ""}${s.id}`)
       .join(",");
-    setParams({ ...params, ...{ sort: sortParam } });
-  }, [sorting]);
+    setParams((prev) => ({ ...prev, sort: sortParam }));
+  }, [sorting, setParams]);
 
   const table = useReactTable({
     data: paginatedData.items,

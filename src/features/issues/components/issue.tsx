@@ -173,7 +173,12 @@ export const IssuesSidebarList = ({
             key={issue.id}
             className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer hover:bg-muted transition-all"
             onClick={() => router.push(`/issues/${issue.id}`)}
-            onKeyDown={() => router.push(`/issues/${issue.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                router.push(`/issues/${issue.id}`);
+              }
+            }}
           >
             <Icon
               className={cn(

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/tooltip";
 import { handleCopy } from "@/lib/copy";
 import { SortableHeader } from "@/components/ui/data-table";
+import { toast } from "sonner";
 
 export const columns: ColumnDef<AssetWithIssues>[] = [
   {
@@ -100,10 +101,18 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
           <DropdownMenuContent align="end" className="w-[200px]">
             <DropdownMenuLabel>Quick Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleCopy(asset.cpe)}>
+            <DropdownMenuItem
+              onClick={() =>
+                handleCopy(asset.cpe, () => toast.success("Copied!"))
+              }
+            >
               <CopyIcon strokeWidth={3} /> Copy Group ID
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleCopy(asset.id)}>
+            <DropdownMenuItem
+              onClick={() =>
+                handleCopy(asset.id, () => toast.success("Copied!"))
+              }
+            >
               <CopyIcon strokeWidth={3} /> Copy Asset ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />

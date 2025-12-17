@@ -11,17 +11,8 @@ import { useSuspenseIssue, useUpdateIssueStatus } from "../hooks/use-issues";
 import { AssetItem } from "@/features/assets/components/assets";
 import { VulnerabilityItem } from "@/features/vulnerabilities/components/vulnerabilities";
 
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { FullIssue } from "@/lib/db";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BugIcon, ChevronDown, MoreVertical } from "lucide-react";
 import {
   DropdownMenu,
@@ -31,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const statusDetails = {
   [IssueStatus.FALSE_POSITIVE]: {
@@ -62,7 +54,7 @@ export const IssueStatusForm = ({ issue }: { issue: Issue | FullIssue }) => {
   const [status, setStatus] = useState<IssueStatus>(issue.status);
   const updateIssueStatus = useUpdateIssueStatus();
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (status === issue.status) {
       return;
     }
@@ -75,7 +67,7 @@ export const IssueStatusForm = ({ issue }: { issue: Issue | FullIssue }) => {
     } catch {
       setStatus(issue.status);
     }
-  };
+  }, [status, issue, updateIssueStatus]);
 
   useEffect(() => {
     handleSave();
@@ -97,7 +89,7 @@ export const IssueStatusForm = ({ issue }: { issue: Issue | FullIssue }) => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {Object.values(IssueStatus)
-          .filter((s) => s !== issue?.status)
+          .filter((s) => s !== status)
           .map((s) => (
             <DropdownMenuItem
               onClick={(e) => {
@@ -161,8 +153,9 @@ export const IssuesSidebarList = ({ issues }: { issues: Issue[] }) => {
             {issues.map((issue) => (
               <li
                 key={issue.id}
-                className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer"
+                className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer hover:bg-muted transition-all"
                 onClick={() => router.push(`/issues/${issue.id}`)}
+                onKeyDown={() => router.push(`/issues/${issue.id}`)}
               >
                 <BugIcon
                   className="text-destructive min-w-4 min-h-4 h-4 w-4"
@@ -188,11 +181,23 @@ export const IssuesSidebarList = ({ issues }: { issues: Issue[] }) => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-[200px]">
-                    <DropdownMenuItem onClick={() => console.log("TODO")}>
-                      Go to Issue Details
+                    <DropdownMenuItem
+                      onClick={(e) => e.stopPropagation()}
+                      className="cursor-pointer"
+                      asChild
+                    >
+                      <Link href={`/issues/${issue.id}`}>
+                        Go to Issue Details
+                      </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => console.log("TODO")}>
-                      Go to Vulnerability Details
+                    <DropdownMenuItem
+                      onClick={(e) => e.stopPropagation()}
+                      className="cursor-pointer"
+                      asChild
+                    >
+                      <Link href={`/vulnerability/${issue.vulnerabilityId}`}>
+                        Go to Vulnerability Details
+                      </Link>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

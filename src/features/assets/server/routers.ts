@@ -65,6 +65,10 @@ const assetsVulnsInputSchema = z.object({
 });
 export type AssetsVulnsInput = z.infer<typeof assetsVulnsInputSchema>;
 
+const assetsListInputSchema = paginationInputSchema.extend({
+  sort: z.string().optional(),
+});
+
 export const assetsRouter = createTRPCRouter({
   // GET /api/assets - List all assets (any authenticated user can see all)
   getMany: protectedProcedure
@@ -112,9 +116,9 @@ export const assetsRouter = createTRPCRouter({
 
   // not exposed on OpenAPI
   getManyInternal: protectedProcedure
-    .input(paginationInputSchema)
+    .input(assetsListInputSchema)
     .query(async ({ input }) => {
-      const { search } = input;
+      const { search, sort } = input;
 
       // Build search filter across multiple fields
       const where = search
@@ -131,13 +135,26 @@ export const assetsRouter = createTRPCRouter({
       const totalCount = await prisma.asset.count({ where: where });
       const meta = buildPaginationMeta(input, totalCount);
 
+      function getSortValue(sort: string) {
+        const sortValue = sort.startsWith("-") ? "desc" : "asc";
+        if (sort === "issues" || sort === "-issues") {
+          return { _count: sortValue };
+        }
+        return sortValue;
+      }
+
       // Fetch paginated items
       const items = await prisma.asset.findMany({
         skip: meta.skip,
         take: meta.take,
         where: where,
         include: { user: userIncludeSelect, issues: true },
-        orderBy: { createdAt: "desc" },
+        orderBy: sort
+          ? [
+              { [sort.replace("-", "")]: getSortValue(sort) },
+              { updatedAt: "desc" },
+            ]
+          : { updatedAt: "desc" },
       });
 
       return createPaginatedResponse(items, meta);
@@ -174,7 +191,7 @@ export const assetsRouter = createTRPCRouter({
       const assetItems = await prisma.asset.findMany({
         where: where,
         include: { user: userIncludeSelect },
-        orderBy: { createdAt: "desc" },
+        orderBy: { updatedAt: "desc" },
       });
 
       const assetCpes = assetItems.map((asset) => asset.cpe).filter(Boolean);

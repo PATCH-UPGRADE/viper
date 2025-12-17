@@ -66,20 +66,11 @@ export const AssetsList = () => {
 
   return (
     <DataTable
-      data={assets.data.items}
+      paginatedData={assets.data}
       columns={columns}
       search={<AssetsSearch />}
     />
   );
-
-  /*return (
-    <EntityList
-      items={assets.data.items}
-      getKey={(asset) => asset.id}
-      renderItem={(asset) => <AssetItem data={asset} />}
-      emptyView={<AssetsEmpty />}
-    />
-  );*/
 };
 
 export const AssetsHeader = ({ disabled }: { disabled?: boolean }) => {

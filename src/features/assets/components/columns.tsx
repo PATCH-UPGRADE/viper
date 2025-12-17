@@ -1,7 +1,14 @@
 "use client";
 
-import { ColumnDef } from "@tanstack/react-table";
-import { MoreVertical, ArrowUpDown, CopyIcon, TrashIcon } from "lucide-react";
+import { Column, ColumnDef } from "@tanstack/react-table";
+import {
+  MoreVertical,
+  ArrowUpDown,
+  CopyIcon,
+  TrashIcon,
+  ArrowDown,
+  ArrowUp,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 import { Button } from "@/components/ui/button";
@@ -16,35 +23,62 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { AssetWithIssues } from "@/lib/db";
 import { AssetDrawer } from "./assets";
-
-/*export type Payment = {
-  id: string
-  amount: number
-  status: "pending" | "processing" | "success" | "failed"
-  email: string
-}*/
+import {
+  TooltipContent,
+  Tooltip,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { SortableAssetColumns } from "../params";
+import { useAssetsParams } from "../hooks/use-assets-params";
 
 export const SortableHeader = ({
   header,
   column,
 }: {
   header: string;
-  column: any;
+  column: Column<AssetWithIssues>;
 }) => {
+  const [params, setParams] = useAssetsParams();
+  const [ascKey, descKey] = [column.id, `-${column.id}`];
+  const isAsc = params.sort === ascKey;
+  const isDesc = params.sort === descKey;
+  const newSort = (
+    isAsc ? descKey : isDesc ? "" : column.id
+  ) as SortableAssetColumns;
+
+  const iconClassName = "ml-2 h-4 w-4";
+
   return (
     <Button
       variant="link"
       className="text-muted-foreground px-0!"
-      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      onClick={
+        () =>
+          setParams({
+            ...params,
+            sort: newSort,
+          }) /*column.toggleSorting(column.getIsSorted() === "asc")*/
+      }
     >
       {header}
-      <ArrowUpDown className="ml-2 h-4 w-4" />
+      {isAsc || isDesc ? (
+        <>
+          {isAsc ? (
+            <ArrowUp strokeWidth={3} className={iconClassName} />
+          ) : (
+            <ArrowDown strokeWidth={3} className={iconClassName} />
+          )}
+        </>
+      ) : (
+        <ArrowUpDown className={iconClassName} />
+      )}
     </Button>
   );
 };
 
 export const columns: ColumnDef<AssetWithIssues>[] = [
   {
+    id: "role",
     accessorKey: "role",
     header: ({ column }) => <SortableHeader header="Role" column={column} />,
     cell: ({ row }) => {
@@ -52,6 +86,7 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
     },
   },
   {
+    id: "issues",
     accessorKey: "issues",
     header: ({ column }) => (
       <SortableHeader header="Active Vulnerabilities" column={column} />
@@ -79,12 +114,23 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
     header: "IP Address",
   },
   {
-    id: "Class",
+    accessorKey: "cpe",
+    meta: { title: "Class" },
     header: ({ column }) => <SortableHeader header="Class" column={column} />,
-    accessorFn: (row) => row.cpe.split(":").slice(3, 5).join(" "),
+    cell: ({ row }) => {
+      return (
+        <Tooltip>
+          <TooltipTrigger>
+            {row.original.cpe.split(":").slice(3, 5).join(" ")}
+          </TooltipTrigger>
+          <TooltipContent>{row.original.cpe}</TooltipContent>
+        </Tooltip>
+      );
+    },
   },
   {
-    id: "Last Updated",
+    accessorKey: "updatedAt",
+    meta: { title: "Last Updated" },
     header: "Last Updated",
     accessorFn: (row) =>
       formatDistanceToNow(row.updatedAt, { addSuffix: true }),
@@ -93,7 +139,7 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
     id: "actions",
     enableHiding: false,
     cell: ({ row }) => {
-      const payment = row.original;
+      const asset = row.original;
 
       return (
         <DropdownMenu>

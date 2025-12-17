@@ -1,5 +1,7 @@
 import z from "zod";
 import { PAGINATION } from "@/config/constants";
+import { useQueryStates } from "nuqs";
+import { createPaginationParams } from "./url-state";
 
 /**
  * Standard pagination input schema for tRPC procedures
@@ -97,3 +99,8 @@ export function createPaginatedResponse<T>(
     hasPreviousPage: meta.hasPreviousPage,
   };
 }
+
+export const usePaginationParams = () => {
+  const params = createPaginationParams();
+  return useQueryStates(params);
+};

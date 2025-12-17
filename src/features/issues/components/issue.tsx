@@ -7,13 +7,17 @@ import {
 } from "@/components/entity-components";
 import { Badge } from "@/components/ui/badge";
 import { IssueStatus, Issue } from "@/generated/prisma";
-import { useSuspenseIssue, useUpdateIssueStatus } from "../hooks/use-issues";
+import {
+  useSuspenseIssue,
+  useSuspenseIssuesById,
+  useUpdateIssueStatus,
+} from "../hooks/use-issues";
 import { AssetItem } from "@/features/assets/components/assets";
 import { VulnerabilityItem } from "@/features/vulnerabilities/components/vulnerabilities";
 
 import { FullIssue } from "@/lib/db";
 import { useCallback, useEffect, useState } from "react";
-import { BugIcon, ChevronDown, MoreVertical } from "lucide-react";
+import { BugIcon, ChevronDown, ComputerIcon, MoreVertical } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +27,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { CopyCode } from "@/components/ui/code";
+import { cn } from "@/lib/utils";
 
 const statusDetails = {
   [IssueStatus.FALSE_POSITIVE]: {
@@ -50,7 +56,13 @@ export const IssueContainer = ({ children }: { children: React.ReactNode }) => {
   return <EntityContainer>{children}</EntityContainer>;
 };
 
-export const IssueStatusForm = ({ issue }: { issue: Issue | FullIssue }) => {
+export const IssueStatusForm = ({
+  issue,
+  className,
+}: {
+  issue: Issue | FullIssue;
+  className?: string;
+}) => {
   const [status, setStatus] = useState<IssueStatus>(issue.status);
   const updateIssueStatus = useUpdateIssueStatus();
 
@@ -82,6 +94,7 @@ export const IssueStatusForm = ({ issue }: { issue: Issue | FullIssue }) => {
         onClick={(e) => {
           e.stopPropagation();
         }}
+        className={className}
       >
         <Badge className={statusDetail.color}>
           {statusDetail.name} <ChevronDown className="ml-2" />
@@ -125,87 +138,111 @@ export const IssueDetailPage = ({ id }: { id: string }) => {
   );
 };
 
-export const IssuesSidebarList = ({ issues }: { issues: Issue[] }) => {
+export const IssuesSidebarList = ({
+  issues,
+  type,
+}: {
+  issues: Issue[];
+  type: "assets" | "vulnerabilities";
+}) => {
   const router = useRouter();
+  const issuesQuery = useSuspenseIssuesById({
+    ids: issues.map((i) => i.id),
+    type,
+  });
+  const issuesMap = issuesQuery.data.reduce((accumulator, currentObject) => {
+    accumulator[currentObject.id] = currentObject;
+    return accumulator;
+  }, {});
+  console.log("HEY", issuesMap);
+
+  if (issues.length === 0) return null;
+
+  const Icon = type === "assets" ? BugIcon : ComputerIcon;
+
   return (
-    <div>
-      {issues.length === 0 ? (
-        <>
-          <h3 className="font-semibold mb-2">Issues</h3>
-          <p className="text-xs text-muted-foreground">No issues detected</p>
-        </>
-      ) : (
-        <>
-          <h3 className="font-semibold mb-2 text-destructive">
-            {issues.length} active vulnerabilities detected
-          </h3>
-          <p className="text-xs text-muted-foreground my-2">
-            Vulnerabilities have been detected. Lab result integrity
-            compromised. Attackers could modify test results before transmission
-            to EMR, leading to incorrect diagnoses and treatment. Altered QC
-            data could hide equipment malfunction. False critical values could
-            trigger unnecessary interventions.
-          </p>
-          <h4 className="text-xs font-semibold text-muted-foreground mt-4 mb-2">
-            Active Issues
-          </h4>
-          <ul className="flex flex-col gap-2">
-            {issues.map((issue) => (
-              <li
-                key={issue.id}
-                className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer hover:bg-muted transition-all"
-                onClick={() => router.push(`/issues/${issue.id}`)}
-                onKeyDown={() => router.push(`/issues/${issue.id}`)}
+    <>
+      <h4 className="text-xs font-semibold text-muted-foreground mt-4 mb-2">
+        Active Issues
+      </h4>
+      <ul className="flex flex-col gap-2">
+        {issues.map((issue) => (
+          <li
+            key={issue.id}
+            className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer hover:bg-muted transition-all"
+            onClick={() => router.push(`/issues/${issue.id}`)}
+            onKeyDown={() => router.push(`/issues/${issue.id}`)}
+          >
+            <Icon
+              className={cn(
+                "min-w-4 min-h-4 h-4 w-4",
+                type === "assets" ? "text-destructive" : "",
+              )}
+              size={16}
+            />
+            {type === "vulnerabilities" ? (
+              <div className="text-xs flex-1">
+                <p className="font-semibold mb-2">
+                  {issuesMap[issue.id].vulnerability?.description}
+                </p>
+                <IssueStatusForm issue={issue} />
+              </div>
+            ) : (
+              <>
+                <p className="font-semibold">
+                  {issuesMap[issue.id].asset?.role}
+                </p>
+                {/*<CopyCode>{issue.id}</CopyCode>*/}
+                <IssueStatusForm className="ml-auto" issue={issue} />
+              </>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                asChild
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
               >
-                <BugIcon
-                  className="text-destructive min-w-4 min-h-4 h-4 w-4"
-                  size={16}
-                />
-                <div className="text-xs">
-                  <p className="font-semibold mb-2">
-                    Hardcoded default credentials in Roche Cobas 600 laboratory
-                    analyzer
-                  </p>
-                  <IssueStatusForm issue={issue} />
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[200px]">
+                <DropdownMenuItem
+                  onClick={(e) => e.stopPropagation()}
+                  className="cursor-pointer"
+                  asChild
+                >
+                  <Link href={`/issues/${issue.id}`}>Go to Issue Details</Link>
+                </DropdownMenuItem>
+                {type === "vulnerabilities" && (
+                  <DropdownMenuItem
+                    onClick={(e) => e.stopPropagation()}
+                    className="cursor-pointer"
                     asChild
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
                   >
-                    <Button variant="ghost" className="h-8 w-8 p-0 ml-auto">
-                      <span className="sr-only">Open menu</span>
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-[200px]">
-                    <DropdownMenuItem
-                      onClick={(e) => e.stopPropagation()}
-                      className="cursor-pointer"
-                      asChild
-                    >
-                      <Link href={`/issues/${issue.id}`}>
-                        Go to Issue Details
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(e) => e.stopPropagation()}
-                      className="cursor-pointer"
-                      asChild
-                    >
-                      <Link href={`/vulnerability/${issue.vulnerabilityId}`}>
-                        Go to Vulnerability Details
-                      </Link>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
+                    <Link href={`/vulnerabilities/${issue.vulnerabilityId}`}>
+                      Go to Vulnerability Details
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {type === "assets" && (
+                  <DropdownMenuItem
+                    onClick={(e) => e.stopPropagation()}
+                    className="cursor-pointer"
+                    asChild
+                  >
+                    <Link href={`/assets/${issue.assetId}`}>
+                      Go to Asset Details
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 };

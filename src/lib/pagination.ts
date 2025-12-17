@@ -20,6 +20,7 @@ export const paginationInputSchema = z.object({
     .max(PAGINATION.MAX_PAGE_SIZE)
     .default(PAGINATION.DEFAULT_PAGE_SIZE),
   search: z.string().default(""),
+  sort: z.string().default(""),
 });
 
 export type PaginationInput = z.infer<typeof paginationInputSchema>;

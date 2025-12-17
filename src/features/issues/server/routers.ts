@@ -13,6 +13,24 @@ export const issuesRouter = createTRPCRouter({
       });
     }),
 
+  getManyByIds: protectedProcedure
+    .input(
+      z.object({
+        ids: z.array(z.string()),
+        type: z.enum(["assets", "vulnerabilities"]),
+      }),
+    )
+    .query(async ({ input }) => {
+      const { ids, type } = input;
+      return prisma.issue.findMany({
+        where: { id: { in: ids } },
+        include: {
+          asset: type === "assets",
+          vulnerability: type === "vulnerabilities",
+        },
+      });
+    }),
+
   updateStatus: protectedProcedure
     .input(z.object({ id: z.string(), status: z.nativeEnum(IssueStatus) }))
     .mutation(({ input }) => {

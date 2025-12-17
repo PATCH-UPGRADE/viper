@@ -84,32 +84,13 @@ export const AssetsHeader = ({ disabled }: { disabled?: boolean }) => {
   );
 };
 
-export const AssetsPagination = () => {
-  const assets = useSuspenseAssets();
-  const [params, setParams] = useAssetsParams();
-
-  return (
-    <EntityPagination
-      disabled={assets.isFetching}
-      totalPages={assets.data.totalPages}
-      page={assets.data.page}
-      onPageChange={(page) => setParams({ ...params, page })}
-    />
-  );
-};
-
 export const AssetsContainer = ({
   children,
 }: {
   children: React.ReactNode;
 }) => {
   return (
-    <EntityContainer
-      header={<AssetsHeader />}
-      pagination={<AssetsPagination />}
-    >
-      {children}
-    </EntityContainer>
+    <EntityContainer header={<AssetsHeader />}>{children}</EntityContainer>
   );
 };
 
@@ -189,7 +170,7 @@ export function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
           {asset.role}
         </Button>
       </DrawerTrigger>
-      <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
+      <DrawerContent className={isMobile ? "" : "max-w-[36rem]!"}>
         <DrawerHeader className="gap-1">
           <DrawerTitle>{asset.role}</DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
@@ -237,7 +218,33 @@ export function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
           {hasIssues && (
             <>
               <Separator />
-              <IssuesSidebarList issues={asset.issues} />
+              <div>
+                {asset.issues.length === 0 ? (
+                  <>
+                    <h3 className="font-semibold mb-2">Issues</h3>
+                    <p className="text-xs text-muted-foreground">
+                      No issues detected
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="font-semibold mb-2 text-destructive">
+                      {asset.issues.length} active vulnerabilit
+                      {asset.issues.length === 1 ? "y" : "ies"} detected
+                    </h3>
+                    <p className="text-xs text-muted-foreground my-2">
+                      Vulnerabilities have been detected. Lab result integrity
+                      compromised. Attackers could modify test results before
+                      transmission to EMR, leading to incorrect diagnoses and
+                      treatment. Lorem ipsum dolor asset...
+                    </p>
+                  </>
+                )}
+                <IssuesSidebarList
+                  issues={asset.issues}
+                  type="vulnerabilities"
+                />
+              </div>
             </>
           )}
 

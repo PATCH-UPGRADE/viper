@@ -65,10 +65,6 @@ const assetsVulnsInputSchema = z.object({
 });
 export type AssetsVulnsInput = z.infer<typeof assetsVulnsInputSchema>;
 
-const assetsListInputSchema = paginationInputSchema.extend({
-  sort: z.string().optional(),
-});
-
 export const assetsRouter = createTRPCRouter({
   // GET /api/assets - List all assets (any authenticated user can see all)
   getMany: protectedProcedure
@@ -116,7 +112,7 @@ export const assetsRouter = createTRPCRouter({
 
   // not exposed on OpenAPI
   getManyInternal: protectedProcedure
-    .input(assetsListInputSchema)
+    .input(paginationInputSchema)
     .query(async ({ input }) => {
       const { search, sort } = input;
 
@@ -151,7 +147,9 @@ export const assetsRouter = createTRPCRouter({
         include: { user: userIncludeSelect, issues: true },
         orderBy: sort
           ? [
-              { [sort.replace("-", "")]: getSortValue(sort) },
+              ...sort.split(",").map((s) => {
+                return { [s.replace("-", "")]: getSortValue(s) };
+              }),
               { updatedAt: "desc" },
             ]
           : { updatedAt: "desc" },

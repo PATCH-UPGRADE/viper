@@ -1,52 +1,41 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreVertical, CopyIcon, TrashIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import type { AssetWithIssues } from "@/lib/db";
-import { AssetDrawer } from "./assets";
-import {
-  TooltipContent,
-  Tooltip,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { handleCopy } from "@/lib/copy";
+import type { VulnerabilityWithIssues } from "@/lib/db";
 import { SortableHeader } from "@/components/ui/data-table";
+import { CopyCode } from "@/components/ui/code";
+import { VulnerabilityDrawer } from "./vulnerabilities";
 
-export const columns: ColumnDef<AssetWithIssues>[] = [
+export const columns: ColumnDef<VulnerabilityWithIssues>[] = [
   {
-    id: "role",
-    accessorKey: "role",
-    header: ({ column }) => <SortableHeader header="Role" column={column} />,
-    cell: ({ row }) => {
-      return <AssetDrawer asset={row.original} />;
-    },
+    accessorKey: "description",
+    header: ({ column }) => (
+      <SortableHeader header="Description" column={column} />
+    ),
+    cell: ({ row }) => (
+      <VulnerabilityDrawer vulnerability={row.original}>
+        <div className="max-w-[500px] overflow-hidden text-ellipsis hover:underline pb-[1px]">
+          {row.original.description}
+        </div>
+      </VulnerabilityDrawer>
+    ),
   },
   {
-    id: "issues",
     accessorKey: "issues",
     header: ({ column }) => (
-      <SortableHeader header="Active Vulnerabilities" column={column} />
+      <SortableHeader header="Affected Assets" column={column} />
     ),
     cell: ({ row }) => {
-      const numVulns = row.original.issues.length;
+      const numAssets = row.original.issues.length;
       return (
         <div>
-          <Badge variant={numVulns === 0 ? "outline" : "destructive"}>
-            {numVulns >= 1 ? (
+          <Badge variant={numAssets === 0 ? "outline" : "destructive"}>
+            {numAssets >= 1 ? (
               <>
-                {numVulns} Vuln{numVulns === 1 ? "" : "s"}.
+                {numAssets} Asset{numAssets === 1 ? "" : "s"}
               </>
             ) : (
               "None"
@@ -57,23 +46,13 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
     },
   },
   {
-    id: "IP Address",
-    accessorKey: "ip",
-    header: "IP Address",
-  },
-  {
     accessorKey: "cpe",
-    meta: { title: "Class" },
-    header: ({ column }) => <SortableHeader header="Class" column={column} />,
+    meta: { title: "Group ID" },
+    header: ({ column }) => (
+      <SortableHeader header="Group ID" column={column} />
+    ),
     cell: ({ row }) => {
-      return (
-        <Tooltip>
-          <TooltipTrigger>
-            {row.original.cpe.split(":").slice(3, 5).join(" ")}
-          </TooltipTrigger>
-          <TooltipContent>{row.original.cpe}</TooltipContent>
-        </Tooltip>
-      );
+      return <CopyCode>{row.original.cpe}</CopyCode>;
     },
   },
   {
@@ -83,7 +62,7 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
     accessorFn: (row) =>
       formatDistanceToNow(row.updatedAt, { addSuffix: true }),
   },
-  {
+  /*{
     id: "actions",
     enableHiding: false,
     cell: ({ row }) => {
@@ -117,5 +96,5 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
         </DropdownMenu>
       );
     },
-  },
+  }*/
 ];

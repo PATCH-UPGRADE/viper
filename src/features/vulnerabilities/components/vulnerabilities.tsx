@@ -5,7 +5,6 @@ import {
   EmptyView,
   EntityContainer,
   EntityHeader,
-  EntityItem,
   EntityList,
   EntityPagination,
   EntitySearch,
@@ -36,7 +35,14 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { VulnerabilityWithIssues } from "@/lib/db";
 import Link from "next/link";
-import { IssueStatusBadge } from "@/features/issues/components/issue";
+import {
+  IssuesSidebarList,
+  IssueStatusBadge,
+} from "@/features/issues/components/issue";
+import { DataTable } from "@/components/ui/data-table";
+import { columns } from "./columns";
+import { PropsWithChildren } from "react";
+import { CopyCode } from "@/components/ui/code";
 
 export const VulnerabilitiesSearch = () => {
   const [params, setParams] = useVulnerabilitiesParams();
@@ -58,11 +64,10 @@ export const VulnerabilitiesList = () => {
   const vulnerabilities = useSuspenseVulnerabilities();
 
   return (
-    <EntityList
-      items={vulnerabilities.data.items}
-      getKey={(vulnerability) => vulnerability.id}
-      renderItem={(vulnerability) => <VulnerabilityItem data={vulnerability} />}
-      emptyView={<VulnerabilitiesEmpty />}
+    <DataTable
+      paginatedData={vulnerabilities.data}
+      columns={columns}
+      search={<VulnerabilitiesSearch />}
     />
   );
 };
@@ -78,31 +83,13 @@ export const VulnerabilitiesHeader = ({ disabled }: { disabled?: boolean }) => {
   );
 };
 
-export const VulnerabilitiesPagination = () => {
-  const vulnerabilities = useSuspenseVulnerabilities();
-  const [params, setParams] = useVulnerabilitiesParams();
-
-  return (
-    <EntityPagination
-      disabled={vulnerabilities.isFetching}
-      totalPages={vulnerabilities.data.totalPages}
-      page={vulnerabilities.data.page}
-      onPageChange={(page) => setParams({ ...params, page })}
-    />
-  );
-};
-
 export const VulnerabilitiesContainer = ({
   children,
 }: {
   children: React.ReactNode;
 }) => {
   return (
-    <EntityContainer
-      header={<VulnerabilitiesHeader />}
-      search={<VulnerabilitiesSearch />}
-      pagination={<VulnerabilitiesPagination />}
-    >
+    <EntityContainer header={<VulnerabilitiesHeader />}>
       {children}
     </EntityContainer>
   );
@@ -174,11 +161,12 @@ export const VulnerabilityItem = ({
   );
 };
 
-function VulnerabilityDrawer({
+export function VulnerabilityDrawer({
   vulnerability,
-}: {
+  children,
+}: PropsWithChildren<{
   vulnerability: VulnerabilityWithIssues | Vulnerability;
-}) {
+}>) {
   const hasIssues = isVulnerabilityWithIssues(vulnerability);
   const isMobile = useIsMobile();
 
@@ -189,10 +177,10 @@ function VulnerabilityDrawer({
           variant="link"
           className="text-foreground h-auto p-0 text-left font-medium"
         >
-          {vulnerability.cpe}
+          {children ? children : vulnerability.cpe}
         </Button>
       </DrawerTrigger>
-      <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
+      <DrawerContent className={isMobile ? "" : "max-w-[36rem]!"}>
         <DrawerHeader className="gap-1">
           <DrawerTitle>{vulnerability.cpe}</DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
@@ -230,6 +218,10 @@ function VulnerabilityDrawer({
           <div className="flex flex-col gap-2">
             <h3 className="font-semibold text-destructive">Clinical Impact</h3>
             <p className="text-muted-foreground">{vulnerability.impact}</p>
+            {/* Issues */}
+            {hasIssues && (
+              <IssuesSidebarList issues={vulnerability.issues} type="assets" />
+            )}
           </div>
 
           <Separator />
@@ -243,9 +235,7 @@ function VulnerabilityDrawer({
                 <div className="text-xs font-medium text-muted-foreground mb-1">
                   CPE Identifier
                 </div>
-                <code className="text-xs bg-muted px-2 py-1 rounded">
-                  {vulnerability.cpe}
-                </code>
+                <CopyCode>{vulnerability.cpe}</CopyCode>
               </div>
 
               <div>
@@ -289,34 +279,6 @@ function VulnerabilityDrawer({
               {JSON.stringify(vulnerability.sarif, null, 2)}
             </pre>
           </div>
-
-          {/* Issues */}
-          {hasIssues && (
-            <>
-              <Separator />
-
-              <div className="flex flex-col gap-3">
-                <h3 className="font-semibold">Issues</h3>
-                {vulnerability.issues.length === 0 ? (
-                  <p className="text-xs">Vulnerability has no issues!</p>
-                ) : (
-                  <ul className="list-disc pl-8">
-                    {vulnerability.issues.map((issue) => (
-                      <li key={issue.id}>
-                        <Link
-                          className="text-xs text-primary hover:underline flex items-center gap-1"
-                          href={`/issues/${issue.id}`}
-                        >
-                          <IssueStatusBadge status={issue.status} />
-                          Issue
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </>
-          )}
         </div>
 
         <DrawerFooter>

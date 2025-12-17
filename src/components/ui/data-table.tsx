@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { RowData, Table as TableType } from "@tanstack/react-table";
+import { Column, RowData, Table as TableType } from "@tanstack/react-table";
 import {
   ColumnDef,
   SortingState,
@@ -39,6 +39,9 @@ import {
 } from "@/components/ui/select";
 
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -53,6 +56,40 @@ declare module "@tanstack/react-table" {
   }
 }
 
+interface SortableHeaderProps<TData> {
+  header: string;
+  column: Column<TData>;
+}
+
+export function SortableHeader<TData>({
+  header,
+  column,
+}: SortableHeaderProps<TData>) {
+  const iconClassName = "ml-2 h-4 w-4";
+  const sorted = column.getIsSorted();
+
+  return (
+    <Button
+      variant="link"
+      className="text-muted-foreground px-0!"
+      onClick={() => column.toggleSorting(undefined, true)}
+    >
+      {header}
+      {sorted ? (
+        <>
+          {sorted === "asc" ? (
+            <ArrowUp strokeWidth={3} className={iconClassName} />
+          ) : (
+            <ArrowDown strokeWidth={3} className={iconClassName} />
+          )}
+        </>
+      ) : (
+        <ArrowUpDown className={iconClassName} />
+      )}
+    </Button>
+  );
+}
+
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   paginatedData: PaginatedResponse<TData>;
@@ -65,6 +102,7 @@ export function DataTable<TData, TValue>({
   search,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [params, setParams] = usePaginationParams();
 
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -74,12 +112,19 @@ export function DataTable<TData, TValue>({
     pageSize: paginatedData.pageSize,
   };
 
+  React.useEffect(() => {
+    const sortParam = sorting
+      .map((s) => `${s.desc ? "-" : ""}${s.id}`)
+      .join(",");
+    setParams({ ...params, ...{ sort: sortParam } });
+  }, [sorting]);
+
   const table = useReactTable({
     data: paginatedData.items,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    manualSorting: true,
     onSortingChange: setSorting,
-    getSortedRowModel: getSortedRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     state: {
       sorting,

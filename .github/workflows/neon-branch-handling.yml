@@ -1,1 +1,7 @@
-# 
+name: Placeholder
+on: workflow_dispatch
+jobs:
+  nothing:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Hi, I am a placeholder."

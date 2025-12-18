@@ -39,7 +39,7 @@ Run `npm run openapi:generate` or visit the server at
 │  │ VMP Core Components                                             │  │
 │  │  • /assets: Asset Management                                    │  │
 │  │  • /vulnerabilities: Vulnerability Management (TA3 integration) │  │
-│  │  • /remediations: Remediations  (TA4 integration)                │  │
+│  │  • /remediations: Remediations  (TA4 integration)               │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │                                                                       │
 │  ┌─────────────────────────────────────────────────────────────────┐  │

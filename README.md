@@ -5,6 +5,10 @@ Viper is the PATCH Teams Vulnerability Management Platform (VMP).
 - Define healthcare workflows
 - Simulate cybersecurity events on those workflows.
 
+## Ticket Tracking
+
+We are using the [Northeastern PATCH Jira](https://northeastern-patch.atlassian.net/jira/software/projects/VW/boards/67) for tracking tickets/progress.
+
 ## Getting Started
 
 Follow the guide in `.env.example` to create a `.env` file.

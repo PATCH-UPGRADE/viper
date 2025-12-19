@@ -37,7 +37,13 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { AssetWithIssues } from "@/lib/db";
 import Link from "next/link";
-import { IssueStatusBadge } from "@/features/issues/components/issue";
+import {
+  IssuesSidebarList,
+  IssueStatusBadge,
+} from "@/features/issues/components/issue";
+import { DataTable } from "@/components/ui/data-table";
+import { columns } from "./columns";
+import { CopyCode } from "@/components/ui/code";
 
 export const AssetsSearch = () => {
   const [params, setParams] = useAssetsParams();
@@ -59,11 +65,10 @@ export const AssetsList = () => {
   const assets = useSuspenseAssets();
 
   return (
-    <EntityList
-      items={assets.data.items}
-      getKey={(asset) => asset.id}
-      renderItem={(asset) => <AssetItem data={asset} />}
-      emptyView={<AssetsEmpty />}
+    <DataTable
+      paginatedData={assets.data}
+      columns={columns}
+      search={<AssetsSearch />}
     />
   );
 };
@@ -79,33 +84,13 @@ export const AssetsHeader = ({ disabled }: { disabled?: boolean }) => {
   );
 };
 
-export const AssetsPagination = () => {
-  const assets = useSuspenseAssets();
-  const [params, setParams] = useAssetsParams();
-
-  return (
-    <EntityPagination
-      disabled={assets.isFetching}
-      totalPages={assets.data.totalPages}
-      page={assets.data.page}
-      onPageChange={(page) => setParams({ ...params, page })}
-    />
-  );
-};
-
 export const AssetsContainer = ({
   children,
 }: {
   children: React.ReactNode;
 }) => {
   return (
-    <EntityContainer
-      header={<AssetsHeader />}
-      search={<AssetsSearch />}
-      pagination={<AssetsPagination />}
-    >
-      {children}
-    </EntityContainer>
+    <EntityContainer header={<AssetsHeader />}>{children}</EntityContainer>
   );
 };
 
@@ -171,7 +156,7 @@ export const AssetItem = ({ data }: { data: AssetWithIssues | Asset }) => {
   );
 };
 
-function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
+export function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
   const isMobile = useIsMobile();
   const hasIssues = isAssetWithIssues(asset);
 
@@ -185,7 +170,7 @@ function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
           {asset.role}
         </Button>
       </DrawerTrigger>
-      <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
+      <DrawerContent className={isMobile ? "" : "max-w-[36rem]!"}>
         <DrawerHeader className="gap-1">
           <DrawerTitle>{asset.role}</DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
@@ -217,21 +202,51 @@ function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
                 <div className="text-xs font-medium text-muted-foreground mb-1">
                   IP Address
                 </div>
-                <code className="text-xs bg-muted px-2 py-1 rounded">
-                  {asset.ip}
-                </code>
+                <CopyCode>{asset.ip}</CopyCode>
               </div>
 
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1">
-                  CPE Identifier
+                  Group ID
                 </div>
-                <code className="text-xs bg-muted px-2 py-1 rounded break-all">
-                  {asset.cpe}
-                </code>
+                <CopyCode>{asset.cpe}</CopyCode>
               </div>
             </div>
           </div>
+
+          {/* Issues */}
+          {hasIssues && (
+            <>
+              <Separator />
+              <div>
+                {asset.issues.length === 0 ? (
+                  <>
+                    <h3 className="font-semibold mb-2">Issues</h3>
+                    <p className="text-xs text-muted-foreground">
+                      No issues detected
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="font-semibold mb-2 text-destructive">
+                      {asset.issues.length} active vulnerabilit
+                      {asset.issues.length === 1 ? "y" : "ies"} detected
+                    </h3>
+                    <p className="text-xs text-muted-foreground my-2">
+                      Vulnerabilities have been detected. Lab result integrity
+                      compromised. Attackers could modify test results before
+                      transmission to EMR, leading to incorrect diagnoses and
+                      treatment. Lorem ipsum dolor asset...
+                    </p>
+                  </>
+                )}
+                <IssuesSidebarList
+                  issues={asset.issues}
+                  type="vulnerabilities"
+                />
+              </div>
+            </>
+          )}
 
           <Separator />
 
@@ -286,38 +301,9 @@ function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
                 <div className="text-xs font-medium text-muted-foreground mb-1">
                   Asset ID
                 </div>
-                <code className="text-xs bg-muted px-2 py-1 rounded">
-                  {asset.id}
-                </code>
+                <CopyCode>{asset.id}</CopyCode>
               </div>
             </div>
-
-            {/* Issues */}
-            {hasIssues && (
-              <>
-                <Separator />
-                <div className="flex flex-col gap-3">
-                  <h3 className="font-semibold">Issues</h3>
-                  {asset.issues.length === 0 ? (
-                    <p className="text-xs">Asset has no issues!</p>
-                  ) : (
-                    <ul className="list-disc pl-8">
-                      {asset.issues.map((issue) => (
-                        <li key={issue.id}>
-                          <Link
-                            className="text-xs text-primary hover:underline flex items-center gap-1"
-                            href={`/issues/${issue.id}`}
-                          >
-                            <IssueStatusBadge status={issue.status} />
-                            Issue
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </>
-            )}
           </div>
         </div>
 

@@ -1,5 +1,7 @@
 import z from "zod";
 import { PAGINATION } from "@/config/constants";
+import { useQueryStates } from "nuqs";
+import { createPaginationParams } from "./url-state";
 
 /**
  * Standard pagination input schema for tRPC procedures
@@ -18,6 +20,7 @@ export const paginationInputSchema = z.object({
     .max(PAGINATION.MAX_PAGE_SIZE)
     .default(PAGINATION.DEFAULT_PAGE_SIZE),
   search: z.string().default(""),
+  sort: z.string().default(""),
 });
 
 export type PaginationInput = z.infer<typeof paginationInputSchema>;
@@ -97,3 +100,8 @@ export function createPaginatedResponse<T>(
     hasPreviousPage: meta.hasPreviousPage,
   };
 }
+
+export const usePaginationParams = () => {
+  const params = createPaginationParams();
+  return useQueryStates(params);
+};

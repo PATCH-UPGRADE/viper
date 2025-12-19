@@ -97,7 +97,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
   getManyInternal: protectedProcedure
     .input(paginationInputSchema)
     .query(async ({ input }) => {
-      const { search } = input;
+      const { search, sort } = input;
+      // TODO: DRY with asset getmanyinternal
 
       // Build search filter across multiple fields
       const searchFilter = search
@@ -118,13 +119,28 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       });
       const meta = buildPaginationMeta(input, totalCount);
 
+      function getSortValue(sort: string) {
+        const sortValue = sort.startsWith("-") ? "desc" : "asc";
+        if (sort === "issues" || sort === "-issues") {
+          return { _count: sortValue };
+        }
+        return sortValue;
+      }
+
       // Fetch paginated items
       const items = await prisma.vulnerability.findMany({
         skip: meta.skip,
         take: meta.take,
         where: searchFilter,
         include: { user: userIncludeSelect, issues: true },
-        orderBy: { createdAt: "desc" },
+        orderBy: sort
+          ? [
+              ...sort.split(",").map((s) => {
+                return { [s.replace("-", "")]: getSortValue(s) };
+              }),
+              { updatedAt: "desc" },
+            ]
+          : { updatedAt: "desc" },
       });
 
       return createPaginatedResponse(items, meta);

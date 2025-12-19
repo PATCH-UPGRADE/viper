@@ -14,5 +14,6 @@ export function createPaginationParams() {
       .withDefault(PAGINATION.DEFAULT_PAGE_SIZE)
       .withOptions({ clearOnDefault: true }),
     search: parseAsString.withDefault("").withOptions({ clearOnDefault: true }),
+    sort: parseAsString.withDefault("").withOptions({ clearOnDefault: true }),
   };
 }

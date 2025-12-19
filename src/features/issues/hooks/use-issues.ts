@@ -35,3 +35,14 @@ export const useSuspenseIssue = (id: string) => {
   const trpc = useTRPC();
   return useSuspenseQuery(trpc.issues.getOne.queryOptions({ id }));
 };
+
+export const useSuspenseIssuesById = ({
+  ids,
+  type,
+}: {
+  ids: string[];
+  type: "assets" | "vulnerabilities";
+}) => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(trpc.issues.getManyByIds.queryOptions({ ids, type }));
+};

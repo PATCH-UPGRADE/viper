@@ -69,23 +69,21 @@ function InputGroupAddon({
     e.currentTarget.parentElement?.querySelector("input")?.focus();
   };
   return (
-    <>
-      {/* biome-ignore lint/a11y/useSemanticElements: prefer role to keep role description*/}
-      <div
-        role="group"
-        data-slot="input-group-addon"
-        data-align={align}
-        className={cn(inputGroupAddonVariants({ align }), className)}
-        onClick={onClick}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onClick(e);
-          }
-        }}
-        {...props}
-      />
-    </>
+    <div
+      role="menuitem" // TODO: possibly a better aria role?
+      data-slot="input-group-addon"
+      data-align={align}
+      className={cn(inputGroupAddonVariants({ align }), className)}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick(e);
+        }
+      }}
+      tabIndex={0}
+      {...props}
+    />
   );
 }
 

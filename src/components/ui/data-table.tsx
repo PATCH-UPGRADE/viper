@@ -48,7 +48,8 @@ import {
 import { type PaginatedResponse, usePaginationParams } from "@/lib/pagination";
 
 declare module "@tanstack/react-table" {
-  interface ColumnMeta<_TData extends RowData, _TValue> {
+  // biome-ignore lint/correctness/noUnusedVariables: required for declaration merging
+  interface ColumnMeta<TData extends RowData, TValue> {
     title: string;
   }
 }

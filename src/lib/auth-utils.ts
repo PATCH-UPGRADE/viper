@@ -17,7 +17,7 @@ export const verifyApiKey = async (req: Request) => {
   if (!authHeader) {
     return { valid: false, error: null, key: null };
   }
-  let apiKey;
+  let apiKey: string;
 
   if (authHeader.startsWith("Bearer ")) {
     apiKey = authHeader.substring(7);

@@ -1,9 +1,8 @@
 import request from "supertest";
-import { BASE_URL, AUTH_TOKEN, generateCPE } from "./test-config";
+import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
 
 describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
   const authHeader = { Authorization: AUTH_TOKEN };
-  let TestState: { vulnerabilityId?: string } = {};
 
   const payload = {
     sarif: { tool: { driver: { name: "TestScanner" } } },

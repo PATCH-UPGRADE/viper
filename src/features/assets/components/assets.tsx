@@ -1,27 +1,19 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
+import { ExternalLinkIcon, ServerIcon } from "lucide-react";
 import {
   EmptyView,
   EntityContainer,
   EntityHeader,
-  EntityItem,
-  EntityList,
-  EntityPagination,
   EntitySearch,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import {
-  useCreateAsset,
-  useRemoveAsset,
-  useSuspenseAssets,
-} from "../hooks/use-assets";
-import { useAssetsParams } from "../hooks/use-assets-params";
-import { useEntitySearch } from "@/hooks/use-entity-search";
-import type { Asset } from "@/generated/prisma";
-import { ServerIcon, ExternalLinkIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CopyCode } from "@/components/ui/code";
+import { DataTable } from "@/components/ui/data-table";
 import {
   Drawer,
   DrawerClose,
@@ -32,18 +24,15 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { AssetWithIssues } from "@/lib/db";
-import Link from "next/link";
-import {
-  IssuesSidebarList,
-  IssueStatusBadge,
-} from "@/features/issues/components/issue";
-import { DataTable } from "@/components/ui/data-table";
+import { IssuesSidebarList } from "@/features/issues/components/issue";
+import type { Asset } from "@/generated/prisma";
+import { useEntitySearch } from "@/hooks/use-entity-search";
+import { useIsMobile } from "@/hooks/use-mobile";
+import type { AssetWithIssues } from "@/lib/db";
+import { useRemoveAsset, useSuspenseAssets } from "../hooks/use-assets";
+import { useAssetsParams } from "../hooks/use-assets-params";
 import { columns } from "./columns";
-import { CopyCode } from "@/components/ui/code";
 
 export const AssetsSearch = () => {
   const [params, setParams] = useAssetsParams();

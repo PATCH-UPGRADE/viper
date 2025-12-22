@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import {
   IssueContainer,
   IssueDetailPage,
@@ -7,8 +9,6 @@ import {
 import { prefetchIssue } from "@/features/issues/server/prefetch";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
-import { ErrorBoundary } from "react-error-boundary";
-import { Suspense } from "react";
 
 interface PageProps {
   params: Promise<{

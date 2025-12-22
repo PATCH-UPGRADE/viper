@@ -1,25 +1,20 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
+import { AlertTriangleIcon, ExternalLinkIcon } from "lucide-react";
+import type { PropsWithChildren } from "react";
 import {
   EmptyView,
   EntityContainer,
   EntityHeader,
-  EntityList,
-  EntityPagination,
   EntitySearch,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import {
-  useRemoveVulnerability,
-  useSuspenseVulnerabilities,
-} from "../hooks/use-vulnerabilities";
-import { useVulnerabilitiesParams } from "../hooks/use-vulnerabilities-params";
-import { useEntitySearch } from "@/hooks/use-entity-search";
-import type { Vulnerability } from "@/generated/prisma";
-import { AlertTriangleIcon, ExternalLinkIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CopyCode } from "@/components/ui/code";
+import { DataTable } from "@/components/ui/data-table";
 import {
   Drawer,
   DrawerClose,
@@ -30,19 +25,18 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { VulnerabilityWithIssues } from "@/lib/db";
-import Link from "next/link";
+import { IssuesSidebarList } from "@/features/issues/components/issue";
+import type { Vulnerability } from "@/generated/prisma";
+import { useEntitySearch } from "@/hooks/use-entity-search";
+import { useIsMobile } from "@/hooks/use-mobile";
+import type { VulnerabilityWithIssues } from "@/lib/db";
 import {
-  IssuesSidebarList,
-  IssueStatusBadge,
-} from "@/features/issues/components/issue";
-import { DataTable } from "@/components/ui/data-table";
+  useRemoveVulnerability,
+  useSuspenseVulnerabilities,
+} from "../hooks/use-vulnerabilities";
+import { useVulnerabilitiesParams } from "../hooks/use-vulnerabilities-params";
 import { columns } from "./columns";
-import { PropsWithChildren } from "react";
-import { CopyCode } from "@/components/ui/code";
 
 export const VulnerabilitiesSearch = () => {
   const [params, setParams] = useVulnerabilitiesParams();

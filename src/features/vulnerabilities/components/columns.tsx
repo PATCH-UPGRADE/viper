@@ -1,12 +1,12 @@
 "use client";
 
-import { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
 
 import { Badge } from "@/components/ui/badge";
-import type { VulnerabilityWithIssues } from "@/lib/db";
-import { SortableHeader } from "@/components/ui/data-table";
 import { CopyCode } from "@/components/ui/code";
+import { SortableHeader } from "@/components/ui/data-table";
+import type { VulnerabilityWithIssues } from "@/lib/db";
 import { VulnerabilityDrawer } from "./vulnerabilities";
 
 export const columns: ColumnDef<VulnerabilityWithIssues>[] = [

@@ -8,8 +8,8 @@
 
 import { writeFile } from "node:fs/promises";
 import { generateOpenApiDocument } from "trpc-to-openapi";
-import { appRouter } from "../src/trpc/routers/_app";
 import { getBaseUrl } from "@/lib/url-utils";
+import { appRouter } from "../src/trpc/routers/_app";
 
 async function generateOpenApiSpec() {
   console.log("🔧 Generating OpenAPI specification...");

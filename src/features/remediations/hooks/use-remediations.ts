@@ -1,10 +1,10 @@
-import { useTRPC } from "@/trpc/client";
 import {
   useMutation,
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTRPC } from "@/trpc/client";
 import { useRemediationsParams } from "./use-remediations-params";
 
 /**
@@ -26,7 +26,7 @@ export const useCreateRemediation = () => {
 
   return useMutation(
     trpc.remediations.create.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: (_data) => {
         toast.success("Remediation created");
         // Invalidate all getMany queries regardless of params (page, search, etc.)
         queryClient.invalidateQueries({
@@ -52,7 +52,7 @@ export const useUpdateRemediation = () => {
 
   return useMutation(
     trpc.remediations.update.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: (_data) => {
         toast.success("Remediation updated");
         // Invalidate all getMany queries regardless of params
         queryClient.invalidateQueries({
@@ -82,7 +82,7 @@ export const useRemoveRemediation = () => {
 
   return useMutation(
     trpc.remediations.remove.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: (_data) => {
         toast.success("Remediation removed");
         // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({

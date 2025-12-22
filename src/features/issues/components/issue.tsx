@@ -1,34 +1,32 @@
 "use client";
 
+import { BugIcon, ChevronDown, ComputerIcon, MoreVertical } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import {
   EntityContainer,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
 import { Badge } from "@/components/ui/badge";
-import { IssueStatus, Issue } from "@/generated/prisma";
-import {
-  useSuspenseIssue,
-  useSuspenseIssuesById,
-  useUpdateIssueStatus,
-} from "../hooks/use-issues";
-import { AssetItem } from "@/features/assets/components/assets";
-import { VulnerabilityItem } from "@/features/vulnerabilities/components/vulnerabilities";
-
-import { FullIssue } from "@/lib/db";
-import { useCallback, useEffect, useState } from "react";
-import { BugIcon, ChevronDown, ComputerIcon, MoreVertical } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { CopyCode } from "@/components/ui/code";
+import { AssetItem } from "@/features/assets/components/assets";
+import { VulnerabilityItem } from "@/features/vulnerabilities/components/vulnerabilities";
+import { type Issue, IssueStatus } from "@/generated/prisma";
+import type { FullIssue } from "@/lib/db";
 import { cn } from "@/lib/utils";
+import {
+  useSuspenseIssue,
+  useSuspenseIssuesById,
+  useUpdateIssueStatus,
+} from "../hooks/use-issues";
 
 const statusDetails = {
   [IssueStatus.FALSE_POSITIVE]: {
@@ -83,7 +81,7 @@ export const IssueStatusForm = ({
 
   useEffect(() => {
     handleSave();
-  }, [status]);
+  }, [handleSave]);
 
   const statusDetail = statusDetails[status];
 

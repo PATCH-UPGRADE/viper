@@ -1,6 +1,6 @@
 import { generateOpenApiDocument } from "trpc-to-openapi";
-import { appRouter } from "@/trpc/routers/_app";
 import { getBaseUrl } from "@/lib/url-utils";
+import { appRouter } from "@/trpc/routers/_app";
 
 // This endpoint is publicly accessible (no auth required)
 export async function GET() {

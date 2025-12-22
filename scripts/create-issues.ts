@@ -1,4 +1,5 @@
 import { PrismaClient } from "@/generated/prisma";
+
 const prisma = new PrismaClient();
 
 async function createIssuesForVulnerabilities() {
@@ -15,7 +16,9 @@ async function createIssuesForVulnerabilities() {
       if (!cpeToAssets.has(asset.cpe)) {
         cpeToAssets.set(asset.cpe, []);
       }
-      cpeToAssets.get(asset.cpe)!.push(asset.id);
+      const assetsArr = cpeToAssets.get(asset.cpe) || [];
+      assetsArr.push(asset.id);
+      cpeToAssets.set(asset.cpe, assetsArr);
     }
 
     const issueRecords = [];

@@ -1,11 +1,11 @@
-import { useTRPC } from "@/trpc/client";
 import {
+  type QueryClient,
   useMutation,
   useQueryClient,
   useSuspenseQuery,
-  type QueryClient,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTRPC } from "@/trpc/client";
 import { useEmulatorsParams } from "./use-emulators-params";
 
 /**

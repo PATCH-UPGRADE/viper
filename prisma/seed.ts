@@ -1,5 +1,5 @@
-import { PrismaClient } from "@/generated/prisma";
 import { hashPassword } from "better-auth/crypto";
+import { PrismaClient } from "@/generated/prisma";
 
 const prisma = new PrismaClient();
 

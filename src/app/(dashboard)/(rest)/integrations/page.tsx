@@ -1,14 +1,14 @@
-import { requireAuth } from "@/lib/auth-utils";
+import { Badge } from "@/components/ui/badge";
 
 import {
   Card,
+  CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
-  CardContent,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
+import { requireAuth } from "@/lib/auth-utils";
 
 const Page = async () => {
   await requireAuth();

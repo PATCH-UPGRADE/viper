@@ -1,10 +1,10 @@
 "use client";
 
-import { useReactFlow, type Node, type NodeProps } from "@xyflow/react";
+import { type Node, type NodeProps, useReactFlow } from "@xyflow/react";
 import { CircleQuestionMark } from "lucide-react";
 import { memo, useState } from "react";
 import { BaseStepNode } from "./base-step-node";
-import { StepFormValues, StepDialog } from "./dialog";
+import { StepDialog, type StepFormValues } from "./dialog";
 
 type StepNodeData = {
   icon?: string;

@@ -1,8 +1,8 @@
 import {
   WorkflowsContainer,
+  WorkflowsError,
   WorkflowsList,
   WorkflowsLoading,
-  WorkflowsError,
 } from "@/features/workflows/components/workflows";
 import { workflowsParamsLoader } from "@/features/workflows/server/params-loader";
 import { prefetchWorkflows } from "@/features/workflows/server/prefetch";

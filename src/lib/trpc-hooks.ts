@@ -1,12 +1,12 @@
 "use client";
 
 import {
+  type UseMutationOptions,
   useMutation,
   useQueryClient,
-  type UseMutationOptions,
 } from "@tanstack/react-query";
-import { toast } from "sonner";
 import type { TRPCClientError } from "@trpc/client";
+import { toast } from "sonner";
 
 /**
  * Generic factory for create mutation hooks

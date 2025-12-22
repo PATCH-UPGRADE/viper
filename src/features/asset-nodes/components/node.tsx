@@ -1,15 +1,14 @@
 "use client";
 
-import { useReactFlow, type Node, type NodeProps } from "@xyflow/react";
+import { type Node, type NodeProps, useReactFlow } from "@xyflow/react";
 import { BugIcon, CircleQuestionMark, ComputerIcon } from "lucide-react";
 import { memo, useState } from "react";
-import { BaseAssetNode } from "./base-asset-node";
-import { AssetFormValues, AssetDialog } from "./dialog";
-import { DeviceIconType, getIconByType } from "../types";
-import { useSuspenseAssetsVulns } from "@/features/assets/hooks/use-assets";
 import { Badge } from "@/components/ui/badge";
-
+import { useSuspenseAssetsVulns } from "@/features/assets/hooks/use-assets";
 import { cn } from "@/lib/utils";
+import { type DeviceIconType, getIconByType } from "../types";
+import { BaseAssetNode } from "./base-asset-node";
+import { AssetDialog, type AssetFormValues } from "./dialog";
 
 export type AssetNodeData = {
   icon?: string;

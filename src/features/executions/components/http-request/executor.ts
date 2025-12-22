@@ -1,6 +1,6 @@
-import type { NodeExecutor } from "@/features/executions/types";
 import { NonRetriableError } from "inngest";
 import ky, { type Options as KyOptions } from "ky"; // Alternatively could use axios.
+import type { NodeExecutor } from "@/features/executions/types";
 
 type HttpRequestData = {
   endpoint?: string;

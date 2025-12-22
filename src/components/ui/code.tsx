@@ -1,11 +1,10 @@
 "use client";
 
-import * as React from "react";
-
-import { cn } from "@/lib/utils";
 import { CopyIcon } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
+import * as React from "react";
 import { handleCopy } from "@/lib/copy";
+import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 
 const Copy = ({ content }: { content: string }) => {
   const [copied, setCopied] = React.useState(false);

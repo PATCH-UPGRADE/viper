@@ -1,13 +1,13 @@
 "use client";
 
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import Markdown from "react-markdown";
-import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Spinner } from "@/components/ui/spinner";
 
 type Chunk = {
   type: string;
@@ -101,31 +101,27 @@ export const RecommendationsPage = () => {
         </Button>
         {loading && <Spinner className="my-6 size-8" />}
         {Object.values(requests).length > 0 ? (
-          <>
-            {Object.values(requests)
-              .reverse()
-              .map((chunks, idx) => {
-                const markdownStr = chunks
-                  .map((chunk) => chunk.content)
-                  .join("");
-                return (
-                  <Card className="my-4" key={`requestsCard-${idx}`}>
-                    <CardHeader>
-                      <CardTitle>Recommendation</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="markdown">
-                        {!markdownStr ? (
-                          <Spinner />
-                        ) : (
-                          <Markdown>{markdownStr}</Markdown>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-          </>
+          Object.values(requests)
+            .reverse()
+            .map((chunks, idx) => {
+              const markdownStr = chunks.map((chunk) => chunk.content).join("");
+              return (
+                <Card className="my-4" key={`requestsCard-${idx}`}>
+                  <CardHeader>
+                    <CardTitle>Recommendation</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="markdown">
+                      {!markdownStr ? (
+                        <Spinner />
+                      ) : (
+                        <Markdown>{markdownStr}</Markdown>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
         ) : (
           <p className="text-sm text-muted-foreground mt-4">
             No recommendations currently. Click the button to get a new

@@ -1,15 +1,15 @@
+import type { Edge, Node } from "@xyflow/react";
 import { generateSlug } from "random-word-slugs";
-import prisma from "@/lib/db";
-import type { Node, Edge } from "@xyflow/react";
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import z from "zod";
 import { NodeType } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
+import prisma from "@/lib/db";
 import {
-  paginationInputSchema,
   buildPaginationMeta,
   createPaginatedResponse,
+  paginationInputSchema,
 } from "@/lib/pagination";
+import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 export const workflowsRouter = createTRPCRouter({
   // TODO: we probably don't need this code here
@@ -43,7 +43,7 @@ export const workflowsRouter = createTRPCRouter({
   }),
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(({ ctx, input }) => {
+    .mutation(({ input }) => {
       return prisma.workflow.delete({
         where: {
           id: input.id,
@@ -72,7 +72,7 @@ export const workflowsRouter = createTRPCRouter({
         ),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       const { id, nodes, edges } = input;
 
       const workflow = await prisma.workflow.findUniqueOrThrow({

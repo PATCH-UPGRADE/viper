@@ -1,8 +1,8 @@
 import {
   EmulatorsContainer,
+  EmulatorsError,
   EmulatorsList,
   EmulatorsLoading,
-  EmulatorsError,
 } from "@/features/emulators/components/emulators";
 import { emulatorsParamsLoader } from "@/features/emulators/server/params-loader";
 import { prefetchEmulators } from "@/features/emulators/server/prefetch";

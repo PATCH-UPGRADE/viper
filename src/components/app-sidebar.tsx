@@ -2,17 +2,14 @@
 
 import {
   BugIcon,
-  HeartIcon,
   ComputerIcon,
-  FolderOpenIcon,
-  WorkflowIcon,
   CpuIcon,
+  ExternalLink,
+  HeartIcon,
   HistoryIcon,
   KeyIcon,
-  LogOutIcon,
-  BookIcon,
-  ExternalLink,
   ShieldCheckIcon,
+  WorkflowIcon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";

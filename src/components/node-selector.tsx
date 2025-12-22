@@ -12,10 +12,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { NodeType } from "@/generated/prisma";
-import { Separator } from "./ui/separator";
-import { Button } from "./ui/button";
 import { DeviceIconType, getIconByType } from "@/features/asset-nodes/types";
+import { NodeType } from "@/generated/prisma";
+import { Button } from "./ui/button";
+import { Separator } from "./ui/separator";
 
 export type NodeTypeOption = {
   type: NodeType;
@@ -81,7 +81,15 @@ const NodeTemplateMenuItem = ({
     <div
       key={nodeTemplate.label}
       className="w-full justify-start h-auto py-5 px-4 rounded-none cursor-pointer border-l-2 border-transparent hover:border-l-primary"
+      role="menuitem"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
     >
       <div className="flex items-center gap-6 w-full overflow-hidden">
         <Icon className="size-5" />
@@ -124,7 +132,7 @@ export function NodeSelector({
   onOpenChange,
   children,
 }: NodeSelectorProps) {
-  const { setNodes, getNodes, screenToFlowPosition } = useReactFlow();
+  const { setNodes, screenToFlowPosition } = useReactFlow();
 
   const [openModal, setOpenModal] = useState(false);
   const [nodeType, setNodeType] = useState<NodeType | undefined>(undefined);
@@ -171,7 +179,7 @@ export function NodeSelector({
 
       onOpenChange(false);
     },
-    [setNodes, getNodes, onOpenChange, screenToFlowPosition],
+    [setNodes, onOpenChange, screenToFlowPosition],
   );
 
   return (

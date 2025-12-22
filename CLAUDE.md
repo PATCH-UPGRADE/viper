@@ -196,13 +196,13 @@ export const nodeComponents = {
 To add a new node type:
 
 1. Add enum value to `NodeType` in Prisma schema
-2. Create node component extending `BaseTriggerNode` or `BaseExecutionNode`
+2. Create node component extending an existing base 
 3. Register in `node-components.ts`
 4. Add to node selector in `components/node-selector.tsx`
 
 **Node Component Architecture**:
 
-- Base components: `BaseTriggerNode`, `BaseExecutionNode`
+- Base components: `BaseTriggerNode`, `BaseExecutionNode`, `BaseAssetNode`, `BaseStepNode`
 - Wrapper: `WorkflowNode` (provides toolbar, delete button, settings)
 - Primitives: `BaseNode`, `BaseHandle`, `NodeStatusIndicator`
 - Each node type has companion dialog for configuration

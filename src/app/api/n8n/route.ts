@@ -1,5 +1,5 @@
-import { getSession } from "@/lib/auth-utils";
 import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth-utils";
 
 export async function POST() {
   const session = await getSession();
@@ -33,7 +33,10 @@ export async function POST() {
     });
   } catch (error) {
     return NextResponse.json(
-      { error: "Upstream error", message: "Failed to reach N8N webhook" },
+      {
+        error: "Upstream error",
+        message: `Failed to reach N8N webhook: ${error}`,
+      },
       { status: 502 },
     );
   }

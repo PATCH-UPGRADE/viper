@@ -1,13 +1,12 @@
 "use client";
 
-import * as React from "react";
 import useEmblaCarousel, {
   type UseEmblaCarouselType,
 } from "embla-carousel-react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-
-import { cn } from "@/lib/utils";
+import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type CarouselApi = UseEmblaCarouselType[1];
 type UseCarouselParameters = Parameters<typeof useEmblaCarousel>;
@@ -118,6 +117,7 @@ function Carousel({
         canScrollNext,
       }}
     >
+      {/* biome-ignore lint/a11y/useSemanticElements: prefer role to keep role description*/}
       <div
         onKeyDownCapture={handleKeyDown}
         className={cn("relative", className)}
@@ -157,17 +157,20 @@ function CarouselItem({ className, ...props }: React.ComponentProps<"div">) {
   const { orientation } = useCarousel();
 
   return (
-    <div
-      role="group"
-      aria-roledescription="slide"
-      data-slot="carousel-item"
-      className={cn(
-        "min-w-0 shrink-0 grow-0 basis-full",
-        orientation === "horizontal" ? "pl-4" : "pt-4",
-        className,
-      )}
-      {...props}
-    />
+    <>
+      {/* biome-ignore lint/a11y/useSemanticElements: prefer role to keep role description*/}
+      <div
+        role="group"
+        aria-roledescription="slide"
+        data-slot="carousel-item"
+        className={cn(
+          "min-w-0 shrink-0 grow-0 basis-full",
+          orientation === "horizontal" ? "pl-4" : "pt-4",
+          className,
+        )}
+        {...props}
+      />
+    </>
   );
 }
 

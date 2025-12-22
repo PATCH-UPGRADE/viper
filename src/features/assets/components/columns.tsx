@@ -1,10 +1,12 @@
 "use client";
 
-import { ColumnDef } from "@tanstack/react-table";
-import { MoreVertical, CopyIcon, TrashIcon } from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
-
+import { CopyIcon, MoreVertical, TrashIcon } from "lucide-react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SortableHeader } from "@/components/ui/data-table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,17 +15,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
-import type { AssetWithIssues } from "@/lib/db";
-import { AssetDrawer } from "./assets";
 import {
-  TooltipContent,
   Tooltip,
+  TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { handleCopy } from "@/lib/copy";
-import { SortableHeader } from "@/components/ui/data-table";
-import { toast } from "sonner";
+import type { AssetWithIssues } from "@/lib/db";
+import { AssetDrawer } from "./assets";
 
 export const columns: ColumnDef<AssetWithIssues>[] = [
   {

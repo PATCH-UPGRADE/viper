@@ -1,16 +1,14 @@
+import { headers } from "next/headers";
+import { z } from "zod";
+import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import z from "zod";
-import { userSchema, userIncludeSelect, safeUrlSchema } from "@/lib/schemas";
 import {
-  paginationInputSchema,
   buildPaginationMeta,
   createPaginatedResponse,
-  createPaginatedResponseSchema,
+  paginationInputSchema,
 } from "@/lib/pagination";
+import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
 import { apiTokenInputSchema } from "../types";
 
 export const userRouter = createTRPCRouter({

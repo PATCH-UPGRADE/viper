@@ -3,8 +3,6 @@ import type { NodeExecutor } from "@/features/executions/types";
 type ManualTriggerData = Record<string, unknown>;
 
 export const manualTriggerExecutor: NodeExecutor<ManualTriggerData> = async ({
-  data,
-  nodeId,
   context,
   step,
 }) => {

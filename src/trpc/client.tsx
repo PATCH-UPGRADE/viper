@@ -4,12 +4,12 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { createTRPCContext } from "@trpc/tanstack-react-query";
 import { useState } from "react";
+import type { ChildrenProps } from "@/lib/page-types";
 import { createBrowserSingleton } from "@/lib/singleton";
-import { getApiUrl } from "@/lib/url-utils";
 import { TRPC_TRANSFORMER } from "@/lib/trpc-config";
+import { getApiUrl } from "@/lib/url-utils";
 import { makeQueryClient } from "./query-client";
 import type { AppRouter } from "./routers/_app";
-import type { ChildrenProps } from "@/lib/page-types";
 
 export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
 

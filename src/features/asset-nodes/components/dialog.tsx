@@ -1,5 +1,11 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CircleX } from "lucide-react";
+import { useEffect } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -26,16 +32,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import z from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useFieldArray, useForm } from "react-hook-form";
-import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { DeviceIconType, getIconByType } from "../types";
-import { CircleX } from "lucide-react";
+import type { Asset, Vulnerability } from "@/generated/prisma";
 import { cpeSchema } from "@/lib/schemas";
-import { Asset, Vulnerability } from "@/generated/prisma";
-import { AssetNodeData } from "./node";
+import { DeviceIconType, getIconByType } from "../types";
+import type { AssetNodeData } from "./node";
 
 const formSchema = z.object({
   icon: z.string(),

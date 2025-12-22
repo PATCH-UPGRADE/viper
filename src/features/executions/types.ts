@@ -1,4 +1,4 @@
-import { GetStepTools, Inngest } from "inngest";
+import type { GetStepTools, Inngest } from "inngest";
 
 export type WorkflowContext = Record<string, unknown>;
 

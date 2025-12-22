@@ -1,12 +1,12 @@
-import { useTRPC } from "@/trpc/client";
 import {
   useMutation,
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTRPC } from "@/trpc/client";
+import type { AssetsVulnsInput } from "../server/routers";
 import { useAssetsParams } from "./use-assets-params";
-import { AssetsVulnsInput } from "../server/routers";
 
 /**
  * Hook to fetch all assets using suspense

@@ -1,7 +1,9 @@
 "use client";
 
-import { UserIcon, EllipsisVertical, LogOutIcon } from "lucide-react";
-
+import { EllipsisVertical, LogOutIcon, UserIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -19,9 +21,6 @@ import {
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
 import { Skeleton } from "./ui/skeleton";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { useEffect } from "react";
 
 export function NavUser() {
   const { isMobile } = useSidebar();

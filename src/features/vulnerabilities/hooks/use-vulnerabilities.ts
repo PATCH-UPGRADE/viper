@@ -1,10 +1,10 @@
-import { useTRPC } from "@/trpc/client";
 import {
   useMutation,
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTRPC } from "@/trpc/client";
 import { useVulnerabilitiesParams } from "./use-vulnerabilities-params";
 
 /**
@@ -54,7 +54,7 @@ export const useUpdateVulnerability = () => {
 
   return useMutation(
     trpc.vulnerabilities.update.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: (_data) => {
         toast.success("Vulnerability updated");
         // Invalidate all getMany queries regardless of params
         queryClient.invalidateQueries({
@@ -85,7 +85,7 @@ export const useRemoveVulnerability = () => {
 
   return useMutation(
     trpc.vulnerabilities.remove.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: (_data) => {
         toast.success("Vulnerability removed");
         // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({

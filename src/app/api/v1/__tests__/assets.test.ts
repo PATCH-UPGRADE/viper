@@ -1,5 +1,5 @@
 import request from "supertest";
-import { BASE_URL, AUTH_TOKEN, generateCPE } from "./test-config";
+import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
 
 describe("Assets Endpoint (/assets)", () => {
   const authHeader = { Authorization: AUTH_TOKEN };

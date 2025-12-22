@@ -1,31 +1,29 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
 import {
-  ReactFlow,
-  applyNodeChanges,
-  applyEdgeChanges,
   addEdge,
-  type Node,
-  type Edge,
-  type NodeChange,
-  type EdgeChange,
-  type Connection,
+  applyEdgeChanges,
+  applyNodeChanges,
   Background,
+  type Connection,
   Controls,
+  type Edge,
+  type EdgeChange,
   MiniMap,
+  type Node,
+  type NodeChange,
   Panel,
+  ReactFlow,
 } from "@xyflow/react";
+import { useCallback, useState } from "react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { useSuspenseWorkflow } from "@/features/workflows/hooks/use-workflows";
 
 import "@xyflow/react/dist/style.css";
-import { nodeComponents } from "@/config/node-components";
-import { AddNodeButton } from "./add-node-button";
 import { useSetAtom } from "jotai";
+import { nodeComponents } from "@/config/node-components";
 import { editorAtom } from "../store/atoms";
-import { NodeType } from "@/generated/prisma";
-import { ExecuteWorkflowButton } from "./execute-workflow-button";
+import { AddNodeButton } from "./add-node-button";
 
 export const EditorLoading = () => {
   return <LoadingView message="Loading editor..." />;

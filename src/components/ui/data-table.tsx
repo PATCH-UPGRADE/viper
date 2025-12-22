@@ -1,43 +1,16 @@
 "use client";
 
-import * as React from "react";
-import { Column, RowData, Table as TableType } from "@tanstack/react-table";
 import {
-  ColumnDef,
-  SortingState,
-  VisibilityState,
+  type Column,
+  type ColumnDef,
   flexRender,
   getCoreRowModel,
+  type RowData,
+  type SortingState,
+  type Table as TableType,
   useReactTable,
-  getPaginationRowModel,
-  getSortedRowModel,
+  type VisibilityState,
 } from "@tanstack/react-table";
-
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "./input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
 import {
   ArrowDown,
   ArrowUp,
@@ -48,9 +21,34 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
-import { PaginatedResponse, usePaginationParams } from "@/lib/pagination";
+import * as React from "react";
+
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { type PaginatedResponse, usePaginationParams } from "@/lib/pagination";
 
 declare module "@tanstack/react-table" {
+  // biome-ignore lint/correctness/noUnusedVariables: required for declaration merging
   interface ColumnMeta<TData extends RowData, TValue> {
     title: string;
   }
@@ -76,13 +74,11 @@ export function SortableHeader<TData>({
     >
       {header}
       {sorted ? (
-        <>
-          {sorted === "asc" ? (
-            <ArrowUp strokeWidth={3} className={iconClassName} />
-          ) : (
-            <ArrowDown strokeWidth={3} className={iconClassName} />
-          )}
-        </>
+        sorted === "asc" ? (
+          <ArrowUp strokeWidth={3} className={iconClassName} />
+        ) : (
+          <ArrowDown strokeWidth={3} className={iconClassName} />
+        )
       ) : (
         <ArrowUpDown className={iconClassName} />
       )}

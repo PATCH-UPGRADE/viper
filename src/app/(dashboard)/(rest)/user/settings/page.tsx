@@ -1,8 +1,8 @@
 import {
   ApiTokensContainer,
+  ApiTokensError,
   ApiTokensList,
   ApiTokensLoading,
-  ApiTokensError,
 } from "@/features/user/components/user";
 import { apiTokensParamsLoader } from "@/features/user/server/params-loader";
 import { prefetchApiTokens } from "@/features/user/server/prefetch";

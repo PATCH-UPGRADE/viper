@@ -1,8 +1,8 @@
 import {
   VulnerabilitiesContainer,
+  VulnerabilitiesError,
   VulnerabilitiesList,
   VulnerabilitiesLoading,
-  VulnerabilitiesError,
 } from "@/features/vulnerabilities/components/vulnerabilities";
 import { vulnerabilitiesParamsLoader } from "@/features/vulnerabilities/server/params-loader";
 import { prefetchVulnerabilities } from "@/features/vulnerabilities/server/prefetch";

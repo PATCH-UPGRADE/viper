@@ -1,8 +1,8 @@
 import {
   AssetsContainer,
+  AssetsError,
   AssetsList,
   AssetsLoading,
-  AssetsError,
 } from "@/features/assets/components/assets";
 import { assetsParamsLoader } from "@/features/assets/server/params-loader";
 import { prefetchAssets } from "@/features/assets/server/prefetch";

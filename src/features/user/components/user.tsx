@@ -1,38 +1,23 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { formatDistanceToNow } from "date-fns";
+import { AlertCircleIcon, Copy, EyeIcon, EyeOffIcon } from "lucide-react";
+import { useState } from "react";
+import { type UseFormReturn, useForm } from "react-hook-form";
+import { toast } from "sonner";
 import {
   EmptyView,
   EntityContainer,
   EntityHeader,
-  EntityItem,
   EntityList,
   EntityPagination,
   EntitySearch,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import {
-  useCreateApiToken,
-  useRemoveApiToken,
-  useSuspenseApiTokens,
-} from "../hooks/use-user";
-import { useEntitySearch } from "@/hooks/use-entity-search";
-import type { Apikey } from "@/generated/prisma";
-import { AlertCircleIcon, EyeIcon, EyeOffIcon } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { useApiTokenParams } from "../hooks/use-user-params";
-import { toast } from "sonner";
-
-import { Copy } from "lucide-react";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
-import { useState } from "react";
-import { useForm, UseFormReturn } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
   DialogContent,
@@ -58,8 +43,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ApiTokenFormValues, apiTokenInputSchema } from "../types";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { Apikey } from "@/generated/prisma";
+import { useEntitySearch } from "@/hooks/use-entity-search";
+import { handleCopy } from "@/lib/copy";
+import {
+  useCreateApiToken,
+  useRemoveApiToken,
+  useSuspenseApiTokens,
+} from "../hooks/use-user";
+import { useApiTokenParams } from "../hooks/use-user-params";
+import { type ApiTokenFormValues, apiTokenInputSchema } from "../types";
 
 export const ApiTokensSearch = () => {
   const [params, setParams] = useApiTokenParams();
@@ -104,14 +102,11 @@ const ApiTokenSuccessModal = ({
 
   if (!apiKey) return null;
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(apiKey.key);
+  const handleCopyOuter = async () => {
+    await handleCopy(apiKey.key, () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      toast.error("Failed to copy to clipboard");
-    }
+    });
   };
 
   return (
@@ -147,7 +142,10 @@ const ApiTokenSuccessModal = ({
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button onClick={handleCopy}>
+                  <Button
+                    onClick={handleCopyOuter}
+                    aria-label="Copy API token to clipboard"
+                  >
                     <Copy />
                   </Button>
                 </TooltipTrigger>

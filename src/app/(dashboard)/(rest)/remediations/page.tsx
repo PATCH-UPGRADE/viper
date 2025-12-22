@@ -1,8 +1,8 @@
 import {
   RemediationsContainer,
+  RemediationsError,
   RemediationsList,
   RemediationsLoading,
-  RemediationsError,
 } from "@/features/remediations/components/remediations";
 import { remediationsParamsLoader } from "@/features/remediations/server/params-loader";
 import { prefetchRemediations } from "@/features/remediations/server/prefetch";

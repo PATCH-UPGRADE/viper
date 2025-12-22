@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
+import { AlertTriangleIcon, ExternalLinkIcon, WrenchIcon } from "lucide-react";
 import {
   EmptyView,
   EntityContainer,
@@ -11,14 +12,7 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import {
-  useRemoveRemediation,
-  useSuspenseRemediations,
-} from "../hooks/use-remediations";
-import { useRemediationsParams } from "../hooks/use-remediations-params";
-import { useEntitySearch } from "@/hooks/use-entity-search";
-import type { Remediation } from "@/generated/prisma";
-import { WrenchIcon, ExternalLinkIcon, AlertTriangleIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -30,9 +24,15 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
+import type { Remediation } from "@/generated/prisma";
+import { useEntitySearch } from "@/hooks/use-entity-search";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  useRemoveRemediation,
+  useSuspenseRemediations,
+} from "../hooks/use-remediations";
+import { useRemediationsParams } from "../hooks/use-remediations-params";
 
 export const RemediationsSearch = () => {
   const [params, setParams] = useRemediationsParams();

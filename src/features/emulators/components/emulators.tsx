@@ -1,31 +1,18 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
+import { DownloadIcon, ExternalLinkIcon, PackageIcon } from "lucide-react";
 import {
   EmptyView,
   EntityContainer,
   EntityHeader,
-  EntityItem,
   EntityList,
   EntityPagination,
   EntitySearch,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import {
-  useCreateEmulator,
-  useRemoveEmulator,
-  useSuspenseEmulators,
-} from "../hooks/use-emulators";
-import { useEmulatorsParams } from "../hooks/use-emulators-params";
-import { useEntitySearch } from "@/hooks/use-entity-search";
-import type { Emulator } from "@/generated/prisma";
-import {
-  ServerIcon,
-  ExternalLinkIcon,
-  PackageIcon,
-  DownloadIcon,
-} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -37,9 +24,15 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
+import type { Emulator } from "@/generated/prisma";
+import { useEntitySearch } from "@/hooks/use-entity-search";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  useRemoveEmulator,
+  useSuspenseEmulators,
+} from "../hooks/use-emulators";
+import { useEmulatorsParams } from "../hooks/use-emulators-params";
 
 export const EmulatorsSearch = () => {
   const [params, setParams] = useEmulatorsParams();

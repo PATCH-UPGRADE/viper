@@ -1,9 +1,9 @@
-import { getSession, verifyApiKey } from "@/lib/auth-utils";
-import { TRPC_TRANSFORMER } from "@/lib/trpc-config";
 import { initTRPC, TRPCError } from "@trpc/server";
-import { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
+import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import type { CreateNextContextOptions } from "@trpc/server/adapters/next";
 import type { OpenApiMeta } from "trpc-to-openapi";
+import { getSession, verifyApiKey } from "@/lib/auth-utils";
+import { TRPC_TRANSFORMER } from "@/lib/trpc-config";
 
 export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   /**
@@ -16,6 +16,7 @@ export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
 
 export const createOpenApiContext = async ({
   req,
+  // biome-ignore lint/suspicious/noExplicitAny: TS gets mad at casting Request to NextRequest. possible TODO?
 }: FetchCreateContextFnOptions): Promise<any> => {
   return { req };
 };

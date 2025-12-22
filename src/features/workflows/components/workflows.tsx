@@ -1,6 +1,8 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
+import { WorkflowIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
   EmptyView,
   EntityContainer,
@@ -12,16 +14,14 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import type { Workflow } from "@/generated/prisma";
+import { useEntitySearch } from "@/hooks/use-entity-search";
 import {
   useCreateWorkflow,
   useRemoveWorkflow,
   useSuspenseWorkflows,
 } from "../hooks/use-workflows";
-import { useRouter } from "next/navigation";
 import { useWorkflowsParams } from "../hooks/use-workflows-params";
-import { useEntitySearch } from "@/hooks/use-entity-search";
-import type { Workflow } from "@/generated/prisma";
-import { WorkflowIcon } from "lucide-react";
 
 export const WorkflowsSearch = () => {
   const [params, setParams] = useWorkflowsParams();
@@ -61,23 +61,21 @@ export const WorkflowsHeader = ({ disabled }: { disabled?: boolean }) => {
       onSuccess: (data) => {
         router.push(`/workflows/${data.id}`);
       },
-      onError: (error) => {
+      onError: (_error) => {
         // TODO: Handle errors
       },
     });
   };
 
   return (
-    <>
-      <EntityHeader
-        title="Workflows"
-        description="Create and manage your workflows"
-        onNew={handleCreate}
-        newButtonLabel="New workflow"
-        disabled={disabled}
-        isCreating={createWorkflow.isPending}
-      />
-    </>
+    <EntityHeader
+      title="Workflows"
+      description="Create and manage your workflows"
+      onNew={handleCreate}
+      newButtonLabel="New workflow"
+      disabled={disabled}
+      isCreating={createWorkflow.isPending}
+    />
   );
 };
 
@@ -125,7 +123,7 @@ export const WorkflowsEmpty = () => {
 
   const handleCreate = () => {
     createWorkflow.mutate(undefined, {
-      onError: (error) => {
+      onError: (_error) => {
         // TODO: handle
       },
       onSuccess: (data) => {
@@ -135,12 +133,10 @@ export const WorkflowsEmpty = () => {
   };
 
   return (
-    <>
-      <EmptyView
-        onNew={handleCreate}
-        message="You haven't created any workflows yet. Get started by creating your first workflow"
-      />
-    </>
+    <EmptyView
+      onNew={handleCreate}
+      message="You haven't created any workflows yet. Get started by creating your first workflow"
+    />
   );
 };
 

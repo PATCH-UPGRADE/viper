@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { CircleX } from "lucide-react";
 import { useEffect } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
-import z from "zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

@@ -68,13 +68,7 @@ function InputOTPSlot({
 
 function InputOTPSeparator({ ...props }: React.ComponentProps<"div">) {
   return (
-    <div
-      data-slot="input-otp-separator"
-      // biome-ignore lint/a11y/useAriaPropsForRole: assume aria-valuenow is provided in props
-      role="separator"
-      tabIndex={0}
-      {...props}
-    >
+    <div data-slot="input-otp-separator" {...props}>
       <MinusIcon />
     </div>
   );

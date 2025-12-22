@@ -1,3 +1,5 @@
+"use client";
+
 import { FlaskConicalIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useExecuteWorkflow } from "@/features/workflows/hooks/use-workflows";

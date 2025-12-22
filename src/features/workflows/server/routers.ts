@@ -1,6 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import { generateSlug } from "random-word-slugs";
-import z from "zod";
+import { z } from "zod";
 import { NodeType } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";

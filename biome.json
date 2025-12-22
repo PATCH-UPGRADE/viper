@@ -23,7 +23,7 @@
         "noArrayIndexKey": "off"
       },
       "a11y": {
-        "useSemanticElements": "off"
+        "useSemanticElements": "warn"
       },
       "style": {
         "noNonNullAssertion": "off"

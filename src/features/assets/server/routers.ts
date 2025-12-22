@@ -1,4 +1,4 @@
-import z from "zod";
+import { z } from "zod";
 import prisma from "@/lib/db";
 import {
   buildPaginationMeta,

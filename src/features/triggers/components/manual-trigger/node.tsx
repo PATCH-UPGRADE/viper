@@ -1,3 +1,5 @@
+"use client";
+
 import type { NodeProps } from "@xyflow/react";
 import { MousePointerIcon } from "lucide-react";
 import { memo, useState } from "react";

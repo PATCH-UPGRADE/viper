@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import z from "zod";
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
 import {

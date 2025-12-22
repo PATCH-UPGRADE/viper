@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/tooltip";
 import type { Apikey } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
+import { handleCopy } from "@/lib/copy";
 import {
   useCreateApiToken,
   useRemoveApiToken,
@@ -101,14 +102,11 @@ const ApiTokenSuccessModal = ({
 
   if (!apiKey) return null;
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(apiKey.key);
+  const handleCopyOuter = async () => {
+    await handleCopy(apiKey.key, () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (_err) {
-      toast.error("Failed to copy to clipboard");
-    }
+    });
   };
 
   return (
@@ -144,7 +142,10 @@ const ApiTokenSuccessModal = ({
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button onClick={handleCopy}>
+                  <Button
+                    onClick={handleCopyOuter}
+                    aria-label="Copy API token to clipboard"
+                  >
                     <Copy />
                   </Button>
                 </TooltipTrigger>

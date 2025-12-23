@@ -141,8 +141,6 @@ export function DataTable<TData, TValue>({
     rowCount: paginatedData.totalCount,
   });
 
-  const _showLoading = isLoading || isPending;
-
   return (
     <>
       <div className="flex items-center py-4">

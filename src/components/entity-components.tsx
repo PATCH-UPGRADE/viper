@@ -351,7 +351,7 @@ export const EntityItem = ({
 export interface EntityDrawerProps {
   open?: boolean;
   setOpen?: (open: boolean) => void;
-  trigger: React.ReactNode;
+  trigger?: React.ReactNode;
 }
 
 export function EntityDrawer({

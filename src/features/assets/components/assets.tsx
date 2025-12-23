@@ -2,9 +2,12 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { ExternalLinkIcon, ServerIcon } from "lucide-react";
+import { type PropsWithChildren, Suspense, useState } from "react";
 import {
   EmptyView,
   EntityContainer,
+  EntityDrawer,
+  type EntityDrawerProps,
   EntityHeader,
   EntitySearch,
   ErrorView,
@@ -15,20 +18,15 @@ import { Button } from "@/components/ui/button";
 import { CopyCode } from "@/components/ui/code";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
   DrawerDescription,
-  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import type { Asset } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
-import { useIsMobile } from "@/hooks/use-mobile";
 import type { AssetWithIssues } from "@/lib/db";
 import { useRemoveAsset, useSuspenseAssets } from "../hooks/use-assets";
 import { useAssetsParams } from "../hooks/use-assets-params";
@@ -51,14 +49,26 @@ export const AssetsSearch = () => {
 };
 
 export const AssetsList = () => {
-  const assets = useSuspenseAssets();
+  const { data: assets, isFetching } = useSuspenseAssets();
+  const [asset, setAsset] = useState<AssetWithIssues | undefined>(undefined);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <DataTable
-      paginatedData={assets.data}
-      columns={columns}
-      search={<AssetsSearch />}
-    />
+    <>
+      {asset && (
+        <AssetDrawer asset={asset} open={drawerOpen} setOpen={setDrawerOpen} />
+      )}
+      <DataTable
+        paginatedData={assets}
+        columns={columns}
+        isLoading={isFetching}
+        search={<AssetsSearch />}
+        rowOnclick={(row) => {
+          setDrawerOpen(true);
+          setAsset(row.original);
+        }}
+      />
+    </>
   );
 };
 
@@ -118,7 +128,7 @@ export const AssetItem = ({ data }: { data: AssetWithIssues | Asset }) => {
         <ServerIcon className="size-5 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
-        <AssetDrawer asset={data} />
+        <AssetDrawer asset={data}>{data.role}</AssetDrawer>
         <div className="text-xs text-muted-foreground mt-1">
           {data.ip} &bull; {data.cpe.split(":").slice(3, 5).join(" ")} &bull;
           Updated {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
@@ -145,163 +155,155 @@ export const AssetItem = ({ data }: { data: AssetWithIssues | Asset }) => {
   );
 };
 
-export function AssetDrawer({ asset }: { asset: AssetWithIssues | Asset }) {
-  const isMobile = useIsMobile();
+interface AssetDrawerProps extends Omit<EntityDrawerProps, "trigger"> {
+  asset: AssetWithIssues | Asset;
+}
+
+export function AssetDrawer({
+  asset,
+  children,
+  ...props
+}: PropsWithChildren<AssetDrawerProps>) {
   const hasIssues = isAssetWithIssues(asset);
 
   return (
-    <Drawer direction={isMobile ? "bottom" : "right"}>
-      <DrawerTrigger asChild>
-        <Button
-          variant="link"
-          className="text-foreground h-auto p-0 text-left font-medium"
-        >
-          {asset.role}
-        </Button>
-      </DrawerTrigger>
-      <DrawerContent className={isMobile ? "" : "max-w-[36rem]!"}>
-        <DrawerHeader className="gap-1">
-          <DrawerTitle>{asset.role}</DrawerTitle>
-          <DrawerDescription className="flex items-center gap-2">
-            <Badge variant="outline">
-              <ServerIcon className="size-3 mr-1" />
-              Hospital Asset
-            </Badge>
-            <span className="text-xs">
-              Updated{" "}
-              {formatDistanceToNow(asset.updatedAt, { addSuffix: true })}
-            </span>
-          </DrawerDescription>
-        </DrawerHeader>
+    <EntityDrawer trigger={children} {...props}>
+      <DrawerHeader className="gap-1">
+        <DrawerTitle>{asset.role}</DrawerTitle>
+        <DrawerDescription className="flex items-center gap-2">
+          <Badge variant="outline">
+            <ServerIcon className="size-3 mr-1" />
+            Hospital Asset
+          </Badge>
+          <span className="text-xs">
+            Updated {formatDistanceToNow(asset.updatedAt, { addSuffix: true })}
+          </span>
+        </DrawerDescription>
+      </DrawerHeader>
 
-        <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4 text-sm">
-          {/* Device Information */}
-          <div className="flex flex-col gap-3">
-            <h3 className="font-semibold">Device Information</h3>
+      <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4 text-sm">
+        {/* Device Information */}
+        <div className="flex flex-col gap-3">
+          <h3 className="font-semibold">Device Information</h3>
 
-            <div className="grid grid-cols-1 gap-3">
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Role
-                </div>
-                <div className="text-sm">{asset.role}</div>
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                Role
               </div>
-
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  IP Address
-                </div>
-                <CopyCode>{asset.ip}</CopyCode>
-              </div>
-
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Group ID
-                </div>
-                <CopyCode>{asset.cpe}</CopyCode>
-              </div>
+              <div className="text-sm">{asset.role}</div>
             </div>
-          </div>
-
-          {/* Issues */}
-          {hasIssues && (
-            <>
-              <Separator />
-              <div>
-                {asset.issues.length === 0 ? (
-                  <>
-                    <h3 className="font-semibold mb-2">Issues</h3>
-                    <p className="text-xs text-muted-foreground">
-                      No issues detected
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="font-semibold mb-2 text-destructive">
-                      {asset.issues.length} active vulnerabilit
-                      {asset.issues.length === 1 ? "y" : "ies"} detected
-                    </h3>
-                    <p className="text-xs text-muted-foreground my-2">
-                      Vulnerabilities have been detected. Lab result integrity
-                      compromised. Attackers could modify test results before
-                      transmission to EMR, leading to incorrect diagnoses and
-                      treatment. Lorem ipsum dolor asset...
-                    </p>
-                  </>
-                )}
-                <IssuesSidebarList
-                  issues={asset.issues}
-                  type="vulnerabilities"
-                />
-              </div>
-            </>
-          )}
-
-          <Separator />
-
-          {/* API Integration */}
-          <div className="flex flex-col gap-3">
-            <h3 className="font-semibold">API Integration</h3>
 
             <div>
               <div className="text-xs font-medium text-muted-foreground mb-1">
-                Upstream API
+                IP Address
               </div>
-              <a
-                href={asset.upstreamApi}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-              >
-                {asset.upstreamApi}
-                <ExternalLinkIcon className="size-3 flex-shrink-0" />
-              </a>
+              <CopyCode>{asset.ip}</CopyCode>
             </div>
-          </div>
 
-          <Separator />
-
-          {/* Metadata */}
-          <div className="flex flex-col gap-3">
-            <h3 className="font-semibold">Metadata</h3>
-
-            <div className="grid grid-cols-1 gap-3">
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Created
-                </div>
-                <div className="text-xs">
-                  {formatDistanceToNow(asset.createdAt, { addSuffix: true })} (
-                  {new Date(asset.createdAt).toLocaleString()})
-                </div>
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                Group ID
               </div>
-
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Last Updated
-                </div>
-                <div className="text-xs">
-                  {formatDistanceToNow(asset.updatedAt, { addSuffix: true })} (
-                  {new Date(asset.updatedAt).toLocaleString()})
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Asset ID
-                </div>
-                <CopyCode>{asset.id}</CopyCode>
-              </div>
+              <CopyCode>{asset.cpe}</CopyCode>
             </div>
           </div>
         </div>
 
-        <DrawerFooter>
-          <DrawerClose asChild>
-            <Button variant="outline">Close</Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+        {/* Issues */}
+        {hasIssues && (
+          <>
+            <Separator />
+            <div>
+              {asset.issues.length === 0 ? (
+                <>
+                  <h3 className="font-semibold mb-2">Issues</h3>
+                  <p className="text-xs text-muted-foreground">
+                    No issues detected
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-semibold mb-2 text-destructive">
+                    {asset.issues.length} active vulnerabilit
+                    {asset.issues.length === 1 ? "y" : "ies"} detected
+                  </h3>
+                  <p className="text-xs text-muted-foreground my-2">
+                    Vulnerabilities have been detected. Lab result integrity
+                    compromised. Attackers could modify test results before
+                    transmission to EMR, leading to incorrect diagnoses and
+                    treatment. Lorem ipsum dolor asset...
+                  </p>
+                </>
+              )}
+              <Suspense fallback={<Skeleton className="h-16 w-full" />}>
+                <IssuesSidebarList
+                  issues={asset.issues}
+                  type="vulnerabilities"
+                />
+              </Suspense>
+            </div>
+          </>
+        )}
+
+        <Separator />
+
+        {/* API Integration */}
+        <div className="flex flex-col gap-3">
+          <h3 className="font-semibold">API Integration</h3>
+
+          <div>
+            <div className="text-xs font-medium text-muted-foreground mb-1">
+              Upstream API
+            </div>
+            <a
+              href={asset.upstreamApi}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
+            >
+              {asset.upstreamApi}
+              <ExternalLinkIcon className="size-3 flex-shrink-0" />
+            </a>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Metadata */}
+        <div className="flex flex-col gap-3">
+          <h3 className="font-semibold">Metadata</h3>
+
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                Created
+              </div>
+              <div className="text-xs">
+                {formatDistanceToNow(asset.createdAt, { addSuffix: true })} (
+                {new Date(asset.createdAt).toLocaleString()})
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                Last Updated
+              </div>
+              <div className="text-xs">
+                {formatDistanceToNow(asset.updatedAt, { addSuffix: true })} (
+                {new Date(asset.updatedAt).toLocaleString()})
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                Asset ID
+              </div>
+              <CopyCode>{asset.id}</CopyCode>
+            </div>
+          </div>
+        </div>
+      </div>
+    </EntityDrawer>
   );
 }

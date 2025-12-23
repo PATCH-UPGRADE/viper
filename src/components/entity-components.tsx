@@ -10,6 +10,15 @@ import {
   TrashIcon,
 } from "lucide-react";
 import Link from "next/link";
+import type { PropsWithChildren } from "react";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerFooter,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "./ui/card";
@@ -338,3 +347,46 @@ export const EntityItem = ({
 
   return <Link href={href}>{content}</Link>;
 };
+
+export interface EntityDrawerProps {
+  open?: boolean;
+  setOpen?: (open: boolean) => void;
+  trigger?: React.ReactNode;
+}
+
+export function EntityDrawer({
+  open,
+  setOpen,
+  trigger,
+  children,
+}: PropsWithChildren<EntityDrawerProps>) {
+  const isMobile = useIsMobile();
+
+  return (
+    <Drawer
+      direction={isMobile ? "bottom" : "right"}
+      open={open}
+      onOpenChange={setOpen}
+    >
+      {trigger && (
+        <DrawerTrigger asChild>
+          <Button
+            variant="link"
+            className="text-foreground h-auto p-0 text-left font-medium"
+          >
+            {trigger}
+          </Button>
+        </DrawerTrigger>
+      )}
+      <DrawerContent className={isMobile ? "" : "max-w-[36rem]!"}>
+        {children}
+
+        <DrawerFooter>
+          <DrawerClose asChild>
+            <Button variant="outline">Close</Button>
+          </DrawerClose>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
+  );
+}

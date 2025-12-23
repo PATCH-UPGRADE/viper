@@ -1,11 +1,13 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { AlertTriangleIcon, ExternalLinkIcon } from "lucide-react";
-import type { PropsWithChildren } from "react";
+import { BugIcon, ExternalLinkIcon } from "lucide-react";
+import { type PropsWithChildren, Suspense, useState } from "react";
 import {
   EmptyView,
   EntityContainer,
+  EntityDrawer,
+  type EntityDrawerProps,
   EntityHeader,
   EntitySearch,
   ErrorView,
@@ -16,20 +18,15 @@ import { Button } from "@/components/ui/button";
 import { CopyCode } from "@/components/ui/code";
 import { DataTable } from "@/components/ui/data-table";
 import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
   DrawerDescription,
-  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import type { Vulnerability } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
-import { useIsMobile } from "@/hooks/use-mobile";
 import type { VulnerabilityWithIssues } from "@/lib/db";
 import {
   useRemoveVulnerability,
@@ -55,14 +52,32 @@ export const VulnerabilitiesSearch = () => {
 };
 
 export const VulnerabilitiesList = () => {
-  const vulnerabilities = useSuspenseVulnerabilities();
+  const { data: vulnerabilities, isFetching } = useSuspenseVulnerabilities();
+  const [vuln, setVuln] = useState<VulnerabilityWithIssues | undefined>(
+    undefined,
+  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <DataTable
-      paginatedData={vulnerabilities.data}
-      columns={columns}
-      search={<VulnerabilitiesSearch />}
-    />
+    <>
+      {vuln && (
+        <VulnerabilityDrawer
+          vulnerability={vuln}
+          open={drawerOpen}
+          setOpen={setDrawerOpen}
+        />
+      )}
+      <DataTable
+        paginatedData={vulnerabilities}
+        columns={columns}
+        isLoading={isFetching}
+        search={<VulnerabilitiesSearch />}
+        rowOnclick={(row) => {
+          setDrawerOpen(true);
+          setVuln(row.original);
+        }}
+      />
+    </>
   );
 };
 
@@ -124,10 +139,12 @@ export const VulnerabilityItem = ({
   return (
     <div className="flex items-center gap-3 p-4 border rounded-lg">
       <div className="size-8 flex items-center justify-center">
-        <AlertTriangleIcon className="size-5 text-destructive" />
+        <BugIcon className="size-5 text-destructive" />
       </div>
       <div className="flex-1 min-w-0">
-        <VulnerabilityDrawer vulnerability={data} />
+        <VulnerabilityDrawer vulnerability={data}>
+          {data.cpe}
+        </VulnerabilityDrawer>
         <div className="text-xs text-muted-foreground mt-1">
           {data.description.substring(0, 100)}
           {data.description.length > 100 ? "..." : ""} &bull; Updated{" "}
@@ -155,132 +172,120 @@ export const VulnerabilityItem = ({
   );
 };
 
+interface VulnerabilityDrawerProps extends Omit<EntityDrawerProps, "trigger"> {
+  vulnerability: VulnerabilityWithIssues | Vulnerability;
+}
+
 export function VulnerabilityDrawer({
   vulnerability,
   children,
-}: PropsWithChildren<{
-  vulnerability: VulnerabilityWithIssues | Vulnerability;
-}>) {
+  ...props
+}: PropsWithChildren<VulnerabilityDrawerProps>) {
   const hasIssues = isVulnerabilityWithIssues(vulnerability);
-  const isMobile = useIsMobile();
 
   return (
-    <Drawer direction={isMobile ? "bottom" : "right"}>
-      <DrawerTrigger asChild>
-        <Button
-          variant="link"
-          className="text-foreground h-auto p-0 text-left font-medium"
-        >
-          {children ? children : vulnerability.cpe}
-        </Button>
-      </DrawerTrigger>
-      <DrawerContent className={isMobile ? "" : "max-w-[36rem]!"}>
-        <DrawerHeader className="gap-1">
-          <DrawerTitle>{vulnerability.cpe}</DrawerTitle>
-          <DrawerDescription className="flex items-center gap-2">
-            <Badge variant="outline" className="text-destructive">
-              <AlertTriangleIcon className="size-3 mr-1" />
-              Vulnerability
-            </Badge>
-            <span className="text-xs">
-              Updated{" "}
-              {formatDistanceToNow(vulnerability.updatedAt, {
-                addSuffix: true,
-              })}
-            </span>
-          </DrawerDescription>
-        </DrawerHeader>
+    <EntityDrawer trigger={children} {...props}>
+      <DrawerHeader className="gap-1">
+        <DrawerTitle>{vulnerability.cpe}</DrawerTitle>
+        <DrawerDescription className="flex items-center gap-2">
+          <Badge variant="outline" className="text-destructive">
+            <BugIcon className="size-3 mr-1" />
+            Vulnerability
+          </Badge>
+          <span className="text-xs">
+            Updated{" "}
+            {formatDistanceToNow(vulnerability.updatedAt, {
+              addSuffix: true,
+            })}
+          </span>
+        </DrawerDescription>
+      </DrawerHeader>
 
-        <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4 text-sm">
-          {/* Description */}
-          <div className="flex flex-col gap-2">
-            <h3 className="font-semibold">Description</h3>
-            <p className="text-muted-foreground">{vulnerability.description}</p>
-          </div>
+      <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4 text-sm">
+        {/* Description */}
+        <div className="flex flex-col gap-2">
+          <h3 className="font-semibold">Description</h3>
+          <p className="text-muted-foreground">{vulnerability.description}</p>
+        </div>
 
-          <Separator />
+        <Separator />
 
-          {/* Exploit Narrative */}
-          <div className="flex flex-col gap-2">
-            <h3 className="font-semibold">Exploit Narrative</h3>
-            <p className="text-muted-foreground">{vulnerability.narrative}</p>
-          </div>
+        {/* Exploit Narrative */}
+        <div className="flex flex-col gap-2">
+          <h3 className="font-semibold">Exploit Narrative</h3>
+          <p className="text-muted-foreground">{vulnerability.narrative}</p>
+        </div>
 
-          <Separator />
+        <Separator />
 
-          {/* Clinical Impact */}
-          <div className="flex flex-col gap-2">
-            <h3 className="font-semibold text-destructive">Clinical Impact</h3>
-            <p className="text-muted-foreground">{vulnerability.impact}</p>
-            {/* Issues */}
-            {hasIssues && (
+        {/* Clinical Impact */}
+        <div className="flex flex-col gap-2">
+          <h3 className="font-semibold text-destructive">Clinical Impact</h3>
+          <p className="text-muted-foreground">{vulnerability.impact}</p>
+          {/* Issues */}
+          {hasIssues && (
+            <Suspense fallback={<Skeleton className="h-16 w-full" />}>
               <IssuesSidebarList issues={vulnerability.issues} type="assets" />
-            )}
-          </div>
+            </Suspense>
+          )}
+        </div>
 
-          <Separator />
+        <Separator />
 
-          {/* Technical Details */}
-          <div className="flex flex-col gap-3">
-            <h3 className="font-semibold">Technical Details</h3>
+        {/* Technical Details */}
+        <div className="flex flex-col gap-3">
+          <h3 className="font-semibold">Technical Details</h3>
 
-            <div className="grid grid-cols-1 gap-3">
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  CPE Identifier
-                </div>
-                <CopyCode>{vulnerability.cpe}</CopyCode>
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                CPE Identifier
               </div>
-
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Exploit Repository
-                </div>
-                <a
-                  href={vulnerability.exploitUri}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  {vulnerability.exploitUri}
-                  <ExternalLinkIcon className="size-3" />
-                </a>
-              </div>
-
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Upstream API
-                </div>
-                <a
-                  href={vulnerability.upstreamApi}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  {vulnerability.upstreamApi}
-                  <ExternalLinkIcon className="size-3" />
-                </a>
-              </div>
+              <CopyCode>{vulnerability.cpe}</CopyCode>
             </div>
-          </div>
 
-          <Separator />
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                Exploit Repository
+              </div>
+              <a
+                href={vulnerability.exploitUri}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                {vulnerability.exploitUri}
+                <ExternalLinkIcon className="size-3" />
+              </a>
+            </div>
 
-          {/* SARIF Data */}
-          <div className="flex flex-col gap-2">
-            <h3 className="font-semibold">SARIF Data</h3>
-            <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-              {JSON.stringify(vulnerability.sarif, null, 2)}
-            </pre>
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                Upstream API
+              </div>
+              <a
+                href={vulnerability.upstreamApi}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                {vulnerability.upstreamApi}
+                <ExternalLinkIcon className="size-3" />
+              </a>
+            </div>
           </div>
         </div>
 
-        <DrawerFooter>
-          <DrawerClose asChild>
-            <Button variant="outline">Close</Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+        <Separator />
+
+        {/* SARIF Data */}
+        <div className="flex flex-col gap-2">
+          <h3 className="font-semibold">SARIF Data</h3>
+          <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+            {JSON.stringify(vulnerability.sarif, null, 2)}
+          </pre>
+        </div>
+      </div>
+    </EntityDrawer>
   );
 }

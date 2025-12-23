@@ -12,8 +12,8 @@ export const AuthLayout = ({ children }: { children: React.ReactNode }) => {
           <Image src="/logos/logo.svg" alt="Viper" width={30} height={30} />
           Viper
         </Link>
-        <span className="self-center">
-          Patch, Understand, Learn, Secure, Evolve.
+        <span className="self-center text-center">
+          Vulnerability Intelligence Program for Evaluation and Response
         </span>
         {children}
       </div>

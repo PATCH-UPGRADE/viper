@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
 import type { VulnerabilityWithIssues } from "@/lib/db";
-import { VulnerabilityDrawer } from "./vulnerabilities";
 
 export const columns: ColumnDef<VulnerabilityWithIssues>[] = [
   {
@@ -16,11 +15,9 @@ export const columns: ColumnDef<VulnerabilityWithIssues>[] = [
       <SortableHeader header="Description" column={column} />
     ),
     cell: ({ row }) => (
-      <VulnerabilityDrawer vulnerability={row.original}>
-        <div className="max-w-[500px] overflow-hidden text-ellipsis hover:underline pb-[1px]">
-          {row.original.description}
-        </div>
-      </VulnerabilityDrawer>
+      <div className="max-w-[500px] overflow-hidden text-ellipsis">
+        {row.original.description}
+      </div>
     ),
   },
   {
@@ -58,7 +55,9 @@ export const columns: ColumnDef<VulnerabilityWithIssues>[] = [
   {
     accessorKey: "updatedAt",
     meta: { title: "Last Updated" },
-    header: "Last Updated",
+    header: ({ column }) => (
+      <SortableHeader header="Last Updated" column={column} />
+    ),
     accessorFn: (row) =>
       formatDistanceToNow(row.updatedAt, { addSuffix: true }),
   },

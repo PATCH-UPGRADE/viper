@@ -5,6 +5,7 @@ import {
   type ColumnDef,
   flexRender,
   getCoreRowModel,
+  type Row,
   type RowData,
   type SortingState,
   type Table as TableType,
@@ -46,6 +47,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { type PaginatedResponse, usePaginationParams } from "@/lib/pagination";
+import { cn } from "@/lib/utils";
 
 declare module "@tanstack/react-table" {
   // biome-ignore lint/correctness/noUnusedVariables: required for declaration merging
@@ -89,16 +91,21 @@ export function SortableHeader<TData>({
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   paginatedData: PaginatedResponse<TData>;
+  isLoading?: boolean;
   search?: React.ReactNode;
+  rowOnclick?: (row: Row<TData>) => void;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   paginatedData,
+  isLoading,
   search,
+  rowOnclick,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [_params, setParams] = usePaginationParams();
+  const [isPending, startTransition] = React.useTransition();
 
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -112,7 +119,9 @@ export function DataTable<TData, TValue>({
     const sortParam = sorting
       .map((s) => `${s.desc ? "-" : ""}${s.id}`)
       .join(",");
-    setParams((prev) => ({ ...prev, sort: sortParam }));
+    startTransition(() => {
+      setParams((prev) => ({ ...prev, sort: sortParam }));
+    });
   }, [sorting, setParams]);
 
   const table = useReactTable({
@@ -131,6 +140,8 @@ export function DataTable<TData, TValue>({
     manualPagination: true,
     rowCount: paginatedData.totalCount,
   });
+
+  const _showLoading = isLoading || isPending;
 
   return (
     <>
@@ -186,12 +197,14 @@ export function DataTable<TData, TValue>({
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
+          <TableBody className={isPending ? "opacity-50" : ""}>
+            {!isLoading && table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  onClick={rowOnclick ? () => rowOnclick(row) : undefined}
+                  className={cn(rowOnclick ? "cursor-pointer" : "")}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
@@ -212,7 +225,11 @@ export function DataTable<TData, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  No results.
+                  {isLoading ? (
+                    <i className="italic">Loading...</i>
+                  ) : (
+                    "No results."
+                  )}
                 </TableCell>
               </TableRow>
             )}

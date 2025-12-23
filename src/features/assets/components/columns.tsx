@@ -22,16 +22,12 @@ import {
 } from "@/components/ui/tooltip";
 import { handleCopy } from "@/lib/copy";
 import type { AssetWithIssues } from "@/lib/db";
-import { AssetDrawer } from "./assets";
 
 export const columns: ColumnDef<AssetWithIssues>[] = [
   {
     id: "role",
     accessorKey: "role",
     header: ({ column }) => <SortableHeader header="Role" column={column} />,
-    cell: ({ row }) => {
-      return <AssetDrawer asset={row.original} />;
-    },
   },
   {
     id: "issues",
@@ -57,7 +53,7 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
     },
   },
   {
-    id: "IP Address",
+    meta: { title: "IP Address" },
     accessorKey: "ip",
     header: "IP Address",
   },
@@ -79,7 +75,9 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
   {
     accessorKey: "updatedAt",
     meta: { title: "Last Updated" },
-    header: "Last Updated",
+    header: ({ column }) => (
+      <SortableHeader header="Last Updated" column={column} />
+    ),
     accessorFn: (row) =>
       formatDistanceToNow(row.updatedAt, { addSuffix: true }),
   },

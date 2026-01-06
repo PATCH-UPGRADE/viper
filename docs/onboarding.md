@@ -13,6 +13,7 @@
 - [TanStack Query](https://tanstack.com/query/latest) (React Query) - Data fetching and caching
 - [trpc-to-openapi](https://github.com/mcampa/trpc-to-openapi) - OpenAPI support for tRPC
 - [nuqs](https://nuqs.dev/) - Type-safe URL search params
+- [Zod](https://zod.dev/) - Typescript-based schema validator
 - [Scalar](https://scalar.com/) - OpenAPI visualization
 
 ### UI & Styling
@@ -52,7 +53,7 @@ Ideally, we have:
 - comprehensive end to end and unit tests for API endpoints, with a specific focus on our external API endpoints
 - Playwright tests for the most common user tasks (i.e, logging in and viewing assets)
 
-Existing tests are in `__tests__` directories.
+Existing Jest tests are in `__tests__` directories, i.e `src/app/api/v1/__tests__/assets.test.ts`. Component level tests go with their components.
 
 ## API Endpoints and Considerations
 

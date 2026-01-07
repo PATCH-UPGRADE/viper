@@ -23,6 +23,13 @@ const assetInputSchema = z.object({
   upstreamApi: safeUrlSchema,
 });
 
+// NOTE: tRPC / OpenAPI doesn't allow for arrays as the INPUT schema
+// if you try it will default to a single asset schema
+// to get around that wrap the array of assets in an object
+const assetArrayInputSchema = z.object({
+  assets: z.array(assetInputSchema).nonempty(),
+});
+
 const assetSettingsInputSchema = z.object({
   url: safeUrlSchema,
   name: z.string().min(1),
@@ -40,6 +47,8 @@ const assetResponseSchema = z.object({
   updatedAt: z.date(),
   user: userSchema,
 });
+
+const assetArrayResponseSchema = z.array(assetResponseSchema);
 
 const paginatedAssetResponseSchema =
   createPaginatedResponseSchema(assetResponseSchema);
@@ -254,6 +263,34 @@ export const assetsRouter = createTRPCRouter({
         },
         include: { user: userIncludeSelect },
       });
+    }),
+
+  // POST /api/assets/bulk - Create one or more assets
+  createBulk: protectedProcedure
+    .input(assetArrayInputSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/assets/bulk",
+        tags: ["Assets"],
+        summary: "Create Bulk Assets",
+        description:
+          "Create one or more new assets from an array. The authenticated user will be recorded as the creator.",
+      },
+    })
+    .output(assetArrayResponseSchema)
+    .mutation(({ ctx, input }) => {
+      return Promise.all(
+        input.assets.map((asset) => {
+          return prisma.asset.create({
+            data: {
+              ...asset,
+              userId: ctx.auth.user.id,
+            },
+            include: { user: userIncludeSelect },
+          });
+        }),
+      );
     }),
 
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)

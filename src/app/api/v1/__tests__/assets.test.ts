@@ -3,6 +3,7 @@ import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
 
 describe("Assets Endpoint (/assets)", () => {
   const authHeader = { Authorization: AUTH_TOKEN };
+  const jsonHeader = { "Content-Type": "application/json" };
 
   const payload = {
     ip: "192.168.1.100",
@@ -11,8 +12,22 @@ describe("Assets Endpoint (/assets)", () => {
     upstreamApi: "https://api.hospital-upstream.com/v1",
   };
 
+  const payload2 = {
+    ip: "192.168.1.101",
+    cpe: generateCPE("asset_v1"),
+    role: "Primary Server",
+    upstreamApi: "https://api.hospital-upstream.com/v1",
+  };
+
   it("POST /assets - Without auth, should get a 401", async () => {
     const res = await request(BASE_URL).post("/assets").send(payload);
+
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("UNAUTHORIZED");
+  });
+
+  it("POST /assets/bulk - Without auth, should get a 401", async () => {
+    const res = await request(BASE_URL).post("/assets/bulk").send(payload);
 
     expect(res.status).toBe(401);
     expect(res.body.code).toBe("UNAUTHORIZED");
@@ -81,5 +96,105 @@ describe("Assets Endpoint (/assets)", () => {
       .set(authHeader);
 
     expect(deleteRes.status).toBe(200);
+  });
+
+  it("Assets bulk endpoint happy path integration test", async () => {
+    // POST create the assets
+    const reqData = { assets: [payload, payload2] };
+    const res = await request(BASE_URL)
+      .post("/assets/bulk")
+      .set(authHeader)
+      .set(jsonHeader)
+      .send(reqData);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBe(2);
+
+    const bodyFirst = res.body.at(0);
+    expect(bodyFirst).toHaveProperty("id");
+    expect(bodyFirst.ip).toBe(payload.ip);
+
+    const bodySecond = res.body.at(1);
+    expect(bodySecond).toHaveProperty("id");
+    expect(bodySecond.ip).toBe(payload2.ip);
+
+    // GET first payload from DB
+    const firstAssetId = bodyFirst.id;
+    const firstDetailRes = await request(BASE_URL)
+      .get(`/assets/${firstAssetId}`)
+      .set(authHeader);
+
+    expect(firstDetailRes.status).toBe(200);
+    expect(firstDetailRes.body.id).toBe(firstAssetId);
+
+    // GET second payload from DB
+    const secondAssetId = bodySecond.id;
+    const secondDetailRes = await request(BASE_URL)
+      .get(`/assets/${secondAssetId}`)
+      .set(authHeader);
+
+    expect(secondDetailRes.status).toBe(200);
+    expect(secondDetailRes.body.id).toBe(secondAssetId);
+
+    // DELETE the assets
+    const deleteFirstAssetRes = await request(BASE_URL)
+      .delete(`/assets/${firstAssetId}`)
+      .set(authHeader);
+
+    expect(deleteFirstAssetRes.status).toBe(200);
+
+    const deleteSecondAssetRes = await request(BASE_URL)
+      .delete(`/assets/${secondAssetId}`)
+      .set(authHeader);
+
+    expect(deleteSecondAssetRes.status).toBe(200);
+  });
+
+  it("Assets bulk endpoint fail case tests", async () => {
+    const emptyData = {};
+    const emptyDataRes = await request(BASE_URL)
+      .post("/assets/bulk")
+      .set(authHeader)
+      .set(jsonHeader)
+      .send(emptyData);
+
+    expect(emptyDataRes.status).toBe(400);
+
+    const emptyAssets = { assets: [] };
+    const emptyAssetsRes = await request(BASE_URL)
+      .post("/assets/bulk")
+      .set(authHeader)
+      .set(jsonHeader)
+      .send(emptyAssets);
+
+    expect(emptyAssetsRes.status).toBe(400);
+
+    const blankAsset = { assets: [{}] };
+    const blankAssetRes = await request(BASE_URL)
+      .post("/assets/bulk")
+      .set(authHeader)
+      .set(jsonHeader)
+      .send(blankAsset);
+
+    expect(blankAssetRes.status).toBe(400);
+
+    const blankFirstAsset = { assets: [{}, payload] };
+    const blankFirstAssetRes = await request(BASE_URL)
+      .post("/assets/bulk")
+      .set(authHeader)
+      .set(jsonHeader)
+      .send(blankFirstAsset);
+
+    expect(blankFirstAssetRes.status).toBe(400);
+
+    const blankSecondAsset = { assets: [payload, {}] };
+    const blankSecondAssetRes = await request(BASE_URL)
+      .post("/assets/bulk")
+      .set(authHeader)
+      .set(jsonHeader)
+      .send(blankSecondAsset);
+
+    expect(blankSecondAssetRes.status).toBe(400);
   });
 });

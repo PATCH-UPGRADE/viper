@@ -114,10 +114,16 @@ describe("Assets Endpoint (/assets)", () => {
     const bodyFirst = res.body.at(0);
     expect(bodyFirst).toHaveProperty("id");
     expect(bodyFirst.ip).toBe(payload.ip);
+    expect(bodyFirst.cpe).toBe(payload.cpe);
+    expect(bodyFirst.role).toBe(payload.role);
+    expect(bodyFirst.upstreamApi).toBe(payload.upstreamApi);
 
     const bodySecond = res.body.at(1);
     expect(bodySecond).toHaveProperty("id");
     expect(bodySecond.ip).toBe(payload2.ip);
+    expect(bodySecond.cpe).toBe(payload2.cpe);
+    expect(bodySecond.role).toBe(payload2.role);
+    expect(bodySecond.upstreamApi).toBe(payload2.upstreamApi);
 
     // GET first payload from DB
     const firstAssetId = bodyFirst.id;
@@ -127,6 +133,10 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(firstDetailRes.status).toBe(200);
     expect(firstDetailRes.body.id).toBe(firstAssetId);
+    expect(firstDetailRes.body.ip).toBe(payload.ip);
+    expect(firstDetailRes.body.cpe).toBe(payload.cpe);
+    expect(firstDetailRes.body.role).toBe(payload.role);
+    expect(firstDetailRes.body.upstreamApi).toBe(payload.upstreamApi);
 
     // GET second payload from DB
     const secondAssetId = bodySecond.id;
@@ -136,6 +146,10 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(secondDetailRes.status).toBe(200);
     expect(secondDetailRes.body.id).toBe(secondAssetId);
+    expect(secondDetailRes.body.ip).toBe(payload2.ip);
+    expect(secondDetailRes.body.cpe).toBe(payload2.cpe);
+    expect(secondDetailRes.body.role).toBe(payload2.role);
+    expect(secondDetailRes.body.upstreamApi).toBe(payload2.upstreamApi);
 
     // DELETE the assets
     const deleteFirstAssetRes = await request(BASE_URL)
@@ -151,7 +165,8 @@ describe("Assets Endpoint (/assets)", () => {
     expect(deleteSecondAssetRes.status).toBe(200);
   });
 
-  it("Assets bulk endpoint fail case tests", async () => {
+
+  it("Assets bulk endpoint no data fail case", async () => {
     const emptyData = {};
     const emptyDataRes = await request(BASE_URL)
       .post("/assets/bulk")
@@ -160,7 +175,9 @@ describe("Assets Endpoint (/assets)", () => {
       .send(emptyData);
 
     expect(emptyDataRes.status).toBe(400);
+  });
 
+  it("Assets bulk endpoint empty asset array fail case", async () => {
     const emptyAssets = { assets: [] };
     const emptyAssetsRes = await request(BASE_URL)
       .post("/assets/bulk")
@@ -169,7 +186,9 @@ describe("Assets Endpoint (/assets)", () => {
       .send(emptyAssets);
 
     expect(emptyAssetsRes.status).toBe(400);
+  });
 
+  it("Assets bulk endpoint bad asset fail case", async () => {
     const blankAsset = { assets: [{}] };
     const blankAssetRes = await request(BASE_URL)
       .post("/assets/bulk")
@@ -178,7 +197,9 @@ describe("Assets Endpoint (/assets)", () => {
       .send(blankAsset);
 
     expect(blankAssetRes.status).toBe(400);
+  });
 
+  it("Assets bulk endpoint bad first asset in array fail case", async () => {
     const blankFirstAsset = { assets: [{}, payload] };
     const blankFirstAssetRes = await request(BASE_URL)
       .post("/assets/bulk")
@@ -187,7 +208,9 @@ describe("Assets Endpoint (/assets)", () => {
       .send(blankFirstAsset);
 
     expect(blankFirstAssetRes.status).toBe(400);
+  });
 
+  it("Assets bulk endpoint bad second asset in array fail case", async () => {
     const blankSecondAsset = { assets: [payload, {}] };
     const blankSecondAssetRes = await request(BASE_URL)
       .post("/assets/bulk")

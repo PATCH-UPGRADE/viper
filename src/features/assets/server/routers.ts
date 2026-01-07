@@ -280,7 +280,7 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetArrayResponseSchema)
     .mutation(({ ctx, input }) => {
-      return Promise.all(
+      return prisma.$transaction(
         input.assets.map((asset) => {
           return prisma.asset.create({
             data: {

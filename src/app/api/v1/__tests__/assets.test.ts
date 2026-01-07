@@ -165,7 +165,6 @@ describe("Assets Endpoint (/assets)", () => {
     expect(deleteSecondAssetRes.status).toBe(200);
   });
 
-
   it("Assets bulk endpoint no data fail case", async () => {
     const emptyData = {};
     const emptyDataRes = await request(BASE_URL)

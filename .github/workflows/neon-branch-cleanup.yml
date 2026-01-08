@@ -19,5 +19,7 @@ jobs:
       
       - name: Warn if Neon branch was not deleted
         if: steps.delete_neon_branch.outcome == 'failure'
+        env:
+          BRANCH_NAME: preview/${{ github.event.pull_request.head.ref }}
         run: |
-          echo "::warning title=Neon cleanup failed::Could not delete branch 'preview/${{ github.event.pull_request.head.ref }}'. This may indicate a missing or renamed branch, or an issue connecting to Neon. Manual cleanup might be required."
+          echo "::warning title=Neon cleanup failed::Could not delete branch '${BRANCH_NAME}'. This may indicate a missing or renamed branch, or an issue connecting to Neon. Manual cleanup might be required."

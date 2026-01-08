@@ -65,8 +65,9 @@ After seeding, you can log in with:
 
 ## Tech Stack
 
-- React Framework: Nextjs
-- Routing: Tanstack
+- React Framework: Next.js
+- Routing: Next.js App Router
+- Data Fetching/Caching: Tanstack
 - Styling: Tailwind
 - Queue: inngest
 - DB: PSQL

@@ -1,0 +1,25 @@
+# Intent: automatically delete Neon branches when a PR is closed for a given GitHub branch
+name: Neon branch cleanup
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  delete-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Neon Branch
+        id: delete_neon_branch
+        continue-on-error: true
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: preview/${{ github.event.pull_request.head.ref }}
+      
+      - name: Warn if Neon branch was not deleted
+        if: steps.delete_neon_branch.outcome == 'failure'
+        env:
+          BRANCH_NAME: preview/${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "::warning title=Neon cleanup failed::Could not delete branch '${BRANCH_NAME}'. This may indicate a missing or renamed branch, or an issue connecting to Neon. Manual cleanup might be required."

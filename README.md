@@ -11,6 +11,8 @@ We are using the [Northeastern PATCH Jira](https://northeastern-patch.atlassian.
 
 ## Getting Started
 
+Check out the documentation under the `docs` folder and also `CLAUDE.md`.
+
 Follow the guide in `.env.example` to create a `.env` file.
 
 Install `mprocs` to run the multiple services:
@@ -63,11 +65,33 @@ After seeding, you can log in with:
 
 ## Tech Stack
 
+- React Framework: Next.js
+- Routing: Next.js App Router
+- Data Fetching/Caching: Tanstack
+- Styling: Tailwind
 - Queue: inngest
-- ORM: prisma. Run `npx prisma studio` to view the database, usually on http://localhost:5555
+- DB: PSQL
+- ORM: prisma
+- RPC: tRPC
+- API Validation: Zod
+- Test Framework: Jest
+- API Testing: Supertest
+- Linter: biome
 
-You can view the DB with prisma studio, usually running on port 5555.
+## Database
+
+Run `npx prisma studio` to view the database, usually on `http://localhost:5555`
 
 ## Tests
 
-Use `npm run test`. Set the `API_KEY` env variable to test the api.
+To run tests with Jest use `npm run test`.
+
+You will need to manually export your `API_KEY` env variable to test the API.
+
+You can find your API Keys under `/user/settings`.
+
+## Linting
+
+To check for lint errors use `npm run lint`.
+
+To have biome linter make changes use `npm run format`.

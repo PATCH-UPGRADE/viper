@@ -74,7 +74,7 @@ After seeding, you can log in with:
 - ORM: prisma
 - RPC: tRPC
 - API Validation: Zod
-- Test Framework: Jest
+- Test Framework: Vitest
 - API Testing: Supertest
 - Linter: biome
 

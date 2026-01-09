@@ -1,4 +1,5 @@
 import request from "supertest";
+import { describe, expect, it } from "vitest";
 import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
 
 describe("Assets Endpoint (/assets)", () => {

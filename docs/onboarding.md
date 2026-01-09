@@ -35,7 +35,7 @@
 
 ### Testing
 - [Supertest](https://github.com/ladjs/supertest) - HTTP assertion library
-- [Jest](https://jestjs.io/docs/getting-started) - JavaScript testing framework
+- [Vitest](https://nextjs.org/docs/app/guides/testing/vitest) - JavaScript testing framework
 - [Playwright](https://playwright.dev/docs/intro) - End-to-end testing
 
 ### Misc 

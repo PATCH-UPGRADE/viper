@@ -1,4 +1,4 @@
-import { createColumnHelper } from "@tanstack/react-table";
+import { type Column, createColumnHelper } from "@tanstack/react-table";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { withNuqsTestingAdapter } from "nuqs/adapters/testing";
@@ -265,24 +265,32 @@ describe("DataTable", () => {
 
 describe("SortableHeader", () => {
   it("renders header text", () => {
-    const mockColumn = {
+    const mockColumn: Partial<Column<TestData, unknown>> = {
       getIsSorted: () => false,
       toggleSorting: vi.fn(),
-    } as any;
+    };
 
-    render(<SortableHeader header="Test Header" column={mockColumn} />);
+    render(
+      <SortableHeader
+        header="Test Header"
+        column={mockColumn as Column<TestData, unknown>}
+      />,
+    );
 
     expect(screen.getByText("Test Header")).toBeInTheDocument();
   });
 
   it("shows unsorted icon by default", () => {
-    const mockColumn = {
+    const mockColumn: Partial<Column<TestData, unknown>> = {
       getIsSorted: () => false,
       toggleSorting: vi.fn(),
-    } as any;
+    };
 
     const { getByLabelText } = render(
-      <SortableHeader header="clickable header" column={mockColumn} />,
+      <SortableHeader
+        header="clickable header"
+        column={mockColumn as Column<TestData, unknown>}
+      />,
     );
 
     const button = getByLabelText("Sort clickable header neutral");
@@ -290,13 +298,16 @@ describe("SortableHeader", () => {
   });
 
   it("shows ascending arrow when sorted ascending", () => {
-    const mockColumn = {
+    const mockColumn: Partial<Column<TestData, unknown>> = {
       getIsSorted: () => "asc",
       toggleSorting: vi.fn(),
-    } as any;
+    };
 
     const { getByLabelText } = render(
-      <SortableHeader header="Test Header" column={mockColumn} />,
+      <SortableHeader
+        header="Test Header"
+        column={mockColumn as Column<TestData, unknown>}
+      />,
     );
 
     const button = getByLabelText("Sort Test Header descending");
@@ -305,13 +316,16 @@ describe("SortableHeader", () => {
   });
 
   it("shows descending arrow when sorted descending", () => {
-    const mockColumn = {
+    const mockColumn: Partial<Column<TestData, unknown>> = {
       getIsSorted: () => "desc",
       toggleSorting: vi.fn(),
-    } as any;
+    };
 
     const { getByLabelText } = render(
-      <SortableHeader header="Test Header" column={mockColumn} />,
+      <SortableHeader
+        header="Test Header"
+        column={mockColumn as Column<TestData, unknown>}
+      />,
     );
 
     const button = getByLabelText("Sort Test Header ascending");
@@ -322,13 +336,16 @@ describe("SortableHeader", () => {
   it("calls toggleSorting when clicked", async () => {
     const user = userEvent.setup();
     const toggleSorting = vi.fn();
-    const mockColumn = {
+    const mockColumn: Partial<Column<TestData, unknown>> = {
       getIsSorted: () => false,
       toggleSorting,
-    } as any;
+    };
 
     const { container } = render(
-      <SortableHeader header="clickable header" column={mockColumn} />,
+      <SortableHeader
+        header="clickable header"
+        column={mockColumn as Column<TestData, unknown>}
+      />,
     );
 
     const button = within(container).getByRole("button");

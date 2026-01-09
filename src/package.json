@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "test:browser": "vitest --config=../vitest.browser.config.ts"
+  }
+}

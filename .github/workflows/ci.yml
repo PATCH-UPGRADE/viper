@@ -2,7 +2,6 @@ name: CI/CD Pipeline
 
 env:
   NODE_VERSION: '20'
-  POSTGRES_VERSION: '17'
 on:
   push:
     branches: [main, develop]
@@ -40,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:${{ env.POSTGRES_VERSION }}
+        image: postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres

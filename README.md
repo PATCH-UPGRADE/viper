@@ -84,7 +84,7 @@ Run `npx prisma studio` to view the database, usually on `http://localhost:5555`
 
 ## Tests
 
-To run tests with Jest use `npm run test`.
+To run tests with Vitest use `npm run test`.
 
 You will need to manually export your `API_KEY` env variable to test the API.
 

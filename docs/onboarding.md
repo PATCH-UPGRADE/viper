@@ -53,7 +53,7 @@ Ideally, we have:
 - comprehensive end to end and unit tests for API endpoints, with a specific focus on our external API endpoints
 - Playwright tests for the most common user tasks (i.e, logging in and viewing assets)
 
-Existing Jest tests are in `__tests__` directories, i.e `src/app/api/v1/__tests__/assets.test.ts`. Component level tests go with their components.
+Existing Vitest tests are in `__tests__` directories, i.e `src/app/api/v1/__tests__/assets.test.ts`. Component level tests go with their components.
 
 ## API Endpoints and Considerations
 

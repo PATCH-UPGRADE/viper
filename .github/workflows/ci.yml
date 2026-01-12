@@ -2,6 +2,7 @@ name: CI/CD Pipeline
 
 env:
   NODE_VERSION: '20'
+  POSTGRES_VERSION: '17'
 on:
   push:
     branches: [main, develop]
@@ -33,3 +34,47 @@ jobs:
 
       - name: Type check
         run: npx tsc --noEmit
+
+  run-npm-tests:
+    name: Run npm tests with vitest
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:${{ env.POSTGRES_VERSION }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d testdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/testdb
+      API_KEY: ${{ secrets.VIPER_API_KEY }} # TODO
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed postgres database
+        run: npm run db:seed
+
+      - name: Run npm tests
+        run: npm run test
+

@@ -51,6 +51,8 @@ const mockPaginatedData: PaginatedResponse<TestData> = {
   pageSize: 10,
   totalCount: 3,
   totalPages: 1,
+  hasNextPage: false,
+  hasPreviousPage: false,
 };
 
 describe("DataTable", () => {

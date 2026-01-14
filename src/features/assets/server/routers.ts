@@ -4,6 +4,7 @@ import {
   buildPaginationMeta,
   createPaginatedResponse,
   createPaginatedResponseSchema,
+  createPaginatedResponseWithLinksSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
 import {
@@ -15,13 +16,31 @@ import {
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
 
-// Validation schemas matching the FastAPI spec
+const AssetStatus = z.enum(['Active', 'Decommissioned', 'Maintenance']);
+
 const assetInputSchema = z.object({
   ip: z.string().min(1),
+  networkSegment: z.string().optional(),
   cpe: cpeSchema,
   role: z.string().min(1),
   upstreamApi: safeUrlSchema,
+  hostname: z.string().optional(),
+  macAddress: z.string().optional(),
+  serialNumber: z.string().optional(),
+  location: z.object({
+      facility: z.string().optional(),
+      building: z.string().optional(),
+      floor: z.string().optional(),
+      room: z.string().optional(),
+  }).optional(),
+  status: AssetStatus.optional(),
 });
+
+const integrationAssetSchema = assetInputSchema.extend({
+  vendorId: z.string(),
+});
+const integrationResponseSchema = z.object({})
+
 
 // NOTE: tRPC / OpenAPI doesn't allow for arrays as the INPUT schema
 // if you try it will default to a single asset schema
@@ -52,6 +71,10 @@ const assetArrayResponseSchema = z.array(assetResponseSchema);
 
 const paginatedAssetResponseSchema =
   createPaginatedResponseSchema(assetResponseSchema);
+
+const integrationAssetInputSchema = createPaginatedResponseWithLinksSchema(integrationAssetSchema).extend({
+  vendor: z.string(),
+});
 
 const settingsResponseSchema = z.object({
   id: z.string(),
@@ -291,6 +314,25 @@ export const assetsRouter = createTRPCRouter({
           });
         }),
       );
+    }),
+
+
+  // POST /api/assets/integrationUpload
+  processIntegrationCreate: protectedProcedure
+    .input( integrationAssetInputSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/assets/integrationUpload",
+        tags: ["Assets"],
+        summary: "Synchronize assets with integration",
+        description:
+          "Syncrhonize assets on VIPER from a partnered platform",
+      },
+    })
+    .output(integrationResponseSchema)
+    .mutation(({ ctx, input }) => {
+      return "TODO";
     }),
 
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)

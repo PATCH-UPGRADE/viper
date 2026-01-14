@@ -1,5 +1,3 @@
-import { Badge } from "@/components/ui/badge";
-
 import {
   Card,
   CardContent,
@@ -7,8 +5,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { requireAuth } from "@/lib/auth-utils";
+import Link from "next/link";
 
 const Page = async () => {
   await requireAuth();
@@ -39,6 +39,7 @@ const Page = async () => {
 
       {/* Integrations grid */}
       <div className="grid gap-4 md:grid-cols-2">
+      <Link href="/integrations/assets/">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-base">
@@ -52,6 +53,7 @@ const Page = async () => {
             Used to discover and keep your environment model in sync.
           </CardContent>
         </Card>
+        </Link>
 
         <Card>
           <CardHeader>

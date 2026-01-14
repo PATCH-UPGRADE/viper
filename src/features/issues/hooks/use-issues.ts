@@ -5,6 +5,7 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
+import { IssueStatus } from "@/generated/prisma";
 
 /**
  * Hook to update an issue status
@@ -45,4 +46,9 @@ export const useSuspenseIssuesById = ({
 }) => {
   const trpc = useTRPC();
   return useSuspenseQuery(trpc.issues.getManyByIds.queryOptions({ ids, type }));
+};
+
+export const useSuspenseIssuesByAssetId = ({ id, status }: { id: string, status: IssueStatus }) => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(trpc.issues.getManyInternalByAssetId.queryOptions({ id, status }))
 };

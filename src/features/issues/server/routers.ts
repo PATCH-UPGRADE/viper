@@ -2,6 +2,12 @@ import { z } from "zod";
 import { IssueStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { buildPaginationMeta, createPaginatedResponse, paginationInputSchema } from "@/lib/pagination";
+
+const issuePaginationInput = paginationInputSchema.extend({
+  id: z.string(),
+  status: z.string(),
+});
 
 export const issuesRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -41,5 +47,31 @@ export const issuesRouter = createTRPCRouter({
         where: { id: input.id },
         data: { status: input.status },
       });
+    }),
+
+  getManyInternalByAssetId: protectedProcedure
+    .input(issuePaginationInput)
+    .query(async ({ input }) => {
+      const { id, status } = input;
+      const statusEnum = IssueStatus[status as keyof typeof IssueStatus];
+
+      const where = {
+        assetId: id,
+        status: statusEnum,
+      };
+
+      // Get total count and build pagination metadata
+      const totalCount = await prisma.issue.count({ where: where });
+      const meta = buildPaginationMeta(input, totalCount);
+
+      // Fetch paginated items
+      const issues = await prisma.issue.findMany({
+        skip: meta.skip,
+        take: meta.take,
+        where: where,
+        include: { vulnerability: true },
+      });
+
+      return createPaginatedResponse(issues, meta);
     }),
 });

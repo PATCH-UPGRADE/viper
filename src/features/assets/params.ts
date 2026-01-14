@@ -21,3 +21,8 @@ export const assetsParams = {
       .withOptions({ clearOnDefault: true }),
   },
 };
+
+export const assetDetailParams = {
+  ...createPaginationParams(),
+  status: 'PENDING',
+};

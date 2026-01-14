@@ -8,6 +8,7 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { integrationInputSchema } from "../types";
 
 const paginatedIntegrationsInputSchema = paginationInputSchema.extend({
   resourceType: z.enum(["Asset", "Vulnerability", "Emulator", "Remediation"]),
@@ -39,42 +40,47 @@ export const integrationsRouter = createTRPCRouter({
         take: meta.take,
         where: whereFilter,
         orderBy: { createdAt: "desc" },
+        include: { syncStatus: true },
       });
 
       return createPaginatedResponse(items, meta);
     }),
 
-  /*createApiToken: protectedProcedure
-    .input(apiTokenInputSchema)
+  createIntegration: protectedProcedure
+    .input(integrationInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const data = await auth.api.createApiKey({
-        body: {
-          name: input.name,
-          expiresIn: input.expiresIn,
+      return prisma.integration.create({
+        data: {
+          ...input,
           userId: ctx.auth.user.id,
-          remaining: 100, // server-only
-          refillAmount: 100, // server-only
-          refillInterval: 1000, // server-only
-          rateLimitTimeWindow: 1000, // server-only
-          rateLimitMax: 100, // server-only
-          rateLimitEnabled: true, // server-only
-          //permissions, // server-only
+          // TODO: get resourceType from a param maybe?
         },
+        include: { syncStatus: true },
       });
-      return data;
+      // TODO: create inngest job?
     }),
 
-  removeApiToken: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      // Verify ownership
-      await requireOwnership(input.id, ctx.auth.user.id, "apikey");
-      const data = await auth.api.deleteApiKey({
-        body: {
-          keyId: input.id,
-        },
-        headers: await headers(),
+  updateIntegration: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        data: integrationInputSchema,
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const { id, data } = input;
+      return prisma.integration.update({
+        where: { id },
+        data,
+        include: { syncStatus: true },
       });
-      return data;
-    }),*/
+    }),
+
+  removeIntegration: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      return prisma.integration.delete({
+        where: { id: input.id },
+      });
+    }),
 });

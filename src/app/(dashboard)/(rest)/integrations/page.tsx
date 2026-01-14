@@ -39,20 +39,21 @@ const Page = async () => {
 
       {/* Integrations grid */}
       <div className="grid gap-4 md:grid-cols-2">
-      <Link href="/integrations/assets/">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-base">
-              Assets
-            </CardTitle>
-            <CardDescription>
-              Ingest asset inventories by specifying an HTTP route and API key.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            Used to discover and keep your environment model in sync.
-          </CardContent>
-        </Card>
+        <Link href="/integrations/assets/">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-base">
+                Assets
+              </CardTitle>
+              <CardDescription>
+                Ingest asset inventories by specifying an HTTP route and API
+                key.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-xs text-muted-foreground">
+              Used to discover and keep your environment model in sync.
+            </CardContent>
+          </Card>
         </Link>
 
         <Card>

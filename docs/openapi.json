@@ -33,9 +33,7 @@
         "operationId": "assets-getMany",
         "summary": "List Assets",
         "description": "Get all assets. Any authenticated user can view all assets.",
-        "tags": [
-          "Assets"
-        ],
+        "tags": ["Assets"],
         "security": [
           {
             "Authorization": []
@@ -139,12 +137,7 @@
                                 ]
                               }
                             },
-                            "required": [
-                              "id",
-                              "name",
-                              "email",
-                              "image"
-                            ],
+                            "required": ["id", "name", "email", "image"],
                             "additionalProperties": false
                           }
                         },
@@ -251,9 +244,7 @@
         "operationId": "assets-create",
         "summary": "Create Asset",
         "description": "Create a new asset. The authenticated user will be recorded as the creator.",
-        "tags": [
-          "Assets"
-        ],
+        "tags": ["Assets"],
         "security": [
           {
             "Authorization": []
@@ -311,28 +302,14 @@
                         "type": "string"
                       }
                     },
-                    "required": [
-                      "facility",
-                      "building",
-                      "floor",
-                      "room"
-                    ]
+                    "required": ["facility", "building", "floor", "room"]
                   },
                   "status": {
                     "type": "string",
-                    "enum": [
-                      "Active",
-                      "Decommissioned",
-                      "Maintenance"
-                    ]
+                    "enum": ["Active", "Decommissioned", "Maintenance"]
                   }
                 },
-                "required": [
-                  "ip",
-                  "cpe",
-                  "role",
-                  "upstreamApi"
-                ]
+                "required": ["ip", "cpe", "role", "upstreamApi"]
               }
             }
           }
@@ -392,12 +369,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     }
                   },
@@ -465,9 +437,7 @@
         "operationId": "assets-getOne",
         "summary": "Get Asset",
         "description": "Get a single asset by ID. Any authenticated user can view any asset.",
-        "tags": [
-          "Assets"
-        ],
+        "tags": ["Assets"],
         "security": [
           {
             "Authorization": []
@@ -538,12 +508,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     }
                   },
@@ -619,9 +584,7 @@
         "operationId": "assets-remove",
         "summary": "Delete Asset",
         "description": "Delete an asset. Only the user who created the asset can delete it.",
-        "tags": [
-          "Assets"
-        ],
+        "tags": ["Assets"],
         "security": [
           {
             "Authorization": []
@@ -692,12 +655,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     }
                   },
@@ -773,9 +731,7 @@
         "operationId": "assets-update",
         "summary": "Update Asset",
         "description": "Update an asset. Only the user who created the asset can update it.",
-        "tags": [
-          "Assets"
-        ],
+        "tags": ["Assets"],
         "security": [
           {
             "Authorization": []
@@ -815,12 +771,7 @@
                     "format": "uri"
                   }
                 },
-                "required": [
-                  "ip",
-                  "cpe",
-                  "role",
-                  "upstreamApi"
-                ]
+                "required": ["ip", "cpe", "role", "upstreamApi"]
               }
             }
           }
@@ -880,12 +831,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     }
                   },
@@ -963,9 +909,7 @@
         "operationId": "assets-createBulk",
         "summary": "Create Bulk Assets",
         "description": "Create one or more new assets from an array. The authenticated user will be recorded as the creator.",
-        "tags": [
-          "Assets"
-        ],
+        "tags": ["Assets"],
         "security": [
           {
             "Authorization": []
@@ -1029,34 +973,18 @@
                               "type": "string"
                             }
                           },
-                          "required": [
-                            "facility",
-                            "building",
-                            "floor",
-                            "room"
-                          ]
+                          "required": ["facility", "building", "floor", "room"]
                         },
                         "status": {
                           "type": "string",
-                          "enum": [
-                            "Active",
-                            "Decommissioned",
-                            "Maintenance"
-                          ]
+                          "enum": ["Active", "Decommissioned", "Maintenance"]
                         }
                       },
-                      "required": [
-                        "ip",
-                        "cpe",
-                        "role",
-                        "upstreamApi"
-                      ]
+                      "required": ["ip", "cpe", "role", "upstreamApi"]
                     }
                   }
                 },
-                "required": [
-                  "assets"
-                ]
+                "required": ["assets"]
               }
             }
           }
@@ -1118,12 +1046,7 @@
                             ]
                           }
                         },
-                        "required": [
-                          "id",
-                          "name",
-                          "email",
-                          "image"
-                        ],
+                        "required": ["id", "name", "email", "image"],
                         "additionalProperties": false
                       }
                     },
@@ -1192,9 +1115,7 @@
         "operationId": "assets-processIntegrationCreate",
         "summary": "Synchronize assets with integration",
         "description": "Syncrhonize assets on VIPER from a partnered platform",
-        "tags": [
-          "Assets"
-        ],
+        "tags": ["Assets"],
         "security": [
           {
             "Authorization": []
@@ -1257,20 +1178,11 @@
                               "type": "string"
                             }
                           },
-                          "required": [
-                            "facility",
-                            "building",
-                            "floor",
-                            "room"
-                          ]
+                          "required": ["facility", "building", "floor", "room"]
                         },
                         "status": {
                           "type": "string",
-                          "enum": [
-                            "Active",
-                            "Decommissioned",
-                            "Maintenance"
-                          ]
+                          "enum": ["Active", "Decommissioned", "Maintenance"]
                         },
                         "vendorId": {
                           "type": "string"
@@ -1392,9 +1304,7 @@
         "operationId": "assets-getSettings",
         "summary": "Get Asset Manager Settings",
         "description": "Get all asset managers that have been set up. Any authenticated user can view all settings.",
-        "tags": [
-          "Assets"
-        ],
+        "tags": ["Assets"],
         "security": [
           {
             "Authorization": []
@@ -1495,12 +1405,7 @@
                                 ]
                               }
                             },
-                            "required": [
-                              "id",
-                              "name",
-                              "email",
-                              "image"
-                            ],
+                            "required": ["id", "name", "email", "image"],
                             "additionalProperties": false
                           }
                         },
@@ -1606,9 +1511,7 @@
         "operationId": "assets-createSetting",
         "summary": "Create Asset Manager",
         "description": "Create a new asset manager to sync from. The authenticated user will be recorded as the creator.",
-        "tags": [
-          "Assets"
-        ],
+        "tags": ["Assets"],
         "security": [
           {
             "Authorization": []
@@ -1635,11 +1538,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "url",
-                  "name",
-                  "token"
-                ]
+                "required": ["url", "name", "token"]
               }
             }
           }
@@ -1696,12 +1595,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     }
                   },
@@ -1768,9 +1662,7 @@
         "operationId": "vulnerabilities-getMany",
         "summary": "List Vulnerabilities",
         "description": "Get all vulnerabilities. Any authenticated user can view all vulnerabilities.",
-        "tags": [
-          "Vulnerabilities"
-        ],
+        "tags": ["Vulnerabilities"],
         "security": [
           {
             "Authorization": []
@@ -1881,12 +1773,7 @@
                                 ]
                               }
                             },
-                            "required": [
-                              "id",
-                              "name",
-                              "email",
-                              "image"
-                            ],
+                            "required": ["id", "name", "email", "image"],
                             "additionalProperties": false
                           }
                         },
@@ -1996,9 +1883,7 @@
         "operationId": "vulnerabilities-create",
         "summary": "Create Vulnerability",
         "description": "Create a new vulnerability. The authenticated user will be recorded as the creator.",
-        "tags": [
-          "Vulnerabilities"
-        ],
+        "tags": ["Vulnerabilities"],
         "security": [
           {
             "Authorization": []
@@ -2113,12 +1998,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     }
                   },
@@ -2189,9 +2069,7 @@
         "operationId": "vulnerabilities-getOne",
         "summary": "Get Vulnerability",
         "description": "Get a single vulnerability by ID. Any authenticated user can view any vulnerability.",
-        "tags": [
-          "Vulnerabilities"
-        ],
+        "tags": ["Vulnerabilities"],
         "security": [
           {
             "Authorization": []
@@ -2269,12 +2147,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     }
                   },
@@ -2353,9 +2226,7 @@
         "operationId": "vulnerabilities-remove",
         "summary": "Delete Vulnerability",
         "description": "Delete a vulnerability. Only the user who created the vulnerability can delete it.",
-        "tags": [
-          "Vulnerabilities"
-        ],
+        "tags": ["Vulnerabilities"],
         "security": [
           {
             "Authorization": []
@@ -2433,12 +2304,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     }
                   },
@@ -2517,9 +2383,7 @@
         "operationId": "vulnerabilities-update",
         "summary": "Update Vulnerability",
         "description": "Update a vulnerability. Only the user who created the vulnerability can update it.",
-        "tags": [
-          "Vulnerabilities"
-        ],
+        "tags": ["Vulnerabilities"],
         "security": [
           {
             "Authorization": []
@@ -2582,9 +2446,7 @@
                     ]
                   }
                 },
-                "required": [
-                  "data"
-                ]
+                "required": ["data"]
               }
             }
           }
@@ -2651,12 +2513,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     }
                   },
@@ -2737,9 +2594,7 @@
         "operationId": "remediations-getMany",
         "summary": "List Remediations",
         "description": "Get all remediations. Any authenticated user can view all remediations.",
-        "tags": [
-          "Remediations"
-        ],
+        "tags": ["Remediations"],
         "security": [
           {
             "Authorization": []
@@ -2849,12 +2704,7 @@
                                 ]
                               }
                             },
-                            "required": [
-                              "id",
-                              "name",
-                              "email",
-                              "image"
-                            ],
+                            "required": ["id", "name", "email", "image"],
                             "additionalProperties": false
                           },
                           "vulnerability": {
@@ -2873,12 +2723,7 @@
                                 "type": "string"
                               }
                             },
-                            "required": [
-                              "id",
-                              "cpe",
-                              "description",
-                              "impact"
-                            ],
+                            "required": ["id", "cpe", "description", "impact"],
                             "additionalProperties": false
                           }
                         },
@@ -2988,9 +2833,7 @@
         "operationId": "remediations-create",
         "summary": "Create Remediation",
         "description": "Create a new remediation. The authenticated user will be recorded as the creator.",
-        "tags": [
-          "Remediations"
-        ],
+        "tags": ["Remediations"],
         "security": [
           {
             "Authorization": []
@@ -3101,12 +2944,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     },
                     "vulnerability": {
@@ -3125,12 +2963,7 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "id",
-                        "cpe",
-                        "description",
-                        "impact"
-                      ],
+                      "required": ["id", "cpe", "description", "impact"],
                       "additionalProperties": false
                     }
                   },
@@ -3201,9 +3034,7 @@
         "operationId": "remediations-getOne",
         "summary": "Get Remediation",
         "description": "Get a single remediation by ID. Any authenticated user can view any remediation.",
-        "tags": [
-          "Remediations"
-        ],
+        "tags": ["Remediations"],
         "security": [
           {
             "Authorization": []
@@ -3280,12 +3111,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     },
                     "vulnerability": {
@@ -3304,12 +3130,7 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "id",
-                        "cpe",
-                        "description",
-                        "impact"
-                      ],
+                      "required": ["id", "cpe", "description", "impact"],
                       "additionalProperties": false
                     }
                   },
@@ -3388,9 +3209,7 @@
         "operationId": "remediations-remove",
         "summary": "Delete Remediation",
         "description": "Delete a remediation. Only the user who created the remediation can delete it.",
-        "tags": [
-          "Remediations"
-        ],
+        "tags": ["Remediations"],
         "security": [
           {
             "Authorization": []
@@ -3467,12 +3286,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     },
                     "vulnerability": {
@@ -3491,12 +3305,7 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "id",
-                        "cpe",
-                        "description",
-                        "impact"
-                      ],
+                      "required": ["id", "cpe", "description", "impact"],
                       "additionalProperties": false
                     }
                   },
@@ -3575,9 +3384,7 @@
         "operationId": "remediations-update",
         "summary": "Update Remediation",
         "description": "Update a remediation. Only the user who created the remediation can update it.",
-        "tags": [
-          "Remediations"
-        ],
+        "tags": ["Remediations"],
         "security": [
           {
             "Authorization": []
@@ -3637,9 +3444,7 @@
                     ]
                   }
                 },
-                "required": [
-                  "data"
-                ]
+                "required": ["data"]
               }
             }
           }
@@ -3705,12 +3510,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     },
                     "vulnerability": {
@@ -3729,12 +3529,7 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "id",
-                        "cpe",
-                        "description",
-                        "impact"
-                      ],
+                      "required": ["id", "cpe", "description", "impact"],
                       "additionalProperties": false
                     }
                   },
@@ -3815,9 +3610,7 @@
         "operationId": "emulators-getMany",
         "summary": "List Emulators",
         "description": "Get all emulators. Any authenticated user can view all emulators.",
-        "tags": [
-          "Emulators"
-        ],
+        "tags": ["Emulators"],
         "security": [
           {
             "Authorization": []
@@ -3938,12 +3731,7 @@
                                 ]
                               }
                             },
-                            "required": [
-                              "id",
-                              "name",
-                              "email",
-                              "image"
-                            ],
+                            "required": ["id", "name", "email", "image"],
                             "additionalProperties": false
                           },
                           "asset": {
@@ -4080,9 +3868,7 @@
         "operationId": "emulators-create",
         "summary": "Create Emulator",
         "description": "Create a new emulator. The authenticated user will be recorded as the creator. Exactly one of downloadUrl or dockerUrl must be provided.",
-        "tags": [
-          "Emulators"
-        ],
+        "tags": ["Emulators"],
         "security": [
           {
             "Authorization": []
@@ -4131,11 +3917,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "role",
-                  "description",
-                  "assetId"
-                ]
+                "required": ["role", "description", "assetId"]
               }
             }
           }
@@ -4212,12 +3994,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     },
                     "asset": {
@@ -4239,13 +4016,7 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "id",
-                        "ip",
-                        "cpe",
-                        "role",
-                        "upstreamApi"
-                      ],
+                      "required": ["id", "ip", "cpe", "role", "upstreamApi"],
                       "additionalProperties": false
                     }
                   },
@@ -4315,9 +4086,7 @@
         "operationId": "emulators-getOne",
         "summary": "Get Emulator",
         "description": "Get a single emulator by ID. Any authenticated user can view any emulator.",
-        "tags": [
-          "Emulators"
-        ],
+        "tags": ["Emulators"],
         "security": [
           {
             "Authorization": []
@@ -4405,12 +4174,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     },
                     "asset": {
@@ -4432,13 +4196,7 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "id",
-                        "ip",
-                        "cpe",
-                        "role",
-                        "upstreamApi"
-                      ],
+                      "required": ["id", "ip", "cpe", "role", "upstreamApi"],
                       "additionalProperties": false
                     }
                   },
@@ -4516,9 +4274,7 @@
         "operationId": "emulators-remove",
         "summary": "Delete Emulator",
         "description": "Delete an emulator. Only the user who created the emulator can delete it.",
-        "tags": [
-          "Emulators"
-        ],
+        "tags": ["Emulators"],
         "security": [
           {
             "Authorization": []
@@ -4606,12 +4362,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     },
                     "asset": {
@@ -4633,13 +4384,7 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "id",
-                        "ip",
-                        "cpe",
-                        "role",
-                        "upstreamApi"
-                      ],
+                      "required": ["id", "ip", "cpe", "role", "upstreamApi"],
                       "additionalProperties": false
                     }
                   },
@@ -4717,9 +4462,7 @@
         "operationId": "emulators-update",
         "summary": "Update Emulator",
         "description": "Update an emulator. Only the user who created the emulator can update it. Exactly one of downloadUrl or dockerUrl must be provided.",
-        "tags": [
-          "Emulators"
-        ],
+        "tags": ["Emulators"],
         "security": [
           {
             "Authorization": []
@@ -4777,11 +4520,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "role",
-                  "description",
-                  "assetId"
-                ]
+                "required": ["role", "description", "assetId"]
               }
             }
           }
@@ -4858,12 +4597,7 @@
                           ]
                         }
                       },
-                      "required": [
-                        "id",
-                        "name",
-                        "email",
-                        "image"
-                      ],
+                      "required": ["id", "name", "email", "image"],
                       "additionalProperties": false
                     },
                     "asset": {
@@ -4885,13 +4619,7 @@
                           "type": "string"
                         }
                       },
-                      "required": [
-                        "id",
-                        "ip",
-                        "cpe",
-                        "role",
-                        "upstreamApi"
-                      ],
+                      "required": ["id", "ip", "cpe", "role", "upstreamApi"],
                       "additionalProperties": false
                     }
                   },
@@ -5000,17 +4728,12 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "message"
-              ],
+              "required": ["message"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "message",
-          "code"
-        ],
+        "required": ["message", "code"],
         "additionalProperties": false
       },
       "error.UNAUTHORIZED": {
@@ -5044,17 +4767,12 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "message"
-              ],
+              "required": ["message"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "message",
-          "code"
-        ],
+        "required": ["message", "code"],
         "additionalProperties": false
       },
       "error.FORBIDDEN": {
@@ -5088,17 +4806,12 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "message"
-              ],
+              "required": ["message"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "message",
-          "code"
-        ],
+        "required": ["message", "code"],
         "additionalProperties": false
       },
       "error.NOT_FOUND": {
@@ -5132,17 +4845,12 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "message"
-              ],
+              "required": ["message"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "message",
-          "code"
-        ],
+        "required": ["message", "code"],
         "additionalProperties": false
       },
       "error.INTERNAL_SERVER_ERROR": {
@@ -5176,17 +4884,12 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "message"
-              ],
+              "required": ["message"],
               "additionalProperties": false
             }
           }
         },
-        "required": [
-          "message",
-          "code"
-        ],
+        "required": ["message", "code"],
         "additionalProperties": false
       }
     },

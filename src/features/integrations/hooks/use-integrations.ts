@@ -6,54 +6,87 @@ import {
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import { usePaginationParams } from "@/lib/pagination";
-import type { ResourceType } from "@/generated/prisma";
+import type { Integration, ResourceType } from "@/generated/prisma";
 
 export const useSuspenseIntegrations = (resourceType: ResourceType) => {
   const trpc = useTRPC();
   const [params] = usePaginationParams();
   // TODO: augment params to also include `asset`, right? for the `resourceType`
 
-  return useSuspenseQuery(trpc.integrations.getManyIntegrations.queryOptions({...params, ...{resourceType}}));
+  return useSuspenseQuery(
+    trpc.integrations.getManyIntegrations.queryOptions({
+      ...params,
+      ...{ resourceType },
+    }),
+  );
 };
 
 /**
- * Hook to create a new API token
+ * Hook to create a new Integration
  */
-/*export const useCreateIntegration = () => {
+export const useCreateIntegration = () => {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
 
   return useMutation(
     trpc.integrations.createIntegration.mutationOptions({
       onSuccess: (data) => {
-        toast.success("API Token created");
-        // Invalidate all getMany queries regardless of params (page, search, etc.)
+        toast.success("Integration created");
         queryClient.invalidateQueries(
-          trpc.user.getManyApiTokens.queryOptions({}),
+          trpc.integrations.getManyIntegrations.queryOptions({
+            resourceType: data.resourceType,
+          }),
         );
         return data;
       },
       onError: (error) => {
-        toast.error(`Failed to create API token: ${error.message}`);
+        toast.error(`Failed to create integration: ${error.message}`);
       },
     }),
   );
-};*/
+};
 
 /**
- * Hook to remove an API token
+ * Hook to update Integration
+ */
+export const useUpdateIntegration = () => {
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
 
-export const useRemoveApiToken = () => {
+  return useMutation(
+    trpc.integrations.updateIntegration.mutationOptions({
+      onSuccess: (data) => {
+        toast.success("Integration updated");
+        queryClient.invalidateQueries(
+          trpc.integrations.getManyIntegrations.queryOptions({
+            resourceType: data.resourceType,
+          }),
+        );
+        return data;
+      },
+      onError: (error) => {
+        toast.error(`Failed to create integration: ${error.message}`);
+      },
+    }),
+  );
+};
+
+/**
+ * Hook to remove an Integration
+ */
+export const useRemoveIntegration = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   return useMutation(
-    trpc.user.removeApiToken.mutationOptions({
+    trpc.integrations.removeIntegration.mutationOptions({
       onSuccess: (data) => {
-        toast.success("API Token removed");
+        toast.success("Integration removed");
         // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries(
-          trpc.user.getManyApiTokens.queryOptions({}),
+          trpc.integrations.getManyIntegrations.queryOptions({
+            resourceType: data.resourceType,
+          }),
         );
         return data;
       },
@@ -62,4 +95,4 @@ export const useRemoveApiToken = () => {
       },
     }),
   );
-};*/
+};

@@ -1,7 +1,7 @@
 // Creates a 24 hour API key for local dev or CI testing
 
-import { auth } from "../src/lib/auth";
 import { PrismaClient } from "@/generated/prisma";
+import { auth } from "../src/lib/auth";
 
 const prisma = new PrismaClient();
 
@@ -16,9 +16,7 @@ async function main() {
   });
 
   if (!user) {
-    throw new Error(
-      `Seed user not found. Did you run db:seed first?`,
-    );
+    throw new Error(`Seed user not found. Did you run db:seed first?`);
   }
 
   await prisma.apikey.deleteMany({
@@ -40,18 +38,11 @@ async function main() {
 
   const rawKey = result.key;
 
-
   console.log("\n========================================");
   console.log("🔑 TEST API KEY (LOCAL / CI ONLY)");
   console.log("========================================");
-  console.log(rawKey);
-  console.log("========================================\n");
-
-if (process.env.CI) {
   console.log(`API_KEY=${rawKey}`);
-}
-
-
+  console.log("========================================\n");
 }
 
 main()

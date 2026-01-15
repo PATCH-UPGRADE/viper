@@ -54,7 +54,6 @@ jobs:
 
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/testdb
-      API_KEY: ${{ secrets.VIPER_API_KEY }} # TODO
 
     steps:
       - uses: actions/checkout@v4
@@ -73,6 +72,11 @@ jobs:
 
       - name: Seed postgres database
         run: npm run db:seed
+
+      - name: Generate test API key
+        run: |
+          npm run db:create-test-api-key > output.txt
+          grep '^API_KEY=' output.txt >> $GITHUB_ENV
 
       - name: Run npm tests
         run: npm run test

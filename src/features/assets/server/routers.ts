@@ -9,6 +9,8 @@ import {
 } from "@/lib/pagination";
 import {
   cpeSchema,
+  deviceGroupSchema,
+  deviceGroupSelect,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -16,7 +18,7 @@ import {
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
 
-const AssetStatus = z.enum(["Active", "Decommissioned", "Maintenance"]);
+const AssetStatus = z.enum(["Active", "Decomissioned", "Maintenance"]);
 
 const assetInputSchema = z.object({
   ip: z.string().min(1),
@@ -59,7 +61,7 @@ const assetSettingsInputSchema = z.object({
 const assetResponseSchema = z.object({
   id: z.string(),
   ip: z.string(),
-  cpe: z.string(),
+  deviceGroup: deviceGroupSchema,
   role: z.string(),
   upstreamApi: z.string(),
   userId: z.string(),
@@ -138,7 +140,7 @@ export const assetsRouter = createTRPCRouter({
         skip: meta.skip,
         take: meta.take,
         where: where,
-        include: { user: userIncludeSelect },
+        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
         orderBy: { createdAt: "desc" },
       });
 
@@ -179,7 +181,11 @@ export const assetsRouter = createTRPCRouter({
         skip: meta.skip,
         take: meta.take,
         where: where,
-        include: { user: userIncludeSelect, issues: true },
+        include: {
+          user: userIncludeSelect,
+          deviceGroup: deviceGroupSelect,
+          issues: true,
+        },
         orderBy: sort
           ? [
               ...sort.split(",").map((s) => {
@@ -223,14 +229,18 @@ export const assetsRouter = createTRPCRouter({
 
       const assetItems = await prisma.asset.findMany({
         where: where,
-        include: { user: userIncludeSelect },
+        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
         orderBy: { updatedAt: "desc" },
       });
 
-      const assetCpes = assetItems.map((asset) => asset.cpe).filter(Boolean);
+      const assetCpes = assetItems
+        .map((asset) => asset.deviceGroup.cpe)
+        .filter(Boolean);
       const allCpes = [...new Set([...(cpes ?? []), ...assetCpes])];
 
-      const vulnsWhere = { cpe: { in: allCpes } };
+      const vulnsWhere = {
+        affectedDeviceGroups: { some: { cpe: { in: allCpes } } },
+      };
       const vulnsCount = await prisma.vulnerability.count({
         where: vulnsWhere,
       });
@@ -263,7 +273,7 @@ export const assetsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       return prisma.asset.findUniqueOrThrow({
         where: { id: input.id },
-        include: { user: userIncludeSelect },
+        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
       });
     }),
 
@@ -282,12 +292,15 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetResponseSchema)
     .mutation(({ ctx, input }) => {
+      // TODO: VW-34 -- translate cpe into device group
+      const { cpe, ...dataInput } = input;
       return prisma.asset.create({
         data: {
-          ...input,
+          ...dataInput,
+          deviceGroupId: "TODO",
           userId: ctx.auth.user.id,
         },
-        include: { user: userIncludeSelect },
+        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
       });
     }),
 
@@ -308,18 +321,25 @@ export const assetsRouter = createTRPCRouter({
     .mutation(({ ctx, input }) => {
       return prisma.$transaction(
         input.assets.map((asset) => {
+          // TODO: VW-34 -- translate cpe into device group
+          const { cpe, ...dataInput } = input;
           return prisma.asset.create({
             data: {
-              ...asset,
+              ...dataInput,
+              deviceGroupId: "TODO",
               userId: ctx.auth.user.id,
             },
-            include: { user: userIncludeSelect },
+            include: {
+              user: userIncludeSelect,
+              deviceGroup: deviceGroupSelect,
+            },
           });
         }),
       );
     }),
 
   // POST /api/assets/integrationUpload
+  // TODO: VW-38
   processIntegrationCreate: protectedProcedure
     .input(integrationAssetInputSchema)
     .meta({
@@ -333,7 +353,7 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(integrationResponseSchema)
     .mutation(({ ctx, input }) => {
-      return "TODO";
+      return {};
     }),
 
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)
@@ -356,7 +376,7 @@ export const assetsRouter = createTRPCRouter({
 
       return prisma.asset.delete({
         where: { id: input.id },
-        include: { user: userIncludeSelect },
+        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
       });
     }),
 
@@ -387,109 +407,11 @@ export const assetsRouter = createTRPCRouter({
       await requireOwnership(input.id, ctx.auth.user.id, "asset");
 
       const { id, ...updateData } = input;
+      // TODO: VW-34 -- translate cpe into device group
       return prisma.asset.update({
         where: { id },
         data: updateData,
-        include: { user: userIncludeSelect },
+        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
       });
-    }),
-
-  // GET /api/assets/settings - List all asset settings
-  getSettings: protectedProcedure
-    .input(paginationInputSchema)
-    .meta({
-      openapi: {
-        method: "GET",
-        path: "/assets/settings",
-        tags: ["Assets"],
-        summary: "Get Asset Manager Settings",
-        description:
-          "Get all asset managers that have been set up. Any authenticated user can view all settings.",
-      },
-    })
-    .output(paginatedSettingsResponseSchema)
-    .query(async ({ input }) => {
-      const { search } = input;
-
-      const searchFilter = search
-        ? {
-            OR: [
-              { name: { contains: search, mode: "insensitive" as const } },
-              { url: { contains: search, mode: "insensitive" as const } },
-            ],
-          }
-        : {};
-
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.assetSettings.count({
-        where: searchFilter,
-      });
-      const meta = buildPaginationMeta(input, totalCount);
-
-      // Fetch paginated items
-      const rawItems = await prisma.assetSettings.findMany({
-        skip: meta.skip,
-        take: meta.take,
-        where: searchFilter,
-        select: {
-          id: true,
-          url: true,
-          name: true,
-          token: true, // Select to check if exists, but don't return
-          userId: true,
-          createdAt: true,
-          updatedAt: true,
-          user: userIncludeSelect,
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      // Map items to exclude token and add hasToken flag
-      const items = rawItems.map(({ token, ...item }) => ({
-        ...item,
-        hasToken: !!token && token.length > 0,
-      }));
-
-      return createPaginatedResponse(items, meta);
-    }),
-
-  // POST /api/assets/settings - Create asset setting
-  createSetting: protectedProcedure
-    .input(assetSettingsInputSchema)
-    .meta({
-      openapi: {
-        method: "POST",
-        path: "/assets/settings",
-        tags: ["Assets"],
-        summary: "Create Asset Manager",
-        description:
-          "Create a new asset manager to sync from. The authenticated user will be recorded as the creator.",
-      },
-    })
-    .output(settingsResponseSchema)
-    .mutation(async ({ ctx, input }) => {
-      const created = await prisma.assetSettings.create({
-        data: {
-          ...input,
-          userId: ctx.auth.user.id,
-        },
-        select: {
-          id: true,
-          url: true,
-          name: true,
-          token: true, // Select to check if exists, but don't return
-          userId: true,
-          createdAt: true,
-          updatedAt: true,
-          user: userIncludeSelect,
-        },
-      });
-
-      // Exclude token from response, add hasToken flag
-      const { token, ...response } = created;
-      return {
-        ...response,
-        hasToken: !!token && token.length > 0,
-      };
     }),
 });

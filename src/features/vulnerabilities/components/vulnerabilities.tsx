@@ -25,9 +25,11 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
-import type { Vulnerability } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
-import type { VulnerabilityWithIssues } from "@/lib/db";
+import type {
+  VulnerabilityWithDeviceGroups,
+  VulnerabilityWithIssues,
+} from "@/lib/db";
 import {
   useRemoveVulnerability,
   useSuspenseVulnerabilities,
@@ -119,7 +121,7 @@ export const VulnerabilitiesEmpty = () => {
 };
 
 function isVulnerabilityWithIssues(
-  data: Vulnerability | VulnerabilityWithIssues,
+  data: VulnerabilityWithDeviceGroups | VulnerabilityWithIssues,
 ): data is VulnerabilityWithIssues {
   return (data as VulnerabilityWithIssues).issues !== undefined;
 }
@@ -127,7 +129,7 @@ function isVulnerabilityWithIssues(
 export const VulnerabilityItem = ({
   data,
 }: {
-  data: VulnerabilityWithIssues | Vulnerability;
+  data: VulnerabilityWithIssues | VulnerabilityWithDeviceGroups;
 }) => {
   const hasIssues = isVulnerabilityWithIssues(data);
   const removeVulnerability = useRemoveVulnerability();
@@ -143,7 +145,7 @@ export const VulnerabilityItem = ({
       </div>
       <div className="flex-1 min-w-0">
         <VulnerabilityDrawer vulnerability={data}>
-          {data.cpe}
+          {data.affectedDeviceGroups.map((group) => group.cpe).join(", ")}
         </VulnerabilityDrawer>
         <div className="text-xs text-muted-foreground mt-1">
           {data.description.substring(0, 100)}
@@ -173,7 +175,7 @@ export const VulnerabilityItem = ({
 };
 
 interface VulnerabilityDrawerProps extends Omit<EntityDrawerProps, "trigger"> {
-  vulnerability: VulnerabilityWithIssues | Vulnerability;
+  vulnerability: VulnerabilityWithIssues | VulnerabilityWithDeviceGroups;
 }
 
 export function VulnerabilityDrawer({
@@ -186,7 +188,11 @@ export function VulnerabilityDrawer({
   return (
     <EntityDrawer trigger={children} {...props}>
       <DrawerHeader className="gap-1">
-        <DrawerTitle>{vulnerability.cpe}</DrawerTitle>
+        <DrawerTitle>
+          {vulnerability.affectedDeviceGroups
+            .map((group) => group.cpe)
+            .join(", ")}
+        </DrawerTitle>
         <DrawerDescription className="flex items-center gap-2">
           <Badge variant="outline" className="text-destructive">
             <BugIcon className="size-3 mr-1" />
@@ -241,7 +247,11 @@ export function VulnerabilityDrawer({
               <div className="text-xs font-medium text-muted-foreground mb-1">
                 CPE Identifier
               </div>
-              <CopyCode>{vulnerability.cpe}</CopyCode>
+              <CopyCode>
+                {vulnerability.affectedDeviceGroups
+                  .map((group) => group.cpe)
+                  .join(", ")}
+              </CopyCode>
             </div>
 
             <div>

@@ -10,6 +10,7 @@ export const userSchema = z.object({
   email: z.string(),
   image: z.string().nullable(),
 });
+export type UserIncludeType = z.infer<typeof userSchema>;
 
 /**
  * Shared user include/select pattern for Prisma queries
@@ -21,6 +22,20 @@ export const userIncludeSelect = {
     name: true,
     email: true,
     image: true,
+  },
+} as const;
+
+export const deviceGroupSchema = z.object({
+  id: z.string(),
+  cpe: z.string(),
+});
+export type DeviceGroupIncludeType = z.infer<typeof deviceGroupSchema>;
+
+
+export const deviceGroupSelect = {
+  select: {
+    id: true,
+    cpe: true,
   },
 } as const;
 

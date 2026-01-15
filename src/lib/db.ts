@@ -9,8 +9,29 @@ export type AssetWithIssues = Prisma.AssetGetPayload<{
   include: { issues: true };
 }>;
 
+
 export type VulnerabilityWithIssues = Prisma.VulnerabilityGetPayload<{
-  include: { issues: true };
+  include: {
+    issues: true; 
+    affectedDeviceGroups: {
+      select: {
+        id: true;
+        cpe: true;
+      };
+    };
+  };
+}>;
+
+
+export type VulnerabilityWithDeviceGroups = Prisma.VulnerabilityGetPayload<{
+  include: {
+    affectedDeviceGroups: {
+      select: {
+        id: true;
+        cpe: true;
+      };
+    };
+  };
 }>;
 
 export type FullIssue = Prisma.IssueGetPayload<{

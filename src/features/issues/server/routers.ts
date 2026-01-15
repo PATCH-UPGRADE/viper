@@ -2,6 +2,7 @@ import { z } from "zod";
 import { IssueStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { deviceGroupSelect } from "@/lib/schemas";
 
 export const issuesRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -25,13 +26,21 @@ export const issuesRouter = createTRPCRouter({
       if (ids.length === 0) {
         return [];
       }
-      return prisma.issue.findMany({
-        where: { id: { in: ids } },
+return prisma.issue.findMany({
+  where: { id: { in: ids } },
+  include: {
+    ...(type === "assets" && { 
+      asset: true 
+    }),
+    ...(type === "vulnerabilities" && { 
+      vulnerability: {
         include: {
-          asset: type === "assets",
-          vulnerability: type === "vulnerabilities",
+          affectedDeviceGroups: deviceGroupSelect, 
         },
-      });
+      },
+    }),
+  },
+});
     }),
 
   updateStatus: protectedProcedure

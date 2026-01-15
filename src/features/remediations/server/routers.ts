@@ -9,6 +9,8 @@ import {
 } from "@/lib/pagination";
 import {
   cpeSchema,
+  deviceGroupSchema,
+  deviceGroupSelect,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -28,7 +30,7 @@ const remediationInputSchema = z.object({
 
 const vulnerabilitySchema = z.object({
   id: z.string(),
-  cpe: z.string(),
+  affectedDeviceGroups: z.array(deviceGroupSchema),
   description: z.string(),
   impact: z.string(),
 });
@@ -37,7 +39,7 @@ const remediationResponseSchema = z.object({
   id: z.string(),
   fixUri: z.string(),
   vulnerabilityId: z.string(),
-  cpe: z.string(),
+  deviceGroup: deviceGroupSchema,
   description: z.string(),
   narrative: z.string(),
   upstreamApi: z.string(),
@@ -51,6 +53,22 @@ const remediationResponseSchema = z.object({
 const paginatedRemediationResponseSchema = createPaginatedResponseSchema(
   remediationResponseSchema,
 );
+
+const remediationVulnerabilitySelect = {
+  select: {
+              id: true,
+              affectedDeviceGroups: deviceGroupSelect,
+              description: true,
+              impact: true,
+            },
+
+} as const;
+
+const remediationInclude = {
+          user: userIncludeSelect,
+          vulnerability: remediationVulnerabilitySelect,
+          deviceGroup: deviceGroupSelect,
+}
 
 export const remediationsRouter = createTRPCRouter({
   // GET /api/remediations - List all remediations (any authenticated user can see all)
@@ -74,7 +92,14 @@ export const remediationsRouter = createTRPCRouter({
       const searchFilter = search
         ? {
             OR: [
-              { cpe: { contains: search, mode: "insensitive" as const } },
+              {
+                deviceGroup: {
+                  cpe: {
+                    contains: search,
+                    mode: "insensitive" as const,
+                  },
+                },
+              },
               {
                 description: { contains: search, mode: "insensitive" as const },
               },
@@ -94,17 +119,7 @@ export const remediationsRouter = createTRPCRouter({
         skip: meta.skip,
         take: meta.take,
         where: searchFilter,
-        include: {
-          user: userIncludeSelect,
-          vulnerability: {
-            select: {
-              id: true,
-              cpe: true,
-              description: true,
-              impact: true,
-            },
-          },
-        },
+        include: remediationInclude,
         orderBy: { createdAt: "desc" },
       });
 
@@ -128,17 +143,7 @@ export const remediationsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       return prisma.remediation.findUniqueOrThrow({
         where: { id: input.id },
-        include: {
-          user: userIncludeSelect,
-          vulnerability: {
-            select: {
-              id: true,
-              cpe: true,
-              description: true,
-              impact: true,
-            },
-          },
-        },
+        include: remediationInclude,
       });
     }),
 
@@ -169,22 +174,15 @@ export const remediationsRouter = createTRPCRouter({
         });
       }
 
+      // TODO: VW-34 -- translate cpe into device group
+      const {cpe, ...dataInput} = input;
       return prisma.remediation.create({
         data: {
-          ...input,
+          ...dataInput,
+          deviceGroupId: "TODO",
           userId: ctx.auth.user.id,
         },
-        include: {
-          user: userIncludeSelect,
-          vulnerability: {
-            select: {
-              id: true,
-              cpe: true,
-              description: true,
-              impact: true,
-            },
-          },
-        },
+        include: remediationInclude,
       });
     }),
 
@@ -208,17 +206,7 @@ export const remediationsRouter = createTRPCRouter({
 
       return prisma.remediation.delete({
         where: { id: input.id },
-        include: {
-          user: userIncludeSelect,
-          vulnerability: {
-            select: {
-              id: true,
-              cpe: true,
-              description: true,
-              impact: true,
-            },
-          },
-        },
+        include: remediationInclude,
       });
     }),
 
@@ -279,17 +267,7 @@ export const remediationsRouter = createTRPCRouter({
       return prisma.remediation.update({
         where: { id: input.id },
         data: input.data,
-        include: {
-          user: userIncludeSelect,
-          vulnerability: {
-            select: {
-              id: true,
-              cpe: true,
-              description: true,
-              impact: true,
-            },
-          },
-        },
+        include: remediationInclude,
       });
     }),
 });

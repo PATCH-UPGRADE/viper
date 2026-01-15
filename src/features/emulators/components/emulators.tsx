@@ -33,6 +33,12 @@ import {
   useSuspenseEmulators,
 } from "../hooks/use-emulators";
 import { useEmulatorsParams } from "../hooks/use-emulators-params";
+import { DeviceGroupIncludeType, UserIncludeType } from "@/lib/schemas";
+
+type EmulatorWithRelations = Omit<Emulator, "deviceGroupId"> & {
+  deviceGroup: DeviceGroupIncludeType,
+  user: UserIncludeType, 
+};
 
 export const EmulatorsSearch = () => {
   const [params, setParams] = useEmulatorsParams();
@@ -121,15 +127,7 @@ export const EmulatorsEmpty = () => {
 export const EmulatorItem = ({
   data,
 }: {
-  data: Emulator & {
-    asset: {
-      id: string;
-      role: string;
-      cpe: string;
-      ip: string;
-      upstreamApi: string;
-    };
-  };
+  data: EmulatorWithRelations;
 }) => {
   const removeEmulator = useRemoveEmulator();
 
@@ -150,7 +148,7 @@ export const EmulatorItem = ({
       <div className="flex-1 min-w-0">
         <EmulatorDrawer emulator={data} />
         <div className="text-xs text-muted-foreground mt-1">
-          {distributionType} &bull; {data.asset.role} &bull; Updated{" "}
+          {distributionType} &bull; {data.deviceGroup.cpe} &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
         </div>
       </div>
@@ -169,15 +167,7 @@ export const EmulatorItem = ({
 function EmulatorDrawer({
   emulator,
 }: {
-  emulator: Emulator & {
-    asset: {
-      id: string;
-      role: string;
-      cpe: string;
-      ip: string;
-      upstreamApi: string;
-    };
-  };
+  emulator: EmulatorWithRelations;
 }) {
   const isMobile = useIsMobile();
 
@@ -248,33 +238,17 @@ function EmulatorDrawer({
 
           <Separator />
 
-          {/* Associated Asset */}
+          {/* Associated Device Group */}
           <div className="flex flex-col gap-3">
-            <h3 className="font-semibold">Associated Asset</h3>
+            <h3 className="font-semibold">Associated Device Group</h3>
 
             <div className="grid grid-cols-1 gap-3">
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Device Role
-                </div>
-                <div className="text-sm">{emulator.asset.role}</div>
-              </div>
-
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  IP Address
-                </div>
-                <code className="text-xs bg-muted px-2 py-1 rounded">
-                  {emulator.asset.ip}
-                </code>
-              </div>
-
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1">
                   CPE Identifier
                 </div>
                 <code className="text-xs bg-muted px-2 py-1 rounded break-all">
-                  {emulator.asset.cpe}
+                  {emulator.deviceGroup.cpe}
                 </code>
               </div>
             </div>

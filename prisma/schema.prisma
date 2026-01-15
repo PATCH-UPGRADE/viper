@@ -170,7 +170,8 @@ model DeviceGroup {
   deviceGroupHistories DeviceGroupHistory[]
   assets               Asset[]
   vulnerbailities      Vulnerability[]      @relation("VulnerabilityDeviceGroups")
-  Emulator             Emulator[]
+  emulators             Emulator[]
+  remediations Remediation[]
 
   @@index([cpe])
   @@map("device_group")
@@ -212,10 +213,9 @@ model Asset {
   // TODO: is Cascade the correct behavior for this?
   deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
 
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  emulators            Emulator[]
   issues               Issue[]
   deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
@@ -268,8 +268,6 @@ model Emulator {
 
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
-  Asset         Asset?          @relation(fields: [assetId], references: [id])
-  assetId       String?
   Vulnerability Vulnerability[]
 
   @@index([deviceGroupId])
@@ -330,7 +328,8 @@ model Issue {
 model Remediation {
   id          String @id @default(cuid())
   fixUri      String @map("fix-uri")
-  cpe         String
+  deviceGroupId String
+  deviceGroup DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
   description String @db.Text
   narrative   String @db.Text
   upstreamApi String @map("upstream-api")
@@ -344,7 +343,7 @@ model Remediation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([cpe])
+  @@index([deviceGroupId])
   @@index([vulnerabilityId])
   @@index([userId])
   @@map("remediation")
@@ -374,22 +373,25 @@ model Apikey {
   permissions         String?
   metadata            String?
 
+  integration Integration?
+
   @@map("apikey")
 }
 
 model Integration {
-  id               String       @id @default(cuid())
-  name             String
-  platform         String? // The name of the integration platform, e.g "BlueFlow"
-  integrationUri   String       @map("integration-uri")
-  isGeneric        Boolean
-  authType         AuthType
-  resourceType     ResourceType
-  authentication   Json
-  syncEvery        Int // e.g 300, sync every 300 seconds
+  id             String       @id @default(cuid())
+  name           String
+  platform       String? // The name of the integration platform, e.g "BlueFlow"
+  integrationUri String       @map("integration-uri")
+  isGeneric      Boolean
+  authType       AuthType
+  resourceType   ResourceType
+  authentication Json
+  syncEvery      Int // e.g 300, sync every 300 seconds
   //syncSchedule     String? // e.g 0 12 * * *, sync every day at noon (cron)
-  syncStatus       SyncStatus[]
-  lastSyncStatusId String?
+  syncStatus     SyncStatus[]
+  apiKeyId       String?      @unique
+  apiKey         Apikey?      @relation(fields: [apiKeyId], references: [id])
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)

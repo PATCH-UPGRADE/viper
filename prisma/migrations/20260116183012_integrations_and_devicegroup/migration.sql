@@ -2,10 +2,13 @@
   Warnings:
 
   - You are about to drop the column `cpe` on the `asset` table. All the data in the column will be lost.
+  - You are about to drop the column `assetId` on the `emulator` table. All the data in the column will be lost.
+  - You are about to drop the column `cpe` on the `remediation` table. All the data in the column will be lost.
   - You are about to drop the column `cpe` on the `vulnerability` table. All the data in the column will be lost.
   - You are about to drop the `asset_settings` table. If the table is not empty, all the data it contains will be lost.
   - Added the required column `deviceGroupId` to the `asset` table without a default value. This is not possible if the table is not empty.
   - Added the required column `deviceGroupId` to the `emulator` table without a default value. This is not possible if the table is not empty.
+  - Added the required column `deviceGroupId` to the `remediation` table without a default value. This is not possible if the table is not empty.
 
 */
 -- CreateEnum
@@ -27,6 +30,9 @@ ALTER TABLE "public"."emulator" DROP CONSTRAINT "emulator_assetId_fkey";
 DROP INDEX "public"."emulator_assetId_idx";
 
 -- DropIndex
+DROP INDEX "public"."remediation_cpe_idx";
+
+-- DropIndex
 DROP INDEX "public"."vulnerability_cpe_idx";
 
 -- AlterTable
@@ -38,13 +44,16 @@ ADD COLUMN     "location" JSONB,
 ADD COLUMN     "macAddress" TEXT,
 ADD COLUMN     "networkSegment" TEXT,
 ADD COLUMN     "serialNumber" TEXT,
-ADD COLUMN     "status" "AssetStatus",
-ALTER COLUMN "userId" DROP NOT NULL;
+ADD COLUMN     "status" "AssetStatus";
 
 -- AlterTable
-ALTER TABLE "emulator" ADD COLUMN     "deviceGroupId" TEXT NOT NULL,
-ADD COLUMN     "helmSbomId" TEXT,
-ALTER COLUMN "assetId" DROP NOT NULL;
+ALTER TABLE "emulator" DROP COLUMN "assetId",
+ADD COLUMN     "deviceGroupId" TEXT NOT NULL,
+ADD COLUMN     "helmSbomId" TEXT;
+
+-- AlterTable
+ALTER TABLE "remediation" DROP COLUMN "cpe",
+ADD COLUMN     "deviceGroupId" TEXT NOT NULL;
 
 -- AlterTable
 ALTER TABLE "vulnerability" DROP COLUMN "cpe",
@@ -78,6 +87,18 @@ CREATE TABLE "device_group_history" (
 );
 
 -- CreateTable
+CREATE TABLE "external_asset_mappings" (
+    "id" TEXT NOT NULL,
+    "assetId" TEXT NOT NULL,
+    "integrationId" TEXT NOT NULL,
+    "externalId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "external_asset_mappings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "integration" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -87,9 +108,8 @@ CREATE TABLE "integration" (
     "authType" "AuthType" NOT NULL,
     "resourceType" "ResourceType" NOT NULL,
     "authentication" JSONB NOT NULL,
-    "syncEvery" INTEGER,
-    "syncSchedule" TEXT,
-    "lastSyncStatusId" TEXT,
+    "syncEvery" INTEGER NOT NULL,
+    "apiKeyId" TEXT,
     "userId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -120,6 +140,18 @@ CREATE TABLE "_VulnerabilityDeviceGroups" (
 CREATE INDEX "device_group_cpe_idx" ON "device_group"("cpe");
 
 -- CreateIndex
+CREATE INDEX "external_asset_mappings_assetId_idx" ON "external_asset_mappings"("assetId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "external_asset_mappings_assetId_integrationId_key" ON "external_asset_mappings"("assetId", "integrationId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "external_asset_mappings_integrationId_externalId_key" ON "external_asset_mappings"("integrationId", "externalId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "integration_apiKeyId_key" ON "integration"("apiKeyId");
+
+-- CreateIndex
 CREATE INDEX "integration_userId_idx" ON "integration"("userId");
 
 -- CreateIndex
@@ -131,6 +163,9 @@ CREATE INDEX "asset_deviceGroupId_idx" ON "asset"("deviceGroupId");
 -- CreateIndex
 CREATE INDEX "emulator_deviceGroupId_idx" ON "emulator"("deviceGroupId");
 
+-- CreateIndex
+CREATE INDEX "remediation_deviceGroupId_idx" ON "remediation"("deviceGroupId");
+
 -- AddForeignKey
 ALTER TABLE "device_group_history" ADD CONSTRAINT "device_group_history_deviceGroupId_fkey" FOREIGN KEY ("deviceGroupId") REFERENCES "device_group"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -141,13 +176,22 @@ ALTER TABLE "device_group_history" ADD CONSTRAINT "device_group_history_assetId_
 ALTER TABLE "asset" ADD CONSTRAINT "asset_deviceGroupId_fkey" FOREIGN KEY ("deviceGroupId") REFERENCES "device_group"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "external_asset_mappings" ADD CONSTRAINT "external_asset_mappings_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "asset"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "external_asset_mappings" ADD CONSTRAINT "external_asset_mappings_integrationId_fkey" FOREIGN KEY ("integrationId") REFERENCES "integration"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "emulator" ADD CONSTRAINT "emulator_deviceGroupId_fkey" FOREIGN KEY ("deviceGroupId") REFERENCES "device_group"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "emulator" ADD CONSTRAINT "emulator_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "asset"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "vulnerability" ADD CONSTRAINT "vulnerability_emulatorId_fkey" FOREIGN KEY ("emulatorId") REFERENCES "emulator"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "vulnerability" ADD CONSTRAINT "vulnerability_emulatorId_fkey" FOREIGN KEY ("emulatorId") REFERENCES "emulator"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "remediation" ADD CONSTRAINT "remediation_deviceGroupId_fkey" FOREIGN KEY ("deviceGroupId") REFERENCES "device_group"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "integration" ADD CONSTRAINT "integration_apiKeyId_fkey" FOREIGN KEY ("apiKeyId") REFERENCES "apikey"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "integration" ADD CONSTRAINT "integration_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;

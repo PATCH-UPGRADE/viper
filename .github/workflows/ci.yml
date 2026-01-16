@@ -78,8 +78,11 @@ jobs:
           API_KEY_LINE="$(npm run db:create-test-api-key --silent | grep '^API_KEY=' | tr -d '\r')"
           echo "$API_KEY_LINE" >> "$GITHUB_ENV"
 
-      - name: Run npm tests
-        run: |
-          npm run dev &
-          npx wait-on http://localhost:3000/workflows 
-          API_KEY=$API_KEY npm run test
+      - name: Start API server
+        run: npm run start:dev &
+
+      - name: Wait for API
+        run: npx wait-on http://localhost:3000/workflows
+
+      - name: Run tests
+        run: API_KEY=$API_KEY npm run test

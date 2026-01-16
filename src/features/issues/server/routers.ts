@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { IssueStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { deviceGroupSelect } from "@/lib/schemas";
+import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 export const issuesRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -10,7 +10,18 @@ export const issuesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       return prisma.issue.findUniqueOrThrow({
         where: { id: input.id },
-        include: { asset: true, vulnerability: true },
+        include: {
+          asset: {
+            include: {
+              deviceGroup: deviceGroupSelect,
+            },
+          },
+          vulnerability: {
+            include: {
+              affectedDeviceGroups: deviceGroupSelect,
+            },
+          },
+        },
       });
     }),
 
@@ -26,21 +37,25 @@ export const issuesRouter = createTRPCRouter({
       if (ids.length === 0) {
         return [];
       }
-return prisma.issue.findMany({
-  where: { id: { in: ids } },
-  include: {
-    ...(type === "assets" && { 
-      asset: true 
-    }),
-    ...(type === "vulnerabilities" && { 
-      vulnerability: {
+      return prisma.issue.findMany({
+        where: { id: { in: ids } },
         include: {
-          affectedDeviceGroups: deviceGroupSelect, 
+          ...(type === "assets" && {
+            asset: {
+              include: {
+                deviceGroup: deviceGroupSelect,
+              },
+            },
+          }),
+          ...(type === "vulnerabilities" && {
+            vulnerability: {
+              include: {
+                affectedDeviceGroups: deviceGroupSelect,
+              },
+            },
+          }),
         },
-      },
-    }),
-  },
-});
+      });
     }),
 
   updateStatus: protectedProcedure

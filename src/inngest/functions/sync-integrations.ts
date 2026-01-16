@@ -1,5 +1,5 @@
-import { inngest } from "../client";
 import prisma from "@/lib/db";
+import { inngest } from "../client";
 
 export const syncAllIntegrations = inngest.createFunction(
   { id: "sync-all-integrations" },
@@ -50,6 +50,11 @@ export const syncAllIntegrations = inngest.createFunction(
  * - Creates a SyncStatus model
  *
  */
+
+type SyncResult =
+  // biome-ignore lint/suspicious/noExplicitAny: data from a server could potentially be any here, that's normal, right?
+  { success: true; data: any } | { success: false; errorMessage: string };
+
 export const syncIntegration = inngest.createFunction(
   { id: "sync-integration" },
   { event: "integration/sync.requested" },
@@ -80,10 +85,10 @@ export const syncIntegration = inngest.createFunction(
           const token = Buffer.from(`${username}:${password}`).toString(
             "base64",
           );
-          headers["Authorization"] = `Basic ${token}`;
+          headers.Authorization = `Basic ${token}`;
         } else if (integration.authType === "Bearer") {
           const { token } = integration.authentication as { token: string };
-          headers["Authorization"] = `Bearer ${token}`;
+          headers.Authorization = `Bearer ${token}`;
         } else if (integration.authType === "Header") {
           const { header, value } = integration.authentication as {
             header: string;
@@ -102,13 +107,13 @@ export const syncIntegration = inngest.createFunction(
         }
 
         const data = await response.json();
-        return { success: true, data };
+        return { success: true, data } as SyncResult;
       } catch (error) {
         return {
           success: false,
           errorMessage:
             error instanceof Error ? error.message : "Unknown error",
-        };
+        } as SyncResult;
       }
     });
 

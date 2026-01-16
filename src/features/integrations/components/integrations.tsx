@@ -1,9 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { formatDistanceToNow } from "date-fns";
-import { AlertCircleIcon, Copy, EyeIcon, EyeOffIcon } from "lucide-react";
-import { PropsWithChildren, useState } from "react";
+import { type PropsWithChildren, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import {
@@ -12,11 +10,9 @@ import {
   EntityHeader,
   EntityList,
   EntityPagination,
-  EntitySearch,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,7 +29,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -43,22 +38,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Apikey, Integration, ResourceType } from "@/generated/prisma";
-import { useEntitySearch } from "@/hooks/use-entity-search";
-import { handleCopy } from "@/lib/copy";
+import type { Integration, ResourceType } from "@/generated/prisma";
+import { usePaginationParams } from "@/lib/pagination";
 import {
   useCreateIntegration,
   useRemoveIntegration,
   useSuspenseIntegrations,
   useUpdateIntegration,
 } from "../hooks/use-integrations";
-import { usePaginationParams } from "@/lib/pagination";
-import { IntegrationFormValues, integrationInputSchema } from "../types";
+import {
+  type AuthenticationInputType,
+  type IntegrationFormValues,
+  integrationInputSchema,
+} from "../types";
 //import { useApiTokenParams } from "../hooks/use-user-params";
 //import { type ApiTokenFormValues, apiTokenInputSchema } from "../types";
 
@@ -456,7 +448,7 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
       authType: data.authType,
       resourceType: data.resourceType,
       syncEvery: data.syncEvery || 300,
-      authentication: data.authentication,
+      authentication: data.authentication as AuthenticationInputType,
     },
   });
 

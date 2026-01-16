@@ -1,15 +1,13 @@
-import { requireAuth } from "@/lib/auth-utils";
-import { HydrateClient } from "@/trpc/server";
-import { ErrorBoundary } from "react-error-boundary";
 import { Suspense } from "react";
-import { prefetchIntegrations } from "@/features/integrations/server/prefetch";
-import { usePaginationParams } from "@/lib/pagination";
+import { ErrorBoundary } from "react-error-boundary";
 import {
   IntegrationsContainer,
   IntegrationsError,
   IntegrationsList,
   IntegrationsLoading,
 } from "@/features/integrations/components/integrations";
+import { requireAuth } from "@/lib/auth-utils";
+import { HydrateClient } from "@/trpc/server";
 
 const Page = async () => {
   await requireAuth();

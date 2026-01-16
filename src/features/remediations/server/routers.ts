@@ -56,19 +56,18 @@ const paginatedRemediationResponseSchema = createPaginatedResponseSchema(
 
 const remediationVulnerabilitySelect = {
   select: {
-              id: true,
-              affectedDeviceGroups: deviceGroupSelect,
-              description: true,
-              impact: true,
-            },
-
+    id: true,
+    affectedDeviceGroups: deviceGroupSelect,
+    description: true,
+    impact: true,
+  },
 } as const;
 
 const remediationInclude = {
-          user: userIncludeSelect,
-          vulnerability: remediationVulnerabilitySelect,
-          deviceGroup: deviceGroupSelect,
-}
+  user: userIncludeSelect,
+  vulnerability: remediationVulnerabilitySelect,
+  deviceGroup: deviceGroupSelect,
+};
 
 export const remediationsRouter = createTRPCRouter({
   // GET /api/remediations - List all remediations (any authenticated user can see all)
@@ -175,7 +174,7 @@ export const remediationsRouter = createTRPCRouter({
       }
 
       // TODO: VW-34 -- translate cpe into device group
-      const {cpe, ...dataInput} = input;
+      const { cpe, ...dataInput } = input;
       return prisma.remediation.create({
         data: {
           ...dataInput,

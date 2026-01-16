@@ -1,5 +1,5 @@
-import { safeUrlSchema } from "@/lib/schemas";
 import { z } from "zod";
+import { safeUrlSchema } from "@/lib/schemas";
 
 const basicAuthSchema = z.object({
   username: z.string(),
@@ -20,6 +20,7 @@ const authenticationSchema = z.union([
   bearerAuthSchema,
   headerAuthSchema,
 ]);
+export type AuthenticationInputType = z.infer<typeof authenticationSchema>;
 
 export const integrationInputSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -29,6 +30,6 @@ export const integrationInputSchema = z.object({
   authType: z.enum(["Basic", "Bearer", "Header"]),
   resourceType: z.enum(["Asset", "Vulnerability", "Emulator", "Remediation"]),
   authentication: authenticationSchema,
-  syncEvery: z.number().int().positive().min(60).default(300),
+  syncEvery: z.number().int().positive().min(60),
 });
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;

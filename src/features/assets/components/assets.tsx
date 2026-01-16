@@ -25,9 +25,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
-import type { Asset } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
-import type { AssetWithIssues } from "@/lib/db";
+import type { AssetWithDeviceGroup, AssetWithIssues } from "@/lib/db";
 import { useRemoveAsset, useSuspenseAssets } from "../hooks/use-assets";
 import { useAssetsParams } from "../hooks/use-assets-params";
 import { columns } from "./columns";
@@ -108,12 +107,16 @@ export const AssetsEmpty = () => {
 };
 
 function isAssetWithIssues(
-  data: Asset | AssetWithIssues,
+  data: AssetWithDeviceGroup | AssetWithIssues,
 ): data is AssetWithIssues {
   return (data as AssetWithIssues).issues !== undefined;
 }
 
-export const AssetItem = ({ data }: { data: AssetWithIssues | Asset }) => {
+export const AssetItem = ({
+  data,
+}: {
+  data: AssetWithIssues | AssetWithDeviceGroup;
+}) => {
   const removeAsset = useRemoveAsset();
 
   const handleRemove = () => {
@@ -130,8 +133,9 @@ export const AssetItem = ({ data }: { data: AssetWithIssues | Asset }) => {
       <div className="flex-1 min-w-0">
         <AssetDrawer asset={data}>{data.role}</AssetDrawer>
         <div className="text-xs text-muted-foreground mt-1">
-          {data.ip} &bull; {data.cpe.split(":").slice(3, 5).join(" ")} &bull;
-          Updated {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
+          {data.ip} &bull;{" "}
+          {data.deviceGroup.cpe.split(":").slice(3, 5).join(" ")} &bull; Updated{" "}
+          {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
           {hasIssues && data.issues.length >= 1 && (
             <>
               {" "}
@@ -156,7 +160,7 @@ export const AssetItem = ({ data }: { data: AssetWithIssues | Asset }) => {
 };
 
 interface AssetDrawerProps extends Omit<EntityDrawerProps, "trigger"> {
-  asset: AssetWithIssues | Asset;
+  asset: AssetWithIssues | AssetWithDeviceGroup;
 }
 
 export function AssetDrawer({
@@ -205,7 +209,7 @@ export function AssetDrawer({
               <div className="text-xs font-medium text-muted-foreground mb-1">
                 Group ID
               </div>
-              <CopyCode>{asset.cpe}</CopyCode>
+              <CopyCode>{asset.deviceGroup.cpe}</CopyCode>
             </div>
           </div>
         </div>

@@ -28,16 +28,16 @@ import { Separator } from "@/components/ui/separator";
 import type { Emulator } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
+import type { DeviceGroupIncludeType, UserIncludeType } from "@/lib/schemas";
 import {
   useRemoveEmulator,
   useSuspenseEmulators,
 } from "../hooks/use-emulators";
 import { useEmulatorsParams } from "../hooks/use-emulators-params";
-import { DeviceGroupIncludeType, UserIncludeType } from "@/lib/schemas";
 
 type EmulatorWithRelations = Omit<Emulator, "deviceGroupId"> & {
-  deviceGroup: DeviceGroupIncludeType,
-  user: UserIncludeType, 
+  deviceGroup: DeviceGroupIncludeType;
+  user: UserIncludeType;
 };
 
 export const EmulatorsSearch = () => {
@@ -124,11 +124,7 @@ export const EmulatorsEmpty = () => {
   );
 };
 
-export const EmulatorItem = ({
-  data,
-}: {
-  data: EmulatorWithRelations;
-}) => {
+export const EmulatorItem = ({ data }: { data: EmulatorWithRelations }) => {
   const removeEmulator = useRemoveEmulator();
 
   const handleRemove = () => {
@@ -164,11 +160,7 @@ export const EmulatorItem = ({
   );
 };
 
-function EmulatorDrawer({
-  emulator,
-}: {
-  emulator: EmulatorWithRelations;
-}) {
+function EmulatorDrawer({ emulator }: { emulator: EmulatorWithRelations }) {
   const isMobile = useIsMobile();
 
   return (

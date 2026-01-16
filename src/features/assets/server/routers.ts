@@ -52,7 +52,7 @@ const assetArrayInputSchema = z.object({
   assets: z.array(assetInputSchema).nonempty(),
 });
 
-const assetSettingsInputSchema = z.object({
+const _assetSettingsInputSchema = z.object({
   url: safeUrlSchema,
   name: z.string().min(1),
   token: z.string().min(1),
@@ -92,7 +92,7 @@ const settingsResponseSchema = z.object({
   user: userSchema,
 });
 
-const paginatedSettingsResponseSchema = createPaginatedResponseSchema(
+const _paginatedSettingsResponseSchema = createPaginatedResponseSchema(
   settingsResponseSchema,
 );
 
@@ -322,7 +322,7 @@ export const assetsRouter = createTRPCRouter({
       return prisma.$transaction(
         input.assets.map((asset) => {
           // TODO: VW-34 -- translate cpe into device group
-          const { cpe, ...dataInput } = input;
+          const { cpe, ...dataInput } = asset;
           return prisma.asset.create({
             data: {
               ...dataInput,

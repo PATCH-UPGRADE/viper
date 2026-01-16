@@ -4,9 +4,9 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useTRPC } from "@/trpc/client";
+import type { ResourceType } from "@/generated/prisma";
 import { usePaginationParams } from "@/lib/pagination";
-import type { Integration, ResourceType } from "@/generated/prisma";
+import { useTRPC } from "@/trpc/client";
 
 export const useSuspenseIntegrations = (resourceType: ResourceType) => {
   const trpc = useTRPC();

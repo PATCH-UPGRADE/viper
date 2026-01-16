@@ -31,7 +31,6 @@ export const deviceGroupSchema = z.object({
 });
 export type DeviceGroupIncludeType = z.infer<typeof deviceGroupSchema>;
 
-
 export const deviceGroupSelect = {
   select: {
     id: true,

@@ -1,4 +1,5 @@
 import { hashPassword } from "better-auth/crypto";
+import type { AssetStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
 // Seed user credentials
@@ -1108,7 +1109,7 @@ async function seedIssues() {
             },
           });
           issues.push(issue);
-        } catch (error) {
+        } catch (_error) {
           console.warn(
             `⚠️  Issue already exists for asset ${asset.id} and vulnerability ${vulnerability.id}`,
           );

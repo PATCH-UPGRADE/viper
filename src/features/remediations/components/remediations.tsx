@@ -28,12 +28,12 @@ import { Separator } from "@/components/ui/separator";
 import type { Remediation } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
+import type { DeviceGroupIncludeType } from "@/lib/schemas";
 import {
   useRemoveRemediation,
   useSuspenseRemediations,
 } from "../hooks/use-remediations";
 import { useRemediationsParams } from "../hooks/use-remediations-params";
-import { DeviceGroupIncludeType } from "@/lib/schemas";
 
 export const RemediationsSearch = () => {
   const [params, setParams] = useRemediationsParams();
@@ -122,11 +122,11 @@ export const RemediationsEmpty = () => {
 type RemediationWithRelations = Omit<Remediation, "deviceGroupId"> & {
   vulnerability: {
     id: string;
-    affectedDeviceGroups: DeviceGroupIncludeType[],
+    affectedDeviceGroups: DeviceGroupIncludeType[];
     description: string;
     impact: string;
   };
-  deviceGroup: DeviceGroupIncludeType,
+  deviceGroup: DeviceGroupIncludeType;
 };
 
 export const RemediationItem = ({
@@ -223,7 +223,9 @@ function RemediationDrawer({
               <div className="flex items-center gap-2 mb-2">
                 <AlertTriangleIcon className="size-4 text-destructive" />
                 <span className="font-medium text-sm">
-                  {remediation.vulnerability.affectedDeviceGroups.map((group) => group.cpe).join(", ")}
+                  {remediation.vulnerability.affectedDeviceGroups
+                    .map((group) => group.cpe)
+                    .join(", ")}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mb-2">

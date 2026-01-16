@@ -79,7 +79,7 @@ jobs:
           echo "$API_KEY_LINE" >> "$GITHUB_ENV"
 
       - name: Start API server
-        run: npm run start:dev &
+        run: npm run dev &
 
       - name: Wait for API
         run: npx wait-on http://localhost:3000/workflows

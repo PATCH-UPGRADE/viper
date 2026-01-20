@@ -97,6 +97,7 @@ export const syncIntegration = inngest.createFunction(
           headers[header] = value;
         }
 
+        // TODO: modify this for VW-36 / VW-53
         const response = await fetch(integration.integrationUri, {
           method: "GET",
           headers,

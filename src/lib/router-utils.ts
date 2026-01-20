@@ -4,12 +4,10 @@ export async function cpeToDeviceGroup(cpe: string) {
   // requires: cpe is properly formatted according to cpeSchema
   // outputs: the DeviceGroup model instance that `cpe` specifies (creates a new one if none exist)
   try {
-    console.log("HERE");
     return await prisma.deviceGroup.findUniqueOrThrow({
       where: { cpe },
     });
-  } catch (error) {
-    console.log("HEY", error);
+  } catch (_error) {
     // If not found, create a new device group
     // TODO: VW-38 create a cpe naming table here to standardize input
     // also populate Manufacturer, model name, version fields

@@ -384,6 +384,9 @@ model Integration {
   platform       String? // The name of the integration platform, e.g "BlueFlow"
   integrationUri String       @map("integration-uri")
   isGeneric      Boolean
+  // ^a generic integration uses AI to pull data
+  // if generic is false, the integration will respond to one of our endpoints
+  //  with structured data
   authType       AuthType
   resourceType   ResourceType
   authentication Json

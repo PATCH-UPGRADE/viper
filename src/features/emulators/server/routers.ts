@@ -6,6 +6,7 @@ import {
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
+import { cpeToDeviceGroup } from "@/lib/router-utils";
 import {
   cpeSchema,
   deviceGroupSchema,
@@ -21,6 +22,7 @@ import { requireOwnership } from "@/trpc/middleware";
 const emulatorInputSchema = z
   .object({
     role: z.string().min(1, "Role is required"),
+    cpe: cpeSchema,
     downloadUrl: safeUrlSchema.nullable().optional(),
     dockerUrl: safeUrlSchema.nullable().optional(),
     description: z.string().min(1, "Description is required"),
@@ -172,15 +174,15 @@ export const emulatorsRouter = createTRPCRouter({
       },
     })
     .output(emulatorResponseSchema)
-    .mutation(({ ctx, input }) => {
-      // TODO: VW-34 -- translate cpe into device group
+    .mutation(async ({ ctx, input }) => {
+      const deviceGroup = await cpeToDeviceGroup(input.cpe);
       return prisma.emulator.create({
         data: {
           role: input.role,
           downloadUrl: input.downloadUrl || null,
           dockerUrl: input.dockerUrl || null,
           description: input.description,
-          deviceGroupId: "TODO",
+          deviceGroupId: deviceGroup.id,
           userId: ctx.auth.user.id,
         },
         include: {
@@ -236,12 +238,12 @@ export const emulatorsRouter = createTRPCRouter({
       await requireOwnership(input.id, ctx.auth.user.id, "emulator");
 
       const { id, cpe, ...updateData } = input;
-      // TODO: VW-34 -- translate cpe into device group
+      const deviceGroup = await cpeToDeviceGroup(cpe);
       return prisma.emulator.update({
         where: { id },
         data: {
           role: updateData.role,
-          deviceGroupId: "TODO",
+          deviceGroupId: deviceGroup.id,
           downloadUrl: updateData.downloadUrl || null,
           dockerUrl: updateData.dockerUrl || null,
           description: updateData.description,

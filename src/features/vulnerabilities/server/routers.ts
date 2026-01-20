@@ -6,6 +6,7 @@ import {
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
+import { cpesToDeviceGroups } from "@/lib/router-utils";
 import {
   cpeSchema,
   deviceGroupSchema,
@@ -20,7 +21,7 @@ import { requireOwnership } from "@/trpc/middleware";
 // Validation schemas
 const vulnerabilityInputSchema = z.object({
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  cpe: cpeSchema,
+  cpes: z.array(cpeSchema),
   exploitUri: safeUrlSchema,
   upstreamApi: safeUrlSchema,
   description: z.string().min(1),
@@ -202,11 +203,15 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       },
     })
     .output(vulnerabilityResponseSchema)
-    .mutation(({ ctx, input }) => {
-      // TODO: VW-34 -- translate cpes into device groups
+    .mutation(async ({ ctx, input }) => {
+      const { cpes, ...dataInput } = input;
+      const deviceGroups = await cpesToDeviceGroups(cpes);
       return prisma.vulnerability.create({
         data: {
-          ...input,
+          ...dataInput,
+          affectedDeviceGroups: {
+            connect: deviceGroups.map((dg) => ({ id: dg.id })),
+          },
           userId: ctx.auth.user.id,
         },
         include: {
@@ -266,7 +271,6 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "vulnerability");
 
-      // TODO: VW-34 -- translate cpes into device groups
       return prisma.vulnerability.update({
         where: { id: input.id },
         data: input.data,

@@ -137,6 +137,9 @@ CREATE TABLE "_VulnerabilityDeviceGroups" (
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "device_group_cpe_key" ON "device_group"("cpe");
+
+-- CreateIndex
 CREATE INDEX "device_group_cpe_idx" ON "device_group"("cpe");
 
 -- CreateIndex

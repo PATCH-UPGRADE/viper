@@ -160,7 +160,7 @@ model Connection {
 
 model DeviceGroup {
   id                   String               @id @default(cuid())
-  cpe                  String
+  cpe                  String               @unique
   manufacturer         String?
   modelName            String?
   version              String?
@@ -170,8 +170,8 @@ model DeviceGroup {
   deviceGroupHistories DeviceGroupHistory[]
   assets               Asset[]
   vulnerbailities      Vulnerability[]      @relation("VulnerabilityDeviceGroups")
-  emulators             Emulator[]
-  remediations Remediation[]
+  emulators            Emulator[]
+  remediations         Remediation[]
 
   @@index([cpe])
   @@map("device_group")
@@ -326,13 +326,13 @@ model Issue {
 }
 
 model Remediation {
-  id          String @id @default(cuid())
-  fixUri      String @map("fix-uri")
+  id            String      @id @default(cuid())
+  fixUri        String      @map("fix-uri")
   deviceGroupId String
-  deviceGroup DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
-  description String @db.Text
-  narrative   String @db.Text
-  upstreamApi String @map("upstream-api")
+  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
+  description   String      @db.Text
+  narrative     String      @db.Text
+  upstreamApi   String      @map("upstream-api")
 
   vulnerabilityId String
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)

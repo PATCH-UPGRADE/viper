@@ -7,6 +7,7 @@ import {
   createPaginatedResponseWithLinksSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
+import { cpeToDeviceGroup } from "@/lib/router-utils";
 import {
   cpeSchema,
   deviceGroupSchema,
@@ -291,13 +292,13 @@ export const assetsRouter = createTRPCRouter({
       },
     })
     .output(assetResponseSchema)
-    .mutation(({ ctx, input }) => {
-      // TODO: VW-34 -- translate cpe into device group
+    .mutation(async ({ ctx, input }) => {
       const { cpe, ...dataInput } = input;
+      const deviceGroup = await cpeToDeviceGroup(cpe);
       return prisma.asset.create({
         data: {
           ...dataInput,
-          deviceGroupId: "TODO",
+          deviceGroupId: deviceGroup.id,
           userId: ctx.auth.user.id,
         },
         include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
@@ -318,15 +319,23 @@ export const assetsRouter = createTRPCRouter({
       },
     })
     .output(assetArrayResponseSchema)
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // resolve all device groups in parallel
+      const deviceGroupPromises = input.assets.map(async (asset) => {
+        const { cpe } = asset;
+        return await cpeToDeviceGroup(cpe);
+      });
+
+      const deviceGroups = await Promise.all(deviceGroupPromises);
+
+      // create all assets in a transaction
       return prisma.$transaction(
-        input.assets.map((asset) => {
-          // TODO: VW-34 -- translate cpe into device group
-          const { cpe, ...dataInput } = asset;
+        input.assets.map((asset, index) => {
+          const { cpe: _cpe, ...dataInput } = asset;
           return prisma.asset.create({
             data: {
               ...dataInput,
-              deviceGroupId: "TODO",
+              deviceGroupId: deviceGroups[index].id,
               userId: ctx.auth.user.id,
             },
             include: {
@@ -352,7 +361,7 @@ export const assetsRouter = createTRPCRouter({
       },
     })
     .output(integrationResponseSchema)
-    .mutation(({ ctx, input }) => {
+    .mutation(() => {
       return {};
     }),
 
@@ -406,11 +415,14 @@ export const assetsRouter = createTRPCRouter({
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "asset");
 
-      const { id, ...updateData } = input;
-      // TODO: VW-34 -- translate cpe into device group
+      const { id, cpe, ...updateData } = input;
+      const deviceGroup = await cpeToDeviceGroup(cpe);
       return prisma.asset.update({
         where: { id },
-        data: updateData,
+        data: {
+          deviceGroupId: deviceGroup.id,
+          ...updateData,
+        },
         include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
       });
     }),

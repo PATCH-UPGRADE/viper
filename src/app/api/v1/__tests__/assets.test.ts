@@ -115,14 +115,14 @@ describe("Assets Endpoint (/assets)", () => {
     const bodyFirst = res.body.at(0);
     expect(bodyFirst).toHaveProperty("id");
     expect(bodyFirst.ip).toBe(payload.ip);
-    expect(bodyFirst.cpe).toBe(payload.cpe);
+    expect(bodyFirst.deviceGroup.cpe).toBe(payload.cpe);
     expect(bodyFirst.role).toBe(payload.role);
     expect(bodyFirst.upstreamApi).toBe(payload.upstreamApi);
 
     const bodySecond = res.body.at(1);
     expect(bodySecond).toHaveProperty("id");
     expect(bodySecond.ip).toBe(payload2.ip);
-    expect(bodySecond.cpe).toBe(payload2.cpe);
+    expect(bodySecond.deviceGroup.cpe).toBe(payload2.cpe);
     expect(bodySecond.role).toBe(payload2.role);
     expect(bodySecond.upstreamApi).toBe(payload2.upstreamApi);
 
@@ -135,7 +135,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(firstDetailRes.status).toBe(200);
     expect(firstDetailRes.body.id).toBe(firstAssetId);
     expect(firstDetailRes.body.ip).toBe(payload.ip);
-    expect(firstDetailRes.body.cpe).toBe(payload.cpe);
+    expect(firstDetailRes.body.deviceGroup.cpe).toBe(payload.cpe);
     expect(firstDetailRes.body.role).toBe(payload.role);
     expect(firstDetailRes.body.upstreamApi).toBe(payload.upstreamApi);
 
@@ -148,7 +148,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(secondDetailRes.status).toBe(200);
     expect(secondDetailRes.body.id).toBe(secondAssetId);
     expect(secondDetailRes.body.ip).toBe(payload2.ip);
-    expect(secondDetailRes.body.cpe).toBe(payload2.cpe);
+    expect(secondDetailRes.body.deviceGroup.cpe).toBe(payload2.cpe);
     expect(secondDetailRes.body.role).toBe(payload2.role);
     expect(secondDetailRes.body.upstreamApi).toBe(payload2.upstreamApi);
 

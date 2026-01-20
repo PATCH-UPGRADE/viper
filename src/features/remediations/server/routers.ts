@@ -7,6 +7,7 @@ import {
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
+import { cpeToDeviceGroup } from "@/lib/router-utils";
 import {
   cpeSchema,
   deviceGroupSchema,
@@ -173,12 +174,12 @@ export const remediationsRouter = createTRPCRouter({
         });
       }
 
-      // TODO: VW-34 -- translate cpe into device group
       const { cpe, ...dataInput } = input;
+      const deviceGroup = await cpeToDeviceGroup(cpe);
       return prisma.remediation.create({
         data: {
           ...dataInput,
-          deviceGroupId: "TODO",
+          deviceGroupId: deviceGroup.id,
           userId: ctx.auth.user.id,
         },
         include: remediationInclude,

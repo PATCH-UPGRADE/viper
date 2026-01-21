@@ -1,7 +1,7 @@
 import { prefetch, trpc } from "@/trpc/server";
 import { inferInput } from "@trpc/tanstack-react-query";
 
-type Input = inferInput<typeof trpc.issues.getManyInternalByAssetId>;
+type Input = inferInput<typeof trpc.issues.getManyInternalByStatusAndAssetId>;
 
 /**
  * Prefetch a single issue
@@ -15,5 +15,5 @@ export const prefetchIssue = (id: string) => {
  * @returns Prefetched page of issues filtered by the assetId and status fields
  */
 export const prefetchIssuesByAssetId = (input: Input) => {
-  return prefetch(trpc.issues.getManyInternalByAssetId.queryOptions(input));
+  return prefetch(trpc.issues.getManyInternalByStatusAndAssetId.queryOptions(input));
 };

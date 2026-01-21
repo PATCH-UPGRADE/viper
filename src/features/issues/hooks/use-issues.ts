@@ -6,6 +6,7 @@ import {
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import { IssueStatus } from "@/generated/prisma";
+import { useAssetDetailParams } from "@/features/assets/hooks/use-asset-detail-params";
 
 /**
  * Hook to update an issue status
@@ -50,13 +51,24 @@ export const useSuspenseIssuesById = ({
 
 export const useSuspenseIssuesByAssetId = ({
   id,
-  status,
+  issueStatus,
 }: {
   id: string;
-  status: IssueStatus;
+  issueStatus: IssueStatus;
 }) => {
   const trpc = useTRPC();
+  const [params] = useAssetDetailParams();
+
+  let page = 1;
+  if (params.issueStatus === IssueStatus.PENDING.toString()) {
+    page = params.activeIssuePage;
+  } else if (params.issueStatus === IssueStatus.FALSE_POSITIVE.toString()) {
+    page = params.falsePosIssuePage;
+  } else if (params.issueStatus === IssueStatus.REMEDIATED.toString()) {
+    page = params.remediatedIssuePage;
+  }
+
   return useSuspenseQuery(
-    trpc.issues.getManyInternalByAssetId.queryOptions({ id, status }),
+    trpc.issues.getManyInternalByStatusAndAssetId.queryOptions({ ...params, id, issueStatus, page }),
   );
 };

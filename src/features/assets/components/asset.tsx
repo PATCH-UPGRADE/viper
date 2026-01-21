@@ -62,7 +62,7 @@ export const AssetError = () => {
   return <ErrorView message="Error loading asset" />;
 };
 
-interface VulnPageProps {
+interface VulnListProps {
   items: any[];
   page: number;
   totalPages: number;
@@ -76,7 +76,7 @@ const VulnList = ({
   totalPages,
   paramKey,
   onPageChange,
-}: VulnPageProps) => {
+}: VulnListProps) => {
   if (items == undefined || items.length == 0) {
     return <p className="flex justify-center pt-24">No Issues found</p>;
   }
@@ -180,25 +180,13 @@ const VulnList = ({
   );
 };
 
-export const AssetDetailPage = ({ id }: { id: string }) => {
+interface TabulatedVulnListProps {
+  id: string;
+};
+
+const TabulatedVulnList = ({ id }: TabulatedVulnListProps) => {
   const [params, setParams] = useAssetDetailParams();
   const [currentTab, setCurrentTab] = useState(params.issueStatus);
-
-  const assetResult = useSuspenseAsset(id);
-  const asset = assetResult.data;
-
-  const activeIssues = useSuspenseIssuesByAssetId({
-    id,
-    status: IssueStatus.PENDING,
-  });
-  const falsePositiveIssues = useSuspenseIssuesByAssetId({
-    id,
-    status: IssueStatus.FALSE_POSITIVE,
-  });
-  const remediatedIssues = useSuspenseIssuesByAssetId({
-    id,
-    status: IssueStatus.REMEDIATED,
-  });
 
   const handleUpdateTab = (issueStatus: string) => {
     setParams({ ...params, issueStatus });
@@ -216,6 +204,87 @@ export const AssetDetailPage = ({ id }: { id: string }) => {
 
     setParams({ ...params, [key]: newPageValue });
   };
+
+  const activeIssues = useSuspenseIssuesByAssetId({
+    id,
+    issueStatus: IssueStatus.PENDING,
+  });
+  const falsePositiveIssues = useSuspenseIssuesByAssetId({
+    id,
+    issueStatus: IssueStatus.FALSE_POSITIVE,
+  });
+  const remediatedIssues = useSuspenseIssuesByAssetId({
+    id,
+    issueStatus: IssueStatus.REMEDIATED,
+  });
+
+  return (
+    <>
+      {activeIssues.data.totalCount > 0 ||
+        falsePositiveIssues.data.totalCount > 0 ||
+        remediatedIssues.data.totalCount > 0 ? (
+        <Tabs
+          value={currentTab}
+          onValueChange={(v) => handleUpdateTab(v)}
+        >
+          <TabsList>
+            <TabsTrigger className="font-bold text-base" value="PENDING">
+              Active ({activeIssues.data.totalCount})
+            </TabsTrigger>
+            <TabsTrigger
+              className="font-bold text-base"
+              value="FALSE_POSITIVE"
+            >
+              False Positive ({falsePositiveIssues.data.totalCount})
+            </TabsTrigger>
+            <TabsTrigger
+              className="font-bold text-base"
+              value="REMEDIATED"
+            >
+              Remediated ({remediatedIssues.data.totalCount})
+            </TabsTrigger>
+          </TabsList>
+        
+          <TabsContent value="PENDING">
+            <VulnList
+              items={activeIssues.data.items}
+              page={params.activeIssuePage}
+              totalPages={activeIssues.data.totalPages}
+              paramKey={"activeIssuePage"}
+              onPageChange={handlePageChange}
+            />
+          </TabsContent>
+
+          <TabsContent value="FALSE_POSITIVE">
+            <VulnList
+              items={falsePositiveIssues.data.items}
+              page={params.falsePosIssuePage}
+              totalPages={falsePositiveIssues.data.totalPages}
+              paramKey={"falsePosIssuePage"}
+              onPageChange={handlePageChange}
+            />
+          </TabsContent>
+
+          <TabsContent value="REMEDIATED">
+            <VulnList
+              items={remediatedIssues.data.items}
+              page={params.remediatedIssuePage}
+              totalPages={remediatedIssues.data.totalPages}
+              paramKey={"remediatedIssuePage"}
+              onPageChange={handlePageChange}
+            />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <p className="flex justify-center pt-24">No Active Issues</p>
+      )}
+    </>
+  );
+}
+
+export const AssetDetailPage = ({ id }: { id: string }) => {
+  const assetResult = useSuspenseAsset(id);
+  const asset = assetResult.data;
 
   return (
     <>
@@ -354,65 +423,7 @@ export const AssetDetailPage = ({ id }: { id: string }) => {
             <h2 className="text-xl font-semibold tracking-tight pb-2">
               Issues
             </h2>
-
-            {activeIssues.data.totalCount > 0 ||
-            falsePositiveIssues.data.totalCount > 0 ||
-            remediatedIssues.data.totalCount > 0 ? (
-              <Tabs
-                value={currentTab}
-                onValueChange={(v) => handleUpdateTab(v)}
-              >
-                <TabsList>
-                  <TabsTrigger className="font-bold text-base" value="PENDING">
-                    Active ({activeIssues.data.totalCount})
-                  </TabsTrigger>
-                  <TabsTrigger
-                    className="font-bold text-base"
-                    value="FALSE_POSITIVE"
-                  >
-                    False Positive ({falsePositiveIssues.data.totalCount})
-                  </TabsTrigger>
-                  <TabsTrigger
-                    className="font-bold text-base"
-                    value="REMEDIATED"
-                  >
-                    Remediated ({remediatedIssues.data.totalCount})
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="PENDING">
-                  <VulnList
-                    items={activeIssues.data.items}
-                    page={params.activeIssuePage}
-                    totalPages={activeIssues.data.totalPages}
-                    paramKey={"activeIssuePage"}
-                    onPageChange={handlePageChange}
-                  />
-                </TabsContent>
-
-                <TabsContent value="FALSE_POSITIVE">
-                  <VulnList
-                    items={falsePositiveIssues.data.items}
-                    page={params.falsePosIssuePage}
-                    totalPages={falsePositiveIssues.data.totalPages}
-                    paramKey={"falsePosIssuePage"}
-                    onPageChange={handlePageChange}
-                  />
-                </TabsContent>
-
-                <TabsContent value="REMEDIATED">
-                  <VulnList
-                    items={remediatedIssues.data.items}
-                    page={params.remediatedIssuePage}
-                    totalPages={remediatedIssues.data.totalPages}
-                    paramKey={"remediatedIssuePage"}
-                    onPageChange={handlePageChange}
-                  />
-                </TabsContent>
-              </Tabs>
-            ) : (
-              <p className="flex justify-center pt-24">No Active Issues</p>
-            )}
+            <TabulatedVulnList id={id} />
           </div>
         </div>
       </div>

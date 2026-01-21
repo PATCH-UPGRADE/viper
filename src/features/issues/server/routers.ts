@@ -10,7 +10,7 @@ import {
 
 const issuePaginationInput = paginationInputSchema.extend({
   id: z.string(),
-  status: z.string(),
+  issueStatus: z.string(),
 });
 
 export const issuesRouter = createTRPCRouter({
@@ -53,15 +53,13 @@ export const issuesRouter = createTRPCRouter({
       });
     }),
 
-  getManyInternalByAssetId: protectedProcedure
+  getManyInternalByStatusAndAssetId: protectedProcedure
     .input(issuePaginationInput)
     .query(async ({ input }) => {
-      const { id, status } = input;
-      const statusEnum = IssueStatus[status as keyof typeof IssueStatus];
-
+      const { id, issueStatus } = input;
       const where = {
         assetId: id,
-        status: statusEnum,
+        status: IssueStatus[issueStatus as keyof typeof IssueStatus],
       };
 
       // Get total count and build pagination metadata

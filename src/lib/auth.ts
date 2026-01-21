@@ -12,15 +12,18 @@ export const DOMAIN_WHITELIST = [
   "medcrypt.co",
   "medcrypt.com",
   "virtalabs.com",
-].map(domain => domain.toLowerCase());
+].map((domain) => domain.toLowerCase());
 
 export const validateDomain = (email: string) => {
   if (process.env.VERCEL_ENV !== "production") return; // Validation is unnecessary for dev environments
   const domain = email.toLowerCase().split("@")[1];
   if (!DOMAIN_WHITELIST.includes(domain)) {
-    throw new APIError("FORBIDDEN", { message: "Your Google domain has not been authorized to access Viper. Please contact the PATCH team for assistance." });
+    throw new APIError("FORBIDDEN", {
+      message:
+        "Your Google domain has not been authorized to access Viper. Please contact the PATCH team for assistance.",
+    });
   }
-}
+};
 
 export const options: BetterAuthOptions = {
   databaseHooks: {
@@ -28,24 +31,24 @@ export const options: BetterAuthOptions = {
       create: {
         before: async (user) => {
           validateDomain(user.email);
-        }
-      }
+        },
+      },
     },
     session: {
       create: {
         before: async (session) => {
           const user = await prisma.user.findUnique({
-            where: { id: session.userId }
+            where: { id: session.userId },
           });
           if (user) {
             validateDomain(user.email);
           }
-          return { data: session }
-        }
-      }
-    }
-  }
-}
+          return { data: session };
+        },
+      },
+    },
+  },
+};
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -55,10 +58,7 @@ export const auth = betterAuth({
     enabled: process.env.VERCEL_ENV === "development",
     autoSignIn: process.env.VERCEL_ENV === "development",
   },
-  plugins: [
-    apiKey(),
-
-  ],
+  plugins: [apiKey()],
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_OAUTH_CLIENT_ID as string,

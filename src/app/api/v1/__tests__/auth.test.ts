@@ -14,16 +14,12 @@ describe("validateDomain", () => {
   });
 
   it("Reject unapproved domains in production", () => {
-    expect(() =>
-      validateDomain("fake_person@baddomain.com")
-    ).toThrow(APIError);
+    expect(() => validateDomain("fake_person@baddomain.com")).toThrow(APIError);
   });
 
   it("Do nothing in non-production environments", () => {
     process.env.VERCEL_ENV = "development";
 
-    expect(() =>
-      validateDomain("fake_person@baddomain.com")
-    ).not.toThrow();
+    expect(() => validateDomain("fake_person@baddomain.com")).not.toThrow();
   });
 });

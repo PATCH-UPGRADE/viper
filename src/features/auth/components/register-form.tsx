@@ -73,6 +73,9 @@ export function RegisterForm() {
 
   const isPending = form.formState.isSubmitting;
 
+  // Check if dev environment for email/password option
+  const showEmailPassword = process.env.NEXT_PUBLIC_TESTING === "True";
+
   return (
     <div className="flex flex-col gap-6">
       <Card>
@@ -90,21 +93,6 @@ export function RegisterForm() {
                     className="w-full"
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleSocialLogin("github")}
-                  >
-                    <Image
-                      alt="GitHub"
-                      src="/logos/github.svg"
-                      width={20}
-                      height={20}
-                    />
-                    Continue with GitHub
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    type="button"
-                    disabled={isPending}
                     onClick={() => handleSocialLogin("google")}
                   >
                     <Image
@@ -116,6 +104,10 @@ export function RegisterForm() {
                     Continue with Google
                   </Button>
                 </div>
+
+                {/* Email/password form only in development */}
+                {showEmailPassword && (
+                <>
                 <div className="grid gap-6">
                   <FormField
                     control={form.control}
@@ -178,6 +170,9 @@ export function RegisterForm() {
                     Login
                   </Link>
                 </div>
+                </>
+                )}
+
               </div>
             </form>
           </Form>

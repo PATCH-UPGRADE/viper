@@ -25,12 +25,16 @@ export const validateDomain = (email: string) => {
   }
 };
 
-export const options: BetterAuthOptions = {
+export const auth = betterAuth({
+  database: prismaAdapter(prisma, {
+    provider: "postgresql",
+  }),
   databaseHooks: {
     user: {
       create: {
         before: async (user) => {
           validateDomain(user.email);
+          return { data: user };
         },
       },
     },
@@ -48,12 +52,6 @@ export const options: BetterAuthOptions = {
       },
     },
   },
-};
-
-export const auth = betterAuth({
-  database: prismaAdapter(prisma, {
-    provider: "postgresql",
-  }),
   emailAndPassword: {
     enabled: process.env.NEXT_PUBLIC_TESTING === "True",
     autoSignIn: process.env.NEXT_PUBLIC_TESTING === "True",

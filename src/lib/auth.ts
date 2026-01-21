@@ -55,8 +55,8 @@ export const auth = betterAuth({
     provider: "postgresql",
   }),
   emailAndPassword: {
-    enabled: process.env.VERCEL_ENV === "development",
-    autoSignIn: process.env.VERCEL_ENV === "development",
+    enabled: process.env.NEXT_PUBLIC_TESTING === "True",
+    autoSignIn: process.env.NEXT_PUBLIC_TESTING === "True",
   },
   plugins: [apiKey()],
   socialProviders: {

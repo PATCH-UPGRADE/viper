@@ -2,7 +2,11 @@ import { z } from "zod";
 import { IssueStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { buildPaginationMeta, createPaginatedResponse, paginationInputSchema } from "@/lib/pagination";
+import {
+  buildPaginationMeta,
+  createPaginatedResponse,
+  paginationInputSchema,
+} from "@/lib/pagination";
 
 const issuePaginationInput = paginationInputSchema.extend({
   id: z.string(),

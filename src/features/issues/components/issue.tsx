@@ -1,6 +1,11 @@
 "use client";
 
-import { BugIcon, ChevronDown, ComputerIcon, MoreVertical } from "lucide-react";
+import {
+  BugIcon,
+  ChevronDown,
+  ComputerIcon,
+  MoreVertical,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -136,6 +141,8 @@ export const IssueDetailPage = ({ id }: { id: string }) => {
   );
 };
 
+const ACTIVE_ISSUES_SHOWN_MAX = 5;
+
 export const IssuesSidebarList = ({
   issues,
   type,
@@ -158,6 +165,20 @@ export const IssuesSidebarList = ({
 
   if (issues.length === 0) return null;
 
+  const assetId = issues[0].assetId;
+
+  const isIssuesOverflow = issues.length > ACTIVE_ISSUES_SHOWN_MAX;
+  const visibleIssues = issues.slice(
+    0,
+    isIssuesOverflow ? ACTIVE_ISSUES_SHOWN_MAX : issues.length,
+  );
+  const remediatedIssuesCount = issues.filter(
+    (i) => i.status === IssueStatus.REMEDIATED,
+  ).length;
+  const falsePositiveIssuesCount = issues.filter(
+    (i) => i.status === IssueStatus.FALSE_POSITIVE,
+  ).length;
+
   const Icon = type === "vulnerabilities" ? BugIcon : ComputerIcon;
 
   return (
@@ -166,7 +187,7 @@ export const IssuesSidebarList = ({
         Active Issues
       </h4>
       <ul className="flex flex-col gap-2">
-        {issues.map((issue) => (
+        {visibleIssues.map((issue) => (
           <li
             key={issue.id}
             className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer hover:bg-muted transition-all"
@@ -238,9 +259,7 @@ export const IssuesSidebarList = ({
                     className="cursor-pointer"
                     asChild
                   >
-                    <Link href={`/assets/${issue.assetId}`}>
-                      Go to Asset Details
-                    </Link>
+                    <Link href={`/assets/${assetId}`}>Go to Asset Details</Link>
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -248,6 +267,56 @@ export const IssuesSidebarList = ({
           </li>
         ))}
       </ul>
+
+      {isIssuesOverflow && (
+        <>
+          <div className="flex flex-col gap-2 pt-2">
+            <div className="flex justify-between">
+              <p>
+                Viewing {ACTIVE_ISSUES_SHOWN_MAX} of {issues.length} Active
+                Issues
+              </p>
+              <Link
+                className="text-primary hover:underline"
+                target="_blank"
+                href={`/assets/${assetId}`}
+              >
+                View All Active Issues
+              </Link>
+            </div>
+          </div>
+        </>
+      )}
+
+      {remediatedIssuesCount < 0 ||
+        (falsePositiveIssuesCount > 0 && (
+          <>
+            <div className="flex flex-col gap-2 pt-2">
+              <h5 className="font-bold">Non-Active Issues</h5>
+
+              {remediatedIssuesCount && (
+                <Link
+                  className="text-primary hover:underline"
+                  target="_blank"
+                  href={`/assets/${assetId}?issueStatus=${IssueStatus.REMEDIATED.toString()}`}
+                >
+                  View {remediatedIssuesCount} Remediated Issue
+                  {remediatedIssuesCount > 1 ? "s" : ""}
+                </Link>
+              )}
+              {falsePositiveIssuesCount && (
+                <Link
+                  className="text-primary hover:underline"
+                  target="_blank"
+                  href={`/assets/${assetId}?issueStatus=${IssueStatus.FALSE_POSITIVE.toString()}`}
+                >
+                  View {falsePositiveIssuesCount} False Positive Issue
+                  {falsePositiveIssuesCount > 1 ? "s" : ""}
+                </Link>
+              )}
+            </div>
+          </>
+        ))}
     </>
   );
 };

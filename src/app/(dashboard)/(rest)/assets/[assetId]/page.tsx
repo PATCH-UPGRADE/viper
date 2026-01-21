@@ -1,4 +1,9 @@
-import { AssetContainer, AssetDetailPage, AssetError, AssetLoading } from "@/features/assets/components/asset";
+import {
+  AssetContainer,
+  AssetDetailPage,
+  AssetError,
+  AssetLoading,
+} from "@/features/assets/components/asset";
 import { assetDetailParams } from "@/features/assets/params";
 import { prefetchAsset } from "@/features/assets/server/prefetch";
 import { prefetchIssuesByAssetId } from "@/features/issues/server/prefetch";
@@ -20,7 +25,9 @@ const Page = async ({ params }: PageProps) => {
   const { assetId } = await params;
 
   prefetchAsset(assetId);
-  prefetchIssuesByAssetId({ id: assetId, status: 'PENDING'});
+  prefetchIssuesByAssetId({ id: assetId, status: "PENDING" });
+  prefetchIssuesByAssetId({ id: assetId, status: "FALSE_POSITIVE" });
+  prefetchIssuesByAssetId({ id: assetId, status: "REMEDIATED" });
 
   return (
     <AssetContainer>
@@ -32,7 +39,7 @@ const Page = async ({ params }: PageProps) => {
         </ErrorBoundary>
       </HydrateClient>
     </AssetContainer>
-  )
+  );
 };
 
 export default Page;

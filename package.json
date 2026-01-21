@@ -12,7 +12,6 @@
     "dev:all": "mprocs",
     "db:seed": "prisma db seed",
     "openapi:generate": "tsx scripts/generate-openapi.ts",
-    "db:create-issues": "tsx scripts/create-issues.ts",
     "postinstall": "prisma generate",
     "test": "vitest"
   },

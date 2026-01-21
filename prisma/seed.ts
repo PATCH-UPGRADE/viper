@@ -796,7 +796,7 @@ async function seedIssues() {
           create: record,
           update: {}, // No updates needed, just prevent duplicates
         });
-      })
+      }),
     );
 
     const successfulIssues = issues.filter((r) => r !== null);

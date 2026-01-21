@@ -48,7 +48,15 @@ export const useSuspenseIssuesById = ({
   return useSuspenseQuery(trpc.issues.getManyByIds.queryOptions({ ids, type }));
 };
 
-export const useSuspenseIssuesByAssetId = ({ id, status }: { id: string, status: IssueStatus }) => {
+export const useSuspenseIssuesByAssetId = ({
+  id,
+  status,
+}: {
+  id: string;
+  status: IssueStatus;
+}) => {
   const trpc = useTRPC();
-  return useSuspenseQuery(trpc.issues.getManyInternalByAssetId.queryOptions({ id, status }))
+  return useSuspenseQuery(
+    trpc.issues.getManyInternalByAssetId.queryOptions({ id, status }),
+  );
 };

@@ -133,11 +133,11 @@ export const syncIntegration = inngest.createFunction(
 
       // Delete old statuses keeping only the 5 most recent
       await prisma.$executeRaw`
-    DELETE FROM "SyncStatus"
+    DELETE FROM "sync_status"
     WHERE "integrationId" = ${integration.id}
     AND "id" NOT IN (
       SELECT "id"
-      FROM "SyncStatus"
+      FROM "sync_status"
       WHERE "integrationId" = ${integration.id}
       ORDER BY "syncedAt" DESC
       LIMIT 5

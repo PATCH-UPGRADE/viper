@@ -214,7 +214,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .output(vulnerabilityResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const { cpes, ...dataInput } = input;
-      const deviceGroups = await cpesToDeviceGroups(cpes);
+      const uniqueCpes = [...new Set(cpes)];
+      const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
       return prisma.vulnerability.create({
         data: {
           ...dataInput,

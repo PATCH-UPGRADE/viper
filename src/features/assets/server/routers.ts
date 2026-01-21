@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import {
@@ -43,6 +44,9 @@ const assetInputSchema = z.object({
 
 const integrationAssetSchema = assetInputSchema.extend({
   vendorId: z.string(),
+});
+const updateAssetSchema = assetInputSchema.extend({
+  id: z.string(),
 });
 const integrationResponseSchema = z.object({});
 
@@ -376,7 +380,10 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(integrationResponseSchema)
     .mutation(() => {
-      return {};
+      throw new TRPCError({
+        code: "NOT_IMPLEMENTED",
+        message: "This endpoint is not implemented yet.",
+      });
     }),
 
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)
@@ -405,15 +412,7 @@ export const assetsRouter = createTRPCRouter({
 
   // PUT /api/assets/{asset_id} - Update asset (only creator can update)
   update: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        ip: z.string().min(1),
-        cpe: cpeSchema,
-        role: z.string().min(1),
-        upstreamApi: safeUrlSchema,
-      }),
-    )
+    .input(updateAssetSchema)
     .meta({
       openapi: {
         method: "PUT",

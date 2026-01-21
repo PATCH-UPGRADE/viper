@@ -3,7 +3,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type PropsWithChildren, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
-import { toast } from "sonner";
 import {
   EmptyView,
   EntityContainer,
@@ -86,7 +85,6 @@ const IntegrationCreateModal = ({
 }) => {
   const onSubmit = (values: IntegrationFormValues) => {
     handleCreate(values);
-    setOpen(false);
   };
 
   const isPending = form.formState.isSubmitting;

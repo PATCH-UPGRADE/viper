@@ -57,18 +57,18 @@ const assetArrayInputSchema = z.object({
   assets: z.array(assetInputSchema).nonempty(),
 });
 
-const _assetSettingsInputSchema = z.object({
-  url: safeUrlSchema,
-  name: z.string().min(1),
-  token: z.string().min(1),
-});
-
 const assetResponseSchema = z.object({
   id: z.string(),
   ip: z.string(),
   deviceGroup: deviceGroupSchema,
   role: z.string(),
   upstreamApi: z.string(),
+  networkSegment: z.string().nullable(),
+  hostname: z.string().nullable(),
+  macAddress: z.string().nullable(),
+  serialNumber: z.string().nullable(),
+  location: z.unknown().nullable(),
+  status: AssetStatus.nullable(),
   userId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),

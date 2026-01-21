@@ -264,9 +264,14 @@ export const remediationsRouter = createTRPCRouter({
         }
       }
 
+      const { cpe, ...updateData } = input.data;
+      const deviceGroup = await cpeToDeviceGroup(cpe);
       return prisma.remediation.update({
         where: { id: input.id },
-        data: input.data,
+        data: {
+          ...updateData,
+          deviceGroupId: deviceGroup.id,
+        },
         include: remediationInclude,
       });
     }),

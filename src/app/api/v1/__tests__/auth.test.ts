@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { DOMAIN_WHITELIST, validateDomain } from "@/lib/auth";
 import { APIError } from "better-auth";
+import { beforeEach, describe, expect, it } from "vitest";
+import { DOMAIN_WHITELIST, validateDomain } from "@/lib/auth";
 
 describe("validateDomain", () => {
   beforeEach(() => {

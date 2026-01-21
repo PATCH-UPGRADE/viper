@@ -26,12 +26,12 @@ model User {
   accounts        Account[]
   workflows       Workflow[]
   assets          Asset[]
-  assetSettings   AssetSettings[]
   vulnerabilities Vulnerability[]
   remediations    Remediation[]
   emulators       Emulator[]
 
-  apikeys Apikey[]
+  apikeys     Apikey[]
+  Integration Integration[]
 
   @@unique([email])
   @@map("user")
@@ -158,38 +158,96 @@ model Connection {
   @@unique([fromNodeId, toNodeId, fromOutput, toInput])
 }
 
+model DeviceGroup {
+  id                   String               @id @default(cuid())
+  cpe                  String               @unique
+  manufacturer         String?
+  modelName            String?
+  version              String?
+  helmSbomId           String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  deviceGroupHistories DeviceGroupHistory[]
+  assets               Asset[]
+  vulnerabilities      Vulnerability[]      @relation("VulnerabilityDeviceGroups")
+  emulators            Emulator[]
+  remediations         Remediation[]
+
+  @@index([cpe])
+  @@map("device_group")
+}
+
+model DeviceGroupHistory {
+  id            String      @id @default(cuid())
+  deviceGroupId String
+  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
+
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@map("device_group_history")
+}
+
+enum AssetStatus {
+  Active
+  Decommissioned
+  Maintenance
+}
+
 model Asset {
-  id          String @id @default(cuid())
-  ip          String
-  cpe         String
-  role        String
-  upstreamApi String @map("upstream-api")
+  id             String  @id @default(cuid())
+  ip             String
+  networkSegment String?
+  role           String
+  upstreamApi    String  @map("upstream-api")
+
+  hostname     String?
+  macAddress   String?
+  serialNumber String?
+  location     Json? // { facility, building, floor, room }
+  status       AssetStatus?
+
+  deviceGroupId String
+  // TODO: is Cascade the correct behavior for this?
+  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  emulators Emulator[]
-  issues     Issue[]
+  issues               Issue[]
+  deviceGroupHistories DeviceGroupHistory[]
+  externalMappings     ExternalAssetMapping[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  lastSynced DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
+  @@index([deviceGroupId])
   @@map("asset")
 }
 
-model AssetSettings {
-  id    String @id @default(cuid())
-  url   String
-  name  String
-  token String
+// External mapping table - links assets to their external IDs across integrations
+model ExternalAssetMapping {
+  id            String @id @default(cuid())
+  assetId       String
+  integrationId String
+  externalId    String // the id the asset has on say, Blueflow
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Relationships
+  asset       Asset       @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("asset_settings")
+  // Composite unique constraint: one external ID per integration per asset
+  @@unique([assetId, integrationId])
+  // Critical index for fast lookups: "find asset by integration's external ID"
+  @@unique([integrationId, externalId])
+  @@index([assetId])
+  @@map("external_asset_mappings")
 }
 
 model Emulator {
@@ -198,41 +256,47 @@ model Emulator {
   downloadUrl String? @map("download-url")
   dockerUrl   String? @map("docker-url")
   description String  @db.Text
+  helmSbomId  String?
 
-  assetId String
-  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  deviceGroupId String
+  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // TODO: VW-48, add versioning to emulators
 
-  @@index([assetId])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  Vulnerability Vulnerability[]
+
+  @@index([deviceGroupId])
   @@index([userId])
   @@map("emulator")
 }
 
 model Vulnerability {
-  id          String @id @default(cuid())
-  sarif       Json
-  cpe         String
-  exploitUri  String @map("exploit-uri")
-  upstreamApi String @map("upstream-api")
-  description String @db.Text
-  narrative   String @db.Text
-  impact      String @db.Text
+  id                   String        @id @default(cuid())
+  sarif                Json
+  affectedDeviceGroups DeviceGroup[] @relation("VulnerabilityDeviceGroups")
+  exploitUri           String        @map("exploit-uri")
+  upstreamApi          String        @map("upstream-api")
+  description          String        @db.Text
+  narrative            String        @db.Text
+  impact               String        @db.Text
+
+  emulatorId String?
+  emulator   Emulator? @relation(fields: [emulatorId], references: [id], onDelete: SetNull)
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   remediations Remediation[]
-  issues     Issue[]
+  issues       Issue[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([cpe])
   @@index([userId])
   @@map("vulnerability")
 }
@@ -262,12 +326,13 @@ model Issue {
 }
 
 model Remediation {
-  id          String @id @default(cuid())
-  fixUri      String @map("fix-uri")
-  cpe         String
-  description String @db.Text
-  narrative   String @db.Text
-  upstreamApi String @map("upstream-api")
+  id            String      @id @default(cuid())
+  fixUri        String      @map("fix-uri")
+  deviceGroupId String
+  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
+  description   String      @db.Text
+  narrative     String      @db.Text
+  upstreamApi   String      @map("upstream-api")
 
   vulnerabilityId String
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
@@ -278,7 +343,7 @@ model Remediation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([cpe])
+  @@index([deviceGroupId])
   @@index([vulnerabilityId])
   @@index([userId])
   @@map("remediation")
@@ -308,5 +373,60 @@ model Apikey {
   permissions         String?
   metadata            String?
 
+  integration Integration?
+
   @@map("apikey")
+}
+
+model Integration {
+  id             String       @id @default(cuid())
+  name           String
+  platform       String? // The name of the integration platform, e.g "BlueFlow"
+  integrationUri String       @map("integration-uri")
+  isGeneric      Boolean
+  // ^a generic integration uses AI to pull data
+  // if generic is false, the integration will respond to one of our endpoints
+  //  with structured data
+  authType       AuthType
+  resourceType   ResourceType
+  authentication Json // TODO: this needs to be encrypted
+  syncEvery      Int // e.g 300, sync every 300 seconds
+  //syncSchedule     String? // e.g 0 12 * * *, sync every day at noon (cron)
+  syncStatus     SyncStatus[]
+  apiKeyId       String?      @unique
+  apiKey         Apikey?      @relation(fields: [apiKeyId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assetMappings ExternalAssetMapping[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("integration")
+}
+
+model SyncStatus {
+  id            String      @id @default(cuid())
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  integrationId String
+  error         Boolean     @default(false) // Indicates if there was an error during sync
+  errorMessage  String?
+  syncedAt      DateTime    @default(now())
+  @@map("sync_status")
+}
+
+enum AuthType {
+  Basic
+  Bearer
+  Header
+}
+
+enum ResourceType {
+  Asset
+  Vulnerability
+  Emulator
+  Remediation
 }

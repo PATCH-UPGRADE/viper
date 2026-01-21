@@ -6,7 +6,15 @@ import {
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { safeUrlSchema, userIncludeSelect, userSchema } from "@/lib/schemas";
+import { cpeToDeviceGroup } from "@/lib/router-utils";
+import {
+  cpeSchema,
+  deviceGroupSchema,
+  deviceGroupSelect,
+  safeUrlSchema,
+  userIncludeSelect,
+  userSchema,
+} from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
 
@@ -14,10 +22,10 @@ import { requireOwnership } from "@/trpc/middleware";
 const emulatorInputSchema = z
   .object({
     role: z.string().min(1, "Role is required"),
+    cpe: cpeSchema,
     downloadUrl: safeUrlSchema.nullable().optional(),
     dockerUrl: safeUrlSchema.nullable().optional(),
     description: z.string().min(1, "Description is required"),
-    assetId: z.string().min(1, "Asset ID is required"),
   })
   .refine(
     (data) => {
@@ -39,7 +47,7 @@ const emulatorUpdateSchema = z
     downloadUrl: safeUrlSchema.nullable().optional(),
     dockerUrl: safeUrlSchema.nullable().optional(),
     description: z.string().min(1, "Description is required"),
-    assetId: z.string().min(1, "Asset ID is required"),
+    cpe: cpeSchema,
   })
   .refine(
     (data) => {
@@ -60,18 +68,14 @@ const emulatorResponseSchema = z.object({
   downloadUrl: z.string().nullable(),
   dockerUrl: z.string().nullable(),
   description: z.string(),
-  assetId: z.string(),
   userId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),
   user: userSchema,
-  asset: z.object({
-    id: z.string(),
-    ip: z.string(),
-    cpe: z.string(),
-    role: z.string(),
-    upstreamApi: z.string(),
-  }),
+  deviceGroup: deviceGroupSchema,
+  helmSbomId: z.string().nullable(),
+  // TODO:: ^later, do not use helmSbomId externally (need internal API)
+  // i.e, do not put this in an external API that other TA performers might see
 });
 
 const paginatedEmulatorResponseSchema = createPaginatedResponseSchema(
@@ -123,15 +127,7 @@ export const emulatorsRouter = createTRPCRouter({
         where: searchFilter,
         include: {
           user: userIncludeSelect,
-          asset: {
-            select: {
-              id: true,
-              ip: true,
-              cpe: true,
-              role: true,
-              upstreamApi: true,
-            },
-          },
+          deviceGroup: deviceGroupSelect,
         },
         orderBy: { createdAt: "desc" },
       });
@@ -158,15 +154,7 @@ export const emulatorsRouter = createTRPCRouter({
         where: { id: input.id },
         include: {
           user: userIncludeSelect,
-          asset: {
-            select: {
-              id: true,
-              ip: true,
-              cpe: true,
-              role: true,
-              upstreamApi: true,
-            },
-          },
+          deviceGroup: deviceGroupSelect,
         },
       });
     }),
@@ -185,27 +173,20 @@ export const emulatorsRouter = createTRPCRouter({
       },
     })
     .output(emulatorResponseSchema)
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const deviceGroup = await cpeToDeviceGroup(input.cpe);
       return prisma.emulator.create({
         data: {
           role: input.role,
           downloadUrl: input.downloadUrl || null,
           dockerUrl: input.dockerUrl || null,
           description: input.description,
-          assetId: input.assetId,
+          deviceGroupId: deviceGroup.id,
           userId: ctx.auth.user.id,
         },
         include: {
           user: userIncludeSelect,
-          asset: {
-            select: {
-              id: true,
-              ip: true,
-              cpe: true,
-              role: true,
-              upstreamApi: true,
-            },
-          },
+          deviceGroup: deviceGroupSelect,
         },
       });
     }),
@@ -232,15 +213,7 @@ export const emulatorsRouter = createTRPCRouter({
         where: { id: input.id },
         include: {
           user: userIncludeSelect,
-          asset: {
-            select: {
-              id: true,
-              ip: true,
-              cpe: true,
-              role: true,
-              upstreamApi: true,
-            },
-          },
+          deviceGroup: deviceGroupSelect,
         },
       });
     }),
@@ -263,27 +236,20 @@ export const emulatorsRouter = createTRPCRouter({
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "emulator");
 
-      const { id, ...updateData } = input;
+      const { id, cpe, ...updateData } = input;
+      const deviceGroup = await cpeToDeviceGroup(cpe);
       return prisma.emulator.update({
         where: { id },
         data: {
           role: updateData.role,
+          deviceGroupId: deviceGroup.id,
           downloadUrl: updateData.downloadUrl || null,
           dockerUrl: updateData.dockerUrl || null,
           description: updateData.description,
-          assetId: updateData.assetId,
         },
         include: {
           user: userIncludeSelect,
-          asset: {
-            select: {
-              id: true,
-              ip: true,
-              cpe: true,
-              role: true,
-              upstreamApi: true,
-            },
-          },
+          deviceGroup: deviceGroupSelect,
         },
       });
     }),

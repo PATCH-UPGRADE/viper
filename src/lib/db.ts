@@ -6,11 +6,49 @@ const getPrisma = createServerSingleton("prisma", () => new PrismaClient());
 export default getPrisma();
 
 export type AssetWithIssues = Prisma.AssetGetPayload<{
-  include: { issues: true };
+  include: {
+    issues: true;
+    deviceGroup: {
+      select: {
+        id: true;
+        cpe: true;
+      };
+    };
+  };
+}>;
+
+export type AssetWithDeviceGroup = Prisma.AssetGetPayload<{
+  include: {
+    deviceGroup: {
+      select: {
+        id: true;
+        cpe: true;
+      };
+    };
+  };
 }>;
 
 export type VulnerabilityWithIssues = Prisma.VulnerabilityGetPayload<{
-  include: { issues: true };
+  include: {
+    issues: true;
+    affectedDeviceGroups: {
+      select: {
+        id: true;
+        cpe: true;
+      };
+    };
+  };
+}>;
+
+export type VulnerabilityWithDeviceGroups = Prisma.VulnerabilityGetPayload<{
+  include: {
+    affectedDeviceGroups: {
+      select: {
+        id: true;
+        cpe: true;
+      };
+    };
+  };
 }>;
 
 export type FullIssue = Prisma.IssueGetPayload<{

@@ -1,6 +1,8 @@
+import "server-only";
 import { z } from "zod";
 import { IssueStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { deviceGroupSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 export const issuesRouter = createTRPCRouter({
@@ -9,7 +11,18 @@ export const issuesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       return prisma.issue.findUniqueOrThrow({
         where: { id: input.id },
-        include: { asset: true, vulnerability: true },
+        include: {
+          asset: {
+            include: {
+              deviceGroup: deviceGroupSelect,
+            },
+          },
+          vulnerability: {
+            include: {
+              affectedDeviceGroups: deviceGroupSelect,
+            },
+          },
+        },
       });
     }),
 
@@ -28,8 +41,20 @@ export const issuesRouter = createTRPCRouter({
       return prisma.issue.findMany({
         where: { id: { in: ids } },
         include: {
-          asset: type === "assets",
-          vulnerability: type === "vulnerabilities",
+          ...(type === "assets" && {
+            asset: {
+              include: {
+                deviceGroup: deviceGroupSelect,
+              },
+            },
+          }),
+          ...(type === "vulnerabilities" && {
+            vulnerability: {
+              include: {
+                affectedDeviceGroups: deviceGroupSelect,
+              },
+            },
+          }),
         },
       });
     }),

@@ -26,7 +26,6 @@ const emulatorInputSchema = z
     downloadUrl: safeUrlSchema.nullable().optional(),
     dockerUrl: safeUrlSchema.nullable().optional(),
     description: z.string().min(1, "Description is required"),
-    assetId: z.string().min(1, "Asset ID is required"),
   })
   .refine(
     (data) => {
@@ -75,7 +74,7 @@ const emulatorResponseSchema = z.object({
   user: userSchema,
   deviceGroup: deviceGroupSchema,
   helmSbomId: z.string().nullable(),
-  // TODO:: ^do not use helmSbomId externally
+  // TODO:: ^later, do not use helmSbomId externally (need internal API)
   // i.e, do not put this in an external API that other TA performers might see
 });
 

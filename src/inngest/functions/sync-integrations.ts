@@ -1,3 +1,4 @@
+import "server-only";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
 
@@ -78,6 +79,7 @@ export const syncIntegration = inngest.createFunction(
         };
 
         if (integration.authType === "Basic") {
+          // TODO: authentication needs to be encrypted/protected somehow
           const { username, password } = integration.authentication as {
             username: string;
             password: string;

@@ -19,7 +19,7 @@ import {
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
 
-const AssetStatus = z.enum(["Active", "Decomissioned", "Maintenance"]);
+const AssetStatus = z.enum(["Active", "Decommissioned", "Maintenance"]);
 
 const assetInputSchema = z.object({
   ip: z.string().min(1),
@@ -357,7 +357,7 @@ export const assetsRouter = createTRPCRouter({
         path: "/assets/integrationUpload",
         tags: ["Assets"],
         summary: "Synchronize assets with integration",
-        description: "Syncrhonize assets on VIPER from a partnered platform",
+        description: "Synchronize assets on VIPER from a partnered platform",
       },
     })
     .output(integrationResponseSchema)

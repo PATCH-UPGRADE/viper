@@ -12,7 +12,7 @@
 
 */
 -- CreateEnum
-CREATE TYPE "AssetStatus" AS ENUM ('Active', 'Decomissioned', 'Maintenance');
+CREATE TYPE "AssetStatus" AS ENUM ('Active', 'Decommissioned', 'Maintenance');
 
 -- CreateEnum
 CREATE TYPE "AuthType" AS ENUM ('Basic', 'Bearer', 'Header');

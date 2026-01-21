@@ -1,22 +1,17 @@
+import "server-only";
 import prisma from "@/lib/db";
 
 export async function cpeToDeviceGroup(cpe: string) {
   // requires: cpe is properly formatted according to cpeSchema
   // outputs: the DeviceGroup model instance that `cpe` specifies (creates a new one if none exist)
-  try {
-    return await prisma.deviceGroup.findUniqueOrThrow({
-      where: { cpe },
-    });
-  } catch (_error) {
-    // If not found, create a new device group
-    // TODO: VW-38 create a cpe naming table here to standardize input
-    // also populate Manufacturer, model name, version fields
-    return prisma.deviceGroup.create({
-      data: {
-        cpe,
-      },
-    });
-  }
+
+  // TODO: VW-38 create a cpe naming table here to standardize input
+  // when creating a new device group, also populate Manufacturer, model name, version fields
+  return prisma.deviceGroup.upsert({
+    where: { cpe },
+    update: {},
+    create: { cpe },
+  });
 }
 
 export async function cpesToDeviceGroups(cpes: string[]) {

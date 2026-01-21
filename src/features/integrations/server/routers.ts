@@ -1,3 +1,4 @@
+import "server-only";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import {
@@ -13,6 +14,7 @@ const paginatedIntegrationsInputSchema = paginationInputSchema.extend({
 });
 
 export const integrationsRouter = createTRPCRouter({
+  // intentionally fetches all integrations, not just user's
   getManyIntegrations: protectedProcedure
     .input(paginatedIntegrationsInputSchema)
     .query(async ({ input }) => {
@@ -58,6 +60,7 @@ export const integrationsRouter = createTRPCRouter({
       // TODO: create inngest job?
     }),
 
+  // any user can intentionally update any integration
   updateIntegration: protectedProcedure
     .input(
       z.object({
@@ -74,6 +77,7 @@ export const integrationsRouter = createTRPCRouter({
       });
     }),
 
+  // any user can intentionally remove any integration
   removeIntegration: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {

@@ -355,11 +355,8 @@ export const IntegrationsHeader = ({
       onSuccess: () => {
         setOpen(false);
       },
-      onError: (error) => {
+      onError: () => {
         setOpen(true);
-        toast.error(
-          error instanceof Error ? error.message : "Failed to create API token",
-        );
       },
     });
   };

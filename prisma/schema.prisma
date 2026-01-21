@@ -169,7 +169,7 @@ model DeviceGroup {
   updatedAt            DateTime             @updatedAt
   deviceGroupHistories DeviceGroupHistory[]
   assets               Asset[]
-  vulnerbailities      Vulnerability[]      @relation("VulnerabilityDeviceGroups")
+  vulnerabilities      Vulnerability[]      @relation("VulnerabilityDeviceGroups")
   emulators            Emulator[]
   remediations         Remediation[]
 
@@ -192,7 +192,7 @@ model DeviceGroupHistory {
 
 enum AssetStatus {
   Active
-  Decomissioned
+  Decommissioned
   Maintenance
 }
 
@@ -389,7 +389,7 @@ model Integration {
   //  with structured data
   authType       AuthType
   resourceType   ResourceType
-  authentication Json
+  authentication Json // TODO: this needs to be encrypted
   syncEvery      Int // e.g 300, sync every 300 seconds
   //syncSchedule     String? // e.g 0 12 * * *, sync every day at noon (cron)
   syncStatus     SyncStatus[]

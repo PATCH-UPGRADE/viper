@@ -119,7 +119,16 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const searchFilter = search
         ? {
             OR: [
-              { cpe: { contains: search, mode: "insensitive" as const } },
+              {
+                affectedDeviceGroups: {
+                  some: {
+                    cpe: {
+                      contains: search,
+                      mode: "insensitive" as const,
+                    },
+                  },
+                },
+              },
               {
                 description: { contains: search, mode: "insensitive" as const },
               },
@@ -270,10 +279,17 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "vulnerability");
+      const { cpes, ...dataInput } = input.data;
+      const deviceGroups = await cpesToDeviceGroups(cpes);
 
       return prisma.vulnerability.update({
         where: { id: input.id },
-        data: input.data,
+        data: {
+          ...dataInput,
+          affectedDeviceGroups: {
+            set: deviceGroups.map((dg) => ({ id: dg.id })),
+          },
+        },
         include: {
           user: userIncludeSelect,
           affectedDeviceGroups: deviceGroupSelect,

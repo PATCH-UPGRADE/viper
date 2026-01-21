@@ -40,7 +40,7 @@ export const useCreateIntegration = () => {
         return data;
       },
       onError: (error) => {
-        toast.error(`Failed to create integration: ${error.message}`);
+        toast.error(`Failed to create Integration: ${error.message}`);
       },
     }),
   );
@@ -65,7 +65,7 @@ export const useUpdateIntegration = () => {
         return data;
       },
       onError: (error) => {
-        toast.error(`Failed to create integration: ${error.message}`);
+        toast.error(`Failed to update Integration: ${error.message}`);
       },
     }),
   );
@@ -91,7 +91,7 @@ export const useRemoveIntegration = () => {
         return data;
       },
       onError: (error) => {
-        toast.error(`Failed to remove API token: ${error.message}`);
+        toast.error(`Failed to remove Integration: ${error.message}`);
       },
     }),
   );

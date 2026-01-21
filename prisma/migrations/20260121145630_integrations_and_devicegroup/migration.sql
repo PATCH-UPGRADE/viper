@@ -118,14 +118,14 @@ CREATE TABLE "integration" (
 );
 
 -- CreateTable
-CREATE TABLE "SyncStatus" (
+CREATE TABLE "sync_status" (
     "id" TEXT NOT NULL,
     "integrationId" TEXT NOT NULL,
     "error" BOOLEAN NOT NULL DEFAULT false,
     "errorMessage" TEXT,
     "syncedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "SyncStatus_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "sync_status_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -200,7 +200,7 @@ ALTER TABLE "integration" ADD CONSTRAINT "integration_apiKeyId_fkey" FOREIGN KEY
 ALTER TABLE "integration" ADD CONSTRAINT "integration_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "SyncStatus" ADD CONSTRAINT "SyncStatus_integrationId_fkey" FOREIGN KEY ("integrationId") REFERENCES "integration"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "sync_status" ADD CONSTRAINT "sync_status_integrationId_fkey" FOREIGN KEY ("integrationId") REFERENCES "integration"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_VulnerabilityDeviceGroups" ADD CONSTRAINT "_VulnerabilityDeviceGroups_A_fkey" FOREIGN KEY ("A") REFERENCES "device_group"("id") ON DELETE CASCADE ON UPDATE CASCADE;

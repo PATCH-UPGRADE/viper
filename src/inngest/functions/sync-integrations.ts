@@ -103,6 +103,7 @@ export const syncIntegration = inngest.createFunction(
         const response = await fetch(integration.integrationUri, {
           method: "GET",
           headers,
+          signal: AbortSignal.timeout(30000), // 30s timeout
         });
 
         if (!response.ok) {

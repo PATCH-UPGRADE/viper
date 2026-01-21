@@ -126,8 +126,15 @@ export const assetsRouter = createTRPCRouter({
         ? {
             OR: [
               { ip: { contains: search, mode: "insensitive" as const } },
-              { cpe: { contains: search, mode: "insensitive" as const } },
               { role: { contains: search, mode: "insensitive" as const } },
+              {
+                deviceGroup: {
+                  cpe: {
+                    contains: search,
+                    mode: "insensitive" as const,
+                  },
+                },
+              },
             ],
           }
         : {};
@@ -159,8 +166,15 @@ export const assetsRouter = createTRPCRouter({
         ? {
             OR: [
               { ip: { contains: search, mode: "insensitive" as const } },
-              { cpe: { contains: search, mode: "insensitive" as const } },
               { role: { contains: search, mode: "insensitive" as const } },
+              {
+                deviceGroup: {
+                  cpe: {
+                    contains: search,
+                    mode: "insensitive" as const,
+                  },
+                },
+              },
             ],
           }
         : {};
@@ -222,7 +236,7 @@ export const assetsRouter = createTRPCRouter({
       const where = {
         OR: [
           ...(assetIds?.length ? [{ id: { in: assetIds } }] : []),
-          ...(cpes?.length ? [{ cpe: { in: cpes } }] : []),
+          ...(cpes?.length ? [{ deviceGroup: { cpe: { in: cpes } } }] : []),
           // TODO:: ^this needs to be a pattern match, not just "in"
         ],
       };

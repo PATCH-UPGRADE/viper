@@ -415,6 +415,7 @@ model SyncStatus {
   error         Boolean     @default(false) // Indicates if there was an error during sync
   errorMessage  String?
   syncedAt      DateTime    @default(now())
+  @@map("sync_status")
 }
 
 enum AuthType {

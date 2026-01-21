@@ -21,7 +21,7 @@ import { requireOwnership } from "@/trpc/middleware";
 // Validation schemas
 const vulnerabilityInputSchema = z.object({
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  cpes: z.array(cpeSchema),
+  cpes: z.array(cpeSchema).min(1, "At least one CPE is required"),
   exploitUri: safeUrlSchema,
   upstreamApi: safeUrlSchema,
   description: z.string().min(1),

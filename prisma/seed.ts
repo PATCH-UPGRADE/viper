@@ -151,14 +151,6 @@ const SAMPLE_ASSETS = [
     role: "Firewall",
     upstreamApi: "https://api.fortinet.com/network/firewall",
   },
-
-  // Extra Test Assets
-  {
-    ip: "192.168.0.1",
-    cpe: "cpe:2.3:h:test:highlyvulnerable:*:*:*:*:*:*:*:*",
-    role: "Highly Vulnerable Asset",
-    upstreamApi: "https://localhost:3000",
-  },
 ];
 
 // Sample hospital vulnerability data
@@ -351,158 +343,6 @@ const SAMPLE_VULNERABILITIES = [
       "An authenticated user with low privileges could exploit a logic flaw in the CLI command parser to escalate to administrative privileges. This allows complete control over network switch configuration, VLAN assignments, and port security.",
     impact:
       "Hospital network segmentation failure. Compromised network infrastructure could allow lateral movement between clinical and administrative networks. Attackers could access isolated medical device VLANs, intercept patient data, or disrupt critical network services including PACS, EMR, and pharmacy systems.",
-  },
-
-  // Additional Vulnerabilities targeting one asset
-  {
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Mock Vulnerable Device" } },
-          results: [
-            {
-              ruleId: "CVE-NOT-REAL",
-              level: "error",
-              message: {
-                text: "Mock Exploit",
-              },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:test:highlyvulnerable:*:*:*:*:*:*:*:*",
-    exploitUri: "https://localhost:3000/",
-    upstreamApi: "https://localhost:3000/",
-    description: "Mock Vulnerability Description #1",
-    narrative: "Mock Vulnerability Narrative #1",
-    impact: "Mock Vulnerability Impact #1",
-  },
-  {
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Mock Vulnerable Device" } },
-          results: [
-            {
-              ruleId: "CVE-NOT-REAL",
-              level: "error",
-              message: {
-                text: "Mock Exploit",
-              },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:test:highlyvulnerable:*:*:*:*:*:*:*:*",
-    exploitUri: "https://localhost:3000/",
-    upstreamApi: "https://localhost:3000/",
-    description: "Mock Vulnerability Description #2",
-    narrative: "Mock Vulnerability Narrative #2",
-    impact: "Mock Vulnerability Impact #2",
-  },
-  {
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Mock Vulnerable Device" } },
-          results: [
-            {
-              ruleId: "CVE-NOT-REAL",
-              level: "error",
-              message: {
-                text: "Mock Exploit",
-              },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:test:highlyvulnerable:*:*:*:*:*:*:*:*",
-    exploitUri: "https://localhost:3000/",
-    upstreamApi: "https://localhost:3000/",
-    description: "Mock Vulnerability Description #3",
-    narrative: "Mock Vulnerability Narrative #3",
-    impact: "Mock Vulnerability Impact #3",
-  },
-  {
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Mock Vulnerable Device" } },
-          results: [
-            {
-              ruleId: "CVE-NOT-REAL",
-              level: "error",
-              message: {
-                text: "Mock Exploit",
-              },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:test:highlyvulnerable:*:*:*:*:*:*:*:*",
-    exploitUri: "https://localhost:3000/",
-    upstreamApi: "https://localhost:3000/",
-    description: "Mock Vulnerability Description #4",
-    narrative: "Mock Vulnerability Narrative #4",
-    impact: "Mock Vulnerability Impact #4",
-  },
-  {
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Mock Vulnerable Device" } },
-          results: [
-            {
-              ruleId: "CVE-NOT-REAL",
-              level: "error",
-              message: {
-                text: "Mock Exploit",
-              },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:test:highlyvulnerable:*:*:*:*:*:*:*:*",
-    exploitUri: "https://localhost:3000/",
-    upstreamApi: "https://localhost:3000/",
-    description: "Mock Vulnerability Description #5",
-    narrative: "Mock Vulnerability Narrative #5",
-    impact: "Mock Vulnerability Impact #5",
-  },
-  {
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Mock Vulnerable Device" } },
-          results: [
-            {
-              ruleId: "CVE-NOT-REAL",
-              level: "error",
-              message: {
-                text: "Mock Exploit",
-              },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:test:highlyvulnerable:*:*:*:*:*:*:*:*",
-    exploitUri: "https://localhost:3000/",
-    upstreamApi: "https://localhost:3000/",
-    description: "Mock Vulnerability Description #6",
-    narrative: "Mock Vulnerability Narrative #6",
-    impact: "Mock Vulnerability Impact #6",
   },
 ];
 
@@ -748,64 +588,6 @@ async function seedVulnerabilities(userId: string) {
   return vulnerabilities;
 }
 
-async function seedIssues() {
-  console.log("\n🌱 Seeding issues...");
-
-  try {
-    // Retrieve all Assets
-    const assets = await prisma.asset.findMany({
-      select: { id: true, cpe: true },
-    });
-
-    // Build a map of CPE to asset IDs for efficient lookup
-    const cpeToAssets = new Map<string, string[]>();
-    for (const asset of assets) {
-      if (!cpeToAssets.has(asset.cpe)) {
-        cpeToAssets.set(asset.cpe, []);
-      }
-      const assetsArr = cpeToAssets.get(asset.cpe) || [];
-      assetsArr.push(asset.id);
-      cpeToAssets.set(asset.cpe, assetsArr);
-    }
-
-    // Retrieve all vulnerabilities
-    const vulnerabilities = await prisma.vulnerability.findMany();
-
-    // Build the list of Issues matching Asset IDs to Vuln IDs
-    const issueRecords = [];
-    for (const vuln of vulnerabilities) {
-      const matchingAssetIds = cpeToAssets.get(vuln.cpe) || [];
-      for (const assetId of matchingAssetIds) {
-        issueRecords.push({
-          assetId,
-          vulnerabilityId: vuln.id,
-        });
-      }
-    }
-
-    // Batch upsert to avoid duplicates
-    const issues = await Promise.all(
-      issueRecords.map(async (record) => {
-        return await prisma.issue.upsert({
-          where: {
-            assetId_vulnerabilityId: {
-              assetId: record.assetId,
-              vulnerabilityId: record.vulnerabilityId,
-            },
-          },
-          create: record,
-          update: {}, // No updates needed, just prevent duplicates
-        });
-      }),
-    );
-
-    const successfulIssues = issues.filter((r) => r !== null);
-    console.log(`✅ Seeded ${successfulIssues.length} issues`);
-  } catch (error) {
-    console.error("❌ Error creating issues:", error);
-  }
-}
-
 async function seedRemediations(userId: string) {
   console.log("\n🌱 Seeding remediations...");
 
@@ -889,7 +671,6 @@ async function main() {
     // Seed data
     await seedAssets(user.id);
     await seedVulnerabilities(user.id);
-    await seedIssues();
     await seedRemediations(user.id);
     await seedEmulators(user.id);
 

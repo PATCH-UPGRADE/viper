@@ -5,14 +5,10 @@ import prisma from "@/lib/db";
 
 // Domains allowed to create accounts
 // Note that only development environments will allow non-Google OAuth accounts
-export const DOMAIN_WHITELIST = [
-  "bugcrowd.com",
-  "forallsecure.com",
-  "hadronindustries.com",
-  "medcrypt.co",
-  "medcrypt.com",
-  "virtalabs.com",
-].map((domain) => domain.toLowerCase());
+export const DOMAIN_WHITELIST = (process.env.DOMAIN_WHITELIST || "")
+  .split(",")
+  .map((domain) => domain.trim().toLowerCase())
+  .filter(Boolean);
 
 export const validateDomain = (email: string) => {
   if (process.env.VERCEL_ENV !== "production") return; // Validation is unnecessary for dev environments

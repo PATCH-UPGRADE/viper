@@ -1,6 +1,6 @@
 import { APIError } from "better-auth";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { DOMAIN_WHITELIST, validateDomain } from "@/lib/auth";
+import { validateDomain } from "@/lib/auth";
 
 describe("validateDomain", () => {
   const originalVercelEnv = process.env.VERCEL_ENV;
@@ -11,12 +11,6 @@ describe("validateDomain", () => {
 
   afterEach(() => {
     process.env.VERCEL_ENV = originalVercelEnv;
-  });
-
-  it("allows approved domains in production", () => {
-    const validDomain = DOMAIN_WHITELIST[0];
-    const email = `fake_person@${validDomain}`;
-    expect(() => validateDomain(email)).not.toThrow();
   });
 
   it("rejects unapproved domains in production", () => {

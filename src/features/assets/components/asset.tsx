@@ -349,7 +349,7 @@ export const AssetDetailPage = ({ id }: { id: string }) => {
                     <div className="text-xs font-medium text-muted-foreground mb-1">
                       Group ID
                     </div>
-                    <CopyCode>{asset.cpe}</CopyCode>
+                    <CopyCode>{asset.deviceGroup.cpe}</CopyCode>
                   </div>
                 </div>
               </div>

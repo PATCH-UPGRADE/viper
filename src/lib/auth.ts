@@ -53,8 +53,8 @@ export const auth = betterAuth({
     },
   },
   emailAndPassword: {
-    enabled: process.env.NEXT_PUBLIC_TESTING === "True",
-    autoSignIn: process.env.NEXT_PUBLIC_TESTING === "True",
+    enabled: process.env.VERCEL_ENV !== "production",
+    autoSignIn: process.env.VERCEL_ENV !== "production",
   },
   plugins: [apiKey()],
   socialProviders: {

@@ -69,6 +69,9 @@ After seeding, you can log in with:
 - Email: `user@example.com`
 - Password: (read the seed script)
 
+- Note that user/password auth is only enabled for development environments.
+- In production, only Google OAuth can be used.
+
 ## Tech Stack
 
 - React Framework: Next.js

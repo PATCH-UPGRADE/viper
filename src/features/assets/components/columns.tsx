@@ -65,9 +65,9 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
       return (
         <Tooltip>
           <TooltipTrigger>
-            {row.original.cpe.split(":").slice(3, 5).join(" ")}
+            {row.original.deviceGroup.cpe.split(":").slice(3, 5).join(" ")}
           </TooltipTrigger>
-          <TooltipContent>{row.original.cpe}</TooltipContent>
+          <TooltipContent>{row.original.deviceGroup.cpe}</TooltipContent>
         </Tooltip>
       );
     },
@@ -100,7 +100,9 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() =>
-                handleCopy(asset.cpe, () => toast.success("Copied!"))
+                handleCopy(asset.deviceGroup.cpe, () =>
+                  toast.success("Copied!"),
+                )
               }
             >
               <CopyIcon strokeWidth={3} /> Copy Group ID

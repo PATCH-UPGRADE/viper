@@ -4,3 +4,6 @@ procs:
 
   next:
     cmd: ["npm", "run", "dev"]
+
+  prisma:
+    cmd: ["npx", "prisma", "studio"]

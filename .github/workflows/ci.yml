@@ -33,3 +33,56 @@ jobs:
 
       - name: Type check
         run: npx tsc --noEmit
+
+  run-npm-tests:
+    name: Run npm tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d testdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/testdb
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed postgres database
+        run: npm run db:seed
+
+      - name: Generate test API key
+        run: |
+          API_KEY_LINE="$(npm run db:create-test-api-key --silent | grep '^API_KEY=' | tr -d '\r')"
+          echo "$API_KEY_LINE" >> "$GITHUB_ENV"
+
+      - name: Start API server
+        run: npm run dev &
+
+      - name: Wait for API
+        run: npx wait-on http://localhost:3000/workflows
+
+      - name: Run tests
+        run: API_KEY=$API_KEY npm run test

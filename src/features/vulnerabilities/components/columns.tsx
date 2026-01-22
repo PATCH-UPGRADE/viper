@@ -49,7 +49,13 @@ export const columns: ColumnDef<VulnerabilityWithIssues>[] = [
       <SortableHeader header="Group ID" column={column} />
     ),
     cell: ({ row }) => {
-      return <CopyCode>{row.original.cpe}</CopyCode>;
+      return (
+        <CopyCode>
+          {row.original.affectedDeviceGroups
+            .map((group) => group.id)
+            .join(", ")}
+        </CopyCode>
+      );
     },
   },
   {

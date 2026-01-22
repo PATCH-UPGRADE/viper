@@ -1,5 +1,6 @@
 import { assetsRouter } from "@/features/assets/server/routers";
 import { emulatorsRouter } from "@/features/emulators/server/routers";
+import { integrationsRouter } from "@/features/integrations/server/routers";
 import { issuesRouter } from "@/features/issues/server/routers";
 import { remediationsRouter } from "@/features/remediations/server/routers";
 import { userRouter } from "@/features/user/server/routers";
@@ -15,6 +16,7 @@ export const appRouter = createTRPCRouter({
   emulators: emulatorsRouter,
   user: userRouter,
   issues: issuesRouter,
+  integrations: integrationsRouter,
 });
 // export type definition of API
 export type AppRouter = typeof appRouter;

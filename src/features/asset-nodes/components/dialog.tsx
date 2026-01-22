@@ -32,7 +32,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { Asset, Vulnerability } from "@/generated/prisma";
+import type { Vulnerability } from "@/generated/prisma";
+import type { AssetWithDeviceGroup } from "@/lib/db";
 import { cpeSchema } from "@/lib/schemas";
 import { DeviceIconType, getIconByType } from "../types";
 import type { AssetNodeData } from "./node";
@@ -57,7 +58,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: z.infer<typeof formSchema>) => void;
   defaultValues?: AssetNodeData;
-  assets: Asset[];
+  assets: AssetWithDeviceGroup[];
   vulnerabilities: Vulnerability[];
 }
 
@@ -307,7 +308,8 @@ export const AssetDialog = ({
               <ul className="pl-4">
                 {assets.map((asset, idx) => (
                   <li className="list-disc" key={idx}>
-                    {asset.role} &bull; {asset.cpe} &bull; {asset.id}
+                    {asset.role} &bull; {asset.deviceGroup.cpe} &bull;{" "}
+                    {asset.id}
                   </li>
                 ))}
               </ul>

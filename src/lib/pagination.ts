@@ -52,6 +52,30 @@ export type PaginatedResponse<T> = {
   hasPreviousPage: boolean;
 };
 
+export function createPaginatedResponseWithLinksSchema<T extends z.ZodTypeAny>(
+  itemSchema: T,
+) {
+  return z.object({
+    items: z.array(itemSchema),
+    page: z.number(),
+    pageSize: z.number(),
+    totalCount: z.number(),
+    totalPages: z.number(),
+    next: z.union([z.string(), z.null()]),
+    previous: z.union([z.string(), z.null()]),
+  });
+}
+
+export type PaginatedResponseWithLinks<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  next: string | null;
+  previous: string | null;
+};
+
 /**
  * Builds pagination metadata from count and input parameters
  * Handles page capping to prevent expensive queries

@@ -79,7 +79,7 @@ export function LoginForm() {
   const isPending = form.formState.isSubmitting;
 
   // Check if dev environment for email/password option
-  const showEmailPassword = process.env.VERCEL_ENV !== "production";
+  const showEmailPassword = process.env.NEXT_PUBLIC_VERCEL_ENV !== "production";
 
   return (
     <div className="flex flex-col gap-6">

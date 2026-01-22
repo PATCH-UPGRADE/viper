@@ -505,7 +505,6 @@ async function clearDatabase() {
 
   // Delete in order of dependencies (child tables first)
   await prisma.remediation.deleteMany();
-  await prisma.issue.deleteMany();
   await prisma.vulnerability.deleteMany();
   await prisma.emulator.deleteMany();
   await prisma.assetSettings.deleteMany();

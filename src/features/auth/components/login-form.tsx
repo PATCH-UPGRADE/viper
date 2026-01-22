@@ -33,7 +33,7 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-export const handleSocialLogin = async (provider: "github" | "google") => {
+export const handleSocialLogin = async (provider: "google") => {
   await authClient.signIn.social(
     {
       provider,
@@ -78,6 +78,9 @@ export function LoginForm() {
 
   const isPending = form.formState.isSubmitting;
 
+  // Check if dev environment for email/password option
+  const showEmailPassword = process.env.NEXT_PUBLIC_VERCEL_ENV !== "production";
+
   return (
     <div className="flex flex-col gap-6">
       <Card>
@@ -95,21 +98,6 @@ export function LoginForm() {
                     className="w-full"
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleSocialLogin("github")}
-                  >
-                    <Image
-                      alt="GitHub"
-                      src="/logos/github.svg"
-                      width={20}
-                      height={20}
-                    />
-                    Continue with GitHub
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    type="button"
-                    disabled={isPending}
                     onClick={() => handleSocialLogin("google")}
                   >
                     <Image
@@ -121,45 +109,54 @@ export function LoginForm() {
                     Continue with Google
                   </Button>
                 </div>
-                <div className="grid gap-6">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="email"
-                            placeholder="m@example.com"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="*********"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" className="w-full" disabled={isPending}>
-                    Login
-                  </Button>
-                </div>
+
+                {/* Email/password form only in development */}
+                {showEmailPassword && (
+                  <div className="grid gap-6">
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="email"
+                              placeholder="m@example.com"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              placeholder="*********"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={isPending}
+                    >
+                      Login
+                    </Button>
+                  </div>
+                )}
+
                 <div className="text-center text-sm">
                   Don&apos;t have an account?{" "}
                   <Link href="/signup" className="underline underline-offset-4">

@@ -27,6 +27,7 @@ export const integrationInputSchema = z.object({
   platform: z.string().optional(),
   integrationUri: safeUrlSchema,
   isGeneric: z.boolean(),
+  prompt: z.string().optional(), // only allowed if `isGeneric` is true
   authType: z.enum(["Basic", "Bearer", "Header"]),
   resourceType: z.enum(["Asset", "Vulnerability", "Emulator", "Remediation"]),
   authentication: authenticationSchema,

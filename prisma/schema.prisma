@@ -387,11 +387,11 @@ model Integration {
   // ^a generic integration uses AI to pull data
   // if generic is false, the integration will respond to one of our endpoints
   //  with structured data
+  prompt         String?      @db.Text // optional, additional instructions for AI
   authType       AuthType
   resourceType   ResourceType
   authentication Json // TODO: this needs to be encrypted
   syncEvery      Int // e.g 300, sync every 300 seconds
-  //syncSchedule     String? // e.g 0 12 * * *, sync every day at noon (cron)
   syncStatus     SyncStatus[]
   apiKeyId       String?      @unique
   apiKey         Apikey?      @relation(fields: [apiKeyId], references: [id])
@@ -415,6 +415,7 @@ model SyncStatus {
   error         Boolean     @default(false) // Indicates if there was an error during sync
   errorMessage  String?
   syncedAt      DateTime    @default(now())
+
   @@map("sync_status")
 }
 

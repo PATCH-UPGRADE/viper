@@ -56,20 +56,22 @@ const Page = async () => {
           </Card>
         </Link>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-base">
-              Vulnerabilities
-            </CardTitle>
-            <CardDescription>
-              Pull vulnerability findings from external scanners via HTTP + API
-              key.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            Normalizes findings into a common schema for impact analysis.
-          </CardContent>
-        </Card>
+        <Link href="/integrations/vulnerabilities/">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-base">
+                Vulnerabilities
+              </CardTitle>
+              <CardDescription>
+                Pull vulnerability findings from external scanners via HTTP +
+                API key.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-xs text-muted-foreground">
+              Normalizes findings into a common schema for impact analysis.
+            </CardContent>
+          </Card>
+        </Link>
 
         <Card>
           <CardHeader>

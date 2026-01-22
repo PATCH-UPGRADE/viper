@@ -50,6 +50,9 @@ import {
   type IntegrationFormValues,
   integrationInputSchema,
 } from "../types";
+import { Textarea } from "@/components/ui/textarea";
+import { inngest } from "@/inngest/client";
+import { toast } from "sonner";
 //import { useApiTokenParams } from "../hooks/use-user-params";
 //import { type ApiTokenFormValues, apiTokenInputSchema } from "../types";
 
@@ -89,6 +92,7 @@ const IntegrationCreateModal = ({
 
   const isPending = form.formState.isSubmitting;
   const authType = form.watch("authType");
+  const isGeneric = form.watch("isGeneric");
   const label = isUpdate ? "Update Integration" : "Create Integration";
 
   return (
@@ -161,7 +165,7 @@ const IntegrationCreateModal = ({
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
                       <FormLabel className="text-base">
-                        Generic Integration
+                        ✨ AI Integration ✨
                       </FormLabel>
                     </div>
                     <FormControl>
@@ -174,6 +178,22 @@ const IntegrationCreateModal = ({
                   </FormItem>
                 )}
               />
+
+              {isGeneric && (
+                <FormField
+                  control={form.control}
+                  name="prompt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Additional Instructions</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -440,6 +460,7 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
       platform: data.platform || "",
       integrationUri: data.integrationUri,
       isGeneric: data.isGeneric,
+      prompt: data.prompt,
       authType: data.authType,
       resourceType: data.resourceType,
       syncEvery: data.syncEvery || 300,
@@ -461,6 +482,21 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
     );
   };
 
+  const handleSync = async () => {
+    try {
+      await inngest.send({
+        name: "integration/sync.requested",
+        data: {
+          integrationId: data.id,
+        },
+      });
+      toast.success("Integration sync started successfully!");
+    } catch (error) {
+      toast.error("Failed to trigger sync");
+      console.error(error);
+    }
+  };
+
   return (
     <>
       <div className="flex items-center gap-3 p-4 border rounded-lg">
@@ -471,6 +507,7 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
             <span>{data.integrationUri}</span>
           </div>
           <p>{JSON.stringify(data)}</p>
+          <Button onClick={handleSync}>Sync Now</Button>
         </div>
         <Button
           size="sm"

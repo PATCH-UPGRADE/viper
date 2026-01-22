@@ -41,6 +41,7 @@ export const useCreateIntegration = () => {
       },
       onError: (error) => {
         toast.error(`Failed to create Integration: ${error.message}`);
+        console.error(error.message);
       },
     }),
   );

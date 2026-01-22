@@ -53,7 +53,6 @@ export const integrationsRouter = createTRPCRouter({
         data: {
           ...input,
           userId: ctx.auth.user.id,
-          // TODO: get resourceType from a param maybe?
         },
         include: { syncStatus: true },
       });

@@ -1,6 +1,7 @@
 import "server-only";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
+import type { Integration } from "@/generated/prisma";
 
 export const syncAllIntegrations = inngest.createFunction(
   { id: "sync-all-integrations" },
@@ -44,17 +45,91 @@ export const syncAllIntegrations = inngest.createFunction(
   },
 );
 
-/*
- * TODO: make this actually syncrhonize with the endpoint
- * For now:
- * - Sends a GET request to the integration endpoint
- * - Creates a SyncStatus model
- *
- */
-
 type SyncResult =
   // biome-ignore lint/suspicious/noExplicitAny: data from a server could potentially be any here, that's normal, right?
   { success: true; data: any } | { success: false; errorMessage: string };
+
+// Helper function for AI Integration
+async function syncAiIntegration(
+  integration: Integration,
+): Promise<SyncResult> {
+  const n8nWebhookUrl = process.env.N8N_AI_SYNC_URL;
+  const n8nKey = process.env.N8N_KEY;
+
+  if (!n8nKey || !n8nWebhookUrl) {
+    throw new Error("Either N8N_KEY or N8N_AI_SYNC_URL is not defined");
+  }
+
+  const response = await fetch(n8nWebhookUrl, {
+    method: "POST",
+    headers: {
+      Authorization: n8nKey,
+      "Content-Type": "application/json",
+    },
+    signal: AbortSignal.timeout(30000), // 30s timeout
+    body: JSON.stringify({
+      resourceType: integration.resourceType,
+      integrationUri: integration.integrationUri,
+      additionalInstructions: integration.prompt,
+      authType: integration.authType,
+      authentication: integration.authentication,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to sync data: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return { success: true, data };
+}
+
+// Helper function for Partner Integration
+async function syncPartnerIntegration(
+  integration: Integration,
+): Promise<SyncResult> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (integration.authType === "Basic") {
+    // TODO: authentication needs to be encrypted/protected somehow
+    const { username, password } = integration.authentication as {
+      username: string;
+      password: string;
+    };
+    const token = Buffer.from(`${username}:${password}`).toString("base64");
+    headers.Authorization = `Basic ${token}`;
+  } else if (integration.authType === "Bearer") {
+    const { token } = integration.authentication as { token: string };
+    headers.Authorization = `Bearer ${token}`;
+  } else if (integration.authType === "Header") {
+    const { header, value } = integration.authentication as {
+      header: string;
+      value: string;
+    };
+    headers[header] = value;
+  }
+
+  const response = await fetch(integration.integrationUri, {
+    method: "POST",
+    headers,
+    signal: AbortSignal.timeout(30000), // 30s timeout
+    body: JSON.stringify({
+      last_sync: "TODO", // TODO: VW-36
+      page: 1,
+      pageSize: 500,
+      webhook_url: `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}/api/v1/assets/integrationUpload`,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to sync data: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return { success: true, data };
+}
 
 export const syncIntegration = inngest.createFunction(
   { id: "sync-integration" },
@@ -74,44 +149,11 @@ export const syncIntegration = inngest.createFunction(
 
     const syncResult = await step.run("fetch-integration-data", async () => {
       try {
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
-
-        if (integration.authType === "Basic") {
-          // TODO: authentication needs to be encrypted/protected somehow
-          const { username, password } = integration.authentication as {
-            username: string;
-            password: string;
-          };
-          const token = Buffer.from(`${username}:${password}`).toString(
-            "base64",
-          );
-          headers.Authorization = `Basic ${token}`;
-        } else if (integration.authType === "Bearer") {
-          const { token } = integration.authentication as { token: string };
-          headers.Authorization = `Bearer ${token}`;
-        } else if (integration.authType === "Header") {
-          const { header, value } = integration.authentication as {
-            header: string;
-            value: string;
-          };
-          headers[header] = value;
+        if (integration.isGeneric) {
+          return await syncAiIntegration(integration);
+        } else {
+          return await syncPartnerIntegration(integration);
         }
-
-        // TODO: modify this for VW-36 / VW-53
-        const response = await fetch(integration.integrationUri, {
-          method: "GET",
-          headers,
-          signal: AbortSignal.timeout(30000), // 30s timeout
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        return { success: true, data } as SyncResult;
       } catch (error) {
         return {
           success: false,
@@ -121,6 +163,7 @@ export const syncIntegration = inngest.createFunction(
       }
     });
 
+    // TODO: VW-36, VW-53, don't create sync status here
     await step.run("create-sync-status", async () => {
       await prisma.syncStatus.create({
         data: {
@@ -133,16 +176,16 @@ export const syncIntegration = inngest.createFunction(
 
       // Delete old statuses keeping only the 5 most recent
       await prisma.$executeRaw`
-    DELETE FROM "sync_status"
-    WHERE "integrationId" = ${integration.id}
-    AND "id" NOT IN (
-      SELECT "id"
-      FROM "sync_status"
-      WHERE "integrationId" = ${integration.id}
-      ORDER BY "syncedAt" DESC
-      LIMIT 5
-    )
-  `;
+        DELETE FROM "sync_status"
+        WHERE "integrationId" = ${integration.id}
+        AND "id" NOT IN (
+          SELECT "id"
+          FROM "sync_status"
+          WHERE "integrationId" = ${integration.id}
+          ORDER BY "syncedAt" DESC
+          LIMIT 5
+        )
+      `;
     });
 
     return { success: syncResult.success };

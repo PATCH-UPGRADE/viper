@@ -29,6 +29,10 @@ const vulnerabilityInputSchema = z.object({
   impact: z.string().min(1),
 });
 
+const vulnerabilityArrayInputSchema = z.object({
+  vulnerabilities: z.array(vulnerabilityInputSchema).nonempty(),
+});
+
 const vulnerabilityResponseSchema = z.object({
   id: z.string(),
   sarif: z.any(), // JSON data - Prisma JsonValue type
@@ -43,6 +47,8 @@ const vulnerabilityResponseSchema = z.object({
   updatedAt: z.date(),
   user: userSchema,
 });
+
+const vulnerabilityArrayResponseSchema = z.array(vulnerabilityResponseSchema);
 
 const paginatedVulnerabilityResponseSchema = createPaginatedResponseSchema(
   vulnerabilityResponseSchema,
@@ -229,6 +235,51 @@ export const vulnerabilitiesRouter = createTRPCRouter({
           affectedDeviceGroups: deviceGroupSelect,
         },
       });
+    }),
+
+  // POST /api/vulnerabilities/bulk - Create one or more assets
+  createBulk: protectedProcedure
+    .input(vulnerabilityArrayInputSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/vulnerabilities/bulk",
+        tags: ["Assets"],
+        summary: "Create Bulk Vulnerabilities",
+        description:
+          "Create one or more new vulnerabilities from an array. The authenticated user will be recorded as the creator.",
+      },
+    })
+    .output(vulnerabilityArrayResponseSchema)
+    .mutation(async ({ ctx, input }) => {
+      // resolve all device groups in parallel
+      const deviceGroupPromises = input.vulnerabilities.map(async (vuln) => {
+        const { cpes } = vuln;
+        const uniqueCpes = [...new Set(cpes)];
+        return await cpesToDeviceGroups(uniqueCpes);
+      });
+
+      const deviceGroups = await Promise.all(deviceGroupPromises);
+
+      // create all assets in a transaction
+      return prisma.$transaction(
+        input.vulnerabilities.map((vuln, index) => {
+          const { cpes: _cpes, ...dataInput } = vuln;
+          return prisma.vulnerability.create({
+            data: {
+              ...dataInput,
+              affectedDeviceGroups: {
+                connect: deviceGroups[index].map((dg) => ({ id: dg.id })),
+              },
+              userId: ctx.auth.user.id,
+            },
+            include: {
+              user: userIncludeSelect,
+              affectedDeviceGroups: deviceGroupSelect,
+            },
+          });
+        }),
+      );
     }),
 
   // DELETE /api/vulnerabilities/{id} - Delete vulnerability (only creator can delete)

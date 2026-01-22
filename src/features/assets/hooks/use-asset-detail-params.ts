@@ -1,3 +1,5 @@
+"use client";
+
 import { useQueryStates } from "nuqs";
 import { assetDetailParams } from "../params";
 

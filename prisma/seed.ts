@@ -919,8 +919,10 @@ async function seedDeviceGroups() {
 
   const deviceGroups = await Promise.all(
     SAMPLE_DEVICE_GROUPS.map((dg) =>
-      prisma.deviceGroup.create({
-        data: dg,
+      prisma.deviceGroup.upsert({
+        where: { cpe: dg.cpe },
+        update: dg,
+        create: dg,
       }),
     ),
   );

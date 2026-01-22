@@ -15,5 +15,7 @@ export const prefetchIssue = (id: string) => {
  * @returns Prefetched page of issues filtered by the assetId and status fields
  */
 export const prefetchIssuesByAssetId = (input: Input) => {
-  return prefetch(trpc.issues.getManyInternalByStatusAndAssetId.queryOptions(input));
+  return prefetch(
+    trpc.issues.getManyInternalByStatusAndAssetId.queryOptions(input),
+  );
 };

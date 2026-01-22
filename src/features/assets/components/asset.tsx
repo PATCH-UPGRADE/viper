@@ -182,7 +182,7 @@ const VulnList = ({
 
 interface TabulatedVulnListProps {
   id: string;
-};
+}
 
 const TabulatedVulnList = ({ id }: TabulatedVulnListProps) => {
   const [params, setParams] = useAssetDetailParams();
@@ -221,30 +221,21 @@ const TabulatedVulnList = ({ id }: TabulatedVulnListProps) => {
   return (
     <>
       {activeIssues.data.totalCount > 0 ||
-        falsePositiveIssues.data.totalCount > 0 ||
-        remediatedIssues.data.totalCount > 0 ? (
-        <Tabs
-          value={currentTab}
-          onValueChange={(v) => handleUpdateTab(v)}
-        >
+      falsePositiveIssues.data.totalCount > 0 ||
+      remediatedIssues.data.totalCount > 0 ? (
+        <Tabs value={currentTab} onValueChange={(v) => handleUpdateTab(v)}>
           <TabsList>
             <TabsTrigger className="font-bold text-base" value="PENDING">
               Active ({activeIssues.data.totalCount})
             </TabsTrigger>
-            <TabsTrigger
-              className="font-bold text-base"
-              value="FALSE_POSITIVE"
-            >
+            <TabsTrigger className="font-bold text-base" value="FALSE_POSITIVE">
               False Positive ({falsePositiveIssues.data.totalCount})
             </TabsTrigger>
-            <TabsTrigger
-              className="font-bold text-base"
-              value="REMEDIATED"
-            >
+            <TabsTrigger className="font-bold text-base" value="REMEDIATED">
               Remediated ({remediatedIssues.data.totalCount})
             </TabsTrigger>
           </TabsList>
-        
+
           <TabsContent value="PENDING">
             <VulnList
               items={activeIssues.data.items}
@@ -280,7 +271,7 @@ const TabulatedVulnList = ({ id }: TabulatedVulnListProps) => {
       )}
     </>
   );
-}
+};
 
 export const AssetDetailPage = ({ id }: { id: string }) => {
   const assetResult = useSuspenseAsset(id);

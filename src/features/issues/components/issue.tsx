@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  BugIcon,
-  ChevronDown,
-  ComputerIcon,
-  MoreVertical,
-} from "lucide-react";
+import { BugIcon, ChevronDown, ComputerIcon, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";

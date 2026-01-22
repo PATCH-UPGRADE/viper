@@ -69,6 +69,11 @@ export const useSuspenseIssuesByAssetId = ({
   }
 
   return useSuspenseQuery(
-    trpc.issues.getManyInternalByStatusAndAssetId.queryOptions({ ...params, id, issueStatus, page }),
+    trpc.issues.getManyInternalByStatusAndAssetId.queryOptions({
+      ...params,
+      id,
+      issueStatus,
+      page,
+    }),
   );
 };

@@ -1,0 +1,36 @@
+name: Prisma migrations - preview
+on:
+  pull_request:
+    paths:
+      - 'prisma/schema.prisma'
+      - 'prisma/migrations/**'
+jobs:
+  migrate-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install neonctl
+        run: npm install -g neonctl
+
+      - name: Get Neon preview branch URL
+        env:
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          BRANCH_NAME: preview/${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          CONNECTION_URL=$(neonctl branches connection-string "$BRANCH_NAME" \
+            --project-id "$NEON_PROJECT_ID" \
+            --role-name neondb \
+            --database-name neondb)
+          echo "DATABASE_URL=$CONNECTION_URL" >> $GITHUB_ENV
+        
+      - name: Run Prisma Migrate
+        run: npx prisma migrate deploy

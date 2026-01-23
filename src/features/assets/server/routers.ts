@@ -1,13 +1,18 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
   createPaginatedResponseSchema,
+  createPaginatedResponseWithLinksSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
+import { cpeToDeviceGroup } from "@/lib/router-utils";
 import {
   cpeSchema,
+  deviceGroupSchema,
+  deviceGroupSelect,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -15,13 +20,35 @@ import {
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
 
-// Validation schemas matching the FastAPI spec
+const AssetStatus = z.enum(["Active", "Decommissioned", "Maintenance"]);
+
 const assetInputSchema = z.object({
   ip: z.string().min(1),
+  networkSegment: z.string().optional(),
   cpe: cpeSchema,
   role: z.string().min(1),
   upstreamApi: safeUrlSchema,
+  hostname: z.string().optional(),
+  macAddress: z.string().optional(),
+  serialNumber: z.string().optional(),
+  location: z
+    .object({
+      facility: z.string().optional(),
+      building: z.string().optional(),
+      floor: z.string().optional(),
+      room: z.string().optional(),
+    })
+    .optional(),
+  status: AssetStatus.optional(),
 });
+
+const integrationAssetSchema = assetInputSchema.extend({
+  vendorId: z.string(),
+});
+const updateAssetSchema = assetInputSchema.extend({
+  id: z.string(),
+});
+const integrationResponseSchema = z.object({});
 
 // NOTE: tRPC / OpenAPI doesn't allow for arrays as the INPUT schema
 // if you try it will default to a single asset schema
@@ -30,18 +57,18 @@ const assetArrayInputSchema = z.object({
   assets: z.array(assetInputSchema).nonempty(),
 });
 
-const assetSettingsInputSchema = z.object({
-  url: safeUrlSchema,
-  name: z.string().min(1),
-  token: z.string().min(1),
-});
-
 const assetResponseSchema = z.object({
   id: z.string(),
   ip: z.string(),
-  cpe: z.string(),
+  deviceGroup: deviceGroupSchema,
   role: z.string(),
   upstreamApi: z.string(),
+  networkSegment: z.string().nullable(),
+  hostname: z.string().nullable(),
+  macAddress: z.string().nullable(),
+  serialNumber: z.string().nullable(),
+  location: z.unknown().nullable(),
+  status: AssetStatus.nullable(),
   userId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -52,6 +79,12 @@ const assetArrayResponseSchema = z.array(assetResponseSchema);
 
 const paginatedAssetResponseSchema =
   createPaginatedResponseSchema(assetResponseSchema);
+
+const integrationAssetInputSchema = createPaginatedResponseWithLinksSchema(
+  integrationAssetSchema,
+).extend({
+  vendor: z.string(),
+});
 
 const settingsResponseSchema = z.object({
   id: z.string(),
@@ -64,7 +97,7 @@ const settingsResponseSchema = z.object({
   user: userSchema,
 });
 
-const paginatedSettingsResponseSchema = createPaginatedResponseSchema(
+const _paginatedSettingsResponseSchema = createPaginatedResponseSchema(
   settingsResponseSchema,
 );
 
@@ -97,8 +130,15 @@ export const assetsRouter = createTRPCRouter({
         ? {
             OR: [
               { ip: { contains: search, mode: "insensitive" as const } },
-              { cpe: { contains: search, mode: "insensitive" as const } },
               { role: { contains: search, mode: "insensitive" as const } },
+              {
+                deviceGroup: {
+                  cpe: {
+                    contains: search,
+                    mode: "insensitive" as const,
+                  },
+                },
+              },
             ],
           }
         : {};
@@ -112,7 +152,7 @@ export const assetsRouter = createTRPCRouter({
         skip: meta.skip,
         take: meta.take,
         where: where,
-        include: { user: userIncludeSelect },
+        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
         orderBy: { createdAt: "desc" },
       });
 
@@ -130,8 +170,15 @@ export const assetsRouter = createTRPCRouter({
         ? {
             OR: [
               { ip: { contains: search, mode: "insensitive" as const } },
-              { cpe: { contains: search, mode: "insensitive" as const } },
               { role: { contains: search, mode: "insensitive" as const } },
+              {
+                deviceGroup: {
+                  cpe: {
+                    contains: search,
+                    mode: "insensitive" as const,
+                  },
+                },
+              },
             ],
           }
         : {};
@@ -153,7 +200,11 @@ export const assetsRouter = createTRPCRouter({
         skip: meta.skip,
         take: meta.take,
         where: where,
-        include: { user: userIncludeSelect, issues: true },
+        include: {
+          user: userIncludeSelect,
+          deviceGroup: deviceGroupSelect,
+          issues: true,
+        },
         orderBy: sort
           ? [
               ...sort.split(",").map((s) => {
@@ -189,7 +240,7 @@ export const assetsRouter = createTRPCRouter({
       const where = {
         OR: [
           ...(assetIds?.length ? [{ id: { in: assetIds } }] : []),
-          ...(cpes?.length ? [{ cpe: { in: cpes } }] : []),
+          ...(cpes?.length ? [{ deviceGroup: { cpe: { in: cpes } } }] : []),
           // TODO:: ^this needs to be a pattern match, not just "in"
         ],
       };
@@ -197,14 +248,18 @@ export const assetsRouter = createTRPCRouter({
 
       const assetItems = await prisma.asset.findMany({
         where: where,
-        include: { user: userIncludeSelect },
+        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
         orderBy: { updatedAt: "desc" },
       });
 
-      const assetCpes = assetItems.map((asset) => asset.cpe).filter(Boolean);
+      const assetCpes = assetItems
+        .map((asset) => asset.deviceGroup.cpe)
+        .filter(Boolean);
       const allCpes = [...new Set([...(cpes ?? []), ...assetCpes])];
 
-      const vulnsWhere = { cpe: { in: allCpes } };
+      const vulnsWhere = {
+        affectedDeviceGroups: { some: { cpe: { in: allCpes } } },
+      };
       const vulnsCount = await prisma.vulnerability.count({
         where: vulnsWhere,
       });
@@ -237,7 +292,7 @@ export const assetsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       return prisma.asset.findUniqueOrThrow({
         where: { id: input.id },
-        include: { user: userIncludeSelect },
+        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
       });
     }),
 
@@ -255,13 +310,16 @@ export const assetsRouter = createTRPCRouter({
       },
     })
     .output(assetResponseSchema)
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const { cpe, ...dataInput } = input;
+      const deviceGroup = await cpeToDeviceGroup(cpe);
       return prisma.asset.create({
         data: {
-          ...input,
+          ...dataInput,
+          deviceGroupId: deviceGroup.id,
           userId: ctx.auth.user.id,
         },
-        include: { user: userIncludeSelect },
+        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
       });
     }),
 
@@ -279,18 +337,53 @@ export const assetsRouter = createTRPCRouter({
       },
     })
     .output(assetArrayResponseSchema)
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // resolve all device groups in parallel
+      const deviceGroupPromises = input.assets.map(async (asset) => {
+        const { cpe } = asset;
+        return await cpeToDeviceGroup(cpe);
+      });
+
+      const deviceGroups = await Promise.all(deviceGroupPromises);
+
+      // create all assets in a transaction
       return prisma.$transaction(
-        input.assets.map((asset) => {
+        input.assets.map((asset, index) => {
+          const { cpe: _cpe, ...dataInput } = asset;
           return prisma.asset.create({
             data: {
-              ...asset,
+              ...dataInput,
+              deviceGroupId: deviceGroups[index].id,
               userId: ctx.auth.user.id,
             },
-            include: { user: userIncludeSelect },
+            include: {
+              user: userIncludeSelect,
+              deviceGroup: deviceGroupSelect,
+            },
           });
         }),
       );
+    }),
+
+  // POST /api/assets/integrationUpload
+  // TODO: VW-38
+  processIntegrationCreate: protectedProcedure
+    .input(integrationAssetInputSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/assets/integrationUpload",
+        tags: ["Assets"],
+        summary: "Synchronize assets with integration",
+        description: "Synchronize assets on VIPER from a partnered platform",
+      },
+    })
+    .output(integrationResponseSchema)
+    .mutation(() => {
+      throw new TRPCError({
+        code: "NOT_IMPLEMENTED",
+        message: "This endpoint is not implemented yet.",
+      });
     }),
 
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)
@@ -313,21 +406,13 @@ export const assetsRouter = createTRPCRouter({
 
       return prisma.asset.delete({
         where: { id: input.id },
-        include: { user: userIncludeSelect },
+        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
       });
     }),
 
   // PUT /api/assets/{asset_id} - Update asset (only creator can update)
   update: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        ip: z.string().min(1),
-        cpe: cpeSchema,
-        role: z.string().min(1),
-        upstreamApi: safeUrlSchema,
-      }),
-    )
+    .input(updateAssetSchema)
     .meta({
       openapi: {
         method: "PUT",
@@ -343,110 +428,15 @@ export const assetsRouter = createTRPCRouter({
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "asset");
 
-      const { id, ...updateData } = input;
+      const { id, cpe, ...updateData } = input;
+      const deviceGroup = await cpeToDeviceGroup(cpe);
       return prisma.asset.update({
         where: { id },
-        data: updateData,
-        include: { user: userIncludeSelect },
-      });
-    }),
-
-  // GET /api/assets/settings - List all asset settings
-  getSettings: protectedProcedure
-    .input(paginationInputSchema)
-    .meta({
-      openapi: {
-        method: "GET",
-        path: "/assets/settings",
-        tags: ["Assets"],
-        summary: "Get Asset Manager Settings",
-        description:
-          "Get all asset managers that have been set up. Any authenticated user can view all settings.",
-      },
-    })
-    .output(paginatedSettingsResponseSchema)
-    .query(async ({ input }) => {
-      const { search } = input;
-
-      const searchFilter = search
-        ? {
-            OR: [
-              { name: { contains: search, mode: "insensitive" as const } },
-              { url: { contains: search, mode: "insensitive" as const } },
-            ],
-          }
-        : {};
-
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.assetSettings.count({
-        where: searchFilter,
-      });
-      const meta = buildPaginationMeta(input, totalCount);
-
-      // Fetch paginated items
-      const rawItems = await prisma.assetSettings.findMany({
-        skip: meta.skip,
-        take: meta.take,
-        where: searchFilter,
-        select: {
-          id: true,
-          url: true,
-          name: true,
-          token: true, // Select to check if exists, but don't return
-          userId: true,
-          createdAt: true,
-          updatedAt: true,
-          user: userIncludeSelect,
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      // Map items to exclude token and add hasToken flag
-      const items = rawItems.map(({ token, ...item }) => ({
-        ...item,
-        hasToken: !!token && token.length > 0,
-      }));
-
-      return createPaginatedResponse(items, meta);
-    }),
-
-  // POST /api/assets/settings - Create asset setting
-  createSetting: protectedProcedure
-    .input(assetSettingsInputSchema)
-    .meta({
-      openapi: {
-        method: "POST",
-        path: "/assets/settings",
-        tags: ["Assets"],
-        summary: "Create Asset Manager",
-        description:
-          "Create a new asset manager to sync from. The authenticated user will be recorded as the creator.",
-      },
-    })
-    .output(settingsResponseSchema)
-    .mutation(async ({ ctx, input }) => {
-      const created = await prisma.assetSettings.create({
         data: {
-          ...input,
-          userId: ctx.auth.user.id,
+          deviceGroupId: deviceGroup.id,
+          ...updateData,
         },
-        select: {
-          id: true,
-          url: true,
-          name: true,
-          token: true, // Select to check if exists, but don't return
-          userId: true,
-          createdAt: true,
-          updatedAt: true,
-          user: userIncludeSelect,
-        },
+        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
       });
-
-      // Exclude token from response, add hasToken flag
-      const { token, ...response } = created;
-      return {
-        ...response,
-        hasToken: !!token && token.length > 0,
-      };
     }),
 });

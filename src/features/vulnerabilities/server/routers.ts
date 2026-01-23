@@ -6,8 +6,11 @@ import {
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
+import { cpesToDeviceGroups } from "@/lib/router-utils";
 import {
   cpeSchema,
+  deviceGroupSchema,
+  deviceGroupSelect,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -18,7 +21,7 @@ import { requireOwnership } from "@/trpc/middleware";
 // Validation schemas
 const vulnerabilityInputSchema = z.object({
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  cpe: cpeSchema,
+  cpes: z.array(cpeSchema).min(1, "At least one CPE is required"),
   exploitUri: safeUrlSchema,
   upstreamApi: safeUrlSchema,
   description: z.string().min(1),
@@ -29,7 +32,7 @@ const vulnerabilityInputSchema = z.object({
 const vulnerabilityResponseSchema = z.object({
   id: z.string(),
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  cpe: z.string(),
+  affectedDeviceGroups: z.array(deviceGroupSchema),
   exploitUri: z.string(),
   upstreamApi: z.string(),
   description: z.string(),
@@ -67,11 +70,20 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const searchFilter = search
         ? {
             OR: [
-              { cpe: { contains: search, mode: "insensitive" as const } },
               {
                 description: { contains: search, mode: "insensitive" as const },
               },
               { impact: { contains: search, mode: "insensitive" as const } },
+              {
+                affectedDeviceGroups: {
+                  some: {
+                    cpe: {
+                      contains: search,
+                      mode: "insensitive" as const,
+                    },
+                  },
+                },
+              },
             ],
           }
         : {};
@@ -87,7 +99,10 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         skip: meta.skip,
         take: meta.take,
         where: searchFilter,
-        include: { user: userIncludeSelect },
+        include: {
+          user: userIncludeSelect,
+          affectedDeviceGroups: deviceGroupSelect,
+        },
         orderBy: { createdAt: "desc" },
       });
 
@@ -104,7 +119,16 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const searchFilter = search
         ? {
             OR: [
-              { cpe: { contains: search, mode: "insensitive" as const } },
+              {
+                affectedDeviceGroups: {
+                  some: {
+                    cpe: {
+                      contains: search,
+                      mode: "insensitive" as const,
+                    },
+                  },
+                },
+              },
               {
                 description: { contains: search, mode: "insensitive" as const },
               },
@@ -132,7 +156,11 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         skip: meta.skip,
         take: meta.take,
         where: searchFilter,
-        include: { user: userIncludeSelect, issues: true },
+        include: {
+          user: userIncludeSelect,
+          issues: true,
+          affectedDeviceGroups: deviceGroupSelect,
+        },
         orderBy: sort
           ? [
               ...sort.split(",").map((s) => {
@@ -163,7 +191,10 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       return prisma.vulnerability.findUniqueOrThrow({
         where: { id: input.id },
-        include: { user: userIncludeSelect },
+        include: {
+          user: userIncludeSelect,
+          affectedDeviceGroups: deviceGroupSelect,
+        },
       });
     }),
 
@@ -181,13 +212,22 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       },
     })
     .output(vulnerabilityResponseSchema)
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const { cpes, ...dataInput } = input;
+      const uniqueCpes = [...new Set(cpes)];
+      const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
       return prisma.vulnerability.create({
         data: {
-          ...input,
+          ...dataInput,
+          affectedDeviceGroups: {
+            connect: deviceGroups.map((dg) => ({ id: dg.id })),
+          },
           userId: ctx.auth.user.id,
         },
-        include: { user: userIncludeSelect },
+        include: {
+          user: userIncludeSelect,
+          affectedDeviceGroups: deviceGroupSelect,
+        },
       });
     }),
 
@@ -211,7 +251,10 @@ export const vulnerabilitiesRouter = createTRPCRouter({
 
       return prisma.vulnerability.delete({
         where: { id: input.id },
-        include: { user: userIncludeSelect },
+        include: {
+          user: userIncludeSelect,
+          affectedDeviceGroups: deviceGroupSelect,
+        },
       });
     }),
 
@@ -237,11 +280,21 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "vulnerability");
+      const { cpes, ...dataInput } = input.data;
+      const deviceGroups = await cpesToDeviceGroups(cpes);
 
       return prisma.vulnerability.update({
         where: { id: input.id },
-        data: input.data,
-        include: { user: userIncludeSelect },
+        data: {
+          ...dataInput,
+          affectedDeviceGroups: {
+            set: deviceGroups.map((dg) => ({ id: dg.id })),
+          },
+        },
+        include: {
+          user: userIncludeSelect,
+          affectedDeviceGroups: deviceGroupSelect,
+        },
       });
     }),
 });

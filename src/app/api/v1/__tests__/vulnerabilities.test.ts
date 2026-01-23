@@ -7,7 +7,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
 
   const payload = {
     sarif: { tool: { driver: { name: "TestScanner" } } },
-    cpe: generateCPE("vuln_v1"),
+    cpes: [generateCPE("vuln_v1")],
     exploitUri: "https://exploit-db.com/1234",
     upstreamApi: "https://nvd.nist.gov/api",
     description: "Buffer overflow in device X",
@@ -52,6 +52,16 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
 
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.id).toBe(vulnerabilityId);
+
+    expect(Array.isArray(detailRes.body.affectedDeviceGroups)).toBe(true);
+
+    // Check that the array has one element
+    expect(detailRes.body.affectedDeviceGroups.length).toBe(1);
+
+    // Check that the single object in the array has the correct .cpe value
+    expect(detailRes.body.affectedDeviceGroups[0]).toEqual(
+      expect.objectContaining({ cpe: payload.cpes[0] }),
+    );
 
     const deleteRes = await request(BASE_URL)
       .delete(`/vulnerabilities/${vulnerabilityId}`)

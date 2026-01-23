@@ -78,11 +78,11 @@ const VulnList = ({
   paramKey,
   onPageChange,
 }: VulnListProps) => {
+  const router = useRouter();
+
   if (items === undefined || items.length === 0) {
     return <p className="flex justify-center pt-24">No Issues found</p>;
   }
-
-  const router = useRouter();
 
   return (
     <>

@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import type { Remediation } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
+import type { DeviceGroupIncludeType } from "@/lib/schemas";
 import {
   useRemoveRemediation,
   useSuspenseRemediations,
@@ -118,13 +119,14 @@ export const RemediationsEmpty = () => {
   );
 };
 
-type RemediationWithRelations = Remediation & {
+type RemediationWithRelations = Omit<Remediation, "deviceGroupId"> & {
   vulnerability: {
     id: string;
-    cpe: string;
+    affectedDeviceGroups: DeviceGroupIncludeType[];
     description: string;
     impact: string;
   };
+  deviceGroup: DeviceGroupIncludeType;
 };
 
 export const RemediationItem = ({
@@ -177,12 +179,12 @@ function RemediationDrawer({
           variant="link"
           className="text-foreground h-auto p-0 text-left font-medium"
         >
-          {remediation.cpe}
+          {remediation.deviceGroup.cpe}
         </Button>
       </DrawerTrigger>
       <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
         <DrawerHeader className="gap-1">
-          <DrawerTitle>{remediation.cpe}</DrawerTitle>
+          <DrawerTitle>{remediation.deviceGroup.id}</DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
             <Badge variant="outline" className="text-primary">
               <WrenchIcon className="size-3 mr-1" />
@@ -221,7 +223,9 @@ function RemediationDrawer({
               <div className="flex items-center gap-2 mb-2">
                 <AlertTriangleIcon className="size-4 text-destructive" />
                 <span className="font-medium text-sm">
-                  {remediation.vulnerability.cpe}
+                  {remediation.vulnerability.affectedDeviceGroups
+                    .map((group) => group.cpe)
+                    .join(", ")}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mb-2">
@@ -248,7 +252,7 @@ function RemediationDrawer({
                   CPE Identifier
                 </div>
                 <code className="text-xs bg-muted px-2 py-1 rounded">
-                  {remediation.cpe}
+                  {remediation.deviceGroup.cpe}
                 </code>
               </div>
 

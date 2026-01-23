@@ -48,6 +48,12 @@ The seed script will:
 1. Check if the seed user exists (creates if needed)
 2. Seed 20 realistic hospital assets owned by the seed user
 
+If you also want a temporary (24 hour) testing API key, run:
+
+```bash
+npm run db:create-test-api-key
+``` 
+
 ### Optional: Clear database before seeding
 
 ```bash

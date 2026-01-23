@@ -1,7 +1,6 @@
 import { hashPassword } from "better-auth/crypto";
-import { PrismaClient } from "@/generated/prisma";
-
-const prisma = new PrismaClient();
+import type { AssetStatus } from "@/generated/prisma";
+import prisma from "@/lib/db";
 
 // Seed user credentials
 const SEED_USER = {
@@ -10,7 +9,144 @@ const SEED_USER = {
   name: "Seed User",
 };
 
-// Sample hospital asset data
+// Sample device groups (manufacturers and models)
+const SAMPLE_DEVICE_GROUPS = [
+  // ICU Medical Devices
+  {
+    cpe: "cpe:2.3:h:philips:intellivue_mp70:*:*:*:*:*:*:*:*",
+    manufacturer: "Philips",
+    modelName: "IntelliVue MP70",
+    version: "Rev B",
+  },
+  {
+    cpe: "cpe:2.3:h:baxter:infusion_pump:sigma_spectrum:*:*:*:*:*:*:*",
+    manufacturer: "Baxter",
+    modelName: "Sigma Spectrum Infusion Pump",
+    version: "8.0",
+  },
+  {
+    cpe: "cpe:2.3:h:ge_healthcare:dash_4000:*:*:*:*:*:*:*:*",
+    manufacturer: "GE Healthcare",
+    modelName: "DASH 4000",
+    version: "3.0",
+  },
+  {
+    cpe: "cpe:2.3:h:draeger:evita_v500:*:*:*:*:*:*:*:*",
+    manufacturer: "Dräger",
+    modelName: "Evita V500",
+    version: "2.5",
+  },
+  // Laboratory Equipment
+  {
+    cpe: "cpe:2.3:h:roche:cobas_6000:*:*:*:*:*:*:*:*",
+    manufacturer: "Roche",
+    modelName: "Cobas 6000",
+    version: "c501",
+  },
+  {
+    cpe: "cpe:2.3:h:abbott:architect_i2000sr:*:*:*:*:*:*:*:*",
+    manufacturer: "Abbott",
+    modelName: "Architect i2000SR",
+    version: "5.0",
+  },
+  {
+    cpe: "cpe:2.3:h:sysmex:xs-1000i:*:*:*:*:*:*:*:*",
+    manufacturer: "Sysmex",
+    modelName: "XS-1000i",
+    version: "1.2",
+  },
+  // Imaging Equipment
+  {
+    cpe: "cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*",
+    manufacturer: "Siemens Healthineers",
+    modelName: "Magnetom Aera",
+    version: "VE11C",
+  },
+  {
+    cpe: "cpe:2.3:h:ge_healthcare:optima_ct660:*:*:*:*:*:*:*:*",
+    manufacturer: "GE Healthcare",
+    modelName: "Optima CT660",
+    version: "15.0",
+  },
+  {
+    cpe: "cpe:2.3:h:fujifilm:fcr_xg-1:*:*:*:*:*:*:*:*",
+    manufacturer: "Fujifilm",
+    modelName: "FCR XG-1",
+    version: "2.0",
+  },
+  // IT Infrastructure
+  {
+    cpe: "cpe:2.3:a:epic:emr:2023:*:*:*:*:*:*:*",
+    manufacturer: "Epic Systems",
+    modelName: "EMR",
+    version: "2023",
+  },
+  {
+    cpe: "cpe:2.3:a:cerner:millennium:*:*:*:*:*:*:*:*",
+    manufacturer: "Cerner",
+    modelName: "Millennium",
+    version: "2023.1",
+  },
+  {
+    cpe: "cpe:2.3:a:meditech:expanse:*:*:*:*:*:*:*:*",
+    manufacturer: "Meditech",
+    modelName: "Expanse",
+    version: "7.0",
+  },
+  {
+    cpe: "cpe:2.3:h:cisco:unified_communications:*:*:*:*:*:*:*:*",
+    manufacturer: "Cisco",
+    modelName: "Unified Communications",
+    version: "12.5",
+  },
+  // Surgical Equipment
+  {
+    cpe: "cpe:2.3:h:stryker:surgical_navigation:*:*:*:*:*:*:*:*",
+    manufacturer: "Stryker",
+    modelName: "Surgical Navigation System",
+    version: "8.0",
+  },
+  {
+    cpe: "cpe:2.3:h:intuitive:da_vinci_xi:*:*:*:*:*:*:*:*",
+    manufacturer: "Intuitive Surgical",
+    modelName: "da Vinci Xi",
+    version: "5.0",
+  },
+  // Workstations
+  {
+    cpe: "cpe:2.3:h:dell:optiplex_7090:*:*:*:*:*:*:*:*",
+    manufacturer: "Dell",
+    modelName: "OptiPlex 7090",
+    version: "N/A",
+  },
+  {
+    cpe: "cpe:2.3:h:hp:elitedesk_800:*:*:*:*:*:*:*:*",
+    manufacturer: "HP",
+    modelName: "EliteDesk 800",
+    version: "G8",
+  },
+  {
+    cpe: "cpe:2.3:h:lenovo:thinkcentre_m90a:*:*:*:*:*:*:*:*",
+    manufacturer: "Lenovo",
+    modelName: "ThinkCentre M90a",
+    version: "Gen 3",
+  },
+  // Network Infrastructure
+  {
+    cpe: "cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*",
+    manufacturer: "Cisco",
+    modelName: "Catalyst 9300",
+    version: "IOS-XE 17.6",
+  },
+  {
+    cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
+    manufacturer: "Fortinet",
+    modelName: "FortiGate 600E",
+    version: "7.0",
+  },
+];
+
+// Sample hospital asset data (individual devices)
 const SAMPLE_ASSETS = [
   // ICU Medical Devices
   {
@@ -18,138 +154,363 @@ const SAMPLE_ASSETS = [
     cpe: "cpe:2.3:h:philips:intellivue_mp70:*:*:*:*:*:*:*:*",
     role: "ICU Patient Monitor",
     upstreamApi: "https://api.philips.com/devices/monitor",
+    networkSegment: "ICU-VLAN-20",
+    hostname: "ICU-MON-101",
+    macAddress: "00:1A:2B:3C:4D:5E",
+    serialNumber: "PH-MP70-2023-001",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower A",
+      floor: "3",
+      room: "ICU-301",
+    },
+    status: "Active",
   },
   {
     ip: "10.20.1.102",
     cpe: "cpe:2.3:h:baxter:infusion_pump:sigma_spectrum:*:*:*:*:*:*:*",
     role: "Infusion Pump",
     upstreamApi: "https://api.baxter.com/devices/pump",
+    networkSegment: "ICU-VLAN-20",
+    hostname: "ICU-PUMP-102",
+    macAddress: "00:1A:2B:3C:4D:5F",
+    serialNumber: "BX-SS-2023-042",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower A",
+      floor: "3",
+      room: "ICU-302",
+    },
+    status: "Active",
   },
   {
     ip: "10.20.1.103",
     cpe: "cpe:2.3:h:ge_healthcare:dash_4000:*:*:*:*:*:*:*:*",
     role: "Vital Signs Monitor",
     upstreamApi: "https://api.gehealthcare.com/devices/vitals",
+    networkSegment: "ICU-VLAN-20",
+    hostname: "ICU-VITAL-103",
+    macAddress: "00:1A:2B:3C:4D:60",
+    serialNumber: "GE-D4K-2023-078",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower A",
+      floor: "3",
+      room: "ICU-303",
+    },
+    status: "Active",
   },
   {
     ip: "10.20.1.104",
     cpe: "cpe:2.3:h:draeger:evita_v500:*:*:*:*:*:*:*:*",
     role: "Ventilator",
     upstreamApi: "https://api.draeger.com/devices/ventilator",
+    networkSegment: "ICU-VLAN-20",
+    hostname: "ICU-VENT-104",
+    macAddress: "00:1A:2B:3C:4D:61",
+    serialNumber: "DR-EV5-2023-015",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower A",
+      floor: "3",
+      room: "ICU-304",
+    },
+    status: "Active",
   },
-
   // Laboratory Equipment
   {
     ip: "10.30.2.201",
     cpe: "cpe:2.3:h:roche:cobas_6000:*:*:*:*:*:*:*:*",
     role: "Laboratory Analyzer",
     upstreamApi: "https://api.roche.com/lab/analyzer",
+    networkSegment: "LAB-VLAN-30",
+    hostname: "LAB-COBAS-201",
+    macAddress: "00:1A:2B:3C:4D:62",
+    serialNumber: "RC-C6K-2023-009",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower B",
+      floor: "1",
+      room: "Lab-Core",
+    },
+    status: "Active",
   },
   {
     ip: "10.30.2.202",
     cpe: "cpe:2.3:h:abbott:architect_i2000sr:*:*:*:*:*:*:*:*",
     role: "Immunoassay Analyzer",
     upstreamApi: "https://api.abbott.com/lab/immunoassay",
+    networkSegment: "LAB-VLAN-30",
+    hostname: "LAB-ABBOTT-202",
+    macAddress: "00:1A:2B:3C:4D:63",
+    serialNumber: "AB-I2K-2023-024",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower B",
+      floor: "1",
+      room: "Lab-Immuno",
+    },
+    status: "Active",
   },
   {
     ip: "10.30.2.203",
     cpe: "cpe:2.3:h:sysmex:xs-1000i:*:*:*:*:*:*:*:*",
     role: "Hematology Analyzer",
     upstreamApi: "https://api.sysmex.com/lab/hematology",
+    networkSegment: "LAB-VLAN-30",
+    hostname: "LAB-SYSMEX-203",
+    macAddress: "00:1A:2B:3C:4D:64",
+    serialNumber: "SY-XS1-2023-051",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower B",
+      floor: "1",
+      room: "Lab-Heme",
+    },
+    status: "Active",
   },
-
   // Imaging Equipment
   {
     ip: "10.40.3.301",
     cpe: "cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*",
     role: "MRI Scanner",
     upstreamApi: "https://api.siemens-healthineers.com/imaging/mri",
+    networkSegment: "IMAGING-VLAN-40",
+    hostname: "RAD-MRI-301",
+    macAddress: "00:1A:2B:3C:4D:65",
+    serialNumber: "SI-MAG-2023-003",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower C",
+      floor: "1",
+      room: "MRI-Suite-1",
+    },
+    status: "Active",
   },
   {
     ip: "10.40.3.302",
     cpe: "cpe:2.3:h:ge_healthcare:optima_ct660:*:*:*:*:*:*:*:*",
     role: "CT Scanner",
     upstreamApi: "https://api.gehealthcare.com/imaging/ct",
+    networkSegment: "IMAGING-VLAN-40",
+    hostname: "RAD-CT-302",
+    macAddress: "00:1A:2B:3C:4D:66",
+    serialNumber: "GE-CT6-2023-012",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower C",
+      floor: "1",
+      room: "CT-Suite-2",
+    },
+    status: "Active",
   },
   {
     ip: "10.40.3.303",
     cpe: "cpe:2.3:h:fujifilm:fcr_xg-1:*:*:*:*:*:*:*:*",
     role: "X-Ray System",
     upstreamApi: "https://api.fujifilm.com/imaging/xray",
+    networkSegment: "IMAGING-VLAN-40",
+    hostname: "RAD-XRAY-303",
+    macAddress: "00:1A:2B:3C:4D:67",
+    serialNumber: "FJ-XG1-2023-087",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower C",
+      floor: "1",
+      room: "XRay-Room-3",
+    },
+    status: "Active",
   },
-
   // IT Infrastructure
   {
     ip: "10.10.4.401",
     cpe: "cpe:2.3:a:epic:emr:2023:*:*:*:*:*:*:*",
     role: "EMR Server",
     upstreamApi: "https://api.epic.com/emr/server",
+    networkSegment: "IT-SERVER-VLAN-10",
+    hostname: "EMR-PROD-401",
+    macAddress: "00:1A:2B:3C:4D:68",
+    serialNumber: "EP-EMR-2023-001",
+    location: {
+      facility: "Main Hospital",
+      building: "Data Center",
+      floor: "B1",
+      room: "DC-Rack-12",
+    },
+    status: "Active",
   },
   {
     ip: "10.10.4.402",
     cpe: "cpe:2.3:a:cerner:millennium:*:*:*:*:*:*:*:*",
     role: "Clinical Information System",
     upstreamApi: "https://api.cerner.com/cis/server",
+    networkSegment: "IT-SERVER-VLAN-10",
+    hostname: "CIS-PROD-402",
+    macAddress: "00:1A:2B:3C:4D:69",
+    serialNumber: "CR-MIL-2023-005",
+    location: {
+      facility: "Main Hospital",
+      building: "Data Center",
+      floor: "B1",
+      room: "DC-Rack-13",
+    },
+    status: "Active",
   },
   {
     ip: "10.10.4.403",
     cpe: "cpe:2.3:a:meditech:expanse:*:*:*:*:*:*:*:*",
     role: "Pharmacy System",
     upstreamApi: "https://api.meditech.com/pharmacy/server",
+    networkSegment: "IT-SERVER-VLAN-10",
+    hostname: "PHARM-PROD-403",
+    macAddress: "00:1A:2B:3C:4D:6A",
+    serialNumber: "MT-EXP-2023-008",
+    location: {
+      facility: "Main Hospital",
+      building: "Data Center",
+      floor: "B1",
+      room: "DC-Rack-14",
+    },
+    status: "Active",
   },
   {
     ip: "10.10.4.404",
     cpe: "cpe:2.3:h:cisco:unified_communications:*:*:*:*:*:*:*:*",
     role: "Nurse Call System",
     upstreamApi: "https://api.cisco.com/communications/nurse",
+    networkSegment: "IT-SERVER-VLAN-10",
+    hostname: "NURSE-CALL-404",
+    macAddress: "00:1A:2B:3C:4D:6B",
+    serialNumber: "CS-UC-2023-019",
+    location: {
+      facility: "Main Hospital",
+      building: "Data Center",
+      floor: "B1",
+      room: "DC-Rack-15",
+    },
+    status: "Active",
   },
-
   // Surgical Equipment
   {
     ip: "10.50.5.501",
     cpe: "cpe:2.3:h:stryker:surgical_navigation:*:*:*:*:*:*:*:*",
     role: "Surgical Navigation System",
     upstreamApi: "https://api.stryker.com/surgical/navigation",
+    networkSegment: "OR-VLAN-50",
+    hostname: "OR-NAV-501",
+    macAddress: "00:1A:2B:3C:4D:6C",
+    serialNumber: "ST-NAV-2023-007",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower A",
+      floor: "4",
+      room: "OR-5",
+    },
+    status: "Active",
   },
   {
     ip: "10.50.5.502",
     cpe: "cpe:2.3:h:intuitive:da_vinci_xi:*:*:*:*:*:*:*:*",
     role: "Robotic Surgical System",
     upstreamApi: "https://api.intuitive.com/surgical/robot",
+    networkSegment: "OR-VLAN-50",
+    hostname: "OR-ROBOT-502",
+    macAddress: "00:1A:2B:3C:4D:6D",
+    serialNumber: "IN-DV-2023-002",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower A",
+      floor: "4",
+      room: "OR-6",
+    },
+    status: "Active",
   },
-
   // Workstations
   {
     ip: "10.60.6.601",
     cpe: "cpe:2.3:h:dell:optiplex_7090:*:*:*:*:*:*:*:*",
     role: "Clinical Workstation",
     upstreamApi: "https://api.dell.com/workstation/clinical",
+    networkSegment: "WORKSTATION-VLAN-60",
+    hostname: "WKS-CLINIC-601",
+    macAddress: "00:1A:2B:3C:4D:6E",
+    serialNumber: "DL-OP7-2023-156",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower A",
+      floor: "2",
+      room: "Nurse-Station-2A",
+    },
+    status: "Active",
   },
   {
     ip: "10.60.6.602",
     cpe: "cpe:2.3:h:hp:elitedesk_800:*:*:*:*:*:*:*:*",
     role: "Nurse Station Workstation",
     upstreamApi: "https://api.hp.com/workstation/nurse",
+    networkSegment: "WORKSTATION-VLAN-60",
+    hostname: "WKS-NURSE-602",
+    macAddress: "00:1A:2B:3C:4D:6F",
+    serialNumber: "HP-ED8-2023-234",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower A",
+      floor: "3",
+      room: "Nurse-Station-3A",
+    },
+    status: "Active",
   },
   {
     ip: "10.60.6.603",
     cpe: "cpe:2.3:h:lenovo:thinkcentre_m90a:*:*:*:*:*:*:*:*",
     role: "Administrative Workstation",
     upstreamApi: "https://api.lenovo.com/workstation/admin",
+    networkSegment: "ADMIN-VLAN-65",
+    hostname: "WKS-ADMIN-603",
+    macAddress: "00:1A:2B:3C:4D:70",
+    serialNumber: "LN-M90-2023-089",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower B",
+      floor: "2",
+      room: "Admin-Office-201",
+    },
+    status: "Active",
   },
-
   // Network Infrastructure
   {
     ip: "10.70.7.701",
     cpe: "cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*",
     role: "Network Switch",
     upstreamApi: "https://api.cisco.com/network/switch",
+    networkSegment: "INFRASTRUCTURE-VLAN-70",
+    hostname: "SW-CORE-701",
+    macAddress: "00:1A:2B:3C:4D:71",
+    serialNumber: "CS-C93-2023-045",
+    location: {
+      facility: "Main Hospital",
+      building: "Data Center",
+      floor: "B1",
+      room: "DC-Network",
+    },
+    status: "Active",
   },
   {
     ip: "10.70.7.702",
     cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
     role: "Firewall",
     upstreamApi: "https://api.fortinet.com/network/firewall",
+    networkSegment: "INFRASTRUCTURE-VLAN-70",
+    hostname: "FW-EDGE-702",
+    macAddress: "00:1A:2B:3C:4D:72",
+    serialNumber: "FT-FG6-2023-011",
+    location: {
+      facility: "Main Hospital",
+      building: "Data Center",
+      floor: "B1",
+      room: "DC-Security",
+    },
+    status: "Active",
   },
 ];
 
@@ -504,12 +865,16 @@ async function clearDatabase() {
   console.log("🗑️  Clearing database...");
 
   // Delete in order of dependencies (child tables first)
+  await prisma.issue.deleteMany();
+  await prisma.syncStatus.deleteMany();
+  await prisma.externalAssetMapping.deleteMany();
   await prisma.remediation.deleteMany();
   await prisma.vulnerability.deleteMany();
   await prisma.emulator.deleteMany();
-  await prisma.assetSettings.deleteMany();
+  await prisma.deviceGroupHistory.deleteMany();
   await prisma.asset.deleteMany();
-  // Don't delete users - we'll handle the seed user separately
+  await prisma.deviceGroup.deleteMany();
+  await prisma.integration.deleteMany();
 
   console.log("✅ Database cleared");
 }
@@ -517,7 +882,6 @@ async function clearDatabase() {
 async function createOrGetSeedUser() {
   console.log("\n👤 Creating/finding seed user...");
 
-  // Check if seed user already exists
   let user = await prisma.user.findUnique({
     where: { email: SEED_USER.email },
   });
@@ -527,7 +891,6 @@ async function createOrGetSeedUser() {
     return user;
   }
 
-  // Create new seed user with hashed password
   const hashedPassword = await hashPassword(SEED_USER.password);
 
   user = await prisma.user.create({
@@ -551,40 +914,94 @@ async function createOrGetSeedUser() {
   return user;
 }
 
-async function seedAssets(userId: string) {
-  console.log("\n🌱 Seeding assets...");
+async function seedDeviceGroups() {
+  console.log("\n🌱 Seeding device groups...");
 
-  const assets = await Promise.all(
-    SAMPLE_ASSETS.map((asset) =>
-      prisma.asset.create({
-        data: {
-          ...asset,
-          userId,
-        },
+  const deviceGroups = await Promise.all(
+    SAMPLE_DEVICE_GROUPS.map((dg) =>
+      prisma.deviceGroup.upsert({
+        where: { cpe: dg.cpe },
+        update: dg,
+        create: dg,
       }),
     ),
   );
 
-  console.log(`✅ Seeded ${assets.length} assets`);
-  return assets;
+  console.log(`✅ Seeded ${deviceGroups.length} device groups`);
+  return deviceGroups;
+}
+
+async function seedAssets(userId: string) {
+  console.log("\n🌱 Seeding assets...");
+
+  const assets = await Promise.all(
+    SAMPLE_ASSETS.map(async (asset) => {
+      const deviceGroup = await prisma.deviceGroup.findFirst({
+        where: { cpe: asset.cpe },
+      });
+
+      if (!deviceGroup) {
+        console.warn(`⚠️  No device group found for CPE: ${asset.cpe}`);
+        return null;
+      }
+
+      return prisma.asset.create({
+        data: {
+          ip: asset.ip,
+          networkSegment: asset.networkSegment,
+          role: asset.role,
+          upstreamApi: asset.upstreamApi,
+          hostname: asset.hostname,
+          macAddress: asset.macAddress,
+          serialNumber: asset.serialNumber,
+          location: asset.location,
+          status: asset.status as AssetStatus,
+          deviceGroupId: deviceGroup.id,
+          userId,
+        },
+      });
+    }),
+  );
+
+  const successfulAssets = assets.filter((a) => a !== null);
+  console.log(`✅ Seeded ${successfulAssets.length} assets`);
+  return successfulAssets;
 }
 
 async function seedVulnerabilities(userId: string) {
   console.log("\n🌱 Seeding vulnerabilities...");
 
   const vulnerabilities = await Promise.all(
-    SAMPLE_VULNERABILITIES.map((vulnerability) =>
-      prisma.vulnerability.create({
+    SAMPLE_VULNERABILITIES.map(async (vulnerability) => {
+      const deviceGroup = await prisma.deviceGroup.findFirst({
+        where: { cpe: vulnerability.cpe },
+      });
+
+      if (!deviceGroup) {
+        console.warn(`⚠️  No device group found for CPE: ${vulnerability.cpe}`);
+        return null;
+      }
+
+      return prisma.vulnerability.create({
         data: {
-          ...vulnerability,
+          sarif: vulnerability.sarif,
+          exploitUri: vulnerability.exploitUri,
+          upstreamApi: vulnerability.upstreamApi,
+          description: vulnerability.description,
+          narrative: vulnerability.narrative,
+          impact: vulnerability.impact,
           userId,
+          affectedDeviceGroups: {
+            connect: { id: deviceGroup.id },
+          },
         },
-      }),
-    ),
+      });
+    }),
   );
 
-  console.log(`✅ Seeded ${vulnerabilities.length} vulnerabilities`);
-  return vulnerabilities;
+  const successfulVulnerabilities = vulnerabilities.filter((v) => v !== null);
+  console.log(`✅ Seeded ${successfulVulnerabilities.length} vulnerabilities`);
+  return successfulVulnerabilities;
 }
 
 async function seedRemediations(userId: string) {
@@ -592,9 +1009,21 @@ async function seedRemediations(userId: string) {
 
   const remediations = await Promise.all(
     SAMPLE_REMEDIATIONS.map(async (remediation) => {
-      // Find the vulnerability by CPE to get its ID
-      const vulnerability = await prisma.vulnerability.findFirst({
+      const deviceGroup = await prisma.deviceGroup.findFirst({
         where: { cpe: remediation.cpe },
+      });
+
+      if (!deviceGroup) {
+        console.warn(`⚠️  No device group found for CPE: ${remediation.cpe}`);
+        return null;
+      }
+
+      const vulnerability = await prisma.vulnerability.findFirst({
+        where: {
+          affectedDeviceGroups: {
+            some: { id: deviceGroup.id },
+          },
+        },
       });
 
       if (!vulnerability) {
@@ -605,7 +1034,7 @@ async function seedRemediations(userId: string) {
       return prisma.remediation.create({
         data: {
           fixUri: remediation.fixUri,
-          cpe: remediation.cpe,
+          deviceGroupId: deviceGroup.id,
           description: remediation.description,
           narrative: remediation.narrative,
           upstreamApi: remediation.upstreamApi,
@@ -626,13 +1055,12 @@ async function seedEmulators(userId: string) {
 
   const emulators = await Promise.all(
     SAMPLE_EMULATORS.map(async (emulator) => {
-      // Find the asset by CPE to get its ID
-      const asset = await prisma.asset.findFirst({
+      const deviceGroup = await prisma.deviceGroup.findFirst({
         where: { cpe: emulator.cpe },
       });
 
-      if (!asset) {
-        console.warn(`⚠️  No asset found for CPE: ${emulator.cpe}`);
+      if (!deviceGroup) {
+        console.warn(`⚠️  No device group found for CPE: ${emulator.cpe}`);
         return null;
       }
 
@@ -642,7 +1070,7 @@ async function seedEmulators(userId: string) {
           downloadUrl: emulator.downloadUrl || null,
           dockerUrl: emulator.dockerUrl || null,
           description: emulator.description,
-          assetId: asset.id,
+          deviceGroupId: deviceGroup.id,
           userId,
         },
       });
@@ -654,24 +1082,65 @@ async function seedEmulators(userId: string) {
   return successfulEmulators;
 }
 
+async function seedIssues() {
+  console.log("\n🌱 Seeding issues (linking assets to vulnerabilities)...");
+
+  const assets = await prisma.asset.findMany({
+    include: { deviceGroup: true },
+  });
+
+  const vulnerabilities = await prisma.vulnerability.findMany({
+    include: { affectedDeviceGroups: true },
+  });
+
+  const issues = [];
+
+  for (const asset of assets) {
+    for (const vulnerability of vulnerabilities) {
+      const isAffected = vulnerability.affectedDeviceGroups.some(
+        (dg) => dg.id === asset.deviceGroupId,
+      );
+
+      if (isAffected) {
+        try {
+          const issue = await prisma.issue.create({
+            data: {
+              assetId: asset.id,
+              vulnerabilityId: vulnerability.id,
+              status: "PENDING",
+            },
+          });
+          issues.push(issue);
+        } catch (_error) {
+          console.warn(
+            `⚠️  Issue already exists for asset ${asset.id} and vulnerability ${vulnerability.id}`,
+          );
+        }
+      }
+    }
+  }
+
+  console.log(`✅ Seeded ${issues.length} issues`);
+  return issues;
+}
+
 async function main() {
   console.log("🌱 Starting database seed...\n");
 
   try {
-    // Optional: Clear database before seeding
     const shouldClear = process.env.SEED_CLEAR_DB === "true";
     if (shouldClear) {
       await clearDatabase();
     }
 
-    // Create or get seed user
     const user = await createOrGetSeedUser();
 
-    // Seed data
+    await seedDeviceGroups();
     await seedAssets(user.id);
     await seedVulnerabilities(user.id);
     await seedRemediations(user.id);
     await seedEmulators(user.id);
+    await seedIssues();
 
     console.log("\n✅ Database seeding completed successfully!");
     console.log(`\n📧 Login with: ${SEED_USER.email} / ${SEED_USER.password}`);

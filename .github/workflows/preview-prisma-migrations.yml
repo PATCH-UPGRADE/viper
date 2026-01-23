@@ -1,9 +1,14 @@
 name: Prisma migrations - preview
+
+env:
+  NODE_VERSION: '20'
+
 on:
   pull_request:
     paths:
       - 'prisma/schema.prisma'
       - 'prisma/migrations/**'
+
 jobs:
   migrate-preview:
     runs-on: ubuntu-latest
@@ -15,6 +20,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
 
       - name: Install neonctl
         run: npm install -g neonctl

@@ -27,8 +27,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type { AssetWithDeviceGroup, AssetWithIssues } from "@/lib/db";
-import { useRemoveAsset, useSuspenseAssets } from "../hooks/use-assets";
 import { useAssetsParams } from "../hooks/use-asset-params";
+import { useRemoveAsset, useSuspenseAssets } from "../hooks/use-assets";
 import { columns } from "./columns";
 
 export const AssetsSearch = () => {

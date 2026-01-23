@@ -171,7 +171,7 @@ export const IssuesSidebarList = ({
   const nonActiveIssueStatuses = Object.values(IssueStatus).filter(
     (s) => s !== IssueStatus.ACTIVE,
   );
-  let nonActiveIssueCount: number[] = [];
+  const nonActiveIssueCount: number[] = [];
   let showNonActiveIssueLinks = false;
   for (const issueStatus of nonActiveIssueStatuses) {
     const count = issues.filter((i) => i.status === issueStatus).length;
@@ -273,46 +273,41 @@ export const IssuesSidebarList = ({
       </ul>
 
       {isIssuesOverflow && (
-        <>
-          <div className="flex flex-col gap-2 pt-2">
-            <div className="flex justify-between">
-              <p>
-                Viewing {ACTIVE_ISSUES_SHOWN_MAX} of {issues.length} Active
-                Issues
-              </p>
-              <Link
-                className="text-primary hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-                href={`/assets/${assetId}`}
-              >
-                View All Active Issues
-              </Link>
-            </div>
+        <div className="flex flex-col gap-2 pt-2">
+          <div className="flex justify-between">
+            <p>
+              Viewing {ACTIVE_ISSUES_SHOWN_MAX} of {issues.length} Active Issues
+            </p>
+            <Link
+              className="text-primary hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+              href={`/assets/${assetId}`}
+            >
+              View All Active Issues
+            </Link>
           </div>
-        </>
+        </div>
       )}
 
       {showNonActiveIssueLinks && (
-        <>
-          <div className="flex flex-col gap-2 pt-2">
-            <h5 className="font-bold">Non-Active Issues</h5>
+        <div className="flex flex-col gap-2 pt-2">
+          <h5 className="font-bold">Non-Active Issues</h5>
 
-            {nonActiveIssueCount.map((count, index) => (
-              <Link
-                key={index}
-                className="text-primary hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-                href={`/assets/${assetId}?issueStatus=${nonActiveIssueStatuses[index]}`}
-              >
-                View {count} {statusDetails[nonActiveIssueStatuses[index]].name}{" "}
-                Issue
-                {count > 1 ? "s" : ""}
-              </Link>
-            ))}
-          </div>
-        </>
+          {nonActiveIssueCount.map((count, index) => (
+            <Link
+              key={index}
+              className="text-primary hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+              href={`/assets/${assetId}?issueStatus=${nonActiveIssueStatuses[index]}`}
+            >
+              View {count} {statusDetails[nonActiveIssueStatuses[index]].name}{" "}
+              Issue
+              {count > 1 ? "s" : ""}
+            </Link>
+          ))}
+        </div>
       )}
     </>
   );

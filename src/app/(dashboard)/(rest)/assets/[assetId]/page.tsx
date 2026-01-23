@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import {
   AssetContainer,
   AssetDetailPage,
@@ -9,8 +11,6 @@ import { prefetchIssuesByAssetId } from "@/features/issues/server/prefetch";
 import { IssueStatus } from "@/generated/prisma";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
-import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
 
 interface PageProps {
   params: Promise<{

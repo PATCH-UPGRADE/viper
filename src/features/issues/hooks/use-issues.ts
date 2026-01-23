@@ -4,9 +4,9 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useTRPC } from "@/trpc/client";
-import { IssueStatus } from "@/generated/prisma";
 import { useAssetDetailParams } from "@/features/assets/hooks/use-asset-params";
+import { IssueStatus } from "@/generated/prisma";
+import { useTRPC } from "@/trpc/client";
 
 /**
  * Hook to update an issue status
@@ -62,7 +62,7 @@ export const useSuspenseIssuesByAssetId = ({
   let page = 1;
   for (const status of Object.values(IssueStatus)) {
     if (params.issueStatus === status) {
-      const key = status.toLowerCase() + "Page";
+      const key = `${status.toLowerCase()}Page`;
       if (key in params) {
         const val = params[key as keyof typeof params];
         if (typeof val === "number") {

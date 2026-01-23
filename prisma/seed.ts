@@ -1107,7 +1107,7 @@ async function seedIssues() {
             data: {
               assetId: asset.id,
               vulnerabilityId: vulnerability.id,
-              status: "PENDING",
+              status: "ACTIVE",
             },
           });
           issues.push(issue);

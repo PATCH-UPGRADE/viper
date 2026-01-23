@@ -1,15 +1,7 @@
 "use client";
 
-import {
-  EntityContainer,
-  ErrorView,
-  LoadingView,
-} from "@/components/entity-components";
-import Link from "next/link";
-import { useSuspenseAsset } from "../hooks/use-assets";
-import { Badge } from "@/components/ui/badge";
-import { CopyCode } from "@/components/ui/code";
-import { Asset, Issue, IssueStatus, Vulnerability } from "@/generated/prisma";
+import { TabsContent } from "@radix-ui/react-tabs";
+import { formatDistanceToNow } from "date-fns";
 import {
   BugIcon,
   ExternalLinkIcon,
@@ -17,8 +9,15 @@ import {
   ServerIcon,
   SlashIcon,
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { formatDistanceToNow } from "date-fns";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import {
+  EntityContainer,
+  ErrorView,
+  LoadingView,
+} from "@/components/entity-components";
+import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -27,29 +26,34 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TabsContent } from "@radix-ui/react-tabs";
-import { useSuspenseIssuesByAssetId } from "@/features/issues/hooks/use-issues";
-import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { CopyCode } from "@/components/ui/code";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { IssueStatusForm } from "@/features/issues/components/issue";
-import { useState } from "react";
 import {
   Pagination,
   PaginationContent,
   PaginationItem,
-  PaginationPrevious,
   PaginationLink,
   PaginationNext,
+  PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { IssueStatusForm } from "@/features/issues/components/issue";
+import { useSuspenseIssuesByAssetId } from "@/features/issues/hooks/use-issues";
+import {
+  type Issue,
+  IssueStatus,
+  type Vulnerability,
+} from "@/generated/prisma";
+import { type PaginatedResponse } from "@/lib/pagination";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
-import { PaginatedResponse } from "@/lib/pagination";
+import { useSuspenseAsset } from "../hooks/use-assets";
 
 export const AssetContainer = ({ children }: { children: React.ReactNode }) => {
   return <EntityContainer>{children}</EntityContainer>;
@@ -64,7 +68,7 @@ export const AssetError = () => {
 };
 
 interface VulnListProps {
-  items: any[];
+  items: ({ vulnerability: Vulnerability } & Issue)[];
   page: number;
   totalPages: number;
   paramKey: string;
@@ -218,7 +222,7 @@ const TabulatedVulnList = ({ assetId }: TabulatedVulnListProps) => {
   };
 
   const getPageFromParams = (status: string): number => {
-    const key = status.toLowerCase() + "Page";
+    const key = `${status.toLowerCase()}Page`;
     if (key in params) {
       const page = params[key as keyof typeof params];
       if (typeof page === "number") {
@@ -228,21 +232,28 @@ const TabulatedVulnList = ({ assetId }: TabulatedVulnListProps) => {
     return 1;
   };
 
-  let results: PaginatedResponse<{ vulnerability: Vulnerability } & Issue>[] =
+  const results: PaginatedResponse<{ vulnerability: Vulnerability } & Issue>[] =
     [];
+  const aResult = useSuspenseIssuesByAssetId({
+    assetId,
+    issueStatus: IssueStatus.ACTIVE,
+  });
+  const fpResult = useSuspenseIssuesByAssetId({
+    assetId,
+    issueStatus: IssueStatus.FALSE_POSITIVE,
+  });
+  const rResult = useSuspenseIssuesByAssetId({
+    assetId,
+    issueStatus: IssueStatus.REMEDIATED,
+  });
+
   let showTabs = false;
-  Object.values(IssueStatus).forEach((issueStatus, index) => {
-    const result = useSuspenseIssuesByAssetId({
-      assetId,
-      issueStatus,
-    });
-
-    results.push(result.data);
-
-    if (!showTabs && results[index].totalCount > 0) {
+  for (const res of [aResult, fpResult, rResult]) {
+    results.push(res.data);
+    if (res.data.totalCount > 0) {
       showTabs = true;
     }
-  });
+  }
 
   return (
     <>
@@ -266,7 +277,7 @@ const TabulatedVulnList = ({ assetId }: TabulatedVulnListProps) => {
                 items={results[i].items}
                 page={getPageFromParams(status)}
                 totalPages={results[i].totalPages}
-                paramKey={status.toLowerCase() + "Page"}
+                paramKey={`${status.toLowerCase()}Page`}
                 onPageChange={handlePageChange}
               />
             </TabsContent>
@@ -288,146 +299,141 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
   const asset = assetResult.data;
 
   return (
-    <>
-      <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4 text-sm">
-        {/* Asset Detail Header */}
-        <div className="flex flex-col">
-          <Breadcrumb className="pb-6">
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/assets">All Assets</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator>
-                <SlashIcon />
-              </BreadcrumbSeparator>
-              <BreadcrumbItem>
-                <BreadcrumbPage>{asset.role}</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+    <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4 text-sm">
+      {/* Asset Detail Header */}
+      <div className="flex flex-col">
+        <Breadcrumb className="pb-6">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/assets">All Assets</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator>
+              <SlashIcon />
+            </BreadcrumbSeparator>
+            <BreadcrumbItem>
+              <BreadcrumbPage>{asset.role}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
-          <h1 className="text-3xl font-semibold tracking-tight pb-2">
-            {asset.role}
-          </h1>
+        <h1 className="text-3xl font-semibold tracking-tight pb-2">
+          {asset.role}
+        </h1>
 
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">
-              <ServerIcon className="size-3 mr-1" />
-              Hospital Asset
-            </Badge>
-            <span className="text-xs">
-              Updated{" "}
-              {formatDistanceToNow(asset.updatedAt, { addSuffix: true })}
-            </span>
-          </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline">
+            <ServerIcon className="size-3 mr-1" />
+            Hospital Asset
+          </Badge>
+          <span className="text-xs">
+            Updated {formatDistanceToNow(asset.updatedAt, { addSuffix: true })}
+          </span>
         </div>
+      </div>
 
-        {/* Left / Right Column Body */}
-        <div className="flex gap-6">
-          {/* Left Column - Meta Information */}
-          <div className="flex flex-col gap-6">
-            <Card className="p-4">
-              {/* Device Information */}
-              <div className="flex flex-col gap-3">
-                <h3 className="font-semibold">Device Information</h3>
+      {/* Left / Right Column Body */}
+      <div className="flex gap-6">
+        {/* Left Column - Meta Information */}
+        <div className="flex flex-col gap-6">
+          <Card className="p-4">
+            {/* Device Information */}
+            <div className="flex flex-col gap-3">
+              <h3 className="font-semibold">Device Information</h3>
 
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      Role
-                    </div>
-                    <div className="text-sm">{asset.role}</div>
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                    Role
                   </div>
-
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      IP Address
-                    </div>
-                    <CopyCode>{asset.ip}</CopyCode>
-                  </div>
-
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      Group ID
-                    </div>
-                    <CopyCode>{asset.deviceGroup.cpe}</CopyCode>
-                  </div>
+                  <div className="text-sm">{asset.role}</div>
                 </div>
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              {/* API Integration */}
-              <div className="flex flex-col gap-3">
-                <h3 className="font-semibold">API Integration</h3>
 
                 <div>
                   <div className="text-xs font-medium text-muted-foreground mb-1">
-                    Upstream API
+                    IP Address
                   </div>
-                  <a
-                    href={asset.upstreamApi}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-                  >
-                    {asset.upstreamApi}
-                    <ExternalLinkIcon className="size-3 flex-shrink-0" />
-                  </a>
+                  <CopyCode>{asset.ip}</CopyCode>
+                </div>
+
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                    Group ID
+                  </div>
+                  <CopyCode>{asset.deviceGroup.cpe}</CopyCode>
                 </div>
               </div>
-            </Card>
+            </div>
+          </Card>
 
-            <Card className="p-4">
-              {/* Metadata */}
-              <div className="flex flex-col gap-3">
-                <h3 className="font-semibold">Metadata</h3>
+          <Card className="p-4">
+            {/* API Integration */}
+            <div className="flex flex-col gap-3">
+              <h3 className="font-semibold">API Integration</h3>
 
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      Created
-                    </div>
-                    <div className="text-xs">
-                      {formatDistanceToNow(asset.createdAt, {
-                        addSuffix: true,
-                      })}{" "}
-                      ({new Date(asset.createdAt).toLocaleString()})
-                    </div>
+              <div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Upstream API
+                </div>
+                <a
+                  href={asset.upstreamApi}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
+                >
+                  {asset.upstreamApi}
+                  <ExternalLinkIcon className="size-3 flex-shrink-0" />
+                </a>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            {/* Metadata */}
+            <div className="flex flex-col gap-3">
+              <h3 className="font-semibold">Metadata</h3>
+
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                    Created
                   </div>
-
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      Last Updated
-                    </div>
-                    <div className="text-xs">
-                      {formatDistanceToNow(asset.updatedAt, {
-                        addSuffix: true,
-                      })}{" "}
-                      ({new Date(asset.updatedAt).toLocaleString()})
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      Asset ID
-                    </div>
-                    <CopyCode>{asset.id}</CopyCode>
+                  <div className="text-xs">
+                    {formatDistanceToNow(asset.createdAt, {
+                      addSuffix: true,
+                    })}{" "}
+                    ({new Date(asset.createdAt).toLocaleString()})
                   </div>
                 </div>
-              </div>
-            </Card>
-          </div>
 
-          {/* Right Column - Vulnerabilities List */}
-          <div className="flex-grow">
-            <h2 className="text-xl font-semibold tracking-tight pb-2">
-              Issues
-            </h2>
-            <TabulatedVulnList assetId={assetId} />
-          </div>
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                    Last Updated
+                  </div>
+                  <div className="text-xs">
+                    {formatDistanceToNow(asset.updatedAt, {
+                      addSuffix: true,
+                    })}{" "}
+                    ({new Date(asset.updatedAt).toLocaleString()})
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                    Asset ID
+                  </div>
+                  <CopyCode>{asset.id}</CopyCode>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Right Column - Vulnerabilities List */}
+        <div className="flex-grow">
+          <h2 className="text-xl font-semibold tracking-tight pb-2">Issues</h2>
+          <TabulatedVulnList assetId={assetId} />
         </div>
       </div>
-    </>
+    </div>
   );
 };

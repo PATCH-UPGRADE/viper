@@ -4,12 +4,11 @@ import {
   AssetError,
   AssetLoading,
 } from "@/features/assets/components/asset";
-import { assetDetailParams } from "@/features/assets/params";
 import { prefetchAsset } from "@/features/assets/server/prefetch";
 import { prefetchIssuesByAssetId } from "@/features/issues/server/prefetch";
+import { IssueStatus } from "@/generated/prisma";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
-import { parseAsNumberLiteral } from "nuqs/server";
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
@@ -25,16 +24,17 @@ const Page = async ({ params }: PageProps) => {
   const { assetId } = await params;
 
   prefetchAsset(assetId);
-  prefetchIssuesByAssetId({ id: assetId, status: "PENDING" });
-  prefetchIssuesByAssetId({ id: assetId, status: "FALSE_POSITIVE" });
-  prefetchIssuesByAssetId({ id: assetId, status: "REMEDIATED" });
+
+  for (const issueStatus of Object.values(IssueStatus)) {
+    prefetchIssuesByAssetId({ assetId: assetId, issueStatus });
+  }
 
   return (
     <AssetContainer>
       <HydrateClient>
         <ErrorBoundary fallback={<AssetError />}>
           <Suspense fallback={<AssetLoading />}>
-            <AssetDetailPage id={assetId} />
+            <AssetDetailPage assetId={assetId} />
           </Suspense>
         </ErrorBoundary>
       </HydrateClient>

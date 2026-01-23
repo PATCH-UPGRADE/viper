@@ -2,7 +2,8 @@ import { parseAsStringEnum } from "nuqs/server";
 import { createPaginationParams } from "@/lib/url-state";
 import { PAGINATION } from "@/config/constants";
 import { IssueStatus } from "@/generated/prisma";
-import { parseAsInteger, parseAsString } from "nuqs/server";
+import { parseAsInteger } from "nuqs/server";
+import { SingleParserBuilder } from "nuqs";
 
 export enum SortableAssetColumns {
   role = "role",
@@ -25,15 +26,17 @@ export const assetsParams = {
   },
 };
 
+const issueStatusPageParams: Record<string, SingleParserBuilder<number>> = {};
+for (const status of Object.values(IssueStatus)) {
+  const key = status.toLowerCase() + "Page";
+  issueStatusPageParams[key] = parseAsInteger
+    .withDefault(PAGINATION.DEFAULT_PAGE)
+    .withOptions({ clearOnDefault: true });
+}
+
 export const assetDetailParams = {
-  activeIssuePage: parseAsInteger
-    .withDefault(PAGINATION.DEFAULT_PAGE)
+  ...issueStatusPageParams,
+  issueStatus: parseAsStringEnum<IssueStatus>(Object.values(IssueStatus))
+    .withDefault(IssueStatus.ACTIVE)
     .withOptions({ clearOnDefault: true }),
-  falsePosIssuePage: parseAsInteger
-    .withDefault(PAGINATION.DEFAULT_PAGE)
-    .withOptions({ clearOnDefault: true }),
-  remediatedIssuePage: parseAsInteger
-    .withDefault(PAGINATION.DEFAULT_PAGE)
-    .withOptions({ clearOnDefault: true }),
-  issueStatus: parseAsString.withDefault(IssueStatus.PENDING.toString()),
 };

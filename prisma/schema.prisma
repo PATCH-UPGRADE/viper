@@ -238,7 +238,7 @@ model Vulnerability {
 }
 
 enum IssueStatus {
-  PENDING
+  ACTIVE
   FALSE_POSITIVE
   REMEDIATED
 }
@@ -252,7 +252,7 @@ model Issue {
   vulnerabilityId String
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
-  status IssueStatus @default(PENDING)
+  status IssueStatus @default(ACTIVE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

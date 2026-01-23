@@ -9,8 +9,8 @@ import {
 } from "@/lib/pagination";
 
 const issuePaginationInput = paginationInputSchema.extend({
-  id: z.string(),
-  issueStatus: z.string(),
+  assetId: z.string(),
+  issueStatus: z.enum(IssueStatus),
 });
 
 export const issuesRouter = createTRPCRouter({
@@ -56,10 +56,10 @@ export const issuesRouter = createTRPCRouter({
   getManyInternalByStatusAndAssetId: protectedProcedure
     .input(issuePaginationInput)
     .query(async ({ input }) => {
-      const { id, issueStatus } = input;
+      const { assetId, issueStatus } = input;
       const where = {
-        assetId: id,
-        status: IssueStatus[issueStatus as keyof typeof IssueStatus],
+        assetId,
+        status: issueStatus,
       };
 
       // Get total count and build pagination metadata
@@ -72,6 +72,7 @@ export const issuesRouter = createTRPCRouter({
         take: meta.take,
         where: where,
         include: { vulnerability: true },
+        orderBy: { createdAt: "desc" },
       });
 
       return createPaginatedResponse(issues, meta);

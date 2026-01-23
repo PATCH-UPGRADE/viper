@@ -33,7 +33,7 @@ const statusDetails = {
     name: "False Positive",
     color: "bg-yellow-500",
   },
-  [IssueStatus.PENDING]: { name: "Active", color: "bg-red-500" },
+  [IssueStatus.ACTIVE]: { name: "Active", color: "bg-red-500" },
   [IssueStatus.REMEDIATED]: { name: "Remediated", color: "bg-green-500" },
 };
 
@@ -167,12 +167,19 @@ export const IssuesSidebarList = ({
     0,
     isIssuesOverflow ? ACTIVE_ISSUES_SHOWN_MAX : issues.length,
   );
-  const remediatedIssuesCount = issues.filter(
-    (i) => i.status === IssueStatus.REMEDIATED,
-  ).length;
-  const falsePositiveIssuesCount = issues.filter(
-    (i) => i.status === IssueStatus.FALSE_POSITIVE,
-  ).length;
+
+  const nonActiveIssueStatuses = Object.values(IssueStatus).filter(
+    (s) => s !== IssueStatus.ACTIVE,
+  );
+  let nonActiveIssueCount: number[] = [];
+  let showNonActiveIssueLinks = false;
+  for (const issueStatus of nonActiveIssueStatuses) {
+    const count = issues.filter((i) => i.status === issueStatus).length;
+    nonActiveIssueCount.push(count);
+    if (!showNonActiveIssueLinks && count > 0) {
+      showNonActiveIssueLinks = true;
+    }
+  }
 
   const Icon = type === "vulnerabilities" ? BugIcon : ComputerIcon;
 
@@ -254,7 +261,9 @@ export const IssuesSidebarList = ({
                     className="cursor-pointer"
                     asChild
                   >
-                    <Link href={`/assets/${assetId}`}>Go to Asset Details</Link>
+                    <Link href={`/assets/${issue.assetId}`}>
+                      Go to Asset Details
+                    </Link>
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -274,6 +283,7 @@ export const IssuesSidebarList = ({
               <Link
                 className="text-primary hover:underline"
                 target="_blank"
+                rel="noopener noreferrer"
                 href={`/assets/${assetId}`}
               >
                 View All Active Issues
@@ -283,35 +293,27 @@ export const IssuesSidebarList = ({
         </>
       )}
 
-      {remediatedIssuesCount < 0 ||
-        (falsePositiveIssuesCount > 0 && (
-          <>
-            <div className="flex flex-col gap-2 pt-2">
-              <h5 className="font-bold">Non-Active Issues</h5>
+      {showNonActiveIssueLinks && (
+        <>
+          <div className="flex flex-col gap-2 pt-2">
+            <h5 className="font-bold">Non-Active Issues</h5>
 
-              {remediatedIssuesCount && (
-                <Link
-                  className="text-primary hover:underline"
-                  target="_blank"
-                  href={`/assets/${assetId}?issueStatus=${IssueStatus.REMEDIATED.toString()}`}
-                >
-                  View {remediatedIssuesCount} Remediated Issue
-                  {remediatedIssuesCount > 1 ? "s" : ""}
-                </Link>
-              )}
-              {falsePositiveIssuesCount && (
-                <Link
-                  className="text-primary hover:underline"
-                  target="_blank"
-                  href={`/assets/${assetId}?issueStatus=${IssueStatus.FALSE_POSITIVE.toString()}`}
-                >
-                  View {falsePositiveIssuesCount} False Positive Issue
-                  {falsePositiveIssuesCount > 1 ? "s" : ""}
-                </Link>
-              )}
-            </div>
-          </>
-        ))}
+            {nonActiveIssueCount.map((count, index) => (
+              <Link
+                key={index}
+                className="text-primary hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+                href={`/assets/${assetId}?issueStatus=${nonActiveIssueStatuses[index]}`}
+              >
+                View {count} {statusDetails[nonActiveIssueStatuses[index]].name}{" "}
+                Issue
+                {count > 1 ? "s" : ""}
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
     </>
   );
 };

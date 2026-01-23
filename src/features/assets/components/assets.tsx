@@ -29,7 +29,7 @@ import type { Asset } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type { AssetWithIssues } from "@/lib/db";
 import { useRemoveAsset, useSuspenseAssets } from "../hooks/use-assets";
-import { useAssetsParams } from "../hooks/use-assets-params";
+import { useAssetsParams } from "../hooks/use-asset-params";
 import { columns } from "./columns";
 
 export const AssetsSearch = () => {

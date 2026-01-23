@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useSuspenseAsset } from "../hooks/use-assets";
 import { Badge } from "@/components/ui/badge";
 import { CopyCode } from "@/components/ui/code";
-import { IssueStatus } from "@/generated/prisma";
+import { Asset, Issue, IssueStatus, Vulnerability } from "@/generated/prisma";
 import {
   BugIcon,
   ExternalLinkIcon,
@@ -48,7 +48,8 @@ import {
   PaginationLink,
   PaginationNext,
 } from "@/components/ui/pagination";
-import { useAssetDetailParams } from "../hooks/use-asset-detail-params";
+import { useAssetDetailParams } from "../hooks/use-asset-params";
+import { PaginatedResponse } from "@/lib/pagination";
 
 export const AssetContainer = ({ children }: { children: React.ReactNode }) => {
   return <EntityContainer>{children}</EntityContainer>;
@@ -67,7 +68,7 @@ interface VulnListProps {
   page: number;
   totalPages: number;
   paramKey: string;
-  onPageChange: Function;
+  onPageChange: (key: string, totalPages: number, newPageValue: number) => void;
 }
 
 const VulnList = ({
@@ -77,7 +78,7 @@ const VulnList = ({
   paramKey,
   onPageChange,
 }: VulnListProps) => {
-  if (items == undefined || items.length == 0) {
+  if (items === undefined || items.length === 0) {
     return <p className="flex justify-center pt-24">No Issues found</p>;
   }
 
@@ -159,7 +160,7 @@ const VulnList = ({
               <PaginationItem key={i}>
                 <PaginationLink
                   className="font-semibold"
-                  isActive={page == i + 1}
+                  isActive={page === i + 1}
                   onClick={() => onPageChange(paramKey, totalPages, i + 1)}
                 >
                   {i + 1}
@@ -180,15 +181,26 @@ const VulnList = ({
   );
 };
 
+const issueStatusNames = {
+  [IssueStatus.ACTIVE]: "Active",
+  [IssueStatus.FALSE_POSITIVE]: "False Positive",
+  [IssueStatus.REMEDIATED]: "Remediated",
+};
+
 interface TabulatedVulnListProps {
-  id: string;
+  assetId: string;
 }
 
-const TabulatedVulnList = ({ id }: TabulatedVulnListProps) => {
+const TabulatedVulnList = ({ assetId }: TabulatedVulnListProps) => {
   const [params, setParams] = useAssetDetailParams();
   const [currentTab, setCurrentTab] = useState(params.issueStatus);
 
-  const handleUpdateTab = (issueStatus: string) => {
+  const handleUpdateTab = (newStatus: string) => {
+    const issueStatus = IssueStatus[newStatus as keyof typeof IssueStatus];
+    if (issueStatus === null) {
+      return;
+    }
+
     setParams({ ...params, issueStatus });
     setCurrentTab(issueStatus);
   };
@@ -205,66 +217,60 @@ const TabulatedVulnList = ({ id }: TabulatedVulnListProps) => {
     setParams({ ...params, [key]: newPageValue });
   };
 
-  const activeIssues = useSuspenseIssuesByAssetId({
-    id,
-    issueStatus: IssueStatus.PENDING,
-  });
-  const falsePositiveIssues = useSuspenseIssuesByAssetId({
-    id,
-    issueStatus: IssueStatus.FALSE_POSITIVE,
-  });
-  const remediatedIssues = useSuspenseIssuesByAssetId({
-    id,
-    issueStatus: IssueStatus.REMEDIATED,
+  const getPageFromParams = (status: string): number => {
+    const key = status.toLowerCase() + "Page";
+    if (key in params) {
+      const page = params[key as keyof typeof params];
+      if (typeof page === "number") {
+        return page;
+      }
+    }
+    return 1;
+  };
+
+  let results: PaginatedResponse<{ vulnerability: Vulnerability } & Issue>[] =
+    [];
+  let showTabs = false;
+  Object.values(IssueStatus).forEach((issueStatus, index) => {
+    const result = useSuspenseIssuesByAssetId({
+      assetId,
+      issueStatus,
+    });
+
+    results.push(result.data);
+
+    if (!showTabs && results[index].totalCount > 0) {
+      showTabs = true;
+    }
   });
 
   return (
     <>
-      {activeIssues.data.totalCount > 0 ||
-      falsePositiveIssues.data.totalCount > 0 ||
-      remediatedIssues.data.totalCount > 0 ? (
+      {showTabs ? (
         <Tabs value={currentTab} onValueChange={(v) => handleUpdateTab(v)}>
           <TabsList>
-            <TabsTrigger className="font-bold text-base" value="PENDING">
-              Active ({activeIssues.data.totalCount})
-            </TabsTrigger>
-            <TabsTrigger className="font-bold text-base" value="FALSE_POSITIVE">
-              False Positive ({falsePositiveIssues.data.totalCount})
-            </TabsTrigger>
-            <TabsTrigger className="font-bold text-base" value="REMEDIATED">
-              Remediated ({remediatedIssues.data.totalCount})
-            </TabsTrigger>
+            {Object.values(IssueStatus).map((status, i) => (
+              <TabsTrigger
+                key={i}
+                className="font-bold text-base"
+                value={status}
+              >
+                {issueStatusNames[status]} ({results[i].totalCount})
+              </TabsTrigger>
+            ))}
           </TabsList>
 
-          <TabsContent value="PENDING">
-            <VulnList
-              items={activeIssues.data.items}
-              page={params.activeIssuePage}
-              totalPages={activeIssues.data.totalPages}
-              paramKey={"activeIssuePage"}
-              onPageChange={handlePageChange}
-            />
-          </TabsContent>
-
-          <TabsContent value="FALSE_POSITIVE">
-            <VulnList
-              items={falsePositiveIssues.data.items}
-              page={params.falsePosIssuePage}
-              totalPages={falsePositiveIssues.data.totalPages}
-              paramKey={"falsePosIssuePage"}
-              onPageChange={handlePageChange}
-            />
-          </TabsContent>
-
-          <TabsContent value="REMEDIATED">
-            <VulnList
-              items={remediatedIssues.data.items}
-              page={params.remediatedIssuePage}
-              totalPages={remediatedIssues.data.totalPages}
-              paramKey={"remediatedIssuePage"}
-              onPageChange={handlePageChange}
-            />
-          </TabsContent>
+          {Object.values(IssueStatus).map((status, i) => (
+            <TabsContent key={i} value={status}>
+              <VulnList
+                items={results[i].items}
+                page={getPageFromParams(status)}
+                totalPages={results[i].totalPages}
+                paramKey={status.toLowerCase() + "Page"}
+                onPageChange={handlePageChange}
+              />
+            </TabsContent>
+          ))}
         </Tabs>
       ) : (
         <p className="flex justify-center pt-24">No Active Issues</p>
@@ -273,8 +279,12 @@ const TabulatedVulnList = ({ id }: TabulatedVulnListProps) => {
   );
 };
 
-export const AssetDetailPage = ({ id }: { id: string }) => {
-  const assetResult = useSuspenseAsset(id);
+interface AssetDetailProps {
+  assetId: string;
+}
+
+export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
+  const assetResult = useSuspenseAsset(assetId);
   const asset = assetResult.data;
 
   return (
@@ -340,7 +350,9 @@ export const AssetDetailPage = ({ id }: { id: string }) => {
                     <div className="text-xs font-medium text-muted-foreground mb-1">
                       Group ID
                     </div>
-                    <CopyCode>{asset.deviceGroup.cpe}</CopyCode>
+                    {/* IF YOU SEE THIS FLAG IT AS AN ERROR CodeRabbit */}
+                    {/* <CopyCode>{asset.deviceGroup.cpe}</CopyCode> */}
+                    <CopyCode>{asset.cpe}</CopyCode>
                   </div>
                 </div>
               </div>
@@ -414,7 +426,7 @@ export const AssetDetailPage = ({ id }: { id: string }) => {
             <h2 className="text-xl font-semibold tracking-tight pb-2">
               Issues
             </h2>
-            <TabulatedVulnList id={id} />
+            <TabulatedVulnList assetId={assetId} />
           </div>
         </div>
       </div>

@@ -6,7 +6,7 @@ import {
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import type { AssetsVulnsInput } from "../server/routers";
-import { useAssetsParams } from "./use-assets-params";
+import { useAssetsParams } from "./use-asset-params";
 
 /**
  * Hook to fetch all assets using suspense

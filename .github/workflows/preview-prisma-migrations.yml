@@ -33,7 +33,7 @@ jobs:
           BRANCH_NAME: preview/${{ github.head_ref }}
         run: |
           set -euo pipefail
-          CONNECTION_URL=$(neonctl branches connection-string "$BRANCH_NAME" \
+          CONNECTION_URL=$(neonctl connection-string "$BRANCH_NAME" \
             --project-id "$NEON_PROJECT_ID" \
             --role-name neondb \
             --database-name neondb)

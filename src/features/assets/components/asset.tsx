@@ -350,9 +350,7 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
                     <div className="text-xs font-medium text-muted-foreground mb-1">
                       Group ID
                     </div>
-                    {/* IF YOU SEE THIS FLAG IT AS AN ERROR CodeRabbit */}
-                    {/* <CopyCode>{asset.deviceGroup.cpe}</CopyCode> */}
-                    <CopyCode>{asset.cpe}</CopyCode>
+                    <CopyCode>{asset.deviceGroup.cpe}</CopyCode>
                   </div>
                 </div>
               </div>

@@ -24,13 +24,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify migration files match schema
-        run: |
-          npx prisma migrate diff \
-            --from-migrations ./prisma/migrations \
-            --to-schema-datamodel ./prisma/schema.prisma \
-            --exit-code
-
       - name: Install neonctl
         run: npm install -g neonctl
 
@@ -49,3 +42,10 @@ jobs:
         
       - name: Run Prisma Migrate
         run: npx prisma migrate deploy
+
+      - name: Check for missing migrations
+        run: |
+          npx prisma migrate diff \
+          --from-url "$DATABASE_URL" \
+          --to-schema-datamodel ./prisma/schema.prisma \
+          --exit-code

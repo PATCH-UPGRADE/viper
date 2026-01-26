@@ -81,7 +81,7 @@ export const IssueStatusForm = ({
 
   useEffect(() => {
     handleSave();
-  }, [status]);
+  }, [handleSave]);
 
   const statusDetail = statusDetails[status];
 

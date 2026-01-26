@@ -1,6 +1,5 @@
 "use client";
 
-import { TabsContent } from "@radix-ui/react-tabs";
 import { formatDistanceToNow } from "date-fns";
 import {
   BugIcon,
@@ -43,7 +42,8 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { IssueStatusForm } from "@/features/issues/components/issue";
 import { useSuspenseIssuesByAssetId } from "@/features/issues/hooks/use-issues";
 import {
   type Issue,
@@ -53,7 +53,6 @@ import {
 import { type PaginatedResponse } from "@/lib/pagination";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
-import { IssueStatusForm } from "@/features/issues/components/issue";
 
 export const AssetContainer = ({ children }: { children: React.ReactNode }) => {
   return <EntityContainer>{children}</EntityContainer>;
@@ -96,8 +95,6 @@ const VulnList = ({
             key={issue.id}
             className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer hover:bg-muted transition-all"
             onClick={() => router.push(`/issues/${issue.id}`)}
-            role="button"
-            tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();

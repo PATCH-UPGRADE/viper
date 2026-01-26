@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type PropsWithChildren, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
+import { toast } from "sonner";
 import {
   EmptyView,
   EntityContainer,
@@ -37,7 +38,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type { Integration, ResourceType } from "@/generated/prisma";
+import { inngest } from "@/inngest/client";
 import { usePaginationParams } from "@/lib/pagination";
 import {
   useCreateIntegration,
@@ -50,9 +53,6 @@ import {
   type IntegrationFormValues,
   integrationInputSchema,
 } from "../types";
-import { Textarea } from "@/components/ui/textarea";
-import { inngest } from "@/inngest/client";
-import { toast } from "sonner";
 //import { useApiTokenParams } from "../hooks/use-user-params";
 //import { type ApiTokenFormValues, apiTokenInputSchema } from "../types";
 

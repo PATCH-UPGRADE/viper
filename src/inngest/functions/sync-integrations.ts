@@ -1,7 +1,10 @@
 import "server-only";
+import { z } from "zod";
+import { assetArrayInputSchema } from "@/features/assets/server/routers";
+import { vulnerabilityArrayInputSchema } from "@/features/vulnerabilities/server/routers";
+import type { Integration, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
-import type { Integration } from "@/generated/prisma";
 
 export const syncAllIntegrations = inngest.createFunction(
   { id: "sync-all-integrations" },
@@ -45,6 +48,19 @@ export const syncAllIntegrations = inngest.createFunction(
   },
 );
 
+const getInputSchema = (resourceType: ResourceType) => {
+  switch (resourceType) {
+    case "Asset":
+      return z.toJSONSchema(assetArrayInputSchema);
+    case "Vulnerability":
+      return z.toJSONSchema(vulnerabilityArrayInputSchema);
+    case "Emulator":
+      return z.toJSONSchema(z.any()); // TODO later
+    case "Remediation":
+      return z.toJSONSchema(z.any()); // TODO later
+  }
+};
+
 type SyncResult =
   // biome-ignore lint/suspicious/noExplicitAny: data from a server could potentially be any here, that's normal, right?
   { success: true; data: any } | { success: false; errorMessage: string };
@@ -69,6 +85,7 @@ async function syncAiIntegration(
     signal: AbortSignal.timeout(30000), // 30s timeout
     body: JSON.stringify({
       resourceType: integration.resourceType,
+      responseSchema: getInputSchema(integration.resourceType),
       integrationUri: integration.integrationUri,
       additionalInstructions: integration.prompt,
       authType: integration.authType,

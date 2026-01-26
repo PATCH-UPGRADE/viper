@@ -53,7 +53,7 @@ const integrationResponseSchema = z.object({});
 // NOTE: tRPC / OpenAPI doesn't allow for arrays as the INPUT schema
 // if you try it will default to a single asset schema
 // to get around that wrap the array of assets in an object
-const assetArrayInputSchema = z.object({
+export const assetArrayInputSchema = z.object({
   assets: z.array(assetInputSchema).nonempty(),
 });
 

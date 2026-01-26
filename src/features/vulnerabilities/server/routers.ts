@@ -29,7 +29,7 @@ const vulnerabilityInputSchema = z.object({
   impact: z.string().min(1),
 });
 
-const vulnerabilityArrayInputSchema = z.object({
+export const vulnerabilityArrayInputSchema = z.object({
   vulnerabilities: z.array(vulnerabilityInputSchema).nonempty(),
 });
 

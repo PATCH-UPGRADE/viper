@@ -1,4 +1,3 @@
-import "server-only";
 import { type Prisma, PrismaClient } from "@/generated/prisma";
 import { getBaseUrl } from "@/lib/url-utils";
 

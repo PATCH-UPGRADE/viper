@@ -70,7 +70,7 @@ export const issuesRouter = createTRPCRouter({
     }),
 
   updateStatus: protectedProcedure
-    .input(z.object({ id: z.string(), status: z.nativeEnum(IssueStatus) }))
+    .input(z.object({ id: z.string(), status: z.enum(IssueStatus) }))
     .mutation(({ input }) => {
       return prisma.issue.update({
         where: { id: input.id },

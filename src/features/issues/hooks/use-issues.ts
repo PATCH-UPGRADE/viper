@@ -22,6 +22,11 @@ export const useUpdateIssueStatus = () => {
         queryClient.invalidateQueries(
           trpc.issues.getOne.queryFilter({ id: data.id }),
         );
+        queryClient.invalidateQueries(
+          trpc.issues.getManyInternalByStatusAndAssetId.queryFilter({
+            assetId: data.assetId,
+          }),
+        );
       },
       onError: (error) => {
         toast.error(`Failed to update issue status: ${error.message}`);

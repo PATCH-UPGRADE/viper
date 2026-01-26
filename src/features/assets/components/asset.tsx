@@ -44,7 +44,6 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { IssueStatusForm } from "@/features/issues/components/issue";
 import { useSuspenseIssuesByAssetId } from "@/features/issues/hooks/use-issues";
 import {
   type Issue,
@@ -54,6 +53,7 @@ import {
 import { type PaginatedResponse } from "@/lib/pagination";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
+import { IssueStatusForm } from "@/features/issues/components/issue";
 
 export const AssetContainer = ({ children }: { children: React.ReactNode }) => {
   return <EntityContainer>{children}</EntityContainer>;
@@ -96,6 +96,8 @@ const VulnList = ({
             key={issue.id}
             className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer hover:bg-muted transition-all"
             onClick={() => router.push(`/issues/${issue.id}`)}
+            role="button"
+            tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
@@ -201,7 +203,7 @@ const TabulatedVulnList = ({ assetId }: TabulatedVulnListProps) => {
 
   const handleUpdateTab = (newStatus: string) => {
     const issueStatus = IssueStatus[newStatus as keyof typeof IssueStatus];
-    if (issueStatus === null) {
+    if (issueStatus === undefined) {
       return;
     }
 
@@ -232,8 +234,6 @@ const TabulatedVulnList = ({ assetId }: TabulatedVulnListProps) => {
     return 1;
   };
 
-  const results: PaginatedResponse<{ vulnerability: Vulnerability } & Issue>[] =
-    [];
   const aResult = useSuspenseIssuesByAssetId({
     assetId,
     issueStatus: IssueStatus.ACTIVE,
@@ -247,6 +247,8 @@ const TabulatedVulnList = ({ assetId }: TabulatedVulnListProps) => {
     issueStatus: IssueStatus.REMEDIATED,
   });
 
+  const results: PaginatedResponse<{ vulnerability: Vulnerability } & Issue>[] =
+    [];
   let showTabs = false;
   for (const res of [aResult, fpResult, rResult]) {
     results.push(res.data);
@@ -353,6 +355,15 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
                     IP Address
                   </div>
                   <CopyCode>{asset.ip}</CopyCode>
+                </div>
+
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                    Class
+                  </div>
+                  <CopyCode>
+                    {asset.deviceGroup.cpe.split(":").slice(3, 5).join(" ")}
+                  </CopyCode>
                 </div>
 
                 <div>

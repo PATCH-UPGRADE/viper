@@ -11,7 +11,7 @@ export const prefetchIssue = (id: string) => {
 };
 
 /**
- * @param input (assetId, issueStatus, page, pageSize
+ * @param input (assetId, issueStatus, page, pageSize)
  * @returns Prefetched page of issues filtered by the assetId and status fields
  */
 export const prefetchIssuesByAssetId = (input: Input) => {

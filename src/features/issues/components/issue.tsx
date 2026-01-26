@@ -81,7 +81,7 @@ export const IssueStatusForm = ({
 
   useEffect(() => {
     handleSave();
-  }, [handleSave]);
+  }, [status]);
 
   const statusDetail = statusDetails[status];
 
@@ -168,17 +168,19 @@ export const IssuesSidebarList = ({
     isIssuesOverflow ? ACTIVE_ISSUES_SHOWN_MAX : issues.length,
   );
 
-  const nonActiveIssueStatuses = Object.values(IssueStatus).filter(
-    (s) => s !== IssueStatus.ACTIVE,
-  );
-  const nonActiveIssueCount: number[] = [];
+  const nonActiveIssuesCount: { issueStatus: IssueStatus; count: number }[] =
+    [];
   let showNonActiveIssueLinks = false;
-  for (const issueStatus of nonActiveIssueStatuses) {
-    const count = issues.filter((i) => i.status === issueStatus).length;
-    nonActiveIssueCount.push(count);
-    if (!showNonActiveIssueLinks && count > 0) {
-      showNonActiveIssueLinks = true;
+  for (const issueStatus of Object.values(IssueStatus)) {
+    if (issueStatus === IssueStatus.ACTIVE) {
+      continue;
     }
+    const count = issues.filter((i) => i.status === issueStatus).length;
+    if (count === 0) {
+      continue;
+    }
+    nonActiveIssuesCount.push({ issueStatus, count });
+    showNonActiveIssueLinks = true;
   }
 
   const Icon = type === "vulnerabilities" ? BugIcon : ComputerIcon;
@@ -294,17 +296,17 @@ export const IssuesSidebarList = ({
         <div className="flex flex-col gap-2 pt-2">
           <h5 className="font-bold">Non-Active Issues</h5>
 
-          {nonActiveIssueCount.map((count, index) => (
+          {nonActiveIssuesCount.map((statusCountTuple, i) => (
             <Link
-              key={index}
+              key={i}
               className="text-primary hover:underline"
               target="_blank"
               rel="noopener noreferrer"
-              href={`/assets/${assetId}?issueStatus=${nonActiveIssueStatuses[index]}`}
+              href={`/assets/${assetId}?issueStatus=${statusCountTuple.issueStatus}`}
             >
-              View {count} {statusDetails[nonActiveIssueStatuses[index]].name}{" "}
-              Issue
-              {count > 1 ? "s" : ""}
+              View {statusCountTuple.count}{" "}
+              {statusDetails[statusCountTuple.issueStatus].name} Issue
+              {statusCountTuple.count > 1 ? "s" : ""}
             </Link>
           ))}
         </div>

@@ -77,6 +77,17 @@ describe("Assets Endpoint (/assets)", () => {
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.id).toBe(assetId);
 
+    const deviceGroupId = detailRes.body.deviceGroup.id;
+
+    const listByDeviceGroupRes = await request(BASE_URL)
+      .get(`/deviceGroups/${deviceGroupId}/assets`)
+      .set(authHeader);
+
+    expect(listByDeviceGroupRes.status).toBe(200);
+    expect(listByDeviceGroupRes.body.items[0].deviceGroup.id).toBe(
+      deviceGroupId,
+    );
+
     const updatePayload = {
       ip: "192.168.1.105", // Updated field
       cpe: generateCPE("asset_v1"),
@@ -116,6 +127,11 @@ describe("Assets Endpoint (/assets)", () => {
     expect(bodyFirst).toHaveProperty("id");
     expect(bodyFirst.ip).toBe(payload.ip);
     expect(bodyFirst.deviceGroup.cpe).toBe(payload.cpe);
+    expect(bodyFirst.deviceGroup).toHaveProperty("url");
+    expect(bodyFirst.deviceGroup).toHaveProperty("sbomUrl");
+    expect(bodyFirst.deviceGroup).toHaveProperty("vulnerabilitiesUrl");
+    expect(bodyFirst.deviceGroup).toHaveProperty("assetsUrl");
+    expect(bodyFirst.deviceGroup).toHaveProperty("emulatorsUrl");
     expect(bodyFirst.role).toBe(payload.role);
     expect(bodyFirst.upstreamApi).toBe(payload.upstreamApi);
 
@@ -136,6 +152,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(firstDetailRes.body.id).toBe(firstAssetId);
     expect(firstDetailRes.body.ip).toBe(payload.ip);
     expect(firstDetailRes.body.deviceGroup.cpe).toBe(payload.cpe);
+    expect(firstDetailRes.body.deviceGroup).toHaveProperty("url");
     expect(firstDetailRes.body.role).toBe(payload.role);
     expect(firstDetailRes.body.upstreamApi).toBe(payload.upstreamApi);
 

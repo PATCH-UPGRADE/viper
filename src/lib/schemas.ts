@@ -30,11 +30,24 @@ export const deviceGroupSchema = z.object({
   cpe: z.string(),
 });
 export type DeviceGroupIncludeType = z.infer<typeof deviceGroupSchema>;
+export const deviceGroupWithUrlsSchema = deviceGroupSchema.extend({
+  url: z.string(),
+  sbomUrl: z.string().nullable(), // TODO: VW-54
+  vulnerabilitiesUrl: z.string(),
+  emulatorsUrl: z.string(),
+  assetsUrl: z.string(),
+});
+export type DeviceGroupWithUrls = z.infer<typeof deviceGroupWithUrlsSchema>;
 
 export const deviceGroupSelect = {
   select: {
     id: true,
     cpe: true,
+    url: true,
+    sbomUrl: true,
+    vulnerabilitiesUrl: true,
+    assetsUrl: true,
+    emulatorsUrl: true,
   },
 } as const;
 

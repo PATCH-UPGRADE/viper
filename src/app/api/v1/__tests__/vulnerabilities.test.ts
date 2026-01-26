@@ -62,6 +62,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(detailRes.body.affectedDeviceGroups[0]).toEqual(
       expect.objectContaining({ cpe: payload.cpes[0] }),
     );
+    expect(detailRes.body.affectedDeviceGroups[0]).toHaveProperty("url");
 
     const deleteRes = await request(BASE_URL)
       .delete(`/vulnerabilities/${vulnerabilityId}`)

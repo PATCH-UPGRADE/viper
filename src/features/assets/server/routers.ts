@@ -2,17 +2,15 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import {
-  buildPaginationMeta,
-  createPaginatedResponse,
   createPaginatedResponseSchema,
   createPaginatedResponseWithLinksSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { cpeToDeviceGroup } from "@/lib/router-utils";
+import { cpeToDeviceGroup, fetchPaginated } from "@/lib/router-utils";
 import {
   cpeSchema,
-  deviceGroupSchema,
   deviceGroupSelect,
+  deviceGroupWithUrlsSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -60,7 +58,7 @@ const assetArrayInputSchema = z.object({
 const assetResponseSchema = z.object({
   id: z.string(),
   ip: z.string(),
-  deviceGroup: deviceGroupSchema,
+  deviceGroup: deviceGroupWithUrlsSchema,
   role: z.string(),
   upstreamApi: z.string(),
   networkSegment: z.string().nullable(),
@@ -74,6 +72,7 @@ const assetResponseSchema = z.object({
   updatedAt: z.date(),
   user: userSchema,
 });
+export type AssetResponseSchemaType = z.infer<typeof assetResponseSchema>;
 
 const assetArrayResponseSchema = z.array(assetResponseSchema);
 
@@ -86,26 +85,35 @@ const integrationAssetInputSchema = createPaginatedResponseWithLinksSchema(
   vendor: z.string(),
 });
 
-const settingsResponseSchema = z.object({
-  id: z.string(),
-  url: z.string(),
-  name: z.string(),
-  hasToken: z.boolean(),
-  userId: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  user: userSchema,
-});
-
-const _paginatedSettingsResponseSchema = createPaginatedResponseSchema(
-  settingsResponseSchema,
-);
-
 const assetsVulnsInputSchema = z.object({
   assetIds: z.array(z.string()).optional(),
   cpes: z.array(cpeSchema).optional(),
 });
 export type AssetsVulnsInput = z.infer<typeof assetsVulnsInputSchema>;
+
+const assetInclude = {
+  user: userIncludeSelect,
+  deviceGroup: deviceGroupSelect,
+};
+
+const createSearchFilter = (search: string) => {
+  return search
+    ? {
+        OR: [
+          { ip: { contains: search, mode: "insensitive" as const } },
+          { role: { contains: search, mode: "insensitive" as const } },
+          {
+            deviceGroup: {
+              cpe: {
+                contains: search,
+                mode: "insensitive" as const,
+              },
+            },
+          },
+        ],
+      }
+    : {};
+};
 
 export const assetsRouter = createTRPCRouter({
   // GET /api/assets - List all assets (any authenticated user can see all)
@@ -125,38 +133,55 @@ export const assetsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { search } = input;
 
-      // Build search filter across multiple fields
-      const where = search
+      const where = createSearchFilter(search);
+
+      return fetchPaginated(prisma.asset, input, {
+        where: where,
+        include: assetInclude,
+      });
+    }),
+
+  // GET /api/deviceGroups/{deviceGroupId}/assets - List emulators for a device group
+  getManyByDeviceGroup: protectedProcedure
+    .input(
+      paginationInputSchema.extend({
+        deviceGroupId: z.string(),
+      }),
+    )
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/deviceGroups/{deviceGroupId}/assets",
+        tags: ["Assets", "DeviceGroups"],
+        summary: "List Assets by Device Group",
+        description:
+          "Get all assets affecting a specific device group. Any authenticated user can view all assets.",
+      },
+    })
+    .output(paginatedAssetResponseSchema)
+    .query(async ({ input }) => {
+      const { search, deviceGroupId } = input;
+      const searchFilter = createSearchFilter(search);
+      const whereFilter = search
         ? {
-            OR: [
-              { ip: { contains: search, mode: "insensitive" as const } },
-              { role: { contains: search, mode: "insensitive" as const } },
+            AND: [
+              searchFilter,
               {
                 deviceGroup: {
-                  cpe: {
-                    contains: search,
-                    mode: "insensitive" as const,
-                  },
+                  id: deviceGroupId,
                 },
               },
             ],
           }
-        : {};
-
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.asset.count({ where: where });
-      const meta = buildPaginationMeta(input, totalCount);
-
-      // Fetch paginated items
-      const items = await prisma.asset.findMany({
-        skip: meta.skip,
-        take: meta.take,
-        where: where,
-        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
-        orderBy: { createdAt: "desc" },
+        : {
+            deviceGroup: {
+              id: deviceGroupId,
+            },
+          };
+      return fetchPaginated(prisma.asset, input, {
+        where: whereFilter,
+        include: assetInclude,
       });
-
-      return createPaginatedResponse(items, meta);
     }),
 
   // not exposed on OpenAPI
@@ -165,27 +190,7 @@ export const assetsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { search, sort } = input;
 
-      // Build search filter across multiple fields
-      const where = search
-        ? {
-            OR: [
-              { ip: { contains: search, mode: "insensitive" as const } },
-              { role: { contains: search, mode: "insensitive" as const } },
-              {
-                deviceGroup: {
-                  cpe: {
-                    contains: search,
-                    mode: "insensitive" as const,
-                  },
-                },
-              },
-            ],
-          }
-        : {};
-
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.asset.count({ where: where });
-      const meta = buildPaginationMeta(input, totalCount);
+      const where = createSearchFilter(search);
 
       function getSortValue(sort: string) {
         const sortValue = sort.startsWith("-") ? "desc" : "asc";
@@ -195,16 +200,9 @@ export const assetsRouter = createTRPCRouter({
         return sortValue;
       }
 
-      // Fetch paginated items
-      const items = await prisma.asset.findMany({
-        skip: meta.skip,
-        take: meta.take,
+      return fetchPaginated(prisma.asset, input, {
         where: where,
-        include: {
-          user: userIncludeSelect,
-          deviceGroup: deviceGroupSelect,
-          issues: true,
-        },
+        include: { ...assetInclude, issues: true },
         orderBy: sort
           ? [
               ...sort.split(",").map((s) => {
@@ -214,8 +212,6 @@ export const assetsRouter = createTRPCRouter({
             ]
           : { updatedAt: "desc" },
       });
-
-      return createPaginatedResponse(items, meta);
     }),
 
   // Internal API for asset vulnerability matching

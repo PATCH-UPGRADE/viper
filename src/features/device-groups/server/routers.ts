@@ -25,7 +25,7 @@ export const deviceGroupsRouter = createTRPCRouter({
         tags: ["DeviceGroups"],
         summary: "List Device Groups",
         description:
-          "Get all Device Groups. Any authenticated user can view all assets.",
+          "Get all Device Groups. Any authenticated user can view all Device Groups.",
       },
     })
     .output(paginatedDeviceGroupResponseSchema)
@@ -63,7 +63,7 @@ export const deviceGroupsRouter = createTRPCRouter({
         tags: ["DeviceGroups"],
         summary: "Get Device Group",
         description:
-          "Get a single Device Group by ID. Any authenticated user can view any asset.",
+          "Get a single Device Group by ID. Any authenticated user can view any Device Group.",
       },
     })
     .output(deviceGroupResponseSchema)

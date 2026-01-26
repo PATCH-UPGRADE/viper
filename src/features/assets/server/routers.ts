@@ -141,7 +141,7 @@ export const assetsRouter = createTRPCRouter({
       });
     }),
 
-  // GET /api/deviceGroups/{deviceGroupId}/emulators - List emulators for a device group
+  // GET /api/deviceGroups/{deviceGroupId}/assets - List emulators for a device group
   getManyByDeviceGroup: protectedProcedure
     .input(
       paginationInputSchema.extend({

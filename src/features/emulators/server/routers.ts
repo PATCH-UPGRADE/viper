@@ -7,8 +7,8 @@ import {
 import { cpeToDeviceGroup, fetchPaginated } from "@/lib/router-utils";
 import {
   cpeSchema,
-  deviceGroupSchema,
   deviceGroupSelect,
+  deviceGroupWithUrlsSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -70,7 +70,7 @@ const emulatorResponseSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
   user: userSchema,
-  deviceGroup: deviceGroupSchema,
+  deviceGroup: deviceGroupWithUrlsSchema,
   helmSbomId: z.string().nullable(),
   // TODO:: ^later, do not use helmSbomId externally (need internal API)
   // i.e, do not put this in an external API that other TA performers might see
@@ -141,7 +141,7 @@ export const emulatorsRouter = createTRPCRouter({
       openapi: {
         method: "GET",
         path: "/deviceGroups/{deviceGroupId}/emulators",
-        tags: ["Emulators", "DeviceGroup"],
+        tags: ["Emulators", "DeviceGroups"],
         summary: "List Emulators by Device Group",
         description:
           "Get all emulators affecting a specific device group. Any authenticated user can view all emulators.",

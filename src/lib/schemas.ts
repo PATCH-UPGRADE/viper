@@ -43,6 +43,11 @@ export const deviceGroupSelect = {
   select: {
     id: true,
     cpe: true,
+    url: true,
+    sbomUrl: true,
+    vulnerabilitiesUrl: true,
+    assetsUrl: true,
+    emulatorsUrl: true,
   },
 } as const;
 

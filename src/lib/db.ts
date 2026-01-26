@@ -1,9 +1,45 @@
 import { type Prisma, PrismaClient } from "@/generated/prisma";
-import { createServerSingleton } from "./singleton";
+import { getBaseUrl } from "./url-utils";
 
-const getPrisma = createServerSingleton("prisma", () => new PrismaClient());
-
-export default getPrisma();
+// previously used this here: const getPrisma = createServerSingleton("prisma", () => new PrismaClient());
+// allows us to extend deviceGroup model wherever it gets used
+const prisma = new PrismaClient().$extends({
+  result: {
+    deviceGroup: {
+      url: {
+        needs: { id: true },
+        compute(deviceGroup) {
+          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}`;
+        },
+      },
+      sbomUrl: {
+        needs: { id: true },
+        compute(deviceGroup) {
+          return `TODO. ${deviceGroup.id}`; // VW-54
+        },
+      },
+      vulnerabilitiesUrl: {
+        needs: { id: true },
+        compute(deviceGroup) {
+          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/vulnerabilities`;
+        },
+      },
+      emulatorsUrl: {
+        needs: { id: true },
+        compute(deviceGroup) {
+          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/emulators`;
+        },
+      },
+      assetsUrl: {
+        needs: { id: true },
+        compute(deviceGroup) {
+          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/assets`;
+        },
+      },
+    },
+  },
+});
+export default prisma;
 
 export type AssetWithIssues = Prisma.AssetGetPayload<{
   include: {

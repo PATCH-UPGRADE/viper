@@ -9,8 +9,8 @@ import {
 import { cpeToDeviceGroup, fetchPaginated } from "@/lib/router-utils";
 import {
   cpeSchema,
-  deviceGroupSchema,
   deviceGroupSelect,
+  deviceGroupWithUrlsSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -58,7 +58,7 @@ const assetArrayInputSchema = z.object({
 const assetResponseSchema = z.object({
   id: z.string(),
   ip: z.string(),
-  deviceGroup: deviceGroupSchema, // TODO: deviceGroupWithUrlSchema
+  deviceGroup: deviceGroupWithUrlsSchema,
   role: z.string(),
   upstreamApi: z.string(),
   networkSegment: z.string().nullable(),
@@ -152,7 +152,7 @@ export const assetsRouter = createTRPCRouter({
       openapi: {
         method: "GET",
         path: "/deviceGroups/{deviceGroupId}/assets",
-        tags: ["Assets", "DeviceGroup"],
+        tags: ["Assets", "DeviceGroups"],
         summary: "List Assets by Device Group",
         description:
           "Get all assets affecting a specific device group. Any authenticated user can view all assets.",

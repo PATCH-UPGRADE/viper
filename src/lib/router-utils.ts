@@ -27,7 +27,9 @@ export async function cpesToDeviceGroups(cpes: string[]) {
 }
 
 type PrismaDelegate = {
-  count: (args: any) => Promise<number>;
+  // biome-ignore lint/suspicious/noExplicitAny: use any because it allows us to reuse this fn for multiple models
+  count: (args: any) => Promise<number | any>;
+  // biome-ignore lint/suspicious/noExplicitAny: use any because it allows us to reuse this fn for multiple models
   findMany: (args: any) => Promise<any[]>;
 };
 

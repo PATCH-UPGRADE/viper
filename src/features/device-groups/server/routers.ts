@@ -1,32 +1,12 @@
 import { z } from "zod";
-import type { DeviceGroup } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
-  buildPaginationMeta,
-  createPaginatedResponse,
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import {
-  type DeviceGroupWithUrls,
-  deviceGroupWithUrlsSchema,
-} from "@/lib/schemas";
-import { getBaseUrl } from "@/lib/url-utils";
+import { fetchPaginated } from "@/lib/router-utils";
+import { deviceGroupWithUrlsSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-
-export const addDeviceGroupUrls = (
-  deviceGroup: DeviceGroup,
-): DeviceGroupWithUrls => {
-  return {
-    id: deviceGroup.id,
-    cpe: deviceGroup.cpe,
-    url: `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}`,
-    sbomUrl: "TODO", // VW-54
-    vulnerabilitiesUrl: `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/vulnerabilities`,
-    emulatorsUrl: `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/emulators`,
-    assetsUrl: `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/assets`,
-  };
-};
 
 const deviceGroupResponseSchema = deviceGroupWithUrlsSchema;
 
@@ -68,20 +48,9 @@ export const deviceGroupsRouter = createTRPCRouter({
           }
         : {};
 
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.deviceGroup.count({ where: where });
-      const meta = buildPaginationMeta(input, totalCount);
-
-      // Fetch paginated items
-      const items = await prisma.deviceGroup.findMany({
-        skip: meta.skip,
-        take: meta.take,
+      return fetchPaginated(prisma.deviceGroup, input, {
         where: where,
-        orderBy: { createdAt: "desc" },
       });
-      const itemsWithUrls = items.map((item) => addDeviceGroupUrls(item));
-
-      return createPaginatedResponse(itemsWithUrls, meta);
     }),
 
   // GET /api/deviceGroups/{deviceGroupId} - Get single device group (any authenticated user can access)
@@ -99,10 +68,9 @@ export const deviceGroupsRouter = createTRPCRouter({
     })
     .output(deviceGroupResponseSchema)
     .query(async ({ input }) => {
-      const deviceGroup = await prisma.deviceGroup.findUniqueOrThrow({
+      return prisma.deviceGroup.findUniqueOrThrow({
         where: { id: input.id },
       });
-      return addDeviceGroupUrls(deviceGroup);
     }),
 
   // PUT /api/deviceGroups/{deviceGroupId} - Update DeviceGroup

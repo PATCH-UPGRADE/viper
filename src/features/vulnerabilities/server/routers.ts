@@ -7,8 +7,8 @@ import {
 import { cpesToDeviceGroups, fetchPaginated } from "@/lib/router-utils";
 import {
   cpeSchema,
-  deviceGroupSchema,
   deviceGroupSelect,
+  deviceGroupWithUrlsSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -30,7 +30,7 @@ const vulnerabilityInputSchema = z.object({
 const vulnerabilityResponseSchema = z.object({
   id: z.string(),
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  affectedDeviceGroups: z.array(deviceGroupSchema),
+  affectedDeviceGroups: z.array(deviceGroupWithUrlsSchema),
   exploitUri: z.string(),
   upstreamApi: z.string(),
   description: z.string(),
@@ -111,7 +111,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       openapi: {
         method: "GET",
         path: "/deviceGroups/{deviceGroupId}/vulnerabilities",
-        tags: ["Vulnerabilities", "DeviceGroup"],
+        tags: ["Vulnerabilities", "DeviceGroups"],
         summary: "List Vulnerabilities by Device Group",
         description:
           "Get all vulnerabilities affecting a specific device group. Any authenticated user can view all vulnerabilities.",

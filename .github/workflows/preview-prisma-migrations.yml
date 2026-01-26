@@ -34,11 +34,25 @@ jobs:
           BRANCH_NAME: preview/${{ github.head_ref }}
         run: |
           set -euo pipefail
-          CONNECTION_URL=$(neonctl connection-string "$BRANCH_NAME" \
-            --project-id "$NEON_PROJECT_ID" \
-            --role-name neondb_owner \
-            --database-name neondb)
-          echo "DATABASE_URL=$CONNECTION_URL" >> $GITHUB_ENV
+
+          echo "Waiting for Neon branch: $BRANCH_NAME"
+
+          for i in {1..30}; do
+            if CONNECTION_URL=$(neonctl connection-string "$BRANCH_NAME" \
+              --project-id "$NEON_PROJECT_ID" \
+              --role-name neondb_owner \
+              --database-name neondb); then
+              echo "Neon branch is ready"
+              echo "DATABASE_URL=$CONNECTION_URL" >> $GITHUB_ENV
+              exit 0
+            fi
+
+            echo "Attempt $i/30 failed. Retrying in 10 seconds..."
+            sleep 10
+          done
+
+          echo "Neon branch did not become available within 5 minute timeout."
+          exit 1
         
       - name: Run Prisma Migrate
         run: npx prisma migrate deploy

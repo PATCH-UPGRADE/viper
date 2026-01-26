@@ -244,7 +244,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       openapi: {
         method: "POST",
         path: "/vulnerabilities/bulk",
-        tags: ["Assets"],
+        tags: ["Vulnerabilities"],
         summary: "Create Bulk Vulnerabilities",
         description:
           "Create one or more new vulnerabilities from an array. The authenticated user will be recorded as the creator.",

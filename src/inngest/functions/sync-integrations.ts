@@ -4,6 +4,7 @@ import { assetArrayInputSchema } from "@/features/assets/server/routers";
 import { vulnerabilityArrayInputSchema } from "@/features/vulnerabilities/server/routers";
 import type { Integration, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { getBaseUrl } from "@/lib/url-utils";
 import { inngest } from "../client";
 
 export const syncAllIntegrations = inngest.createFunction(
@@ -48,16 +49,30 @@ export const syncAllIntegrations = inngest.createFunction(
   },
 );
 
-const getInputSchema = (resourceType: ResourceType) => {
+const getResponseConfig = (resourceType: ResourceType) => {
   switch (resourceType) {
     case "Asset":
-      return z.toJSONSchema(assetArrayInputSchema);
+      return {
+        path: "/assets/bulk",
+        schema: z.toJSONSchema(assetArrayInputSchema),
+      };
     case "Vulnerability":
-      return z.toJSONSchema(vulnerabilityArrayInputSchema);
+      return {
+        path: "/vulnerabilities/bulk",
+        schema: z.toJSONSchema(vulnerabilityArrayInputSchema),
+      };
     case "Emulator":
-      return z.toJSONSchema(z.any()); // TODO later
+      return {
+        // TODO later
+        path: "TODO",
+        schema: z.toJSONSchema(z.any()),
+      };
     case "Remediation":
-      return z.toJSONSchema(z.any()); // TODO later
+      return {
+        // TODO later
+        path: "TODO",
+        schema: z.toJSONSchema(z.any()),
+      };
   }
 };
 
@@ -76,6 +91,10 @@ async function syncAiIntegration(
     throw new Error("Either N8N_KEY or N8N_AI_SYNC_URL is not defined");
   }
 
+  const { schema: responseSchema, path: responsePath } = getResponseConfig(
+    integration.resourceType,
+  );
+
   const response = await fetch(n8nWebhookUrl, {
     method: "POST",
     headers: {
@@ -84,8 +103,11 @@ async function syncAiIntegration(
     },
     signal: AbortSignal.timeout(30000), // 30s timeout
     body: JSON.stringify({
+      // If you're testing this locally and need webhooks, use NEXT_PUBLIC_APP_URL
+      baseApiUrl: `${getBaseUrl()}/api/v1`,
+      responsePath,
+      responseSchema,
       resourceType: integration.resourceType,
-      responseSchema: getInputSchema(integration.resourceType),
       integrationUri: integration.integrationUri,
       additionalInstructions: integration.prompt,
       authType: integration.authType,

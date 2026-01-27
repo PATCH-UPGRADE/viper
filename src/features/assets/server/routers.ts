@@ -17,6 +17,7 @@ import {
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
+import { apiKey } from "better-auth/plugins";
 
 const AssetStatus = z.enum(["Active", "Decommissioned", "Maintenance"]);
 
@@ -46,7 +47,9 @@ const integrationAssetSchema = assetInputSchema.extend({
 const updateAssetSchema = assetInputSchema.extend({
   id: z.string(),
 });
-const integrationResponseSchema = z.object({});
+const integrationResponseSchema = z.object({
+  message: z.string(),
+});
 
 // NOTE: tRPC / OpenAPI doesn't allow for arrays as the INPUT schema
 // if you try it will default to a single asset schema
@@ -362,7 +365,6 @@ export const assetsRouter = createTRPCRouter({
     }),
 
   // POST /api/assets/integrationUpload
-  // TODO: VW-38
   processIntegrationCreate: protectedProcedure
     .input(integrationAssetInputSchema)
     .meta({
@@ -375,11 +377,94 @@ export const assetsRouter = createTRPCRouter({
       },
     })
     .output(integrationResponseSchema)
-    .mutation(() => {
-      throw new TRPCError({
-        code: "NOT_IMPLEMENTED",
-        message: "This endpoint is not implemented yet.",
+    .mutation(async ({ ctx, input }) => {
+
+      const foundIntegration = await prisma.integration.findFirstOrThrow({ 
+        where: { userId: ctx.auth.user.id },
       });
+
+      const assetInclude = {
+        user: userIncludeSelect,
+        deviceGroup: deviceGroupSelect
+      };
+
+      // return prisma.$transaction(
+        input.items.map(async (item) => {
+          // Look for an existing mapping first
+          const foundMapping = await prisma.externalAssetMapping.findFirst({
+            where: {
+              integrationId: foundIntegration.id,
+              externalId: item.vendorId,
+            },
+            include: { asset: true }
+          });
+
+          // If we have a ExternalAssetMapping, we just need to update the asset
+          if (foundMapping && foundMapping.asset) {
+            return prisma.asset.update({
+              where: { id: foundMapping.asset.id },
+              data: {
+                ...item,
+              },
+              include: assetInclude
+            });
+          }
+
+          // Otherwise try to find a matching Asset by unique properties
+          const foundAsset = await prisma.asset.findFirst({
+            where: {
+              OR: [
+                { hostname: item.hostname },
+                { macAddress: item.macAddress },
+                { serialNumber: item.serialNumber },
+              ],
+            }
+          });
+
+          const deviceGroup = await cpeToDeviceGroup(item.cpe);
+
+          // If no Asset, we need to create the Asset and ExternalAssetMapping
+          if (!foundAsset) {
+            const createdAsset = await prisma.asset.create({
+              data: {
+                ...item,
+                deviceGroupId: deviceGroup.id,
+                userId: ctx.auth.user.id,
+              },
+              include: assetInclude
+            });
+
+            await prisma.externalAssetMapping.create({
+              data: {
+                assetId: createdAsset.id,
+                integrationId: foundIntegration.id,
+                externalId: item.vendorId,
+              }
+            });
+            return createdAsset;
+          }
+
+          // If we have an Asset but no ExternalAssetMapping then create the mapping
+          await prisma.externalAssetMapping.create({
+            data: {
+              assetId: foundAsset.id,
+              integrationId: foundIntegration.id,
+              externalId: item.vendorId,
+            }
+          });
+
+          // and then update the existing Asset
+          return prisma.asset.update({
+            where: { id: foundAsset.id },
+            data: {
+              ...item,
+              deviceGroupId: deviceGroup.id,
+              userId: ctx.auth.user.id,
+            },
+            include: assetInclude
+          });
+        })
+      // );
     }),
 
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)

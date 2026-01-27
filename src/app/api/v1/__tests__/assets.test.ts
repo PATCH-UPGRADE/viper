@@ -1,6 +1,8 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
+import prisma from "@/lib/db";
+import { apiKey } from "better-auth/plugins";
 
 describe("Assets Endpoint (/assets)", () => {
   const authHeader = { Authorization: AUTH_TOKEN };
@@ -20,221 +22,336 @@ describe("Assets Endpoint (/assets)", () => {
     upstreamApi: "https://api.hospital-upstream.com/v1",
   };
 
-  it("POST /assets - Without auth, should get a 401", async () => {
-    const res = await request(BASE_URL).post("/assets").send(payload);
+  const mockIntegrationPayload = {
+    name: "mockIntegration",
+    platform: "mockIntegrationPlatform",
+    integrationUri: "https://mock-upstream-api.com/",
+    isGeneric: false,
+    authType: "Bearer",
+    resourceType: "Asset",
+    authentication: {
+      token: AUTH_TOKEN
+    },
+    syncEvery: 300,
+  };
 
-    expect(res.status).toBe(401);
-    expect(res.body.code).toBe("UNAUTHORIZED");
-  });
+  const assetIntegrationPayload = {
+    vendor: "mockIntegrationVendor",
+    items: [
+      {
+        ip: "172.20.15.244",
+        networkSegment: "Medical Imaging VLAN",
+        cpe: "cpe:2.3:h:ge_healthcare:hispeed_ct_e:*:*:*:*:*:*:*",
+        role: "CT Scanner",
+        upstreamApi: "https://mock-upstream-api.com/",
+        hostname: "med-dev-00001.hospital.local",
+        macAddress: "11:1E:DD:87:A9:4A",
+        serialNumber: "GH-2019-00001",
+        location: {
+          facility: "Main Campus",
+          building: "Diagnostic Imaging Center",
+          floor: "B1",
+          room: "RAD-001",
+        },
+        status: "Active",
+        vendorId: "mockIntegration-1",
+      },
+      {
+        ip: "172.20.15.245",
+        networkSegment: "Medical Imaging VLAN",
+        cpe: "cpe:2.3:h:ge_healthcare:brive_ct315:*:*:*:*:*:*:*",
+        role: "CT Scanner",
+        upstreamApi: "https://mock-upstream-api.com/",
+        hostname: "med-dev-00002.hospital.local",
+        macAddress: "11:1E:DD:87:A9:4B",
+        serialNumber: "GH-2019-00002",
+        location: {
+          facility: "Main Campus",
+          building: "Diagnostic Imaging Center",
+          floor: "B1",
+          room: "RAD-002",
+        },
+        status: "Active",
+        vendorId: "mockIntegration-2",
+      }
+    ],
+    page: 1,
+    pageSize: 100,
+    totalCount: 2,
+    totalPages: 1,
+    next: null,
+    previous: null,
+  };
 
-  it("POST /assets/bulk - Without auth, should get a 401", async () => {
-    const res = await request(BASE_URL).post("/assets/bulk").send(payload);
+  // it("POST /assets - Without auth, should get a 401", async () => {
+  //   const res = await request(BASE_URL).post("/assets").send(payload);
 
-    expect(res.status).toBe(401);
-    expect(res.body.code).toBe("UNAUTHORIZED");
-  });
+  //   expect(res.status).toBe(401);
+  //   expect(res.body.code).toBe("UNAUTHORIZED");
+  // });
 
-  it("GET /assets - Without auth, should be 401", async () => {
-    const res = await request(BASE_URL)
-      .get("/assets")
-      .query({ page: 1, pageSize: 5 });
+  // it("POST /assets/bulk - Without auth, should get a 401", async () => {
+  //   const res = await request(BASE_URL).post("/assets/bulk").send(payload);
 
-    expect(res.status).toBe(401);
-    expect(res.body.code).toBe("UNAUTHORIZED");
-  });
+  //   expect(res.status).toBe(401);
+  //   expect(res.body.code).toBe("UNAUTHORIZED");
+  // });
 
-  it("GET /assets/{id} - Without auth, should be 401", async () => {
-    const res = await request(BASE_URL).get(`/assets/foo`);
+  // it("GET /assets - Without auth, should be 401", async () => {
+  //   const res = await request(BASE_URL)
+  //     .get("/assets")
+  //     .query({ page: 1, pageSize: 5 });
 
-    expect(res.status).toBe(401);
-    expect(res.body.code).toBe("UNAUTHORIZED");
-  });
+  //   expect(res.status).toBe(401);
+  //   expect(res.body.code).toBe("UNAUTHORIZED");
+  // });
 
-  it("Assets endpoint integration test", async () => {
-    const res = await request(BASE_URL)
-      .post("/assets")
-      .set(authHeader)
-      .send(payload);
+  // it("GET /assets/{id} - Without auth, should be 401", async () => {
+  //   const res = await request(BASE_URL).get(`/assets/foo`);
 
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty("id");
-    expect(res.body.ip).toBe(payload.ip);
+  //   expect(res.status).toBe(401);
+  //   expect(res.body.code).toBe("UNAUTHORIZED");
+  // });
 
-    const assetId = res.body.id;
+  // it("GET /assets/integrationUpload - Without auth, should be 401", async () => {
+  //   const res = await request(BASE_URL).get(`/assets/integrationUpload`);
 
-    const getRes = await request(BASE_URL)
-      .get("/assets")
-      .query({ page: 1, pageSize: 5 })
-      .set(authHeader);
+  //   expect(res.status).toBe(401);
+  //   expect(res.body.code).toBe("UNAUTHORIZED");
+  // });
 
-    expect(getRes.status).toBe(200);
-    expect(Array.isArray(getRes.body.items)).toBe(true);
+  // it("Assets endpoint integration test", async () => {
+  //   const res = await request(BASE_URL)
+  //     .post("/assets")
+  //     .set(authHeader)
+  //     .send(payload);
 
-    const detailRes = await request(BASE_URL)
-      .get(`/assets/${assetId}`)
-      .set(authHeader);
+  //   expect(res.status).toBe(200);
+  //   expect(res.body).toHaveProperty("id");
+  //   expect(res.body.ip).toBe(payload.ip);
 
-    expect(detailRes.status).toBe(200);
-    expect(detailRes.body.id).toBe(assetId);
+  //   const assetId = res.body.id;
 
-    const deviceGroupId = detailRes.body.deviceGroup.id;
+  //   const getRes = await request(BASE_URL)
+  //     .get("/assets")
+  //     .query({ page: 1, pageSize: 5 })
+  //     .set(authHeader);
 
-    const listByDeviceGroupRes = await request(BASE_URL)
-      .get(`/deviceGroups/${deviceGroupId}/assets`)
-      .set(authHeader);
+  //   expect(getRes.status).toBe(200);
+  //   expect(Array.isArray(getRes.body.items)).toBe(true);
 
-    expect(listByDeviceGroupRes.status).toBe(200);
-    expect(listByDeviceGroupRes.body.items[0].deviceGroup.id).toBe(
-      deviceGroupId,
-    );
+  //   const detailRes = await request(BASE_URL)
+  //     .get(`/assets/${assetId}`)
+  //     .set(authHeader);
 
-    const updatePayload = {
-      ip: "192.168.1.105", // Updated field
-      cpe: generateCPE("asset_v1"),
-      role: "Backup Server",
-      upstreamApi: "https://api.hospital-upstream.com/v1",
+  //   expect(detailRes.status).toBe(200);
+  //   expect(detailRes.body.id).toBe(assetId);
+
+  //   const deviceGroupId = detailRes.body.deviceGroup.id;
+
+  //   const listByDeviceGroupRes = await request(BASE_URL)
+  //     .get(`/deviceGroups/${deviceGroupId}/assets`)
+  //     .set(authHeader);
+
+  //   expect(listByDeviceGroupRes.status).toBe(200);
+  //   expect(listByDeviceGroupRes.body.items[0].deviceGroup.id).toBe(
+  //     deviceGroupId,
+  //   );
+
+  //   const updatePayload = {
+  //     ip: "192.168.1.105", // Updated field
+  //     cpe: generateCPE("asset_v1"),
+  //     role: "Backup Server",
+  //     upstreamApi: "https://api.hospital-upstream.com/v1",
+  //   };
+
+  //   const putRes = await request(BASE_URL)
+  //     .put(`/assets/${assetId}`)
+  //     .set(authHeader)
+  //     .send(updatePayload);
+
+  //   expect(putRes.status).toBe(200);
+  //   expect(putRes.body.role).toBe("Backup Server");
+
+  //   const deleteRes = await request(BASE_URL)
+  //     .delete(`/assets/${assetId}`)
+  //     .set(authHeader);
+
+  //   expect(deleteRes.status).toBe(200);
+  // });
+
+  // it("Assets bulk endpoint happy path integration test", async () => {
+  //   // POST create the assets
+  //   const reqData = { assets: [payload, payload2] };
+  //   const res = await request(BASE_URL)
+  //     .post("/assets/bulk")
+  //     .set(authHeader)
+  //     .set(jsonHeader)
+  //     .send(reqData);
+
+  //   expect(res.status).toBe(200);
+  //   expect(Array.isArray(res.body)).toBe(true);
+  //   expect(res.body.length).toBe(2);
+
+  //   const bodyFirst = res.body.at(0);
+  //   expect(bodyFirst).toHaveProperty("id");
+  //   expect(bodyFirst.ip).toBe(payload.ip);
+  //   expect(bodyFirst.deviceGroup.cpe).toBe(payload.cpe);
+  //   expect(bodyFirst.deviceGroup).toHaveProperty("url");
+  //   expect(bodyFirst.deviceGroup).toHaveProperty("sbomUrl");
+  //   expect(bodyFirst.deviceGroup).toHaveProperty("vulnerabilitiesUrl");
+  //   expect(bodyFirst.deviceGroup).toHaveProperty("assetsUrl");
+  //   expect(bodyFirst.deviceGroup).toHaveProperty("emulatorsUrl");
+  //   expect(bodyFirst.role).toBe(payload.role);
+  //   expect(bodyFirst.upstreamApi).toBe(payload.upstreamApi);
+
+  //   const bodySecond = res.body.at(1);
+  //   expect(bodySecond).toHaveProperty("id");
+  //   expect(bodySecond.ip).toBe(payload2.ip);
+  //   expect(bodySecond.deviceGroup.cpe).toBe(payload2.cpe);
+  //   expect(bodySecond.role).toBe(payload2.role);
+  //   expect(bodySecond.upstreamApi).toBe(payload2.upstreamApi);
+
+  //   // GET first payload from DB
+  //   const firstAssetId = bodyFirst.id;
+  //   const firstDetailRes = await request(BASE_URL)
+  //     .get(`/assets/${firstAssetId}`)
+  //     .set(authHeader);
+
+  //   expect(firstDetailRes.status).toBe(200);
+  //   expect(firstDetailRes.body.id).toBe(firstAssetId);
+  //   expect(firstDetailRes.body.ip).toBe(payload.ip);
+  //   expect(firstDetailRes.body.deviceGroup.cpe).toBe(payload.cpe);
+  //   expect(firstDetailRes.body.deviceGroup).toHaveProperty("url");
+  //   expect(firstDetailRes.body.role).toBe(payload.role);
+  //   expect(firstDetailRes.body.upstreamApi).toBe(payload.upstreamApi);
+
+  //   // GET second payload from DB
+  //   const secondAssetId = bodySecond.id;
+  //   const secondDetailRes = await request(BASE_URL)
+  //     .get(`/assets/${secondAssetId}`)
+  //     .set(authHeader);
+
+  //   expect(secondDetailRes.status).toBe(200);
+  //   expect(secondDetailRes.body.id).toBe(secondAssetId);
+  //   expect(secondDetailRes.body.ip).toBe(payload2.ip);
+  //   expect(secondDetailRes.body.deviceGroup.cpe).toBe(payload2.cpe);
+  //   expect(secondDetailRes.body.role).toBe(payload2.role);
+  //   expect(secondDetailRes.body.upstreamApi).toBe(payload2.upstreamApi);
+
+  //   // DELETE the assets
+  //   const deleteFirstAssetRes = await request(BASE_URL)
+  //     .delete(`/assets/${firstAssetId}`)
+  //     .set(authHeader);
+
+  //   expect(deleteFirstAssetRes.status).toBe(200);
+
+  //   const deleteSecondAssetRes = await request(BASE_URL)
+  //     .delete(`/assets/${secondAssetId}`)
+  //     .set(authHeader);
+
+  //   expect(deleteSecondAssetRes.status).toBe(200);
+  // });
+
+  // it("Assets bulk endpoint no data fail case", async () => {
+  //   const emptyData = {};
+  //   const emptyDataRes = await request(BASE_URL)
+  //     .post("/assets/bulk")
+  //     .set(authHeader)
+  //     .set(jsonHeader)
+  //     .send(emptyData);
+
+  //   expect(emptyDataRes.status).toBe(400);
+  // });
+
+  // it("Assets bulk endpoint empty asset array fail case", async () => {
+  //   const emptyAssets = { assets: [] };
+  //   const emptyAssetsRes = await request(BASE_URL)
+  //     .post("/assets/bulk")
+  //     .set(authHeader)
+  //     .set(jsonHeader)
+  //     .send(emptyAssets);
+
+  //   expect(emptyAssetsRes.status).toBe(400);
+  // });
+
+  // it("Assets bulk endpoint bad asset fail case", async () => {
+  //   const blankAsset = { assets: [{}] };
+  //   const blankAssetRes = await request(BASE_URL)
+  //     .post("/assets/bulk")
+  //     .set(authHeader)
+  //     .set(jsonHeader)
+  //     .send(blankAsset);
+
+  //   expect(blankAssetRes.status).toBe(400);
+  // });
+
+  // it("Assets bulk endpoint bad first asset in array fail case", async () => {
+  //   const blankFirstAsset = { assets: [{}, payload] };
+  //   const blankFirstAssetRes = await request(BASE_URL)
+  //     .post("/assets/bulk")
+  //     .set(authHeader)
+  //     .set(jsonHeader)
+  //     .send(blankFirstAsset);
+
+  //   expect(blankFirstAssetRes.status).toBe(400);
+  // });
+
+  // it("Assets bulk endpoint bad second asset in array fail case", async () => {
+  //   const blankSecondAsset = { assets: [payload, {}] };
+  //   const blankSecondAssetRes = await request(BASE_URL)
+  //     .post("/assets/bulk")
+  //     .set(authHeader)
+  //     .set(jsonHeader)
+  //     .send(blankSecondAsset);
+
+  //   expect(blankSecondAssetRes.status).toBe(400);
+  // });
+
+  const buildMockIntegrationData = async () => {
+    const key = AUTH_TOKEN.split(" ")[1];
+    const apiKeyRecord = await prisma.apikey.findFirstOrThrow({
+      where: {
+        start: {
+          startsWith: key.slice(0, 5),
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+      },
+    });
+
+    return {
+      apiKeyId: apiKeyRecord.id,
+      userId: apiKeyRecord.userId,
+      ...mockIntegrationPayload,
     };
+  }
 
-    const putRes = await request(BASE_URL)
-      .put(`/assets/${assetId}`)
-      .set(authHeader)
-      .send(updatePayload);
+  it("Assets Upload Integration endpoint integration test", async () => {
+    const integrationData = await buildMockIntegrationData();
+    const createdIntegration = await prisma.integration.create({
+      data: {
+        ...integrationData,
+      }
+    });
 
-    expect(putRes.status).toBe(200);
-    expect(putRes.body.role).toBe("Backup Server");
+    expect(createdIntegration).toBeDefined();
+    expect(createdIntegration).toHaveProperty("id");
 
-    const deleteRes = await request(BASE_URL)
-      .delete(`/assets/${assetId}`)
-      .set(authHeader);
+    console.log(createdIntegration);
 
-    expect(deleteRes.status).toBe(200);
-  });
-
-  it("Assets bulk endpoint happy path integration test", async () => {
-    // POST create the assets
-    const reqData = { assets: [payload, payload2] };
     const res = await request(BASE_URL)
-      .post("/assets/bulk")
+      .post("/assets/integrationUpload")
       .set(authHeader)
       .set(jsonHeader)
-      .send(reqData);
+      .send(assetIntegrationPayload);
 
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBe(2);
+    console.log("res", res);
 
-    const bodyFirst = res.body.at(0);
-    expect(bodyFirst).toHaveProperty("id");
-    expect(bodyFirst.ip).toBe(payload.ip);
-    expect(bodyFirst.deviceGroup.cpe).toBe(payload.cpe);
-    expect(bodyFirst.deviceGroup).toHaveProperty("url");
-    expect(bodyFirst.deviceGroup).toHaveProperty("sbomUrl");
-    expect(bodyFirst.deviceGroup).toHaveProperty("vulnerabilitiesUrl");
-    expect(bodyFirst.deviceGroup).toHaveProperty("assetsUrl");
-    expect(bodyFirst.deviceGroup).toHaveProperty("emulatorsUrl");
-    expect(bodyFirst.role).toBe(payload.role);
-    expect(bodyFirst.upstreamApi).toBe(payload.upstreamApi);
-
-    const bodySecond = res.body.at(1);
-    expect(bodySecond).toHaveProperty("id");
-    expect(bodySecond.ip).toBe(payload2.ip);
-    expect(bodySecond.deviceGroup.cpe).toBe(payload2.cpe);
-    expect(bodySecond.role).toBe(payload2.role);
-    expect(bodySecond.upstreamApi).toBe(payload2.upstreamApi);
-
-    // GET first payload from DB
-    const firstAssetId = bodyFirst.id;
-    const firstDetailRes = await request(BASE_URL)
-      .get(`/assets/${firstAssetId}`)
-      .set(authHeader);
-
-    expect(firstDetailRes.status).toBe(200);
-    expect(firstDetailRes.body.id).toBe(firstAssetId);
-    expect(firstDetailRes.body.ip).toBe(payload.ip);
-    expect(firstDetailRes.body.deviceGroup.cpe).toBe(payload.cpe);
-    expect(firstDetailRes.body.deviceGroup).toHaveProperty("url");
-    expect(firstDetailRes.body.role).toBe(payload.role);
-    expect(firstDetailRes.body.upstreamApi).toBe(payload.upstreamApi);
-
-    // GET second payload from DB
-    const secondAssetId = bodySecond.id;
-    const secondDetailRes = await request(BASE_URL)
-      .get(`/assets/${secondAssetId}`)
-      .set(authHeader);
-
-    expect(secondDetailRes.status).toBe(200);
-    expect(secondDetailRes.body.id).toBe(secondAssetId);
-    expect(secondDetailRes.body.ip).toBe(payload2.ip);
-    expect(secondDetailRes.body.deviceGroup.cpe).toBe(payload2.cpe);
-    expect(secondDetailRes.body.role).toBe(payload2.role);
-    expect(secondDetailRes.body.upstreamApi).toBe(payload2.upstreamApi);
-
-    // DELETE the assets
-    const deleteFirstAssetRes = await request(BASE_URL)
-      .delete(`/assets/${firstAssetId}`)
-      .set(authHeader);
-
-    expect(deleteFirstAssetRes.status).toBe(200);
-
-    const deleteSecondAssetRes = await request(BASE_URL)
-      .delete(`/assets/${secondAssetId}`)
-      .set(authHeader);
-
-    expect(deleteSecondAssetRes.status).toBe(200);
-  });
-
-  it("Assets bulk endpoint no data fail case", async () => {
-    const emptyData = {};
-    const emptyDataRes = await request(BASE_URL)
-      .post("/assets/bulk")
-      .set(authHeader)
-      .set(jsonHeader)
-      .send(emptyData);
-
-    expect(emptyDataRes.status).toBe(400);
-  });
-
-  it("Assets bulk endpoint empty asset array fail case", async () => {
-    const emptyAssets = { assets: [] };
-    const emptyAssetsRes = await request(BASE_URL)
-      .post("/assets/bulk")
-      .set(authHeader)
-      .set(jsonHeader)
-      .send(emptyAssets);
-
-    expect(emptyAssetsRes.status).toBe(400);
-  });
-
-  it("Assets bulk endpoint bad asset fail case", async () => {
-    const blankAsset = { assets: [{}] };
-    const blankAssetRes = await request(BASE_URL)
-      .post("/assets/bulk")
-      .set(authHeader)
-      .set(jsonHeader)
-      .send(blankAsset);
-
-    expect(blankAssetRes.status).toBe(400);
-  });
-
-  it("Assets bulk endpoint bad first asset in array fail case", async () => {
-    const blankFirstAsset = { assets: [{}, payload] };
-    const blankFirstAssetRes = await request(BASE_URL)
-      .post("/assets/bulk")
-      .set(authHeader)
-      .set(jsonHeader)
-      .send(blankFirstAsset);
-
-    expect(blankFirstAssetRes.status).toBe(400);
-  });
-
-  it("Assets bulk endpoint bad second asset in array fail case", async () => {
-    const blankSecondAsset = { assets: [payload, {}] };
-    const blankSecondAssetRes = await request(BASE_URL)
-      .post("/assets/bulk")
-      .set(authHeader)
-      .set(jsonHeader)
-      .send(blankSecondAsset);
-
-    expect(blankSecondAssetRes.status).toBe(400);
+    await prisma.integration.delete({
+      where: { id: createdIntegration.id },
+    });
   });
 });

@@ -2,10 +2,8 @@
   Warnings:
 
   - You are about to drop the column `lastSynced` on the `asset` table. All the data in the column will be lost.
-  - You are about to drop the column `assetId` on the `external_asset_mappings` table. All the data in the column will be lost.
   - You are about to drop the column `error` on the `sync_status` table. All the data in the column will be lost.
   - A unique constraint covering the columns `[itemId,integrationId]` on the table `external_asset_mappings` will be added. If there are existing duplicate values, this will fail.
-  - Added the required column `itemId` to the `external_asset_mappings` table without a default value. This is not possible if the table is not empty.
 
 */
 -- CreateEnum
@@ -24,9 +22,8 @@ DROP INDEX "public"."external_asset_mappings_assetId_integrationId_key";
 ALTER TABLE "asset" DROP COLUMN "lastSynced";
 
 -- AlterTable
-ALTER TABLE "external_asset_mappings" DROP COLUMN "assetId",
-ADD COLUMN     "itemId" TEXT NOT NULL,
-ADD COLUMN     "lastSynced" TIMESTAMP(3);
+ALTER TABLE "external_asset_mappings" RENAME COLUMN "assetId" TO "itemId";
+ALTER TABLE "external_asset_mappings" ADD COLUMN     "lastSynced" TIMESTAMP(3);
 
 -- AlterTable
 ALTER TABLE "sync_status" DROP COLUMN "error",

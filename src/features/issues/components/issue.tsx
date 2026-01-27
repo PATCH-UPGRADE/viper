@@ -33,7 +33,7 @@ const statusDetails = {
     name: "False Positive",
     color: "bg-yellow-500",
   },
-  [IssueStatus.PENDING]: { name: "Active", color: "bg-red-500" },
+  [IssueStatus.ACTIVE]: { name: "Active", color: "bg-red-500" },
   [IssueStatus.REMEDIATED]: { name: "Remediated", color: "bg-green-500" },
 };
 
@@ -136,6 +136,8 @@ export const IssueDetailPage = ({ id }: { id: string }) => {
   );
 };
 
+const ACTIVE_ISSUES_SHOWN_MAX = 5;
+
 export const IssuesSidebarList = ({
   issues,
   type,
@@ -158,6 +160,29 @@ export const IssuesSidebarList = ({
 
   if (issues.length === 0) return null;
 
+  const assetId = issues[0].assetId;
+
+  const isIssuesOverflow = issues.length > ACTIVE_ISSUES_SHOWN_MAX;
+  const visibleIssues = issues.slice(
+    0,
+    isIssuesOverflow ? ACTIVE_ISSUES_SHOWN_MAX : issues.length,
+  );
+
+  const nonActiveIssuesCount: { issueStatus: IssueStatus; count: number }[] =
+    [];
+  let showNonActiveIssueLinks = false;
+  for (const issueStatus of Object.values(IssueStatus)) {
+    if (issueStatus === IssueStatus.ACTIVE) {
+      continue;
+    }
+    const count = issues.filter((i) => i.status === issueStatus).length;
+    if (count === 0) {
+      continue;
+    }
+    nonActiveIssuesCount.push({ issueStatus, count });
+    showNonActiveIssueLinks = true;
+  }
+
   const Icon = type === "vulnerabilities" ? BugIcon : ComputerIcon;
 
   return (
@@ -166,7 +191,7 @@ export const IssuesSidebarList = ({
         Active Issues
       </h4>
       <ul className="flex flex-col gap-2">
-        {issues.map((issue) => (
+        {visibleIssues.map((issue) => (
           <li
             key={issue.id}
             className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer hover:bg-muted transition-all"
@@ -248,6 +273,44 @@ export const IssuesSidebarList = ({
           </li>
         ))}
       </ul>
+
+      {isIssuesOverflow && (
+        <div className="flex flex-col gap-2 pt-2">
+          <div className="flex justify-between">
+            <p>
+              Viewing {ACTIVE_ISSUES_SHOWN_MAX} of {issues.length} Active Issues
+            </p>
+            <Link
+              className="text-primary hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+              href={`/assets/${assetId}`}
+            >
+              View All Active Issues
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {showNonActiveIssueLinks && (
+        <div className="flex flex-col gap-2 pt-2">
+          <h5 className="font-bold">Non-Active Issues</h5>
+
+          {nonActiveIssuesCount.map((statusCountTuple, i) => (
+            <Link
+              key={i}
+              className="text-primary hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+              href={`/assets/${assetId}?issueStatus=${statusCountTuple.issueStatus}`}
+            >
+              View {statusCountTuple.count}{" "}
+              {statusDetails[statusCountTuple.issueStatus].name} Issue
+              {statusCountTuple.count > 1 ? "s" : ""}
+            </Link>
+          ))}
+        </div>
+      )}
     </>
   );
 };

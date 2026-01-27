@@ -1,4 +1,5 @@
 import "server-only";
+import { SyncStatusEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
 
@@ -125,7 +126,9 @@ export const syncIntegration = inngest.createFunction(
       await prisma.syncStatus.create({
         data: {
           integrationId: integration.id,
-          error: !syncResult.success,
+          status: !syncResult.success
+            ? SyncStatusEnum.Error
+            : SyncStatusEnum.Pending,
           errorMessage: syncResult.success ? null : syncResult.errorMessage,
           syncedAt: new Date(),
         },

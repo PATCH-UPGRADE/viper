@@ -220,9 +220,8 @@ model Asset {
   deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
 
-  lastSynced DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([deviceGroupId])
   @@map("asset")
@@ -231,23 +230,44 @@ model Asset {
 // External mapping table - links assets to their external IDs across integrations
 model ExternalAssetMapping {
   id            String @id @default(cuid())
-  assetId       String
+  itemId        String
   integrationId String
   externalId    String // the id the asset has on say, Blueflow
 
   // Relationships
-  asset       Asset       @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  item        Asset       @relation(fields: [itemId], references: [id], onDelete: Cascade)
   integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  lastSynced DateTime?
 
-  // Composite unique constraint: one external ID per integration per asset
-  @@unique([assetId, integrationId])
-  // Critical index for fast lookups: "find asset by integration's external ID"
+  // Composite unique constraint: one external ID per integration per item
+  @@unique([itemId, integrationId])
+  // Critical index for fast lookups: "find item by integration's external ID"
   @@unique([integrationId, externalId])
-  @@index([assetId])
+  @@index([itemId])
   @@map("external_asset_mappings")
+}
+
+// duplicate model for type safety and performance
+model ExternalVulnerabilityMapping {
+  id            String @id @default(cuid())
+  itemId        String
+  integrationId String
+  externalId    String
+
+  item        Vulnerability @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  integration Integration   @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  lastSynced DateTime?
+
+  @@unique([itemId, integrationId])
+  @@unique([integrationId, externalId])
+  @@index([itemId])
+  @@map("external_item_mappings")
 }
 
 model Emulator {
@@ -294,8 +314,9 @@ model Vulnerability {
   remediations Remediation[]
   issues       Issue[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt        DateTime                       @default(now())
+  updatedAt        DateTime                       @updatedAt
+  externalMappings ExternalVulnerabilityMapping[]
 
   @@index([userId])
   @@map("vulnerability")
@@ -399,7 +420,8 @@ model Integration {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  assetMappings ExternalAssetMapping[]
+  assetMappings         ExternalAssetMapping[]
+  vulnerabilityMappings ExternalVulnerabilityMapping[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -408,13 +430,20 @@ model Integration {
   @@map("integration")
 }
 
+enum SyncStatusEnum {
+  Error
+  Pending
+  Success
+}
+
 model SyncStatus {
-  id            String      @id @default(cuid())
-  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  id            String         @id @default(cuid())
+  integration   Integration    @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   integrationId String
-  error         Boolean     @default(false) // Indicates if there was an error during sync
+  status        SyncStatusEnum @default(Pending)
   errorMessage  String?
-  syncedAt      DateTime    @default(now())
+  syncedAt      DateTime       @default(now())
+
   @@map("sync_status")
 }
 

@@ -88,7 +88,7 @@ export const ApiTokensList = () => {
   );
 };
 
-const ApiTokenSuccessModal = ({
+export const ApiTokenSuccessModal = ({
   open,
   setOpen,
   apiKey,

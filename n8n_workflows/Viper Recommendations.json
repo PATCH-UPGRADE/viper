@@ -1,0 +1,323 @@
+{
+  "name": "Viper Recommendations",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "449fad1f-6f7e-4f36-af86-832175b37bdd",
+        "authentication": "headerAuth",
+        "responseMode": "streaming",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -416,
+        -160
+      ],
+      "id": "11070fc8-1b4e-41fc-9990-be5a56079dd3",
+      "name": "Webhook",
+      "webhookId": "449fad1f-6f7e-4f36-af86-832175b37bdd",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ioWk9yQJfyA0x50j",
+          "name": "Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "apiBaseUrl",
+              "value": "https://viper-xi.vercel.app/",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "apiEndpoint1",
+              "value": "/api/v1/assets",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "apiEndpoint2",
+              "value": "/api/v1/vulnerabilities",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "apiEndpoint3",
+              "value": "/api/v1/remediations",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "f12b0ae8-bdf7-4fef-8f2c-eaf8e5e89ff2",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -192,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Workflow Configuration').first().json.apiBaseUrl + $('Workflow Configuration').first().json.apiEndpoint1 }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "2cb8f1b0-7569-4c33-92cf-4f258c279cad",
+      "name": "Fetch Data 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        32,
+        -160
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "1M7bJlVV6osJ3KV0",
+          "name": "production viper auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Workflow Configuration').first().json.apiBaseUrl + $('Workflow Configuration').first().json.apiEndpoint2 }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "4fa2441b-7dcd-4ed3-8c06-da48f6bebd18",
+      "name": "Fetch Data 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        256,
+        -160
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "1M7bJlVV6osJ3KV0",
+          "name": "production viper auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Workflow Configuration').first().json.apiBaseUrl + $('Workflow Configuration').first().json.apiEndpoint3 }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "40f76d56-10b1-4c4d-8a3b-c9be831f8b9e",
+      "name": "Fetch Data 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        480,
+        -160
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "1M7bJlVV6osJ3KV0",
+          "name": "production viper auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "Asset Data",
+              "value": "={{ $('Fetch Data 1').item.json }}",
+              "type": "object"
+            },
+            {
+              "id": "id-2",
+              "name": "Vulnerability Data",
+              "value": "={{ $('Fetch Data 2').item.json }}",
+              "type": "object"
+            },
+            {
+              "id": "id-3",
+              "name": "Remediation Data",
+              "value": "={{ $('Fetch Data 3').item.json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8c15c270-effa-4f6f-b26b-a12bdc5f9fbd",
+      "name": "Combine API Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        704,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json }}",
+        "options": {
+          "systemMessage": "You are a hospital cybersecurity expert. You will be given a json object of Asset Data representing device assets that a hospital has, Vulnerability Data representing vulnerabilities that may affect those assets, and Remediation Data representing remediations hospital administrators can take to address vulnerabilities.\n\nGiven this information, give a short recommendation to hospital IT staff on how to secure hospital assets. In your recommendation, be sure to predict what impact any downtime of devices may have on patient care. ",
+          "enableStreaming": true
+        }
+      },
+      "id": "10a2c1ea-64a6-4790-a166-f8fadc8f2968",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        912,
+        -352
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        912,
+        32
+      ],
+      "id": "b754c9d2-79ef-4f3b-a397-ad9990eaa161",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "dftjgoSsk0ElMNJo",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1424,
+        -176
+      ],
+      "id": "9db3699e-8d7c-4bc9-8c51-aceccfd74fd5",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Workflow Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Configuration": {
+      "main": [
+        [
+          {
+            "node": "Fetch Data 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Data 1": {
+      "main": [
+        [
+          {
+            "node": "Fetch Data 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Data 2": {
+      "main": [
+        [
+          {
+            "node": "Fetch Data 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Data 3": {
+      "main": [
+        [
+          {
+            "node": "Combine API Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine API Data": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "694ad32f-888e-44f8-b235-c96392d61ee1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "66207f7815720e24b39297468a019ba2a80d8e3ab7d395f296925a8d0e9081c5"
+  },
+  "id": "qoVK8TS6KJQ9Xb4W",
+  "tags": []
+}

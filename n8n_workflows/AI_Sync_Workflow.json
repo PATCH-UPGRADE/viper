@@ -1,0 +1,332 @@
+{
+  "name": "AI_Sync_Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-sync",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "id": "8dd3deb9-6967-414c-8238-8028774692b3",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -416
+      ],
+      "webhookId": "1741504f-8151-46a9-9ab9-52eea89e7087",
+      "alwaysOutputData": false,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ioWk9yQJfyA0x50j",
+          "name": "Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "apiBaseUrl",
+              "value": "={{ $json.body.baseApiUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "684395a7-ceb1-4524-8eaf-a3970c6fb934",
+              "name": "responsePath",
+              "value": "={{ $json.body.responsePath }}",
+              "type": "string"
+            },
+            {
+              "id": "a4e97f8d-527d-4500-8fd5-a52a38b260b2",
+              "name": "viperAPIKey",
+              "value": "={{ $json.body.responseApiKey }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "94b344ca-17b1-42af-990d-13a5457bc7ba",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        -416
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "35d168fa-54bd-4526-a190-54dd16344933",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        -192
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "j0mv3A9ieKbr7MtD",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Make HTTP requests to fetch web pages and API data. Use this to visit URLs, follow links, and gather information from web resources.",
+        "url": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('URL', `Start with either the user-provided integration URL, or a URL specified in additional instructions`, 'string') }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "={{  $json.authType === \"Header\" ? $json.authentication.header : \"Authentication\" }}",
+              "value": "={{  $json.authType === \"Header\" ? $json.authentication.value : \"Bearer \" + $json.authentication.token  }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "fce3b4e5-7ea3-432a-a7df-7c01b662451e",
+      "name": "HTTP Request Tool",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        800,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "9c4df191-cbbc-4955-83b1-be893245905b",
+      "name": "OpenAI Model for Vulnerability Parser",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1008,
+        16
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "j0mv3A9ieKbr7MtD",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ \"Integration URL: \" + $json.body.integrationUri + \"\\n\\nAuthentication Type: \" + $json.body.authType + \"\\n\\nAuthentication Details: \" + JSON.stringify($json.body.authentication) }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "={{ $json.agentInstructions + \"\\n\\n## Tools\\nYou have access to an HTTP Request Tool that can make web requests. Use it to visit the integration URL and any additional pages you need to gather complete information. You may need to make multiple requests to follow links or paginate through data. Refer to applicable instructions on how to do this.\\n\\nOnce you have gathered all relevant information, format your response according to the JSON schema provided by the output parser. Be thorough and accurate in your data collection.\" }}"
+        }
+      },
+      "id": "9ba71bf5-4408-4e18-8e94-7b214508392d",
+      "name": "API Crawler - AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        728,
+        -416
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "={{ JSON.stringify($('Workflow Configuration').first().json.body.responseSchema, null, 2)\n }}",
+        "autoFix": true
+      },
+      "id": "61d6e769-9846-483e-b09c-32779d613781",
+      "name": "JSON Schema Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        928,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "agentInstructions",
+              "value": "={{ \"You are a web research agent specialized in collecting vulnerability information from external integrations. Visit the provided integration URL and extract vulnerabillity data. Format your response as a JSON array of objects that match the following schema:\\n\\n\" + \n\nJSON.stringify($('Workflow Configuration').first().json.body.responseSchema) +\n\n($json.body.additionalInstructions ? \"\\n\\nAdditional instructions specific to this integration were provided by the user: \" + $json.body.additionalInstructions : \"\") }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "9a42ce23-608e-4e57-a12b-d2542d55f47a",
+      "name": "Prepare Instructions",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        -416
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Configuration').first().json.apiBaseUrl + $('Workflow Configuration').first().json.responsePath }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.output) }}",
+        "options": {}
+      },
+      "id": "ff3b2bb5-d18a-406d-b796-6cb704ab58a7",
+      "name": "Send Data to VIPER API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1296,
+        -416
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "1M7bJlVV6osJ3KV0",
+          "name": "production viper auth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Workflow Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Configuration": {
+      "main": [
+        [
+          {
+            "node": "Prepare Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "API Crawler - AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "API Crawler - AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model for Vulnerability Parser": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "JSON Schema Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Crawler - AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send Data to VIPER API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JSON Schema Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "API Crawler - AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Instructions": {
+      "main": [
+        [
+          {
+            "node": "API Crawler - AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b1c40fa0-12d4-49b8-8878-fff285974aad",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "66207f7815720e24b39297468a019ba2a80d8e3ab7d395f296925a8d0e9081c5"
+  },
+  "id": "rziNag025lMXRDDF",
+  "tags": []
+}

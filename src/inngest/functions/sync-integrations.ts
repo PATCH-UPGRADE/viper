@@ -6,6 +6,7 @@ import type { Integration, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { getBaseUrl } from "@/lib/url-utils";
 import { inngest } from "../client";
+import { auth } from "@/lib/auth";
 
 export const syncAllIntegrations = inngest.createFunction(
   { id: "sync-all-integrations" },
@@ -91,9 +92,23 @@ async function syncAiIntegration(
     throw new Error("Either N8N_KEY or N8N_AI_SYNC_URL is not defined");
   }
 
+  // get where n8n should respond, and what schema it should respond with
   const { schema: responseSchema, path: responsePath } = getResponseConfig(
     integration.resourceType,
   );
+
+  // generate an api key for the response
+  // TODO: this probably isn't great auth, use HMAC and a webhook secret later on
+  // put the integration user id in the payload
+  const apiKey = await auth.api.createApiKey({
+    body: {
+      userId: integration.userId,
+      name: "n8n response api key",
+      // we cannot create api keys that are shorter than 24 hrs
+      expiresIn: 60 * 60 * 24,
+      rateLimitEnabled: false,
+    },
+  });
 
   const response = await fetch(n8nWebhookUrl, {
     method: "POST",
@@ -105,6 +120,7 @@ async function syncAiIntegration(
     body: JSON.stringify({
       // If you're testing this locally and need webhooks, use NEXT_PUBLIC_APP_URL
       baseApiUrl: `${getBaseUrl()}/api/v1`,
+      responseApiKey: apiKey.key, // TODO: eventually switch to tokens or webhook secrets
       responsePath,
       responseSchema,
       resourceType: integration.resourceType,

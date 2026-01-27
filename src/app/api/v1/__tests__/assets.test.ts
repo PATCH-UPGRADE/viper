@@ -1,8 +1,8 @@
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
 import prisma from "@/lib/db";
-import { apiKey } from "better-auth/plugins";
+import { fail } from "assert";
 
 describe("Assets Endpoint (/assets)", () => {
   const authHeader = { Authorization: AUTH_TOKEN };
@@ -41,7 +41,7 @@ describe("Assets Endpoint (/assets)", () => {
       {
         ip: "172.20.15.244",
         networkSegment: "Medical Imaging VLAN",
-        cpe: "cpe:2.3:h:ge_healthcare:hispeed_ct_e:*:*:*:*:*:*:*",
+        cpe: "cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*",
         role: "CT Scanner",
         upstreamApi: "https://mock-upstream-api.com/",
         hostname: "med-dev-00001.hospital.local",
@@ -59,7 +59,7 @@ describe("Assets Endpoint (/assets)", () => {
       {
         ip: "172.20.15.245",
         networkSegment: "Medical Imaging VLAN",
-        cpe: "cpe:2.3:h:ge_healthcare:brive_ct315:*:*:*:*:*:*:*",
+        cpe: "cpe:2.3:h:mock:brive_ct315:*:*:*:*:*:*:*",
         role: "CT Scanner",
         upstreamApi: "https://mock-upstream-api.com/",
         hostname: "med-dev-00002.hospital.local",
@@ -308,7 +308,7 @@ describe("Assets Endpoint (/assets)", () => {
   //   expect(blankSecondAssetRes.status).toBe(400);
   // });
 
-  const buildMockIntegrationData = async () => {
+  const setupMockIntegration = async () => {
     const key = AUTH_TOKEN.split(" ")[1];
     const apiKeyRecord = await prisma.apikey.findFirstOrThrow({
       where: {
@@ -322,36 +322,165 @@ describe("Assets Endpoint (/assets)", () => {
       },
     });
 
-    return {
-      apiKeyId: apiKeyRecord.id,
-      userId: apiKeyRecord.userId,
-      ...mockIntegrationPayload,
-    };
+    const createdIntegration = await prisma.integration.create({
+      data: {
+        apiKeyId: apiKeyRecord.id,
+        userId: apiKeyRecord.userId,
+        ...mockIntegrationPayload,
+      }
+    });
+
+    onTestFinished(async () => {
+      await prisma.integration.delete({
+        where: { id: createdIntegration.id },
+      });
+    });
+
+    expect(createdIntegration.apiKeyId).toBe(apiKeyRecord.id);
+    expect(createdIntegration.userId).toBe(apiKeyRecord.userId);
+    expect(createdIntegration.name).toBe(mockIntegrationPayload.name);
+    expect(createdIntegration.platform).toBe(mockIntegrationPayload.platform);
+    expect(createdIntegration.integrationUri).toBe(mockIntegrationPayload.integrationUri);
+    expect(createdIntegration.isGeneric).toBe(mockIntegrationPayload.isGeneric);
+    expect(createdIntegration.authType).toBe(mockIntegrationPayload.authType);
+    expect(createdIntegration.resourceType).toBe(mockIntegrationPayload.resourceType);
+    expect(createdIntegration.authentication).toStrictEqual(mockIntegrationPayload.authentication);
+    expect(createdIntegration.syncEvery).toBe(mockIntegrationPayload.syncEvery);
+
+    return createdIntegration;
   }
 
   it("Assets Upload Integration endpoint integration test", async () => {
-    const integrationData = await buildMockIntegrationData();
-    const createdIntegration = await prisma.integration.create({
-      data: {
-        ...integrationData,
-      }
-    });
+    const createdIntegration = await setupMockIntegration();
 
     expect(createdIntegration).toBeDefined();
     expect(createdIntegration).toHaveProperty("id");
 
-    console.log(createdIntegration);
-
-    const res = await request(BASE_URL)
+    const integrationRes = await request(BASE_URL)
       .post("/assets/integrationUpload")
       .set(authHeader)
       .set(jsonHeader)
       .send(assetIntegrationPayload);
+    
+    console.log(integrationRes.body);
 
-    console.log("res", res);
+    expect(integrationRes.status).toBe(200);
+    expect(integrationRes.body.createdAssetsCount).toBe(2);
+    expect(integrationRes.body.updatedAssetsCount).toBe(0);
+    expect(integrationRes.body.status).toBe(200);
+    expect(integrationRes.body.message).toBe("success");
 
-    await prisma.integration.delete({
-      where: { id: createdIntegration.id },
+    const assetPayload1 = assetIntegrationPayload.items[0];
+    const mapping1 = await prisma.externalAssetMapping.findFirst({
+      where: {
+        externalId: assetPayload1.vendorId,
+      }
     });
+
+    if (!mapping1) {
+      fail();
+    }
+
+    const foundAsset1 = await prisma.asset.findFirst({
+      where: {
+        id: mapping1.assetId,
+      },
+      include: {
+        deviceGroup: true,
+      }
+    });
+
+    if (!foundAsset1) {
+      fail();
+    }
+
+    onTestFinished(async () => {
+      await prisma.asset.delete({
+        where: { id: foundAsset1.id },
+        include: { externalMappings: true },
+      });
+    });
+
+    expect(mapping1.integrationId).toBe(createdIntegration.id);
+    expect(mapping1.externalId).toBe(assetPayload1.vendorId);
+
+    expect(foundAsset1.networkSegment).toBe(assetPayload1.networkSegment);
+    expect(foundAsset1.role).toBe(assetPayload1.role);
+    expect(foundAsset1.upstreamApi).toBe(assetPayload1.upstreamApi);
+    expect(foundAsset1.hostname).toBe(assetPayload1.hostname);
+    expect(foundAsset1.macAddress).toBe(assetPayload1.macAddress);
+    expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
+    expect(foundAsset1.location).toStrictEqual(assetPayload1.location);
+    expect(foundAsset1.status).toBe(assetPayload1.status);
+    expect(foundAsset1.deviceGroup.cpe).toBe(assetPayload1.cpe);
+
+    const assetPayload2 = assetIntegrationPayload.items[1];
+    const mapping2 = await prisma.externalAssetMapping.findFirst({
+      where: {
+        externalId: assetPayload2.vendorId,
+      }
+    });
+
+    if (!mapping2) {
+      fail();
+    }
+
+    const foundAsset2 = await prisma.asset.findFirst({
+      where: {
+        id: mapping2.assetId,
+      },
+      include: {
+        deviceGroup: true,
+      }
+    });
+
+    if (!foundAsset2) {
+      fail();
+    }
+
+    onTestFinished(async () => {
+      await prisma.asset.delete({
+        where: { id: foundAsset2.id },
+        include: { externalMappings: true },
+      });
+    });
+
+    expect(mapping2.integrationId).toBe(createdIntegration.id);
+    expect(mapping2.externalId).toBe(assetPayload2.vendorId);
+
+    expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
+    expect(foundAsset2.role).toBe(assetPayload2.role);
+    expect(foundAsset2.upstreamApi).toBe(assetPayload2.upstreamApi);
+    expect(foundAsset2.hostname).toBe(assetPayload2.hostname);
+    expect(foundAsset2.macAddress).toBe(assetPayload2.macAddress);
+    expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
+    expect(foundAsset2.location).toStrictEqual(assetPayload2.location);
+    expect(foundAsset2.status).toBe(assetPayload2.status);
+    expect(foundAsset2.deviceGroup.cpe).toBe(assetPayload2.cpe);
+
+    if (!foundAsset1.lastSynced || !foundAsset2.lastSynced) {
+      fail();
+    }
+
+    expect(foundAsset1.lastSynced).toStrictEqual(foundAsset2.lastSynced);
+
+    const foundSync = await prisma.syncStatus.findFirst({
+      where: { syncedAt: foundAsset1.lastSynced }
+    });
+
+    if (!foundSync) {
+      fail();
+    }
+
+    onTestFinished(async () => {
+      await prisma.syncStatus.delete({
+        where: { id: foundSync.id },
+      });
+    });
+
+    expect(foundSync.integrationId).toBe(createdIntegration.id);
+    expect(foundSync.error).toBe(false);
+    expect(foundSync.errorMessage).toBe("success");
+    expect(foundSync.syncedAt).toStrictEqual(foundAsset2.lastSynced);
   });
 });

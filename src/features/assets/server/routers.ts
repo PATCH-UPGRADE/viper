@@ -17,7 +17,7 @@ import {
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
-import { apiKey } from "better-auth/plugins";
+import { PrismaClientKnownRequestError, PrismaClientUnknownRequestError, PrismaClientValidationError } from "@/generated/prisma/runtime/library";
 
 const AssetStatus = z.enum(["Active", "Decommissioned", "Maintenance"]);
 
@@ -48,7 +48,11 @@ const updateAssetSchema = assetInputSchema.extend({
   id: z.string(),
 });
 const integrationResponseSchema = z.object({
+  status: z.number(),
   message: z.string(),
+  createdAssetsCount: z.number(),
+  updatedAssetsCount: z.number(),
+  syncedAt: z.string(),
 });
 
 // NOTE: tRPC / OpenAPI doesn't allow for arrays as the INPUT schema
@@ -379,92 +383,135 @@ export const assetsRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ ctx, input }) => {
 
+      const userId = ctx.auth.user.id;
       const foundIntegration = await prisma.integration.findFirstOrThrow({ 
-        where: { userId: ctx.auth.user.id },
+        where: { apiKey: { userId } },
+        select: { id: true, },
       });
 
-      const assetInclude = {
-        user: userIncludeSelect,
-        deviceGroup: deviceGroupSelect
+      const lastSynced = new Date();
+
+      const response = {
+        status: 200,
+        message: "success",
+        createdAssetsCount: 0,
+        updatedAssetsCount: 0,
+        syncedAt: lastSynced.toString(),
       };
 
-      // return prisma.$transaction(
-        input.items.map(async (item) => {
-          // Look for an existing mapping first
-          const foundMapping = await prisma.externalAssetMapping.findFirst({
-            where: {
-              integrationId: foundIntegration.id,
-              externalId: item.vendorId,
-            },
-            include: { asset: true }
-          });
+      for (const item of input.items) {
+        // extract certain fields because they don't belong in asset data creation
+        const { cpe, vendorId, ...assetData } = item;
 
-          // If we have a ExternalAssetMapping, we just need to update the asset
-          if (foundMapping && foundMapping.asset) {
-            return prisma.asset.update({
-              where: { id: foundMapping.asset.id },
-              data: {
-                ...item,
-              },
-              include: assetInclude
-            });
+        console.log(item);
+        // Look for an existing mapping first
+        const foundMapping = await prisma.externalAssetMapping.findFirst({
+          where: {
+            integrationId: foundIntegration.id,
+            externalId: vendorId,
+          },
+          select: {
+            assetId: true,
           }
+        });
 
-          // Otherwise try to find a matching Asset by unique properties
-          const foundAsset = await prisma.asset.findFirst({
-            where: {
-              OR: [
-                { hostname: item.hostname },
-                { macAddress: item.macAddress },
-                { serialNumber: item.serialNumber },
-              ],
-            }
+        // If we have a ExternalAssetMapping, we just need to update the asset
+        if (foundMapping) {
+          prisma.asset.update({
+            where: { id: foundMapping.assetId },
+            data: {
+              ...assetData,
+              lastSynced,
+            },
           });
 
-          const deviceGroup = await cpeToDeviceGroup(item.cpe);
+          response.updatedAssetsCount++;
+          continue;
+        }
 
-          // If no Asset, we need to create the Asset and ExternalAssetMapping
-          if (!foundAsset) {
+        // Otherwise try to find a matching Asset by unique properties
+        const foundAsset = await prisma.asset.findFirst({
+          where: {
+            OR: [
+              { hostname: assetData.hostname },
+              { macAddress: assetData.macAddress },
+              { serialNumber: assetData.serialNumber },
+            ],
+          }
+        });
+
+        const deviceGroup = await cpeToDeviceGroup(cpe);
+
+        // If no Asset, we need to create the Asset and ExternalAssetMapping
+        if (!foundAsset) {
+          try {
             const createdAsset = await prisma.asset.create({
               data: {
-                ...item,
+                ...assetData,
                 deviceGroupId: deviceGroup.id,
-                userId: ctx.auth.user.id,
+                userId,
+                lastSynced,
               },
-              include: assetInclude
             });
+
+            response.createdAssetsCount++;
 
             await prisma.externalAssetMapping.create({
               data: {
                 assetId: createdAsset.id,
                 integrationId: foundIntegration.id,
-                externalId: item.vendorId,
+                externalId: vendorId,
               }
             });
-            return createdAsset;
+          } catch (error: unknown) {
+            const { message, status } = handlePrismaError(error);
+            response.message = message;
+            response.status = status;
+            break;
           }
 
+          continue;
+        }
+
+        try {
           // If we have an Asset but no ExternalAssetMapping then create the mapping
           await prisma.externalAssetMapping.create({
             data: {
               assetId: foundAsset.id,
               integrationId: foundIntegration.id,
-              externalId: item.vendorId,
+              externalId: vendorId,
             }
           });
-
           // and then update the existing Asset
-          return prisma.asset.update({
+          await prisma.asset.update({
             where: { id: foundAsset.id },
             data: {
-              ...item,
+              ...assetData,
               deviceGroupId: deviceGroup.id,
               userId: ctx.auth.user.id,
+              lastSynced,
             },
-            include: assetInclude
           });
-        })
-      // );
+          response.updatedAssetsCount++;
+
+        } catch (error: unknown) {
+          const { message, status } = handlePrismaError(error);
+          response.message = message;
+          response.status = status;
+          break;
+        }
+      }
+
+      await prisma.syncStatus.create({
+        data: {
+          integrationId: foundIntegration.id,
+          error: response.status !== 200,
+          errorMessage: response.message,
+          syncedAt: lastSynced,
+        }
+      });
+
+      return response;
     }),
 
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)
@@ -521,3 +568,24 @@ export const assetsRouter = createTRPCRouter({
       });
     }),
 });
+
+const handlePrismaError = (e: unknown): { message: string, status: number } => {
+  let message = "";
+  let status = 500;
+
+  if (e instanceof PrismaClientKnownRequestError) {
+    message = e.message;
+    status = 400;
+  } else if (e instanceof PrismaClientValidationError) {
+    message = e.message;
+    status = 400;
+  } else {
+    message = "Internal Server Error";
+    status = 500;
+  }
+
+  return {
+    message,
+    status,
+  };
+};

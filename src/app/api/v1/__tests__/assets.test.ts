@@ -489,134 +489,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
-    expect(foundSync.errorMessage).toBe("success");
-    expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
-  });
-
-  it("create+update Assets uploadIntegration endpoint int test", async () => {
-    const createdIntegration = await setupMockIntegration();
-
-    onTestFinished(async () => {
-      // this won't throw errors if it misses, which messes up the onTestFinished stack
-      await prisma.asset.deleteMany({
-        where: {
-          networkSegment: {
-            contains: "mock",
-            mode: "insensitive" as const,
-          },
-          hostname: {
-            contains: "mock",
-            mode: "insensitive" as const,
-          },
-        },
-      });
-    });
-
-    // create one asset first
-    const oneAsset = {
-      ...assetIntegrationPayload,
-      items: assetIntegrationPayload.items.slice(1),
-    };
-    const createAssetReq = await request(BASE_URL)
-      .post("/assets/integrationUpload")
-      .set(authHeader)
-      .set(jsonHeader)
-      .send(oneAsset);
-
-    expect(createAssetReq.status).toBe(200);
-    expect(createAssetReq.body.createdAssetsCount).toBe(1);
-    expect(createAssetReq.body.updatedAssetsCount).toBe(0);
-    expect(createAssetReq.body.shouldRetry).toBe(false);
-    expect(createAssetReq.body.message).toBe("success");
-
-    // now create another asset and update the existing one
-    const createWithUpdateAssets = { ...assetIntegrationPayload };
-    const newUpstreamApi = "https://mock-upstream-api.com/v2";
-    createWithUpdateAssets.items[0].upstreamApi = newUpstreamApi;
-
-    const integrationRes = await request(BASE_URL)
-      .post("/assets/integrationUpload")
-      .set(authHeader)
-      .set(jsonHeader)
-      .send(createWithUpdateAssets);
-
-    expect(integrationRes.status).toBe(200);
-    expect(integrationRes.body.createdAssetsCount).toBe(1);
-    expect(integrationRes.body.updatedAssetsCount).toBe(1);
-    expect(integrationRes.body.shouldRetry).toBe(false);
-    expect(integrationRes.body.message).toBe("success");
-
-    const assetPayload1 = createWithUpdateAssets.items[0];
-    const mapping1 = await prisma.externalAssetMapping.findFirstOrThrow({
-      where: {
-        externalId: assetPayload1.vendorId,
-      },
-    });
-
-    const foundAsset1 = await prisma.asset.findFirstOrThrow({
-      where: {
-        id: mapping1.itemId,
-      },
-      include: {
-        deviceGroup: true,
-      },
-    });
-
-    expect(mapping1.integrationId).toBe(createdIntegration.id);
-    expect(mapping1.externalId).toBe(assetPayload1.vendorId);
-
-    expect(foundAsset1.networkSegment).toBe(assetPayload1.networkSegment);
-    expect(foundAsset1.role).toBe(assetPayload1.role);
-    expect(foundAsset1.upstreamApi).toBe(newUpstreamApi); // this field should be updated
-    expect(foundAsset1.hostname).toBe(assetPayload1.hostname);
-    expect(foundAsset1.macAddress).toBe(assetPayload1.macAddress);
-    expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
-    expect(foundAsset1.location).toStrictEqual(assetPayload1.location);
-    expect(foundAsset1.status).toBe(assetPayload1.status);
-    expect(foundAsset1.deviceGroup.cpe).toBe(assetPayload1.cpe);
-
-    const assetPayload2 = assetIntegrationPayload.items[1];
-    const mapping2 = await prisma.externalAssetMapping.findFirstOrThrow({
-      where: {
-        externalId: assetPayload2.vendorId,
-      },
-    });
-
-    const foundAsset2 = await prisma.asset.findFirstOrThrow({
-      where: {
-        id: mapping2.itemId,
-      },
-      include: {
-        deviceGroup: true,
-      },
-    });
-
-    expect(mapping2.integrationId).toBe(createdIntegration.id);
-    expect(mapping2.externalId).toBe(assetPayload2.vendorId);
-
-    expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
-    expect(foundAsset2.role).toBe(assetPayload2.role);
-    expect(foundAsset2.upstreamApi).toBe(assetPayload2.upstreamApi);
-    expect(foundAsset2.hostname).toBe(assetPayload2.hostname);
-    expect(foundAsset2.macAddress).toBe(assetPayload2.macAddress);
-    expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
-    expect(foundAsset2.location).toStrictEqual(assetPayload2.location);
-    expect(foundAsset2.status).toBe(assetPayload2.status);
-    expect(foundAsset2.deviceGroup.cpe).toBe(assetPayload2.cpe);
-
-    if (!mapping1.lastSynced || !mapping2.lastSynced) {
-      fail("lastSynced values should not be null");
-    }
-
-    expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
-
-    const foundSync = await prisma.syncStatus.findFirstOrThrow({
-      where: { syncedAt: mapping1.lastSynced },
-    });
-
-    expect(foundSync.integrationId).toBe(createdIntegration.id);
-    expect(foundSync.status).toBe(SyncStatusEnum.Success);
-    expect(foundSync.errorMessage).toBe("success");
+    expect(foundSync.errorMessage).toBeNullable();
     expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
   });
 
@@ -665,7 +538,7 @@ describe("Assets Endpoint (/assets)", () => {
       .post("/assets/integrationUpload")
       .set(authHeader)
       .set(jsonHeader)
-      .send(assetIntegrationPayload);
+      .send(updateAssetsPayload);
 
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdAssetsCount).toBe(0);
@@ -673,7 +546,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(integrationRes.body.shouldRetry).toBe(false);
     expect(integrationRes.body.message).toBe("success");
 
-    const assetPayload1 = assetIntegrationPayload.items[0];
+    const assetPayload1 = updateAssetsPayload.items[0];
     const mapping1 = await prisma.externalAssetMapping.findFirstOrThrow({
       where: {
         externalId: assetPayload1.vendorId,
@@ -702,7 +575,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset1.status).toBe(assetPayload1.status);
     expect(foundAsset1.deviceGroup.cpe).toBe(assetPayload1.cpe);
 
-    const assetPayload2 = assetIntegrationPayload.items[1];
+    const assetPayload2 = updateAssetsPayload.items[1];
     const mapping2 = await prisma.externalAssetMapping.findFirstOrThrow({
       where: {
         externalId: assetPayload2.vendorId,
@@ -743,11 +616,11 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
-    expect(foundSync.errorMessage).toBe("success");
+    expect(foundSync.errorMessage).toBeNullable();
     expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
   });
 
-  it("create+update Assets uploadIntegration endpoint int test", async () => {
+  it("mixed create+update Assets uploadIntegration endpoint int test", async () => {
     const createdIntegration = await setupMockIntegration();
 
     onTestFinished(async () => {
@@ -870,7 +743,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
-    expect(foundSync.errorMessage).toBe("success");
+    expect(foundSync.errorMessage).toBeNullable();
     expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
   });
 
@@ -971,7 +844,155 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
-    expect(foundSync.errorMessage).toBe("success");
+    expect(foundSync.errorMessage).toBeNullable();
     expect(foundSync.syncedAt).toStrictEqual(mapping1.lastSynced);
+  });
+
+  it("all null unique field should miss Asset uploadIntegration endpoint int test", async () => {
+    await setupMockIntegration();
+
+    onTestFinished(async () => {
+      // this won't throw errors if it misses, which messes up the onTestFinished stack
+      await prisma.asset.deleteMany({
+        where: {
+          OR: [
+            {
+              networkSegment: {
+                contains: "mock",
+                mode: "insensitive" as const,
+              },
+            },
+            {
+              hostname: {
+                contains: "mock",
+                mode: "insensitive" as const,
+              },
+            },
+          ],
+        },
+      });
+    });
+
+    // create our unfindable asset by overriding all unique fields
+    const createdAssetRes = await request(BASE_URL)
+      .post("/assets")
+      .set(authHeader)
+      .set(jsonHeader)
+      .send({
+        ...assetIntegrationPayload.items[0],
+        hostname: undefined,
+        macAddress: undefined,
+        serialNumber: undefined,
+      });
+
+    const foundAsset = await prisma.asset.findFirstOrThrow({
+      where: {
+        id: createdAssetRes.body.id,
+      },
+    });
+
+    expect(foundAsset.hostname).toBeNullable();
+    expect(foundAsset.macAddress).toBeNullable();
+    expect(foundAsset.serialNumber).toBeNullable();
+
+    const unmatchableAsset = {
+      ...assetIntegrationPayload.items[0],
+      hostname: undefined,
+      macAddress: undefined,
+      serialNumber: undefined,
+    };
+
+    // this should create a new asset because all unique fields are missing
+    const integrationRes = await request(BASE_URL)
+      .post("/assets/integrationUpload")
+      .set(authHeader)
+      .set(jsonHeader)
+      .send({
+        ...assetIntegrationPayload,
+        items: [unmatchableAsset],
+      });
+
+    expect(integrationRes.status).toBe(200);
+    expect(integrationRes.body.createdAssetsCount).toBe(1);
+    expect(integrationRes.body.updatedAssetsCount).toBe(0);
+    expect(integrationRes.body.shouldRetry).toBe(false);
+    expect(integrationRes.body.message).toBe("success");
+  });
+
+  it("partial null unique field shouldn't miss Asset uploadIntegration endpoint int test", async () => {
+    await setupMockIntegration();
+
+    onTestFinished(async () => {
+      // this won't throw errors if it misses, which messes up the onTestFinished stack
+      await prisma.asset.deleteMany({
+        where: {
+          OR: [
+            {
+              networkSegment: {
+                contains: "mock",
+                mode: "insensitive" as const,
+              },
+            },
+            {
+              hostname: {
+                contains: "mock",
+                mode: "insensitive" as const,
+              },
+            },
+          ],
+        },
+      });
+    });
+
+    const newUpstreamApi = "https://mock-upstream-api.com/v2";
+
+    // create our unfindable asset by overriding all unique fields
+    const createdAssetRes = await request(BASE_URL)
+      .post("/assets")
+      .set(authHeader)
+      .set(jsonHeader)
+      .send({
+        ...assetIntegrationPayload.items[0],
+        hostname: undefined,
+        macAddress: undefined,
+      });
+
+    const matchableAsset = {
+      ...assetIntegrationPayload.items[0],
+      hostname: undefined,
+      macAddress: undefined,
+      upstreamApi: newUpstreamApi,
+    };
+
+    // this should produce an update based on serialNumber match
+    const integrationRes = await request(BASE_URL)
+      .post("/assets/integrationUpload")
+      .set(authHeader)
+      .set(jsonHeader)
+      .send({
+        ...assetIntegrationPayload,
+        items: [matchableAsset],
+      });
+
+    expect(integrationRes.status).toBe(200);
+    expect(integrationRes.body.createdAssetsCount).toBe(0);
+    expect(integrationRes.body.updatedAssetsCount).toBe(1);
+    expect(integrationRes.body.shouldRetry).toBe(false);
+    expect(integrationRes.body.message).toBe("success");
+
+    const foundAsset = await prisma.asset.findFirstOrThrow({
+      where: {
+        id: createdAssetRes.body.id,
+      },
+    });
+
+    expect(foundAsset.networkSegment).toBe(matchableAsset.networkSegment);
+    expect(foundAsset.role).toBe(matchableAsset.role);
+    expect(foundAsset.upstreamApi).toBe(matchableAsset.upstreamApi); // this should be updated
+    expect(foundAsset.hostname).toBeNullable();
+    expect(foundAsset.macAddress).toBeNullable();
+    expect(foundAsset.serialNumber).toBe(matchableAsset.serialNumber);
+    expect(foundAsset.location).toStrictEqual(matchableAsset.location);
+    expect(foundAsset.status).toBe(matchableAsset.status);
   });
 });

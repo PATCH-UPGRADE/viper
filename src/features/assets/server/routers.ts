@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SyncStatusEnum } from "@/generated/prisma";
+import { type Asset, SyncStatusEnum } from "@/generated/prisma";
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
@@ -441,16 +441,25 @@ export const assetsRouter = createTRPCRouter({
           continue;
         }
 
-        // Otherwise try to find a matching Asset by unique properties
-        const foundAsset = await prisma.asset.findFirst({
-          where: {
-            OR: [
-              { hostname: assetData.hostname },
-              { macAddress: assetData.macAddress },
-              { serialNumber: assetData.serialNumber },
-            ],
-          },
-        });
+        // avoid nullable unique fields in our where condition
+        const OR = [];
+        if (assetData.hostname) {
+          OR.push({ hostname: assetData.hostname });
+        }
+        if (assetData.macAddress) {
+          OR.push({ macAddress: assetData.macAddress });
+        }
+        if (assetData.serialNumber) {
+          OR.push({ serialNumber: assetData.serialNumber });
+        }
+
+        let foundAsset: Asset | null = null;
+        if (OR.length > 0) {
+          // otherwise try to find matching Asset by unique properties
+          foundAsset = await prisma.asset.findFirst({
+            where: { OR },
+          });
+        }
 
         const deviceGroup = await cpeToDeviceGroup(cpe);
 
@@ -517,7 +526,7 @@ export const assetsRouter = createTRPCRouter({
           status: response.shouldRetry
             ? SyncStatusEnum.Error
             : SyncStatusEnum.Success,
-          errorMessage: response.message,
+          errorMessage: response.shouldRetry ? response.message : undefined,
           syncedAt: lastSynced,
         },
       });

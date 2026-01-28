@@ -3,6 +3,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
 import prisma from "@/lib/db";
 import { fail } from "assert";
+import { SyncStatusEnum } from "@/generated/prisma";
 
 describe("Assets Endpoint (/assets)", () => {
   const authHeader = { Authorization: AUTH_TOKEN };
@@ -427,7 +428,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     const foundAsset1 = await prisma.asset.findFirstOrThrow({
       where: {
-        id: mapping1.assetId,
+        id: mapping1.itemId,
       },
       include: {
         deviceGroup: true,
@@ -456,7 +457,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     const foundAsset2 = await prisma.asset.findFirstOrThrow({
       where: {
-        id: mapping2.assetId,
+        id: mapping2.itemId,
       },
       include: {
         deviceGroup: true,
@@ -476,20 +477,20 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset2.status).toBe(assetPayload2.status);
     expect(foundAsset2.deviceGroup.cpe).toBe(assetPayload2.cpe);
 
-    if (!foundAsset1.lastSynced || !foundAsset2.lastSynced) {
-      fail();
+    if (!mapping1.lastSynced || !mapping2.lastSynced) {
+      fail("lastSynced values should not be null");
     }
 
-    expect(foundAsset1.lastSynced).toStrictEqual(foundAsset2.lastSynced);
+    expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
 
     const foundSync = await prisma.syncStatus.findFirstOrThrow({
-      where: { syncedAt: foundAsset1.lastSynced },
+      where: { syncedAt: mapping1.lastSynced },
     });
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
-    expect(foundSync.error).toBe(false);
+    expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBe("success");
-    expect(foundSync.syncedAt).toStrictEqual(foundAsset2.lastSynced);
+    expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
   });
 
   it("create+update Assets uploadIntegration endpoint int test", async () => {
@@ -554,7 +555,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     const foundAsset1 = await prisma.asset.findFirstOrThrow({
       where: {
-        id: mapping1.assetId,
+        id: mapping1.itemId,
       },
       include: {
         deviceGroup: true,
@@ -583,7 +584,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     const foundAsset2 = await prisma.asset.findFirstOrThrow({
       where: {
-        id: mapping2.assetId,
+        id: mapping2.itemId,
       },
       include: {
         deviceGroup: true,
@@ -603,20 +604,20 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset2.status).toBe(assetPayload2.status);
     expect(foundAsset2.deviceGroup.cpe).toBe(assetPayload2.cpe);
 
-    if (!foundAsset1.lastSynced || !foundAsset2.lastSynced) {
-      fail();
+    if (!mapping1.lastSynced || !mapping2.lastSynced) {
+      fail("lastSynced values should not be null");
     }
 
-    expect(foundAsset1.lastSynced).toStrictEqual(foundAsset2.lastSynced);
+    expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
 
     const foundSync = await prisma.syncStatus.findFirstOrThrow({
-      where: { syncedAt: foundAsset1.lastSynced },
+      where: { syncedAt: mapping1.lastSynced },
     });
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
-    expect(foundSync.error).toBe(false);
+    expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBe("success");
-    expect(foundSync.syncedAt).toStrictEqual(foundAsset2.lastSynced);
+    expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
   });
 
   it("update Assets uploadIntegration endpoint int test", async () => {
@@ -682,7 +683,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     const foundAsset1 = await prisma.asset.findFirstOrThrow({
       where: {
-        id: mapping1.assetId,
+        id: mapping1.itemId,
       },
       include: {
         deviceGroup: true,
@@ -711,12 +712,18 @@ describe("Assets Endpoint (/assets)", () => {
 
     const foundAsset2 = await prisma.asset.findFirstOrThrow({
       where: {
-        id: mapping2.assetId,
+        id: mapping2.itemId,
       },
       include: {
         deviceGroup: true,
       },
     });
+
+    if (!mapping1.lastSynced || !mapping2.lastSynced) {
+      fail("lastSynced values should not be null");
+    }
+
+    expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
 
     expect(mapping2.integrationId).toBe(createdIntegration.id);
     expect(mapping2.externalId).toBe(assetPayload2.vendorId);
@@ -731,20 +738,14 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset2.status).toBe(assetPayload2.status);
     expect(foundAsset2.deviceGroup.cpe).toBe(assetPayload2.cpe);
 
-    if (!foundAsset1.lastSynced || !foundAsset2.lastSynced) {
-      fail();
-    }
-
-    expect(foundAsset1.lastSynced).toStrictEqual(foundAsset2.lastSynced);
-
     const foundSync = await prisma.syncStatus.findFirstOrThrow({
-      where: { syncedAt: foundAsset1.lastSynced },
+      where: { syncedAt: mapping1.lastSynced },
     });
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
-    expect(foundSync.error).toBe(false);
+    expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBe("success");
-    expect(foundSync.syncedAt).toStrictEqual(foundAsset2.lastSynced);
+    expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
   });
 
   it("create+update Assets uploadIntegration endpoint int test", async () => {
@@ -809,7 +810,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     const foundAsset1 = await prisma.asset.findFirstOrThrow({
       where: {
-        id: mapping1.assetId,
+        id: mapping1.itemId,
       },
       include: {
         deviceGroup: true,
@@ -838,7 +839,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     const foundAsset2 = await prisma.asset.findFirstOrThrow({
       where: {
-        id: mapping2.assetId,
+        id: mapping2.itemId,
       },
       include: {
         deviceGroup: true,
@@ -858,20 +859,20 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset2.status).toBe(assetPayload2.status);
     expect(foundAsset2.deviceGroup.cpe).toBe(assetPayload2.cpe);
 
-    if (!foundAsset1.lastSynced || !foundAsset2.lastSynced) {
-      fail();
+    if (!mapping1.lastSynced || !mapping2.lastSynced) {
+      fail("lastSynced values should not be null");
     }
 
-    expect(foundAsset1.lastSynced).toStrictEqual(foundAsset2.lastSynced);
+    expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
 
     const foundSync = await prisma.syncStatus.findFirstOrThrow({
-      where: { syncedAt: foundAsset1.lastSynced },
+      where: { syncedAt: mapping1.lastSynced },
     });
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
-    expect(foundSync.error).toBe(false);
+    expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBe("success");
-    expect(foundSync.syncedAt).toStrictEqual(foundAsset2.lastSynced);
+    expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
   });
 
   it("asset with no mapping Assets uploadIntegration endpoint int test", async () => {
@@ -904,7 +905,7 @@ describe("Assets Endpoint (/assets)", () => {
     // no mapping should exist yet
     const noMapping = await prisma.externalAssetMapping.findFirst({
       where: {
-        assetId: createdAssetRes.body.id,
+        itemId: createdAssetRes.body.id,
       },
     });
 
@@ -940,14 +941,14 @@ describe("Assets Endpoint (/assets)", () => {
 
     const foundAsset1 = await prisma.asset.findFirstOrThrow({
       where: {
-        id: mapping1.assetId,
+        id: mapping1.itemId,
       },
       include: {
         deviceGroup: true,
       },
     });
 
-    expect(mapping1.assetId).toBe(foundAsset1.id);
+    expect(mapping1.itemId).toBe(foundAsset1.id);
     expect(mapping1.integrationId).toBe(createdIntegration.id);
     expect(mapping1.externalId).toBe(updatedAsset.vendorId);
 
@@ -961,17 +962,17 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset1.status).toBe(updatedAsset.status);
     expect(foundAsset1.deviceGroup.cpe).toBe(updatedAsset.cpe);
 
-    if (!foundAsset1.lastSynced) {
-      fail();
+    if (!mapping1.lastSynced) {
+      fail("lastSynced value should not be null");
     }
 
     const foundSync = await prisma.syncStatus.findFirstOrThrow({
-      where: { syncedAt: foundAsset1.lastSynced },
+      where: { syncedAt: mapping1.lastSynced },
     });
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
-    expect(foundSync.error).toBe(false);
+    expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBe("success");
-    expect(foundSync.syncedAt).toStrictEqual(foundAsset1.lastSynced);
+    expect(foundSync.syncedAt).toStrictEqual(mapping1.lastSynced);
   });
 });

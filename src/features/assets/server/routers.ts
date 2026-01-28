@@ -22,6 +22,7 @@ import {
   PrismaClientUnknownRequestError,
   PrismaClientValidationError,
 } from "@/generated/prisma/runtime/library";
+import { SyncStatusEnum } from "@/generated/prisma";
 
 const AssetStatus = z.enum(["Active", "Decommissioned", "Maintenance"]);
 
@@ -413,18 +414,23 @@ export const assetsRouter = createTRPCRouter({
             externalId: vendorId,
           },
           select: {
-            assetId: true,
+            id: true,
+            itemId: true,
           },
         });
 
-        // If we have a ExternalAssetMapping, we just need to update the asset
+        // If we have a ExternalAssetMapping, update the sync time and asset
         if (foundMapping) {
           try {
+            await prisma.externalAssetMapping.update({
+              where: { id: foundMapping.id },
+              data: { lastSynced }
+            })
+
             await prisma.asset.update({
-              where: { id: foundMapping.assetId },
+              where: { id: foundMapping.itemId },
               data: {
                 ...assetData,
-                lastSynced,
               },
             });
           } catch (error: unknown) {
@@ -458,7 +464,6 @@ export const assetsRouter = createTRPCRouter({
                 ...assetData,
                 deviceGroupId: deviceGroup.id,
                 userId,
-                lastSynced,
               },
             });
 
@@ -466,9 +471,10 @@ export const assetsRouter = createTRPCRouter({
 
             await prisma.externalAssetMapping.create({
               data: {
-                assetId: createdAsset.id,
+                itemId: createdAsset.id,
                 integrationId: foundIntegration.id,
                 externalId: vendorId,
+                lastSynced,
               },
             });
           } catch (error: unknown) {
@@ -484,9 +490,10 @@ export const assetsRouter = createTRPCRouter({
           // If we have an Asset but no ExternalAssetMapping then create the mapping
           await prisma.externalAssetMapping.create({
             data: {
-              assetId: foundAsset.id,
+              itemId: foundAsset.id,
               integrationId: foundIntegration.id,
               externalId: vendorId,
+              lastSynced,
             },
           });
           // and then update the existing Asset
@@ -496,7 +503,6 @@ export const assetsRouter = createTRPCRouter({
               ...assetData,
               deviceGroupId: deviceGroup.id,
               userId: ctx.auth.user.id,
-              lastSynced,
             },
           });
           response.updatedAssetsCount++;
@@ -510,7 +516,7 @@ export const assetsRouter = createTRPCRouter({
       await prisma.syncStatus.create({
         data: {
           integrationId: foundIntegration.id,
-          error: response.shouldRetry,
+          status: response.shouldRetry ? SyncStatusEnum.Error : SyncStatusEnum.Success,
           errorMessage: response.message,
           syncedAt: lastSynced,
         },

@@ -14,7 +14,7 @@ export const useSuspenseIntegrations = (resourceType: ResourceType) => {
   // TODO: augment params to also include `asset`, right? for the `resourceType`
 
   return useSuspenseQuery(
-    trpc.integrations.getManyIntegrations.queryOptions({
+    trpc.integrations.getMany.queryOptions({
       ...params,
       ...{ resourceType },
     }),
@@ -29,18 +29,19 @@ export const useCreateIntegration = () => {
   const trpc = useTRPC();
 
   return useMutation(
-    trpc.integrations.createIntegration.mutationOptions({
+    trpc.integrations.create.mutationOptions({
       onSuccess: (data) => {
         toast.success("Integration created");
         queryClient.invalidateQueries(
-          trpc.integrations.getManyIntegrations.queryOptions({
-            resourceType: data.resourceType,
+          trpc.integrations.getMany.queryOptions({
+            resourceType: data.integration.resourceType,
           }),
         );
         return data;
       },
       onError: (error) => {
         toast.error(`Failed to create Integration: ${error.message}`);
+        console.error(error);
       },
     }),
   );
@@ -54,11 +55,11 @@ export const useUpdateIntegration = () => {
   const trpc = useTRPC();
 
   return useMutation(
-    trpc.integrations.updateIntegration.mutationOptions({
+    trpc.integrations.update.mutationOptions({
       onSuccess: (data) => {
         toast.success("Integration updated");
         queryClient.invalidateQueries(
-          trpc.integrations.getManyIntegrations.queryOptions({
+          trpc.integrations.getMany.queryOptions({
             resourceType: data.resourceType,
           }),
         );
@@ -79,12 +80,12 @@ export const useRemoveIntegration = () => {
   const queryClient = useQueryClient();
 
   return useMutation(
-    trpc.integrations.removeIntegration.mutationOptions({
+    trpc.integrations.remove.mutationOptions({
       onSuccess: (data) => {
         toast.success("Integration removed");
         // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries(
-          trpc.integrations.getManyIntegrations.queryOptions({
+          trpc.integrations.getMany.queryOptions({
             resourceType: data.resourceType,
           }),
         );
@@ -92,6 +93,25 @@ export const useRemoveIntegration = () => {
       },
       onError: (error) => {
         toast.error(`Failed to remove Integration: ${error.message}`);
+      },
+    }),
+  );
+};
+
+/**
+ * Hook to rotate Integration API Key
+ */
+export const useRotateIntegration = () => {
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.integrations.rotateKey.mutationOptions({
+      onSuccess: (data) => {
+        toast.success("Integration API key updated");
+        return data;
+      },
+      onError: (error) => {
+        toast.error(`Failed to rotate Integration API key: ${error.message}`);
       },
     }),
   );

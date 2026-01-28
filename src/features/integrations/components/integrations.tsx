@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -37,11 +39,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Integration, ResourceType } from "@/generated/prisma";
+import { ApiTokenSuccessModal } from "@/features/user/components/user";
+import type { Apikey, Integration, ResourceType } from "@/generated/prisma";
 import { usePaginationParams } from "@/lib/pagination";
 import {
   useCreateIntegration,
   useRemoveIntegration,
+  useRotateIntegration,
   useSuspenseIntegrations,
   useUpdateIntegration,
 } from "../hooks/use-integrations";
@@ -330,6 +334,44 @@ const IntegrationCreateModal = ({
   );
 };
 
+interface RotateIntegrationConfirmModalProps {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  handleRotate: () => void;
+}
+
+export function RotateIntegrationConfirmModal({
+  open,
+  setOpen,
+  handleRotate,
+}: RotateIntegrationConfirmModalProps) {
+  const onConfirm = () => {
+    handleRotate();
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rotate API Key</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to rotate this API key? This will invalidate
+            the current key and generate a new one. Any applications using the
+            old key will need to be updated.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={onConfirm}>Rotate Key</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export const IntegrationsHeader = ({
   resourceType,
 }: {
@@ -337,6 +379,8 @@ export const IntegrationsHeader = ({
 }) => {
   const createIntegration = useCreateIntegration();
   const [open, setOpen] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [key, setKey] = useState<Apikey | undefined>(undefined);
 
   const form = useForm<IntegrationFormValues>({
     resolver: zodResolver(integrationInputSchema),
@@ -350,8 +394,10 @@ export const IntegrationsHeader = ({
 
   const handleCreate = (item: IntegrationFormValues) => {
     createIntegration.mutate(item, {
-      onSuccess: () => {
+      onSuccess: (data) => {
         setOpen(false);
+        setKey(data.apiKey);
+        setSuccessOpen(true);
       },
       onError: () => {
         setOpen(true);
@@ -372,6 +418,11 @@ export const IntegrationsHeader = ({
         open={open}
         setOpen={setOpen}
         handleCreate={handleCreate}
+      />
+      <ApiTokenSuccessModal
+        open={successOpen}
+        setOpen={setSuccessOpen}
+        apiKey={key}
       />
     </>
   );
@@ -431,7 +482,11 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
   };
 
   const updateIntegration = useUpdateIntegration();
+  const rotateIntegration = useRotateIntegration();
   const [open, setOpen] = useState(false);
+  const [rotateOpen, setRotateOpen] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [key, setKey] = useState<Apikey | undefined>(undefined);
 
   const form = useForm<IntegrationFormValues>({
     resolver: zodResolver(integrationInputSchema),
@@ -461,6 +516,21 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
     );
   };
 
+  const handleRotate = () => {
+    rotateIntegration.mutate(
+      { id: data.id },
+      {
+        onSuccess: (data) => {
+          setKey(data.apiKey);
+          setSuccessOpen(true);
+        },
+        onError: () => {
+          setRotateOpen(true);
+        },
+      },
+    );
+  };
+
   return (
     <>
       <div className="flex items-center gap-3 p-4 border rounded-lg">
@@ -479,6 +549,9 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
         >
           {updateIntegration.isPending ? "Updating..." : "Update"}
         </Button>
+        <Button size="sm" onClick={() => setRotateOpen(true)}>
+          {"Rotate API Key"}
+        </Button>
         <Button
           variant="destructive"
           size="sm"
@@ -496,6 +569,20 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
           setOpen={setOpen}
           handleCreate={handleUpdate}
           isUpdate={true}
+        />
+      )}
+      {rotateOpen && (
+        <RotateIntegrationConfirmModal
+          open={rotateOpen}
+          setOpen={setRotateOpen}
+          handleRotate={handleRotate}
+        />
+      )}
+      {successOpen && (
+        <ApiTokenSuccessModal
+          open={successOpen}
+          setOpen={setSuccessOpen}
+          apiKey={key}
         />
       )}
     </>

@@ -407,7 +407,7 @@ model Integration {
   prompt         String?      @db.Text // optional, additional instructions for AI
   authType       AuthType
   resourceType   ResourceType
-  authentication Json // TODO: this needs to be encrypted
+  authentication Json? // TODO: this needs to be encrypted
   syncEvery      Int // e.g 300, sync every 300 seconds
   syncStatus     SyncStatus[]
   apiKeyId       String?      @unique
@@ -447,6 +447,7 @@ enum AuthType {
   Basic
   Bearer
   Header
+  None
 }
 
 enum ResourceType {

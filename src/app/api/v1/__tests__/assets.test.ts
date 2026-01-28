@@ -1,9 +1,9 @@
+import { fail } from "assert";
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
-import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
-import prisma from "@/lib/db";
-import { fail } from "assert";
 import { SyncStatusEnum } from "@/generated/prisma";
+import prisma from "@/lib/db";
+import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
 
 describe("Assets Endpoint (/assets)", () => {
   const authHeader = { Authorization: AUTH_TOKEN };
@@ -100,7 +100,7 @@ describe("Assets Endpoint (/assets)", () => {
     });
 
     const createdIntegration = await prisma.integration.create({
-      // @ts-ignore - TS wants a User field that doesn't need to be here
+      // @ts-expect-error - TS wants a User field that doesn't need to be here
       data: {
         ...mockIntegrationPayload,
         apiKeyId: apiKeyRecord.id,
@@ -660,7 +660,6 @@ describe("Assets Endpoint (/assets)", () => {
     const newUpstreamApi = "https://mock-upstream-api.com/v2";
     updateAssetsPayload.items[0].upstreamApi = newUpstreamApi;
     updateAssetsPayload.items[1].upstreamApi = newUpstreamApi;
-    console.log(updateAssetsPayload.items[1].upstreamApi);
 
     const integrationRes = await request(BASE_URL)
       .post("/assets/integrationUpload")
@@ -895,7 +894,7 @@ describe("Assets Endpoint (/assets)", () => {
     });
 
     // create the asset directly first
-    const { vendorId, ...assetData } = assetIntegrationPayload.items[0];
+    const assetData = assetIntegrationPayload.items[0];
     const createdAssetRes = await request(BASE_URL)
       .post("/assets")
       .set(authHeader)

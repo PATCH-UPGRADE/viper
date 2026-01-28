@@ -1,5 +1,9 @@
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { SyncStatusEnum } from "@/generated/prisma";
+import {
+  PrismaClientKnownRequestError,
+  PrismaClientValidationError,
+} from "@/generated/prisma/runtime/library";
 import prisma from "@/lib/db";
 import {
   createPaginatedResponseSchema,
@@ -17,12 +21,6 @@ import {
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
-import {
-  PrismaClientKnownRequestError,
-  PrismaClientUnknownRequestError,
-  PrismaClientValidationError,
-} from "@/generated/prisma/runtime/library";
-import { SyncStatusEnum } from "@/generated/prisma";
 
 const AssetStatus = z.enum(["Active", "Decommissioned", "Maintenance"]);
 
@@ -424,8 +422,8 @@ export const assetsRouter = createTRPCRouter({
           try {
             await prisma.externalAssetMapping.update({
               where: { id: foundMapping.id },
-              data: { lastSynced }
-            })
+              data: { lastSynced },
+            });
 
             await prisma.asset.update({
               where: { id: foundMapping.itemId },
@@ -516,7 +514,9 @@ export const assetsRouter = createTRPCRouter({
       await prisma.syncStatus.create({
         data: {
           integrationId: foundIntegration.id,
-          status: response.shouldRetry ? SyncStatusEnum.Error : SyncStatusEnum.Success,
+          status: response.shouldRetry
+            ? SyncStatusEnum.Error
+            : SyncStatusEnum.Success,
           errorMessage: response.message,
           syncedAt: lastSynced,
         },

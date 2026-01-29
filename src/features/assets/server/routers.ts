@@ -398,7 +398,7 @@ export const assetsRouter = createTRPCRouter({
         createdAssetsCount: 0,
         updatedAssetsCount: 0,
         shouldRetry: false,
-        syncedAt: lastSynced.toString(),
+        syncedAt: lastSynced.toISOString(),
       };
 
       for (const item of input.items) {
@@ -590,14 +590,12 @@ export const assetsRouter = createTRPCRouter({
 });
 
 const handlePrismaError = (e: unknown): string => {
-  let message = "Internal Server Error";
-
   if (
     e instanceof PrismaClientKnownRequestError ||
     e instanceof PrismaClientValidationError
   ) {
-    message = e.message;
+    return e.message;
   }
 
-  return message;
+  return "Internal Server Error";
 };

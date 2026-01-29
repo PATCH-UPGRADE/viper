@@ -18,12 +18,20 @@ const paginatedDeviceGroupResponseSchema = createPaginatedResponseSchema(
   deviceGroupResponseSchema,
 );
 
-const deviceGroupInputSchema = z.object({
-  id: z.string(),
-  manufacturer: z.string().optional(),
-  modelName: z.string().optional(),
-  version: z.string().optional(),
-});
+const deviceGroupInputSchema = z
+  .object({
+    id: z.string(),
+    manufacturer: z.string().optional(),
+    modelName: z.string().optional(),
+    version: z.string().optional(),
+  })
+  .refine(
+    (data) =>
+      data.manufacturer !== undefined ||
+      data.modelName !== undefined ||
+      data.version !== undefined,
+    { message: "At least one field must be provided." },
+  );
 
 const deviceGroupInputHelmIdSchema = z.object({
   id: z.string(),

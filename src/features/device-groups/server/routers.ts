@@ -16,14 +16,14 @@ const paginatedDeviceGroupResponseSchema = createPaginatedResponseSchema(
 
 const deviceGroupInputSchema = z.object({
   id: z.string(),
-  manufacturer: z.string().nullable().optional(),
-  modelName: z.string().nullable().optional(),
-  version: z.string().nullable().optional(),
+  manufacturer: z.string().optional(),
+  modelName: z.string().optional(),
+  version: z.string().optional(),
 })
 
-const deviceGroupInputHHelmIdSchema = z.object({
+const deviceGroupInputHelmIdSchema = z.object({
   id: z.string(),
-  helmSbomId: z.string().nullable().optional(),
+  helmSbomId: z.string(),
 })
 
 export const deviceGroupsRouter = createTRPCRouter({
@@ -108,5 +108,22 @@ export const deviceGroupsRouter = createTRPCRouter({
 
 
   // PUT /api/deviceGroups/{deviceGroupId}/updateHelmId
-  // TODO: VW-52
+  updateHelmId: protectedProcedure
+    .input(deviceGroupInputHelmIdSchema)
+    .meta({
+      openapi: {
+        method: "PUT",
+        path: "/deviceGroups/{id}/updateHelmId",
+        tags: ["DeviceGroups"],
+        summary: "Update Device Group Helm SBOM ID",
+        description: "Update only the helmSbomId field on a given Device Group."
+      }
+    })
+    .mutation(async ({ input }) => {
+      const { id, helmSbomId } = input;
+      return prisma.deviceGroup.update({
+        where: { id },
+        data: helmSbomId,
+      })
+    })
 });

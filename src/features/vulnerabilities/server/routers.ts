@@ -219,10 +219,10 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const uniqueCpes = [...new Set(cpes)];
       const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
 
-      const assetIds = [];
+      const assetIds: Record<string, { assetId: string }> = {};
       for (const dg of deviceGroups) {
         for (const asset of dg.assets) {
-          assetIds.push({ assetId: asset.id });
+          assetIds[asset.id] = { assetId: asset.id };
         }
       }
 
@@ -233,11 +233,11 @@ export const vulnerabilitiesRouter = createTRPCRouter({
             connect: deviceGroups.map((dg) => ({ id: dg.id })),
           },
           issues: {
-            create: assetIds,
+            create: Object.values(assetIds),
           },
           userId: ctx.auth.user.id,
         },
-        include: { ...vulnerabilityInclude, issues: true },
+        include: vulnerabilityInclude,
       });
     }),
 

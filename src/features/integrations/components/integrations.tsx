@@ -389,6 +389,7 @@ export const IntegrationsHeader = ({
       resourceType: resourceType,
       isGeneric: false,
       syncEvery: 300,
+      authType: "None",
     },
   });
 

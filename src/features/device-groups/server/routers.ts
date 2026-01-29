@@ -1,3 +1,4 @@
+import "server-only";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import {

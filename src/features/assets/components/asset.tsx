@@ -50,7 +50,7 @@ import {
   IssueStatus,
   type Vulnerability,
 } from "@/generated/prisma";
-import { type PaginatedResponse } from "@/lib/pagination";
+import type { PaginatedResponse } from "@/lib/pagination";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
 

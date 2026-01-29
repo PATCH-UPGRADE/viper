@@ -25,7 +25,10 @@ async function createIntegrationApiKey(
   const name = `${integrationName} Integration Key`;
   const apiKey = await auth.api.createApiKey({
     body: {
-      name: name.length < BETTER_AUTH_MAX_KEY_NAME_LENGTH ? name : "Integration Key",
+      name:
+        name.length < BETTER_AUTH_MAX_KEY_NAME_LENGTH
+          ? name
+          : "Integration Key",
       expiresIn: null,
       userId,
     },
@@ -72,8 +75,8 @@ export const integrationsRouter = createTRPCRouter({
       const integrationUser = await prisma.user.create({
         data: {
           id: crypto.randomUUID(),
-          name: input.name, 
-        }
+          name: input.name,
+        },
       });
 
       const apiKey = await createIntegrationApiKey(

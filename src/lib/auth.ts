@@ -40,7 +40,7 @@ export const auth = betterAuth({
           const user = await prisma.user.findUnique({
             where: { id: session.userId },
           });
-          if (user && user.email) {
+          if (user?.email) {
             validateDomain(user.email);
           }
           return { data: session };

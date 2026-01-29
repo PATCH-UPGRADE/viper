@@ -22,9 +22,9 @@ const paginatedDeviceGroupResponseSchema = createPaginatedResponseSchema(
 const deviceGroupInputSchema = z
   .object({
     id: z.string(),
-    manufacturer: z.string().optional(),
-    modelName: z.string().optional(),
-    version: z.string().optional(),
+    manufacturer: z.string().nullable().optional(),
+    modelName: z.string().nullable().optional(),
+    version: z.string().nullable().optional(),
   })
   .refine(
     (data) =>

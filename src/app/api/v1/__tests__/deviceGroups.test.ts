@@ -137,6 +137,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .set(authHeader)
       .send(updateDeviceGroupPayload);
     expect(updateDeviceGroup.status).toBe(200);
+    expect(updateDeviceGroup.body.id).toBe(assetDeviceGroupId);
     expect(updateDeviceGroup.body.manufacturer).toBe(
       updateDeviceGroupPayload.manufacturer,
     );
@@ -153,6 +154,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .set(authHeader)
       .send(updateDeviceGroupSbomIdPayload);
     expect(updateDeviceGroupSbomId.status).toBe(200);
+    expect(updateDeviceGroupSbomId.body.id).toBe(assetDeviceGroupId);
     expect(updateDeviceGroupSbomId.body.helmSbomId).toBe(
       updateDeviceGroupSbomIdPayload.helmSbomId,
     );

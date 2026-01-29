@@ -402,7 +402,6 @@ export const assetsRouter = createTRPCRouter({
       };
 
       for (const item of input.items) {
-        // extract certain fields because they don't belong in Asset schema
         const { cpe, vendorId, ...assetData } = item;
 
         // Look for an existing mapping first
@@ -417,20 +416,24 @@ export const assetsRouter = createTRPCRouter({
           },
         });
 
+        const deviceGroup = await cpeToDeviceGroup(cpe);
+
         // If we have a ExternalAssetMapping, update the sync time and asset
         if (foundMapping) {
           try {
-            await prisma.externalAssetMapping.update({
-              where: { id: foundMapping.id },
-              data: { lastSynced },
-            });
-
-            await prisma.asset.update({
-              where: { id: foundMapping.itemId },
-              data: {
-                ...assetData,
-              },
-            });
+            await prisma.$transaction([
+              prisma.externalAssetMapping.update({
+                where: { id: foundMapping.id },
+                data: { lastSynced },
+              }),
+              prisma.asset.update({
+                where: { id: foundMapping.itemId },
+                data: {
+                  ...assetData,
+                  deviceGroupId: deviceGroup.id,
+                },
+              }),
+            ]);
           } catch (error: unknown) {
             response.message = handlePrismaError(error);
             response.shouldRetry = true;
@@ -455,33 +458,27 @@ export const assetsRouter = createTRPCRouter({
 
         let foundAsset: Asset | null = null;
         if (OR.length > 0) {
-          // otherwise try to find matching Asset by unique properties
+          // try to find matching Asset by unique identifying properties
           foundAsset = await prisma.asset.findFirst({
             where: { OR },
           });
         }
 
-        const deviceGroup = await cpeToDeviceGroup(cpe);
-
         // If no Asset, we need to create the Asset and ExternalAssetMapping
         if (!foundAsset) {
           try {
-            const createdAsset = await prisma.asset.create({
+            await prisma.asset.create({
               data: {
                 ...assetData,
                 deviceGroupId: deviceGroup.id,
                 userId,
-              },
-            });
-
-            response.createdAssetsCount++;
-
-            await prisma.externalAssetMapping.create({
-              data: {
-                itemId: createdAsset.id,
-                integrationId: foundIntegration.id,
-                externalId: vendorId,
-                lastSynced,
+                externalMappings: {
+                  create: {
+                    integrationId: foundIntegration.id,
+                    externalId: vendorId,
+                    lastSynced,
+                  },
+                },
               },
             });
           } catch (error: unknown) {
@@ -490,34 +487,37 @@ export const assetsRouter = createTRPCRouter({
             break;
           }
 
+          response.createdAssetsCount++;
           continue;
         }
 
         try {
           // If we have an Asset but no ExternalAssetMapping then create the mapping
-          await prisma.externalAssetMapping.create({
-            data: {
-              itemId: foundAsset.id,
-              integrationId: foundIntegration.id,
-              externalId: vendorId,
-              lastSynced,
-            },
-          });
-          // and then update the existing Asset
-          await prisma.asset.update({
-            where: { id: foundAsset.id },
-            data: {
-              ...assetData,
-              deviceGroupId: deviceGroup.id,
-              userId: ctx.auth.user.id,
-            },
-          });
-          response.updatedAssetsCount++;
+          await prisma.$transaction([
+            prisma.externalAssetMapping.create({
+              data: {
+                itemId: foundAsset.id,
+                integrationId: foundIntegration.id,
+                externalId: vendorId,
+                lastSynced,
+              },
+            }),
+            // and then update the existing Asset
+            prisma.asset.update({
+              where: { id: foundAsset.id },
+              data: {
+                ...assetData,
+                deviceGroupId: deviceGroup.id,
+              },
+            }),
+          ]);
         } catch (error: unknown) {
           response.message = handlePrismaError(error);
           response.shouldRetry = true;
           break;
         }
+
+        response.updatedAssetsCount++;
       }
 
       await prisma.syncStatus.create({

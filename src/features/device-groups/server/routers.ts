@@ -14,6 +14,18 @@ const paginatedDeviceGroupResponseSchema = createPaginatedResponseSchema(
   deviceGroupResponseSchema,
 );
 
+const deviceGroupInputSchema = z.object({
+  id: z.string(),
+  manufacturer: z.string().nullable().optional(),
+  modelName: z.string().nullable().optional(),
+  version: z.string().nullable().optional(),
+})
+
+const deviceGroupInputHHelmIdSchema = z.object({
+  id: z.string(),
+  helmSbomId: z.string().nullable().optional(),
+})
+
 export const deviceGroupsRouter = createTRPCRouter({
   // GET /api/deviceGroups - List all device groups (any authenticated user can see all)
   getMany: protectedProcedure
@@ -74,7 +86,26 @@ export const deviceGroupsRouter = createTRPCRouter({
     }),
 
   // PUT /api/deviceGroups/{deviceGroupId} - Update DeviceGroup
-  // TODO: VW-52
+  update: protectedProcedure
+    .input(deviceGroupInputSchema)
+    .meta({
+      openapi: {
+        method: "PUT",
+        path: "/deviceGroups/{id}",
+        tags: ["DeviceGroups"],
+        summary: "Update Device Group",
+        description: "Update a device group.",
+      },
+    })
+    .output(deviceGroupResponseSchema)
+    .mutation(async ({ input }) => {
+      const { id, ...updateData } = input;
+      return prisma.deviceGroup.update({
+        where: { id },
+        data: updateData,
+      });
+    }),
+
 
   // PUT /api/deviceGroups/{deviceGroupId}/updateHelmId
   // TODO: VW-52

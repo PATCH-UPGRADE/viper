@@ -219,7 +219,6 @@ export const syncIntegration = inngest.createFunction(
       }
     });
 
-    // TODO: VW-36, VW-53, don't create sync status here
     await step.run("create-sync-status", async () => {
       await prisma.syncStatus.create({
         data: {

@@ -237,10 +237,6 @@ const IntegrationCreateModal = ({
                           { Object.keys(AuthType).map((authType) => (
                             <SelectItem value={authType} key={authType}>{authType}</SelectItem>
                           ))}
-                          {/*<SelectItem value="Basic">Basic</SelectItem>
-                          <SelectItem value="Bearer">Bearer</SelectItem>
-                          <SelectItem value="Header">Header</SelectItem>
-                          <SelectItem value="None">None</SelectItem>*/}
                         </SelectGroup>
                       </SelectContent>
                     </Select>

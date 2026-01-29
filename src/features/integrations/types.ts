@@ -27,10 +27,10 @@ export const integrationInputSchema = z.object({
   platform: z.string().optional(),
   integrationUri: safeUrlSchema,
   isGeneric: z.boolean(),
-  prompt: z.string().optional(), // only allowed if `isGeneric` is true
+  prompt: z.string().nullable(), // only allowed if `isGeneric` is true
   authType: z.enum(["Basic", "Bearer", "Header", "None"]),
   resourceType: z.enum(["Asset", "Vulnerability", "Emulator", "Remediation"]),
-  authentication: authenticationSchema.optional(),
+  authentication: authenticationSchema.nullable(),
   syncEvery: z.number().int().positive().min(60),
 });
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;

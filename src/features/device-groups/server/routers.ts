@@ -5,10 +5,14 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
-import { deviceGroupWithUrlsSchema } from "@/lib/schemas";
+import {
+  deviceGroupWithUrlsSchema,
+  deviceGroupWithDetailsSchema,
+} from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 const deviceGroupResponseSchema = deviceGroupWithUrlsSchema;
+const deviceGroupDetailsResponseSchema = deviceGroupWithDetailsSchema;
 
 const paginatedDeviceGroupResponseSchema = createPaginatedResponseSchema(
   deviceGroupResponseSchema,
@@ -19,12 +23,12 @@ const deviceGroupInputSchema = z.object({
   manufacturer: z.string().optional(),
   modelName: z.string().optional(),
   version: z.string().optional(),
-})
+});
 
 const deviceGroupInputHelmIdSchema = z.object({
   id: z.string(),
   helmSbomId: z.string(),
-})
+});
 
 export const deviceGroupsRouter = createTRPCRouter({
   // GET /api/deviceGroups - List all device groups (any authenticated user can see all)
@@ -97,7 +101,7 @@ export const deviceGroupsRouter = createTRPCRouter({
         description: "Update a device group.",
       },
     })
-    .output(deviceGroupResponseSchema)
+    .output(deviceGroupDetailsResponseSchema)
     .mutation(async ({ input }) => {
       const { id, ...updateData } = input;
       return prisma.deviceGroup.update({
@@ -105,7 +109,6 @@ export const deviceGroupsRouter = createTRPCRouter({
         data: updateData,
       });
     }),
-
 
   // PUT /api/deviceGroups/{deviceGroupId}/updateHelmId
   updateHelmId: protectedProcedure
@@ -116,17 +119,18 @@ export const deviceGroupsRouter = createTRPCRouter({
         path: "/deviceGroups/{id}/updateHelmId",
         tags: ["DeviceGroups"],
         summary: "Update Device Group Helm SBOM ID",
-        description: "Update only the helmSbomId field on a given Device Group."
-      }
+        description:
+          "Update only the helmSbomId field on a given Device Group.",
+      },
     })
-    .output(deviceGroupResponseSchema)
+    .output(deviceGroupDetailsResponseSchema)
     .mutation(async ({ input }) => {
       const { id, helmSbomId } = input;
       return prisma.deviceGroup.update({
         where: { id },
         data: {
-          helmSbomId: helmSbomId
-        }
-      })
-    })
+          helmSbomId: helmSbomId,
+        },
+      });
+    }),
 });

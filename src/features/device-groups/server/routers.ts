@@ -119,11 +119,14 @@ export const deviceGroupsRouter = createTRPCRouter({
         description: "Update only the helmSbomId field on a given Device Group."
       }
     })
+    .output(deviceGroupResponseSchema)
     .mutation(async ({ input }) => {
       const { id, helmSbomId } = input;
       return prisma.deviceGroup.update({
         where: { id },
-        data: helmSbomId,
+        data: {
+          helmSbomId: helmSbomId
+        }
       })
     })
 });

@@ -6,8 +6,8 @@ import {
 } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
 import {
-  deviceGroupWithUrlsSchema,
   deviceGroupWithDetailsSchema,
+  deviceGroupWithUrlsSchema,
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 

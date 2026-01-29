@@ -45,7 +45,7 @@ export const deviceGroupWithDetailsSchema = deviceGroupWithUrlsSchema.extend({
   helmSbomId: z.string().nullable(),
 });
 export type DeviceGroupWithDetails = z.infer<
-typeof deviceGroupWithDetailsSchema
+  typeof deviceGroupWithDetailsSchema
 >;
 
 export const deviceGroupSelect = {

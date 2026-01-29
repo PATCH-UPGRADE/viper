@@ -1,5 +1,6 @@
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
+import prisma from "@/lib/db";
 import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
 
 describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
@@ -13,6 +14,13 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     description: "Buffer overflow in device X",
     narrative: "Found during routine scan.",
     impact: "High",
+  };
+
+  const assetPayload = {
+    ip: "192.168.1.100",
+    cpe: generateCPE("vuln_v1"),
+    role: "Primary Server",
+    upstreamApi: "https://api.hospital-upstream.com/v1",
   };
 
   it("POST /vulnerabilities - Without auth, should get a 401", async () => {
@@ -37,6 +45,20 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
   });
 
   it("/vulnerabilities - Integration test", async () => {
+    const postAssetRes = await request(BASE_URL)
+      .post("/assets")
+      .set(authHeader)
+      .send(assetPayload);
+
+    expect(postAssetRes.status).toBe(200);
+    expect(postAssetRes.body).toHaveProperty("id");
+
+    onTestFinished(async () => {
+      await prisma.asset.delete({
+        where: { id: postAssetRes.body.id },
+      });
+    });
+
     const res = await request(BASE_URL)
       .post("/vulnerabilities")
       .set(authHeader)
@@ -52,6 +74,16 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
 
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.id).toBe(vulnerabilityId);
+
+    const foundIssue = await prisma.issue.findMany({
+      where: {
+        vulnerabilityId: detailRes.body.id,
+      },
+    });
+
+    expect(foundIssue.length).toBe(1);
+    expect(foundIssue[0].assetId).toBe(postAssetRes.body.id);
+    expect(foundIssue[0].vulnerabilityId).toBe(res.body.id);
 
     expect(Array.isArray(detailRes.body.affectedDeviceGroups)).toBe(true);
 

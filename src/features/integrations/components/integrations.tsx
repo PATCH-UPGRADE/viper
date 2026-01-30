@@ -40,7 +40,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ApiTokenSuccessModal } from "@/features/user/components/user";
-import type { Apikey, Integration, ResourceType } from "@/generated/prisma";
+import {
+  type Apikey,
+  AuthType,
+  type Integration,
+  type ResourceType,
+} from "@/generated/prisma";
 import { usePaginationParams } from "@/lib/pagination";
 import {
   useCreateIntegration,
@@ -214,9 +219,11 @@ const IntegrationCreateModal = ({
                       <SelectContent>
                         <SelectGroup>
                           <SelectLabel>Auth Type</SelectLabel>
-                          <SelectItem value="Basic">Basic</SelectItem>
-                          <SelectItem value="Bearer">Bearer</SelectItem>
-                          <SelectItem value="Header">Header</SelectItem>
+                          {Object.keys(AuthType).map((authType) => (
+                            <SelectItem value={authType} key={authType}>
+                              {authType}
+                            </SelectItem>
+                          ))}
                         </SelectGroup>
                       </SelectContent>
                     </Select>
@@ -389,6 +396,7 @@ export const IntegrationsHeader = ({
       resourceType: resourceType,
       isGeneric: false,
       syncEvery: 300,
+      authType: "None",
     },
   });
 

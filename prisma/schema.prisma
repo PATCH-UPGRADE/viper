@@ -17,7 +17,7 @@ datasource db {
 model User {
   id              String          @id
   name            String
-  email           String
+  email           String?
   emailVerified   Boolean         @default(false)
   image           String?
   createdAt       DateTime        @default(now())
@@ -31,7 +31,8 @@ model User {
   emulators       Emulator[]
 
   apikeys     Apikey[]
-  Integration Integration[]
+  integration Integration[]
+  integrationUsers Integration[] @relation("integration_user")
 
   @@unique([email])
   @@map("user")
@@ -404,9 +405,10 @@ model Integration {
   // ^a generic integration uses AI to pull data
   // if generic is false, the integration will respond to one of our endpoints
   //  with structured data
+  prompt         String?      @db.Text // optional, additional instructions for AI
   authType       AuthType
   resourceType   ResourceType
-  authentication Json // TODO: this needs to be encrypted
+  authentication Json? // TODO: this needs to be encrypted
   syncEvery      Int // e.g 300, sync every 300 seconds
   //syncSchedule     String? // e.g 0 12 * * *, sync every day at noon (cron)
   syncStatus     SyncStatus[]
@@ -415,6 +417,12 @@ model Integration {
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // The user who created the integration
+
+  integrationUserId String?
+  integrationUser   User?   @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
+  // the user that this integration creates
+  // TODO: should this be required? leaving it optional for migration 
 
   assetMappings         ExternalAssetMapping[]
   vulnerabilityMappings ExternalVulnerabilityMapping[]
@@ -423,6 +431,7 @@ model Integration {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([integrationUserId])
   @@map("integration")
 }
 
@@ -447,6 +456,7 @@ enum AuthType {
   Basic
   Bearer
   Header
+  None
 }
 
 enum ResourceType {

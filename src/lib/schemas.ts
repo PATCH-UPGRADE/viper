@@ -7,7 +7,7 @@ import { z } from "zod";
 export const userSchema = z.object({
   id: z.string(),
   name: z.string(),
-  email: z.string(),
+  email: z.string().nullable(),
   image: z.string().nullable(),
 });
 export type UserIncludeType = z.infer<typeof userSchema>;

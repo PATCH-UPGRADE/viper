@@ -1,16 +1,14 @@
 import { z } from "zod";
 import prisma from "@/lib/db";
 import {
-  buildPaginationMeta,
-  createPaginatedResponse,
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { cpeToDeviceGroup } from "@/lib/router-utils";
+import { cpeToDeviceGroup, fetchPaginated } from "@/lib/router-utils";
 import {
   cpeSchema,
-  deviceGroupSchema,
   deviceGroupSelect,
+  deviceGroupWithUrlsSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -72,7 +70,7 @@ const emulatorResponseSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
   user: userSchema,
-  deviceGroup: deviceGroupSchema,
+  deviceGroup: deviceGroupWithUrlsSchema,
   helmSbomId: z.string().nullable(),
   // TODO:: ^later, do not use helmSbomId externally (need internal API)
   // i.e, do not put this in an external API that other TA performers might see
@@ -81,6 +79,29 @@ const emulatorResponseSchema = z.object({
 const paginatedEmulatorResponseSchema = createPaginatedResponseSchema(
   emulatorResponseSchema,
 );
+
+// TODO: do something DRY with `createSearchFilter` in other routers
+const createSearchFilter = (search: string) => {
+  return search
+    ? {
+        OR: [
+          { role: { contains: search, mode: "insensitive" as const } },
+          {
+            description: { contains: search, mode: "insensitive" as const },
+          },
+          {
+            downloadUrl: { contains: search, mode: "insensitive" as const },
+          },
+          { dockerUrl: { contains: search, mode: "insensitive" as const } },
+        ],
+      }
+    : {};
+};
+
+const emulatorInclude = {
+  user: userIncludeSelect,
+  deviceGroup: deviceGroupSelect,
+};
 
 export const emulatorsRouter = createTRPCRouter({
   // GET /api/emulators - List all emulators (any authenticated user can see all)
@@ -101,38 +122,55 @@ export const emulatorsRouter = createTRPCRouter({
       const { search } = input;
 
       // Build search filter across multiple fields
-      const searchFilter = search
+      const searchFilter = createSearchFilter(search);
+
+      return fetchPaginated(prisma.emulator, input, {
+        where: searchFilter,
+        include: emulatorInclude,
+      });
+    }),
+
+  // GET /api/deviceGroups/{deviceGroupId}/emulators - List emulators for a device group
+  getManyByDeviceGroup: protectedProcedure
+    .input(
+      paginationInputSchema.extend({
+        deviceGroupId: z.string(),
+      }),
+    )
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/deviceGroups/{deviceGroupId}/emulators",
+        tags: ["Emulators", "DeviceGroups"],
+        summary: "List Emulators by Device Group",
+        description:
+          "Get all emulators affecting a specific device group. Any authenticated user can view all emulators.",
+      },
+    })
+    .output(paginatedEmulatorResponseSchema)
+    .query(async ({ input }) => {
+      const { search, deviceGroupId } = input;
+      const searchFilter = createSearchFilter(search);
+      const whereFilter = search
         ? {
-            OR: [
-              { role: { contains: search, mode: "insensitive" as const } },
+            AND: [
+              searchFilter,
               {
-                description: { contains: search, mode: "insensitive" as const },
+                deviceGroup: {
+                  id: deviceGroupId,
+                },
               },
-              {
-                downloadUrl: { contains: search, mode: "insensitive" as const },
-              },
-              { dockerUrl: { contains: search, mode: "insensitive" as const } },
             ],
           }
-        : {};
-
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.emulator.count({ where: searchFilter });
-      const meta = buildPaginationMeta(input, totalCount);
-
-      // Fetch paginated items
-      const items = await prisma.emulator.findMany({
-        skip: meta.skip,
-        take: meta.take,
-        where: searchFilter,
-        include: {
-          user: userIncludeSelect,
-          deviceGroup: deviceGroupSelect,
-        },
-        orderBy: { createdAt: "desc" },
+        : {
+            deviceGroup: {
+              id: deviceGroupId,
+            },
+          };
+      return fetchPaginated(prisma.emulator, input, {
+        where: whereFilter,
+        include: emulatorInclude,
       });
-
-      return createPaginatedResponse(items, meta);
     }),
 
   // GET /api/emulators/{emulator_id} - Get single emulator (any authenticated user can access)
@@ -152,10 +190,7 @@ export const emulatorsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       return prisma.emulator.findUniqueOrThrow({
         where: { id: input.id },
-        include: {
-          user: userIncludeSelect,
-          deviceGroup: deviceGroupSelect,
-        },
+        include: emulatorInclude,
       });
     }),
 
@@ -184,10 +219,7 @@ export const emulatorsRouter = createTRPCRouter({
           deviceGroupId: deviceGroup.id,
           userId: ctx.auth.user.id,
         },
-        include: {
-          user: userIncludeSelect,
-          deviceGroup: deviceGroupSelect,
-        },
+        include: emulatorInclude,
       });
     }),
 
@@ -211,10 +243,7 @@ export const emulatorsRouter = createTRPCRouter({
 
       return prisma.emulator.delete({
         where: { id: input.id },
-        include: {
-          user: userIncludeSelect,
-          deviceGroup: deviceGroupSelect,
-        },
+        include: emulatorInclude,
       });
     }),
 
@@ -247,10 +276,7 @@ export const emulatorsRouter = createTRPCRouter({
           dockerUrl: updateData.dockerUrl || null,
           description: updateData.description,
         },
-        include: {
-          user: userIncludeSelect,
-          deviceGroup: deviceGroupSelect,
-        },
+        include: emulatorInclude,
       });
     }),
 });

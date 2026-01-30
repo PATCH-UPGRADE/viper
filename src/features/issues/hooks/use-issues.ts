@@ -4,6 +4,8 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useAssetDetailParams } from "@/features/assets/hooks/use-asset-params";
+import { IssueStatus } from "@/generated/prisma";
 import { useTRPC } from "@/trpc/client";
 
 /**
@@ -19,6 +21,11 @@ export const useUpdateIssueStatus = () => {
         toast.success(`Issue status updated`);
         queryClient.invalidateQueries(
           trpc.issues.getOne.queryFilter({ id: data.id }),
+        );
+        queryClient.invalidateQueries(
+          trpc.issues.getManyInternalByStatusAndAssetId.queryFilter({
+            assetId: data.assetId,
+          }),
         );
       },
       onError: (error) => {
@@ -45,4 +52,38 @@ export const useSuspenseIssuesById = ({
 }) => {
   const trpc = useTRPC();
   return useSuspenseQuery(trpc.issues.getManyByIds.queryOptions({ ids, type }));
+};
+
+export const useSuspenseIssuesByAssetId = ({
+  assetId,
+  issueStatus,
+}: {
+  assetId: string;
+  issueStatus: IssueStatus;
+}) => {
+  const trpc = useTRPC();
+  const [params] = useAssetDetailParams();
+
+  let page = 1;
+  for (const status of Object.values(IssueStatus)) {
+    if (params.issueStatus === status) {
+      const key = `${status.toLowerCase()}Page`;
+      if (key in params) {
+        const val = params[key as keyof typeof params];
+        if (typeof val === "number") {
+          page = val;
+          break;
+        }
+      }
+    }
+  }
+
+  return useSuspenseQuery(
+    trpc.issues.getManyInternalByStatusAndAssetId.queryOptions({
+      ...params,
+      assetId,
+      issueStatus,
+      page,
+    }),
+  );
 };

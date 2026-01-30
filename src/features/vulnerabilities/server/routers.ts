@@ -1,16 +1,14 @@
 import { z } from "zod";
 import prisma from "@/lib/db";
 import {
-  buildPaginationMeta,
-  createPaginatedResponse,
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { cpesToDeviceGroups } from "@/lib/router-utils";
+import { cpesToDeviceGroups, fetchPaginated } from "@/lib/router-utils";
 import {
   cpeSchema,
-  deviceGroupSchema,
   deviceGroupSelect,
+  deviceGroupWithUrlsSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -36,7 +34,7 @@ export const vulnerabilityArrayInputSchema = z.object({
 const vulnerabilityResponseSchema = z.object({
   id: z.string(),
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  affectedDeviceGroups: z.array(deviceGroupSchema),
+  affectedDeviceGroups: z.array(deviceGroupWithUrlsSchema),
   exploitUri: z.string(),
   upstreamApi: z.string(),
   description: z.string(),
@@ -53,6 +51,34 @@ const vulnerabilityArrayResponseSchema = z.array(vulnerabilityResponseSchema);
 const paginatedVulnerabilityResponseSchema = createPaginatedResponseSchema(
   vulnerabilityResponseSchema,
 );
+
+const vulnerabilityInclude = {
+  user: userIncludeSelect,
+  affectedDeviceGroups: deviceGroupSelect,
+};
+
+const createSearchFilter = (search: string) => {
+  return search
+    ? {
+        OR: [
+          {
+            description: { contains: search, mode: "insensitive" as const },
+          },
+          { impact: { contains: search, mode: "insensitive" as const } },
+          {
+            affectedDeviceGroups: {
+              some: {
+                cpe: {
+                  contains: search,
+                  mode: "insensitive" as const,
+                },
+              },
+            },
+          },
+        ],
+      }
+    : {};
+};
 
 export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/vulnerabilities - List all vulnerabilities (any authenticated user can see all)
@@ -72,82 +98,67 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { search } = input;
 
-      // Build search filter across multiple fields
-      const searchFilter = search
+      const searchFilter = createSearchFilter(search);
+      //return fetchPaginatedVulnerabilities(input, searchFilter);
+      return fetchPaginated(prisma.vulnerability, input, {
+        where: searchFilter,
+        include: vulnerabilityInclude,
+      });
+    }),
+
+  // GET /api/deviceGroups/{deviceGroupId}/vulnerabilities - List vulnerabilities for a device group
+  getManyByDeviceGroup: protectedProcedure
+    .input(
+      paginationInputSchema.extend({
+        deviceGroupId: z.string(),
+      }),
+    )
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/deviceGroups/{deviceGroupId}/vulnerabilities",
+        tags: ["Vulnerabilities", "DeviceGroups"],
+        summary: "List Vulnerabilities by Device Group",
+        description:
+          "Get all vulnerabilities affecting a specific device group. Any authenticated user can view all vulnerabilities.",
+      },
+    })
+    .output(paginatedVulnerabilityResponseSchema)
+    .query(async ({ input }) => {
+      const { search, deviceGroupId } = input;
+      const searchFilter = createSearchFilter(search);
+      const whereFilter = search
         ? {
-            OR: [
-              {
-                description: { contains: search, mode: "insensitive" as const },
-              },
-              { impact: { contains: search, mode: "insensitive" as const } },
+            AND: [
+              searchFilter,
               {
                 affectedDeviceGroups: {
                   some: {
-                    cpe: {
-                      contains: search,
-                      mode: "insensitive" as const,
-                    },
+                    id: deviceGroupId,
                   },
                 },
               },
             ],
           }
-        : {};
-
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.vulnerability.count({
-        where: searchFilter,
+        : {
+            affectedDeviceGroups: {
+              some: {
+                id: deviceGroupId,
+              },
+            },
+          };
+      return fetchPaginated(prisma.vulnerability, input, {
+        where: whereFilter,
+        include: vulnerabilityInclude,
       });
-      const meta = buildPaginationMeta(input, totalCount);
-
-      // Fetch paginated items
-      const items = await prisma.vulnerability.findMany({
-        skip: meta.skip,
-        take: meta.take,
-        where: searchFilter,
-        include: {
-          user: userIncludeSelect,
-          affectedDeviceGroups: deviceGroupSelect,
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      return createPaginatedResponse(items, meta);
     }),
 
   getManyInternal: protectedProcedure
     .input(paginationInputSchema)
     .query(async ({ input }) => {
       const { search, sort } = input;
-      // TODO: DRY with asset getmanyinternal
 
-      // Build search filter across multiple fields
-      const searchFilter = search
-        ? {
-            OR: [
-              {
-                affectedDeviceGroups: {
-                  some: {
-                    cpe: {
-                      contains: search,
-                      mode: "insensitive" as const,
-                    },
-                  },
-                },
-              },
-              {
-                description: { contains: search, mode: "insensitive" as const },
-              },
-              { impact: { contains: search, mode: "insensitive" as const } },
-            ],
-          }
-        : {};
-
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.vulnerability.count({
-        where: searchFilter,
-      });
-      const meta = buildPaginationMeta(input, totalCount);
+      const searchFilter = createSearchFilter(search);
 
       function getSortValue(sort: string) {
         const sortValue = sort.startsWith("-") ? "desc" : "asc";
@@ -157,15 +168,11 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         return sortValue;
       }
 
-      // Fetch paginated items
-      const items = await prisma.vulnerability.findMany({
-        skip: meta.skip,
-        take: meta.take,
+      return fetchPaginated(prisma.vulnerability, input, {
         where: searchFilter,
         include: {
-          user: userIncludeSelect,
+          ...vulnerabilityInclude,
           issues: true,
-          affectedDeviceGroups: deviceGroupSelect,
         },
         orderBy: sort
           ? [
@@ -176,8 +183,6 @@ export const vulnerabilitiesRouter = createTRPCRouter({
             ]
           : { updatedAt: "desc" },
       });
-
-      return createPaginatedResponse(items, meta);
     }),
 
   // GET /api/vulnerabilities/{id} - Get single vulnerability (any authenticated user can access)
@@ -197,10 +202,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       return prisma.vulnerability.findUniqueOrThrow({
         where: { id: input.id },
-        include: {
-          user: userIncludeSelect,
-          affectedDeviceGroups: deviceGroupSelect,
-        },
+        include: vulnerabilityInclude,
       });
     }),
 
@@ -230,10 +232,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
           },
           userId: ctx.auth.user.id,
         },
-        include: {
-          user: userIncludeSelect,
-          affectedDeviceGroups: deviceGroupSelect,
-        },
+        include: vulnerabilityInclude,
       });
     }),
 
@@ -302,10 +301,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
 
       return prisma.vulnerability.delete({
         where: { id: input.id },
-        include: {
-          user: userIncludeSelect,
-          affectedDeviceGroups: deviceGroupSelect,
-        },
+        include: vulnerabilityInclude,
       });
     }),
 
@@ -342,10 +338,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
             set: deviceGroups.map((dg) => ({ id: dg.id })),
           },
         },
-        include: {
-          user: userIncludeSelect,
-          affectedDeviceGroups: deviceGroupSelect,
-        },
+        include: vulnerabilityInclude,
       });
     }),
 });

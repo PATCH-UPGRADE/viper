@@ -20,11 +20,15 @@ async function createIntegrationApiKey(
   integrationName: string,
   userId: string,
 ) {
+  // better auth api keys fail to get created if name is too long
   const BETTER_AUTH_MAX_KEY_NAME_LENGTH = 32;
   const name = `${integrationName} Integration Key`;
   const apiKey = await auth.api.createApiKey({
     body: {
-      name: name.length < BETTER_AUTH_MAX_KEY_NAME_LENGTH ? name : "Integration Key",
+      name:
+        name.length < BETTER_AUTH_MAX_KEY_NAME_LENGTH
+          ? name
+          : "Integration Key",
       expiresIn: null,
       userId,
     },
@@ -68,17 +72,23 @@ export const integrationsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(integrationInputSchema)
     .mutation(async ({ ctx, input }) => {
-      console.log("API")
+      const integrationUser = await prisma.user.create({
+        data: {
+          id: crypto.randomUUID(),
+          name: input.name,
+        },
+      });
+
       const apiKey = await createIntegrationApiKey(
         input.name,
-        ctx.auth.user.id,
+        integrationUser.id,
       );
 
-      console.log("HERE")
       const integration = await prisma.integration.create({
         data: {
           ...input,
           userId: ctx.auth.user.id,
+          integrationUserId: integrationUser.id,
           apiKeyId: apiKey.id,
         },
         include: { syncStatus: true },

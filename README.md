@@ -69,6 +69,9 @@ After seeding, you can log in with:
 - Email: `user@example.com`
 - Password: (read the seed script)
 
+- Note that user/password auth is only enabled for development environments.
+- In production, only Google OAuth can be used, with a domain whitelist in Vercel's env vars.
+
 ## Tech Stack
 
 - React Framework: Next.js
@@ -87,6 +90,20 @@ After seeding, you can log in with:
 ## Database
 
 Run `npx prisma studio` to view the database, usually on `http://localhost:5555`
+
+### Manually Migrating Deployments
+
+1. Run `npx prisma migrate status` -- should indicate that you have a generated migration that has not been applied
+2. Change your `DATABASE_URL` `.env` file to be the URL associated with your Vercel preview/production environment
+    - You can find this by going to our Vercel viper project page -> Storage -> neon-vmp-db
+    - Hit "show secret"
+3. Verify that you're using the correct `DATABASE_URL` with `npx prisma studio`. Just makes sure the entries look consistent
+4. `npx prisma migrate deploy`
+5. Got an error? Made a mistake? You can restore our Neon database in the Neon console (accessible through Vercel -> neon-vmp-db -> Open in Neon)
+    - Go to "Backup & Restore", select a time to restore to (can often just pick a few mins ago)
+    - Check [Prisma docs for failed migrations](https://www.prisma.io/docs/orm/prisma-migrate/workflows/patching-and-hotfixing#failed-migration)
+
+You can also try this process using your Vercel Preview environment *first*, then try it with the main branch. Sometimes however *main* may have more migrations than your preview environment (e.g, you made a branch, and afterwards someone else made a branch with a migration and merged that into main before you could), so this doesn't always work.
 
 ## Tests
 

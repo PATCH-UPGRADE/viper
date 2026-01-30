@@ -43,7 +43,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { inngest } from "@/inngest/client";
 import { ApiTokenSuccessModal } from "@/features/user/components/user";
-import { AuthType, type Apikey, type Integration, type ResourceType } from "@/generated/prisma";
+import {
+  type Apikey,
+  AuthType,
+  type Integration,
+  type ResourceType,
+} from "@/generated/prisma";
 import { usePaginationParams } from "@/lib/pagination";
 import {
   useCreateIntegration,
@@ -234,8 +239,10 @@ const IntegrationCreateModal = ({
                       <SelectContent>
                         <SelectGroup>
                           <SelectLabel>Auth Type</SelectLabel>
-                          { Object.keys(AuthType).map((authType) => (
-                            <SelectItem value={authType} key={authType}>{authType}</SelectItem>
+                          {Object.keys(AuthType).map((authType) => (
+                            <SelectItem value={authType} key={authType}>
+                              {authType}
+                            </SelectItem>
                           ))}
                         </SelectGroup>
                       </SelectContent>
@@ -625,4 +632,4 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
       )}
     </>
   );
-}
+};

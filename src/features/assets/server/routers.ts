@@ -1,18 +1,20 @@
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { type Asset, SyncStatusEnum } from "@/generated/prisma";
+import {
+  PrismaClientKnownRequestError,
+  PrismaClientValidationError,
+} from "@/generated/prisma/runtime/library";
 import prisma from "@/lib/db";
 import {
-  buildPaginationMeta,
-  createPaginatedResponse,
   createPaginatedResponseSchema,
   createPaginatedResponseWithLinksSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { cpeToDeviceGroup } from "@/lib/router-utils";
+import { cpeToDeviceGroup, fetchPaginated } from "@/lib/router-utils";
 import {
   cpeSchema,
-  deviceGroupSchema,
   deviceGroupSelect,
+  deviceGroupWithUrlsSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -48,7 +50,13 @@ const integrationAssetSchema = assetInputSchema.extend({
 const updateAssetSchema = assetInputSchema.extend({
   id: z.string(),
 });
-const integrationResponseSchema = z.object({});
+const integrationResponseSchema = z.object({
+  message: z.string(),
+  createdAssetsCount: z.number(),
+  updatedAssetsCount: z.number(),
+  shouldRetry: z.boolean(),
+  syncedAt: z.string(),
+});
 
 // NOTE: tRPC / OpenAPI doesn't allow for arrays as the INPUT schema
 // if you try it will default to a single asset schema
@@ -60,7 +68,7 @@ export const assetArrayInputSchema = z.object({
 const assetResponseSchema = z.object({
   id: z.string(),
   ip: z.string(),
-  deviceGroup: deviceGroupSchema,
+  deviceGroup: deviceGroupWithUrlsSchema,
   role: z.string(),
   upstreamApi: z.string(),
   networkSegment: z.string().nullable(),
@@ -74,6 +82,7 @@ const assetResponseSchema = z.object({
   updatedAt: z.date(),
   user: userSchema,
 });
+export type AssetResponseSchemaType = z.infer<typeof assetResponseSchema>;
 
 const assetArrayResponseSchema = z.array(assetResponseSchema);
 
@@ -86,26 +95,35 @@ const integrationAssetInputSchema = createPaginatedResponseWithLinksSchema(
   vendor: z.string(),
 });
 
-const settingsResponseSchema = z.object({
-  id: z.string(),
-  url: z.string(),
-  name: z.string(),
-  hasToken: z.boolean(),
-  userId: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  user: userSchema,
-});
-
-const _paginatedSettingsResponseSchema = createPaginatedResponseSchema(
-  settingsResponseSchema,
-);
-
 const assetsVulnsInputSchema = z.object({
   assetIds: z.array(z.string()).optional(),
   cpes: z.array(cpeSchema).optional(),
 });
 export type AssetsVulnsInput = z.infer<typeof assetsVulnsInputSchema>;
+
+const assetInclude = {
+  user: userIncludeSelect,
+  deviceGroup: deviceGroupSelect,
+};
+
+const createSearchFilter = (search: string) => {
+  return search
+    ? {
+        OR: [
+          { ip: { contains: search, mode: "insensitive" as const } },
+          { role: { contains: search, mode: "insensitive" as const } },
+          {
+            deviceGroup: {
+              cpe: {
+                contains: search,
+                mode: "insensitive" as const,
+              },
+            },
+          },
+        ],
+      }
+    : {};
+};
 
 export const assetsRouter = createTRPCRouter({
   // GET /api/assets - List all assets (any authenticated user can see all)
@@ -125,38 +143,55 @@ export const assetsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { search } = input;
 
-      // Build search filter across multiple fields
-      const where = search
+      const where = createSearchFilter(search);
+
+      return fetchPaginated(prisma.asset, input, {
+        where: where,
+        include: assetInclude,
+      });
+    }),
+
+  // GET /api/deviceGroups/{deviceGroupId}/assets - List emulators for a device group
+  getManyByDeviceGroup: protectedProcedure
+    .input(
+      paginationInputSchema.extend({
+        deviceGroupId: z.string(),
+      }),
+    )
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/deviceGroups/{deviceGroupId}/assets",
+        tags: ["Assets", "DeviceGroups"],
+        summary: "List Assets by Device Group",
+        description:
+          "Get all assets affecting a specific device group. Any authenticated user can view all assets.",
+      },
+    })
+    .output(paginatedAssetResponseSchema)
+    .query(async ({ input }) => {
+      const { search, deviceGroupId } = input;
+      const searchFilter = createSearchFilter(search);
+      const whereFilter = search
         ? {
-            OR: [
-              { ip: { contains: search, mode: "insensitive" as const } },
-              { role: { contains: search, mode: "insensitive" as const } },
+            AND: [
+              searchFilter,
               {
                 deviceGroup: {
-                  cpe: {
-                    contains: search,
-                    mode: "insensitive" as const,
-                  },
+                  id: deviceGroupId,
                 },
               },
             ],
           }
-        : {};
-
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.asset.count({ where: where });
-      const meta = buildPaginationMeta(input, totalCount);
-
-      // Fetch paginated items
-      const items = await prisma.asset.findMany({
-        skip: meta.skip,
-        take: meta.take,
-        where: where,
-        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
-        orderBy: { createdAt: "desc" },
+        : {
+            deviceGroup: {
+              id: deviceGroupId,
+            },
+          };
+      return fetchPaginated(prisma.asset, input, {
+        where: whereFilter,
+        include: assetInclude,
       });
-
-      return createPaginatedResponse(items, meta);
     }),
 
   // not exposed on OpenAPI
@@ -165,27 +200,7 @@ export const assetsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { search, sort } = input;
 
-      // Build search filter across multiple fields
-      const where = search
-        ? {
-            OR: [
-              { ip: { contains: search, mode: "insensitive" as const } },
-              { role: { contains: search, mode: "insensitive" as const } },
-              {
-                deviceGroup: {
-                  cpe: {
-                    contains: search,
-                    mode: "insensitive" as const,
-                  },
-                },
-              },
-            ],
-          }
-        : {};
-
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.asset.count({ where: where });
-      const meta = buildPaginationMeta(input, totalCount);
+      const where = createSearchFilter(search);
 
       function getSortValue(sort: string) {
         const sortValue = sort.startsWith("-") ? "desc" : "asc";
@@ -195,16 +210,9 @@ export const assetsRouter = createTRPCRouter({
         return sortValue;
       }
 
-      // Fetch paginated items
-      const items = await prisma.asset.findMany({
-        skip: meta.skip,
-        take: meta.take,
+      return fetchPaginated(prisma.asset, input, {
         where: where,
-        include: {
-          user: userIncludeSelect,
-          deviceGroup: deviceGroupSelect,
-          issues: true,
-        },
+        include: { ...assetInclude, issues: true },
         orderBy: sort
           ? [
               ...sort.split(",").map((s) => {
@@ -214,8 +222,6 @@ export const assetsRouter = createTRPCRouter({
             ]
           : { updatedAt: "desc" },
       });
-
-      return createPaginatedResponse(items, meta);
     }),
 
   // Internal API for asset vulnerability matching
@@ -366,7 +372,6 @@ export const assetsRouter = createTRPCRouter({
     }),
 
   // POST /api/assets/integrationUpload
-  // TODO: VW-38
   processIntegrationCreate: protectedProcedure
     .input(integrationAssetInputSchema)
     .meta({
@@ -379,11 +384,154 @@ export const assetsRouter = createTRPCRouter({
       },
     })
     .output(integrationResponseSchema)
-    .mutation(() => {
-      throw new TRPCError({
-        code: "NOT_IMPLEMENTED",
-        message: "This endpoint is not implemented yet.",
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.auth.user.id;
+      const foundIntegration = await prisma.integration.findFirstOrThrow({
+        where: { apiKey: { userId } },
+        select: { id: true },
       });
+
+      const lastSynced = new Date();
+
+      const response = {
+        message: "success",
+        createdAssetsCount: 0,
+        updatedAssetsCount: 0,
+        shouldRetry: false,
+        syncedAt: lastSynced.toISOString(),
+      };
+
+      for (const item of input.items) {
+        const { cpe, vendorId, ...assetData } = item;
+
+        // Look for an existing mapping first
+        const foundMapping = await prisma.externalAssetMapping.findFirst({
+          where: {
+            integrationId: foundIntegration.id,
+            externalId: vendorId,
+          },
+          select: {
+            id: true,
+            itemId: true,
+          },
+        });
+
+        const deviceGroup = await cpeToDeviceGroup(cpe);
+
+        // If we have a ExternalAssetMapping, update the sync time and asset
+        if (foundMapping) {
+          try {
+            await prisma.$transaction([
+              prisma.externalAssetMapping.update({
+                where: { id: foundMapping.id },
+                data: { lastSynced },
+              }),
+              prisma.asset.update({
+                where: { id: foundMapping.itemId },
+                data: {
+                  ...assetData,
+                  deviceGroupId: deviceGroup.id,
+                },
+              }),
+            ]);
+          } catch (error: unknown) {
+            response.message = handlePrismaError(error);
+            response.shouldRetry = true;
+            break;
+          }
+
+          response.updatedAssetsCount++;
+          continue;
+        }
+
+        // avoid nullable unique fields in our where condition
+        const OR = [];
+        if (assetData.hostname) {
+          OR.push({ hostname: assetData.hostname });
+        }
+        if (assetData.macAddress) {
+          OR.push({ macAddress: assetData.macAddress });
+        }
+        if (assetData.serialNumber) {
+          OR.push({ serialNumber: assetData.serialNumber });
+        }
+
+        let foundAsset: Asset | null = null;
+        if (OR.length > 0) {
+          // try to find matching Asset by unique identifying properties
+          foundAsset = await prisma.asset.findFirst({
+            where: { OR },
+          });
+        }
+
+        // If no Asset, we need to create the Asset and ExternalAssetMapping
+        if (!foundAsset) {
+          try {
+            await prisma.asset.create({
+              data: {
+                ...assetData,
+                deviceGroupId: deviceGroup.id,
+                userId,
+                externalMappings: {
+                  create: {
+                    integrationId: foundIntegration.id,
+                    externalId: vendorId,
+                    lastSynced,
+                  },
+                },
+              },
+            });
+          } catch (error: unknown) {
+            response.message = handlePrismaError(error);
+            response.shouldRetry = true;
+            break;
+          }
+
+          response.createdAssetsCount++;
+          continue;
+        }
+
+        try {
+          // If we have an Asset but no ExternalAssetMapping then create the mapping
+          await prisma.$transaction([
+            prisma.externalAssetMapping.create({
+              data: {
+                itemId: foundAsset.id,
+                integrationId: foundIntegration.id,
+                externalId: vendorId,
+                lastSynced,
+              },
+            }),
+            // and then update the existing Asset
+            prisma.asset.update({
+              where: { id: foundAsset.id },
+              data: {
+                ...assetData,
+                deviceGroupId: deviceGroup.id,
+              },
+            }),
+          ]);
+        } catch (error: unknown) {
+          response.message = handlePrismaError(error);
+          response.shouldRetry = true;
+          break;
+        }
+
+        response.updatedAssetsCount++;
+      }
+
+      await prisma.syncStatus.create({
+        data: {
+          integrationId: foundIntegration.id,
+          status: response.shouldRetry
+            ? SyncStatusEnum.Error
+            : SyncStatusEnum.Success,
+          errorMessage: response.shouldRetry ? response.message : undefined,
+          syncedAt: lastSynced,
+        },
+      });
+
+      return response;
     }),
 
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)
@@ -440,3 +588,14 @@ export const assetsRouter = createTRPCRouter({
       });
     }),
 });
+
+const handlePrismaError = (e: unknown): string => {
+  if (
+    e instanceof PrismaClientKnownRequestError ||
+    e instanceof PrismaClientValidationError
+  ) {
+    return e.message;
+  }
+
+  return "Internal Server Error";
+};

@@ -17,7 +17,7 @@ datasource db {
 model User {
   id              String          @id
   name            String
-  email           String
+  email           String?
   emailVerified   Boolean         @default(false)
   image           String?
   createdAt       DateTime        @default(now())
@@ -31,7 +31,8 @@ model User {
   emulators       Emulator[]
 
   apikeys     Apikey[]
-  Integration Integration[]
+  integration Integration[]
+  integrationUsers Integration[] @relation("integration_user")
 
   @@unique([email])
   @@map("user")
@@ -319,7 +320,7 @@ model Vulnerability {
 }
 
 enum IssueStatus {
-  PENDING
+  ACTIVE
   FALSE_POSITIVE
   REMEDIATED
 }
@@ -333,7 +334,7 @@ model Issue {
   vulnerabilityId String
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
-  status IssueStatus @default(PENDING)
+  status IssueStatus @default(ACTIVE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -415,6 +416,12 @@ model Integration {
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // The user who created the integration
+
+  integrationUserId String?
+  integrationUser   User?   @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
+  // the user that this integration creates
+  // TODO: should this be required? leaving it optional for migration 
 
   assetMappings         ExternalAssetMapping[]
   vulnerabilityMappings ExternalVulnerabilityMapping[]
@@ -423,6 +430,7 @@ model Integration {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([integrationUserId])
   @@map("integration")
 }
 

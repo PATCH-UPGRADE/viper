@@ -12,10 +12,7 @@
       "name": "Webhook Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [
-        0,
-        -416
-      ],
+      "position": [0, -416],
       "webhookId": "1741504f-8151-46a9-9ab9-52eea89e7087",
       "alwaysOutputData": false,
       "credentials": {
@@ -56,10 +53,7 @@
       "name": "Workflow Configuration",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [
-        224,
-        -416
-      ]
+      "position": [224, -416]
     },
     {
       "parameters": {
@@ -75,10 +69,7 @@
       "name": "OpenAI Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
-      "position": [
-        672,
-        -192
-      ],
+      "position": [672, -192],
       "credentials": {
         "openAiApi": {
           "id": "j0mv3A9ieKbr7MtD",
@@ -105,10 +96,7 @@
       "name": "HTTP Request Tool",
       "type": "n8n-nodes-base.httpRequestTool",
       "typeVersion": 4.3,
-      "position": [
-        800,
-        -192
-      ]
+      "position": [800, -192]
     },
     {
       "parameters": {
@@ -124,10 +112,7 @@
       "name": "OpenAI Model for Vulnerability Parser",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
-      "position": [
-        1008,
-        16
-      ],
+      "position": [1008, 16],
       "credentials": {
         "openAiApi": {
           "id": "j0mv3A9ieKbr7MtD",
@@ -148,10 +133,7 @@
       "name": "API Crawler - AI Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3,
-      "position": [
-        728,
-        -416
-      ]
+      "position": [728, -416]
     },
     {
       "parameters": {
@@ -163,10 +145,7 @@
       "name": "JSON Schema Parser",
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
-      "position": [
-        928,
-        -192
-      ]
+      "position": [928, -192]
     },
     {
       "parameters": {
@@ -187,10 +166,7 @@
       "name": "Prepare Instructions",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [
-        448,
-        -416
-      ]
+      "position": [448, -416]
     },
     {
       "parameters": {
@@ -216,10 +192,7 @@
       "name": "Send Data to VIPER API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [
-        1296,
-        -416
-      ],
+      "position": [1296, -416],
       "credentials": {
         "httpBearerAuth": {
           "id": "1M7bJlVV6osJ3KV0",

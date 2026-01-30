@@ -11,10 +11,7 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [
-        -416,
-        -160
-      ],
+      "position": [-416, -160],
       "id": "11070fc8-1b4e-41fc-9990-be5a56079dd3",
       "name": "Webhook",
       "webhookId": "449fad1f-6f7e-4f36-af86-832175b37bdd",
@@ -62,10 +59,7 @@
       "name": "Workflow Configuration",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [
-        -192,
-        -160
-      ]
+      "position": [-192, -160]
     },
     {
       "parameters": {
@@ -78,10 +72,7 @@
       "name": "Fetch Data 1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [
-        32,
-        -160
-      ],
+      "position": [32, -160],
       "credentials": {
         "httpBearerAuth": {
           "id": "1M7bJlVV6osJ3KV0",
@@ -100,10 +91,7 @@
       "name": "Fetch Data 2",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [
-        256,
-        -160
-      ],
+      "position": [256, -160],
       "credentials": {
         "httpBearerAuth": {
           "id": "1M7bJlVV6osJ3KV0",
@@ -122,10 +110,7 @@
       "name": "Fetch Data 3",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [
-        480,
-        -160
-      ],
+      "position": [480, -160],
       "credentials": {
         "httpBearerAuth": {
           "id": "1M7bJlVV6osJ3KV0",
@@ -163,10 +148,7 @@
       "name": "Combine API Data",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [
-        704,
-        -160
-      ]
+      "position": [704, -160]
     },
     {
       "parameters": {
@@ -181,10 +163,7 @@
       "name": "AI Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3,
-      "position": [
-        912,
-        -352
-      ]
+      "position": [912, -352]
     },
     {
       "parameters": {
@@ -192,10 +171,7 @@
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
-      "position": [
-        912,
-        32
-      ],
+      "position": [912, 32],
       "id": "b754c9d2-79ef-4f3b-a397-ad9990eaa161",
       "name": "Google Gemini Chat Model",
       "credentials": {
@@ -211,10 +187,7 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
-      "position": [
-        1424,
-        -176
-      ],
+      "position": [1424, -176],
       "id": "9db3699e-8d7c-4bc9-8c51-aceccfd74fd5",
       "name": "Respond to Webhook"
     }

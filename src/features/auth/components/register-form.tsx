@@ -73,6 +73,9 @@ export function RegisterForm() {
 
   const isPending = form.formState.isSubmitting;
 
+  // Check if dev environment for email/password option
+  const showEmailPassword = process.env.NEXT_PUBLIC_VERCEL_ENV !== "production";
+
   return (
     <div className="flex flex-col gap-6">
       <Card>
@@ -90,21 +93,6 @@ export function RegisterForm() {
                     className="w-full"
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleSocialLogin("github")}
-                  >
-                    <Image
-                      alt="GitHub"
-                      src="/logos/github.svg"
-                      width={20}
-                      height={20}
-                    />
-                    Continue with GitHub
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    type="button"
-                    disabled={isPending}
                     onClick={() => handleSocialLogin("google")}
                   >
                     <Image
@@ -116,68 +104,81 @@ export function RegisterForm() {
                     Continue with Google
                   </Button>
                 </div>
-                <div className="grid gap-6">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="email"
-                            placeholder="m@example.com"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="*********"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="confirmPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Confirm Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="*********"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" className="w-full" disabled={isPending}>
-                    Sign up
-                  </Button>
-                </div>
-                <div className="text-center text-sm">
-                  Already have an account?{" "}
-                  <Link href="/login" className="underline underline-offset-4">
-                    Login
-                  </Link>
-                </div>
+
+                {/* Email/password form only in development */}
+                {showEmailPassword && (
+                  <>
+                    <div className="grid gap-6">
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="email"
+                                placeholder="m@example.com"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Password</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="password"
+                                placeholder="*********"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="confirmPassword"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Confirm Password</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="password"
+                                placeholder="*********"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={isPending}
+                      >
+                        Sign up
+                      </Button>
+                    </div>
+                    <div className="text-center text-sm">
+                      Already have an account?{" "}
+                      <Link
+                        href="/login"
+                        className="underline underline-offset-4"
+                      >
+                        Login
+                      </Link>
+                    </div>
+                  </>
+                )}
               </div>
             </form>
           </Form>

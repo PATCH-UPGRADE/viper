@@ -16,6 +16,7 @@ export async function cpeToDeviceGroup(cpe: string) {
     where: { cpe },
     update: {},
     create: { cpe },
+    include: { assets: true },
   });
 }
 

@@ -18,7 +18,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     version: "123.456",
   };
 
-  const updateDeviceGroupSbomIdPayload = {
+  const updateDeviceGroupHelmIdPayload = {
     helmSbomId: "TestSBOMID123",
   };
 
@@ -49,7 +49,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
   it("PUT /deviceGroups/{id}/updateHelmId - without auth, should be 401", async () => {
     const res = await request(BASE_URL)
       .put("/deviceGroups/fakeID/updateHelmId")
-      .send(updateDeviceGroupSbomIdPayload);
+      .send(updateDeviceGroupHelmIdPayload);
     expect(res.status).toBe(401);
     expect(res.body.code).toBe("UNAUTHORIZED");
   });
@@ -149,14 +149,14 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     );
 
     // Update device group helmSbomId
-    const updateDeviceGroupSbomId = await request(BASE_URL)
+    const updateDeviceGroupHelmId = await request(BASE_URL)
       .put(`/deviceGroups/${assetDeviceGroupId}/updateHelmId`)
       .set(authHeader)
-      .send(updateDeviceGroupSbomIdPayload);
-    expect(updateDeviceGroupSbomId.status).toBe(200);
-    expect(updateDeviceGroupSbomId.body.id).toBe(assetDeviceGroupId);
-    expect(updateDeviceGroupSbomId.body.helmSbomId).toBe(
-      updateDeviceGroupSbomIdPayload.helmSbomId,
+      .send(updateDeviceGroupHelmIdPayload);
+    expect(updateDeviceGroupHelmId.status).toBe(200);
+    expect(updateDeviceGroupHelmId.body.id).toBe(assetDeviceGroupId);
+    expect(updateDeviceGroupHelmId.body.helmSbomId).toBe(
+      updateDeviceGroupHelmIdPayload.helmSbomId,
     );
   });
 });

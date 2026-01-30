@@ -29,7 +29,7 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
-          validateDomain(user.email);
+          if (user?.email) validateDomain(user.email);
           return { data: user };
         },
       },

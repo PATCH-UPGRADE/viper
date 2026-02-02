@@ -1,19 +1,13 @@
 import { z } from "zod";
-import { type Asset, SyncStatusEnum } from "@/generated/prisma";
-import {
-  PrismaClientKnownRequestError,
-  PrismaClientValidationError,
-} from "@/generated/prisma/runtime/library";
 import prisma from "@/lib/db";
 import {
   createPaginatedResponseSchema,
-  createPaginatedResponseWithLinksSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
 import {
   cpeToDeviceGroup,
   fetchPaginated,
-  handlePrismaError,
+  processIntegrationSync,
 } from "@/lib/router-utils";
 import {
   cpeSchema,
@@ -364,7 +358,6 @@ export const assetsRouter = createTRPCRouter({
       );
     }),
 
-  // POST /api/assets/integrationUpload
   processIntegrationCreate: protectedProcedure
     .input(integrationAssetInputSchema)
     .meta({
@@ -380,151 +373,48 @@ export const assetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.auth.user.id;
       const foundIntegration = await prisma.integration.findFirstOrThrow({
-        where: { apiKey: { userId } },
+        where: { apiKey: { id: ctx.auth.key?.id } },
         select: { id: true },
       });
       const integrationId = foundIntegration.id;
 
-      const lastSynced = new Date();
+      return processIntegrationSync(
+        prisma,
+        {
+          model: prisma.asset,
+          mappingModel: prisma.externalAssetMapping,
+          mappingIdField: "itemId",
+          transformInputItem: async (item, userId) => {
+            const { cpe, vendorId, ...itemData } = item;
+            const deviceGroup = await cpeToDeviceGroup(cpe);
 
-      const response = {
-        message: "success",
-        createdItemsCount: 0,
-        updatedItemsCount: 0,
-        shouldRetry: false,
-        syncedAt: lastSynced.toISOString(),
-      };
+            const uniqueFields = [
+              "hostname",
+              "macAddress",
+              "serialNumber",
+            ] as const;
+            const uniqueFieldConditions = uniqueFields
+              .filter((field) => itemData[field])
+              .map((field) => ({ [field]: itemData[field] }));
 
-      for (const item of input.items) {
-        const { cpe, vendorId, ...itemData } = item;
-
-        // Look for an existing mapping first
-        const foundMapping = await prisma.externalAssetMapping.findFirst({
-          where: {
-            integrationId,
-            externalId: vendorId,
-          },
-          select: {
-            id: true,
-            itemId: true,
-          },
-        });
-
-        const deviceGroup = await cpeToDeviceGroup(cpe);
-
-        // If we have a ExternalAssetMapping, update the sync time and asset
-        if (foundMapping) {
-          try {
-            await prisma.$transaction([
-              prisma.externalAssetMapping.update({
-                where: { id: foundMapping.id },
-                data: { lastSynced },
-              }),
-              prisma.asset.update({
-                where: { id: foundMapping.itemId },
-                data: {
-                  ...itemData,
-                  deviceGroupId: deviceGroup.id,
-                },
-              }),
-            ]);
-          } catch (error: unknown) {
-            response.message = handlePrismaError(error);
-            response.shouldRetry = true;
-            break;
-          }
-
-          response.updatedItemsCount++;
-          continue;
-        }
-
-        // avoid nullable unique fields in our where condition
-        const uniqueFields = [
-          "hostname",
-          "macAddress",
-          "serialNumber",
-          "upstreamApi",
-        ] as const;
-        const OR = uniqueFields
-          .filter((field) => itemData[field])
-          .map((field) => ({ [field]: itemData[field] }));
-
-        let foundItem: Asset | null = null;
-        if (OR.length > 0) {
-          // try to find matching Asset by unique identifying properties
-          foundItem = await prisma.asset.findFirst({
-            where: { OR },
-          });
-        }
-
-        // If no Asset, we need to create the Asset and ExternalAssetMapping
-        if (!foundItem) {
-          try {
-            await prisma.asset.create({
-              data: {
+            return {
+              createData: {
                 ...itemData,
                 deviceGroupId: deviceGroup.id,
                 userId,
-                externalMappings: {
-                  create: {
-                    integrationId,
-                    externalId: vendorId,
-                    lastSynced,
-                  },
-                },
               },
-            });
-          } catch (error: unknown) {
-            response.message = handlePrismaError(error);
-            response.shouldRetry = true;
-            break;
-          }
-
-          response.createdItemsCount++;
-          continue;
-        }
-
-        try {
-          // If we have an Asset but no ExternalAssetMapping then create the mapping
-          await prisma.$transaction([
-            prisma.externalAssetMapping.create({
-              data: {
-                itemId: foundItem.id,
-                integrationId,
-                externalId: vendorId,
-                lastSynced,
-              },
-            }),
-            // and then update the existing Asset
-            prisma.asset.update({
-              where: { id: foundItem.id },
-              data: {
+              updateData: {
                 ...itemData,
                 deviceGroupId: deviceGroup.id,
               },
-            }),
-          ]);
-        } catch (error: unknown) {
-          response.message = handlePrismaError(error);
-          response.shouldRetry = true;
-          break;
-        }
-
-        response.updatedItemsCount++;
-      }
-
-      await prisma.syncStatus.create({
-        data: {
-          integrationId,
-          status: response.shouldRetry
-            ? SyncStatusEnum.Error
-            : SyncStatusEnum.Success,
-          errorMessage: response.shouldRetry ? response.message : undefined,
-          syncedAt: lastSynced,
+              uniqueFieldConditions,
+            };
+          },
         },
-      });
-
-      return response;
+        input,
+        userId,
+        integrationId,
+      );
     }),
 
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)

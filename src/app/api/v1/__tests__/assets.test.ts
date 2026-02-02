@@ -1,14 +1,18 @@
-import { fail } from "assert";
+import { fail } from "node:assert";
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { SyncStatusEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
+import {
+  AUTH_TOKEN,
+  authHeader,
+  BASE_URL,
+  generateCPE,
+  jsonHeader,
+  setupMockIntegration,
+} from "./test-config";
 
 describe("Assets Endpoint (/assets)", () => {
-  const authHeader = { Authorization: AUTH_TOKEN };
-  const jsonHeader = { "Content-Type": "application/json" };
-
   const payload = {
     ip: "192.168.1.100",
     cpe: generateCPE("asset_v1"),
@@ -82,56 +86,6 @@ describe("Assets Endpoint (/assets)", () => {
     totalPages: 1,
     next: null,
     previous: null,
-  };
-
-  // call this at the top of your  tests
-  const setupMockIntegration = async () => {
-    const key = AUTH_TOKEN.split(" ")[1];
-    const apiKeyRecord = await prisma.apikey.findFirstOrThrow({
-      where: {
-        start: {
-          startsWith: key.slice(0, 5),
-        },
-      },
-      select: {
-        id: true,
-        userId: true,
-      },
-    });
-
-    const createdIntegration = await prisma.integration.create({
-      // @ts-expect-error - TS wants a User field that doesn't need to be here
-      data: {
-        ...mockIntegrationPayload,
-        apiKeyId: apiKeyRecord.id,
-        userId: apiKeyRecord.userId,
-      },
-    });
-
-    onTestFinished(async () => {
-      await prisma.integration.delete({
-        where: { id: createdIntegration.id },
-      });
-    });
-
-    expect(createdIntegration.apiKeyId).toBe(apiKeyRecord.id);
-    expect(createdIntegration.userId).toBe(apiKeyRecord.userId);
-    expect(createdIntegration.name).toBe(mockIntegrationPayload.name);
-    expect(createdIntegration.platform).toBe(mockIntegrationPayload.platform);
-    expect(createdIntegration.integrationUri).toBe(
-      mockIntegrationPayload.integrationUri,
-    );
-    expect(createdIntegration.isGeneric).toBe(mockIntegrationPayload.isGeneric);
-    expect(createdIntegration.authType).toBe(mockIntegrationPayload.authType);
-    expect(createdIntegration.resourceType).toBe(
-      mockIntegrationPayload.resourceType,
-    );
-    expect(createdIntegration.authentication).toStrictEqual(
-      mockIntegrationPayload.authentication,
-    );
-    expect(createdIntegration.syncEvery).toBe(mockIntegrationPayload.syncEvery);
-
-    return createdIntegration;
   };
 
   it("POST /assets - Without auth, should get a 401", async () => {
@@ -371,13 +325,13 @@ describe("Assets Endpoint (/assets)", () => {
   });
 
   it("empty Assets uploadIntegration endpoint int test", async () => {
-    await setupMockIntegration();
+    const { apiKey } = await setupMockIntegration(mockIntegrationPayload);
 
     // this should succeed and nothing should be created
     const noAssets = { ...assetIntegrationPayload, items: [] };
     const createAssetResp = await request(BASE_URL)
       .post("/assets/integrationUpload")
-      .set(authHeader)
+      .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(noAssets);
 
@@ -389,7 +343,8 @@ describe("Assets Endpoint (/assets)", () => {
   });
 
   it("create Assets uploadIntegration endpoint int test", async () => {
-    const createdIntegration = await setupMockIntegration();
+    const { integration: createdIntegration, apiKey } =
+      await setupMockIntegration(mockIntegrationPayload);
 
     onTestFinished(async () => {
       // this won't throw errors if it misses, which messes up the onTestFinished stack
@@ -409,7 +364,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     const integrationRes = await request(BASE_URL)
       .post("/assets/integrationUpload")
-      .set(authHeader)
+      .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(assetIntegrationPayload);
 
@@ -494,7 +449,8 @@ describe("Assets Endpoint (/assets)", () => {
   });
 
   it("update Assets uploadIntegration endpoint int test", async () => {
-    const createdIntegration = await setupMockIntegration();
+    const { integration: createdIntegration, apiKey } =
+      await setupMockIntegration(mockIntegrationPayload);
 
     onTestFinished(async () => {
       // this won't cause an error if it misses which messes up the onTestFinished stack
@@ -515,7 +471,7 @@ describe("Assets Endpoint (/assets)", () => {
     // create the assets first
     const createAssetsReq = await request(BASE_URL)
       .post("/assets/integrationUpload")
-      .set(authHeader)
+      .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(assetIntegrationPayload);
 
@@ -536,7 +492,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     const integrationRes = await request(BASE_URL)
       .post("/assets/integrationUpload")
-      .set(authHeader)
+      .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(updateAssetsPayload);
 
@@ -621,7 +577,8 @@ describe("Assets Endpoint (/assets)", () => {
   });
 
   it("mixed create+update Assets uploadIntegration endpoint int test", async () => {
-    const createdIntegration = await setupMockIntegration();
+    const { integration: createdIntegration, apiKey } =
+      await setupMockIntegration(mockIntegrationPayload);
 
     onTestFinished(async () => {
       // this won't throw errors if it misses, which messes up the onTestFinished stack
@@ -646,7 +603,7 @@ describe("Assets Endpoint (/assets)", () => {
     };
     const createAssetResp = await request(BASE_URL)
       .post("/assets/integrationUpload")
-      .set(authHeader)
+      .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(oneAsset);
 
@@ -663,7 +620,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     const integrationResp = await request(BASE_URL)
       .post("/assets/integrationUpload")
-      .set(authHeader)
+      .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(createWithUpdateAssets);
 
@@ -748,7 +705,8 @@ describe("Assets Endpoint (/assets)", () => {
   });
 
   it("asset with no mapping Assets uploadIntegration endpoint int test", async () => {
-    const createdIntegration = await setupMockIntegration();
+    const { integration: createdIntegration, apiKey } =
+      await setupMockIntegration(mockIntegrationPayload);
 
     onTestFinished(async () => {
       // this won't cause an error if it misses which messes up the onTestFinished stack
@@ -770,7 +728,7 @@ describe("Assets Endpoint (/assets)", () => {
     const assetData = assetIntegrationPayload.items[0];
     const createdAssetRes = await request(BASE_URL)
       .post("/assets")
-      .set(authHeader)
+      .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(assetData);
 
@@ -795,7 +753,7 @@ describe("Assets Endpoint (/assets)", () => {
     // then run the endpoint which should update the asset and create the mapping
     const updateAssetResp = await request(BASE_URL)
       .post("/assets/integrationUpload")
-      .set(authHeader)
+      .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(updateAssetPayload);
 
@@ -849,7 +807,7 @@ describe("Assets Endpoint (/assets)", () => {
   });
 
   it("all null unique field should miss Asset uploadIntegration endpoint int test", async () => {
-    await setupMockIntegration();
+    const { apiKey } = await setupMockIntegration(mockIntegrationPayload);
 
     onTestFinished(async () => {
       // this won't throw errors if it misses, which messes up the onTestFinished stack
@@ -905,7 +863,7 @@ describe("Assets Endpoint (/assets)", () => {
     // this should create a new asset because all unique fields are missing
     const integrationRes = await request(BASE_URL)
       .post("/assets/integrationUpload")
-      .set(authHeader)
+      .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send({
         ...assetIntegrationPayload,
@@ -920,7 +878,7 @@ describe("Assets Endpoint (/assets)", () => {
   });
 
   it("partial null unique field shouldn't miss Asset uploadIntegration endpoint int test", async () => {
-    await setupMockIntegration();
+    const { apiKey } = await setupMockIntegration(mockIntegrationPayload);
 
     onTestFinished(async () => {
       // this won't throw errors if it misses, which messes up the onTestFinished stack
@@ -967,7 +925,7 @@ describe("Assets Endpoint (/assets)", () => {
     // this should produce an update based on serialNumber match
     const integrationRes = await request(BASE_URL)
       .post("/assets/integrationUpload")
-      .set(authHeader)
+      .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send({
         ...assetIntegrationPayload,

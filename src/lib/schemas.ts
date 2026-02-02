@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { createPaginatedResponseWithLinksSchema } from "./pagination";
-import { ZodTypeAny } from "zod/v3";
 
 /**
  * Shared Zod schema for User responses
@@ -89,6 +88,7 @@ export const integrationResponseSchema = z.object({
   shouldRetry: z.boolean(),
   syncedAt: z.string(),
 });
+export type IntegrationResponseType = z.infer<typeof integrationResponseSchema>;
 export const createIntegrationInputSchema = <T extends z.ZodRawShape>(
   inputSchema: z.ZodObject<T>,
 ) => {

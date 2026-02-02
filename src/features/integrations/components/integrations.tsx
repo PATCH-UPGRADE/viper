@@ -41,7 +41,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { inngest } from "@/inngest/client";
 import { ApiTokenSuccessModal } from "@/features/user/components/user";
 import {
   type Apikey,
@@ -49,6 +48,7 @@ import {
   type Integration,
   type ResourceType,
 } from "@/generated/prisma";
+import { inngest } from "@/inngest/client";
 import { usePaginationParams } from "@/lib/pagination";
 import {
   useCreateIntegration,

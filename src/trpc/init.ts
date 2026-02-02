@@ -40,14 +40,14 @@ export const baseProcedure = t.procedure;
 export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
   const session = await getSession();
   if (session) {
-    return next({ ctx: { ...ctx, auth: session } });
+    return next({ ctx: { ...ctx, auth: { ...session, key: undefined } } });
   }
 
   // @ts-expect-error
   const { valid, error, key } = await verifyApiKey(ctx.req as Request);
 
   if (valid && key && !error) {
-    return next({ ctx: { ...ctx, auth: { user: { id: key.userId } } } });
+    return next({ ctx: { ...ctx, auth: { user: { id: key.userId }, key } } });
   }
 
   throw new TRPCError({

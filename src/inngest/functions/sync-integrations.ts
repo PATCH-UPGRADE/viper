@@ -4,10 +4,10 @@ import { assetArrayInputSchema } from "@/features/assets/server/routers";
 import { vulnerabilityArrayInputSchema } from "@/features/vulnerabilities/server/routers";
 import type { Integration, ResourceType } from "@/generated/prisma";
 import { SyncStatusEnum } from "@/generated/prisma";
+import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { getBaseUrl } from "@/lib/url-utils";
 import { inngest } from "../client";
-import { auth } from "@/lib/auth";
 
 export const syncAllIntegrations = inngest.createFunction(
   { id: "sync-all-integrations" },

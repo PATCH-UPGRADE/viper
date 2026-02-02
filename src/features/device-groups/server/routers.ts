@@ -1,3 +1,4 @@
+import "server-only";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import {
@@ -5,14 +6,38 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
-import { deviceGroupWithUrlsSchema } from "@/lib/schemas";
+import {
+  deviceGroupWithDetailsSchema,
+  deviceGroupWithUrlsSchema,
+} from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 const deviceGroupResponseSchema = deviceGroupWithUrlsSchema;
+const deviceGroupDetailsResponseSchema = deviceGroupWithDetailsSchema;
 
 const paginatedDeviceGroupResponseSchema = createPaginatedResponseSchema(
   deviceGroupResponseSchema,
 );
+
+const deviceGroupInputSchema = z
+  .object({
+    id: z.string(),
+    manufacturer: z.string().nullable().optional(),
+    modelName: z.string().nullable().optional(),
+    version: z.string().nullable().optional(),
+  })
+  .refine(
+    (data) =>
+      data.manufacturer !== undefined ||
+      data.modelName !== undefined ||
+      data.version !== undefined,
+    { message: "At least one field must be provided." },
+  );
+
+const deviceGroupInputHelmIdSchema = z.object({
+  id: z.string(),
+  helmSbomId: z.string(),
+});
 
 export const deviceGroupsRouter = createTRPCRouter({
   // GET /api/deviceGroups - List all device groups (any authenticated user can see all)
@@ -74,8 +99,47 @@ export const deviceGroupsRouter = createTRPCRouter({
     }),
 
   // PUT /api/deviceGroups/{deviceGroupId} - Update DeviceGroup
-  // TODO: VW-52
+  update: protectedProcedure
+    .input(deviceGroupInputSchema)
+    .meta({
+      openapi: {
+        method: "PUT",
+        path: "/deviceGroups/{id}",
+        tags: ["DeviceGroups"],
+        summary: "Update Device Group",
+        description: "Update a device group.",
+      },
+    })
+    .output(deviceGroupDetailsResponseSchema)
+    .mutation(async ({ input }) => {
+      const { id, ...updateData } = input;
+      return prisma.deviceGroup.update({
+        where: { id },
+        data: updateData,
+      });
+    }),
 
   // PUT /api/deviceGroups/{deviceGroupId}/updateHelmId
-  // TODO: VW-52
+  updateHelmId: protectedProcedure
+    .input(deviceGroupInputHelmIdSchema)
+    .meta({
+      openapi: {
+        method: "PUT",
+        path: "/deviceGroups/{id}/updateHelmId",
+        tags: ["DeviceGroups"],
+        summary: "Update Device Group Helm SBOM ID",
+        description:
+          "Update only the helmSbomId field on a given Device Group.",
+      },
+    })
+    .output(deviceGroupDetailsResponseSchema)
+    .mutation(async ({ input }) => {
+      const { id, helmSbomId } = input;
+      return prisma.deviceGroup.update({
+        where: { id },
+        data: {
+          helmSbomId: helmSbomId,
+        },
+      });
+    }),
 });

@@ -12,6 +12,16 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     upstreamApi: "https://api.hospital-upstream.com/v1",
   };
 
+  const updateDeviceGroupPayload = {
+    manufacturer: "Test Manufacturer",
+    modelName: "Test Model",
+    version: "123.456",
+  };
+
+  const updateDeviceGroupHelmIdPayload = {
+    helmSbomId: "TestSBOMID123",
+  };
+
   it("GET /deviceGroups - Without auth, should get a 401", async () => {
     const res = await request(BASE_URL)
       .get("/deviceGroups")
@@ -24,6 +34,22 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
   it("GET /deviceGroups/{id} - Without auth, should be 401", async () => {
     const res = await request(BASE_URL).get(`/deviceGroups/foo`);
 
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("UNAUTHORIZED");
+  });
+
+  it("PUT /deviceGroups/{id} - without auth, should be 401", async () => {
+    const res = await request(BASE_URL)
+      .put("/deviceGroups/fakeID")
+      .send(updateDeviceGroupPayload);
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("UNAUTHORIZED");
+  });
+
+  it("PUT /deviceGroups/{id}/updateHelmId - without auth, should be 401", async () => {
+    const res = await request(BASE_URL)
+      .put("/deviceGroups/fakeID/updateHelmId")
+      .send(updateDeviceGroupHelmIdPayload);
     expect(res.status).toBe(401);
     expect(res.body.code).toBe("UNAUTHORIZED");
   });
@@ -52,7 +78,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     expect(res.body).toHaveProperty("totalPages");
   });
 
-  it("Device Groups integration test - Get list and detail", async () => {
+  it("Device Groups integration test - Get list and detail & attempt updates", async () => {
     // First, post an asset, which should create a device group (if one doesn't exist already)
     const assetRes = await request(BASE_URL)
       .post("/assets")
@@ -62,7 +88,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     expect(assetRes.body).toHaveProperty("deviceGroup");
     const assetDeviceGroupId = assetRes.body.deviceGroup.id;
 
-    // First, get a list of device groups
+    // Get a list of device groups
     const listRes = await request(BASE_URL)
       .get("/deviceGroups")
       .query({ page: 1, pageSize: 10 })
@@ -87,7 +113,6 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       const detailRes = await request(BASE_URL)
         .get(`/deviceGroups/${deviceGroupId}`)
         .set(authHeader);
-
       expect(detailRes.status).toBe(200);
       expect(detailRes.body.id).toBe(deviceGroupId);
       expect(detailRes.body.cpe).toBe(deviceGroup.cpe);
@@ -102,9 +127,36 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     const detailRes = await request(BASE_URL)
       .get(`/deviceGroups/${assetDeviceGroupId}`)
       .set(authHeader);
-
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.id).toBe(assetDeviceGroupId);
     expect(detailRes.body.cpe).toBe(assetPayload.cpe);
+
+    // Update device group
+    const updateDeviceGroup = await request(BASE_URL)
+      .put(`/deviceGroups/${assetDeviceGroupId}`)
+      .set(authHeader)
+      .send(updateDeviceGroupPayload);
+    expect(updateDeviceGroup.status).toBe(200);
+    expect(updateDeviceGroup.body.id).toBe(assetDeviceGroupId);
+    expect(updateDeviceGroup.body.manufacturer).toBe(
+      updateDeviceGroupPayload.manufacturer,
+    );
+    expect(updateDeviceGroup.body.modelName).toBe(
+      updateDeviceGroupPayload.modelName,
+    );
+    expect(updateDeviceGroup.body.version).toBe(
+      updateDeviceGroupPayload.version,
+    );
+
+    // Update device group helmSbomId
+    const updateDeviceGroupHelmId = await request(BASE_URL)
+      .put(`/deviceGroups/${assetDeviceGroupId}/updateHelmId`)
+      .set(authHeader)
+      .send(updateDeviceGroupHelmIdPayload);
+    expect(updateDeviceGroupHelmId.status).toBe(200);
+    expect(updateDeviceGroupHelmId.body.id).toBe(assetDeviceGroupId);
+    expect(updateDeviceGroupHelmId.body.helmSbomId).toBe(
+      updateDeviceGroupHelmIdPayload.helmSbomId,
+    );
   });
 });

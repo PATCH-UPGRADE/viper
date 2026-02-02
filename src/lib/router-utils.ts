@@ -93,6 +93,47 @@ export const handlePrismaError = (e: unknown): string => {
   return "Internal Server Error";
 };
 
+async function upsertSyncStatus(
+  integrationId: string,
+  response: IntegrationResponseType,
+  lastSynced: Date,
+): Promise<void> {
+  // sync-integrations.ts shoudl create PENDING sync status
+  // update that if possible
+  const latestPending = await prisma.syncStatus.findFirst({
+    where: {
+      integrationId: integrationId,
+      status: SyncStatusEnum.Pending,
+    },
+    orderBy: {
+      syncedAt: "desc", // assuming syncedAt is the timestamp for sorting
+    },
+  });
+
+  const statusToSet = response.shouldRetry
+    ? SyncStatusEnum.Error
+    : SyncStatusEnum.Success;
+  const errorMessage = response.shouldRetry ? response.message : undefined;
+
+  await prisma.syncStatus.upsert({
+    where: {
+      id: latestPending?.id || "-1",
+      // ^Use a non-existent ID to trigger creation if no Pending status found
+    },
+    update: {
+      status: statusToSet,
+      errorMessage: errorMessage,
+      syncedAt: lastSynced,
+    },
+    create: {
+      integrationId,
+      status: statusToSet,
+      errorMessage: errorMessage,
+      syncedAt: lastSynced,
+    },
+  });
+}
+
 /**
  * Configuration for the sync helper
  */

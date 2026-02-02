@@ -51,7 +51,7 @@ const updateAssetSchema = assetInputSchema.extend({
 // NOTE: tRPC / OpenAPI doesn't allow for arrays as the INPUT schema
 // if you try it will default to a single asset schema
 // to get around that wrap the array of assets in an object
-export const assetArrayInputSchema = z.object({
+const assetArrayInputSchema = z.object({
   assets: z.array(assetInputSchema).nonempty(),
 });
 
@@ -79,7 +79,7 @@ const assetArrayResponseSchema = z.array(assetResponseSchema);
 const paginatedAssetResponseSchema =
   createPaginatedResponseSchema(assetResponseSchema);
 
-const integrationAssetInputSchema =
+export const integrationAssetInputSchema =
   createIntegrationInputSchema(assetInputSchema);
 
 const assetsVulnsInputSchema = z.object({

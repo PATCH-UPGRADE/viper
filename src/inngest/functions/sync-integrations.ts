@@ -1,7 +1,13 @@
 import "server-only";
 import { z } from "zod";
-import { assetArrayInputSchema } from "@/features/assets/server/routers";
-import { vulnerabilityArrayInputSchema } from "@/features/vulnerabilities/server/routers";
+import {
+  assetArrayInputSchema,
+  integrationAssetInputSchema,
+} from "@/features/assets/server/routers";
+import {
+  integrationVulnerabilityInputSchema,
+  vulnerabilityArrayInputSchema,
+} from "@/features/vulnerabilities/server/routers";
 import type { Integration, ResourceType } from "@/generated/prisma";
 import { SyncStatusEnum } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
@@ -55,13 +61,13 @@ const getResponseConfig = (resourceType: ResourceType) => {
   switch (resourceType) {
     case "Asset":
       return {
-        path: "/assets/bulk",
-        schema: z.toJSONSchema(assetArrayInputSchema),
+        path: "/assets/integrationUpload",
+        schema: z.toJSONSchema(integrationAssetInputSchema),
       };
     case "Vulnerability":
       return {
-        path: "/vulnerabilities/bulk",
-        schema: z.toJSONSchema(vulnerabilityArrayInputSchema),
+        path: "/vulnerabilities/integrationUpload",
+        schema: z.toJSONSchema(integrationVulnerabilityInputSchema),
       };
     case "Emulator":
       return {
@@ -109,6 +115,12 @@ async function syncAiIntegration(
       expiresIn: 60 * 60 * 24,
       rateLimitEnabled: false,
     },
+  });
+
+  // update integration with new key
+  await prisma.integration.update({
+    where: { id: integration.id },
+    data: { apiKeyId: apiKey.id },
   });
 
   const response = await fetch(n8nWebhookUrl, {

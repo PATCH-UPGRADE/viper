@@ -33,7 +33,7 @@ const vulnerabilityInputSchema = z.object({
   impact: z.string().min(1),
 });
 
-export const vulnerabilityArrayInputSchema = z.object({
+const vulnerabilityArrayInputSchema = z.object({
   vulnerabilities: z.array(vulnerabilityInputSchema).nonempty(),
 });
 
@@ -58,7 +58,7 @@ const paginatedVulnerabilityResponseSchema = createPaginatedResponseSchema(
   vulnerabilityResponseSchema,
 );
 
-const integrationVulnerabilityInputSchema = createIntegrationInputSchema(
+export const integrationVulnerabilityInputSchema = createIntegrationInputSchema(
   vulnerabilityInputSchema,
 );
 const vulnerabilityInclude = {

@@ -382,8 +382,8 @@ describe("Assets Endpoint (/assets)", () => {
       .send(noAssets);
 
     expect(createAssetResp.status).toBe(200);
-    expect(createAssetResp.body.createdAssetsCount).toBe(0);
-    expect(createAssetResp.body.updatedAssetsCount).toBe(0);
+    expect(createAssetResp.body.createdItemsCount).toBe(0);
+    expect(createAssetResp.body.updatedItemsCount).toBe(0);
     expect(createAssetResp.body.shouldRetry).toBe(false);
     expect(createAssetResp.body.message).toBe("success");
   });
@@ -414,8 +414,8 @@ describe("Assets Endpoint (/assets)", () => {
       .send(assetIntegrationPayload);
 
     expect(integrationRes.status).toBe(200);
-    expect(integrationRes.body.createdAssetsCount).toBe(2);
-    expect(integrationRes.body.updatedAssetsCount).toBe(0);
+    expect(integrationRes.body.createdItemsCount).toBe(2);
+    expect(integrationRes.body.updatedItemsCount).toBe(0);
     expect(integrationRes.body.shouldRetry).toBe(false);
     expect(integrationRes.body.message).toBe("success");
 
@@ -520,8 +520,8 @@ describe("Assets Endpoint (/assets)", () => {
       .send(assetIntegrationPayload);
 
     expect(createAssetsReq.status).toBe(200);
-    expect(createAssetsReq.body.createdAssetsCount).toBe(2);
-    expect(createAssetsReq.body.updatedAssetsCount).toBe(0);
+    expect(createAssetsReq.body.createdItemsCount).toBe(2);
+    expect(createAssetsReq.body.updatedItemsCount).toBe(0);
     expect(createAssetsReq.body.shouldRetry).toBe(false);
     expect(createAssetsReq.body.message).toBe("success");
 
@@ -541,8 +541,8 @@ describe("Assets Endpoint (/assets)", () => {
       .send(updateAssetsPayload);
 
     expect(integrationRes.status).toBe(200);
-    expect(integrationRes.body.createdAssetsCount).toBe(0);
-    expect(integrationRes.body.updatedAssetsCount).toBe(2);
+    expect(integrationRes.body.createdItemsCount).toBe(0);
+    expect(integrationRes.body.updatedItemsCount).toBe(2);
     expect(integrationRes.body.shouldRetry).toBe(false);
     expect(integrationRes.body.message).toBe("success");
 
@@ -651,8 +651,8 @@ describe("Assets Endpoint (/assets)", () => {
       .send(oneAsset);
 
     expect(createAssetResp.status).toBe(200);
-    expect(createAssetResp.body.createdAssetsCount).toBe(1);
-    expect(createAssetResp.body.updatedAssetsCount).toBe(0);
+    expect(createAssetResp.body.createdItemsCount).toBe(1);
+    expect(createAssetResp.body.updatedItemsCount).toBe(0);
     expect(createAssetResp.body.shouldRetry).toBe(false);
     expect(createAssetResp.body.message).toBe("success");
 
@@ -668,8 +668,8 @@ describe("Assets Endpoint (/assets)", () => {
       .send(createWithUpdateAssets);
 
     expect(integrationResp.status).toBe(200);
-    expect(integrationResp.body.createdAssetsCount).toBe(1);
-    expect(integrationResp.body.updatedAssetsCount).toBe(1);
+    expect(integrationResp.body.createdItemsCount).toBe(1);
+    expect(integrationResp.body.updatedItemsCount).toBe(1);
     expect(integrationResp.body.shouldRetry).toBe(false);
     expect(integrationResp.body.message).toBe("success");
 
@@ -802,8 +802,8 @@ describe("Assets Endpoint (/assets)", () => {
     expect(updateAssetResp.status).toBe(200);
     expect(updateAssetResp.body.shouldRetry).toBe(false);
     expect(updateAssetResp.body.message).toBe("success");
-    expect(updateAssetResp.body.createdAssetsCount).toBe(0);
-    expect(updateAssetResp.body.updatedAssetsCount).toBe(1);
+    expect(updateAssetResp.body.createdItemsCount).toBe(0);
+    expect(updateAssetResp.body.updatedItemsCount).toBe(1);
 
     const mapping1 = await prisma.externalAssetMapping.findFirstOrThrow({
       where: {
@@ -913,8 +913,8 @@ describe("Assets Endpoint (/assets)", () => {
       });
 
     expect(integrationRes.status).toBe(200);
-    expect(integrationRes.body.createdAssetsCount).toBe(1);
-    expect(integrationRes.body.updatedAssetsCount).toBe(0);
+    expect(integrationRes.body.createdItemsCount).toBe(1);
+    expect(integrationRes.body.updatedItemsCount).toBe(0);
     expect(integrationRes.body.shouldRetry).toBe(false);
     expect(integrationRes.body.message).toBe("success");
   });
@@ -975,8 +975,8 @@ describe("Assets Endpoint (/assets)", () => {
       });
 
     expect(integrationRes.status).toBe(200);
-    expect(integrationRes.body.createdAssetsCount).toBe(0);
-    expect(integrationRes.body.updatedAssetsCount).toBe(1);
+    expect(integrationRes.body.createdItemsCount).toBe(0);
+    expect(integrationRes.body.updatedItemsCount).toBe(1);
     expect(integrationRes.body.shouldRetry).toBe(false);
     expect(integrationRes.body.message).toBe("success");
 

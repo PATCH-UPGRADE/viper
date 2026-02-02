@@ -10,11 +10,17 @@ import {
   createPaginatedResponseWithLinksSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { cpeToDeviceGroup, fetchPaginated } from "@/lib/router-utils";
+import {
+  cpeToDeviceGroup,
+  fetchPaginated,
+  handlePrismaError,
+} from "@/lib/router-utils";
 import {
   cpeSchema,
+  createIntegrationInputSchema,
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
+  integrationResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -44,18 +50,8 @@ const assetInputSchema = z.object({
   status: AssetStatus.optional(),
 });
 
-const integrationAssetSchema = assetInputSchema.extend({
-  vendorId: z.string(),
-});
 const updateAssetSchema = assetInputSchema.extend({
   id: z.string(),
-});
-const integrationResponseSchema = z.object({
-  message: z.string(),
-  createdAssetsCount: z.number(),
-  updatedAssetsCount: z.number(),
-  shouldRetry: z.boolean(),
-  syncedAt: z.string(),
 });
 
 // NOTE: tRPC / OpenAPI doesn't allow for arrays as the INPUT schema
@@ -89,11 +85,8 @@ const assetArrayResponseSchema = z.array(assetResponseSchema);
 const paginatedAssetResponseSchema =
   createPaginatedResponseSchema(assetResponseSchema);
 
-const integrationAssetInputSchema = createPaginatedResponseWithLinksSchema(
-  integrationAssetSchema,
-).extend({
-  vendor: z.string(),
-});
+const integrationAssetInputSchema =
+  createIntegrationInputSchema(assetInputSchema);
 
 const assetsVulnsInputSchema = z.object({
   assetIds: z.array(z.string()).optional(),
@@ -390,24 +383,25 @@ export const assetsRouter = createTRPCRouter({
         where: { apiKey: { userId } },
         select: { id: true },
       });
+      const integrationId = foundIntegration.id;
 
       const lastSynced = new Date();
 
       const response = {
         message: "success",
-        createdAssetsCount: 0,
-        updatedAssetsCount: 0,
+        createdItemsCount: 0,
+        updatedItemsCount: 0,
         shouldRetry: false,
         syncedAt: lastSynced.toISOString(),
       };
 
       for (const item of input.items) {
-        const { cpe, vendorId, ...assetData } = item;
+        const { cpe, vendorId, ...itemData } = item;
 
         // Look for an existing mapping first
         const foundMapping = await prisma.externalAssetMapping.findFirst({
           where: {
-            integrationId: foundIntegration.id,
+            integrationId,
             externalId: vendorId,
           },
           select: {
@@ -429,7 +423,7 @@ export const assetsRouter = createTRPCRouter({
               prisma.asset.update({
                 where: { id: foundMapping.itemId },
                 data: {
-                  ...assetData,
+                  ...itemData,
                   deviceGroupId: deviceGroup.id,
                 },
               }),
@@ -440,41 +434,40 @@ export const assetsRouter = createTRPCRouter({
             break;
           }
 
-          response.updatedAssetsCount++;
+          response.updatedItemsCount++;
           continue;
         }
 
         // avoid nullable unique fields in our where condition
-        const OR = [];
-        if (assetData.hostname) {
-          OR.push({ hostname: assetData.hostname });
-        }
-        if (assetData.macAddress) {
-          OR.push({ macAddress: assetData.macAddress });
-        }
-        if (assetData.serialNumber) {
-          OR.push({ serialNumber: assetData.serialNumber });
-        }
+        const uniqueFields = [
+          "hostname",
+          "macAddress",
+          "serialNumber",
+          "upstreamApi",
+        ] as const;
+        const OR = uniqueFields
+          .filter((field) => itemData[field])
+          .map((field) => ({ [field]: itemData[field] }));
 
-        let foundAsset: Asset | null = null;
+        let foundItem: Asset | null = null;
         if (OR.length > 0) {
           // try to find matching Asset by unique identifying properties
-          foundAsset = await prisma.asset.findFirst({
+          foundItem = await prisma.asset.findFirst({
             where: { OR },
           });
         }
 
         // If no Asset, we need to create the Asset and ExternalAssetMapping
-        if (!foundAsset) {
+        if (!foundItem) {
           try {
             await prisma.asset.create({
               data: {
-                ...assetData,
+                ...itemData,
                 deviceGroupId: deviceGroup.id,
                 userId,
                 externalMappings: {
                   create: {
-                    integrationId: foundIntegration.id,
+                    integrationId,
                     externalId: vendorId,
                     lastSynced,
                   },
@@ -487,7 +480,7 @@ export const assetsRouter = createTRPCRouter({
             break;
           }
 
-          response.createdAssetsCount++;
+          response.createdItemsCount++;
           continue;
         }
 
@@ -496,17 +489,17 @@ export const assetsRouter = createTRPCRouter({
           await prisma.$transaction([
             prisma.externalAssetMapping.create({
               data: {
-                itemId: foundAsset.id,
-                integrationId: foundIntegration.id,
+                itemId: foundItem.id,
+                integrationId,
                 externalId: vendorId,
                 lastSynced,
               },
             }),
             // and then update the existing Asset
             prisma.asset.update({
-              where: { id: foundAsset.id },
+              where: { id: foundItem.id },
               data: {
-                ...assetData,
+                ...itemData,
                 deviceGroupId: deviceGroup.id,
               },
             }),
@@ -517,12 +510,12 @@ export const assetsRouter = createTRPCRouter({
           break;
         }
 
-        response.updatedAssetsCount++;
+        response.updatedItemsCount++;
       }
 
       await prisma.syncStatus.create({
         data: {
-          integrationId: foundIntegration.id,
+          integrationId,
           status: response.shouldRetry
             ? SyncStatusEnum.Error
             : SyncStatusEnum.Success,
@@ -588,14 +581,3 @@ export const assetsRouter = createTRPCRouter({
       });
     }),
 });
-
-const handlePrismaError = (e: unknown): string => {
-  if (
-    e instanceof PrismaClientKnownRequestError ||
-    e instanceof PrismaClientValidationError
-  ) {
-    return e.message;
-  }
-
-  return "Internal Server Error";
-};

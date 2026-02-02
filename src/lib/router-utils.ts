@@ -3,8 +3,14 @@ import prisma from "@/lib/db";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
+  createPaginatedResponseWithLinksSchema,
   type PaginationInput,
 } from "./pagination";
+import {
+  PrismaClientKnownRequestError,
+  PrismaClientValidationError,
+} from "@/generated/prisma/runtime/library";
+import { integrationInputSchema } from "@/features/integrations/types";
 
 export async function cpeToDeviceGroup(cpe: string) {
   // requires: cpe is properly formatted according to cpeSchema
@@ -56,3 +62,14 @@ export async function fetchPaginated<
 
   return createPaginatedResponse(items, meta);
 }
+
+export const handlePrismaError = (e: unknown): string => {
+  if (
+    e instanceof PrismaClientKnownRequestError ||
+    e instanceof PrismaClientValidationError
+  ) {
+    return e.message;
+  }
+
+  return "Internal Server Error";
+};

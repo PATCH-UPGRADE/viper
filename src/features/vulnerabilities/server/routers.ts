@@ -2,19 +2,27 @@ import { z } from "zod";
 import prisma from "@/lib/db";
 import {
   createPaginatedResponseSchema,
+  createPaginatedResponseWithLinksSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { cpesToDeviceGroups, fetchPaginated } from "@/lib/router-utils";
+import {
+  cpesToDeviceGroups,
+  fetchPaginated,
+  handlePrismaError,
+} from "@/lib/router-utils";
 import {
   cpeSchema,
+  createIntegrationInputSchema,
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
+  integrationResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
+import { SyncStatusEnum, Vulnerability } from "@/generated/prisma";
 
 // Validation schemas
 const vulnerabilityInputSchema = z.object({
@@ -52,6 +60,9 @@ const paginatedVulnerabilityResponseSchema = createPaginatedResponseSchema(
   vulnerabilityResponseSchema,
 );
 
+const integrationVulnerabilityInputSchema = createIntegrationInputSchema(
+  vulnerabilityInputSchema,
+);
 const vulnerabilityInclude = {
   user: userIncludeSelect,
   affectedDeviceGroups: deviceGroupSelect,
@@ -236,7 +247,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       });
     }),
 
-  // POST /api/vulnerabilities/bulk - Create one or more assets
+  // POST /api/vulnerabilities/bulk - Create one or more vulnerabilities
   createBulk: protectedProcedure
     .input(vulnerabilityArrayInputSchema)
     .meta({
@@ -260,7 +271,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
 
       const deviceGroups = await Promise.all(deviceGroupPromises);
 
-      // create all assets in a transaction
+      // create all vulns in a transaction
       return prisma.$transaction(
         input.vulnerabilities.map((vuln, index) => {
           const { cpes: _cpes, ...dataInput } = vuln;
@@ -279,6 +290,172 @@ export const vulnerabilitiesRouter = createTRPCRouter({
           });
         }),
       );
+    }),
+
+  // POST /api/vulnerabilities/integrationUpload
+  processIntegrationCreate: protectedProcedure
+    .input(integrationVulnerabilityInputSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/vulnerability/integrationUpload",
+        tags: ["Vulnerabilities"],
+        summary: "Synchronize vulnerabilities with integration",
+        description:
+          "Synchronize vulnerabilities on VIPER from a partnered platform",
+      },
+    })
+    .output(integrationResponseSchema)
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.auth.user.id;
+      const foundIntegration = await prisma.integration.findFirstOrThrow({
+        where: { apiKey: { userId } },
+        select: { id: true },
+      });
+      const integrationId = foundIntegration.id;
+
+      const lastSynced = new Date();
+
+      const response = {
+        message: "success",
+        createdItemsCount: 0,
+        updatedItemsCount: 0,
+        shouldRetry: false,
+        syncedAt: lastSynced.toISOString(),
+      };
+
+      for (const item of input.items) {
+        const { cpes, vendorId, ...itemData } = item;
+
+        // Look for an existing mapping first
+        const foundMapping =
+          await prisma.externalVulnerabilityMapping.findFirst({
+            where: {
+              integrationId,
+              externalId: vendorId,
+            },
+            select: {
+              id: true,
+              itemId: true,
+            },
+          });
+
+        const deviceGroups = await cpesToDeviceGroups(cpes);
+
+        // If we have a ExternalItemMapping, update the sync time and item
+        if (foundMapping) {
+          try {
+            await prisma.$transaction([
+              prisma.externalVulnerabilityMapping.update({
+                where: { id: foundMapping.id },
+                data: { lastSynced },
+              }),
+              prisma.vulnerability.update({
+                where: { id: foundMapping.itemId },
+                data: {
+                  ...itemData,
+                  affectedDeviceGroups: {
+                    set: deviceGroups.map((dg) => ({ id: dg.id })),
+                  },
+                },
+              }),
+            ]);
+          } catch (error: unknown) {
+            response.message = handlePrismaError(error);
+            response.shouldRetry = true;
+            break;
+          }
+
+          response.updatedItemsCount++;
+          continue;
+        }
+
+        // avoid nullable unique fields in our where condition
+        const OR = [];
+        if (itemData.upstreamApi) {
+          OR.push({ upstreamApi: itemData.upstreamApi });
+        }
+
+        let foundItem: Vulnerability | null = null;
+        if (OR.length > 0) {
+          // try to find matching Vulnerability by unique identifying properties
+          foundItem = await prisma.vulnerability.findFirst({
+            where: { OR },
+          });
+        }
+
+        // If no Vulnerability, we need to create the Vulnerability and ExternalVulnerabilityMapping
+        if (!foundItem) {
+          try {
+            await prisma.vulnerability.create({
+              data: {
+                ...itemData,
+                affectedDeviceGroups: {
+                  connect: deviceGroups.map((dg) => ({ id: dg.id })),
+                },
+                userId,
+                externalMappings: {
+                  create: {
+                    integrationId,
+                    externalId: vendorId,
+                    lastSynced,
+                  },
+                },
+              },
+            });
+          } catch (error: unknown) {
+            response.message = handlePrismaError(error);
+            response.shouldRetry = true;
+            break;
+          }
+
+          response.createdItemsCount++;
+          continue;
+        }
+
+        try {
+          // If we have a Vulnerability but no ExternalVulnerabilityMapping then create the mapping
+          await prisma.$transaction([
+            prisma.externalVulnerabilityMapping.create({
+              data: {
+                itemId: foundItem.id,
+                integrationId,
+                externalId: vendorId,
+                lastSynced,
+              },
+            }),
+            // and then update the existing Vulnerability
+            prisma.vulnerability.update({
+              where: { id: foundItem.id },
+              data: {
+                ...itemData,
+                affectedDeviceGroups: {
+                  set: deviceGroups.map((dg) => ({ id: dg.id })),
+                },
+              },
+            }),
+          ]);
+        } catch (error: unknown) {
+          response.message = handlePrismaError(error);
+          response.shouldRetry = true;
+          break;
+        }
+
+        response.updatedItemsCount++;
+      }
+
+      await prisma.syncStatus.create({
+        data: {
+          integrationId,
+          status: response.shouldRetry
+            ? SyncStatusEnum.Error
+            : SyncStatusEnum.Success,
+          errorMessage: response.shouldRetry ? response.message : undefined,
+          syncedAt: lastSynced,
+        },
+      });
+
+      return response;
     }),
 
   // DELETE /api/vulnerabilities/{id} - Delete vulnerability (only creator can delete)

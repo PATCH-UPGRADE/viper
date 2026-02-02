@@ -523,7 +523,7 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
       platform: data.platform || "",
       integrationUri: data.integrationUri,
       isGeneric: data.isGeneric,
-      prompt: data.prompt,
+      prompt: data.prompt || "",
       authType: data.authType,
       resourceType: data.resourceType,
       syncEvery: data.syncEvery || 300,

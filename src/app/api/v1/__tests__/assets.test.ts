@@ -1,7 +1,7 @@
 import { fail } from "node:assert";
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
-import { SyncStatusEnum } from "@/generated/prisma";
+import { AuthType, ResourceType, SyncStatusEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   AUTH_TOKEN,
@@ -32,8 +32,8 @@ describe("Assets Endpoint (/assets)", () => {
     platform: "mockIntegrationPlatform",
     integrationUri: "https://mock-upstream-api.com/",
     isGeneric: false,
-    authType: "Bearer",
-    resourceType: "Asset",
+    authType: AuthType.Bearer,
+    resourceType: ResourceType.Asset,
     authentication: {
       token: AUTH_TOKEN,
     },

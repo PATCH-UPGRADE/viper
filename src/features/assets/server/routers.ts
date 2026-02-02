@@ -373,6 +373,7 @@ export const assetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.auth.user.id;
       const foundIntegration = await prisma.integration.findFirstOrThrow({
+        // @ts-expect-error ctx.auth.key.id is defined if logging in with api key
         where: { apiKey: { id: ctx.auth.key?.id } },
         select: { id: true },
       });
@@ -383,7 +384,6 @@ export const assetsRouter = createTRPCRouter({
         {
           model: prisma.asset,
           mappingModel: prisma.externalAssetMapping,
-          mappingIdField: "itemId",
           transformInputItem: async (item, userId) => {
             const { cpe, vendorId, ...itemData } = item;
             const deviceGroup = await cpeToDeviceGroup(cpe);

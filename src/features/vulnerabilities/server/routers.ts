@@ -305,8 +305,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.auth.user.id;
-      console.log(ctx.auth);
       const foundIntegration = await prisma.integration.findFirstOrThrow({
+        // @ts-expect-error ctx.auth.key.id is defined if logging in with api key
         where: { apiKey: { id: ctx.auth.key?.id } },
         select: { id: true },
       });
@@ -317,7 +317,6 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         {
           model: prisma.vulnerability,
           mappingModel: prisma.externalVulnerabilityMapping,
-          mappingIdField: "itemId",
           transformInputItem: async (item, userId) => {
             const { cpes, vendorId, ...itemData } = item;
             const deviceGroups = await cpesToDeviceGroups(cpes);

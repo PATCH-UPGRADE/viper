@@ -1,19 +1,21 @@
 import "server-only";
 import { z } from "zod";
-import {
-  assetArrayInputSchema,
-  integrationAssetInputSchema,
-} from "@/features/assets/server/routers";
-import {
-  integrationVulnerabilityInputSchema,
-  vulnerabilityArrayInputSchema,
-} from "@/features/vulnerabilities/server/routers";
+import { integrationAssetInputSchema } from "@/features/assets/server/routers";
+import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/server/routers";
 import type { Integration, ResourceType } from "@/generated/prisma";
 import { SyncStatusEnum } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { getBaseUrl } from "@/lib/url-utils";
 import { inngest } from "../client";
+
+type IntegrationWithStringDates = Omit<
+  Integration,
+  "createdAt" | "updatedAt"
+> & {
+  createdAt: string;
+  updatedAt: string;
+};
 
 export const syncAllIntegrations = inngest.createFunction(
   { id: "sync-all-integrations" },
@@ -90,7 +92,7 @@ type SyncResult =
 
 // Helper function for AI Integration
 async function syncAiIntegration(
-  integration: Integration,
+  integration: IntegrationWithStringDates,
 ): Promise<SyncResult> {
   const n8nWebhookUrl = process.env.N8N_AI_SYNC_URL;
   const n8nKey = process.env.N8N_KEY;
@@ -154,7 +156,7 @@ async function syncAiIntegration(
 
 // Helper function for Partner Integration
 async function syncPartnerIntegration(
-  integration: Integration,
+  integration: IntegrationWithStringDates,
 ): Promise<SyncResult> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

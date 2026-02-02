@@ -1,5 +1,6 @@
+// biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
 import "server-only";
-import { type PrismaClient, SyncStatusEnum } from "@/generated/prisma";
+import { SyncStatusEnum } from "@/generated/prisma";
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
@@ -17,19 +18,18 @@ import type { IntegrationResponseType } from "./schemas";
 // ============================================================================
 
 // so we can take in `prisma` into functions and work with it
-// biome-ignore lint/suspicious/noExplicitAny: allows reuse across multiple models
 type PrismaDelegate<T = any> = {
-  // biome-ignore lint/suspicious/noExplicitAny: allows reuse across multiple models
-  count: (args?: any) => Promise<number>;
-  // biome-ignore lint/suspicious/noExplicitAny: allows reuse across multiple models
+  count: (args?: any) => Promise<number | any>;
   findFirst: (args?: any) => Promise<T | null>;
-  // biome-ignore lint/suspicious/noExplicitAny: allows reuse across multiple models
   findMany: (args?: any) => Promise<T[]>;
-  // biome-ignore lint/suspicious/noExplicitAny: allows reuse across multiple models
   create: (args: any) => Promise<T>;
-  // biome-ignore lint/suspicious/noExplicitAny: allows reuse across multiple models
   update: (args: any) => Promise<T>;
 };
+
+interface PrismaClientLike {
+  $transaction: (...args: any[]) => Promise<any>;
+  syncStatus: Pick<PrismaDelegate, "create">;
+}
 
 // ============================================================================
 // List / Detail view helpers
@@ -175,7 +175,7 @@ export async function processIntegrationSync<
   TModel extends { id: string },
   TMappingModel extends { id: string; itemId: string },
 >(
-  prisma: PrismaClient,
+  prisma: PrismaClientLike,
   config: SyncConfig<
     TInputItem,
     TCreateData,
@@ -301,16 +301,7 @@ export async function processIntegrationSync<
   }
 
   // Create sync status record
-  await prisma.syncStatus.create({
-    data: {
-      integrationId,
-      status: response.shouldRetry
-        ? SyncStatusEnum.Error
-        : SyncStatusEnum.Success,
-      errorMessage: response.shouldRetry ? response.message : undefined,
-      syncedAt: lastSynced,
-    },
-  });
+  await upsertSyncStatus(integrationId, response, lastSynced);
 
   return response;
 }

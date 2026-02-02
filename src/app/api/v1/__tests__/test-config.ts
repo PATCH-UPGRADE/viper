@@ -1,5 +1,6 @@
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
+import type { IntegrationFormValues } from "@/features/integrations/types";
 import prisma from "@/lib/db";
 
 export const BASE_URL = "http://localhost:3000/api/v1";
@@ -22,7 +23,9 @@ describe("Configuration Tests", () => {
 
 export const authHeader = { Authorization: AUTH_TOKEN };
 export const jsonHeader = { "Content-Type": "application/json" };
-export const setupMockIntegration = async (mockIntegrationPayload) => {
+export const setupMockIntegration = async (
+  mockIntegrationPayload: IntegrationFormValues,
+) => {
   const trpcPayload = {
     "0": {
       json: mockIntegrationPayload,

@@ -14,7 +14,6 @@ CREATE TYPE "ArtifactType" AS ENUM ('Source', 'Binary', 'Firmware', 'Emulator', 
 
 -- DropForeignKey (we'll recreate these after renaming)
 ALTER TABLE "public"."emulator" DROP CONSTRAINT "emulator_deviceGroupId_fkey";
-ALTER TABLE "public"."emulator" DROP CONSTRAINT "emulator_userId_fkey";
 ALTER TABLE "public"."vulnerability" DROP CONSTRAINT "vulnerability_emulatorId_fkey";
 ALTER TABLE "public"."remediation" DROP CONSTRAINT "remediation_deviceGroupId_fkey";
 
@@ -23,13 +22,17 @@ DROP INDEX "public"."remediation_deviceGroupId_idx";
 
 -- Rename emulator table to device_artifact
 ALTER TABLE "public"."emulator" RENAME TO "device_artifact";
+ALTER TABLE "device_artifact" RENAME CONSTRAINT "emulator_pkey" TO "device_artifact_pkey";
+ALTER TABLE "device_artifact" RENAME CONSTRAINT "emulator_userId_fkey" TO "device_artifact_userId_fkey";
+ALTER INDEX "emulator_userId_idx" RENAME TO "device_artifact_userId_idx";
+ALTER INDEX "emulator_deviceGroupId_idx" RENAME TO "device_artifact_deviceGroupId_idx";
 
 -- Rename emulatorId column to deviceArtifactId in vulnerability
 ALTER TABLE "vulnerability" RENAME COLUMN "emulatorId" TO "deviceArtifactId";
 
--- Role is now nullable
-ALTER TABLE "device_artifact"
-ALTER COLUMN "role" DROP NOT NULL;
+-- Role and description are now nullable
+ALTER TABLE "device_artifact" ALTER COLUMN "role" TEXT NULL;
+ALTER TABLE "device_artifact" ALTER COLUMN "description" TEXT NULL;
 
 -- add upstream-api
 ALTER TABLE "device_artifact" ADD COLUMN "upstream-api" TEXT;
@@ -82,7 +85,7 @@ CREATE UNIQUE INDEX "artifact_prevVersionId_key" ON "artifact"("prevVersionId");
 CREATE INDEX "artifact_wrapperId_idx" ON "artifact"("wrapperId");
 CREATE INDEX "artifact_userId_idx" ON "artifact"("userId");
 CREATE INDEX "_RemediationDeviceGroups_B_index" ON "_RemediationDeviceGroups"("B");
-CREATE INDEX "vulnerability_deviceArtifactId_idx" ON "vulnerability"("deviceArtifactId");
+-- TODO: CREATE INDEX "vulnerability_deviceArtifactId_idx" ON "vulnerability"("deviceArtifactId");
 
 -- DATA MIGRATION: Migrate Emulator docker-url and download-url to Artifacts
 DO $$
@@ -184,8 +187,8 @@ ALTER TABLE "artifact" ADD CONSTRAINT "artifact_userId_fkey"
 ALTER TABLE "device_artifact" ADD CONSTRAINT "device_artifact_deviceGroupId_fkey" 
     FOREIGN KEY ("deviceGroupId") REFERENCES "device_group"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE "device_artifact" ADD CONSTRAINT "device_artifact_userId_fkey" 
-    FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+--ALTER TABLE "device_artifact" ADD CONSTRAINT "device_artifact_userId_fkey" 
+--    FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE "vulnerability" ADD CONSTRAINT "vulnerability_deviceArtifactId_fkey" 
     FOREIGN KEY ("deviceArtifactId") REFERENCES "device_artifact"("id") ON DELETE SET NULL ON UPDATE CASCADE;

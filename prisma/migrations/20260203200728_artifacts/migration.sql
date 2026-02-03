@@ -31,8 +31,8 @@ ALTER INDEX "emulator_deviceGroupId_idx" RENAME TO "device_artifact_deviceGroupI
 ALTER TABLE "vulnerability" RENAME COLUMN "emulatorId" TO "deviceArtifactId";
 
 -- Role and description are now nullable
-ALTER TABLE "device_artifact" ALTER COLUMN "role" TEXT NULL;
-ALTER TABLE "device_artifact" ALTER COLUMN "description" TEXT NULL;
+ALTER TABLE "device_artifact" ALTER COLUMN "role" DROP NOT NULL;
+ALTER TABLE "device_artifact" ALTER COLUMN "description" DROP NOT NULL;
 
 -- add upstream-api
 ALTER TABLE "device_artifact" ADD COLUMN "upstream-api" TEXT;

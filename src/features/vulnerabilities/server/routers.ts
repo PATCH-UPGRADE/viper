@@ -4,11 +4,17 @@ import {
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { cpesToDeviceGroups, fetchPaginated } from "@/lib/router-utils";
+import {
+  cpesToDeviceGroups,
+  fetchPaginated,
+  processIntegrationSync,
+} from "@/lib/router-utils";
 import {
   cpeSchema,
+  createIntegrationInputSchema,
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
+  integrationResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -27,6 +33,10 @@ const vulnerabilityInputSchema = z.object({
   impact: z.string().min(1),
 });
 
+const vulnerabilityArrayInputSchema = z.object({
+  vulnerabilities: z.array(vulnerabilityInputSchema).nonempty(),
+});
+
 const vulnerabilityResponseSchema = z.object({
   id: z.string(),
   sarif: z.any(), // JSON data - Prisma JsonValue type
@@ -42,10 +52,15 @@ const vulnerabilityResponseSchema = z.object({
   user: userSchema,
 });
 
+const vulnerabilityArrayResponseSchema = z.array(vulnerabilityResponseSchema);
+
 const paginatedVulnerabilityResponseSchema = createPaginatedResponseSchema(
   vulnerabilityResponseSchema,
 );
 
+export const integrationVulnerabilityInputSchema = createIntegrationInputSchema(
+  vulnerabilityInputSchema,
+);
 const vulnerabilityInclude = {
   user: userIncludeSelect,
   affectedDeviceGroups: deviceGroupSelect,
@@ -219,26 +234,118 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const uniqueCpes = [...new Set(cpes)];
       const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
 
-      const assetIds: Record<string, { assetId: string }> = {};
-      for (const dg of deviceGroups) {
-        for (const asset of dg.assets) {
-          assetIds[asset.id] = { assetId: asset.id };
-        }
-      }
-
       return prisma.vulnerability.create({
         data: {
           ...dataInput,
           affectedDeviceGroups: {
             connect: deviceGroups.map((dg) => ({ id: dg.id })),
           },
-          issues: {
-            create: Object.values(assetIds),
-          },
           userId: ctx.auth.user.id,
         },
         include: vulnerabilityInclude,
       });
+    }),
+
+  // POST /api/vulnerabilities/bulk - Create one or more vulnerabilities
+  createBulk: protectedProcedure
+    .input(vulnerabilityArrayInputSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/vulnerabilities/bulk",
+        tags: ["Vulnerabilities"],
+        summary: "Create Bulk Vulnerabilities",
+        description:
+          "Create one or more new vulnerabilities from an array. The authenticated user will be recorded as the creator.",
+      },
+    })
+    .output(vulnerabilityArrayResponseSchema)
+    .mutation(async ({ ctx, input }) => {
+      // resolve all device groups in parallel
+      const deviceGroupPromises = input.vulnerabilities.map(async (vuln) => {
+        const { cpes } = vuln;
+        const uniqueCpes = [...new Set(cpes)];
+        return await cpesToDeviceGroups(uniqueCpes);
+      });
+
+      const deviceGroups = await Promise.all(deviceGroupPromises);
+
+      // create all vulns in a transaction
+      return prisma.$transaction(
+        input.vulnerabilities.map((vuln, index) => {
+          const { cpes: _cpes, ...dataInput } = vuln;
+          return prisma.vulnerability.create({
+            data: {
+              ...dataInput,
+              affectedDeviceGroups: {
+                connect: deviceGroups[index].map((dg) => ({ id: dg.id })),
+              },
+              userId: ctx.auth.user.id,
+            },
+            include: {
+              user: userIncludeSelect,
+              affectedDeviceGroups: deviceGroupSelect,
+            },
+          });
+        }),
+      );
+    }),
+
+  processIntegrationCreate: protectedProcedure
+    .input(integrationVulnerabilityInputSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/vulnerabilities/integrationUpload",
+        tags: ["Vulnerabilities"],
+        summary: "Synchronize vulnerabilities with integration",
+        description:
+          "Synchronize vulnerabilities on VIPER from a partnered platform",
+      },
+    })
+    .output(integrationResponseSchema)
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.auth.user.id;
+      const foundIntegration = await prisma.integration.findFirstOrThrow({
+        // @ts-expect-error ctx.auth.key.id is defined if logging in with api key
+        where: { apiKey: { id: ctx.auth.key?.id } },
+        select: { id: true },
+      });
+      const integrationId = foundIntegration.id;
+
+      return processIntegrationSync(
+        prisma,
+        {
+          model: prisma.vulnerability,
+          mappingModel: prisma.externalVulnerabilityMapping,
+          transformInputItem: async (item, userId) => {
+            const { cpes, vendorId: _vendorId, ...itemData } = item;
+            const uniqueCpes = [...new Set(cpes)];
+            const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
+
+            return {
+              createData: {
+                ...itemData,
+                userId,
+                affectedDeviceGroups: {
+                  connect: deviceGroups.map((dg) => ({ id: dg.id })),
+                },
+              },
+              updateData: {
+                ...itemData,
+                affectedDeviceGroups: {
+                  set: deviceGroups.map((dg) => ({ id: dg.id })),
+                },
+              },
+              uniqueFieldConditions: [],
+              // ^always create unmapped vulns
+            };
+          },
+        },
+        input,
+        userId,
+        integrationId,
+      );
     }),
 
   // DELETE /api/vulnerabilities/{id} - Delete vulnerability (only creator can delete)

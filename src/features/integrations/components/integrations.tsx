@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type PropsWithChildren, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
+import { toast } from "sonner";
 import {
   EmptyView,
   EntityContainer,
@@ -39,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { ApiTokenSuccessModal } from "@/features/user/components/user";
 import {
   type Apikey,
@@ -52,6 +54,7 @@ import {
   useRemoveIntegration,
   useRotateIntegration,
   useSuspenseIntegrations,
+  useTriggerSync,
   useUpdateIntegration,
 } from "../hooks/use-integrations";
 import {
@@ -98,6 +101,7 @@ const IntegrationCreateModal = ({
 
   const isPending = form.formState.isSubmitting;
   const authType = form.watch("authType");
+  const isGeneric = form.watch("isGeneric");
   const label = isUpdate ? "Update Integration" : "Create Integration";
 
   return (
@@ -170,7 +174,7 @@ const IntegrationCreateModal = ({
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
                       <FormLabel className="text-base">
-                        Generic Integration
+                        ✨ AI Integration ✨
                       </FormLabel>
                     </div>
                     <FormControl>
@@ -183,6 +187,22 @@ const IntegrationCreateModal = ({
                   </FormItem>
                 )}
               />
+
+              {isGeneric && (
+                <FormField
+                  control={form.control}
+                  name="prompt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Additional Instructions</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -396,7 +416,7 @@ export const IntegrationsHeader = ({
       resourceType: resourceType,
       isGeneric: false,
       syncEvery: 300,
-      authType: "None",
+      authType: AuthType.None,
     },
   });
 
@@ -491,6 +511,7 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
 
   const updateIntegration = useUpdateIntegration();
   const rotateIntegration = useRotateIntegration();
+  const triggerSync = useTriggerSync();
   const [open, setOpen] = useState(false);
   const [rotateOpen, setRotateOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -503,6 +524,7 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
       platform: data.platform || "",
       integrationUri: data.integrationUri,
       isGeneric: data.isGeneric,
+      prompt: data.prompt || "",
       authType: data.authType,
       resourceType: data.resourceType,
       syncEvery: data.syncEvery || 300,
@@ -522,6 +544,10 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
         },
       },
     );
+  };
+
+  const handleSync = async () => {
+    await triggerSync.mutateAsync({ id: data.id });
   };
 
   const handleRotate = () => {
@@ -549,6 +575,9 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
             <span>{data.integrationUri}</span>
           </div>
           <p>{JSON.stringify(data)}</p>
+          <Button onClick={handleSync} disabled={triggerSync.isPending}>
+            {triggerSync.isPending ? "Syncing..." : "Sync Now"}
+          </Button>
         </div>
         <Button
           size="sm"

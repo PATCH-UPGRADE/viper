@@ -1,6 +1,8 @@
 import "server-only";
+import { TRPCError } from "@trpc/server";
 import { headers } from "next/headers";
 import { z } from "zod";
+import { inngest } from "@/inngest/client";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
 import {
@@ -161,5 +163,25 @@ export const integrationsRouter = createTRPCRouter({
       return prisma.integration.delete({
         where: { id: input.id },
       });
+    }),
+
+  triggerSync: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      // any user can trigger any integration
+      // but if we change so later, implement that here
+      const integration = await prisma.integration.findFirst({
+        where: { id: input.id },
+      });
+      if (!integration) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      await inngest.send({
+        name: "integration/sync.requested",
+        data: { integrationId: input.id },
+      });
+
+      return { success: true };
     }),
 });

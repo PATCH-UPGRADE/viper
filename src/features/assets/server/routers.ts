@@ -1,20 +1,20 @@
 import { z } from "zod";
-import { type Asset, SyncStatusEnum } from "@/generated/prisma";
-import {
-  PrismaClientKnownRequestError,
-  PrismaClientValidationError,
-} from "@/generated/prisma/runtime/library";
 import prisma from "@/lib/db";
 import {
   createPaginatedResponseSchema,
-  createPaginatedResponseWithLinksSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { cpeToDeviceGroup, fetchPaginated } from "@/lib/router-utils";
+import {
+  cpeToDeviceGroup,
+  fetchPaginated,
+  processIntegrationSync,
+} from "@/lib/router-utils";
 import {
   cpeSchema,
+  createIntegrationInputSchema,
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
+  integrationResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -44,18 +44,8 @@ const assetInputSchema = z.object({
   status: AssetStatus.optional(),
 });
 
-const integrationAssetSchema = assetInputSchema.extend({
-  vendorId: z.string(),
-});
 const updateAssetSchema = assetInputSchema.extend({
   id: z.string(),
-});
-const integrationResponseSchema = z.object({
-  message: z.string(),
-  createdAssetsCount: z.number(),
-  updatedAssetsCount: z.number(),
-  shouldRetry: z.boolean(),
-  syncedAt: z.string(),
 });
 
 // NOTE: tRPC / OpenAPI doesn't allow for arrays as the INPUT schema
@@ -89,11 +79,8 @@ const assetArrayResponseSchema = z.array(assetResponseSchema);
 const paginatedAssetResponseSchema =
   createPaginatedResponseSchema(assetResponseSchema);
 
-const integrationAssetInputSchema = createPaginatedResponseWithLinksSchema(
-  integrationAssetSchema,
-).extend({
-  vendor: z.string(),
-});
+export const integrationAssetInputSchema =
+  createIntegrationInputSchema(assetInputSchema);
 
 const assetsVulnsInputSchema = z.object({
   assetIds: z.array(z.string()).optional(),
@@ -371,7 +358,6 @@ export const assetsRouter = createTRPCRouter({
       );
     }),
 
-  // POST /api/assets/integrationUpload
   processIntegrationCreate: protectedProcedure
     .input(integrationAssetInputSchema)
     .meta({
@@ -387,151 +373,48 @@ export const assetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.auth.user.id;
       const foundIntegration = await prisma.integration.findFirstOrThrow({
-        where: { apiKey: { userId } },
+        // @ts-expect-error ctx.auth.key.id is defined if logging in with api key
+        where: { apiKey: { id: ctx.auth.key?.id } },
         select: { id: true },
       });
+      const integrationId = foundIntegration.id;
 
-      const lastSynced = new Date();
+      return processIntegrationSync(
+        prisma,
+        {
+          model: prisma.asset,
+          mappingModel: prisma.externalAssetMapping,
+          transformInputItem: async (item, userId) => {
+            const { cpe, vendorId, ...itemData } = item;
+            const deviceGroup = await cpeToDeviceGroup(cpe);
 
-      const response = {
-        message: "success",
-        createdAssetsCount: 0,
-        updatedAssetsCount: 0,
-        shouldRetry: false,
-        syncedAt: lastSynced.toISOString(),
-      };
+            const uniqueFields = [
+              "hostname",
+              "macAddress",
+              "serialNumber",
+            ] as const;
+            const uniqueFieldConditions = uniqueFields
+              .filter((field) => itemData[field])
+              .map((field) => ({ [field]: itemData[field] }));
 
-      for (const item of input.items) {
-        const { cpe, vendorId, ...assetData } = item;
-
-        // Look for an existing mapping first
-        const foundMapping = await prisma.externalAssetMapping.findFirst({
-          where: {
-            integrationId: foundIntegration.id,
-            externalId: vendorId,
-          },
-          select: {
-            id: true,
-            itemId: true,
-          },
-        });
-
-        const deviceGroup = await cpeToDeviceGroup(cpe);
-
-        // If we have a ExternalAssetMapping, update the sync time and asset
-        if (foundMapping) {
-          try {
-            await prisma.$transaction([
-              prisma.externalAssetMapping.update({
-                where: { id: foundMapping.id },
-                data: { lastSynced },
-              }),
-              prisma.asset.update({
-                where: { id: foundMapping.itemId },
-                data: {
-                  ...assetData,
-                  deviceGroupId: deviceGroup.id,
-                },
-              }),
-            ]);
-          } catch (error: unknown) {
-            response.message = handlePrismaError(error);
-            response.shouldRetry = true;
-            break;
-          }
-
-          response.updatedAssetsCount++;
-          continue;
-        }
-
-        // avoid nullable unique fields in our where condition
-        const OR = [];
-        if (assetData.hostname) {
-          OR.push({ hostname: assetData.hostname });
-        }
-        if (assetData.macAddress) {
-          OR.push({ macAddress: assetData.macAddress });
-        }
-        if (assetData.serialNumber) {
-          OR.push({ serialNumber: assetData.serialNumber });
-        }
-
-        let foundAsset: Asset | null = null;
-        if (OR.length > 0) {
-          // try to find matching Asset by unique identifying properties
-          foundAsset = await prisma.asset.findFirst({
-            where: { OR },
-          });
-        }
-
-        // If no Asset, we need to create the Asset and ExternalAssetMapping
-        if (!foundAsset) {
-          try {
-            await prisma.asset.create({
-              data: {
-                ...assetData,
+            return {
+              createData: {
+                ...itemData,
                 deviceGroupId: deviceGroup.id,
                 userId,
-                externalMappings: {
-                  create: {
-                    integrationId: foundIntegration.id,
-                    externalId: vendorId,
-                    lastSynced,
-                  },
-                },
               },
-            });
-          } catch (error: unknown) {
-            response.message = handlePrismaError(error);
-            response.shouldRetry = true;
-            break;
-          }
-
-          response.createdAssetsCount++;
-          continue;
-        }
-
-        try {
-          // If we have an Asset but no ExternalAssetMapping then create the mapping
-          await prisma.$transaction([
-            prisma.externalAssetMapping.create({
-              data: {
-                itemId: foundAsset.id,
-                integrationId: foundIntegration.id,
-                externalId: vendorId,
-                lastSynced,
-              },
-            }),
-            // and then update the existing Asset
-            prisma.asset.update({
-              where: { id: foundAsset.id },
-              data: {
-                ...assetData,
+              updateData: {
+                ...itemData,
                 deviceGroupId: deviceGroup.id,
               },
-            }),
-          ]);
-        } catch (error: unknown) {
-          response.message = handlePrismaError(error);
-          response.shouldRetry = true;
-          break;
-        }
-
-        response.updatedAssetsCount++;
-      }
-
-      await prisma.syncStatus.create({
-        data: {
-          integrationId: foundIntegration.id,
-          status: response.shouldRetry
-            ? SyncStatusEnum.Error
-            : SyncStatusEnum.Success,
-          errorMessage: response.shouldRetry ? response.message : undefined,
-          syncedAt: lastSynced,
+              uniqueFieldConditions,
+            };
+          },
         },
-      });
-
-      return response;
+        input,
+        userId,
+        integrationId,
+      );
     }),
 
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)
@@ -588,14 +471,3 @@ export const assetsRouter = createTRPCRouter({
       });
     }),
 });
-
-const handlePrismaError = (e: unknown): string => {
-  if (
-    e instanceof PrismaClientKnownRequestError ||
-    e instanceof PrismaClientValidationError
-  ) {
-    return e.message;
-  }
-
-  return "Internal Server Error";
-};

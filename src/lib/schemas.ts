@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createPaginatedResponseWithLinksSchema } from "./pagination";
 
 /**
  * Shared Zod schema for User responses
@@ -88,3 +89,20 @@ export const safeUrlSchema = z
 export const cpeSchema = z
   .string()
   .regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format");
+
+export const integrationResponseSchema = z.object({
+  message: z.string(),
+  createdItemsCount: z.number(),
+  updatedItemsCount: z.number(),
+  shouldRetry: z.boolean(),
+  syncedAt: z.string(),
+});
+export type IntegrationResponseType = z.infer<typeof integrationResponseSchema>;
+export const createIntegrationInputSchema = <T extends z.ZodRawShape>(
+  inputSchema: z.ZodObject<T>,
+) => {
+  const integrationInputSchema = inputSchema.extend({
+    vendorId: z.string(),
+  });
+  return createPaginatedResponseWithLinksSchema(integrationInputSchema);
+};

@@ -410,7 +410,6 @@ model Integration {
   resourceType   ResourceType
   authentication Json? // TODO: this needs to be encrypted
   syncEvery      Int // e.g 300, sync every 300 seconds
-  //syncSchedule     String? // e.g 0 12 * * *, sync every day at noon (cron)
   syncStatus     SyncStatus[]
   apiKeyId       String?      @unique
   apiKey         Apikey?      @relation(fields: [apiKeyId], references: [id])
@@ -447,7 +446,7 @@ model SyncStatus {
   integrationId String
   status        SyncStatusEnum @default(Pending)
   errorMessage  String?
-  syncedAt      DateTime       @default(now())
+  syncedAt      DateTime    @default(now())
 
   @@map("sync_status")
 }

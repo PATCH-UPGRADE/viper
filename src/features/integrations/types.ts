@@ -1,16 +1,16 @@
 import { z } from "zod";
 import { safeUrlSchema } from "@/lib/schemas";
 
-const basicAuthSchema = z.object({
+export const basicAuthSchema = z.object({
   username: z.string(),
   password: z.string(),
 });
 
-const bearerAuthSchema = z.object({
+export const bearerAuthSchema = z.object({
   token: z.string(),
 });
 
-const headerAuthSchema = z.object({
+export const headerAuthSchema = z.object({
   header: z.string(),
   value: z.string(),
 });
@@ -28,6 +28,7 @@ export const integrationInputSchema = z
     platform: z.string().optional(),
     integrationUri: safeUrlSchema,
     isGeneric: z.boolean(),
+    prompt: z.string().optional(),
     authType: z.enum(["Basic", "Bearer", "Header", "None"]),
     resourceType: z.enum(["Asset", "Vulnerability", "Emulator", "Remediation"]),
     authentication: authenticationSchema.optional(),

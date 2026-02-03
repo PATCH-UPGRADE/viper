@@ -28,7 +28,9 @@ model User {
   assets          Asset[]
   vulnerabilities Vulnerability[]
   remediations    Remediation[]
-  emulators       Emulator[]
+  deviceArtifacts DeviceArtifact[]
+  artifacts Artifact[]
+  artifactWrappers ArtifactWrapper[]
 
   apikeys     Apikey[]
   integration Integration[]
@@ -171,8 +173,8 @@ model DeviceGroup {
   deviceGroupHistories DeviceGroupHistory[]
   assets               Asset[]
   vulnerabilities      Vulnerability[]      @relation("VulnerabilityDeviceGroups")
-  emulators            Emulator[]
-  remediations         Remediation[]
+  remediations         Remediation[] @relation("RemediationDeviceGroups")
+  deviceArtifacts DeviceArtifact[]
 
   @@index([cpe])
   @@map("device_group")
@@ -267,30 +269,91 @@ model ExternalVulnerabilityMapping {
   @@map("external_item_mappings")
 }
 
-model Emulator {
-  id          String  @id @default(cuid())
-  role        String
-  downloadUrl String? @map("download-url")
-  dockerUrl   String? @map("docker-url")
-  description String  @db.Text
-  helmSbomId  String?
+model ArtifactWrapper {
+  id            String        @id @default(cuid())
 
-  deviceGroupId String
-  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
+  deviceArtifactId String?
+  deviceArtifact DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: Cascade)
+  remediationId String?
+  remediation Remediation? @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+
+  latestArtifactId String? @unique
+  latestArtifact Artifact? @relation("LatestArtifact", fields: [latestArtifactId], references: [id], onDelete: SetNull)
+
+  artifacts Artifact[] @relation("ArtifactWrapper") // back of fk relation
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // TODO: VW-48, add versioning to emulators
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  @@index([remediationId])
+  @@index([deviceArtifactId])
+  @@index([userId])
+  @@index([latestArtifactId])
+  @@map("artifact_wrapper")
+}
+
+model Artifact {
+  id            String        @id @default(cuid())
+  wrapperId String
+  wrapper ArtifactWrapper @relation("ArtifactWrapper", fields: [wrapperId], references: [id], onDelete: Cascade)
+
+  name String?
+  artifactType ArtifactType
+  downloadUrl String? @map("download-url") // could also be an S3 url we're responsible for hosting
+  size Int? // size in bytes
+
+  prevVersionId String? @unique // null for v1
+  prevVersion Artifact? @relation("VersionChain", fields: [prevVersionId], references: [id], onDelete: SetNull)
+  nextVersion Artifact? @relation("VersionChain") // opposite side of prevVersion
+
+  versionNumber Int // 1, 2, 3...
+
+  latestForWrapper ArtifactWrapper? @relation("LatestArtifact") // opposite side of ArtifactWrapper.latestArtifact
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  @@index([wrapperId])
+  @@index([userId])
+  @@map("artifact")
+}
+
+enum ArtifactType {
+  Source
+  Binary
+  Firmware
+  Emulator
+  Documentation
+  Other
+}
+
+
+model DeviceArtifact {
+  id            String      @id @default(cuid())
+  artifacts ArtifactWrapper[]
+
+  deviceGroupId String
+  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  vulnerability Vulnerability[]
+
+  upstreamApi          String?        @map("upstream-api")
+  description String?  @db.Text
+  role String?
 
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
-  Vulnerability Vulnerability[]
-
   @@index([deviceGroupId])
   @@index([userId])
-  @@map("emulator")
+  @@map("device_artifact")
 }
+
 
 model Vulnerability {
   id                   String        @id @default(cuid())
@@ -302,8 +365,8 @@ model Vulnerability {
   narrative            String        @db.Text
   impact               String        @db.Text
 
-  emulatorId String?
-  emulator   Emulator? @relation(fields: [emulatorId], references: [id], onDelete: SetNull)
+  deviceArtifactId String?
+  deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -345,15 +408,15 @@ model Issue {
 
 model Remediation {
   id            String      @id @default(cuid())
-  fixUri        String      @map("fix-uri")
-  deviceGroupId String
-  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
-  description   String      @db.Text
-  narrative     String      @db.Text
-  upstreamApi   String      @map("upstream-api")
+  artifacts ArtifactWrapper[]
 
-  vulnerabilityId String
-  vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
+  affectedDeviceGroups DeviceGroup[] @relation("RemediationDeviceGroups")
+  description   String?      @db.Text
+  narrative     String?      @db.Text
+  upstreamApi   String?      @map("upstream-api")
+
+  vulnerabilityId String?
+  vulnerability   Vulnerability? @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -361,7 +424,6 @@ model Remediation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([deviceGroupId])
   @@index([vulnerabilityId])
   @@index([userId])
   @@map("remediation")

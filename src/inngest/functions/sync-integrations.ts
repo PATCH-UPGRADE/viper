@@ -1,6 +1,11 @@
 import "server-only";
 import { z } from "zod";
 import { integrationAssetInputSchema } from "@/features/assets/server/routers";
+import {
+  basicAuthSchema,
+  bearerAuthSchema,
+  headerAuthSchema,
+} from "@/features/integrations/types";
 import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/server/routers";
 import type { Integration, ResourceType } from "@/generated/prisma";
 import { SyncStatusEnum } from "@/generated/prisma";
@@ -164,20 +169,26 @@ async function syncPartnerIntegration(
 
   if (integration.authType === "Basic") {
     // TODO: authentication needs to be encrypted/protected somehow
-    const { username, password } = integration.authentication as {
-      username: string;
-      password: string;
-    };
+    const parsed = basicAuthSchema.safeParse(integration.authentication);
+    if (!parsed.success) {
+      throw new Error("Invalid Basic auth configuration");
+    }
+    const { username, password } = parsed.data;
     const token = Buffer.from(`${username}:${password}`).toString("base64");
     headers.Authorization = `Basic ${token}`;
   } else if (integration.authType === "Bearer") {
-    const { token } = integration.authentication as { token: string };
+    const parsed = bearerAuthSchema.safeParse(integration.authentication);
+    if (!parsed.success) {
+      throw new Error("Invalid Bearer auth configuration");
+    }
+    const { token } = parsed.data;
     headers.Authorization = `Bearer ${token}`;
   } else if (integration.authType === "Header") {
-    const { header, value } = integration.authentication as {
-      header: string;
-      value: string;
-    };
+    const parsed = headerAuthSchema.safeParse(integration.authentication);
+    if (!parsed.success) {
+      throw new Error("Invalid Header auth configuration");
+    }
+    const { header, value } = parsed.data;
     headers[header] = value;
   }
 
@@ -189,7 +200,7 @@ async function syncPartnerIntegration(
       last_sync: "TODO", // TODO: VW-36
       page: 1,
       pageSize: 500,
-      webhook_url: `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}/api/v1/assets/integrationUpload`,
+      webhook_url: `${getBaseUrl()}/api/v1/assets/integrationUpload`,
     }),
   });
 

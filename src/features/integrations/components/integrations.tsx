@@ -48,13 +48,13 @@ import {
   type Integration,
   type ResourceType,
 } from "@/generated/prisma";
-import { inngest } from "@/inngest/client";
 import { usePaginationParams } from "@/lib/pagination";
 import {
   useCreateIntegration,
   useRemoveIntegration,
   useRotateIntegration,
   useSuspenseIntegrations,
+  useTriggerSync,
   useUpdateIntegration,
 } from "../hooks/use-integrations";
 import {
@@ -511,6 +511,7 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
 
   const updateIntegration = useUpdateIntegration();
   const rotateIntegration = useRotateIntegration();
+  const triggerSync = useTriggerSync();
   const [open, setOpen] = useState(false);
   const [rotateOpen, setRotateOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -547,13 +548,7 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
 
   const handleSync = async () => {
     try {
-      await inngest.send({
-        name: "integration/sync.requested",
-        data: {
-          integrationId: data.id,
-        },
-      });
-      toast.success("Integration sync started successfully!");
+      await triggerSync.mutateAsync({ id: data.id });
     } catch (error) {
       toast.error("Failed to trigger sync");
       console.error(error);

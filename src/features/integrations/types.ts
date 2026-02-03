@@ -1,16 +1,16 @@
 import { z } from "zod";
 import { safeUrlSchema } from "@/lib/schemas";
 
-const basicAuthSchema = z.object({
+export const basicAuthSchema = z.object({
   username: z.string(),
   password: z.string(),
 });
 
-const bearerAuthSchema = z.object({
+export const bearerAuthSchema = z.object({
   token: z.string(),
 });
 
-const headerAuthSchema = z.object({
+export const headerAuthSchema = z.object({
   header: z.string(),
   value: z.string(),
 });

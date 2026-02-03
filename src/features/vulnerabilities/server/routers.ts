@@ -234,21 +234,11 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const uniqueCpes = [...new Set(cpes)];
       const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
 
-      const assetIds: Record<string, { assetId: string }> = {};
-      for (const dg of deviceGroups) {
-        for (const asset of dg.assets) {
-          assetIds[asset.id] = { assetId: asset.id };
-        }
-      }
-
       return prisma.vulnerability.create({
         data: {
           ...dataInput,
           affectedDeviceGroups: {
             connect: deviceGroups.map((dg) => ({ id: dg.id })),
-          },
-          issues: {
-            create: Object.values(assetIds),
           },
           userId: ctx.auth.user.id,
         },

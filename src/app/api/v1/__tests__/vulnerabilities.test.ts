@@ -22,6 +22,13 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     impact: "High",
   };
 
+  const assetPayload = {
+    ip: "192.168.1.100",
+    cpe: generateCPE("vuln_v1"),
+    role: "Primary Server",
+    upstreamApi: "https://api.hospital-upstream.com/v1",
+  };
+
   const mockIntegrationPayload = {
     name: "mockVulnIntegration",
     platform: "mockIntegrationPlatform",

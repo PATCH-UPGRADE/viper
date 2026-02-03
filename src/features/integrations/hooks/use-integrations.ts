@@ -116,3 +116,20 @@ export const useRotateIntegration = () => {
     }),
   );
 };
+
+export const useTriggerSync = () => {
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.integrations.triggerSync.mutationOptions({
+      onSuccess: (data) => {
+        toast.success("Successfully triggered integration syncrhonization");
+        return data;
+      },
+      onError: (error) => {
+        console.error(error);
+        toast.error(`Failed to trigger syncrhonization`);
+      },
+    }),
+  );
+};

@@ -1,5 +1,5 @@
 import { hashPassword } from "better-auth/crypto";
-import type { AssetStatus } from "@/generated/prisma";
+import type { AssetStatus, ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
 // Seed user credentials
@@ -707,8 +707,8 @@ const SAMPLE_VULNERABILITIES = [
   },
 ];
 
-// Sample emulator data (for asset emulation)
-const SAMPLE_EMULATORS = [
+// Sample device artifact data (formerly emulators)
+const SAMPLE_DEVICE_ARTIFACTS = [
   {
     role: "Philips IntelliVue MP70 Monitor Emulator",
     cpe: "cpe:2.3:h:philips:intellivue_mp70:*:*:*:*:*:*:*:*",
@@ -868,9 +868,12 @@ async function clearDatabase() {
   await prisma.issue.deleteMany();
   await prisma.syncStatus.deleteMany();
   await prisma.externalAssetMapping.deleteMany();
+  await prisma.externalVulnerabilityMapping.deleteMany();
+  await prisma.artifact.deleteMany();
+  await prisma.artifactWrapper.deleteMany();
   await prisma.remediation.deleteMany();
   await prisma.vulnerability.deleteMany();
-  await prisma.emulator.deleteMany();
+  await prisma.deviceArtifact.deleteMany();
   await prisma.deviceGroupHistory.deleteMany();
   await prisma.asset.deleteMany();
   await prisma.deviceGroup.deleteMany();
@@ -1004,6 +1007,88 @@ async function seedVulnerabilities(userId: string) {
   return successfulVulnerabilities;
 }
 
+async function seedDeviceArtifacts(userId: string) {
+  console.log("\n🌱 Seeding device artifacts...");
+
+  const deviceArtifacts = await Promise.all(
+    SAMPLE_DEVICE_ARTIFACTS.map(async (deviceArtifact) => {
+      const deviceGroup = await prisma.deviceGroup.findFirst({
+        where: { cpe: deviceArtifact.cpe },
+      });
+
+      if (!deviceGroup) {
+        console.warn(`⚠️  No device group found for CPE: ${deviceArtifact.cpe}`);
+        return null;
+      }
+
+      // Create the DeviceArtifact
+      const createdDeviceArtifact = await prisma.deviceArtifact.create({
+        data: {
+          role: deviceArtifact.role,
+          description: deviceArtifact.description,
+          deviceGroupId: deviceGroup.id,
+          userId,
+        },
+      });
+
+      // Create ArtifactWrapper for this device artifact
+      const wrapper = await prisma.artifactWrapper.create({
+        data: {
+          deviceArtifactId: createdDeviceArtifact.id,
+          userId,
+        },
+      });
+
+      // Create artifacts for dockerUrl and downloadUrl if they exist
+      const artifacts = [];
+      
+      if (deviceArtifact.dockerUrl) {
+        const dockerArtifact = await prisma.artifact.create({
+          data: {
+            wrapperId: wrapper.id,
+            name: "Docker Image",
+            artifactType: "Emulator" as ArtifactType,
+            downloadUrl: deviceArtifact.dockerUrl,
+            versionNumber: 1,
+            userId,
+          },
+        });
+        artifacts.push(dockerArtifact);
+      }
+
+      if (deviceArtifact.downloadUrl) {
+        const downloadArtifact = await prisma.artifact.create({
+          data: {
+            wrapperId: wrapper.id,
+            name: "Download",
+            artifactType: "Emulator" as ArtifactType,
+            downloadUrl: deviceArtifact.downloadUrl,
+            versionNumber: 1,
+            userId,
+          },
+        });
+        artifacts.push(downloadArtifact);
+      }
+
+      // Set the latest artifact if we created any
+      if (artifacts.length > 0) {
+        await prisma.artifactWrapper.update({
+          where: { id: wrapper.id },
+          data: {
+            latestArtifactId: artifacts[artifacts.length - 1].id,
+          },
+        });
+      }
+
+      return createdDeviceArtifact;
+    }),
+  );
+
+  const successfulDeviceArtifacts = deviceArtifacts.filter((da) => da !== null);
+  console.log(`✅ Seeded ${successfulDeviceArtifacts.length} device artifacts`);
+  return successfulDeviceArtifacts;
+}
+
 async function seedRemediations(userId: string) {
   console.log("\n🌱 Seeding remediations...");
 
@@ -1031,55 +1116,55 @@ async function seedRemediations(userId: string) {
         return null;
       }
 
-      return prisma.remediation.create({
+      // Create the Remediation with affectedDeviceGroups and vulnerability
+      const createdRemediation = await prisma.remediation.create({
         data: {
-          fixUri: remediation.fixUri,
-          deviceGroupId: deviceGroup.id,
           description: remediation.description,
           narrative: remediation.narrative,
           upstreamApi: remediation.upstreamApi,
           vulnerabilityId: vulnerability.id,
           userId,
+          affectedDeviceGroups: {
+            connect: { id: deviceGroup.id },
+          },
         },
       });
+
+      // Create ArtifactWrapper for this remediation
+      const wrapper = await prisma.artifactWrapper.create({
+        data: {
+          remediationId: createdRemediation.id,
+          userId,
+        },
+      });
+
+      // Create artifact for the fixUri
+      const fixArtifact = await prisma.artifact.create({
+        data: {
+          wrapperId: wrapper.id,
+          name: "Fix",
+          artifactType: "Emulator" as ArtifactType,
+          downloadUrl: remediation.fixUri,
+          versionNumber: 1,
+          userId,
+        },
+      });
+
+      // Set as latest artifact
+      await prisma.artifactWrapper.update({
+        where: { id: wrapper.id },
+        data: {
+          latestArtifactId: fixArtifact.id,
+        },
+      });
+
+      return createdRemediation;
     }),
   );
 
   const successfulRemediations = remediations.filter((r) => r !== null);
   console.log(`✅ Seeded ${successfulRemediations.length} remediations`);
   return successfulRemediations;
-}
-
-async function seedEmulators(userId: string) {
-  console.log("\n🌱 Seeding emulators...");
-
-  const emulators = await Promise.all(
-    SAMPLE_EMULATORS.map(async (emulator) => {
-      const deviceGroup = await prisma.deviceGroup.findFirst({
-        where: { cpe: emulator.cpe },
-      });
-
-      if (!deviceGroup) {
-        console.warn(`⚠️  No device group found for CPE: ${emulator.cpe}`);
-        return null;
-      }
-
-      return prisma.emulator.create({
-        data: {
-          role: emulator.role,
-          downloadUrl: emulator.downloadUrl || null,
-          dockerUrl: emulator.dockerUrl || null,
-          description: emulator.description,
-          deviceGroupId: deviceGroup.id,
-          userId,
-        },
-      });
-    }),
-  );
-
-  const successfulEmulators = emulators.filter((e) => e !== null);
-  console.log(`✅ Seeded ${successfulEmulators.length} emulators`);
-  return successfulEmulators;
 }
 
 async function seedIssues() {
@@ -1138,8 +1223,8 @@ async function main() {
     await seedDeviceGroups();
     await seedAssets(user.id);
     await seedVulnerabilities(user.id);
+    await seedDeviceArtifacts(user.id);
     await seedRemediations(user.id);
-    await seedEmulators(user.id);
     await seedIssues();
 
     console.log("\n✅ Database seeding completed successfully!");

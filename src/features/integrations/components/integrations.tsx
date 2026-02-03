@@ -547,12 +547,7 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
   };
 
   const handleSync = async () => {
-    try {
-      await triggerSync.mutateAsync({ id: data.id });
-    } catch (error) {
-      toast.error("Failed to trigger sync");
-      console.error(error);
-    }
+    await triggerSync.mutateAsync({ id: data.id });
   };
 
   const handleRotate = () => {
@@ -580,7 +575,9 @@ export const IntegrationItem = ({ data }: { data: Integration }) => {
             <span>{data.integrationUri}</span>
           </div>
           <p>{JSON.stringify(data)}</p>
-          <Button onClick={handleSync}>Sync Now</Button>
+          <Button onClick={handleSync} disabled={triggerSync.isPending}>
+            {triggerSync.isPending ? "Syncing..." : "Sync Now"}
+          </Button>
         </div>
         <Button
           size="sm"

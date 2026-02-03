@@ -76,18 +76,12 @@ const getResponseConfig = (resourceType: ResourceType) => {
         path: "/vulnerabilities/integrationUpload",
         schema: z.toJSONSchema(integrationVulnerabilityInputSchema),
       };
+    // TODO
     case "Emulator":
-      return {
-        // TODO later
-        path: "TODO",
-        schema: z.toJSONSchema(z.any()),
-      };
     case "Remediation":
-      return {
-        // TODO later
-        path: "TODO",
-        schema: z.toJSONSchema(z.any()),
-      };
+      throw new Error(`ResourceType ${resourceType} is not supported yet`);
+    default:
+      throw new Error(`Unhandled ResourceType: ${resourceType}`);
   }
 };
 
@@ -192,6 +186,8 @@ async function syncPartnerIntegration(
     headers[header] = value;
   }
 
+  const { path: responsePath } = getResponseConfig(integration.resourceType);
+
   const response = await fetch(integration.integrationUri, {
     method: "POST",
     headers,
@@ -200,7 +196,7 @@ async function syncPartnerIntegration(
       last_sync: "TODO", // TODO: VW-36
       page: 1,
       pageSize: 500,
-      webhook_url: `${getBaseUrl()}/api/v1/assets/integrationUpload`,
+      webhook_url: `${getBaseUrl()}/api/v1${responsePath}`,
     }),
   });
 

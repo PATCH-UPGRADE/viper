@@ -319,8 +319,9 @@ export const vulnerabilitiesRouter = createTRPCRouter({
           model: prisma.vulnerability,
           mappingModel: prisma.externalVulnerabilityMapping,
           transformInputItem: async (item, userId) => {
-            const { cpes, vendorId, ...itemData } = item;
-            const deviceGroups = await cpesToDeviceGroups(cpes);
+            const { cpes, vendorId: _vendorId, ...itemData } = item;
+            const uniqueCpes = [...new Set(cpes)];
+            const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
 
             return {
               createData: {

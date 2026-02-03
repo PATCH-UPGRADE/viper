@@ -123,12 +123,12 @@ export const useTriggerSync = () => {
   return useMutation(
     trpc.integrations.triggerSync.mutationOptions({
       onSuccess: (data) => {
-        toast.success("Successfully triggered integration syncrhonization");
+        toast.success("Successfully triggered synchronization");
         return data;
       },
       onError: (error) => {
         console.error(error);
-        toast.error(`Failed to trigger syncrhonization`);
+        toast.error(`Failed to trigger synchronization`);
       },
     }),
   );

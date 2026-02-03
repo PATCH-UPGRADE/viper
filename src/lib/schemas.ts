@@ -35,7 +35,7 @@ export const deviceGroupWithUrlsSchema = deviceGroupSchema.extend({
   url: z.string(),
   sbomUrl: z.string().nullable(), // TODO: VW-54
   vulnerabilitiesUrl: z.string(),
-  emulatorsUrl: z.string(),
+  deviceArtifactsUrl: z.string(),
   assetsUrl: z.string(),
 });
 export type DeviceGroupWithUrls = z.infer<typeof deviceGroupWithUrlsSchema>;
@@ -57,7 +57,7 @@ export const deviceGroupSelect = {
     sbomUrl: true,
     vulnerabilitiesUrl: true,
     assetsUrl: true,
-    emulatorsUrl: true,
+    deviceArtifactsUrl: true,
   },
 } as const;
 

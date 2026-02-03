@@ -25,23 +25,23 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
-import type { Emulator } from "@/generated/prisma";
+import type { DeviceArtifact } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { DeviceGroupIncludeType, UserIncludeType } from "@/lib/schemas";
 import {
-  useRemoveEmulator,
-  useSuspenseEmulators,
-} from "../hooks/use-emulators";
-import { useEmulatorsParams } from "../hooks/use-emulators-params";
+  useRemoveDeviceArtifact,
+  useSuspenseDeviceArtifacts,
+} from "../hooks/use-device-artifacts";
+import { useDeviceArtifactsParams } from "../hooks/use-device-artifacts-params";
 
-type EmulatorWithRelations = Omit<Emulator, "deviceGroupId"> & {
+type DeviceArtifactWithRelations = Omit<DeviceArtifact, "deviceGroupId"> & {
   deviceGroup: DeviceGroupIncludeType;
   user: UserIncludeType;
 };
 
-export const EmulatorsSearch = () => {
-  const [params, setParams] = useEmulatorsParams();
+export const DeviceArtifactsSearch = () => {
+  const [params, setParams] = useDeviceArtifactsParams();
   const { searchValue, onSearchChange } = useEntitySearch({
     params,
     setParams,
@@ -51,84 +51,84 @@ export const EmulatorsSearch = () => {
     <EntitySearch
       value={searchValue}
       onChange={onSearchChange}
-      placeholder="Search emulators"
+      placeholder="Search device artifacts"
     />
   );
 };
 
-export const EmulatorsList = () => {
-  const emulators = useSuspenseEmulators();
+export const DeviceArtifactsList = () => {
+  const deviceArtifacts = useSuspenseDeviceArtifacts();
 
   return (
     <EntityList
-      items={emulators.data.items}
-      getKey={(emulator) => emulator.id}
-      renderItem={(emulator) => <EmulatorItem data={emulator} />}
-      emptyView={<EmulatorsEmpty />}
+      items={deviceArtifacts.data.items}
+      getKey={(deviceArtifact) => deviceArtifact.id}
+      renderItem={(deviceArtifact) => <DeviceArtifactItem data={deviceArtifact} />}
+      emptyView={<DeviceArtifactsEmpty />}
     />
   );
 };
 
-export const EmulatorsHeader = ({ disabled }: { disabled?: boolean }) => {
+export const DeviceArtifactsHeader = ({ disabled }: { disabled?: boolean }) => {
   return (
     <EntityHeader
-      title="Emulators"
-      description="Manage device emulators for security testing and training"
-      newButtonLabel="New emulator"
+      title="Device Artifacts"
+      description="Manage device artifacts for security testing and training"
+      newButtonLabel="New device artifact"
       disabled={disabled}
     />
   );
 };
 
-export const EmulatorsPagination = () => {
-  const emulators = useSuspenseEmulators();
-  const [params, setParams] = useEmulatorsParams();
+export const DeviceArtifactsPagination = () => {
+  const deviceArtifacts = useSuspenseDeviceArtifacts();
+  const [params, setParams] = useDeviceArtifactsParams();
 
   return (
     <EntityPagination
-      disabled={emulators.isFetching}
-      totalPages={emulators.data.totalPages}
-      page={emulators.data.page}
+      disabled={deviceArtifacts.isFetching}
+      totalPages={deviceArtifacts.data.totalPages}
+      page={deviceArtifacts.data.page}
       onPageChange={(page) => setParams({ ...params, page })}
     />
   );
 };
 
-export const EmulatorsContainer = ({
+export const DeviceArtifactsContainer = ({
   children,
 }: {
   children: React.ReactNode;
 }) => {
   return (
     <EntityContainer
-      header={<EmulatorsHeader />}
-      search={<EmulatorsSearch />}
-      pagination={<EmulatorsPagination />}
+      header={<DeviceArtifactsHeader />}
+      search={<DeviceArtifactsSearch />}
+      pagination={<DeviceArtifactsPagination />}
     >
       {children}
     </EntityContainer>
   );
 };
 
-export const EmulatorsLoading = () => {
-  return <LoadingView message="Loading emulators..." />;
+export const DeviceArtifactsLoading = () => {
+  return <LoadingView message="Loading deviceArtifacts..." />;
 };
 
-export const EmulatorsError = () => {
-  return <ErrorView message="Error loading emulators" />;
+export const DeviceArtifactsError = () => {
+  return <ErrorView message="Error loading deviceArtifacts" />;
 };
 
-export const EmulatorsEmpty = () => {
+export const DeviceArtifactsEmpty = () => {
   return (
-    <EmptyView message="No emulators found. Emulators are typically seeded using the database seed script." />
+    <EmptyView message="No device artifacts found. Device artifacts are typically seeded using the database seed script." />
   );
 };
 
-export const EmulatorItem = ({ data }: { data: EmulatorWithRelations }) => {
-  const removeEmulator = useRemoveEmulator();
+export const DeviceArtifactItem = ({ data }: { data: DeviceArtifactWithRelations }) => {
+  const removeDeviceArtifact = useRemoveDeviceArtifact();
 
   const handleRemove = () => {
-    removeEmulator.mutate({ id: data.id });
+    removeDeviceArtifact.mutate({ id: data.id });
   };
 
   // Determine distribution type
@@ -142,7 +142,7 @@ export const EmulatorItem = ({ data }: { data: EmulatorWithRelations }) => {
         <DistIcon className="size-5 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
-        <EmulatorDrawer emulator={data} />
+        <DeviceArtifactDrawer deviceArtifact={data} />
         <div className="text-xs text-muted-foreground mt-1">
           {distributionType} &bull; {data.deviceGroup.cpe} &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
@@ -152,15 +152,15 @@ export const EmulatorItem = ({ data }: { data: EmulatorWithRelations }) => {
         variant="ghost"
         size="sm"
         onClick={handleRemove}
-        disabled={removeEmulator.isPending}
+        disabled={removeDeviceArtifact.isPending}
       >
-        {removeEmulator.isPending ? "Removing..." : "Remove"}
+        {removeDeviceArtifact.isPending ? "Removing..." : "Remove"}
       </Button>
     </div>
   );
 };
 
-function EmulatorDrawer({ emulator }: { emulator: EmulatorWithRelations }) {
+function DeviceArtifactDrawer({ deviceArtifact: deviceArtifact }: { deviceArtifact: DeviceArtifactWithRelations }) {
   const isMobile = useIsMobile();
 
   return (
@@ -170,15 +170,15 @@ function EmulatorDrawer({ emulator }: { emulator: EmulatorWithRelations }) {
           variant="link"
           className="text-foreground h-auto p-0 text-left font-medium"
         >
-          {emulator.role}
+          {deviceArtifact.role}
         </Button>
       </DrawerTrigger>
       <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
         <DrawerHeader className="gap-1">
-          <DrawerTitle>{emulator.role}</DrawerTitle>
+          <DrawerTitle>{deviceArtifact.role}</DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
             <Badge variant="outline">
-              {emulator.dockerUrl ? (
+              {deviceArtifact.dockerUrl ? (
                 <>
                   <PackageIcon className="size-3 mr-1" />
                   Docker Image
@@ -192,7 +192,7 @@ function EmulatorDrawer({ emulator }: { emulator: EmulatorWithRelations }) {
             </Badge>
             <span className="text-xs">
               Updated{" "}
-              {formatDistanceToNow(emulator.updatedAt, { addSuffix: true })}
+              {formatDistanceToNow(deviceArtifact.updatedAt, { addSuffix: true })}
             </span>
           </DrawerDescription>
         </DrawerHeader>
@@ -202,7 +202,7 @@ function EmulatorDrawer({ emulator }: { emulator: EmulatorWithRelations }) {
           <div className="flex flex-col gap-3">
             <h3 className="font-semibold">Description</h3>
             <p className="text-sm text-muted-foreground">
-              {emulator.description}
+              {deviceArtifact.description}
             </p>
           </div>
 
@@ -214,15 +214,15 @@ function EmulatorDrawer({ emulator }: { emulator: EmulatorWithRelations }) {
 
             <div>
               <div className="text-xs font-medium text-muted-foreground mb-1">
-                {emulator.dockerUrl ? "Docker Image" : "Download URL"}
+                {deviceArtifact.dockerUrl ? "Docker Image" : "Download URL"}
               </div>
               <a
-                href={emulator.dockerUrl || emulator.downloadUrl || "#"}
+                href={deviceArtifact.dockerUrl || deviceArtifact.downloadUrl || "#"}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
               >
-                {emulator.dockerUrl || emulator.downloadUrl}
+                {deviceArtifact.dockerUrl || deviceArtifact.downloadUrl}
                 <ExternalLinkIcon className="size-3 flex-shrink-0" />
               </a>
             </div>
@@ -240,7 +240,7 @@ function EmulatorDrawer({ emulator }: { emulator: EmulatorWithRelations }) {
                   CPE Identifier
                 </div>
                 <code className="text-xs bg-muted px-2 py-1 rounded break-all">
-                  {emulator.deviceGroup.cpe}
+                  {deviceArtifact.deviceGroup.cpe}
                 </code>
               </div>
             </div>
@@ -258,8 +258,8 @@ function EmulatorDrawer({ emulator }: { emulator: EmulatorWithRelations }) {
                   Created
                 </div>
                 <div className="text-xs">
-                  {formatDistanceToNow(emulator.createdAt, { addSuffix: true })}{" "}
-                  ({new Date(emulator.createdAt).toLocaleString()})
+                  {formatDistanceToNow(deviceArtifact.createdAt, { addSuffix: true })}{" "}
+                  ({new Date(deviceArtifact.createdAt).toLocaleString()})
                 </div>
               </div>
 
@@ -268,17 +268,17 @@ function EmulatorDrawer({ emulator }: { emulator: EmulatorWithRelations }) {
                   Last Updated
                 </div>
                 <div className="text-xs">
-                  {formatDistanceToNow(emulator.updatedAt, { addSuffix: true })}{" "}
-                  ({new Date(emulator.updatedAt).toLocaleString()})
+                  {formatDistanceToNow(deviceArtifact.updatedAt, { addSuffix: true })}{" "}
+                  ({new Date(deviceArtifact.updatedAt).toLocaleString()})
                 </div>
               </div>
 
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Emulator ID
+                  DeviceArtifact ID
                 </div>
                 <code className="text-xs bg-muted px-2 py-1 rounded">
-                  {emulator.id}
+                  {deviceArtifact.id}
                 </code>
               </div>
             </div>

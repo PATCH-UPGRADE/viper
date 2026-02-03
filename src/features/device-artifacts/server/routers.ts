@@ -16,51 +16,24 @@ import {
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
 
-// Validation schema with XOR constraint: exactly one of downloadUrl OR dockerUrl must be present
-const emulatorInputSchema = z
+const deviceArtifactInputSchema = z
   .object({
     role: z.string().min(1, "Role is required"),
     cpe: cpeSchema,
-    downloadUrl: safeUrlSchema.nullable().optional(),
-    dockerUrl: safeUrlSchema.nullable().optional(),
+    downloadUrl: safeUrlSchema,
     description: z.string().min(1, "Description is required"),
   })
-  .refine(
-    (data) => {
-      const hasDownloadUrl = !!data.downloadUrl;
-      const hasDockerUrl = !!data.dockerUrl;
-      // XOR: exactly one must be true
-      return hasDownloadUrl !== hasDockerUrl;
-    },
-    {
-      message:
-        "Exactly one of downloadUrl or dockerUrl must be provided (not both, not neither)",
-    },
-  );
 
-const emulatorUpdateSchema = z
+const deviceArtifactUpdateSchema = z
   .object({
     id: z.string(),
     role: z.string().min(1, "Role is required"),
-    downloadUrl: safeUrlSchema.nullable().optional(),
-    dockerUrl: safeUrlSchema.nullable().optional(),
+    downloadUrl: safeUrlSchema,
     description: z.string().min(1, "Description is required"),
     cpe: cpeSchema,
-  })
-  .refine(
-    (data) => {
-      const hasDownloadUrl = !!data.downloadUrl;
-      const hasDockerUrl = !!data.dockerUrl;
-      // XOR: exactly one must be true
-      return hasDownloadUrl !== hasDockerUrl;
-    },
-    {
-      message:
-        "Exactly one of downloadUrl or dockerUrl must be provided (not both, not neither)",
-    },
-  );
+  });
 
-const emulatorResponseSchema = z.object({
+const deviceArtifactResponseSchema = z.object({
   id: z.string(),
   role: z.string(),
   downloadUrl: z.string().nullable(),
@@ -71,13 +44,10 @@ const emulatorResponseSchema = z.object({
   updatedAt: z.date(),
   user: userSchema,
   deviceGroup: deviceGroupWithUrlsSchema,
-  helmSbomId: z.string().nullable(),
-  // TODO:: ^later, do not use helmSbomId externally (need internal API)
-  // i.e, do not put this in an external API that other TA performers might see
 });
 
-const paginatedEmulatorResponseSchema = createPaginatedResponseSchema(
-  emulatorResponseSchema,
+const paginateddeviceArtifactResponseSchema = createPaginatedResponseSchema(
+  deviceArtifactResponseSchema,
 );
 
 // TODO: do something DRY with `createSearchFilter` in other routers
@@ -98,39 +68,39 @@ const createSearchFilter = (search: string) => {
     : {};
 };
 
-const emulatorInclude = {
+const deviceArtifactInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
 };
 
-export const emulatorsRouter = createTRPCRouter({
-  // GET /api/emulators - List all emulators (any authenticated user can see all)
+export const deviceArtifactsRouter = createTRPCRouter({
+  // GET /api/deviceArtifacts - List all deviceArtifacts (any authenticated user can see all)
   getMany: protectedProcedure
     .input(paginationInputSchema)
     .meta({
       openapi: {
         method: "GET",
-        path: "/emulators",
-        tags: ["Emulators"],
-        summary: "List Emulators",
+        path: "/deviceArtifacts",
+        tags: ["deviceArtifacts"],
+        summary: "List deviceArtifacts",
         description:
-          "Get all emulators. Any authenticated user can view all emulators.",
+          "Get all deviceArtifacts. Any authenticated user can view all deviceArtifacts.",
       },
     })
-    .output(paginatedEmulatorResponseSchema)
+    .output(paginateddeviceArtifactResponseSchema)
     .query(async ({ input }) => {
       const { search } = input;
 
       // Build search filter across multiple fields
       const searchFilter = createSearchFilter(search);
 
-      return fetchPaginated(prisma.emulator, input, {
+      return fetchPaginated(prisma.deviceArtifact, input, {
         where: searchFilter,
-        include: emulatorInclude,
+        include: deviceArtifactInclude,
       });
     }),
 
-  // GET /api/deviceGroups/{deviceGroupId}/emulators - List emulators for a device group
+  // GET /api/deviceGroups/{deviceGroupId}/deviceArtifacts - List deviceArtifacts for a device group
   getManyByDeviceGroup: protectedProcedure
     .input(
       paginationInputSchema.extend({
@@ -140,14 +110,14 @@ export const emulatorsRouter = createTRPCRouter({
     .meta({
       openapi: {
         method: "GET",
-        path: "/deviceGroups/{deviceGroupId}/emulators",
-        tags: ["Emulators", "DeviceGroups"],
-        summary: "List Emulators by Device Group",
+        path: "/deviceGroups/{deviceGroupId}/deviceArtifacts",
+        tags: ["deviceArtifacts", "DeviceGroups"],
+        summary: "List deviceArtifacts by Device Group",
         description:
-          "Get all emulators affecting a specific device group. Any authenticated user can view all emulators.",
+          "Get all deviceArtifacts affecting a specific device group. Any authenticated user can view all deviceArtifacts.",
       },
     })
-    .output(paginatedEmulatorResponseSchema)
+    .output(paginateddeviceArtifactResponseSchema)
     .query(async ({ input }) => {
       const { search, deviceGroupId } = input;
       const searchFilter = createSearchFilter(search);
@@ -167,50 +137,50 @@ export const emulatorsRouter = createTRPCRouter({
               id: deviceGroupId,
             },
           };
-      return fetchPaginated(prisma.emulator, input, {
+      return fetchPaginated(prisma.deviceArtifact, input, {
         where: whereFilter,
-        include: emulatorInclude,
+        include: deviceArtifactInclude,
       });
     }),
 
-  // GET /api/emulators/{emulator_id} - Get single emulator (any authenticated user can access)
+  // GET /api/deviceArtifacts/{deviceArtifact_id} - Get single deviceArtifact (any authenticated user can access)
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .meta({
       openapi: {
         method: "GET",
-        path: "/emulators/{id}",
-        tags: ["Emulators"],
-        summary: "Get Emulator",
+        path: "/deviceArtifacts/{id}",
+        tags: ["deviceArtifacts"],
+        summary: "Get deviceArtifact",
         description:
-          "Get a single emulator by ID. Any authenticated user can view any emulator.",
+          "Get a single deviceArtifact by ID. Any authenticated user can view any deviceArtifact.",
       },
     })
-    .output(emulatorResponseSchema)
+    .output(deviceArtifactResponseSchema)
     .query(async ({ input }) => {
-      return prisma.emulator.findUniqueOrThrow({
+      return prisma.deviceArtifact.findUniqueOrThrow({
         where: { id: input.id },
-        include: emulatorInclude,
+        include: deviceArtifactInclude,
       });
     }),
 
-  // POST /api/emulators - Create emulator
+  // POST /api/deviceArtifacts - Create deviceArtifact
   create: protectedProcedure
-    .input(emulatorInputSchema)
+    .input(deviceArtifactInputSchema)
     .meta({
       openapi: {
         method: "POST",
-        path: "/emulators",
-        tags: ["Emulators"],
-        summary: "Create Emulator",
+        path: "/deviceArtifacts",
+        tags: ["deviceArtifacts"],
+        summary: "Create deviceArtifact",
         description:
-          "Create a new emulator. The authenticated user will be recorded as the creator. Exactly one of downloadUrl or dockerUrl must be provided.",
+          "Create a new deviceArtifact. The authenticated user will be recorded as the creator. Exactly one of downloadUrl or dockerUrl must be provided.",
       },
     })
-    .output(emulatorResponseSchema)
+    .output(deviceArtifactResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const deviceGroup = await cpeToDeviceGroup(input.cpe);
-      return prisma.emulator.create({
+      return prisma.deviceArtifact.create({
         data: {
           role: input.role,
           downloadUrl: input.downloadUrl || null,
@@ -219,64 +189,63 @@ export const emulatorsRouter = createTRPCRouter({
           deviceGroupId: deviceGroup.id,
           userId: ctx.auth.user.id,
         },
-        include: emulatorInclude,
+        include: deviceArtifactInclude,
       });
     }),
 
-  // DELETE /api/emulators/{emulator_id} - Delete emulator (only creator can delete)
+  // DELETE /api/deviceArtifacts/{deviceArtifact_id} - Delete deviceArtifact (only creator can delete)
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .meta({
       openapi: {
         method: "DELETE",
-        path: "/emulators/{id}",
-        tags: ["Emulators"],
-        summary: "Delete Emulator",
+        path: "/deviceArtifacts/{id}",
+        tags: ["deviceArtifacts"],
+        summary: "Delete deviceArtifact",
         description:
-          "Delete an emulator. Only the user who created the emulator can delete it.",
+          "Delete an deviceArtifact. Only the user who created the deviceArtifact can delete it.",
       },
     })
-    .output(emulatorResponseSchema)
+    .output(deviceArtifactResponseSchema)
     .mutation(async ({ ctx, input }) => {
       // Verify ownership
-      await requireOwnership(input.id, ctx.auth.user.id, "emulator");
+      await requireOwnership(input.id, ctx.auth.user.id, "deviceArtifact");
 
-      return prisma.emulator.delete({
+      return prisma.deviceArtifact.delete({
         where: { id: input.id },
-        include: emulatorInclude,
+        include: deviceArtifactInclude,
       });
     }),
 
-  // PUT /api/emulators/{emulator_id} - Update emulator (only creator can update)
+  // PUT /api/deviceArtifacts/{deviceArtifact_id} - Update deviceArtifact (only creator can update)
   update: protectedProcedure
-    .input(emulatorUpdateSchema)
+    .input(deviceArtifactUpdateSchema)
     .meta({
       openapi: {
         method: "PUT",
-        path: "/emulators/{id}",
-        tags: ["Emulators"],
-        summary: "Update Emulator",
+        path: "/deviceArtifacts/{id}",
+        tags: ["deviceArtifacts"],
+        summary: "Update deviceArtifact",
         description:
-          "Update an emulator. Only the user who created the emulator can update it. Exactly one of downloadUrl or dockerUrl must be provided.",
+          "Update an deviceArtifact. Only the user who created the deviceArtifact can update it. Exactly one of downloadUrl or dockerUrl must be provided.",
       },
     })
-    .output(emulatorResponseSchema)
+    .output(deviceArtifactResponseSchema)
     .mutation(async ({ ctx, input }) => {
       // Verify ownership
-      await requireOwnership(input.id, ctx.auth.user.id, "emulator");
+      await requireOwnership(input.id, ctx.auth.user.id, "deviceArtifact");
 
       const { id, cpe, ...updateData } = input;
       const deviceGroup = await cpeToDeviceGroup(cpe);
-      return prisma.emulator.update({
+      return prisma.deviceArtifact.update({
         where: { id },
         data: {
           role: updateData.role,
           deviceGroupId: deviceGroup.id,
           downloadUrl: updateData.downloadUrl || null,
-          dockerUrl: updateData.dockerUrl || null,
           description: updateData.description,
         },
-        include: emulatorInclude,
+        include: deviceArtifactInclude,
       });
     }),
 });

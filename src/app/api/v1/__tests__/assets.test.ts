@@ -206,7 +206,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(bodyFirst.deviceGroup).toHaveProperty("sbomUrl");
     expect(bodyFirst.deviceGroup).toHaveProperty("vulnerabilitiesUrl");
     expect(bodyFirst.deviceGroup).toHaveProperty("assetsUrl");
-    expect(bodyFirst.deviceGroup).toHaveProperty("emulatorsUrl");
+    expect(bodyFirst.deviceGroup).toHaveProperty("deviceArtifactsUrl");
     expect(bodyFirst.role).toBe(payload.role);
     expect(bodyFirst.upstreamApi).toBe(payload.upstreamApi);
 

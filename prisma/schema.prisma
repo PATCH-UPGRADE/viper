@@ -523,6 +523,6 @@ enum AuthType {
 enum ResourceType {
   Asset
   Vulnerability
-  Emulator
+  DeviceArtifact
   Remediation
 }

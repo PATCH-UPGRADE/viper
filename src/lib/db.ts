@@ -80,10 +80,34 @@ const deviceGroupExtension = Prisma.defineExtension({
   },
 });
 
+// add more helper urls for artifacts 
+const artifactExtension = Prisma.defineExtension({
+  name: "artifactUrls",
+  result: {
+    artifactWrapper: {
+      allVersionsUrl: {
+        needs: { id: true },
+        compute(artifactWrapper) {
+          return `${getBaseUrl()}/api/v1/artifacts/versions/${artifactWrapper.id}`;
+        },
+      },
+    },
+    artifact: {
+      url: {
+        needs: { id: true },
+        compute(artifact) {
+          return `${getBaseUrl()}/api/v1/artifacts/${artifact.id}`;
+        },
+      },
+    },
+  },
+});
+
 // allows us to extend deviceGroup model wherever it gets used
 const createPrismaClient = () =>
   new PrismaClient()
     .$extends(deviceGroupExtension)
+    .$extends(artifactExtension)
     .$extends(vulnerabilityExtension);
 
 // see https://www.prisma.io/docs/guides/nextjs#26-set-up-prisma-client

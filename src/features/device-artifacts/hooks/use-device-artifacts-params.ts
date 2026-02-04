@@ -1,6 +1,6 @@
 import { useQueryStates } from "nuqs";
-import { deviceArtifactParams } from "../params";
+import { deviceArtifactsParams } from "../params";
 
 export const useDeviceArtifactsParams = () => {
-  return useQueryStates(deviceArtifactParams);
+  return useQueryStates(deviceArtifactsParams);
 };

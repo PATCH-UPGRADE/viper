@@ -6,6 +6,9 @@ import {
 } from "@/lib/pagination";
 import { cpeToDeviceGroup, fetchPaginated } from "@/lib/router-utils";
 import {
+    artifactWithUrlsSchema,
+    artifactWrapperSelect,
+  artifactWrapperWithUrlsSchema,
   cpeSchema,
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
@@ -15,6 +18,7 @@ import {
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
+import { ArtifactType } from "@/generated/prisma";
 
 const deviceArtifactInputSchema = z
   .object({
@@ -33,20 +37,43 @@ const deviceArtifactUpdateSchema = z
     cpe: cpeSchema,
   });
 
+/*const deviceArtifactInputSchema = z.object({
+  role: z.string().min(1, "Role is required"),
+  cpe: cpeSchema,
+  description: z.string().optional(),
+  upstreamApi: z.string().optional(),
+  // Initial artifact to create
+  artifact: z.object({
+    name: z.string().optional(),
+    artifactType: z.nativeEnum(ArtifactType),
+    downloadUrl: safeUrlSchema.optional(),
+    size: z.number().optional(),
+  }),
+});
+
+// Schema for adding a new artifact version
+const addArtifactVersionSchema = z.object({
+  deviceArtifactId: z.string(),
+  name: z.string().optional(),
+  artifactType: z.enum(ArtifactType),
+  downloadUrl: safeUrlSchema.optional(),
+  size: z.number().optional(),
+});*/
+
 const deviceArtifactResponseSchema = z.object({
   id: z.string(),
   role: z.string(),
-  downloadUrl: z.string().nullable(),
-  dockerUrl: z.string().nullable(),
-  description: z.string(),
-  userId: z.string(),
+  upstreamApi: z.string().nullable(),
+  description: z.string().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
   user: userSchema,
   deviceGroup: deviceGroupWithUrlsSchema,
+  artifacts: z.array(artifactWrapperWithUrlsSchema),
 });
+export type DeviceArtifactResponse = z.infer<typeof deviceArtifactResponseSchema>;
 
-const paginateddeviceArtifactResponseSchema = createPaginatedResponseSchema(
+const paginatedDeviceArtifactResponseSchema = createPaginatedResponseSchema(
   deviceArtifactResponseSchema,
 );
 
@@ -60,9 +87,24 @@ const createSearchFilter = (search: string) => {
             description: { contains: search, mode: "insensitive" as const },
           },
           {
-            downloadUrl: { contains: search, mode: "insensitive" as const },
+            artifacts: {
+              some: {
+                latestArtifact: {
+                  OR: [
+                    {
+                      name: { contains: search, mode: "insensitive" as const },
+                    },
+                    {
+                      downloadUrl: {
+                        contains: search,
+                        mode: "insensitive" as const,
+                      },
+                    },
+                  ],
+                },
+              },
+            },
           },
-          { dockerUrl: { contains: search, mode: "insensitive" as const } },
         ],
       }
     : {};
@@ -71,6 +113,23 @@ const createSearchFilter = (search: string) => {
 const deviceArtifactInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
+  artifacts: artifactWrapperSelect
+};
+
+// Helper function to transform Prisma result to response format
+const transformDeviceArtifact = (deviceArtifact: any):DeviceArtifactResponse => {
+  return {
+    ...deviceArtifact,
+    artifacts: deviceArtifact.artifacts
+      .map((wrapper: any) => {
+        const {_count:_ignoreMe, ...rest } = wrapper;
+        return {
+          ...rest,
+          versionsCount: wrapper._count.artifacts
+        };
+      })
+      .filter(Boolean),
+  };
 };
 
 export const deviceArtifactsRouter = createTRPCRouter({
@@ -81,23 +140,26 @@ export const deviceArtifactsRouter = createTRPCRouter({
       openapi: {
         method: "GET",
         path: "/deviceArtifacts",
-        tags: ["deviceArtifacts"],
-        summary: "List deviceArtifacts",
+        tags: ["DeviceArtifacts"],
+        summary: "List DeviceArtifacts",
         description:
           "Get all deviceArtifacts. Any authenticated user can view all deviceArtifacts.",
       },
     })
-    .output(paginateddeviceArtifactResponseSchema)
+    .output(paginatedDeviceArtifactResponseSchema)
     .query(async ({ input }) => {
       const { search } = input;
-
-      // Build search filter across multiple fields
       const searchFilter = createSearchFilter(search);
 
-      return fetchPaginated(prisma.deviceArtifact, input, {
+      const result = await fetchPaginated(prisma.deviceArtifact, input, {
         where: searchFilter,
         include: deviceArtifactInclude,
       });
+
+      return {
+        ...result,
+        items: result.items.map(transformDeviceArtifact),
+      };
     }),
 
   // GET /api/deviceGroups/{deviceGroupId}/deviceArtifacts - List deviceArtifacts for a device group
@@ -111,13 +173,13 @@ export const deviceArtifactsRouter = createTRPCRouter({
       openapi: {
         method: "GET",
         path: "/deviceGroups/{deviceGroupId}/deviceArtifacts",
-        tags: ["deviceArtifacts", "DeviceGroups"],
-        summary: "List deviceArtifacts by Device Group",
+        tags: ["DeviceArtifacts", "DeviceGroups"],
+        summary: "List DeviceArtifacts by Device Group",
         description:
-          "Get all deviceArtifacts affecting a specific device group. Any authenticated user can view all deviceArtifacts.",
+          "Get all DeviceArtifacts affecting a specific device group. Any authenticated user can view all deviceArtifacts.",
       },
     })
-    .output(paginateddeviceArtifactResponseSchema)
+    .output(paginatedDeviceArtifactResponseSchema)
     .query(async ({ input }) => {
       const { search, deviceGroupId } = input;
       const searchFilter = createSearchFilter(search);
@@ -137,10 +199,16 @@ export const deviceArtifactsRouter = createTRPCRouter({
               id: deviceGroupId,
             },
           };
-      return fetchPaginated(prisma.deviceArtifact, input, {
+
+      const result = await fetchPaginated(prisma.deviceArtifact, input, {
         where: whereFilter,
         include: deviceArtifactInclude,
       });
+
+      return {
+        ...result,
+        data: result.data.map(transformDeviceArtifact),
+      };
     }),
 
   // GET /api/deviceArtifacts/{deviceArtifact_id} - Get single deviceArtifact (any authenticated user can access)
@@ -150,20 +218,20 @@ export const deviceArtifactsRouter = createTRPCRouter({
       openapi: {
         method: "GET",
         path: "/deviceArtifacts/{id}",
-        tags: ["deviceArtifacts"],
-        summary: "Get deviceArtifact",
+        tags: ["DeviceArtifacts"],
+        summary: "Get DeviceArtifact",
         description:
-          "Get a single deviceArtifact by ID. Any authenticated user can view any deviceArtifact.",
+          "Get a single DeviceArtifact by ID. Any authenticated user can view any DeviceArtifact.",
       },
     })
     .output(deviceArtifactResponseSchema)
     .query(async ({ input }) => {
-      return prisma.deviceArtifact.findUniqueOrThrow({
+      const deviceArtifact = await prisma.deviceArtifact.findUniqueOrThrow({
         where: { id: input.id },
         include: deviceArtifactInclude,
       });
+      return transformDeviceArtifact(deviceArtifact);
     }),
-
   // POST /api/deviceArtifacts - Create deviceArtifact
   create: protectedProcedure
     .input(deviceArtifactInputSchema)
@@ -171,10 +239,10 @@ export const deviceArtifactsRouter = createTRPCRouter({
       openapi: {
         method: "POST",
         path: "/deviceArtifacts",
-        tags: ["deviceArtifacts"],
-        summary: "Create deviceArtifact",
+        tags: ["DeviceArtifacts"],
+        summary: "Create DeviceArtifact",
         description:
-          "Create a new deviceArtifact. The authenticated user will be recorded as the creator. Exactly one of downloadUrl or dockerUrl must be provided.",
+          "Create a new DeviceArtifact. The authenticated user will be recorded as the creator. Exactly one of downloadUrl or dockerUrl must be provided.",
       },
     })
     .output(deviceArtifactResponseSchema)
@@ -200,10 +268,10 @@ export const deviceArtifactsRouter = createTRPCRouter({
       openapi: {
         method: "DELETE",
         path: "/deviceArtifacts/{id}",
-        tags: ["deviceArtifacts"],
-        summary: "Delete deviceArtifact",
+        tags: ["DeviceArtifacts"],
+        summary: "Delete DeviceArtifact",
         description:
-          "Delete an deviceArtifact. Only the user who created the deviceArtifact can delete it.",
+          "Delete an DeviceArtifact. Only the user who created the DeviceArtifact can delete it.",
       },
     })
     .output(deviceArtifactResponseSchema)
@@ -224,10 +292,10 @@ export const deviceArtifactsRouter = createTRPCRouter({
       openapi: {
         method: "PUT",
         path: "/deviceArtifacts/{id}",
-        tags: ["deviceArtifacts"],
-        summary: "Update deviceArtifact",
+        tags: ["DeviceArtifacts"],
+        summary: "Update DeviceArtifact",
         description:
-          "Update an deviceArtifact. Only the user who created the deviceArtifact can update it. Exactly one of downloadUrl or dockerUrl must be provided.",
+          "Update an deviceArtifact. Only the user who created the DeviceArtifact can update it. Exactly one of downloadUrl or dockerUrl must be provided.",
       },
     })
     .output(deviceArtifactResponseSchema)

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createPaginatedResponseWithLinksSchema } from "./pagination";
+import { ArtifactType } from "@/generated/prisma";
 
 /**
  * Shared Zod schema for User responses
@@ -60,6 +61,51 @@ export const deviceGroupSelect = {
     deviceArtifactsUrl: true,
   },
 } as const;
+
+export const artifactWrapperSelect = {
+  select: {
+    id: true,
+    allVersionsUrl: true,
+    latestArtifact: {
+      select: {
+        id: true,
+        name: true,
+        artifactType: true,
+        downloadUrl: true,
+        size: true,
+        versionNumber: true,
+        createdAt: true,
+        updatedAt: true,
+        url: true,
+      },
+    },
+    _count: {
+      select: {
+        artifacts: true
+      }
+    }
+  },
+} as const;
+
+export const artifactWithUrlsSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  artifactType: z.enum(ArtifactType),
+  downloadUrl: z.string().nullable(),
+  size: z.number().nullable(),
+  versionNumber: z.number(), // maps to versionNumber
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  url: z.string(),
+});
+
+export const artifactWrapperWithUrlsSchema = z.object({
+  id: z.string(),
+  versionsCount: z.int(),
+  allVersionsUrl: z.string(),
+  latestArtifact: artifactWithUrlsSchema,
+});
+export type ArtifactWrapperWithUrls = z.infer<typeof artifactWrapperWithUrlsSchema>;
 
 /**
  * Reusable URL validator to prevent javascript: and other dangerous protocols

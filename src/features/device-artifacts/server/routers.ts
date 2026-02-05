@@ -6,8 +6,9 @@ import {
 } from "@/lib/pagination";
 import { cpeToDeviceGroup, fetchPaginated } from "@/lib/router-utils";
 import {
-    artifactWithUrlsSchema,
-    artifactWrapperSelect,
+  artifactInputSchema,
+  artifactWithUrlsSchema,
+  artifactWrapperSelect,
   artifactWrapperWithUrlsSchema,
   cpeSchema,
   deviceGroupSelect,
@@ -18,47 +19,24 @@ import {
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
-import { ArtifactType } from "@/generated/prisma";
 
-const deviceArtifactInputSchema = z
-  .object({
-    role: z.string().min(1, "Role is required"),
-    cpe: cpeSchema,
-    downloadUrl: safeUrlSchema,
-    description: z.string().min(1, "Description is required"),
-  })
-
-const deviceArtifactUpdateSchema = z
-  .object({
-    id: z.string(),
-    role: z.string().min(1, "Role is required"),
-    downloadUrl: safeUrlSchema,
-    description: z.string().min(1, "Description is required"),
-    cpe: cpeSchema,
-  });
-
-/*const deviceArtifactInputSchema = z.object({
-  role: z.string().min(1, "Role is required"),
+const deviceArtifactInputSchema = z.object({
   cpe: cpeSchema,
-  description: z.string().optional(),
-  upstreamApi: z.string().optional(),
-  // Initial artifact to create
-  artifact: z.object({
-    name: z.string().optional(),
-    artifactType: z.nativeEnum(ArtifactType),
-    downloadUrl: safeUrlSchema.optional(),
-    size: z.number().optional(),
-  }),
+  role: z.string().min(1, "Role is required"),
+  description: z.string().min(1, "Description is required"),
+  upstreamApi: safeUrlSchema.optional(),
+  artifacts: z
+    .array(artifactInputSchema)
+    .min(1, "at least one artifact is required"),
 });
 
-// Schema for adding a new artifact version
-const addArtifactVersionSchema = z.object({
-  deviceArtifactId: z.string(),
-  name: z.string().optional(),
-  artifactType: z.enum(ArtifactType),
-  downloadUrl: safeUrlSchema.optional(),
-  size: z.number().optional(),
-});*/
+const deviceArtifactUpdateSchema = z.object({
+  id: z.string(),
+  role: z.string().min(1, "Role is required").optional(),
+  description: z.string().optional(),
+  upstreamApi: z.string().optional(),
+  cpe: cpeSchema.optional(),
+});
 
 const deviceArtifactResponseSchema = z.object({
   id: z.string(),
@@ -71,7 +49,9 @@ const deviceArtifactResponseSchema = z.object({
   deviceGroup: deviceGroupWithUrlsSchema,
   artifacts: z.array(artifactWrapperWithUrlsSchema),
 });
-export type DeviceArtifactResponse = z.infer<typeof deviceArtifactResponseSchema>;
+export type DeviceArtifactResponse = z.infer<
+  typeof deviceArtifactResponseSchema
+>;
 
 const paginatedDeviceArtifactResponseSchema = createPaginatedResponseSchema(
   deviceArtifactResponseSchema,
@@ -113,19 +93,21 @@ const createSearchFilter = (search: string) => {
 const deviceArtifactInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
-  artifacts: artifactWrapperSelect
+  artifacts: artifactWrapperSelect,
 };
 
 // Helper function to transform Prisma result to response format
-const transformDeviceArtifact = (deviceArtifact: any):DeviceArtifactResponse => {
+const transformDeviceArtifact = (
+  deviceArtifact: any,
+): DeviceArtifactResponse => {
   return {
     ...deviceArtifact,
     artifacts: deviceArtifact.artifacts
       .map((wrapper: any) => {
-        const {_count:_ignoreMe, ...rest } = wrapper;
+        const { _count: _ignoreMe, ...rest } = wrapper;
         return {
           ...rest,
-          versionsCount: wrapper._count.artifacts
+          versionsCount: wrapper._count.artifacts,
         };
       })
       .filter(Boolean),
@@ -176,7 +158,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
         tags: ["DeviceArtifacts", "DeviceGroups"],
         summary: "List DeviceArtifacts by Device Group",
         description:
-          "Get all DeviceArtifacts affecting a specific device group. Any authenticated user can view all deviceArtifacts.",
+          "Get all DeviceArtifacts affecting a specific device group. Any authenticated user can view all DeviceArtifacts.",
       },
     })
     .output(paginatedDeviceArtifactResponseSchema)
@@ -207,7 +189,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
 
       return {
         ...result,
-        data: result.data.map(transformDeviceArtifact),
+        items: result.items.map(transformDeviceArtifact),
       };
     }),
 
@@ -232,6 +214,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
       });
       return transformDeviceArtifact(deviceArtifact);
     }),
+
   // POST /api/deviceArtifacts - Create deviceArtifact
   create: protectedProcedure
     .input(deviceArtifactInputSchema)
@@ -242,23 +225,65 @@ export const deviceArtifactsRouter = createTRPCRouter({
         tags: ["DeviceArtifacts"],
         summary: "Create DeviceArtifact",
         description:
-          "Create a new DeviceArtifact. The authenticated user will be recorded as the creator. Exactly one of downloadUrl or dockerUrl must be provided.",
+          "Create a new DeviceArtifact. The authenticated user will be recorded as the creator.",
       },
     })
     .output(deviceArtifactResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const deviceGroup = await cpeToDeviceGroup(input.cpe);
-      return prisma.deviceArtifact.create({
-        data: {
-          role: input.role,
-          downloadUrl: input.downloadUrl || null,
-          dockerUrl: input.dockerUrl || null,
-          description: input.description,
-          deviceGroupId: deviceGroup.id,
-          userId: ctx.auth.user.id,
-        },
-        include: deviceArtifactInclude,
+      const userId = ctx.auth.user.id;
+
+      // Create device artifact with wrappers and initial artifacts in a transaction
+      const result = await prisma.$transaction(async (tx) => {
+        // Create the device artifact
+        const deviceArtifact = await tx.deviceArtifact.create({
+          data: {
+            role: input.role,
+            description: input.description,
+            upstreamApi: input.upstreamApi || null,
+            deviceGroupId: deviceGroup.id,
+            userId,
+          },
+        });
+
+        // Create a wrapper and artifact for each input artifact
+        for (const artifactInput of input.artifacts) {
+          // Create artifact wrapper
+          const wrapper = await tx.artifactWrapper.create({
+            data: {
+              deviceArtifactId: deviceArtifact.id,
+              userId,
+            },
+          });
+
+          // Create initial artifact
+          const artifact = await tx.artifact.create({
+            data: {
+              wrapperId: wrapper.id,
+              name: artifactInput.name || null,
+              artifactType: artifactInput.artifactType,
+              downloadUrl: artifactInput.downloadUrl,
+              size: artifactInput.size || null,
+              versionNumber: 1,
+              userId,
+            },
+          });
+
+          // Update wrapper to point to this artifact as latest
+          await tx.artifactWrapper.update({
+            where: { id: wrapper.id },
+            data: { latestArtifactId: artifact.id },
+          });
+        }
+
+        // Fetch the complete device artifact with includes
+        return tx.deviceArtifact.findUniqueOrThrow({
+          where: { id: deviceArtifact.id },
+          include: deviceArtifactInclude,
+        });
       });
+
+      return transformDeviceArtifact(result);
     }),
 
   // DELETE /api/deviceArtifacts/{deviceArtifact_id} - Delete deviceArtifact (only creator can delete)
@@ -279,10 +304,12 @@ export const deviceArtifactsRouter = createTRPCRouter({
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "deviceArtifact");
 
-      return prisma.deviceArtifact.delete({
+      const deviceArtifact = await prisma.deviceArtifact.delete({
         where: { id: input.id },
         include: deviceArtifactInclude,
       });
+
+      return transformDeviceArtifact(deviceArtifact);
     }),
 
   // PUT /api/deviceArtifacts/{deviceArtifact_id} - Update deviceArtifact (only creator can update)
@@ -295,7 +322,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
         tags: ["DeviceArtifacts"],
         summary: "Update DeviceArtifact",
         description:
-          "Update an deviceArtifact. Only the user who created the DeviceArtifact can update it. Exactly one of downloadUrl or dockerUrl must be provided.",
+          "Update a DeviceArtifact. Only the user who created the DeviceArtifact can update it.",
       },
     })
     .output(deviceArtifactResponseSchema)
@@ -304,16 +331,33 @@ export const deviceArtifactsRouter = createTRPCRouter({
       await requireOwnership(input.id, ctx.auth.user.id, "deviceArtifact");
 
       const { id, cpe, ...updateData } = input;
-      const deviceGroup = await cpeToDeviceGroup(cpe);
-      return prisma.deviceArtifact.update({
+
+      // Prepare update data
+      const data: {
+        role?: string;
+        description?: string;
+        upstreamApi?: string;
+        deviceGroupId?: string;
+      } = {};
+
+      if (updateData.role !== undefined) data.role = updateData.role;
+      if (updateData.description !== undefined)
+        data.description = updateData.description;
+      if (updateData.upstreamApi !== undefined)
+        data.upstreamApi = updateData.upstreamApi;
+
+      // Handle CPE/device group update if provided
+      if (cpe) {
+        const deviceGroup = await cpeToDeviceGroup(cpe);
+        data.deviceGroupId = deviceGroup.id;
+      }
+
+      const deviceArtifact = await prisma.deviceArtifact.update({
         where: { id },
-        data: {
-          role: updateData.role,
-          deviceGroupId: deviceGroup.id,
-          downloadUrl: updateData.downloadUrl || null,
-          description: updateData.description,
-        },
+        data,
         include: deviceArtifactInclude,
       });
+
+      return transformDeviceArtifact(deviceArtifact);
     }),
 });

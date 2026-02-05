@@ -80,7 +80,7 @@ const deviceGroupExtension = Prisma.defineExtension({
   },
 });
 
-// add more helper urls for artifacts 
+// add more helper urls for artifacts
 const artifactExtension = Prisma.defineExtension({
   name: "artifactUrls",
   result: {

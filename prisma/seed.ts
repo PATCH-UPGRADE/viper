@@ -1041,7 +1041,7 @@ async function seedDeviceArtifacts(userId: string) {
 
       // Create artifacts for dockerUrl and downloadUrl if they exist
       const artifacts = [];
-      
+
       if (deviceArtifact.dockerUrl) {
         const dockerArtifact = await prisma.artifact.create({
           data: {

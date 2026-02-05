@@ -15,6 +15,35 @@ export const userSchema = z.object({
 export type UserIncludeType = z.infer<typeof userSchema>;
 
 /**
+ * Reusable URL validator to prevent javascript: and other dangerous protocols
+ * Only allows http, https, and git protocols
+ */
+export const safeUrlSchema = z
+  .string()
+  .url()
+  .refine(
+    (url) => {
+      try {
+        const protocol = new URL(url).protocol;
+        return (
+          protocol === "http:" || protocol === "https:" || protocol === "git:"
+        );
+      } catch {
+        return false;
+      }
+    },
+    { message: "Only http(s) and git URLs allowed" },
+  );
+
+/**
+ * CPE 2.3 format validator
+ * Validates Common Platform Enumeration strings
+ */
+export const cpeSchema = z
+  .string()
+  .regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format");
+
+/**
  * Shared user include/select pattern for Prisma queries
  * Use this consistently across all routers when including user relations
  */
@@ -81,11 +110,19 @@ export const artifactWrapperSelect = {
     },
     _count: {
       select: {
-        artifacts: true
-      }
-    }
+        artifacts: true,
+      },
+    },
   },
 } as const;
+
+export const artifactInputSchema = z.object({
+  name: z.string().optional(),
+  artifactType: z.enum(ArtifactType),
+  downloadUrl: safeUrlSchema,
+  // ^TODO: currently required, although we want to add file uploads. see VW-61
+  size: z.number().optional(),
+});
 
 export const artifactWithUrlsSchema = z.object({
   id: z.string(),
@@ -105,36 +142,9 @@ export const artifactWrapperWithUrlsSchema = z.object({
   allVersionsUrl: z.string(),
   latestArtifact: artifactWithUrlsSchema,
 });
-export type ArtifactWrapperWithUrls = z.infer<typeof artifactWrapperWithUrlsSchema>;
-
-/**
- * Reusable URL validator to prevent javascript: and other dangerous protocols
- * Only allows http, https, and git protocols
- */
-export const safeUrlSchema = z
-  .string()
-  .url()
-  .refine(
-    (url) => {
-      try {
-        const protocol = new URL(url).protocol;
-        return (
-          protocol === "http:" || protocol === "https:" || protocol === "git:"
-        );
-      } catch {
-        return false;
-      }
-    },
-    { message: "Only http(s) and git URLs allowed" },
-  );
-
-/**
- * CPE 2.3 format validator
- * Validates Common Platform Enumeration strings
- */
-export const cpeSchema = z
-  .string()
-  .regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format");
+export type ArtifactWrapperWithUrls = z.infer<
+  typeof artifactWrapperWithUrlsSchema
+>;
 
 export const integrationResponseSchema = z.object({
   message: z.string(),

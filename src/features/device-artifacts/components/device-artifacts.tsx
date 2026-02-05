@@ -28,16 +28,26 @@ import { Separator } from "@/components/ui/separator";
 import type { DeviceArtifact } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
-import type { DeviceGroupIncludeType, UserIncludeType } from "@/lib/schemas";
+import type {
+  ArtifactWrapperWithUrls,
+  DeviceGroupIncludeType,
+  UserIncludeType,
+} from "@/lib/schemas";
 import {
   useRemoveDeviceArtifact,
   useSuspenseDeviceArtifacts,
 } from "../hooks/use-device-artifacts";
 import { useDeviceArtifactsParams } from "../hooks/use-device-artifacts-params";
+import { DeviceArtifactResponse } from "../server/routers";
+import { formatFileSize } from "@/lib/utils";
 
-type DeviceArtifactWithRelations = Omit<DeviceArtifact, "deviceGroupId"> & {
+type DeviceArtifactWithRelations = Omit<
+  DeviceArtifact,
+  "deviceGroupId" | "userId"
+> & {
   deviceGroup: DeviceGroupIncludeType;
   user: UserIncludeType;
+  artifacts: ArtifactWrapperWithUrls[];
 };
 
 export const DeviceArtifactsSearch = () => {
@@ -58,12 +68,15 @@ export const DeviceArtifactsSearch = () => {
 
 export const DeviceArtifactsList = () => {
   const deviceArtifacts = useSuspenseDeviceArtifacts();
+  console.log(deviceArtifacts);
 
   return (
     <EntityList
       items={deviceArtifacts.data.items}
       getKey={(deviceArtifact) => deviceArtifact.id}
-      renderItem={(deviceArtifact) => <DeviceArtifactItem data={deviceArtifact} />}
+      renderItem={(deviceArtifact) => (
+        <DeviceArtifactItem data={deviceArtifact} />
+      )}
       emptyView={<DeviceArtifactsEmpty />}
     />
   );
@@ -124,27 +137,26 @@ export const DeviceArtifactsEmpty = () => {
   );
 };
 
-export const DeviceArtifactItem = ({ data }: { data: DeviceArtifactWithRelations }) => {
+export const DeviceArtifactItem = ({
+  data,
+}: {
+  data: DeviceArtifactResponse;
+}) => {
   const removeDeviceArtifact = useRemoveDeviceArtifact();
 
   const handleRemove = () => {
     removeDeviceArtifact.mutate({ id: data.id });
   };
 
-  // Determine distribution type
-  const distributionType = data.dockerUrl ? "Docker" : "Download";
-  const distributionIcon = data.dockerUrl ? PackageIcon : DownloadIcon;
-  const DistIcon = distributionIcon;
-
   return (
     <div className="flex items-center gap-3 p-4 border rounded-lg">
       <div className="size-8 flex items-center justify-center">
-        <DistIcon className="size-5 text-muted-foreground" />
+        <DownloadIcon className="size-5 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
         <DeviceArtifactDrawer deviceArtifact={data} />
         <div className="text-xs text-muted-foreground mt-1">
-          {distributionType} &bull; {data.deviceGroup.cpe} &bull; Updated{" "}
+          {data.deviceGroup.cpe} &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
         </div>
       </div>
@@ -160,7 +172,11 @@ export const DeviceArtifactItem = ({ data }: { data: DeviceArtifactWithRelations
   );
 };
 
-function DeviceArtifactDrawer({ deviceArtifact: deviceArtifact }: { deviceArtifact: DeviceArtifactWithRelations }) {
+function DeviceArtifactDrawer({
+  deviceArtifact,
+}: {
+  deviceArtifact: DeviceArtifactResponse;
+}) {
   const isMobile = useIsMobile();
 
   return (
@@ -170,29 +186,19 @@ function DeviceArtifactDrawer({ deviceArtifact: deviceArtifact }: { deviceArtifa
           variant="link"
           className="text-foreground h-auto p-0 text-left font-medium"
         >
-          {deviceArtifact.role}
+          {deviceArtifact.role || "Device Artifact"} &bull;{" "}
+          {`${deviceArtifact.artifacts.length} Artifact(s)`}
         </Button>
       </DrawerTrigger>
       <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
         <DrawerHeader className="gap-1">
           <DrawerTitle>{deviceArtifact.role}</DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
-            <Badge variant="outline">
-              {deviceArtifact.dockerUrl ? (
-                <>
-                  <PackageIcon className="size-3 mr-1" />
-                  Docker Image
-                </>
-              ) : (
-                <>
-                  <DownloadIcon className="size-3 mr-1" />
-                  VM Download
-                </>
-              )}
-            </Badge>
             <span className="text-xs">
               Updated{" "}
-              {formatDistanceToNow(deviceArtifact.updatedAt, { addSuffix: true })}
+              {formatDistanceToNow(deviceArtifact.updatedAt, {
+                addSuffix: true,
+              })}
             </span>
           </DrawerDescription>
         </DrawerHeader>
@@ -208,24 +214,50 @@ function DeviceArtifactDrawer({ deviceArtifact: deviceArtifact }: { deviceArtifa
 
           <Separator />
 
-          {/* Distribution */}
+          {/* Artifacts */}
           <div className="flex flex-col gap-3">
-            <h3 className="font-semibold">Distribution</h3>
+            <h3 className="font-semibold">Artifacts</h3>
 
-            <div>
-              <div className="text-xs font-medium text-muted-foreground mb-1">
-                {deviceArtifact.dockerUrl ? "Docker Image" : "Download URL"}
+            {deviceArtifact.artifacts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No artifacts available
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {deviceArtifact.artifacts.map((artifact) => (
+                  <div key={artifact.id} className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {artifact.latestArtifact.name ||
+                          artifact.latestArtifact.artifactType}
+                      </span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">
+                        v{artifact.latestArtifact.versionNumber}
+                      </span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        {artifact.latestArtifact.artifactType}
+                      </span>
+                    </div>
+                    {artifact.latestArtifact.downloadUrl && (
+                      <a
+                        href={artifact.latestArtifact.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
+                      >
+                        {artifact.latestArtifact.downloadUrl}
+                        <ExternalLinkIcon className="size-3 flex-shrink-0" />
+                      </a>
+                    )}
+                    {artifact.latestArtifact.size && (
+                      <span className="text-xs text-muted-foreground">
+                        Size: {formatFileSize(artifact.latestArtifact.size)}
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
-              <a
-                href={deviceArtifact.dockerUrl || deviceArtifact.downloadUrl || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-              >
-                {deviceArtifact.dockerUrl || deviceArtifact.downloadUrl}
-                <ExternalLinkIcon className="size-3 flex-shrink-0" />
-              </a>
-            </div>
+            )}
           </div>
 
           <Separator />
@@ -258,7 +290,9 @@ function DeviceArtifactDrawer({ deviceArtifact: deviceArtifact }: { deviceArtifa
                   Created
                 </div>
                 <div className="text-xs">
-                  {formatDistanceToNow(deviceArtifact.createdAt, { addSuffix: true })}{" "}
+                  {formatDistanceToNow(deviceArtifact.createdAt, {
+                    addSuffix: true,
+                  })}{" "}
                   ({new Date(deviceArtifact.createdAt).toLocaleString()})
                 </div>
               </div>
@@ -268,7 +302,9 @@ function DeviceArtifactDrawer({ deviceArtifact: deviceArtifact }: { deviceArtifa
                   Last Updated
                 </div>
                 <div className="text-xs">
-                  {formatDistanceToNow(deviceArtifact.updatedAt, { addSuffix: true })}{" "}
+                  {formatDistanceToNow(deviceArtifact.updatedAt, {
+                    addSuffix: true,
+                  })}{" "}
                   ({new Date(deviceArtifact.updatedAt).toLocaleString()})
                 </div>
               </div>

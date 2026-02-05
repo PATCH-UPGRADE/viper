@@ -76,7 +76,9 @@ export const useUpdateDeviceArtifact = () => {
     trpc.deviceArtifacts.update.mutationOptions({
       onSuccess: (data) => {
         toast.success(`DeviceArtifact "${data.role}" updated`);
-        invalidateDeviceArtifactQueries(queryClient, trpc, { includeGetOne: true });
+        invalidateDeviceArtifactQueries(queryClient, trpc, {
+          includeGetOne: true,
+        });
       },
       onError: (error) => {
         toast.error(`Failed to update DeviceArtifact: ${error.message}`);
@@ -96,7 +98,9 @@ export const useRemoveDeviceArtifact = () => {
     trpc.deviceArtifacts.remove.mutationOptions({
       onSuccess: (data) => {
         toast.success(`DeviceArtifact "${data.role}" removed`);
-        invalidateDeviceArtifactQueries(queryClient, trpc, { includeGetOne: true });
+        invalidateDeviceArtifactQueries(queryClient, trpc, {
+          includeGetOne: true,
+        });
       },
       onError: (error) => {
         toast.error(`Failed to remove DeviceArtifact: ${error.message}`);

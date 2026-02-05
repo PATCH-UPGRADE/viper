@@ -1,9 +1,14 @@
+import z from "zod";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import z from "zod";
-import { paginatedWebhooksResponseSchema, webhookInputSchema, webhookResponseSchema, updateWebhookSchema } from "../types";
+import {
+  paginatedWebhooksResponseSchema,
+  updateWebhookSchema,
+  webhookInputSchema,
+  webhookResponseSchema,
+} from "../types";
 
 export const webhooksRouter = createTRPCRouter({
   // GET /api/webhooks - List all webhooks of the user
@@ -19,7 +24,7 @@ export const webhooksRouter = createTRPCRouter({
   create: protectedProcedure
     .input(webhookInputSchema)
     .output(webhookResponseSchema)
-    .query(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       return prisma.webhook.create({
         data: {
           ...input,
@@ -32,7 +37,7 @@ export const webhooksRouter = createTRPCRouter({
   update: protectedProcedure
     .input(updateWebhookSchema)
     .output(webhookResponseSchema)
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       const { id, ...updateData } = input;
       return prisma.webhook.update({
         where: { id },
@@ -47,9 +52,9 @@ export const webhooksRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return prisma.webhook.delete({
-        where: { 
+        where: {
           id: input.id,
-          userId: ctx.auth.user.id
+          userId: ctx.auth.user.id,
         },
       });
     }),

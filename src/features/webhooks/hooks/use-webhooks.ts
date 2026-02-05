@@ -1,14 +1,16 @@
-import { useTRPC } from "@/trpc/client";
-import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTRPC } from "@/trpc/client";
 
 // List webhooks
 export const useSuspenseWebhooks = () => {
   const trpc = useTRPC();
 
-  return useSuspenseQuery(
-    trpc.webhooks.getMany.queryOptions({}),
-  );
+  return useSuspenseQuery(trpc.webhooks.getMany.queryOptions({}));
 };
 
 // Create one new Webhook
@@ -20,9 +22,7 @@ export const useCreateWebhook = () => {
     trpc.webhooks.create.mutationOptions({
       onSuccess: (data) => {
         toast.success("Webhook created");
-        queryClient.invalidateQueries(
-          trpc.webhooks.getMany.queryOptions({}),
-        );
+        queryClient.invalidateQueries(trpc.webhooks.getMany.queryOptions({}));
         return data;
       },
       onError: (error) => {
@@ -42,9 +42,7 @@ export const useUpdateWebhook = () => {
     trpc.webhooks.update.mutationOptions({
       onSuccess: (data) => {
         toast.success("Webhook updated");
-        queryClient.invalidateQueries(
-          trpc.webhooks.getMany.queryOptions({}),
-        );
+        queryClient.invalidateQueries(trpc.webhooks.getMany.queryOptions({}));
         return data;
       },
       onError: (error) => {
@@ -63,9 +61,7 @@ export const useRemoveWebhook = () => {
     trpc.webhooks.remove.mutationOptions({
       onSuccess: (data) => {
         toast.success("Webhook removed");
-        queryClient.invalidateQueries(
-          trpc.webhooks.getMany.queryOptions({}),
-        );
+        queryClient.invalidateQueries(trpc.webhooks.getMany.queryOptions({}));
         return data;
       },
       onError: (error) => {

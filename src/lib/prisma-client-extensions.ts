@@ -1,5 +1,15 @@
-import { basicAuthSchema, bearerAuthSchema, headerAuthSchema } from "@/features/integrations/types";
-import { Prisma, Integration, Webhook, TriggerEnum, AuthType } from "@/generated/prisma";
+import {
+  basicAuthSchema,
+  bearerAuthSchema,
+  headerAuthSchema,
+} from "@/features/integrations/types";
+import {
+  AuthType,
+  type Integration,
+  Prisma,
+  TriggerEnum,
+  type Webhook,
+} from "@/generated/prisma";
 import prisma from "./db";
 import { getBaseUrl } from "./url-utils";
 
@@ -84,7 +94,7 @@ export const deviceGroupExtension = Prisma.defineExtension({
 
 // TODO: Make this DRY and accept union type IntegrationWithStringDates
 const parseAuthHeader = (itemWithAuth: Integration | Webhook) => {
-  if (itemWithAuth.authType === "Basic") {
+  if (itemWithAuth.authType === AuthType.Basic) {
     // TODO: authentication needs to be encrypted/protected somehow
     const parsed = basicAuthSchema.safeParse(itemWithAuth.authentication);
     if (!parsed.success) {
@@ -93,16 +103,14 @@ const parseAuthHeader = (itemWithAuth: Integration | Webhook) => {
     const { username, password } = parsed.data;
     const token = Buffer.from(`${username}:${password}`).toString("base64");
     return { key: "Authorization", value: `Basic ${token}` };
-
-  } else if (itemWithAuth.authType === "Bearer") {
+  } else if (itemWithAuth.authType === AuthType.Bearer) {
     const parsed = bearerAuthSchema.safeParse(itemWithAuth.authentication);
     if (!parsed.success) {
       throw new Error("Invalid Bearer auth configuration");
     }
     const { token } = parsed.data;
     return { key: "Authorization", value: `Bearer ${token}` };
-
-  } else if (itemWithAuth.authType === "Header") {
+  } else if (itemWithAuth.authType === AuthType.Header) {
     const parsed = headerAuthSchema.safeParse(itemWithAuth.authentication);
     if (!parsed.success) {
       throw new Error("Invalid Header auth configuration");
@@ -112,7 +120,7 @@ const parseAuthHeader = (itemWithAuth: Integration | Webhook) => {
   }
 
   throw new Error("Invalid auth configuration");
-}
+};
 
 const sendWebhooks = async (triggerType: TriggerEnum, timestamp: Date) => {
   const webhooks = await prisma.webhook.findMany();
@@ -136,14 +144,14 @@ const sendWebhooks = async (triggerType: TriggerEnum, timestamp: Date) => {
           body: JSON.stringify({
             event: triggerType.toString(),
             timestamp: timestamp.toISOString(),
-          })
+          }),
         });
 
         break;
       }
     }
   }
-}
+};
 
 export const sendWebhooksExtension = Prisma.defineExtension({
   name: "sendWebhooksOnDatabaseEvent",
@@ -152,7 +160,10 @@ export const sendWebhooksExtension = Prisma.defineExtension({
       async update({ args, query }) {
         const item = await query(args);
         console.log("updatedAt", item.updatedAt);
-        sendWebhooks(TriggerEnum.DeviceGroup_Updated, args.data.updatedAt as Date);
+        sendWebhooks(
+          TriggerEnum.DeviceGroup_Updated,
+          args.data.updatedAt as Date,
+        );
         return item;
       },
       async updateMany({ args, query }) {
@@ -164,13 +175,17 @@ export const sendWebhooksExtension = Prisma.defineExtension({
         const item = await query(args);
         console.log("upsert middleware", item);
         let type: TriggerEnum = TriggerEnum.DeviceGroup_Created;
-        if (item.createdAt && item.updatedAt && item.createdAt.getTime() === item.updatedAt.getTime()) {
+        if (
+          item.createdAt &&
+          item.updatedAt &&
+          item.createdAt.getTime() === item.updatedAt.getTime()
+        ) {
           type = TriggerEnum.DeviceGroup_Updated;
         }
         sendWebhooks(type, item.createdAt as Date);
         return item;
       },
-      async createMany({ args, query}) {
+      async createMany({ args, query }) {
         // NOTE: Prisma / PSQL createMany doesn't return a list of records for "createdAt" so create one here
         sendWebhooks(TriggerEnum.DeviceGroup_Created, new Date());
         return await query(args);
@@ -179,7 +194,7 @@ export const sendWebhooksExtension = Prisma.defineExtension({
         const item = await query(args);
         sendWebhooks(TriggerEnum.DeviceGroup_Created, item.createdAt as Date);
         return item;
-      }
+      },
     },
-  }
+  },
 });

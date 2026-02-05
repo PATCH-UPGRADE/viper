@@ -1,34 +1,46 @@
-import { TriggerEnum, AuthType } from "@/generated/prisma";
-import { createPaginatedResponseSchema } from "@/lib/pagination";
 import z from "zod";
+import { AuthType, TriggerEnum } from "@/generated/prisma";
+import { createPaginatedResponseSchema } from "@/lib/pagination";
 import { authenticationSchema } from "../integrations/types";
+
+const triggerEnumArray = z.array(z.enum(TriggerEnum));
 
 export const webhookInputSchema = z.object({
   name: z.string(),
   callbackUrl: z.string(),
-  triggers: z.array(z.enum(TriggerEnum)),
+  triggers: triggerEnumArray,
   authType: z.enum(AuthType),
   authentication: authenticationSchema.optional(),
-});
+  }).superRefine((value, ctx) => {
+    if (value.authType !== "None" && !value.authentication) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Authentication details are required for the selected auth type.",
+        path: ["authentication"],
+      });
+    }
+  });
 
 export const updateWebhookSchema = z.object({
   id: z.string(),
   name: z.string(),
   callbackUrl: z.string(),
-  triggers: z.array(z.enum(TriggerEnum)),
+  triggers: triggerEnumArray,
 });
 
 export const webhookResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   callbackUrl: z.string(),
-  triggers: z.array(z.enum(TriggerEnum)),
+  triggers: triggerEnumArray,
   authType: z.enum(AuthType),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
 
-export const paginatedWebhooksResponseSchema =
-  createPaginatedResponseSchema(webhookResponseSchema);
+export const paginatedWebhooksResponseSchema = createPaginatedResponseSchema(
+  webhookResponseSchema,
+);
 
 export type WebhookFormValues = z.infer<typeof webhookInputSchema>;

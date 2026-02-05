@@ -1,5 +1,9 @@
-import { Prisma, PrismaClient } from "@/generated/prisma";
-import { deviceGroupExtension, vulnerabilityExtension, sendWebhooksExtension } from "./prisma-client-extensions";
+import { type Prisma, PrismaClient } from "@/generated/prisma";
+import {
+  deviceGroupExtension,
+  sendWebhooksExtension,
+  vulnerabilityExtension,
+} from "./prisma-client-extensions";
 
 const createPrismaClient = () =>
   new PrismaClient()

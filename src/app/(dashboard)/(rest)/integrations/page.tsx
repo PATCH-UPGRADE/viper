@@ -111,7 +111,8 @@ const Page = async () => {
                 Webhooks
               </CardTitle>
               <CardDescription>
-                Setup Webhooks to receive automated notifications on data events.
+                Setup Webhooks to receive automated notifications on data
+                events.
               </CardDescription>
             </CardHeader>
             <CardContent className="text-xs text-muted-foreground">

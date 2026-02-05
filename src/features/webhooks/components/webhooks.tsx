@@ -3,7 +3,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type PropsWithChildren, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
-import { toast } from "sonner";
 import {
   EmptyView,
   EntityContainer,
@@ -17,8 +16,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -40,18 +37,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import type { AuthenticationInputType } from "@/features/integrations/types";
 import {
-  type Apikey,
-  AuthType,
-  type Webhook,
-} from "@/generated/prisma";
+  useCreateWebhook,
+  useRemoveWebhook,
+  useSuspenseWebhooks,
+  useUpdateWebhook,
+} from "@/features/webhooks/hooks/use-webhooks";
+import { AuthType, TriggerEnum, type Webhook } from "@/generated/prisma";
 import { usePaginationParams } from "@/lib/pagination";
-import { useCreateWebhook, useRemoveWebhook, useSuspenseWebhooks, useUpdateWebhook } from "@/features/webhooks/hooks/use-webhooks";
-import { webhookInputSchema, type WebhookFormValues } from "../types";
-import { AuthenticationInputType } from "@/features/integrations/types";
+import { type WebhookFormValues, webhookInputSchema } from "../types";
 
-export const WebhooksList = ({}: {}) => {
+const triggerDescriptions = {
+  [TriggerEnum.DeviceGroup_Created]: "When a Device Group is created",
+  [TriggerEnum.DeviceGroup_Updated]: "When a Device Group is updated",
+  [TriggerEnum.Artifact_Created]: "When a Artifact is created",
+  [TriggerEnum.Artifact_Updated]: "When a Artifact is updated",
+};
+
+export const WebhooksList = () => {
   const webhooks = useSuspenseWebhooks();
 
   return (
@@ -77,6 +81,25 @@ const WebhookCreateModal = ({
   setOpen: (open: boolean) => void;
   isUpdate?: boolean;
 }) => {
+  const onChangeTriggers = (newValue: string): TriggerEnum[] => {
+    const trigger = newValue as keyof typeof TriggerEnum;
+    if (!trigger) {
+      return form.getValues("triggers");
+    }
+
+    const newList = [...form.getValues("triggers")];
+    const index = newList.indexOf(trigger);
+
+    if (index !== -1) {
+      newList.splice(index, 1);
+    } else {
+      newList.push(trigger);
+    }
+
+    newList.sort();
+    return newList;
+  };
+
   const onSubmit = (values: WebhookFormValues) => {
     handleCreate(values);
   };
@@ -114,37 +137,15 @@ const WebhookCreateModal = ({
 
               <FormField
                 control={form.control}
-                name="platform"
+                name="callbackUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Platform (Optional)</FormLabel>
+                    <FormLabel>Callback URL</FormLabel>
                     <FormControl>
                       <Input
                         type="text"
-                        placeholder="Platform name"
+                        placeholder="https://example.com/api"
                         {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="syncEvery"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sync Interval (seconds)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="300"
-                        {...field}
-                        onChange={(e) => {
-                          const value = parseInt(e.target.value, 10);
-                          field.onChange(Number.isNaN(value) ? 300 : value);
-                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -276,6 +277,40 @@ const WebhookCreateModal = ({
                 </>
               )}
 
+              <FormField
+                control={form.control}
+                name="triggers"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Send a notification when:</FormLabel>
+                    <FormControl>
+                      <div>
+                        {Object.entries(triggerDescriptions).map(
+                          ([key, value], index) => (
+                            <div key={index} className="flex gap-x-1 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={field.value.includes(
+                                  key as keyof typeof TriggerEnum,
+                                )}
+                                onChange={(_e) => {
+                                  const updatedList = onChangeTriggers(key);
+                                  console.log(updatedList)
+                                  field.onChange(updatedList);
+                                }}
+                              />
+                              <span className="font-semibold">{key}</span>
+                              <span className="">- {value}</span>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <Button type="submit" className="w-full" disabled={isPending}>
                 {label}
               </Button>
@@ -290,26 +325,21 @@ const WebhookCreateModal = ({
 export const WebhooksHeader = () => {
   const createWebhook = useCreateWebhook();
   const [open, setOpen] = useState(false);
-  const [successOpen, setSuccessOpen] = useState(false);
-//   const [key, setKey] = useState<Apikey | undefined>(undefined);
 
   const form = useForm<WebhookFormValues>({
-    resolver: zodResolver(WebhookFormValues),
+    resolver: zodResolver(webhookInputSchema),
     defaultValues: {
       name: "",
-    //   resourceType: resourceType,
-    //   isGeneric: false,
-    //   syncEvery: 300,
+      callbackUrl: "",
+      triggers: [],
       authType: AuthType.None,
     },
   });
 
   const handleCreate = (item: WebhookFormValues) => {
     createWebhook.mutate(item, {
-      onSuccess: (data) => {
+      onSuccess: (_data) => {
         setOpen(false);
-        // setKey(data.apiKey);
-        setSuccessOpen(true);
       },
       onError: () => {
         setOpen(true);
@@ -349,7 +379,7 @@ export const WebhooksPagination = () => {
   );
 };
 
-export const WebhooksContainer = ({children }: PropsWithChildren) => {
+export const WebhooksContainer = ({ children }: PropsWithChildren) => {
   return (
     <EntityContainer
       header={<WebhooksHeader />}
@@ -381,27 +411,21 @@ export const WebhookItem = ({ data }: { data: Webhook }) => {
 
   const updateWebhook = useUpdateWebhook();
   const [open, setOpen] = useState(false);
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [key, setKey] = useState<Apikey | undefined>(undefined);
 
   const form = useForm<WebhookFormValues>({
     resolver: zodResolver(webhookInputSchema),
     defaultValues: {
       name: data.name,
-    //   platform: data.platform || "",
-    //   integrationUri: data.integrationUri,
-    //   isGeneric: data.isGeneric,
-    //   prompt: data.prompt || "",
+      callbackUrl: data.callbackUrl,
+      triggers: data.triggers,
       authType: data.authType,
-    //   resourceType: data.resourceType,
-    //   syncEvery: data.syncEvery || 300,
       authentication: data.authentication as AuthenticationInputType,
     },
   });
 
   const handleUpdate = (item: WebhookFormValues) => {
     updateWebhook.mutate(
-      { id: data.id, data: item },
+      { id: data.id, ...item },
       {
         onSuccess: () => {
           setOpen(false);
@@ -413,69 +437,41 @@ export const WebhookItem = ({ data }: { data: Webhook }) => {
     );
   };
 
-//   return (
-//     <>
-//       <div className="flex items-center gap-3 p-4 border rounded-lg">
-//         <div className="flex-1 min-w-0">
-//           <div className="flex gap-2">
-//             <span>{data.name}</span>
-//             <span>&bull;</span>
-//             <span>{data.integrationUri}</span>
-//           </div>
-//           <p>{JSON.stringify(data)}</p>
-//           <Button onClick={handleSync} disabled={triggerSync.isPending}>
-//             {triggerSync.isPending ? "Syncing..." : "Sync Now"}
-//           </Button>
-//         </div>
-//         <Button
-//           size="sm"
-//           onClick={() => setOpen(true)}
-//           disabled={updateIntegration.isPending}
-//         >
-//           {updateIntegration.isPending ? "Updating..." : "Update"}
-//         </Button>
-//         <Button size="sm" onClick={() => setRotateOpen(true)}>
-//           {"Rotate API Key"}
-//         </Button>
-//         <Button
-//           variant="destructive"
-//           size="sm"
-//           onClick={handleRemove}
-//           disabled={removeItem.isPending}
-//         >
-//           {removeItem.isPending ? "Deleting..." : "Delete"}
-//         </Button>
-//       </div>
-
-//       {open && (
-//         <IntegrationCreateModal
-//           form={form}
-//           open={open}
-//           setOpen={setOpen}
-//           handleCreate={handleUpdate}
-//           isUpdate={true}
-//         />
-//       )}
-//       {rotateOpen && (
-//         <RotateIntegrationConfirmModal
-//           open={rotateOpen}
-//           setOpen={setRotateOpen}
-//           handleRotate={handleRotate}
-//         />
-//       )}
-//       {successOpen && (
-//         <ApiTokenSuccessModal
-//           open={successOpen}
-//           setOpen={setSuccessOpen}
-//           apiKey={key}
-//         />
-//       )}
-//     </>
-//   );
-
-return (
+  return (
     <>
-    <div>hello</div>
+      <div className="flex items-center gap-3 p-4 border rounded-lg">
+        <div className="flex-1 min-w-0">
+          <div className="flex gap-2">
+            <span>Name: {data.name}</span>
+          </div>
+          <p>{JSON.stringify(data)}</p>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => setOpen(true)}
+          disabled={updateWebhook.isPending}
+        >
+          {updateWebhook.isPending ? "Updating..." : "Update"}
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={handleRemove}
+          disabled={removeItem.isPending}
+        >
+          {removeItem.isPending ? "Deleting..." : "Delete"}
+        </Button>
+      </div>
+
+      {open && (
+        <WebhookCreateModal
+          form={form}
+          open={open}
+          setOpen={setOpen}
+          handleCreate={handleUpdate}
+          isUpdate={true}
+        />
+      )}
     </>
-)
+  );
 };

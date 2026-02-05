@@ -51,8 +51,8 @@ import { type WebhookFormValues, webhookInputSchema } from "../types";
 const triggerDescriptions = {
   [TriggerEnum.DeviceGroup_Created]: "When a Device Group is created",
   [TriggerEnum.DeviceGroup_Updated]: "When a Device Group is updated",
-  [TriggerEnum.Artifact_Created]: "When a Artifact is created",
-  [TriggerEnum.Artifact_Updated]: "When a Artifact is updated",
+  [TriggerEnum.Artifact_Created]: "(WIP) When a Artifact is created",
+  [TriggerEnum.Artifact_Updated]: "(WIP) When a Artifact is updated",
 };
 
 export const WebhooksList = () => {
@@ -62,6 +62,7 @@ export const WebhooksList = () => {
     <EntityList
       items={webhooks.data.items}
       getKey={(item) => item.id}
+      // @ts-expect-error - WebhookItem correctly expects trigger to be TriggerEnum[] but z.infer type expects it as string[]
       renderItem={(webhook) => <WebhookItem data={webhook} />}
       emptyView={<WebhooksEmpty />}
     />
@@ -295,7 +296,7 @@ const WebhookCreateModal = ({
                                 )}
                                 onChange={(_e) => {
                                   const updatedList = onChangeTriggers(key);
-                                  console.log(updatedList)
+                                  console.log(updatedList);
                                   field.onChange(updatedList);
                                 }}
                               />

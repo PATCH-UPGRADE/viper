@@ -5,13 +5,15 @@ import { authenticationSchema } from "../integrations/types";
 
 const triggerEnumArray = z.array(z.enum(TriggerEnum));
 
-export const webhookInputSchema = z.object({
-  name: z.string(),
-  callbackUrl: z.string(),
-  triggers: triggerEnumArray,
-  authType: z.enum(AuthType),
-  authentication: authenticationSchema.optional(),
-  }).superRefine((value, ctx) => {
+export const webhookInputSchema = z
+  .object({
+    name: z.string(),
+    callbackUrl: z.string(),
+    triggers: triggerEnumArray,
+    authType: z.enum(AuthType),
+    authentication: authenticationSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
     if (value.authType !== "None" && !value.authentication) {
       ctx.addIssue({
         code: "custom",

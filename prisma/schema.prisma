@@ -368,7 +368,7 @@ model Vulnerability {
   description          String?       @db.Text
   narrative            String?       @db.Text
   impact               String?       @db.Text
-  severity             Severity
+  severity             Severity      @default(Medium)
   cvssScore            Float?
   cvssVector           String?
   sarif                Json
@@ -411,6 +411,8 @@ model Issue {
   vulnerabilityId String
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
+  issueRemediations  IssueRemediation[]
+
   status IssueStatus @default(ACTIVE)
 
   createdAt DateTime @default(now())
@@ -432,6 +434,8 @@ model Remediation {
   vulnerabilityId String?
   vulnerability   Vulnerability? @relation(fields: [vulnerabilityId], references: [id], onDelete: SetNull)
 
+  issueRemediations    IssueRemediation[]
+
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -441,6 +445,17 @@ model Remediation {
   @@index([vulnerabilityId])
   @@index([userId])
   @@map("remediation")
+}
+
+model IssueRemediation {
+  issueId         String
+  remediationId   String
+
+  issue           Issue           @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  remediation     Remediation     @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+
+  @@id([issueId, remediationId])
+  @@map("issue_remediation")
 }
 
 model Apikey {

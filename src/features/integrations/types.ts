@@ -15,7 +15,7 @@ export const headerAuthSchema = z.object({
   value: z.string(),
 });
 
-const authenticationSchema = z.union([
+export const authenticationSchema = z.union([
   basicAuthSchema,
   bearerAuthSchema,
   headerAuthSchema,

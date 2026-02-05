@@ -103,6 +103,22 @@ const Page = async () => {
             Supports multiple providers; keys are encrypted at rest.
           </CardContent>
         </Card>
+
+        <Link href="/integrations/webhooks/">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-base">
+                Webhooks
+              </CardTitle>
+              <CardDescription>
+                Setup Webhooks to receive automated notifications on data events.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-xs text-muted-foreground">
+              Configure URL, Authentication and choice of webhook events.
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </div>
   );

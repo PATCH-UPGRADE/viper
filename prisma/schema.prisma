@@ -33,6 +33,7 @@ model User {
   apikeys     Apikey[]
   integration Integration[]
   integrationUsers Integration[] @relation("integration_user")
+  webhooks    Webhook[]
 
   @@unique([email])
   @@map("user")
@@ -449,6 +450,30 @@ model SyncStatus {
   syncedAt      DateTime    @default(now())
 
   @@map("sync_status")
+}
+
+model Webhook {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  triggers       TriggerEnum[]
+  callbackUrl    String
+  name           String
+  authType       AuthType
+  authentication Json?
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([userId])
+}
+
+enum TriggerEnum {
+  DeviceGroup_Created
+  DeviceGroup_Updated
+  Artifact_Created
+  Artifact_Updated
 }
 
 enum AuthType {

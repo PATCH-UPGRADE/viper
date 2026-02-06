@@ -106,6 +106,7 @@ export const artifactWrapperSelect = {
         createdAt: true,
         updatedAt: true,
         url: true,
+        prevVersionId: true,
       },
     },
     _count: {
@@ -134,6 +135,7 @@ export const artifactWithUrlsSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
   url: z.string(),
+  prevVersionId: z.string().nullable(),
 });
 
 export const artifactWrapperWithUrlsSchema = z.object({

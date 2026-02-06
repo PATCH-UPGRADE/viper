@@ -55,9 +55,9 @@ const vulnerabilitySchema = z.object({
 const remediationResponseSchema = z.object({
   id: z.string(),
   affectedDeviceGroups: z.array(deviceGroupSchema),
-  upstreamApi: z.string().optional(),
-  description: z.string().optional(),
-  narrative: z.string().optional(),
+  upstreamApi: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  narrative: z.string().optional().nullable(),
   vulnerability: vulnerabilitySchema.optional().nullable(),
   user: userSchema,
   artifacts: z.array(artifactWrapperWithUrlsSchema),
@@ -229,7 +229,6 @@ export const remediationsRouter = createTRPCRouter({
           include: remediationInclude,
         });
       });
-
       return transformArtifactWrapper(result);
     }),
 
@@ -251,7 +250,7 @@ export const remediationsRouter = createTRPCRouter({
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "remediation");
 
-      const result = prisma.remediation.delete({
+      const result = await prisma.remediation.delete({
         where: { id: input.id },
         include: remediationInclude,
       });

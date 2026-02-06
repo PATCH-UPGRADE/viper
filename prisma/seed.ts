@@ -1,5 +1,5 @@
 import { hashPassword } from "better-auth/crypto";
-import type { AssetStatus, ArtifactType } from "@/generated/prisma";
+import type { ArtifactType, AssetStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
 // Seed user credentials

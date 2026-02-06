@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { createPaginatedResponseWithLinksSchema } from "./pagination";
 import { ArtifactType } from "@/generated/prisma";
+import { createPaginatedResponseWithLinksSchema } from "./pagination";
 
 /**
  * Shared Zod schema for User responses

@@ -2,6 +2,7 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { AlertTriangleIcon, ExternalLinkIcon, WrenchIcon } from "lucide-react";
+import Link from "next/link";
 import {
   EmptyView,
   EntityContainer,
@@ -12,7 +13,6 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,17 +26,15 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
-import type { Remediation } from "@/generated/prisma";
+import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
-import type { DeviceGroupIncludeType } from "@/lib/schemas";
 import {
   useRemoveRemediation,
   useSuspenseRemediations,
 } from "../hooks/use-remediations";
 import { useRemediationsParams } from "../hooks/use-remediations-params";
-import { RemediationResponse } from "../server/routers";
-import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
+import type { RemediationResponse } from "../server/routers";
 
 export const RemediationsSearch = () => {
   const [params, setParams] = useRemediationsParams();
@@ -122,11 +120,7 @@ export const RemediationsEmpty = () => {
   );
 };
 
-export const RemediationItem = ({
-  data,
-}: {
-  data: RemediationResponse;
-}) => {
+export const RemediationItem = ({ data }: { data: RemediationResponse }) => {
   const removeRemediation = useRemoveRemediation();
 
   const handleRemove = () => {
@@ -141,8 +135,11 @@ export const RemediationItem = ({
       <div className="flex-1 min-w-0">
         <RemediationDrawer remediation={data} />
         <div className="text-xs text-muted-foreground mt-1">
-          {data.description ? data.description.substring(0, 100) : "Remediation"}
-          {data.description && data.description.length > 100 ? "..." : ""} &bull; Updated{" "}
+          {data.description
+            ? data.description.substring(0, 100)
+            : "Remediation"}
+          {data.description && data.description.length > 100 ? "..." : ""}{" "}
+          &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
         </div>
       </div>
@@ -209,21 +206,23 @@ function RemediationDrawer({
 
           {/* Related Vulnerability */}
           {remediation.vulnerability && (
-          <div className="flex flex-col gap-2">
-            <h3 className="font-semibold text-destructive">
-              Related Vulnerability
-            </h3>
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangleIcon className="size-4 text-destructive" />
-                <span className="font-medium text-sm">
-                  <Link href={remediation.vulnerability.url}>{remediation.vulnerability.id}</Link>
-                </span>
+            <div className="flex flex-col gap-2">
+              <h3 className="font-semibold text-destructive">
+                Related Vulnerability
+              </h3>
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangleIcon className="size-4 text-destructive" />
+                  <span className="font-medium text-sm">
+                    <Link href={remediation.vulnerability.url}>
+                      {remediation.vulnerability.id}
+                    </Link>
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
           )}
-          
+
           <Separator />
 
           {/* Artifacts */}
@@ -250,16 +249,18 @@ function RemediationDrawer({
                   Upstream API
                 </div>
                 {remediation.upstreamApi ? (
-                <a
-                  href={remediation.upstreamApi}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  {remediation.upstreamApi}
-                  <ExternalLinkIcon className="size-3" />
-                </a>
-                ) : <p>None set</p>}
+                  <a
+                    href={remediation.upstreamApi}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                  >
+                    {remediation.upstreamApi}
+                    <ExternalLinkIcon className="size-3" />
+                  </a>
+                ) : (
+                  <p>None set</p>
+                )}
               </div>
             </div>
           </div>

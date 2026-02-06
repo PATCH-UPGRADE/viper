@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { DownloadIcon, ExternalLinkIcon, PackageIcon } from "lucide-react";
+import { DownloadIcon } from "lucide-react";
 import {
   EmptyView,
   EntityContainer,
@@ -12,7 +12,6 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -25,22 +24,15 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
-import type { DeviceArtifact } from "@/generated/prisma";
+import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
-import type {
-  ArtifactWrapperWithUrls,
-  DeviceGroupIncludeType,
-  UserIncludeType,
-} from "@/lib/schemas";
 import {
   useRemoveDeviceArtifact,
   useSuspenseDeviceArtifacts,
 } from "../hooks/use-device-artifacts";
 import { useDeviceArtifactsParams } from "../hooks/use-device-artifacts-params";
-import { DeviceArtifactResponse } from "../server/routers";
-import { formatFileSize } from "@/lib/utils";
-import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
+import type { DeviceArtifactResponse } from "../server/routers";
 
 export const DeviceArtifactsSearch = () => {
   const [params, setParams] = useDeviceArtifactsParams();

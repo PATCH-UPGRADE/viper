@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   createPaginatedResponseSchema,
@@ -12,7 +13,6 @@ import {
 } from "@/lib/router-utils";
 import {
   artifactInputSchema,
-  artifactWithUrlsSchema,
   artifactWrapperSelect,
   artifactWrapperWithUrlsSchema,
   cpeSchema,
@@ -24,7 +24,6 @@ import {
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
-import { Prisma } from "@/generated/prisma";
 
 const deviceArtifactInputSchema = z.object({
   cpe: cpeSchema,

@@ -1,15 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
-  buildPaginationMeta,
-  createPaginatedResponse,
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
 import {
   cpesToDeviceGroups,
-  cpeToDeviceGroup,
   createArtifactWrappers,
   fetchPaginated,
   transformArtifactWrapper,
@@ -27,7 +25,6 @@ import {
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
-import { Prisma } from "@/generated/prisma";
 
 // Validation schemas
 const remediationInputSchema = z.object({
@@ -67,9 +64,7 @@ const remediationResponseSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
 });
-export type RemediationResponse = z.infer<
-  typeof remediationResponseSchema 
->;
+export type RemediationResponse = z.infer<typeof remediationResponseSchema>;
 
 const paginatedRemediationResponseSchema = createPaginatedResponseSchema(
   remediationResponseSchema,

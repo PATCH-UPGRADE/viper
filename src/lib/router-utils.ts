@@ -1,11 +1,11 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
 import "server-only";
-import { ArtifactType, Prisma, SyncStatusEnum } from "@/generated/prisma";
+import { type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
 } from "@/generated/prisma/runtime/library";
-import prisma, { ExtendedPrismaClient, TransactionClient } from "@/lib/db";
+import prisma, { type TransactionClient } from "@/lib/db";
 import {
   buildPaginationMeta,
   createPaginatedResponse,

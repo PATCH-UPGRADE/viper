@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Integration } from "@/generated/prisma";
 import { safeUrlSchema } from "@/lib/schemas";
 
 export const basicAuthSchema = z.object({
@@ -45,3 +46,11 @@ export const integrationInputSchema = z
     }
   });
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;
+
+export type IntegrationWithStringDates = Omit<
+  Integration,
+  "createdAt" | "updatedAt"
+> & {
+  createdAt: string;
+  updatedAt: string;
+};

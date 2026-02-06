@@ -1,26 +1,15 @@
 import "server-only";
 import { z } from "zod";
 import { integrationAssetInputSchema } from "@/features/assets/server/routers";
-import {
-  basicAuthSchema,
-  bearerAuthSchema,
-  headerAuthSchema,
-} from "@/features/integrations/types";
+import type { IntegrationWithStringDates } from "@/features/integrations/types";
 import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/server/routers";
-import type { Integration, ResourceType } from "@/generated/prisma";
-import { SyncStatusEnum } from "@/generated/prisma";
+import type { ResourceType } from "@/generated/prisma";
+import { AuthType, SyncStatusEnum } from "@/generated/prisma";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { getBaseUrl } from "@/lib/url-utils";
+import { parseAuthenticationJson } from "@/lib/utils";
 import { inngest } from "../client";
-
-type IntegrationWithStringDates = Omit<
-  Integration,
-  "createdAt" | "updatedAt"
-> & {
-  createdAt: string;
-  updatedAt: string;
-};
 
 export const syncAllIntegrations = inngest.createFunction(
   { id: "sync-all-integrations" },
@@ -161,28 +150,8 @@ async function syncPartnerIntegration(
     "Content-Type": "application/json",
   };
 
-  if (integration.authType === "Basic") {
-    // TODO: authentication needs to be encrypted/protected somehow
-    const parsed = basicAuthSchema.safeParse(integration.authentication);
-    if (!parsed.success) {
-      throw new Error("Invalid Basic auth configuration");
-    }
-    const { username, password } = parsed.data;
-    const token = Buffer.from(`${username}:${password}`).toString("base64");
-    headers.Authorization = `Basic ${token}`;
-  } else if (integration.authType === "Bearer") {
-    const parsed = bearerAuthSchema.safeParse(integration.authentication);
-    if (!parsed.success) {
-      throw new Error("Invalid Bearer auth configuration");
-    }
-    const { token } = parsed.data;
-    headers.Authorization = `Bearer ${token}`;
-  } else if (integration.authType === "Header") {
-    const parsed = headerAuthSchema.safeParse(integration.authentication);
-    if (!parsed.success) {
-      throw new Error("Invalid Header auth configuration");
-    }
-    const { header, value } = parsed.data;
+  if (integration.authType !== AuthType.None) {
+    const { header, value } = parseAuthenticationJson(integration);
     headers[header] = value;
   }
 

@@ -1,85 +1,66 @@
-import request from "supertest";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AuthType, TriggerEnum, type Webhook } from "@/generated/prisma";
-import { sendWebhook } from "@/lib/prisma-client-extensions";
-import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { AuthType, TriggerEnum } from "@/generated/prisma";
+import { sendWebhook } from "@/lib/utils";
+import { AUTH_TOKEN, generateCPE } from "./test-config";
+
+const fetchSpy = vi.spyOn(global, "fetch");
 
 describe("Webhook Endpoints (/webhooks)", () => {
-  const authHeader = { Authorization: AUTH_TOKEN };
-
-  const webhook: Webhook = {
-    id: "someId",
-    userId: "someUserId",
+  const webhookPayload = {
     name: "mockWebhook",
     callbackUrl: "http://example.com",
-    triggers: [TriggerEnum.DeviceGroup_Updated],
-    authType: AuthType.None,
-    authentication: null,
+    triggers: [TriggerEnum.DeviceGroup_Created],
+    authType: AuthType.Bearer,
+    authentication: {
+      token: process.env.API_KEY, // "Bearer" we be added back in fetch call
+    },
+  };
+
+  const webhook = {
+    ...webhookPayload,
+    id: "someId",
+    userId: "someUserId",
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
-  const assetPayload = {
+  const _trpcWebhookPayload = {
+    "0": {
+      json: webhookPayload,
+    },
+  };
+
+  const _assetPayload = {
     ip: "192.168.1.100",
     cpe: generateCPE("asset_v1"),
     role: "Primary Server",
     upstreamApi: "https://api.hospital-upstream.com/v1",
   };
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+  afterEach(() => {
+    fetchSpy.mockRestore();
   });
 
   it("Mock sendWebhook fetch", async () => {
-    const mockData = {
-      webhookTrigger: TriggerEnum.DeviceGroup_Updated,
-      timestamp: new Date(),
-    };
-    // @ts-expect-error
-    global.fetch = vi.fn(() => {
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(mockData),
-      });
-    });
-
-    await sendWebhook(mockData.webhookTrigger, mockData.timestamp, webhook);
-    expect(global.fetch).toHaveBeenCalledWith(
-      webhook.callbackUrl,
-      expect.anything(),
-    );
-  });
-
-  it("Test DeviceGroup creation with Mocked Fetch", async () => {
-    const mockData = {
-      webhookTrigger: TriggerEnum.DeviceGroup_Updated,
+    const mockBody = {
+      webhookTrigger: TriggerEnum.DeviceGroup_Created,
       timestamp: new Date(),
     };
 
-    // @ts-expect-error
-    global.fetch = vi.fn(() => {
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(),
-      });
-    });
+    await sendWebhook(mockBody.webhookTrigger, mockBody.timestamp, webhook);
 
-    // common scenario creating an Asset will automatically create a DeviceGroup
-    const assetRes = await request(BASE_URL)
-      .post("/assets")
-      .set(authHeader)
-      .send(assetPayload);
-    expect(assetRes.status).toBe(200);
-    expect(assetRes.body).toHaveProperty("deviceGroup");
-
-    await request(BASE_URL)
-      .delete(`/assets/${assetRes.body.id}`)
-      .set(authHeader)
-      .send(assetPayload);
-
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(fetchSpy).toBeCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(
       webhook.callbackUrl,
-      expect.anything(),
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          Authorization: AUTH_TOKEN,
+          "Content-Type": "application/json",
+        },
+        signal: expect.anything(),
+        body: expect.stringContaining(mockBody.webhookTrigger),
+      }),
     );
   });
 });

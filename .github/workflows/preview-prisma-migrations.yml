@@ -4,7 +4,7 @@ env:
   NODE_VERSION: '20'
   NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
   NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-  BRANCH_NAME: ci/pr-${{ github.event.pull_request.number }}-${{ github.run_id }}
+  BRANCH_NAME: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}
 
 on:
   pull_request:

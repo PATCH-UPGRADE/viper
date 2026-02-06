@@ -34,9 +34,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          neonctl branch create "$BRANCH_NAME" \
+          neonctl branches create --name "$BRANCH_NAME" \
             --project-id "$NEON_PROJECT_ID" \
-            --parent main || true
+            --parent main
 
       - name: Get Neon branch URL
         run: |
@@ -74,6 +74,6 @@ jobs:
       - name: Delete Neon CI branch
         if: always()
         run: |
-          neonctl branch delete "$BRANCH_NAME" \
+          neonctl branches delete --name "$BRANCH_NAME" \
            --project-id "$NEON_PROJECT_ID" \
            --yes || echo "Branch already deleted or missing"

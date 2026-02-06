@@ -58,7 +58,7 @@ CREATE TABLE "artifact" (
     "name" TEXT,
     "artifactType" "ArtifactType" NOT NULL,
     "download-url" TEXT,
-    "size" BIGINT,
+    "size" INTEGER,
     "prevVersionId" TEXT,
     "versionNumber" INTEGER NOT NULL,
     "userId" TEXT NOT NULL,

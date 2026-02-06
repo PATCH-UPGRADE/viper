@@ -11,7 +11,14 @@ export async function GET() {
     version: "1.0.0",
     baseUrl: `${getBaseUrl()}/api/v1`,
     docsUrl: "https://github.com/PATCH-UPGRADE",
-    tags: ["Assets", "Vulnerabilities", "Remediations", "DeviceArtifacts", "Artifacts", "DeviceGroups"],
+    tags: [
+      "Assets",
+      "Vulnerabilities",
+      "Remediations",
+      "DeviceArtifacts",
+      "Artifacts",
+      "DeviceGroups",
+    ],
   });
 
   return Response.json(openApiDocument);

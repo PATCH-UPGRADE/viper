@@ -122,7 +122,7 @@ export const artifactInputSchema = z.object({
   artifactType: z.enum(ArtifactType),
   downloadUrl: safeUrlSchema,
   // ^TODO: currently required, although we want to add file uploads. see VW-61
-  size: z.number().optional(),
+  size: z.coerce.bigint().optional(),
 });
 
 export const artifactWithUrlsSchema = z.object({
@@ -130,7 +130,7 @@ export const artifactWithUrlsSchema = z.object({
   name: z.string().nullable(),
   artifactType: z.enum(ArtifactType),
   downloadUrl: z.string().nullable(),
-  size: z.number().nullable(),
+  size: z.bigint().nullable(),
   versionNumber: z.number(), // maps to versionNumber
   createdAt: z.date(),
   updatedAt: z.date(),

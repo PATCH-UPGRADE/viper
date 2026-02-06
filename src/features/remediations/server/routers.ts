@@ -223,7 +223,7 @@ export const remediationsRouter = createTRPCRouter({
           userId,
         );
 
-        // Fetch the complete remeidation with includes
+        // Fetch the complete remediation with includes
         return tx.remediation.findUniqueOrThrow({
           where: { id: remediation.id },
           include: remediationInclude,

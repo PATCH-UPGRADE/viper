@@ -261,7 +261,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
         tags: ["DeviceArtifacts"],
         summary: "Delete DeviceArtifact",
         description:
-          "Delete an DeviceArtifact. Only the user who created the DeviceArtifact can delete it.",
+          "Delete a DeviceArtifact. Only the user who created the DeviceArtifact can delete it.",
       },
     })
     .output(deviceArtifactResponseSchema)

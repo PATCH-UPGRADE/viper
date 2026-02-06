@@ -174,7 +174,9 @@ function RemediationDrawer({
       </DrawerTrigger>
       <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
         <DrawerHeader className="gap-1">
-          <DrawerTitle>{remediation.affectedDeviceGroups[0]?.cpe ?? "Unknown CPE"}</DrawerTitle>
+          <DrawerTitle>
+            {remediation.affectedDeviceGroups[0]?.cpe ?? "Unknown CPE"}
+          </DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
             <Badge variant="outline" className="text-primary">
               <WrenchIcon className="size-3 mr-1" />

@@ -42,7 +42,7 @@ export const ArtifactsDrawerEntry = ({
               )}
               {artifact.latestArtifact.size && (
                 <span className="text-xs text-muted-foreground">
-                  Size: {formatFileSize(artifact.latestArtifact.size)}
+                  Size: {formatFileSize(Number(artifact.latestArtifact.size))}
                 </span>
               )}
             </div>

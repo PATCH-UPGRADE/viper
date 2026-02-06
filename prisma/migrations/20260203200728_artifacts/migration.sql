@@ -58,7 +58,7 @@ CREATE TABLE "artifact" (
     "name" TEXT,
     "artifactType" "ArtifactType" NOT NULL,
     "download-url" TEXT,
-    "size" INTEGER,
+    "size" BIGINT,
     "prevVersionId" TEXT,
     "versionNumber" INTEGER NOT NULL,
     "userId" TEXT NOT NULL,
@@ -83,6 +83,7 @@ CREATE INDEX "artifact_wrapper_deviceArtifactId_idx" ON "artifact_wrapper"("devi
 CREATE INDEX "artifact_wrapper_userId_idx" ON "artifact_wrapper"("userId");
 CREATE INDEX "artifact_wrapper_latestArtifactId_idx" ON "artifact_wrapper"("latestArtifactId");
 CREATE UNIQUE INDEX "artifact_prevVersionId_key" ON "artifact"("prevVersionId");
+CREATE UNIQUE INDEX "artifact_wrapperId_versionNumber_key" ON "artifact"("wrapperId", "versionNumber");
 CREATE INDEX "artifact_wrapperId_idx" ON "artifact"("wrapperId");
 CREATE INDEX "artifact_userId_idx" ON "artifact"("userId");
 CREATE INDEX "_RemediationDeviceGroups_B_index" ON "_RemediationDeviceGroups"("B");

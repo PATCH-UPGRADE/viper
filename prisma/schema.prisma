@@ -302,7 +302,7 @@ model Artifact {
   name String?
   artifactType ArtifactType
   downloadUrl String? @map("download-url") // could also be an S3 url we're responsible for hosting
-  size Int? // size in bytes
+  size BigInt? // size in bytes
 
   prevVersionId String? @unique // null for v1
   prevVersion Artifact? @relation("VersionChain", fields: [prevVersionId], references: [id], onDelete: SetNull)
@@ -319,6 +319,7 @@ model Artifact {
   updatedAt     DateTime      @updatedAt
   @@index([wrapperId])
   @@index([userId])
+  @@unique([wrapperId, versionNumber])
   @@map("artifact")
 }
 

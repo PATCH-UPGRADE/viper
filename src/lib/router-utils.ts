@@ -102,7 +102,7 @@ export async function createArtifactWrappers(
     name?: string | null;
     artifactType: ArtifactType;
     downloadUrl: string;
-    size?: number | null;
+    size?: bigint | number | null;
   }>,
   parentId: string,
   parentField: "deviceArtifactId" | "remediationId",

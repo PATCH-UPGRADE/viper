@@ -301,6 +301,7 @@ model Vulnerability {
   description          String        @db.Text
   narrative            String        @db.Text
   impact               String        @db.Text
+  testField            String?
 
   emulatorId String?
   emulator   Emulator? @relation(fields: [emulatorId], references: [id], onDelete: SetNull)

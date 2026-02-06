@@ -169,12 +169,12 @@ function RemediationDrawer({
           variant="link"
           className="text-foreground h-auto p-0 text-left font-medium"
         >
-          {remediation.affectedDeviceGroups[0].cpe}
+          {remediation.affectedDeviceGroups[0]?.cpe ?? "Unknown CPE"}
         </Button>
       </DrawerTrigger>
       <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
         <DrawerHeader className="gap-1">
-          <DrawerTitle>{remediation.affectedDeviceGroups[0].cpe}</DrawerTitle>
+          <DrawerTitle>{remediation.affectedDeviceGroups[0]?.cpe ?? "Unknown CPE"}</DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
             <Badge variant="outline" className="text-primary">
               <WrenchIcon className="size-3 mr-1" />
@@ -240,7 +240,7 @@ function RemediationDrawer({
                   CPE Identifier
                 </div>
                 <code className="text-xs bg-muted px-2 py-1 rounded">
-                  {remediation.affectedDeviceGroups[0].cpe}
+                  {remediation.affectedDeviceGroups[0]?.cpe ?? "N/A"}
                 </code>
               </div>
 

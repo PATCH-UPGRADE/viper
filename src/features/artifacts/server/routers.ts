@@ -40,7 +40,7 @@ export const artifactsRouter = createTRPCRouter({
         tags: ["Artifacts"],
         summary: "List all versions of an artifact",
         description:
-          "Get all verions of an artifact, ordered by version number.",
+          "Get all versions of an artifact, ordered by version number.",
       },
     })
     .output(paginatedArtifactResponseSchema)

@@ -379,6 +379,7 @@ model Vulnerability {
   externalMappings ExternalVulnerabilityMapping[]
 
   @@index([userId])
+  @@index([deviceArtifactId])
   @@map("vulnerability")
 }
 
@@ -416,7 +417,7 @@ model Remediation {
   upstreamApi   String?      @map("upstream-api")
 
   vulnerabilityId String?
-  vulnerability   Vulnerability? @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
+  vulnerability   Vulnerability? @relation(fields: [vulnerabilityId], references: [id], onDelete: SetNull)
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)

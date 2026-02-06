@@ -85,7 +85,7 @@ CREATE UNIQUE INDEX "artifact_prevVersionId_key" ON "artifact"("prevVersionId");
 CREATE INDEX "artifact_wrapperId_idx" ON "artifact"("wrapperId");
 CREATE INDEX "artifact_userId_idx" ON "artifact"("userId");
 CREATE INDEX "_RemediationDeviceGroups_B_index" ON "_RemediationDeviceGroups"("B");
--- TODO: CREATE INDEX "vulnerability_deviceArtifactId_idx" ON "vulnerability"("deviceArtifactId");
+CREATE INDEX "vulnerability_deviceArtifactId_idx" ON "vulnerability"("deviceArtifactId");
 
 -- DATA MIGRATION: Migrate Emulator docker-url and download-url to Artifacts
 DO $$

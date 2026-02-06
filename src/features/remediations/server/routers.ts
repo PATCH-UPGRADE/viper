@@ -44,7 +44,7 @@ const remediationUpdateSchema = z.object({
   vulnerabilityId: z.string().optional(),
   description: z.string().optional(),
   narrative: z.string().optional(),
-  upstreamApi: z.string().optional(),
+  upstreamApi: safeUrlSchema.optional(),
 });
 
 const vulnerabilitySchema = z.object({
@@ -201,7 +201,7 @@ export const remediationsRouter = createTRPCRouter({
         }
       }
 
-      // Create device artifact with wrappers and initial artifacts in a transaction
+      // Create remediation with wrappers and initial artifacts in a transaction
       const result = await prisma.$transaction(async (tx) => {
         // Create the device artifact
         const remediation = await tx.remediation.create({

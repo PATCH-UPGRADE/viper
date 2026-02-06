@@ -107,11 +107,11 @@ export const DeviceArtifactsContainer = ({
 };
 
 export const DeviceArtifactsLoading = () => {
-  return <LoadingView message="Loading deviceArtifacts..." />;
+  return <LoadingView message="Loading Device Artifacts..." />;
 };
 
 export const DeviceArtifactsError = () => {
-  return <ErrorView message="Error loading deviceArtifacts" />;
+  return <ErrorView message="Error loading Device Artifacts" />;
 };
 
 export const DeviceArtifactsEmpty = () => {
@@ -175,7 +175,7 @@ function DeviceArtifactDrawer({
       </DrawerTrigger>
       <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
         <DrawerHeader className="gap-1">
-          <DrawerTitle>{deviceArtifact.role}</DrawerTitle>
+          <DrawerTitle>{deviceArtifact.role || "Device Artifact"}</DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
             <span className="text-xs">
               Updated{" "}
@@ -251,7 +251,7 @@ function DeviceArtifactDrawer({
 
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1">
-                  DeviceArtifact ID
+                  Device Artifact ID
                 </div>
                 <code className="text-xs bg-muted px-2 py-1 rounded">
                   {deviceArtifact.id}

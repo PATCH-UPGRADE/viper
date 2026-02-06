@@ -65,7 +65,6 @@ describe("Artifacts Endpoint (/artifacts)", () => {
 
   it("GET /artifacts/{id} - Get single artifact", async () => {
     const remediation = await createRemediationWithArtifacts();
-    console.log("HEY", remediation);
 
     onTestFinished(async () => {
       await prisma.remediation

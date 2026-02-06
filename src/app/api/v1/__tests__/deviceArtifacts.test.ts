@@ -267,6 +267,16 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       .set(authHeader)
       .send(multiArtifactPayload);
 
+    onTestFinished(async () => {
+      await prisma.deviceArtifact
+        .delete({
+          where: { id: createRes.body.id },
+        })
+        .catch(() => {
+          /* already deleted */
+        });
+    });
+
     expect(createRes.status).toBe(200);
     expect(createRes.body.artifacts.length).toBe(4);
 
@@ -278,16 +288,6 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     expect(artifactTypes).toContain(ArtifactType.Documentation);
     expect(artifactTypes).toContain(ArtifactType.Source);
     expect(artifactTypes).toContain(ArtifactType.Binary);
-
-    onTestFinished(async () => {
-      await prisma.deviceArtifact
-        .delete({
-          where: { id: createRes.body.id },
-        })
-        .catch(() => {
-          /* already deleted */
-        });
-    });
   });
 
   it("GET /deviceArtifacts - Pagination test", async () => {

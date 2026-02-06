@@ -16,6 +16,7 @@ CREATE TYPE "ArtifactType" AS ENUM ('Source', 'Binary', 'Firmware', 'Emulator', 
 ALTER TABLE "public"."emulator" DROP CONSTRAINT "emulator_deviceGroupId_fkey";
 ALTER TABLE "public"."vulnerability" DROP CONSTRAINT "vulnerability_emulatorId_fkey";
 ALTER TABLE "public"."remediation" DROP CONSTRAINT "remediation_deviceGroupId_fkey";
+ALTER TABLE "public"."remediation" DROP CONSTRAINT "remediation_vulnerabilityId_fkey";
 
 -- DropIndex
 DROP INDEX "public"."remediation_deviceGroupId_idx";
@@ -198,3 +199,5 @@ ALTER TABLE "_RemediationDeviceGroups" ADD CONSTRAINT "_RemediationDeviceGroups_
 
 ALTER TABLE "_RemediationDeviceGroups" ADD CONSTRAINT "_RemediationDeviceGroups_B_fkey" 
     FOREIGN KEY ("B") REFERENCES "remediation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "remediation" ADD CONSTRAINT "remediation_vulnerabilityId_fkey" FOREIGN KEY ("vulnerabilityId") REFERENCES "vulnerability"("id") ON DELETE SET NULL ON UPDATE CASCADE;

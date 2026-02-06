@@ -7,8 +7,17 @@ import {
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { cpeToDeviceGroup } from "@/lib/router-utils";
 import {
+  cpesToDeviceGroups,
+  cpeToDeviceGroup,
+  createArtifactWrappers,
+  fetchPaginated,
+  transformArtifactWrapper,
+} from "@/lib/router-utils";
+import {
+  artifactInputSchema,
+  artifactWrapperSelect,
+  artifactWrapperWithUrlsSchema,
   cpeSchema,
   deviceGroupSchema,
   deviceGroupSelect,
@@ -18,56 +27,98 @@ import {
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
+import { Prisma } from "@/generated/prisma";
 
 // Validation schemas
 const remediationInputSchema = z.object({
-  fixUri: safeUrlSchema,
-  vulnerabilityId: z.string(),
-  cpe: cpeSchema,
-  description: z.string().min(1),
-  narrative: z.string().min(1),
-  upstreamApi: safeUrlSchema,
+  cpes: z.array(cpeSchema).min(1),
+  vulnerabilityId: z.string().optional(),
+  description: z.string().optional(),
+  narrative: z.string().optional(),
+  upstreamApi: safeUrlSchema.optional(),
+  artifacts: z
+    .array(artifactInputSchema)
+    .min(1, "at least one artifact is required"),
+});
+
+const remediationUpdateSchema = z.object({
+  id: z.string(),
+  cpes: z.array(cpeSchema).optional(),
+  vulnerabilityId: z.string().optional(),
+  description: z.string().optional(),
+  narrative: z.string().optional(),
+  upstreamApi: z.string().optional(),
 });
 
 const vulnerabilitySchema = z.object({
   id: z.string(),
-  affectedDeviceGroups: z.array(deviceGroupSchema),
-  description: z.string(),
-  impact: z.string(),
+  url: z.string(),
 });
 
 const remediationResponseSchema = z.object({
   id: z.string(),
-  fixUri: z.string(),
-  vulnerabilityId: z.string(),
-  deviceGroup: deviceGroupSchema,
-  description: z.string(),
-  narrative: z.string(),
-  upstreamApi: z.string(),
-  userId: z.string(),
+  affectedDeviceGroups: z.array(deviceGroupSchema),
+  upstreamApi: z.string().optional(),
+  description: z.string().optional(),
+  narrative: z.string().optional(),
+  vulnerability: vulnerabilitySchema.optional().nullable(),
+  user: userSchema,
+  artifacts: z.array(artifactWrapperWithUrlsSchema),
   createdAt: z.date(),
   updatedAt: z.date(),
-  user: userSchema,
-  vulnerability: vulnerabilitySchema,
 });
+export type RemediationResponse = z.infer<
+  typeof remediationResponseSchema 
+>;
 
 const paginatedRemediationResponseSchema = createPaginatedResponseSchema(
   remediationResponseSchema,
 );
 
+const createSearchFilter = (search: string) => {
+  return search
+    ? {
+        OR: [
+          { narrative: { contains: search, mode: "insensitive" as const } },
+          {
+            description: { contains: search, mode: "insensitive" as const },
+          },
+          {
+            artifacts: {
+              some: {
+                latestArtifact: {
+                  OR: [
+                    {
+                      name: { contains: search, mode: "insensitive" as const },
+                    },
+                    {
+                      downloadUrl: {
+                        contains: search,
+                        mode: "insensitive" as const,
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      }
+    : {};
+};
+
 const remediationVulnerabilitySelect = {
   select: {
     id: true,
-    affectedDeviceGroups: deviceGroupSelect,
-    description: true,
-    impact: true,
+    url: true,
   },
 } as const;
 
 const remediationInclude = {
   user: userIncludeSelect,
   vulnerability: remediationVulnerabilitySelect,
-  deviceGroup: deviceGroupSelect,
+  affectedDeviceGroups: deviceGroupSelect,
+  artifacts: artifactWrapperSelect,
 };
 
 export const remediationsRouter = createTRPCRouter({
@@ -87,43 +138,17 @@ export const remediationsRouter = createTRPCRouter({
     .output(paginatedRemediationResponseSchema)
     .query(async ({ input }) => {
       const { search } = input;
+      const searchFilter = createSearchFilter(search);
 
-      // Build search filter across multiple fields
-      const searchFilter = search
-        ? {
-            OR: [
-              {
-                deviceGroup: {
-                  cpe: {
-                    contains: search,
-                    mode: "insensitive" as const,
-                  },
-                },
-              },
-              {
-                description: { contains: search, mode: "insensitive" as const },
-              },
-              { narrative: { contains: search, mode: "insensitive" as const } },
-            ],
-          }
-        : {};
-
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.remediation.count({
-        where: searchFilter,
-      });
-      const meta = buildPaginationMeta(input, totalCount);
-
-      // Fetch paginated items
-      const items = await prisma.remediation.findMany({
-        skip: meta.skip,
-        take: meta.take,
+      const result = await fetchPaginated(prisma.remediation, input, {
         where: searchFilter,
         include: remediationInclude,
-        orderBy: { createdAt: "desc" },
       });
 
-      return createPaginatedResponse(items, meta);
+      return {
+        ...result,
+        items: result.items.map(transformArtifactWrapper),
+      };
     }),
 
   // GET /api/remediations/{id} - Get single remediation (any authenticated user can access)
@@ -141,10 +166,11 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationResponseSchema)
     .query(async ({ input }) => {
-      return prisma.remediation.findUniqueOrThrow({
+      const result = await prisma.remediation.findUniqueOrThrow({
         where: { id: input.id },
         include: remediationInclude,
       });
+      return transformArtifactWrapper(result);
     }),
 
   // POST /api/remediations - Create remediation
@@ -162,28 +188,54 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      // Verify the vulnerability exists
-      const vulnerability = await prisma.vulnerability.findUnique({
-        where: { id: input.vulnerabilityId },
-      });
+      const { cpes, artifacts, ...dataInput } = input;
+      const uniqueCpes = [...new Set(cpes)];
+      const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
+      const userId = ctx.auth.user.id;
 
-      if (!vulnerability) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Vulnerability not found",
+      // Verify the vulnerability exists
+      if (input.vulnerabilityId) {
+        const vuln = await prisma.vulnerability.findUnique({
+          where: { id: input.vulnerabilityId },
         });
+        if (!vuln) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Vulnerability not found",
+          });
+        }
       }
 
-      const { cpe, ...dataInput } = input;
-      const deviceGroup = await cpeToDeviceGroup(cpe);
-      return prisma.remediation.create({
-        data: {
-          ...dataInput,
-          deviceGroupId: deviceGroup.id,
-          userId: ctx.auth.user.id,
-        },
-        include: remediationInclude,
+      // Create device artifact with wrappers and initial artifacts in a transaction
+      const result = await prisma.$transaction(async (tx) => {
+        // Create the device artifact
+        const remediation = await tx.remediation.create({
+          data: {
+            ...dataInput,
+            affectedDeviceGroups: {
+              connect: deviceGroups.map((dg) => ({ id: dg.id })),
+            },
+            userId,
+          },
+        });
+
+        // Create a wrapper and artifact for each input artifact
+        await createArtifactWrappers(
+          tx,
+          artifacts,
+          remediation.id,
+          "remediationId",
+          userId,
+        );
+
+        // Fetch the complete remeidation with includes
+        return tx.remediation.findUniqueOrThrow({
+          where: { id: remediation.id },
+          include: remediationInclude,
+        });
       });
+
+      return transformArtifactWrapper(result);
     }),
 
   // DELETE /api/remediations/{id} - Delete remediation (only creator can delete)
@@ -204,20 +256,16 @@ export const remediationsRouter = createTRPCRouter({
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "remediation");
 
-      return prisma.remediation.delete({
+      const result = prisma.remediation.delete({
         where: { id: input.id },
         include: remediationInclude,
       });
+      return transformArtifactWrapper(result);
     }),
 
   // PUT /api/remediations/{id} - Update remediation (only creator can update)
   update: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        data: remediationInputSchema,
-      }),
-    )
+    .input(remediationUpdateSchema)
     .meta({
       openapi: {
         method: "PUT",
@@ -231,48 +279,40 @@ export const remediationsRouter = createTRPCRouter({
     .output(remediationResponseSchema)
     .mutation(async ({ ctx, input }) => {
       // Verify ownership and get current data
-      const remediation = await prisma.remediation.findUnique({
-        where: { id: input.id },
-        select: { userId: true, vulnerabilityId: true },
-      });
+      await requireOwnership(input.id, ctx.auth.user.id, "remediation");
 
-      if (!remediation) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Remediation not found",
-        });
+      const { id, cpes, ...updateData } = input;
+
+      // Prepare update data
+      const data: Prisma.RemediationUpdateInput = {
+        ...(updateData.narrative !== undefined && {
+          narrative: updateData.narrative,
+        }),
+        ...(updateData.description !== undefined && {
+          description: updateData.description,
+        }),
+        ...(updateData.upstreamApi !== undefined && {
+          upstreamApi: updateData.upstreamApi,
+        }),
+        ...(updateData.vulnerabilityId !== undefined && {
+          vulnerabilityId: updateData.vulnerabilityId,
+        }),
+      };
+
+      // Handle CPE/device group update if provided
+      if (cpes) {
+        const uniqueCpes = [...new Set(cpes)];
+        const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
+        data.affectedDeviceGroups = {
+          set: deviceGroups.map((dg) => ({ id: dg.id })),
+        };
       }
 
-      if (remediation.userId !== ctx.auth.user.id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You can only update remediations that you created",
-        });
-      }
-
-      // Verify the vulnerability exists if it's being changed
-      if (input.data.vulnerabilityId !== remediation.vulnerabilityId) {
-        const vulnerability = await prisma.vulnerability.findUnique({
-          where: { id: input.data.vulnerabilityId },
-        });
-
-        if (!vulnerability) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Vulnerability not found",
-          });
-        }
-      }
-
-      const { cpe, ...updateData } = input.data;
-      const deviceGroup = await cpeToDeviceGroup(cpe);
-      return prisma.remediation.update({
-        where: { id: input.id },
-        data: {
-          ...updateData,
-          deviceGroupId: deviceGroup.id,
-        },
+      const result = await prisma.remediation.update({
+        where: { id },
+        data,
         include: remediationInclude,
       });
+      return transformArtifactWrapper(result);
     }),
 });

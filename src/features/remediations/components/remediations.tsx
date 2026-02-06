@@ -12,6 +12,7 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +35,8 @@ import {
   useSuspenseRemediations,
 } from "../hooks/use-remediations";
 import { useRemediationsParams } from "../hooks/use-remediations-params";
+import { RemediationResponse } from "../server/routers";
+import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 
 export const RemediationsSearch = () => {
   const [params, setParams] = useRemediationsParams();
@@ -119,20 +122,10 @@ export const RemediationsEmpty = () => {
   );
 };
 
-type RemediationWithRelations = Omit<Remediation, "deviceGroupId"> & {
-  vulnerability: {
-    id: string;
-    affectedDeviceGroups: DeviceGroupIncludeType[];
-    description: string;
-    impact: string;
-  };
-  deviceGroup: DeviceGroupIncludeType;
-};
-
 export const RemediationItem = ({
   data,
 }: {
-  data: RemediationWithRelations;
+  data: RemediationResponse;
 }) => {
   const removeRemediation = useRemoveRemediation();
 
@@ -148,8 +141,8 @@ export const RemediationItem = ({
       <div className="flex-1 min-w-0">
         <RemediationDrawer remediation={data} />
         <div className="text-xs text-muted-foreground mt-1">
-          {data.description.substring(0, 100)}
-          {data.description.length > 100 ? "..." : ""} &bull; Updated{" "}
+          {data.description ? data.description.substring(0, 100) : "Remediation"}
+          {data.description && data.description.length > 100 ? "..." : ""} &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
         </div>
       </div>
@@ -168,7 +161,7 @@ export const RemediationItem = ({
 function RemediationDrawer({
   remediation,
 }: {
-  remediation: RemediationWithRelations;
+  remediation: RemediationResponse;
 }) {
   const isMobile = useIsMobile();
 
@@ -179,12 +172,12 @@ function RemediationDrawer({
           variant="link"
           className="text-foreground h-auto p-0 text-left font-medium"
         >
-          {remediation.deviceGroup.cpe}
+          {remediation.affectedDeviceGroups[0].cpe}
         </Button>
       </DrawerTrigger>
       <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
         <DrawerHeader className="gap-1">
-          <DrawerTitle>{remediation.deviceGroup.id}</DrawerTitle>
+          <DrawerTitle>{remediation.affectedDeviceGroups[0].cpe}</DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
             <Badge variant="outline" className="text-primary">
               <WrenchIcon className="size-3 mr-1" />
@@ -206,15 +199,16 @@ function RemediationDrawer({
 
           <Separator />
 
-          {/* Deployment Narrative */}
+          {/* Narrative */}
           <div className="flex flex-col gap-2">
-            <h3 className="font-semibold">Deployment Instructions</h3>
+            <h3 className="font-semibold">Narrative</h3>
             <p className="text-muted-foreground">{remediation.narrative}</p>
           </div>
 
           <Separator />
 
           {/* Related Vulnerability */}
+          {remediation.vulnerability && (
           <div className="flex flex-col gap-2">
             <h3 className="font-semibold text-destructive">
               Related Vulnerability
@@ -223,22 +217,17 @@ function RemediationDrawer({
               <div className="flex items-center gap-2 mb-2">
                 <AlertTriangleIcon className="size-4 text-destructive" />
                 <span className="font-medium text-sm">
-                  {remediation.vulnerability.affectedDeviceGroups
-                    .map((group) => group.cpe)
-                    .join(", ")}
+                  <Link href={remediation.vulnerability.url}>{remediation.vulnerability.id}</Link>
                 </span>
-              </div>
-              <p className="text-xs text-muted-foreground mb-2">
-                {remediation.vulnerability.description}
-              </p>
-              <div className="text-xs">
-                <span className="font-medium">Clinical Impact:</span>
-                <p className="text-muted-foreground mt-1">
-                  {remediation.vulnerability.impact}
-                </p>
               </div>
             </div>
           </div>
+          )}
+          
+          <Separator />
+
+          {/* Artifacts */}
+          <ArtifactsDrawerEntry artifacts={remediation.artifacts} />
 
           <Separator />
 
@@ -252,29 +241,15 @@ function RemediationDrawer({
                   CPE Identifier
                 </div>
                 <code className="text-xs bg-muted px-2 py-1 rounded">
-                  {remediation.deviceGroup.cpe}
+                  {remediation.affectedDeviceGroups[0].cpe}
                 </code>
-              </div>
-
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Fix Repository
-                </div>
-                <a
-                  href={remediation.fixUri}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  {remediation.fixUri}
-                  <ExternalLinkIcon className="size-3" />
-                </a>
               </div>
 
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1">
                   Upstream API
                 </div>
+                {remediation.upstreamApi ? (
                 <a
                   href={remediation.upstreamApi}
                   target="_blank"
@@ -284,6 +259,7 @@ function RemediationDrawer({
                   {remediation.upstreamApi}
                   <ExternalLinkIcon className="size-3" />
                 </a>
+                ) : <p>None set</p>}
               </div>
             </div>
           </div>

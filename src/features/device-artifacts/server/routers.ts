@@ -4,7 +4,12 @@ import {
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { cpeToDeviceGroup, fetchPaginated } from "@/lib/router-utils";
+import {
+  cpeToDeviceGroup,
+  createArtifactWrappers,
+  fetchPaginated,
+  transformArtifactWrapper,
+} from "@/lib/router-utils";
 import {
   artifactInputSchema,
   artifactWithUrlsSchema,
@@ -19,6 +24,7 @@ import {
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
+import { Prisma } from "@/generated/prisma";
 
 const deviceArtifactInputSchema = z.object({
   cpe: cpeSchema,
@@ -96,24 +102,6 @@ const deviceArtifactInclude = {
   artifacts: artifactWrapperSelect,
 };
 
-// Helper function to transform Prisma result to response format
-const transformDeviceArtifact = (
-  deviceArtifact: any,
-): DeviceArtifactResponse => {
-  return {
-    ...deviceArtifact,
-    artifacts: deviceArtifact.artifacts
-      .map((wrapper: any) => {
-        const { _count: _ignoreMe, ...rest } = wrapper;
-        return {
-          ...rest,
-          versionsCount: wrapper._count.artifacts,
-        };
-      })
-      .filter(Boolean),
-  };
-};
-
 export const deviceArtifactsRouter = createTRPCRouter({
   // GET /api/deviceArtifacts - List all deviceArtifacts (any authenticated user can see all)
   getMany: protectedProcedure
@@ -140,7 +128,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
 
       return {
         ...result,
-        items: result.items.map(transformDeviceArtifact),
+        items: result.items.map(transformArtifactWrapper),
       };
     }),
 
@@ -189,7 +177,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
 
       return {
         ...result,
-        items: result.items.map(transformDeviceArtifact),
+        items: result.items.map(transformArtifactWrapper),
       };
     }),
 
@@ -212,7 +200,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
         where: { id: input.id },
         include: deviceArtifactInclude,
       });
-      return transformDeviceArtifact(deviceArtifact);
+      return transformArtifactWrapper(deviceArtifact);
     }),
 
   // POST /api/deviceArtifacts - Create deviceArtifact
@@ -246,35 +234,13 @@ export const deviceArtifactsRouter = createTRPCRouter({
           },
         });
 
-        // Create a wrapper and artifact for each input artifact
-        for (const artifactInput of input.artifacts) {
-          // Create artifact wrapper
-          const wrapper = await tx.artifactWrapper.create({
-            data: {
-              deviceArtifactId: deviceArtifact.id,
-              userId,
-            },
-          });
-
-          // Create initial artifact
-          const artifact = await tx.artifact.create({
-            data: {
-              wrapperId: wrapper.id,
-              name: artifactInput.name || null,
-              artifactType: artifactInput.artifactType,
-              downloadUrl: artifactInput.downloadUrl,
-              size: artifactInput.size || null,
-              versionNumber: 1,
-              userId,
-            },
-          });
-
-          // Update wrapper to point to this artifact as latest
-          await tx.artifactWrapper.update({
-            where: { id: wrapper.id },
-            data: { latestArtifactId: artifact.id },
-          });
-        }
+        await createArtifactWrappers(
+          tx,
+          input.artifacts,
+          deviceArtifact.id,
+          "deviceArtifactId",
+          userId,
+        );
 
         // Fetch the complete device artifact with includes
         return tx.deviceArtifact.findUniqueOrThrow({
@@ -283,7 +249,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
         });
       });
 
-      return transformDeviceArtifact(result);
+      return transformArtifactWrapper(result);
     }),
 
   // DELETE /api/deviceArtifacts/{deviceArtifact_id} - Delete deviceArtifact (only creator can delete)
@@ -309,7 +275,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
         include: deviceArtifactInclude,
       });
 
-      return transformDeviceArtifact(deviceArtifact);
+      return transformArtifactWrapper(deviceArtifact);
     }),
 
   // PUT /api/deviceArtifacts/{deviceArtifact_id} - Update deviceArtifact (only creator can update)
@@ -333,23 +299,20 @@ export const deviceArtifactsRouter = createTRPCRouter({
       const { id, cpe, ...updateData } = input;
 
       // Prepare update data
-      const data: {
-        role?: string;
-        description?: string;
-        upstreamApi?: string;
-        deviceGroupId?: string;
-      } = {};
-
-      if (updateData.role !== undefined) data.role = updateData.role;
-      if (updateData.description !== undefined)
-        data.description = updateData.description;
-      if (updateData.upstreamApi !== undefined)
-        data.upstreamApi = updateData.upstreamApi;
+      const data: Prisma.DeviceArtifactUpdateInput = {
+        ...(updateData.role !== undefined && { role: updateData.role }),
+        ...(updateData.description !== undefined && {
+          description: updateData.description,
+        }),
+        ...(updateData.upstreamApi !== undefined && {
+          upstreamApi: updateData.upstreamApi,
+        }),
+      };
 
       // Handle CPE/device group update if provided
       if (cpe) {
         const deviceGroup = await cpeToDeviceGroup(cpe);
-        data.deviceGroupId = deviceGroup.id;
+        data.deviceGroup = { connect: { id: deviceGroup.id } };
       }
 
       const deviceArtifact = await prisma.deviceArtifact.update({
@@ -358,6 +321,6 @@ export const deviceArtifactsRouter = createTRPCRouter({
         include: deviceArtifactInclude,
       });
 
-      return transformDeviceArtifact(deviceArtifact);
+      return transformArtifactWrapper(deviceArtifact);
     }),
 });

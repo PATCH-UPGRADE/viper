@@ -38,6 +38,16 @@ const vulnerabilityExtension = Prisma.defineExtension((client) =>
         },
       },
     },
+    result: {
+      vulnerability: {
+        url: {
+          needs: { id: true },
+          compute(vulnerability) {
+            return `${getBaseUrl()}/api/v1/vulnerabilities/${vulnerability.id}`;
+          },
+        },
+      },
+    },
   }),
 );
 
@@ -109,6 +119,10 @@ const createPrismaClient = () =>
     .$extends(deviceGroupExtension)
     .$extends(artifactExtension)
     .$extends(vulnerabilityExtension);
+export type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
+export type TransactionClient = Parameters<
+  Parameters<ExtendedPrismaClient["$transaction"]>[0]
+>[0];
 
 // see https://www.prisma.io/docs/guides/nextjs#26-set-up-prisma-client
 const globalForPrisma = globalThis as unknown as {

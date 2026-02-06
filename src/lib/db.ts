@@ -38,6 +38,16 @@ const vulnerabilityExtension = Prisma.defineExtension((client) =>
         },
       },
     },
+    result: {
+      vulnerability: {
+        url: {
+          needs: { id: true },
+          compute(vulnerability) {
+            return `${getBaseUrl()}/api/v1/vulnerabilities/${vulnerability.id}`;
+          },
+        },
+      },
+    },
   }),
 );
 
@@ -64,10 +74,10 @@ const deviceGroupExtension = Prisma.defineExtension({
           return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/vulnerabilities`;
         },
       },
-      emulatorsUrl: {
+      deviceArtifactsUrl: {
         needs: { id: true },
         compute(deviceGroup) {
-          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/emulators`;
+          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/deviceArtifacts`;
         },
       },
       assetsUrl: {
@@ -80,11 +90,39 @@ const deviceGroupExtension = Prisma.defineExtension({
   },
 });
 
+// add more helper urls for artifacts
+const artifactExtension = Prisma.defineExtension({
+  name: "artifactUrls",
+  result: {
+    artifactWrapper: {
+      allVersionsUrl: {
+        needs: { id: true },
+        compute(artifactWrapper) {
+          return `${getBaseUrl()}/api/v1/artifacts/versions/${artifactWrapper.id}`;
+        },
+      },
+    },
+    artifact: {
+      url: {
+        needs: { id: true },
+        compute(artifact) {
+          return `${getBaseUrl()}/api/v1/artifacts/${artifact.id}`;
+        },
+      },
+    },
+  },
+});
+
 // allows us to extend deviceGroup model wherever it gets used
 const createPrismaClient = () =>
   new PrismaClient()
     .$extends(deviceGroupExtension)
+    .$extends(artifactExtension)
     .$extends(vulnerabilityExtension);
+export type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
+export type TransactionClient = Parameters<
+  Parameters<ExtendedPrismaClient["$transaction"]>[0]
+>[0];
 
 // see https://www.prisma.io/docs/guides/nextjs#26-set-up-prisma-client
 const globalForPrisma = globalThis as unknown as {

@@ -52,9 +52,9 @@ const menuItems = [
         url: "/vulnerabilities",
       },
       {
-        title: "Emulators",
+        title: "Device Artifacts",
         icon: CpuIcon,
-        url: "/emulators",
+        url: "/deviceArtifacts",
       },
       {
         title: "Remediations",

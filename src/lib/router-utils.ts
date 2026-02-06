@@ -1,11 +1,11 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
 import "server-only";
-import { SyncStatusEnum } from "@/generated/prisma";
+import { type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
 } from "@/generated/prisma/runtime/library";
-import prisma from "@/lib/db";
+import prisma, { type TransactionClient } from "@/lib/db";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
@@ -77,6 +77,65 @@ export async function fetchPaginated<
   } as TArgs);
 
   return createPaginatedResponse(items, meta);
+}
+
+// Helper function to transform Prisma result to response format
+export const transformArtifactWrapper = (item: any) => {
+  return {
+    ...item,
+    artifacts: item.artifacts
+      .map((wrapper: any) => {
+        const { _count: _ignoreMe, ...rest } = wrapper;
+        return {
+          ...rest,
+          versionsCount: wrapper._count.artifacts,
+        };
+      })
+      .filter(Boolean),
+  };
+};
+
+// Helper function to create ArtifactWrapper s
+export async function createArtifactWrappers(
+  tx: TransactionClient,
+  artifacts: Array<{
+    name?: string | null;
+    artifactType: ArtifactType;
+    downloadUrl: string;
+    size?: number | null;
+  }>,
+  parentId: string,
+  parentField: "deviceArtifactId" | "remediationId",
+  userId: string,
+): Promise<void> {
+  for (const artifactInput of artifacts) {
+    // Create artifact wrapper
+    const wrapper = await tx.artifactWrapper.create({
+      data: {
+        [parentField]: parentId,
+        userId,
+      },
+    });
+
+    // Create initial artifact
+    const artifact = await tx.artifact.create({
+      data: {
+        wrapperId: wrapper.id,
+        name: artifactInput.name || null,
+        artifactType: artifactInput.artifactType,
+        downloadUrl: artifactInput.downloadUrl,
+        size: artifactInput.size || null,
+        versionNumber: 1,
+        userId,
+      },
+    });
+
+    // Update wrapper to point to this artifact as latest
+    await tx.artifactWrapper.update({
+      where: { id: wrapper.id },
+      data: { latestArtifactId: artifact.id },
+    });
+  }
 }
 
 // ============================================================================

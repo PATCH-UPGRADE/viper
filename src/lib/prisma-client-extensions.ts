@@ -103,6 +103,16 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
         },
       },
     },
+    result: {
+      vulnerability: {
+        url: {
+          needs: { id: true },
+          compute(vulnerability) {
+            return `${getBaseUrl()}/api/v1/vulnerabilities/${vulnerability.id}`;
+          },
+        },
+      },
+    },
   }),
 );
 

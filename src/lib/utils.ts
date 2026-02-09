@@ -40,8 +40,7 @@ export const parseAuthenticationJson = (
     if (!parsed.success) {
       throw new Error("Invalid Header auth configuration");
     }
-    const { header, value } = parsed.data;
-    return { header, value };
+    return { header: parsed.data.header, value: parsed.data.value };
   }
 
   throw new Error("Invalid auth configuration");

@@ -254,35 +254,39 @@ export function VulnerabilityDrawer({
               </CopyCode>
             </div>
 
-            <div>
-              <div className="text-xs font-medium text-muted-foreground mb-1">
-                Exploit Repository
+            {vulnerability.exploitUri && (
+              <div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Exploit Repository
+                </div>
+                <a
+                  href={vulnerability.exploitUri ?? undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                >
+                  {vulnerability.exploitUri}
+                  <ExternalLinkIcon className="size-3" />
+                </a>
               </div>
-              <a
-                href={vulnerability.exploitUri ?? undefined}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline flex items-center gap-1"
-              >
-                {vulnerability.exploitUri}
-                <ExternalLinkIcon className="size-3" />
-              </a>
-            </div>
+            )}
 
-            <div>
-              <div className="text-xs font-medium text-muted-foreground mb-1">
-                Upstream API
+            {vulnerability.upstreamApi && (
+              <div>
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                  Upstream API
+                </div>
+                <a
+                  href={vulnerability.upstreamApi ?? undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                >
+                  {vulnerability.upstreamApi}
+                  <ExternalLinkIcon className="size-3" />
+                </a>
               </div>
-              <a
-                href={vulnerability.upstreamApi ?? undefined}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline flex items-center gap-1"
-              >
-                {vulnerability.upstreamApi}
-                <ExternalLinkIcon className="size-3" />
-              </a>
-            </div>
+            )}
           </div>
         </div>
 

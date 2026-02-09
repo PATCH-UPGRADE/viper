@@ -148,8 +148,8 @@ export const VulnerabilityItem = ({
           {data.affectedDeviceGroups.map((group) => group.cpe).join(", ")}
         </VulnerabilityDrawer>
         <div className="text-xs text-muted-foreground mt-1">
-          {data.description.substring(0, 100)}
-          {data.description.length > 100 ? "..." : ""} &bull; Updated{" "}
+          {(data.description ?? "").substring(0, 100)}
+          {(data.description ?? "").length > 100 ? "..." : ""} &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
           {hasIssues && data.issues.length >= 1 && (
             <>
@@ -259,7 +259,7 @@ export function VulnerabilityDrawer({
                 Exploit Repository
               </div>
               <a
-                href={vulnerability.exploitUri}
+                href={vulnerability.exploitUri ?? undefined}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-primary hover:underline flex items-center gap-1"
@@ -274,7 +274,7 @@ export function VulnerabilityDrawer({
                 Upstream API
               </div>
               <a
-                href={vulnerability.upstreamApi}
+                href={vulnerability.upstreamApi ?? undefined}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-primary hover:underline flex items-center gap-1"

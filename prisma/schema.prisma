@@ -372,7 +372,7 @@ model Vulnerability {
   cvssScore            Float?
   cvssVector           String?
   sarif                Json
-  affectedComponents   String[]
+  affectedComponents   String[]      @default([])
   affectedDeviceGroups DeviceGroup[] @relation("VulnerabilityDeviceGroups")
   exploitUri           String?       @map("exploit-uri")
   upstreamApi          String?       @map("upstream-api")

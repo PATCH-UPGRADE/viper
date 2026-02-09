@@ -8,7 +8,7 @@
 CREATE TYPE "Severity" AS ENUM ('Critical', 'High', 'Medium', 'Low');
 
 -- AlterTable
-ALTER TABLE "vulnerability" ADD COLUMN     "affectedComponents" TEXT[],
+ALTER TABLE "vulnerability" ADD COLUMN     "affectedComponents" TEXT[] NOT NULL DEFAULT '{}',
 ADD COLUMN     "cveId" TEXT,
 ADD COLUMN     "cvssScore" DOUBLE PRECISION,
 ADD COLUMN     "cvssVector" TEXT,

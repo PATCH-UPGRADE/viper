@@ -27,7 +27,7 @@ export const deviceGroupExtension = Prisma.defineExtension({
           return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/vulnerabilities`;
         },
       },
-      emulatorsUrl: {
+      deviceArtifactsUrl: {
         needs: { id: true },
         compute(deviceGroup) {
           return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/emulators`;

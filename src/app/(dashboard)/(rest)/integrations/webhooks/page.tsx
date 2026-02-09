@@ -6,9 +6,9 @@ import {
   WebhooksList,
   WebhooksLoading,
 } from "@/features/webhooks/components/webhooks";
+import { prefetchWebhooks } from "@/features/webhooks/server/prefetch";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
-import { prefetchWebhooks } from "@/features/webhooks/server/prefetch";
 
 const Page = async () => {
   await requireAuth();

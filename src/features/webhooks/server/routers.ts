@@ -3,6 +3,7 @@ import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { requireOwnership } from "@/trpc/middleware";
 import {
   paginatedWebhooksResponseSchema,
   updateWebhookSchema,
@@ -37,8 +38,11 @@ export const webhooksRouter = createTRPCRouter({
   update: protectedProcedure
     .input(updateWebhookSchema)
     .output(webhookResponseSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { id, ...updateData } = input;
+
+      await requireOwnership(input.id, ctx.auth.user.id, "webhook");
+
       return prisma.webhook.update({
         where: { id },
         data: {
@@ -51,10 +55,13 @@ export const webhooksRouter = createTRPCRouter({
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const userId = ctx.auth.user.id;
+      await requireOwnership(input.id, userId, "webhook");
+
       return prisma.webhook.delete({
         where: {
           id: input.id,
-          userId: ctx.auth.user.id,
+          userId,
         },
       });
     }),

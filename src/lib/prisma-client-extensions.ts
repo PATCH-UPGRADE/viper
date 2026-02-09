@@ -1,7 +1,5 @@
-import {
-  Prisma,
-  TriggerEnum,
-} from "@/generated/prisma";
+import { Prisma, TriggerEnum } from "@/generated/prisma";
+import type { PayloadToResult } from "@/generated/prisma/runtime/library";
 import prisma from "./db";
 import { getBaseUrl } from "./url-utils";
 import { sendWebhook } from "./utils";
@@ -88,26 +86,53 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
 const sendWebhooks = async (triggerType: TriggerEnum, timestamp: Date) => {
   try {
     const webhooks = await prisma.webhook.findMany({
-      where: { triggers: { has: triggerType }}
+      where: { triggers: { has: triggerType } },
     });
     await Promise.allSettled(
-      webhooks.map((webhook) => sendWebhook(triggerType, timestamp, webhook))
-    )
+      webhooks.map((webhook) => sendWebhook(triggerType, timestamp, webhook)),
+    );
   } catch (e: unknown) {
-    console.error("Failed to send webhook with error:", e)
+    console.error("Failed to send webhook with error:", e);
   }
 };
 
+const handleSimpleQuery = (
+  triggerType: TriggerEnum,
+  time: PayloadToResult<Date> | undefined,
+) => {
+  sendWebhooks(triggerType, !time ? new Date() : (time as Date));
+};
+
+const handleUpsertQuery = (
+  createdTrigger: TriggerEnum,
+  updatedTrigger: TriggerEnum,
+  createdAt: PayloadToResult<Date> | undefined,
+  updatedAt: PayloadToResult<Date> | undefined,
+) => {
+  // Need to check if upsert was a create or update by checking timestamps
+  let timestamp = new Date();
+  let trigger: TriggerEnum = updatedTrigger;
+
+  if (createdAt && updatedAt) {
+    const created = createdAt as Date;
+    const updated = updatedAt as Date;
+    timestamp = updated;
+    if (created.getTime() === updated.getTime()) {
+      trigger = createdTrigger;
+    }
+  }
+
+  sendWebhooks(trigger, timestamp);
+};
+
+// sends out related webhooks when prisma (creates | updates | upserts | createMany | updateMany) a DeviceGroup or Artifact
 export const sendWebhooksExtension = Prisma.defineExtension({
   name: "sendWebhooksOnDatabaseEvent",
   query: {
     deviceGroup: {
       async update({ args, query }) {
         const item = await query(args);
-        sendWebhooks(
-          TriggerEnum.DeviceGroup_Updated,
-          !item.updatedAt ? new Date() : (item.updatedAt as Date),
-        );
+        handleSimpleQuery(TriggerEnum.DeviceGroup_Updated, item.updatedAt);
         return item;
       },
       async updateMany({ args, query }) {
@@ -118,21 +143,12 @@ export const sendWebhooksExtension = Prisma.defineExtension({
       },
       async upsert({ args, query }) {
         const item = await query(args);
-
-        // Need to check if upsert was a create or update by checking timestamps
-        let timestamp = new Date();
-        let trigger: TriggerEnum = TriggerEnum.DeviceGroup_Updated;
-
-        if (item.createdAt && item.updatedAt) {
-          const createdAt = item.createdAt as Date;
-          const updatedAt = item.updatedAt as Date;
-          timestamp = updatedAt;
-          if (createdAt.getTime() === updatedAt.getTime()) {
-            trigger = TriggerEnum.DeviceGroup_Created;
-          }
-        }
-
-        sendWebhooks(trigger, timestamp);
+        handleUpsertQuery(
+          TriggerEnum.DeviceGroup_Created,
+          TriggerEnum.DeviceGroup_Updated,
+          item.createdAt,
+          item.updatedAt,
+        );
         return item;
       },
       async createMany({ args, query }) {
@@ -143,10 +159,41 @@ export const sendWebhooksExtension = Prisma.defineExtension({
       },
       async create({ args, query }) {
         const item = await query(args);
-        sendWebhooks(
-          TriggerEnum.DeviceGroup_Created,
-          !item.createdAt ? new Date() : (item.createdAt as Date),
+        handleSimpleQuery(TriggerEnum.DeviceGroup_Created, item.createdAt);
+        return item;
+      },
+    },
+    artifact: {
+      async update({ args, query }) {
+        const item = await query(args);
+        handleSimpleQuery(TriggerEnum.Artifact_Updated, item.updatedAt);
+        return item;
+      },
+      async updateMany({ args, query }) {
+        const items = await query(args);
+        // NOTE: Prisma / PSQL updateMany doesn't return a list of records for "updatedAt" so create one here
+        sendWebhooks(TriggerEnum.Artifact_Updated, new Date());
+        return items;
+      },
+      async upsert({ args, query }) {
+        const item = await query(args);
+        handleUpsertQuery(
+          TriggerEnum.Artifact_Created,
+          TriggerEnum.Artifact_Updated,
+          item.createdAt,
+          item.updatedAt,
         );
+        return item;
+      },
+      async createMany({ args, query }) {
+        const items = await query(args);
+        // NOTE: Prisma / PSQL createMany doesn't return a list of records for "createdAt" so create one here
+        sendWebhooks(TriggerEnum.Artifact_Created, new Date());
+        return items;
+      },
+      async create({ args, query }) {
+        const item = await query(args);
+        handleSimpleQuery(TriggerEnum.Artifact_Created, item.createdAt);
         return item;
       },
     },

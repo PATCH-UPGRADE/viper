@@ -1,8 +1,8 @@
 import z from "zod";
 import { AuthType, TriggerEnum } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
-import { authenticationSchema } from "../integrations/types";
 import { safeUrlSchema } from "@/lib/schemas";
+import { authenticationSchema } from "../integrations/types";
 
 const triggerEnumArray = z.array(z.enum(TriggerEnum));
 

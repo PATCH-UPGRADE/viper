@@ -49,10 +49,12 @@ import { usePaginationParams } from "@/lib/pagination";
 import { type WebhookFormValues, webhookInputSchema } from "../types";
 
 const triggerDescriptions = {
-  [TriggerEnum.DeviceGroup_Created]: "When a Device Group is created",
-  [TriggerEnum.DeviceGroup_Updated]: "When a Device Group is updated",
   [TriggerEnum.Artifact_Created]: "When an Artifact is created",
   [TriggerEnum.Artifact_Updated]: "When an Artifact is updated",
+  [TriggerEnum.DeviceArtifact_Created]: "When a Device Artifact is created",
+  [TriggerEnum.DeviceArtifact_Updated]: "When a Device Artifact is updated",
+  [TriggerEnum.DeviceGroup_Created]: "When a Device Group is created",
+  [TriggerEnum.DeviceGroup_Updated]: "When a Device Group is updated",
 };
 
 export const WebhooksList = () => {

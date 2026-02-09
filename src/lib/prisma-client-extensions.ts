@@ -158,44 +158,10 @@ const handleUpsertQuery = (
   sendWebhooks(trigger, timestamp);
 };
 
-// sends out related webhooks when prisma (creates | updates | upserts | createMany | updateMany) a DeviceGroup or Artifact
+// sends out related webhooks when prisma (creates | updates | upserts | createMany | updateMany) a Artifact, DeviceArtifact or DeviceGroup
 export const sendWebhooksExtension = Prisma.defineExtension({
   name: "sendWebhooksOnDatabaseEvent",
   query: {
-    deviceGroup: {
-      async update({ args, query }) {
-        const item = await query(args);
-        handleSimpleQuery(TriggerEnum.DeviceGroup_Updated, item.updatedAt);
-        return item;
-      },
-      async updateMany({ args, query }) {
-        const items = await query(args);
-        // NOTE: Prisma / PSQL updateMany doesn't return a list of records for "updatedAt" so create one here
-        sendWebhooks(TriggerEnum.DeviceGroup_Updated, new Date());
-        return items;
-      },
-      async upsert({ args, query }) {
-        const item = await query(args);
-        handleUpsertQuery(
-          TriggerEnum.DeviceGroup_Created,
-          TriggerEnum.DeviceGroup_Updated,
-          item.createdAt,
-          item.updatedAt,
-        );
-        return item;
-      },
-      async createMany({ args, query }) {
-        const items = await query(args);
-        // NOTE: Prisma / PSQL createMany doesn't return a list of records for "createdAt" so create one here
-        sendWebhooks(TriggerEnum.DeviceGroup_Created, new Date());
-        return items;
-      },
-      async create({ args, query }) {
-        const item = await query(args);
-        handleSimpleQuery(TriggerEnum.DeviceGroup_Created, item.createdAt);
-        return item;
-      },
-    },
     artifact: {
       async update({ args, query }) {
         const item = await query(args);
@@ -227,6 +193,74 @@ export const sendWebhooksExtension = Prisma.defineExtension({
       async create({ args, query }) {
         const item = await query(args);
         handleSimpleQuery(TriggerEnum.Artifact_Created, item.createdAt);
+        return item;
+      },
+    },
+    deviceArtifact: {
+      async update({ args, query }) {
+        const item = await query(args);
+        handleSimpleQuery(TriggerEnum.DeviceArtifact_Updated, item.updatedAt);
+        return item;
+      },
+      async updateMany({ args, query }) {
+        const items = await query(args);
+        // NOTE: Prisma / PSQL updateMany doesn't return a list of records for "updatedAt" so create one here
+        sendWebhooks(TriggerEnum.DeviceArtifact_Updated, new Date());
+        return items;
+      },
+      async upsert({ args, query }) {
+        const item = await query(args);
+        handleUpsertQuery(
+          TriggerEnum.DeviceArtifact_Created,
+          TriggerEnum.DeviceArtifact_Updated,
+          item.createdAt,
+          item.updatedAt,
+        );
+        return item;
+      },
+      async createMany({ args, query }) {
+        const items = await query(args);
+        // NOTE: Prisma / PSQL createMany doesn't return a list of records for "createdAt" so create one here
+        sendWebhooks(TriggerEnum.DeviceArtifact_Created, new Date());
+        return items;
+      },
+      async create({ args, query }) {
+        const item = await query(args);
+        handleSimpleQuery(TriggerEnum.DeviceArtifact_Created, item.createdAt);
+        return item;
+      },
+    },
+    deviceGroup: {
+      async update({ args, query }) {
+        const item = await query(args);
+        handleSimpleQuery(TriggerEnum.DeviceGroup_Updated, item.updatedAt);
+        return item;
+      },
+      async updateMany({ args, query }) {
+        const items = await query(args);
+        // NOTE: Prisma / PSQL updateMany doesn't return a list of records for "updatedAt" so create one here
+        sendWebhooks(TriggerEnum.DeviceGroup_Updated, new Date());
+        return items;
+      },
+      async upsert({ args, query }) {
+        const item = await query(args);
+        handleUpsertQuery(
+          TriggerEnum.DeviceGroup_Created,
+          TriggerEnum.DeviceGroup_Updated,
+          item.createdAt,
+          item.updatedAt,
+        );
+        return item;
+      },
+      async createMany({ args, query }) {
+        const items = await query(args);
+        // NOTE: Prisma / PSQL createMany doesn't return a list of records for "createdAt" so create one here
+        sendWebhooks(TriggerEnum.DeviceGroup_Created, new Date());
+        return items;
+      },
+      async create({ args, query }) {
+        const item = await query(args);
+        handleSimpleQuery(TriggerEnum.DeviceGroup_Created, item.createdAt);
         return item;
       },
     },

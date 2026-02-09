@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "TriggerEnum" AS ENUM ('DeviceGroup_Created', 'DeviceGroup_Updated', 'Artifact_Created', 'Artifact_Updated');
+CREATE TYPE "TriggerEnum" AS ENUM ('Artifact_Created', 'Artifact_Updated', 'DeviceArtifact_Created', 'DeviceArtifact_Updated', 'DeviceGroup_Created', 'DeviceGroup_Updated');
 
 -- CreateTable
 CREATE TABLE "Webhook" (

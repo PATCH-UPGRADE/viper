@@ -534,10 +534,12 @@ model Webhook {
 }
 
 enum TriggerEnum {
-  DeviceGroup_Created
-  DeviceGroup_Updated
   Artifact_Created
   Artifact_Updated
+  DeviceArtifact_Created
+  DeviceArtifact_Updated
+  DeviceGroup_Created
+  DeviceGroup_Updated
 }
 
 enum AuthType {

@@ -8,6 +8,7 @@ import {
   HeartIcon,
   HistoryIcon,
   KeyIcon,
+  SettingsIcon,
   ShieldCheckIcon,
   WorkflowIcon,
 } from "lucide-react";
@@ -67,9 +68,9 @@ const menuItems = [
         url: "/recommendations",
       },
       {
-        title: "Integrations",
-        icon: KeyIcon,
-        url: "/integrations",
+        title: "Settings",
+        icon: SettingsIcon,
+        url: "/settings",
       },
     ],
   },

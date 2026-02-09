@@ -6,7 +6,6 @@ import {
   CpuIcon,
   ExternalLink,
   HeartIcon,
-  HistoryIcon,
   KeyIcon,
   ShieldCheckIcon,
   WorkflowIcon,
@@ -36,11 +35,12 @@ const menuItems = [
         icon: WorkflowIcon,
         url: "/workflows",
       },
-      {
-        title: "Simulations",
-        icon: HistoryIcon,
-        url: "/executions",
-      },
+      // Hiding for now can bring it back if/when feature is ready
+      // {
+      //   title: "Simulations",
+      //   icon: HistoryIcon,
+      //   url: "/executions",
+      // },
       {
         title: "Assets",
         icon: ComputerIcon,

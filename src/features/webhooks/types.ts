@@ -4,7 +4,7 @@ import { createPaginatedResponseSchema } from "@/lib/pagination";
 import { authenticationSchema } from "../integrations/types";
 import { safeUrlSchema } from "@/lib/schemas";
 
-const triggerEnumArray = z.array(z.nativeEnum(TriggerEnum));
+const triggerEnumArray = z.array(z.enum(TriggerEnum));
 
 export const webhookInputSchema = z
   .object({
@@ -26,8 +26,8 @@ export const webhookInputSchema = z
   });
 
 export const updateWebhookSchema = z.object({
-  id: z.string().min(1),
-  name: z.string(),
+  id: z.string(),
+  name: z.string().min(1),
   callbackUrl: safeUrlSchema,
   triggers: triggerEnumArray,
 });

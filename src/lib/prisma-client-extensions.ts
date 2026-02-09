@@ -111,9 +111,10 @@ export const sendWebhooksExtension = Prisma.defineExtension({
         return item;
       },
       async updateMany({ args, query }) {
+        const items = await query(args);
         // NOTE: Prisma / PSQL updateMany doesn't return a list of records for "updatedAt" so create one here
         sendWebhooks(TriggerEnum.DeviceGroup_Updated, new Date());
-        return await query(args);
+        return items;
       },
       async upsert({ args, query }) {
         const item = await query(args);
@@ -135,9 +136,10 @@ export const sendWebhooksExtension = Prisma.defineExtension({
         return item;
       },
       async createMany({ args, query }) {
+        const items = await query(args);
         // NOTE: Prisma / PSQL createMany doesn't return a list of records for "createdAt" so create one here
         sendWebhooks(TriggerEnum.DeviceGroup_Created, new Date());
-        return await query(args);
+        return items;
       },
       async create({ args, query }) {
         const item = await query(args);

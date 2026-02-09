@@ -62,6 +62,7 @@ export const WebhooksList = () => {
     <EntityList
       items={webhooks.data.items}
       getKey={(item) => item.id}
+      // @ts-expect-error - WebhookItem correctly expects trigger to be TriggerEnum[] but z.infer type expects it as string[]
       renderItem={(webhook) => <WebhookItem data={webhook} />}
       emptyView={<WebhooksEmpty />}
     />

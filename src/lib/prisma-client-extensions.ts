@@ -1,12 +1,10 @@
 import {
-  AuthType,
   Prisma,
   TriggerEnum,
-  type Webhook,
 } from "@/generated/prisma";
 import prisma from "./db";
 import { getBaseUrl } from "./url-utils";
-import { parseAuthenticationJson, sendWebhook } from "./utils";
+import { sendWebhook } from "./utils";
 
 // add more helper urls for device group
 export const deviceGroupExtension = Prisma.defineExtension({
@@ -88,19 +86,15 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
 );
 
 const sendWebhooks = async (triggerType: TriggerEnum, timestamp: Date) => {
-  const webhooks = await prisma.webhook.findMany();
-  for (const webhook of webhooks) {
-    let match = false;
-    for (const trigger of webhook.triggers) {
-      if (trigger === triggerType) {
-        match = true;
-        break;
-      }
-    }
-
-    if (match) {
-      sendWebhook(triggerType, timestamp, webhook);
-    }
+  try {
+    const webhooks = await prisma.webhook.findMany({
+      where: { triggers: { has: triggerType }}
+    });
+    await Promise.allSettled(
+      webhooks.map((webhook) => sendWebhook(triggerType, timestamp, webhook))
+    )
+  } catch (e: unknown) {
+    console.error("Failed to send webhook with error:", e)
   }
 };
 

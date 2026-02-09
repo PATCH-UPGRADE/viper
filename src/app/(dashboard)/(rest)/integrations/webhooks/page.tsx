@@ -8,10 +8,11 @@ import {
 } from "@/features/webhooks/components/webhooks";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
+import { prefetchWebhooks } from "@/features/webhooks/server/prefetch";
 
 const Page = async () => {
   await requireAuth();
-  //const params = await usePaginationParams();
+  prefetchWebhooks();
 
   return (
     <WebhooksContainer>

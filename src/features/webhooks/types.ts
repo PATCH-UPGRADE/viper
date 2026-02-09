@@ -2,13 +2,14 @@ import z from "zod";
 import { AuthType, TriggerEnum } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import { authenticationSchema } from "../integrations/types";
+import { safeUrlSchema } from "@/lib/schemas";
 
-const triggerEnumArray = z.array(z.enum(TriggerEnum));
+const triggerEnumArray = z.array(z.nativeEnum(TriggerEnum));
 
 export const webhookInputSchema = z
   .object({
-    name: z.string(),
-    callbackUrl: z.string(),
+    name: z.string().min(1),
+    callbackUrl: safeUrlSchema,
     triggers: triggerEnumArray,
     authType: z.enum(AuthType),
     authentication: authenticationSchema.optional(),
@@ -25,9 +26,9 @@ export const webhookInputSchema = z
   });
 
 export const updateWebhookSchema = z.object({
-  id: z.string(),
+  id: z.string().min(1),
   name: z.string(),
-  callbackUrl: z.string(),
+  callbackUrl: safeUrlSchema,
   triggers: triggerEnumArray,
 });
 

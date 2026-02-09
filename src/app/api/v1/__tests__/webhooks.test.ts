@@ -3,6 +3,8 @@ import { AuthType, TriggerEnum } from "@/generated/prisma";
 import { sendWebhook } from "@/lib/utils";
 import { AUTH_TOKEN, generateCPE } from "./test-config";
 
+// override fetch so it doesn't send real fetch calls
+global.fetch = vi.fn();
 const fetchSpy = vi.spyOn(global, "fetch");
 
 describe("Webhook Endpoints (/webhooks)", () => {

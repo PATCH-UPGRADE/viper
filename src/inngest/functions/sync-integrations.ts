@@ -66,7 +66,7 @@ const getResponseConfig = (resourceType: ResourceType) => {
         schema: z.toJSONSchema(integrationVulnerabilityInputSchema),
       };
     // TODO
-    case "Emulator":
+    case "DeviceArtifact":
     case "Remediation":
       throw new Error(`ResourceType ${resourceType} is not supported yet`);
     default:

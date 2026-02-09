@@ -11,6 +11,11 @@ const createPrismaClient = () =>
     .$extends(vulnerabilityExtension)
     .$extends(sendWebhooksExtension);
 
+export type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
+export type TransactionClient = Parameters<
+  Parameters<ExtendedPrismaClient["$transaction"]>[0]
+>[0];
+
 // see https://www.prisma.io/docs/guides/nextjs#26-set-up-prisma-client
 const globalForPrisma = globalThis as unknown as {
   prisma?: ReturnType<typeof createPrismaClient>;

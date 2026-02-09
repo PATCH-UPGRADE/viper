@@ -106,7 +106,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       expect(deviceGroup).toHaveProperty("sbomUrl");
       expect(deviceGroup).toHaveProperty("vulnerabilitiesUrl");
       expect(deviceGroup).toHaveProperty("assetsUrl");
-      expect(deviceGroup).toHaveProperty("emulatorsUrl");
+      expect(deviceGroup).toHaveProperty("deviceArtifactsUrl");
       const deviceGroupId = deviceGroup.id;
 
       // Get the specific device group
@@ -120,7 +120,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       expect(detailRes.body).toHaveProperty("sbomUrl");
       expect(detailRes.body).toHaveProperty("vulnerabilitiesUrl");
       expect(detailRes.body).toHaveProperty("assetsUrl");
-      expect(detailRes.body).toHaveProperty("emulatorsUrl");
+      expect(detailRes.body).toHaveProperty("deviceArtifactsUrl");
     }
 
     // check the asset device group

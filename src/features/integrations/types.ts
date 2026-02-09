@@ -31,7 +31,12 @@ export const integrationInputSchema = z
     isGeneric: z.boolean(),
     prompt: z.string().optional(),
     authType: z.enum(["Basic", "Bearer", "Header", "None"]),
-    resourceType: z.enum(["Asset", "Vulnerability", "Emulator", "Remediation"]),
+    resourceType: z.enum([
+      "Asset",
+      "Vulnerability",
+      "DeviceArtifact",
+      "Remediation",
+    ]),
     authentication: authenticationSchema.optional(),
     syncEvery: z.number().int().positive().min(60),
   })

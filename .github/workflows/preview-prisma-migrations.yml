@@ -2,6 +2,9 @@ name: Prisma migrations - preview
 
 env:
   NODE_VERSION: '20'
+  NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+  NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+  BRANCH_NAME: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}
 
 on:
   pull_request:
@@ -27,17 +30,21 @@ jobs:
       - name: Install neonctl
         run: npm install -g neonctl
 
-      - name: Get Neon preview branch URL
-        env:
-          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          BRANCH_NAME: preview/${{ github.head_ref }}
+      - name: Create Neon branch for CI migration testing
+        run: |
+          set -euo pipefail
+
+          neonctl branches create --name "$BRANCH_NAME" \
+            --project-id "$NEON_PROJECT_ID" \
+            --parent main
+
+      - name: Get Neon branch URL
         run: |
           set -euo pipefail
 
           echo "Waiting for Neon branch: $BRANCH_NAME"
 
-          for i in {1..30}; do
+          for i in {1..6}; do
             if CONNECTION_URL=$(neonctl connection-string "$BRANCH_NAME" \
               --project-id "$NEON_PROJECT_ID" \
               --role-name neondb_owner \
@@ -47,11 +54,11 @@ jobs:
               exit 0
             fi
 
-            echo "Attempt $i/30 failed. Retrying in 10 seconds..."
+            echo "Attempt $i/6 to fetch Neon connection string failed. Retrying in 10 seconds..."
             sleep 10
           done
 
-          echo "Neon branch did not become available within 5 minute timeout."
+          echo "Neon branch did not become available within 60 second timeout."
           exit 1
         
       - name: Run Prisma Migrate
@@ -63,3 +70,10 @@ jobs:
           --from-url "$DATABASE_URL" \
           --to-schema-datamodel ./prisma/schema.prisma \
           --exit-code
+
+      - name: Delete Neon CI branch
+        if: always()
+        run: |
+          neonctl branches delete "$BRANCH_NAME" \
+           --project-id "$NEON_PROJECT_ID" \
+           --yes || echo "Branch already deleted or missing"

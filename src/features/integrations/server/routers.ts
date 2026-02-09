@@ -14,7 +14,12 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { integrationInputSchema } from "../types";
 
 const paginatedIntegrationsInputSchema = paginationInputSchema.extend({
-  resourceType: z.enum(["Asset", "Vulnerability", "Emulator", "Remediation"]),
+  resourceType: z.enum([
+    "Asset",
+    "Vulnerability",
+    "DeviceArtifact",
+    "Remediation",
+  ]),
 });
 
 // Helper function to create an API key for an integration

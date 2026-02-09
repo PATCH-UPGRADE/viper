@@ -27,7 +27,7 @@ jobs:
         run: npm ci
 
       - name: Dependency security audit
-        run: npm audit --production --audit-level critical 
+        run: npm audit --omit=dev --audit-level critical 
 
       - name: Check formatting/lint
         run: npx biome ci

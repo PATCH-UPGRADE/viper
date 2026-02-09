@@ -43,6 +43,29 @@ export const deviceGroupExtension = Prisma.defineExtension({
   },
 });
 
+// add more helper urls for artifacts
+export const artifactExtension = Prisma.defineExtension({
+  name: "artifactUrls",
+  result: {
+    artifactWrapper: {
+      allVersionsUrl: {
+        needs: { id: true },
+        compute(artifactWrapper) {
+          return `${getBaseUrl()}/api/v1/artifacts/versions/${artifactWrapper.id}`;
+        },
+      },
+    },
+    artifact: {
+      url: {
+        needs: { id: true },
+        compute(artifact) {
+          return `${getBaseUrl()}/api/v1/artifacts/${artifact.id}`;
+        },
+      },
+    },
+  },
+});
+
 // create issues on vulnerability create
 export const vulnerabilityExtension = Prisma.defineExtension((client) =>
   client.$extends({

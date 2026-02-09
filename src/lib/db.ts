@@ -1,5 +1,6 @@
 import { type Prisma, PrismaClient } from "@/generated/prisma";
 import {
+  artifactExtension,
   deviceGroupExtension,
   sendWebhooksExtension,
   vulnerabilityExtension,
@@ -8,6 +9,7 @@ import {
 const createPrismaClient = () =>
   new PrismaClient()
     .$extends(deviceGroupExtension)
+    .$extends(artifactExtension)
     .$extends(vulnerabilityExtension)
     .$extends(sendWebhooksExtension);
 

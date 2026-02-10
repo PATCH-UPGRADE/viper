@@ -1,5 +1,5 @@
 import "server-only";
 import { createLoader } from "nuqs/server";
-import { apiTokenParams } from "../params";
+import { createPaginationParams } from "@/lib/url-state";
 
-export const apiTokensParamsLoader = createLoader(apiTokenParams);
+export const paginationParamsLoader = createLoader(createPaginationParams());

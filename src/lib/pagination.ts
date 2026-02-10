@@ -1,4 +1,4 @@
-import { useQueryStates } from "nuqs";
+import { createLoader, useQueryStates } from "nuqs";
 import { z } from "zod";
 import { PAGINATION } from "@/config/constants";
 import { createPaginationParams } from "./url-state";

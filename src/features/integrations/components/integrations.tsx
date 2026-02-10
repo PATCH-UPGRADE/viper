@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type PropsWithChildren, useState } from "react";
+import { type PropsWithChildren, useState, useCallback, useMemo } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import {
   EmptyView,
@@ -61,27 +61,31 @@ import {
   type IntegrationFormValues,
   integrationInputSchema,
 } from "../types";
-//import { useApiTokenParams } from "../hooks/use-user-params";
-//import { type ApiTokenFormValues, apiTokenInputSchema } from "../types";
+import { DataTable } from "@/components/ui/data-table";
+import { getIntegrationColumns } from "@/features/integrations/components/columns";
 
 export const IntegrationsList = ({
   resourceType,
 }: {
   resourceType: ResourceType;
 }) => {
-  const integrations = useSuspenseIntegrations(resourceType);
+  const { data: integrations, isFetching } =
+    useSuspenseIntegrations(resourceType);
+
+  const columns = useMemo(() => {
+    return getIntegrationColumns(resourceType);
+  }, [resourceType]);
 
   return (
-    <EntityList
-      items={integrations.data.items}
-      getKey={(item) => item.id}
-      renderItem={(integration) => <IntegrationItem data={integration} />}
-      emptyView={<IntegrationsEmpty />}
-    />
+      <DataTable
+        paginatedData={integrations}
+        columns={columns}
+        isLoading={isFetching}
+      />
   );
 };
 
-const IntegrationCreateModal = ({
+export const IntegrationCreateModal = ({
   form,
   handleCreate,
   open,
@@ -122,24 +126,6 @@ const IntegrationCreateModal = ({
                       <Input
                         type="text"
                         placeholder="Integration name"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="platform"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Platform (Optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        placeholder="Platform name"
                         {...field}
                       />
                     </FormControl>
@@ -398,63 +384,6 @@ export function RotateIntegrationConfirmModal({
   );
 }
 
-export const IntegrationsHeader = ({
-  resourceType,
-}: {
-  resourceType: ResourceType;
-}) => {
-  const createIntegration = useCreateIntegration();
-  const [open, setOpen] = useState(false);
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [key, setKey] = useState<Apikey | undefined>(undefined);
-
-  const form = useForm<IntegrationFormValues>({
-    resolver: zodResolver(integrationInputSchema),
-    defaultValues: {
-      name: "",
-      resourceType: resourceType,
-      isGeneric: false,
-      syncEvery: 300,
-      authType: AuthType.None,
-    },
-  });
-
-  const handleCreate = (item: IntegrationFormValues) => {
-    createIntegration.mutate(item, {
-      onSuccess: (data) => {
-        setOpen(false);
-        setKey(data.apiKey);
-        setSuccessOpen(true);
-      },
-      onError: () => {
-        setOpen(true);
-      },
-    });
-  };
-
-  return (
-    <>
-      <EntityHeader
-        title={`${resourceType} Integrations`}
-        description="Manage Integrations"
-        onNew={() => setOpen(true)}
-        newButtonLabel="New Integration"
-      />
-      <IntegrationCreateModal
-        form={form}
-        open={open}
-        setOpen={setOpen}
-        handleCreate={handleCreate}
-      />
-      <ApiTokenSuccessModal
-        open={successOpen}
-        setOpen={setSuccessOpen}
-        apiKey={key}
-      />
-    </>
-  );
-};
-
 export const IntegrationsPagination = ({
   resourceType,
 }: {
@@ -473,22 +402,6 @@ export const IntegrationsPagination = ({
   );
 };
 
-export const IntegrationsContainer = ({
-  resourceType,
-  children,
-}: PropsWithChildren<{
-  resourceType: ResourceType;
-}>) => {
-  return (
-    <EntityContainer
-      header={<IntegrationsHeader resourceType={resourceType} />}
-      pagination={<IntegrationsPagination resourceType={resourceType} />}
-    >
-      {children}
-    </EntityContainer>
-  );
-};
-
 export const IntegrationsLoading = () => {
   return <LoadingView message="Loading integrations..." />;
 };
@@ -499,128 +412,4 @@ export const IntegrationsError = () => {
 
 export const IntegrationsEmpty = () => {
   return <EmptyView message="No Integrations" />;
-};
-
-export const IntegrationItem = ({ data }: { data: Integration }) => {
-  const removeItem = useRemoveIntegration();
-
-  const handleRemove = () => {
-    removeItem.mutate({ id: data.id });
-  };
-
-  const updateIntegration = useUpdateIntegration();
-  const rotateIntegration = useRotateIntegration();
-  const triggerSync = useTriggerSync();
-  const [open, setOpen] = useState(false);
-  const [rotateOpen, setRotateOpen] = useState(false);
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [key, setKey] = useState<Apikey | undefined>(undefined);
-
-  const form = useForm<IntegrationFormValues>({
-    resolver: zodResolver(integrationInputSchema),
-    defaultValues: {
-      name: data.name,
-      platform: data.platform || "",
-      integrationUri: data.integrationUri,
-      isGeneric: data.isGeneric,
-      prompt: data.prompt || "",
-      authType: data.authType,
-      resourceType: data.resourceType,
-      syncEvery: data.syncEvery || 300,
-      authentication: data.authentication as AuthenticationInputType,
-    },
-  });
-
-  const handleUpdate = (item: IntegrationFormValues) => {
-    updateIntegration.mutate(
-      { id: data.id, data: item },
-      {
-        onSuccess: () => {
-          setOpen(false);
-        },
-        onError: () => {
-          setOpen(true);
-        },
-      },
-    );
-  };
-
-  const handleSync = async () => {
-    await triggerSync.mutateAsync({ id: data.id });
-  };
-
-  const handleRotate = () => {
-    rotateIntegration.mutate(
-      { id: data.id },
-      {
-        onSuccess: (data) => {
-          setKey(data.apiKey);
-          setSuccessOpen(true);
-        },
-        onError: () => {
-          setRotateOpen(true);
-        },
-      },
-    );
-  };
-
-  return (
-    <>
-      <div className="flex items-center gap-3 p-4 border rounded-lg">
-        <div className="flex-1 min-w-0">
-          <div className="flex gap-2">
-            <span>{data.name}</span>
-            <span>&bull;</span>
-            <span>{data.integrationUri}</span>
-          </div>
-          <p>{JSON.stringify(data)}</p>
-          <Button onClick={handleSync} disabled={triggerSync.isPending}>
-            {triggerSync.isPending ? "Syncing..." : "Sync Now"}
-          </Button>
-        </div>
-        <Button
-          size="sm"
-          onClick={() => setOpen(true)}
-          disabled={updateIntegration.isPending}
-        >
-          {updateIntegration.isPending ? "Updating..." : "Update"}
-        </Button>
-        <Button size="sm" onClick={() => setRotateOpen(true)}>
-          {"Rotate API Key"}
-        </Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={handleRemove}
-          disabled={removeItem.isPending}
-        >
-          {removeItem.isPending ? "Deleting..." : "Delete"}
-        </Button>
-      </div>
-
-      {open && (
-        <IntegrationCreateModal
-          form={form}
-          open={open}
-          setOpen={setOpen}
-          handleCreate={handleUpdate}
-          isUpdate={true}
-        />
-      )}
-      {rotateOpen && (
-        <RotateIntegrationConfirmModal
-          open={rotateOpen}
-          setOpen={setRotateOpen}
-          handleRotate={handleRotate}
-        />
-      )}
-      {successOpen && (
-        <ApiTokenSuccessModal
-          open={successOpen}
-          setOpen={setSuccessOpen}
-          apiKey={key}
-        />
-      )}
-    </>
-  );
 };

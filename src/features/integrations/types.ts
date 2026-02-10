@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { safeUrlSchema } from "@/lib/schemas";
+import { safeUrlSchema, UserIncludeType } from "@/lib/schemas";
+import { Integration, ResourceType, SyncStatus } from "@/generated/prisma";
+import { inferOutput } from "@trpc/tanstack-react-query";
+import { trpc } from "@/trpc/server";
 
 export const basicAuthSchema = z.object({
   username: z.string(),
@@ -36,7 +39,7 @@ export const integrationInputSchema = z
       "DeviceArtifact",
       "Remediation",
     ]),
-    authentication: authenticationSchema.optional(),
+    authentication: authenticationSchema.optional().nullable(),
     syncEvery: z.number().int().positive().min(60),
   })
   .superRefine((value, ctx) => {
@@ -50,3 +53,19 @@ export const integrationInputSchema = z
     }
   });
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;
+
+export const integrationsMapping = {
+  // TODO: extend with deviceArtifact and remediations
+  assets: {
+    name: "Asset",
+    type: ResourceType.Asset,
+  },
+  vulnerabilities: {
+    name: "Vulnerability",
+    type: ResourceType.Vulnerability,
+  },
+};
+
+export type IntegrationWithRelations = inferOutput<
+  typeof trpc.integrations.update
+>;

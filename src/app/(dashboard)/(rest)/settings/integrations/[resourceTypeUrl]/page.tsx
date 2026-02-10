@@ -1,0 +1,48 @@
+import {
+  IntegrationsContainer,
+  IntegrationsError,
+  IntegrationsList,
+  IntegrationsLoading,
+} from "@/features/integrations/components/integrations";
+import { paginationParamsLoader } from "@/features/integrations/server/params-loader";
+import { prefetchIntegrations } from "@/features/integrations/server/prefetch";
+import { integrationsMapping } from "@/features/integrations/types";
+import { ResourceType } from "@/generated/prisma";
+import { requireAuth } from "@/lib/auth-utils";
+import { HydrateClient } from "@/trpc/server";
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+
+interface PageProps {
+  params: Promise<{
+    resourceTypeUrl: string;
+  }>;
+}
+
+const Page = async ({ params }: PageProps) => {
+  await requireAuth();
+  const { resourceTypeUrl, ...searchParams } = await params;
+
+  // Validate resourceType
+  const validPages = Object.keys(integrationsMapping);
+  if (!validPages.includes(resourceTypeUrl)) {
+    console.log(validPages, resourceTypeUrl);
+    return <h1>404</h1>; // TODO use an actual error
+  }
+
+  const resourceType = integrationsMapping[resourceTypeUrl].type;
+  const paginationParams = await paginationParamsLoader(searchParams);
+  await prefetchIntegrations({ ...paginationParams, resourceType });
+
+  return (
+    <HydrateClient>
+      <ErrorBoundary fallback={<IntegrationsError />}>
+        <Suspense fallback={<IntegrationsLoading />}>
+          <IntegrationsList resourceType={resourceType} />
+        </Suspense>
+      </ErrorBoundary>
+    </HydrateClient>
+  );
+};
+
+export default Page;

@@ -155,7 +155,7 @@ export const integrationResponseSchema = z.object({
   shouldRetry: z.boolean(),
   syncedAt: z.string(),
 });
-export type IntegrationResponseType = z.infer<typeof integrationResponseSchema>;
+export type IntegrationResponse = z.infer<typeof integrationResponseSchema>;
 export const createIntegrationInputSchema = <T extends z.ZodRawShape>(
   inputSchema: z.ZodObject<T>,
 ) => {

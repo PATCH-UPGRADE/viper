@@ -1,11 +1,7 @@
+import { IntegrationsLayout } from "@/features/integrations/components/integrations-layout";
 
-const IntegrationsLayout = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <div>
-    <h1>Integrations Layout</h1>
-    {children}
-    </div>
-  )
+const Layout = ({ children }: { children: React.ReactNode }) => {
+  return <IntegrationsLayout>{children}</IntegrationsLayout>;
 };
 
-export default IntegrationsLayout;
+export default Layout;

@@ -12,15 +12,32 @@ import {
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { integrationInputSchema } from "../types";
+import { ResourceType } from "@/generated/prisma";
+import { userIncludeSelect } from "@/lib/schemas";
 
 const paginatedIntegrationsInputSchema = paginationInputSchema.extend({
-  resourceType: z.enum([
-    "Asset",
-    "Vulnerability",
-    "DeviceArtifact",
-    "Remediation",
-  ]),
+  resourceType: z.enum(ResourceType),
 });
+
+const integrationsInclude = {
+  user: userIncludeSelect,
+  syncStatus: {
+    select: {
+      status: true,
+      syncedAt: true,
+      errorMessage: true,
+    },
+    orderBy: {
+      syncedAt: 'desc' // newest first
+    }
+  },
+  _count: {
+    select: {
+      assetMappings: true,
+      vulnerabilityMappings: true,
+    },
+  },
+} as const;
 
 // Helper function to create an API key for an integration
 async function createIntegrationApiKey(
@@ -70,7 +87,7 @@ export const integrationsRouter = createTRPCRouter({
         take: meta.take,
         where: whereFilter,
         orderBy: { createdAt: "desc" },
-        include: { syncStatus: true },
+        include: integrationsInclude,
       });
 
       return createPaginatedResponse(items, meta);
@@ -94,6 +111,7 @@ export const integrationsRouter = createTRPCRouter({
       const integration = await prisma.integration.create({
         data: {
           ...input,
+          authentication: input.authentication ?? undefined,
           userId: ctx.auth.user.id,
           integrationUserId: integrationUser.id,
           apiKeyId: apiKey.id,
@@ -116,6 +134,8 @@ export const integrationsRouter = createTRPCRouter({
         where: { id: input.id, userId: ctx.auth.user.id },
         select: { apiKeyId: true, name: true, userId: true },
       });
+
+      console.log("HEY", integration, input, integration.apiKeyId)
 
       // delete the existing API key if it exists
       if (integration.apiKeyId) {
@@ -156,8 +176,11 @@ export const integrationsRouter = createTRPCRouter({
       const { id, data } = input;
       return prisma.integration.update({
         where: { id },
-        data,
-        include: { syncStatus: true },
+        data: {
+          ...data,
+          authentication: data.authentication ?? undefined
+        },
+        include: integrationsInclude,
       });
     }),
 

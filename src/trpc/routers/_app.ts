@@ -7,6 +7,7 @@ import { issuesRouter } from "@/features/issues/server/routers";
 import { remediationsRouter } from "@/features/remediations/server/routers";
 import { userRouter } from "@/features/user/server/routers";
 import { vulnerabilitiesRouter } from "@/features/vulnerabilities/server/routers";
+import { webhooksRouter } from "@/features/webhooks/server/routers";
 import { workflowsRouter } from "@/features/workflows/server/routers";
 import { createTRPCRouter } from "../init";
 
@@ -20,6 +21,7 @@ export const appRouter = createTRPCRouter({
   issues: issuesRouter,
   integrations: integrationsRouter,
   deviceGroups: deviceGroupsRouter,
+  webhooks: webhooksRouter,
   artifacts: artifactsRouter,
 });
 // export type definition of API

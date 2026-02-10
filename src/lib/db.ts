@@ -1,124 +1,18 @@
-import { Prisma, PrismaClient } from "@/generated/prisma";
-import { getBaseUrl } from "@/lib/url-utils";
+import { type Prisma, PrismaClient } from "@/generated/prisma";
+import {
+  artifactExtension,
+  deviceGroupExtension,
+  sendWebhooksExtension,
+  vulnerabilityExtension,
+} from "./prisma-client-extensions";
 
-// create issues on vulnerability create
-const vulnerabilityExtension = Prisma.defineExtension((client) =>
-  client.$extends({
-    name: "vulnerabilityIssueCreation",
-    query: {
-      vulnerability: {
-        async create({ query, args }) {
-          const vulnerability = await query(args);
-          // cast id to string. we know a string exists since create succeeded
-          const vulnerabilityId = vulnerability.id as string;
-
-          // get all assets related to this vuln
-          const assets = await client.asset.findMany({
-            where: {
-              deviceGroup: {
-                vulnerabilities: {
-                  some: { id: vulnerability.id },
-                },
-              },
-            },
-            select: { id: true },
-          });
-
-          // create issues
-          if (assets.length > 0 && vulnerability.id) {
-            await client.issue.createMany({
-              data: assets.map((asset) => ({
-                vulnerabilityId,
-                assetId: asset.id,
-              })),
-            });
-          }
-
-          return vulnerability;
-        },
-      },
-    },
-    result: {
-      vulnerability: {
-        url: {
-          needs: { id: true },
-          compute(vulnerability) {
-            return `${getBaseUrl()}/api/v1/vulnerabilities/${vulnerability.id}`;
-          },
-        },
-      },
-    },
-  }),
-);
-
-// add more helper urls for device group
-const deviceGroupExtension = Prisma.defineExtension({
-  name: "deviceGroupUrls",
-  result: {
-    deviceGroup: {
-      url: {
-        needs: { id: true },
-        compute(deviceGroup) {
-          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}`;
-        },
-      },
-      sbomUrl: {
-        needs: { id: true },
-        compute(deviceGroup) {
-          return `TODO. ${deviceGroup.id}`; // VW-54
-        },
-      },
-      vulnerabilitiesUrl: {
-        needs: { id: true },
-        compute(deviceGroup) {
-          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/vulnerabilities`;
-        },
-      },
-      deviceArtifactsUrl: {
-        needs: { id: true },
-        compute(deviceGroup) {
-          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/deviceArtifacts`;
-        },
-      },
-      assetsUrl: {
-        needs: { id: true },
-        compute(deviceGroup) {
-          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/assets`;
-        },
-      },
-    },
-  },
-});
-
-// add more helper urls for artifacts
-const artifactExtension = Prisma.defineExtension({
-  name: "artifactUrls",
-  result: {
-    artifactWrapper: {
-      allVersionsUrl: {
-        needs: { id: true },
-        compute(artifactWrapper) {
-          return `${getBaseUrl()}/api/v1/artifacts/versions/${artifactWrapper.id}`;
-        },
-      },
-    },
-    artifact: {
-      url: {
-        needs: { id: true },
-        compute(artifact) {
-          return `${getBaseUrl()}/api/v1/artifacts/${artifact.id}`;
-        },
-      },
-    },
-  },
-});
-
-// allows us to extend deviceGroup model wherever it gets used
 const createPrismaClient = () =>
   new PrismaClient()
     .$extends(deviceGroupExtension)
     .$extends(artifactExtension)
-    .$extends(vulnerabilityExtension);
+    .$extends(vulnerabilityExtension)
+    .$extends(sendWebhooksExtension);
+
 export type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
 export type TransactionClient = Parameters<
   Parameters<ExtendedPrismaClient["$transaction"]>[0]

@@ -57,7 +57,7 @@ const vulnerabilityResponseSchema = z.object({
   cveId: z.string().nullable(),
   cvssScore: z.number().nullable(),
   severity: severitySchema,
-  affectedComponents: z.array(z.string()).nullable(),
+  affectedComponents: z.array(z.string()),
   cvssVector: z.string().nullable(),
   userId: z.string(),
   createdAt: z.date(),

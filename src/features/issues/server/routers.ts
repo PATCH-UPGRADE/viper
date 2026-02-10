@@ -9,6 +9,7 @@ import {
 } from "@/lib/pagination";
 import { deviceGroupSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { requireExistence } from "@/trpc/middleware";
 
 const issuePaginationInput = paginationInputSchema.extend({
   assetId: z.string(),
@@ -19,21 +20,19 @@ export const issuesRouter = createTRPCRouter({
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
-      return prisma.issue.findUniqueOrThrow({
-        where: { id: input.id },
-        include: {
-          asset: {
-            include: {
-              deviceGroup: deviceGroupSelect,
-            },
-          },
-          vulnerability: {
-            include: {
-              affectedDeviceGroups: deviceGroupSelect,
-            },
+      const include = {
+        asset: {
+          include: {
+            deviceGroup: deviceGroupSelect,
           },
         },
-      });
+        vulnerability: {
+          include: {
+            affectedDeviceGroups: deviceGroupSelect,
+          },
+        },
+      };
+      return requireExistence(input.id, "issue", include);
     }),
 
   getManyByIds: protectedProcedure

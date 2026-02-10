@@ -20,7 +20,7 @@ import {
   userSchema,
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership } from "@/trpc/middleware";
+import { requireExistence, requireOwnership } from "@/trpc/middleware";
 
 // Validation schemas
 const vulnerabilityInputSchema = z.object({
@@ -209,10 +209,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(vulnerabilityResponseSchema)
     .query(async ({ input }) => {
-      return prisma.vulnerability.findUniqueOrThrow({
-        where: { id: input.id },
-        include: vulnerabilityInclude,
-      });
+      return requireExistence(input.id, "vulnerability", vulnerabilityInclude);
     }),
 
   // POST /api/vulnerabilities - Create vulnerability

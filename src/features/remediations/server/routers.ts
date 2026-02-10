@@ -24,7 +24,7 @@ import {
   userSchema,
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership } from "@/trpc/middleware";
+import { requireExistence, requireOwnership } from "@/trpc/middleware";
 
 // Validation schemas
 const remediationInputSchema = z.object({
@@ -161,10 +161,7 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationResponseSchema)
     .query(async ({ input }) => {
-      const result = await prisma.remediation.findUniqueOrThrow({
-        where: { id: input.id },
-        include: remediationInclude,
-      });
+      const result = requireExistence(input.id, "remediation", remediationInclude);
       return transformArtifactWrapper(result);
     }),
 

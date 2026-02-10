@@ -23,12 +23,7 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
 
 // Validation schemas
-const severitySchema = z.enum([
-  "Critical",
-  "High",
-  "Medium",
-  "Low",
-]);
+const severitySchema = z.enum(["Critical", "High", "Medium", "Low"]);
 
 const vulnerabilityInputSchema = z.object({
   cpes: z.array(cpeSchema).min(1, "At least one CPE is required"),

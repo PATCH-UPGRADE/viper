@@ -24,6 +24,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -39,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea";
 import { ApiTokenSuccessModal } from "@/features/user/components/user";
 import {
@@ -63,6 +65,10 @@ import {
 } from "../types";
 import { DataTable } from "@/components/ui/data-table";
 import { getIntegrationColumns } from "@/features/integrations/components/columns";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { SparkleIcon, Sparkles } from "lucide-react";
+import { DialogClose } from "@radix-ui/react-dialog";
 
 export const IntegrationsList = ({
   resourceType,
@@ -91,11 +97,13 @@ export const IntegrationCreateModal = ({
   open,
   setOpen,
   isUpdate,
+  resourceType,
 }: {
   form: UseFormReturn<IntegrationFormValues>;
   handleCreate: (values: IntegrationFormValues) => void;
   open: boolean;
   setOpen: (open: boolean) => void;
+  resourceType?: ResourceType;
   isUpdate?: boolean;
 }) => {
   const onSubmit = (values: IntegrationFormValues) => {
@@ -105,27 +113,125 @@ export const IntegrationCreateModal = ({
   const isPending = form.formState.isSubmitting;
   const authType = form.watch("authType");
   const isGeneric = form.watch("isGeneric");
-  const label = isUpdate ? "Update Integration" : "Create Integration";
+  const verbLabel = isUpdate ? "Update" : "Create";
+  const label = `${verbLabel} ${!isUpdate ? "New" : ""} ${resourceType || ""} Integration`;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="p-6 rounded-2xl">
+      <DialogContent className="p-6 rounded-2xl w-6xl">
         <DialogHeader>
           <DialogTitle className="text-xl">{label}</DialogTitle>
+          <DialogDescription>Connect a standard integration or use AI to sync with any platform</DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="grid gap-6">
+          <form onSubmit={form.handleSubmit(onSubmit, (errors) => console.log(errors))}>
+          <div className="no-scrollbar -mx-4 max-h-[50vh] overflow-y-auto px-4 grid gap-6">
+
+<FormField
+  control={form.control}
+  name="isGeneric"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>Integration Type *</FormLabel>
+      <FormControl>
+        <RadioGroup
+          onValueChange={(value) => field.onChange(value === "true")}
+          value={field.value ? "true" : "false"}
+          className="grid grid-cols-2 gap-4"
+        >
+          <FormItem>
+            <FormControl>
+              <RadioGroupItem value="false" id="standard" className="sr-only" />
+            </FormControl>
+            <FormLabel
+              htmlFor="standard"
+              className={cn(
+                "flex flex-col cursor-pointer rounded-lg border-2 p-6 hover:border-primary/50 transition-colors",
+                field.value === false
+                  ? "border-primary bg-primary/5"
+                  : "border-border"
+              )}
+            >
+              <div className="flex items-start gap-3 mb-3">
+                <div
+                  className={cn(
+                    "w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5",
+                    field.value === false
+                      ? "border-primary"
+                      : "border-muted-foreground"
+                  )}
+                >
+                  {field.value === false && (
+                    <div className="w-3 h-3 rounded-full bg-primary" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="text-md font-semibold mb-2">
+                    Standard Integration
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-3">
+                    Pre-configured platforms with built-in support
+                  </div>
+                  <Badge className="text-xs">e.g., BlueFlow, Helm</Badge>
+                </div>
+              </div>
+            </FormLabel>
+          </FormItem>
+
+          <FormItem>
+            <FormControl>
+              <RadioGroupItem value="true" id="ai" className="sr-only" />
+            </FormControl>
+            <FormLabel
+              htmlFor="ai"
+              className={cn(
+                "flex flex-col cursor-pointer rounded-lg border-2 p-6 hover:border-primary/50 transition-colors",
+                field.value === true
+                  ? "border-primary bg-primary/5"
+                  : "border-border"
+              )}
+            >
+              <div className="flex items-start gap-3 mb-3">
+                <div
+                  className={cn(
+                    "w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5",
+                    field.value === true
+                      ? "border-primary"
+                      : "border-muted-foreground"
+                  )}
+                >
+                  {field.value === true && (
+                    <div className="w-3 h-3 rounded-full bg-primary" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="text-md font-semibold mb-2 flex gap-1">
+                    <Sparkles size={15} /> AI Integration
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-3">
+                    Flexible setup for any custom platform
+                  </div>
+                  <Badge className="text-xs">Universal & Adaptive</Badge>
+                </div>
+              </div>
+            </FormLabel>
+          </FormItem>
+        </RadioGroup>
+      </FormControl>
+    </FormItem>
+  )}
+/>
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Name</FormLabel>
+                    <FormDescription>How this integration will appear in the platform</FormDescription>
                     <FormControl>
                       <Input
                         type="text"
-                        placeholder="Integration name"
+                        placeholder="e.g., Hospital Asset Inventory"
                         {...field}
                       />
                     </FormControl>
@@ -139,7 +245,8 @@ export const IntegrationCreateModal = ({
                 name="integrationUri"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Integration URI</FormLabel>
+                    <FormLabel>Integration URL *</FormLabel>
+                    <FormDescription>API endpoint for the integration</FormDescription>
                     <FormControl>
                       <Input
                         type="text"
@@ -154,47 +261,11 @@ export const IntegrationCreateModal = ({
 
               <FormField
                 control={form.control}
-                name="isGeneric"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">
-                        ✨ AI Integration ✨
-                      </FormLabel>
-                    </div>
-                    <FormControl>
-                      <input
-                        type="checkbox"
-                        checked={field.value}
-                        onChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              {isGeneric && (
-                <FormField
-                  control={form.control}
-                  name="prompt"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Additional Instructions</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              <FormField
-                control={form.control}
                 name="syncEvery"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Sync Interval (seconds)</FormLabel>
+                    <FormLabel>Sync Interval (seconds) *</FormLabel>
+                    <FormDescription>How often to update assets in the platform</FormDescription>
                     <FormControl>
                       <Input
                         type="number"
@@ -335,12 +406,32 @@ export const IntegrationCreateModal = ({
                 </>
               )}
 
-              <Button type="submit" className="w-full" disabled={isPending}>
-                {label}
-              </Button>
-            </div>
+            {isGeneric && (
+                <FormField
+                  control={form.control}
+                  name="prompt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Additional Instructions (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Provide any additional context, access instructions, or special considerations for the AI to understand your integration" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+</div>
           </form>
         </Form>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button type="submit" onClick={form.handleSubmit(onSubmit)} disabled={isPending}>
+                {verbLabel} Integration
+              </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -32,11 +32,13 @@ export const IntegrationsLayout = ({
   const [successOpen, setSuccessOpen] = useState(false);
   const [key, setKey] = useState<Apikey | undefined>(undefined);
 
+  const resourceType = integrationsMapping[activeTab].type
+
   const form = useForm<IntegrationFormValues>({
     resolver: zodResolver(integrationInputSchema),
     defaultValues: {
       name: "",
-      resourceType: "Asset", // TODO: resourceType,
+      resourceType,
       isGeneric: false,
       syncEvery: 300,
       authType: AuthType.None,
@@ -72,13 +74,14 @@ export const IntegrationsLayout = ({
               </Link>
             </TabsTrigger>
           ))}
-          <Button onClick={() => setOpen(true)}><PlusIcon /> New Integration</Button>
+          <Button onClick={() => setOpen(true)}><PlusIcon /> New {resourceType} Integration</Button>
         </TabsList>
       </Tabs>
 
       <div className="mt-6">{children}</div>
 
       <IntegrationCreateModal
+        resourceType={resourceType}
         form={form}
         open={open}
         setOpen={setOpen}

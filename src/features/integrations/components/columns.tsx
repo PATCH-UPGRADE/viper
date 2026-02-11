@@ -8,6 +8,7 @@ import {
   RotateCcwIcon,
   RotateCwIcon,
   SettingsIcon,
+  Sparkles,
   TrashIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -72,11 +73,23 @@ export const getIntegrationColumns = (resourceType: ResourceType): ColumnDef<Int
     id: "name",
     accessorKey: "name",
     header: ({ column }) => <SortableHeader header="Name" column={column} />,
+    cell: ({ row }) => {
+      return (
+        <div className="flex gap-1 items-center">
+        {row.original.isGeneric && (<Sparkles size={15} />)}
+        <span className="font-semibold">{row.original.name}</span>
+        </div>
+      )
+    }
   },
   {
-    meta: { title: "API url" },
-    accessorKey: "integrationUri",
-    header: "API url",
+    meta: { title: "API URL" },
+    header: "API URL",
+    cell: ({ row }) => {
+      return (
+        <span className="font-mono">{row.original.integrationUri}</span>
+      )
+    }
   },
   {
     accessorKey: "status",

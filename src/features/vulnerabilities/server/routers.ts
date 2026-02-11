@@ -23,14 +23,22 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
 
 // Validation schemas
+const severitySchema = z.enum(["Critical", "High", "Medium", "Low"]);
+
 const vulnerabilityInputSchema = z.object({
-  sarif: z.any(), // JSON data - Prisma JsonValue type
   cpes: z.array(cpeSchema).min(1, "At least one CPE is required"),
-  exploitUri: safeUrlSchema,
-  upstreamApi: safeUrlSchema,
-  description: z.string().min(1),
-  narrative: z.string().min(1),
-  impact: z.string().min(1),
+  sarif: z.any(), // JSON data - Prisma JsonValue type
+  cveId: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  narrative: z.string().min(1).optional(),
+  impact: z.string().min(1).optional(),
+  severity: severitySchema.optional(),
+  cvssScore: z.number().min(0).max(10).optional(),
+  cvssVector: z.string().min(1).optional(),
+  affectedComponents: z.array(z.string().min(1)).optional(),
+  exploitUri: safeUrlSchema.optional(),
+  upstreamApi: safeUrlSchema.optional(),
+  deviceArtifactId: z.string().min(1).optional(),
 });
 
 const vulnerabilityArrayInputSchema = z.object({
@@ -41,11 +49,16 @@ const vulnerabilityResponseSchema = z.object({
   id: z.string(),
   sarif: z.any(), // JSON data - Prisma JsonValue type
   affectedDeviceGroups: z.array(deviceGroupWithUrlsSchema),
-  exploitUri: z.string(),
-  upstreamApi: z.string(),
-  description: z.string(),
-  narrative: z.string(),
-  impact: z.string(),
+  exploitUri: z.string().nullable(),
+  upstreamApi: z.string().nullable(),
+  description: z.string().nullable(),
+  narrative: z.string().nullable(),
+  impact: z.string().nullable(),
+  cveId: z.string().nullable(),
+  cvssScore: z.number().nullable(),
+  severity: severitySchema,
+  affectedComponents: z.array(z.string()),
+  cvssVector: z.string().nullable(),
   userId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),

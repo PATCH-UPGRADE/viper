@@ -21,14 +21,16 @@ import {
 import type { integrationInputSchema } from "@/features/integrations/types";
 import { AuthType } from "@/generated/prisma";
 
-// Extract just the authentication-related fields from your schema
+// Extract just the authentication-related fields from the integration input schema
 export type AuthenticationFormValues = Pick<
   z.infer<typeof integrationInputSchema>,
   "authType" | "authentication"
 >;
 
-interface AuthenticationFieldsProps {
-  form: UseFormReturn<AuthenticationFormValues>;
+interface AuthenticationFieldsProps<
+  T extends AuthenticationFormValues = AuthenticationFormValues,
+> {
+  form: UseFormReturn<T>;
 }
 
 export const AuthenticationFields = ({ form }: AuthenticationFieldsProps) => {
@@ -52,7 +54,7 @@ export const AuthenticationFields = ({ form }: AuthenticationFieldsProps) => {
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>Authentication Type</SelectLabel>
-                  {Object.keys(AuthType).map((authType) => (
+                  {Object.values(AuthType).map((authType) => (
                     <SelectItem value={authType} key={authType}>
                       {authType}
                     </SelectItem>
@@ -104,7 +106,7 @@ export const AuthenticationFields = ({ form }: AuthenticationFieldsProps) => {
             <FormItem>
               <FormLabel>Token *</FormLabel>
               <FormControl>
-                <Input type="text" placeholder="Bearer token" {...field} />
+                <Input type="password" placeholder="Bearer token" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

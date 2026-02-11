@@ -32,7 +32,11 @@ export const columns: ColumnDef<WebhookResponse>[] = [
     meta: { title: "Webhook URL" },
     header: "Webhook URL",
     cell: ({ row }) => {
-      return <span className="font-mono">{row.original.callbackUrl}</span>;
+      return (
+        <div className="font-mono max-w-80 overflow-ellipsis overflow-hidden">
+          {row.original.callbackUrl}
+        </div>
+      );
     },
   },
   {
@@ -98,7 +102,7 @@ export const columns: ColumnDef<WebhookResponse>[] = [
         <>
           <div className="flex gap-0.5 justify-end">
             <Tooltip>
-              <TooltipTrigger>
+              <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   className="h-8 w-8 p-0"
@@ -111,7 +115,7 @@ export const columns: ColumnDef<WebhookResponse>[] = [
               <TooltipContent>Update Webhook</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger>
+              <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   className="h-8 w-8 p-0"

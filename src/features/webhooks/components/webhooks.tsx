@@ -145,7 +145,6 @@ export const WebhookCreateModal = ({
   };
 
   const isPending = form.formState.isSubmitting;
-  const _authType = form.watch("authType");
   const verbLabel = isUpdate ? "Update" : "Create";
   const label = `${verbLabel} ${!isUpdate ? "New" : ""} Webhook`;
 
@@ -156,12 +155,7 @@ export const WebhookCreateModal = ({
           <DialogTitle className="text-xl">{label}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit, (errors) =>
-              console.log(errors),
-            )}
-            className="px-6"
-          >
+          <form onSubmit={form.handleSubmit(onSubmit)} className="px-6">
             <div className="no-scrollbar -mx-6 px-6 py-4 max-h-[60vh] overflow-y-auto grid gap-6">
               <FormField
                 control={form.control}
@@ -212,7 +206,10 @@ export const WebhookCreateModal = ({
                       <div className="border-1 bg-muted p-4 flex flex-col gap-2">
                         {Object.entries(triggerDescriptions).map(
                           ([key, value], index) => (
-                            <div key={index} className="flex gap-x-1 text-sm">
+                            <label
+                              key={index}
+                              className="flex gap-x-1 text-sm cursor-pointer"
+                            >
                               <input
                                 type="checkbox"
                                 checked={field.value.includes(
@@ -223,10 +220,10 @@ export const WebhookCreateModal = ({
                                   field.onChange(updatedList);
                                 }}
                               />
-                              <span className="flex gap-1.5 items-center">
+                              <span className="flex gap-1.5 items-center ml-1">
                                 {value}
                               </span>
-                            </div>
+                            </label>
                           ),
                         )}
                       </div>

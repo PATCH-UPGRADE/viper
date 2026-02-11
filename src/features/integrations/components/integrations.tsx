@@ -1,7 +1,13 @@
 "use client";
 
 import { DialogClose } from "@radix-ui/react-dialog";
-import { CircleCheck, CircleDot, CircleX, Sparkles } from "lucide-react";
+import {
+  AlertCircleIcon,
+  CircleCheck,
+  CircleDot,
+  CircleX,
+  Sparkles,
+} from "lucide-react";
 import { useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { AuthenticationFields } from "@/components/auth-form";
@@ -11,6 +17,7 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -110,10 +117,28 @@ export const IntegrationCreateModal = ({
   };
 
   const isPending = form.formState.isSubmitting;
-  const _authType = form.watch("authType");
   const isGeneric = form.watch("isGeneric");
   const verbLabel = isUpdate ? "Update" : "Create";
   const label = `${verbLabel} ${!isUpdate ? "New" : ""} ${resourceType || ""} Integration`;
+
+  const integrationTypes = [
+    {
+      value: false,
+      id: "standard",
+      title: "Standard Integration",
+      description: "Pre-configured platforms with built-in support",
+      badge: "e.g., BlueFlow, Helm",
+      icon: null,
+    },
+    {
+      value: true,
+      id: "ai",
+      title: "AI Integration",
+      description: "Flexible setup for any custom platform",
+      badge: "Universal & Adaptive",
+      icon: <Sparkles size={15} />,
+    },
+  ] as const;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -141,100 +166,73 @@ export const IntegrationCreateModal = ({
                         value={field.value ? "true" : "false"}
                         className="grid grid-cols-2 gap-4"
                       >
-                        <FormItem>
-                          <FormControl>
-                            <RadioGroupItem
-                              value="false"
-                              id="standard"
-                              className="sr-only"
-                            />
-                          </FormControl>
-                          <FormLabel
-                            htmlFor="standard"
-                            className={cn(
-                              "flex flex-col cursor-pointer rounded-lg border-2 p-6 hover:border-primary/50 transition-colors",
-                              field.value === false
-                                ? "border-primary bg-primary/5"
-                                : "border-border",
-                            )}
-                          >
-                            <div className="flex items-start gap-3 mb-3">
-                              <div
-                                className={cn(
-                                  "w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5",
-                                  field.value === false
-                                    ? "border-primary"
-                                    : "border-muted-foreground",
-                                )}
-                              >
-                                {field.value === false && (
-                                  <div className="w-3 h-3 rounded-full bg-primary" />
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <div className="text-md font-semibold mb-2">
-                                  Standard Integration
-                                </div>
-                                <div className="text-xs text-muted-foreground mb-3">
-                                  Pre-configured platforms with built-in support
-                                </div>
-                                <Badge className="text-xs">
-                                  e.g., BlueFlow, Helm
-                                </Badge>
-                              </div>
-                            </div>
-                          </FormLabel>
-                        </FormItem>
+                        {integrationTypes.map((type) => {
+                          const isSelected = field.value === type.value;
 
-                        <FormItem>
-                          <FormControl>
-                            <RadioGroupItem
-                              value="true"
-                              id="ai"
-                              className="sr-only"
-                            />
-                          </FormControl>
-                          <FormLabel
-                            htmlFor="ai"
-                            className={cn(
-                              "flex flex-col cursor-pointer rounded-lg border-2 p-6 hover:border-primary/50 transition-colors",
-                              field.value === true
-                                ? "border-primary bg-primary/5"
-                                : "border-border",
-                            )}
-                          >
-                            <div className="flex items-start gap-3 mb-3">
-                              <div
+                          return (
+                            <FormItem key={type.id}>
+                              <FormControl>
+                                <RadioGroupItem
+                                  value={String(type.value)}
+                                  id={type.id}
+                                  className="sr-only"
+                                />
+                              </FormControl>
+                              <FormLabel
+                                htmlFor={type.id}
                                 className={cn(
-                                  "w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5",
-                                  field.value === true
-                                    ? "border-primary"
-                                    : "border-muted-foreground",
+                                  "flex flex-col cursor-pointer rounded-lg border-2 p-6 hover:border-primary/50 transition-colors",
+                                  isSelected
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border",
                                 )}
                               >
-                                {field.value === true && (
-                                  <div className="w-3 h-3 rounded-full bg-primary" />
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <div className="text-md font-semibold mb-2 flex gap-1">
-                                  <Sparkles size={15} /> AI Integration
+                                <div className="flex items-start gap-3 mb-3">
+                                  <div
+                                    className={cn(
+                                      "w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5",
+                                      isSelected
+                                        ? "border-primary"
+                                        : "border-muted-foreground",
+                                    )}
+                                  >
+                                    {isSelected && (
+                                      <div className="w-3 h-3 rounded-full bg-primary" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="text-md font-semibold mb-2 flex gap-1">
+                                      {type.icon}
+                                      {type.title}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mb-3">
+                                      {type.description}
+                                    </div>
+                                    <Badge className="text-xs">
+                                      {type.badge}
+                                    </Badge>
+                                  </div>
                                 </div>
-                                <div className="text-xs text-muted-foreground mb-3">
-                                  Flexible setup for any custom platform
-                                </div>
-                                <Badge className="text-xs">
-                                  Universal & Adaptive
-                                </Badge>
-                              </div>
-                            </div>
-                          </FormLabel>
-                        </FormItem>
+                              </FormLabel>
+                            </FormItem>
+                          );
+                        })}
                       </RadioGroup>
                     </FormControl>
                   </FormItem>
                 )}
               />
+              {isGeneric && (
+                <Alert className="border-blue-200 bg-blue-50">
+                  <AlertCircleIcon className="stroke-blue-900" />
+                  <AlertDescription className="text-blue-900">
+                    <strong>AI-generated integrations:</strong> While our AI
+                    does its best to understand and sync with your platform, we
+                    recommend verifying synced data for accuracy.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <FormField
                 control={form.control}
                 name="name"
@@ -287,7 +285,7 @@ export const IntegrationCreateModal = ({
                   <FormItem>
                     <FormLabel>Sync Interval (seconds) *</FormLabel>
                     <FormDescription>
-                      How often to syncrhonize with the integration
+                      How often to synchronize with the integration
                     </FormDescription>
                     <FormControl>
                       <Input
@@ -322,6 +320,7 @@ export const IntegrationCreateModal = ({
                         <Textarea
                           {...field}
                           placeholder="Provide any additional context, access instructions, or special considerations for the AI to understand your integration"
+                          rows={4}
                         />
                       </FormControl>
                       <FormMessage />

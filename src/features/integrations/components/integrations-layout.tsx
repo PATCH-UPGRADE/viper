@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,7 +37,6 @@ export const IntegrationsLayout = ({
   const [key, setKey] = useState<Apikey | undefined>(undefined);
 
   const resourceType = integrationsMapping[activeTab].type;
-
   const form = useForm<IntegrationFormValues>({
     resolver: zodResolver(integrationInputSchema),
     defaultValues: {
@@ -48,6 +47,10 @@ export const IntegrationsLayout = ({
       authType: AuthType.None,
     },
   });
+
+  useEffect(() => {
+    form.setValue("resourceType", resourceType);
+  }, [resourceType, form]);
 
   const handleCreate = (item: IntegrationFormValues) => {
     createIntegration.mutate(item, {

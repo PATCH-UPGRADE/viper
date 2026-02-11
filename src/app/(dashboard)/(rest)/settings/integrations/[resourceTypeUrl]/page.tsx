@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import {
@@ -26,7 +27,7 @@ const Page = async ({ params }: PageProps) => {
 
   // Validate resourceType
   if (!isValidIntegrationKey(resourceTypeUrl)) {
-    return <h1>404</h1>; // TODO use an actual error
+    notFound();
   }
 
   const resourceType = integrationsMapping[resourceTypeUrl].type;

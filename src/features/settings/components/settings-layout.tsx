@@ -28,9 +28,7 @@ export const SettingsSubheader = ({
 
 export const SettingsLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const activeTab = pathname.includes("integrations")
-    ? "integrations"
-    : "webhooks";
+  const activeTab = pathname.includes("webhooks") ? "webhooks" : "integrations";
 
   // path and name for tab
   const tabs = [

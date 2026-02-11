@@ -16,7 +16,7 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { integrationInputSchema } from "../types";
 
 const paginatedIntegrationsInputSchema = paginationInputSchema.extend({
-  resourceType: z.enum(ResourceType),
+  resourceType: z.enum(Object.values(ResourceType)),
 });
 
 const integrationsInclude = {
@@ -134,8 +134,6 @@ export const integrationsRouter = createTRPCRouter({
         where: { id: input.id, userId: ctx.auth.user.id },
         select: { apiKeyId: true, name: true, userId: true },
       });
-
-      console.log("HEY", integration, input, integration.apiKeyId);
 
       // delete the existing API key if it exists
       if (integration.apiKeyId) {

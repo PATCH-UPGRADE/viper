@@ -54,7 +54,7 @@ export const webhooksRouter = createTRPCRouter({
         data: {
           ...updateData,
         },
-        include: { user: true },
+        include: webhooksInclude,
       });
     }),
   // DELETE /api/webhooks - delete a Webhook

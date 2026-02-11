@@ -29,7 +29,7 @@ export const updateWebhookSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
   callbackUrl: safeUrlSchema,
-  triggers: triggerEnumArray,
+  triggers: triggerEnumArray.min(1, "At least one trigger is required"),
 });
 
 export const webhookResponseSchema = z.object({

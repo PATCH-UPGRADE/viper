@@ -86,7 +86,9 @@ export const getIntegrationColumns = (
         return (
           <div className="flex gap-1 items-center">
             {row.original.isGeneric && <Sparkles size={15} />}
-            <span className="font-semibold">{row.original.name}</span>
+            <div className="font-semibold max-w-60 overflow-ellipsis overflow-hidden">
+              {row.original.name}
+            </div>
           </div>
         );
       },
@@ -94,8 +96,13 @@ export const getIntegrationColumns = (
     {
       meta: { title: "API URL" },
       header: "API URL",
+      accessorKey: "integrationUri",
       cell: ({ row }) => {
-        return <span className="font-mono">{row.original.integrationUri}</span>;
+        return (
+          <div className="font-mono max-w-80 overflow-ellipsis overflow-hidden">
+            {row.original.integrationUri}
+          </div>
+        );
       },
     },
     {

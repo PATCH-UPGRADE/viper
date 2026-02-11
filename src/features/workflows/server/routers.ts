@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
 import { generateSlug } from "random-word-slugs";
 import { z } from "zod";
@@ -11,7 +12,6 @@ import {
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
-import { TRPCError } from "@trpc/server";
 
 export const workflowsRouter = createTRPCRouter({
   // TODO: we probably don't need this code here
@@ -138,7 +138,7 @@ export const workflowsRouter = createTRPCRouter({
       if (!workflow) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: 'Workflow not found'
+          message: "Workflow not found",
         });
       }
 

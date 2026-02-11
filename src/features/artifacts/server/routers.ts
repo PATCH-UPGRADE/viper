@@ -130,7 +130,11 @@ export const artifactsRouter = createTRPCRouter({
       return prisma.$transaction(async (tx) => {
         // Get the wrapper with current latest artifact
         const where = { id: wrapperId };
-        const wrapper = await requireExistence(where, "artifactWrapper", include);
+        const wrapper = await requireExistence(
+          where,
+          "artifactWrapper",
+          include,
+        );
 
         const currentLatest = wrapper.latestArtifact;
         const nextVersion = currentLatest ? currentLatest.versionNumber + 1 : 1;

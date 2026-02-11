@@ -1,4 +1,3 @@
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -162,7 +161,11 @@ export const remediationsRouter = createTRPCRouter({
     .output(remediationResponseSchema)
     .query(async ({ input }) => {
       const where = { id: input.id };
-      const result = await requireExistence(where, "remediation", remediationInclude);
+      const result = await requireExistence(
+        where,
+        "remediation",
+        remediationInclude,
+      );
       return transformArtifactWrapper(result);
     }),
 

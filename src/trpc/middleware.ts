@@ -5,7 +5,7 @@ import { formatResourceName } from "@/lib/string-utils";
 // spliting this into it's own function so linting only complains once
 const getPrismaModel = (modelName: keyof typeof prisma) => {
   return prisma[modelName] as any;
-}
+};
 
 /**
  * Verifies that a resource belongs to the current user
@@ -22,7 +22,9 @@ export async function requireOwnership(
   userId: string,
   modelName: keyof typeof prisma,
 ) {
-  const resource = await requireExistence({ id: resourceId }, modelName, null, { userId: true });
+  const resource = await requireExistence({ id: resourceId }, modelName, null, {
+    userId: true,
+  });
 
   // TODO: Is this secure? Double check.
   if (resource.userId !== userId) {
@@ -41,18 +43,23 @@ export async function requireOwnership(
  *
  * @param resourceId - The ID of the resource to check
  * @param modelName - The Prisma model name (e.g., 'asset', 'vulnerability')
- * @param include? - Prisma include clause (e.g. { asset: true, deviceGroup: true } | null )
- * @param select? - Prisma select clause (e.g. { id: true, userId: true } | null )
+ * @param include - (optional) Prisma include clause e.g. { asset: true, deviceGroup: true } or can leave null / empty
+ * @param select - (optional) Prisma select clause e.g. { id: true, userId: true } or can leave null / empty
  * @returns The found resource
  */
-export async function requireExistence(where: any, modelName: keyof typeof prisma, include: any = null, select: any = null) {
+export async function requireExistence(
+  where: unknown,
+  modelName: keyof typeof prisma,
+  include: unknown = null,
+  select: unknown = null,
+) {
   const model = getPrismaModel(modelName);
   const resource = await model.findUnique({ where, include, select });
 
   if (!resource) {
     throw new TRPCError({
       code: "NOT_FOUND",
-      message: `${formatResourceName(String(modelName))} not found`
+      message: `${formatResourceName(String(modelName))} not found`,
     });
   }
 

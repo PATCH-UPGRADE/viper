@@ -210,7 +210,11 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .output(vulnerabilityResponseSchema)
     .query(async ({ input }) => {
       const where = { id: input.id };
-      return await requireExistence(where, "vulnerability", vulnerabilityInclude);
+      return await requireExistence(
+        where,
+        "vulnerability",
+        vulnerabilityInclude,
+      );
     }),
 
   // POST /api/vulnerabilities - Create vulnerability

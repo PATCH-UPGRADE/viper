@@ -20,7 +20,7 @@ import {
   userSchema,
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership, requireExistence } from "@/trpc/middleware";
+import { requireExistence, requireOwnership } from "@/trpc/middleware";
 
 const AssetStatus = z.enum(["Active", "Decommissioned", "Maintenance"]);
 

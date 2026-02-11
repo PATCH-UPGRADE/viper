@@ -11,8 +11,8 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { integrationInputSchema } from "../types";
 import { requireExistence } from "@/trpc/middleware";
+import { integrationInputSchema } from "../types";
 
 const paginatedIntegrationsInputSchema = paginationInputSchema.extend({
   resourceType: z.enum([
@@ -114,7 +114,12 @@ export const integrationsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const where = { id: input.id, userId: ctx.auth.user.id };
       const select = { apiKeyId: true, name: true, userId: true };
-      const integration = await requireExistence(where, "integration", null, select);
+      const integration = await requireExistence(
+        where,
+        "integration",
+        null,
+        select,
+      );
 
       // delete the existing API key if it exists
       if (integration.apiKeyId) {

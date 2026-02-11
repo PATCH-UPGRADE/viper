@@ -137,6 +137,7 @@ export const artifactWithUrlsSchema = z.object({
   url: z.string(),
   prevVersionId: z.string().nullable(),
 });
+export type ArtifactWithUrls = z.infer<typeof artifactWithUrlsSchema>;
 
 export const artifactWrapperWithUrlsSchema = z.object({
   id: z.string(),

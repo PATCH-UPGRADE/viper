@@ -2,6 +2,7 @@ import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import type { ArtifactWithUrls } from "@/lib/schemas";
 import { authHeader, BASE_URL, generateCPE } from "./test-config";
 
 describe("Artifacts Endpoint (/artifacts)", () => {
@@ -290,7 +291,9 @@ describe("Artifacts Endpoint (/artifacts)", () => {
     expect(listRes.status).toBe(200);
     expect(listRes.body.items.length).toBe(3);
 
-    const types = listRes.body.items.map((item: any) => item.artifactType);
+    const types = listRes.body.items.map(
+      (item: ArtifactWithUrls) => item.artifactType,
+    );
     expect(types).toContain(ArtifactType.Firmware);
     expect(types).toContain(ArtifactType.Documentation);
     expect(types).toContain(ArtifactType.Binary);

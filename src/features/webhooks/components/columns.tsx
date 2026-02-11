@@ -1,40 +1,21 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import type { ColumnDef } from "@tanstack/react-table";
-import { formatDistanceToNow } from "date-fns";
-import {
-  CopyIcon,
-  MoreVertical,
-  SettingsIcon,
-  SquarePen,
-  TrashIcon,
-} from "lucide-react";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { SquarePen, TrashIcon } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { SortableHeader } from "@/components/ui/data-table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { handleCopy } from "@/lib/copy";
-import type { AssetWithIssues } from "@/lib/db";
-import { Webhook } from "@/generated/prisma";
+import type { AuthenticationInputType } from "@/features/integrations/types";
+import type { Webhook } from "@/generated/prisma";
 import { useRemoveWebhook, useUpdateWebhook } from "../hooks/use-webhooks";
-import { useState } from "react";
-import { WebhookFormValues, webhookInputSchema } from "../types";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { AuthenticationInputType } from "@/features/integrations/types";
+import { type WebhookFormValues, webhookInputSchema } from "../types";
 import { triggerDescriptions, WebhookCreateModal } from "./webhooks";
 
 export const columns: ColumnDef<Webhook>[] = [

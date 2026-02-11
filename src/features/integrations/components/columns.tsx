@@ -1,27 +1,25 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import type { ColumnDef } from "@tanstack/react-table";
-import { formatDistanceToNow, formatDuration } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import {
-  CopyIcon,
   MoreVertical,
   RefreshCw,
-  RotateCcwIcon,
   RotateCwIcon,
-  SettingsIcon,
   Sparkles,
   SquarePen,
   TrashIcon,
 } from "lucide-react";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import ms from "ms";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { SortableHeader } from "@/components/ui/data-table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -30,11 +28,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { handleCopy } from "@/lib/copy";
+import { ApiTokenSuccessModal } from "@/features/user/components/user";
 import {
-  Apikey,
-  Integration,
-  ResourceType,
+  type Apikey,
+  type ResourceType,
   SyncStatusEnum,
 } from "@/generated/prisma";
 import {
@@ -43,22 +40,17 @@ import {
   useTriggerSync,
   useUpdateIntegration,
 } from "../hooks/use-integrations";
-import { useState } from "react";
 import {
-  AuthenticationInputType,
-  IntegrationFormValues,
+  type AuthenticationInputType,
+  type IntegrationFormValues,
+  type IntegrationWithRelations,
   integrationInputSchema,
-  IntegrationWithRelations,
 } from "../types";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import {
   IntegrationCreateModal,
   RotateIntegrationConfirmModal,
   SyncStatusIndicator,
 } from "./integrations";
-import { ApiTokenSuccessModal } from "@/features/user/components/user";
-import ms from "ms";
 
 export const getIntegrationColumns = (
   resourceType: ResourceType,

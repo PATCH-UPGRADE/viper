@@ -3,6 +3,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import type { DeviceArtifactResponse } from "@/features/device-artifacts/server/routers";
 import { ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import type { ArtifactWrapperWithUrls } from "@/lib/schemas";
 import { authHeader, BASE_URL, generateCPE } from "./test-config";
 
 describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
@@ -282,7 +283,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
     // Verify each artifact was created correctly
     const artifactTypes = createRes.body.artifacts.map(
-      (wrapper: any) => wrapper.latestArtifact.artifactType,
+      (wrapper: ArtifactWrapperWithUrls) => wrapper.latestArtifact.artifactType,
     );
     expect(artifactTypes).toContain(ArtifactType.Firmware);
     expect(artifactTypes).toContain(ArtifactType.Documentation);
@@ -359,7 +360,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     expect(searchRes.status).toBe(200);
     expect(searchRes.body.items.length).toBeGreaterThan(0);
     const found = searchRes.body.items.some(
-      (d: any) => d.id === deviceArtifactId,
+      (d: DeviceArtifactResponse) => d.id === deviceArtifactId,
     );
     expect(found).toBe(true);
   });

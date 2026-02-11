@@ -1,13 +1,8 @@
+import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
-import { safeUrlSchema, UserIncludeType } from "@/lib/schemas";
-import {
-  AuthType,
-  Integration,
-  ResourceType,
-  SyncStatus,
-} from "@/generated/prisma";
-import { inferOutput } from "@trpc/tanstack-react-query";
-import { trpc } from "@/trpc/server";
+import { AuthType, type Integration, ResourceType } from "@/generated/prisma";
+import { safeUrlSchema } from "@/lib/schemas";
+import type { trpc } from "@/trpc/server";
 
 export const basicAuthSchema = z.object({
   username: z.string(),

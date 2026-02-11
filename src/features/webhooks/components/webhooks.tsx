@@ -1,25 +1,25 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ComputerIcon, CpuIcon, FileIcon, PlusIcon } from "lucide-react";
 import { type PropsWithChildren, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
+import { AuthenticationFields } from "@/components/auth-form";
 import {
   EmptyView,
-  EntityContainer,
-  EntityHeader,
-  EntityList,
   EntityPagination,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
 import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogClose,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -30,16 +30,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { mainPadding } from "@/config/constants";
 import type { AuthenticationInputType } from "@/features/integrations/types";
+import { SettingsSubheader } from "@/features/settings/components/settings-layout";
 import {
   useCreateWebhook,
   useRemoveWebhook,
@@ -48,13 +41,8 @@ import {
 } from "@/features/webhooks/hooks/use-webhooks";
 import { AuthType, TriggerEnum, type Webhook } from "@/generated/prisma";
 import { usePaginationParams } from "@/lib/pagination";
-import { type WebhookFormValues, webhookInputSchema } from "../types";
-import { mainPadding } from "@/config/constants";
-import { SettingsSubheader } from "@/features/settings/components/settings-layout";
-import { ComputerIcon, CpuIcon, FileIcon, PlusIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AuthenticationFields } from "@/components/auth-form";
-import { DataTable } from "@/components/ui/data-table";
+import { type WebhookFormValues, webhookInputSchema } from "../types";
 import { columns } from "./columns";
 
 export const triggerDescriptions = {
@@ -157,7 +145,7 @@ export const WebhookCreateModal = ({
   };
 
   const isPending = form.formState.isSubmitting;
-  const authType = form.watch("authType");
+  const _authType = form.watch("authType");
   const verbLabel = isUpdate ? "Update" : "Create";
   const label = `${verbLabel} ${!isUpdate ? "New" : ""} Webhook`;
 
@@ -211,9 +199,10 @@ export const WebhookCreateModal = ({
                 )}
               />
 
+              {/* @ts-expect-error this works, but ts doesn't want you to pass a partial form (extended types don't work) */}
               <AuthenticationFields form={form} />
 
-              <FormField
+                <FormField
                 control={form.control}
                 name="triggers"
                 render={({ field }) => (

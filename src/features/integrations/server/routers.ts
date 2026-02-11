@@ -2,6 +2,7 @@ import "server-only";
 import { TRPCError } from "@trpc/server";
 import { headers } from "next/headers";
 import { z } from "zod";
+import { ResourceType } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
@@ -10,10 +11,9 @@ import {
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
+import { userIncludeSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { integrationInputSchema } from "../types";
-import { ResourceType } from "@/generated/prisma";
-import { userIncludeSelect } from "@/lib/schemas";
 
 const paginatedIntegrationsInputSchema = paginationInputSchema.extend({
   resourceType: z.enum(ResourceType),

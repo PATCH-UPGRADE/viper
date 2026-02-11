@@ -1,25 +1,25 @@
 "use client";
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SettingsSubheader } from "@/features/settings/components/settings-layout";
-import { Apikey, AuthType, ResourceType } from "@/generated/prisma";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { mainPadding } from "@/config/constants";
+import { SettingsSubheader } from "@/features/settings/components/settings-layout";
+import { ApiTokenSuccessModal } from "@/features/user/components/user";
+import { type Apikey, AuthType } from "@/generated/prisma";
+import { cn } from "@/lib/utils";
+import { useCreateIntegration } from "../hooks/use-integrations";
 import {
-  IntegrationFormValues,
+  type IntegrationFormValues,
   integrationInputSchema,
   integrationsMapping,
 } from "../types";
-import { Button } from "@/components/ui/button";
-import { useCreateIntegration } from "../hooks/use-integrations";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { IntegrationCreateModal } from "./integrations";
-import { ApiTokenSuccessModal } from "@/features/user/components/user";
-import { PlusIcon } from "lucide-react";
-import { mainPadding } from "@/config/constants";
-import { cn } from "@/lib/utils";
 
 export const IntegrationsLayout = ({
   children,

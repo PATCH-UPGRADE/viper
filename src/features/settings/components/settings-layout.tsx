@@ -1,12 +1,11 @@
 "use client";
 
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { EntityContainer, EntityHeader } from "@/components/entity-components";
+import { PlugIcon, WebhookIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { headerClass, mainPadding } from "@/config/constants";
 import { cn } from "@/lib/utils";
-import { PlugIcon, WebhookIcon } from "lucide-react";
 
 export const SettingsSubheader = ({
   title,

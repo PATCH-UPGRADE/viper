@@ -1,4 +1,5 @@
-import { UseFormReturn } from "react-hook-form";
+import type { UseFormReturn } from "react-hook-form";
+import type { z } from "zod";
 import {
   FormControl,
   FormDescription,
@@ -7,6 +8,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -16,9 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { z } from "zod";
-import { integrationInputSchema } from "@/features/integrations/types";
+import type { integrationInputSchema } from "@/features/integrations/types";
 import { AuthType } from "@/generated/prisma";
 
 // Extract just the authentication-related fields from your schema

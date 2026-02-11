@@ -1,18 +1,19 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { type PropsWithChildren, useState, useCallback, useMemo } from "react";
-import { type UseFormReturn, useForm } from "react-hook-form";
+import { DialogClose } from "@radix-ui/react-dialog";
+import { CircleCheck, CircleDot, CircleX, Sparkles } from "lucide-react";
+import { useMemo } from "react";
+import type { UseFormReturn } from "react-hook-form";
+import { AuthenticationFields } from "@/components/auth-form";
 import {
   EmptyView,
-  EntityContainer,
-  EntityHeader,
-  EntityList,
   EntityPagination,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
 import {
   Dialog,
   DialogContent,
@@ -31,52 +32,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { ApiTokenSuccessModal } from "@/features/user/components/user";
-import {
-  type Apikey,
-  AuthType,
-  type Integration,
-  type ResourceType,
-  SyncStatusEnum,
-} from "@/generated/prisma";
-import { usePaginationParams } from "@/lib/pagination";
-import {
-  useCreateIntegration,
-  useRemoveIntegration,
-  useRotateIntegration,
-  useSuspenseIntegrations,
-  useTriggerSync,
-  useUpdateIntegration,
-} from "../hooks/use-integrations";
-import {
-  type AuthenticationInputType,
-  type IntegrationFormValues,
-  integrationInputSchema,
-} from "../types";
-import { DataTable } from "@/components/ui/data-table";
 import { getIntegrationColumns } from "@/features/integrations/components/columns";
+import type { ResourceType, SyncStatusEnum } from "@/generated/prisma";
+import { usePaginationParams } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import {
-  CircleCheck,
-  CircleDot,
-  CircleX,
-  SparkleIcon,
-  Sparkles,
-} from "lucide-react";
-import { DialogClose } from "@radix-ui/react-dialog";
-import { AuthenticationFields } from "@/components/auth-form";
+import { useSuspenseIntegrations } from "../hooks/use-integrations";
+import type { IntegrationFormValues } from "../types";
 
 export const IntegrationsList = ({
   resourceType,
@@ -147,7 +110,7 @@ export const IntegrationCreateModal = ({
   };
 
   const isPending = form.formState.isSubmitting;
-  const authType = form.watch("authType");
+  const _authType = form.watch("authType");
   const isGeneric = form.watch("isGeneric");
   const verbLabel = isUpdate ? "Update" : "Create";
   const label = `${verbLabel} ${!isUpdate ? "New" : ""} ${resourceType || ""} Integration`;
@@ -314,6 +277,7 @@ export const IntegrationCreateModal = ({
                 )}
               />
 
+              {/* @ts-expect-error this works, but ts doesn't want you to pass a partial form (extended types don't work) */}
               <AuthenticationFields form={form} />
 
               <FormField

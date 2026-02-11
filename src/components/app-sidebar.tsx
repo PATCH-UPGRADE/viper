@@ -6,7 +6,6 @@ import {
   CpuIcon,
   ExternalLink,
   HeartIcon,
-  KeyIcon,
   SettingsIcon,
   ShieldCheckIcon,
   WorkflowIcon,

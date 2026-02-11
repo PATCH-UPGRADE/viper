@@ -2,6 +2,7 @@ import z from "zod";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
+import { userIncludeSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
 import {
@@ -10,7 +11,6 @@ import {
   webhookInputSchema,
   webhookResponseSchema,
 } from "../types";
-import { userIncludeSelect } from "@/lib/schemas";
 
 const webhooksInclude = {
   user: userIncludeSelect,

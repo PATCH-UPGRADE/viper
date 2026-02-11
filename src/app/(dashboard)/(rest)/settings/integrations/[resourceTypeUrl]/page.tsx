@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import {
   IntegrationsError,
   IntegrationsList,
@@ -8,8 +10,6 @@ import { prefetchIntegrations } from "@/features/integrations/server/prefetch";
 import { integrationsMapping } from "@/features/integrations/types";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
-import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
 
 interface PageProps {
   params: Promise<{

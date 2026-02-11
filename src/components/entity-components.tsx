@@ -18,6 +18,7 @@ import {
   DrawerFooter,
   DrawerTrigger,
 } from "@/components/ui/drawer";
+import { headerClass, mainPadding } from "@/config/constants";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -37,7 +38,6 @@ import {
   EmptyTitle,
 } from "./ui/empty";
 import { Input } from "./ui/input";
-import { headerClass, mainPadding } from "@/config/constants";
 
 type EntityHeaderProps = {
   title: string;

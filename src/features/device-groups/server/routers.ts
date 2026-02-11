@@ -95,7 +95,7 @@ export const deviceGroupsRouter = createTRPCRouter({
     .output(deviceGroupResponseSchema)
     .query(async ({ input }) => {
       const where = { id: input.id };
-      return requireExistence(where, "deviceGroup");
+      return await requireExistence(where, "deviceGroup");
     }),
 
   // PUT /api/deviceGroups/{deviceGroupId} - Update DeviceGroup

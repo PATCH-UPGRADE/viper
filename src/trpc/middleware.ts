@@ -36,7 +36,7 @@ export async function requireOwnership(
 }
 
 /**
- * Error wrapper for findUnique to send 404s instead of 500s when resource is not found
+ * Error 404 wrapper for findUnique
  * Throws NOT_FOUND if resource doesn't exist
  *
  * @param resourceId - The ID of the resource to check

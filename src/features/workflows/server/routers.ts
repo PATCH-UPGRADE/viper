@@ -19,7 +19,7 @@ export const workflowsRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       const where = { id: input.id, userId: ctx.auth.user.id };
-      const workflow = requireExistence(where, "workflow");
+      const workflow = await requireExistence(where, "workflow");
       await inngest.send({
         name: "workflows/execute.workflow",
         data: { workflowId: input.id },
@@ -77,7 +77,7 @@ export const workflowsRouter = createTRPCRouter({
       const { id, nodes, edges } = input;
 
       const where = { id };
-      const workflow = requireExistence(where, "workflow");
+      const workflow = await requireExistence(where, "workflow");
 
       // Transaction to ensure consistency
       return await prisma.$transaction(async (tx) => {
@@ -129,7 +129,7 @@ export const workflowsRouter = createTRPCRouter({
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
-      // using requireExistence causes type issues with nested object includes
+      // TODO: using requireExistence causes type issues with nested object includes
       const workflow = await prisma.workflow.findUnique({
         where: { id: input.id },
         include: { nodes: true, connections: true },

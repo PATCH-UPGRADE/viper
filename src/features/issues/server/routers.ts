@@ -33,7 +33,7 @@ export const issuesRouter = createTRPCRouter({
           },
         },
       };
-      return requireExistence(where, "issue", include);
+      return await requireExistence(where, "issue", include);
     }),
 
   getManyByIds: protectedProcedure

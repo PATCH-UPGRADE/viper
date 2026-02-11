@@ -202,7 +202,7 @@ export const WebhookCreateModal = ({
               {/* @ts-expect-error this works, but ts doesn't want you to pass a partial form (extended types don't work) */}
               <AuthenticationFields form={form} />
 
-                <FormField
+              <FormField
                 control={form.control}
                 name="triggers"
                 render={({ field }) => (

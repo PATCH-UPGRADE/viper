@@ -54,6 +54,12 @@ export const integrationInputSchema = z
   });
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;
 
+export function isValidIntegrationKey(
+  key: string,
+): key is keyof typeof integrationsMapping {
+  return key in integrationsMapping;
+}
+
 export const integrationsMapping = {
   // TODO: extend with deviceArtifact and remediations
   assets: {

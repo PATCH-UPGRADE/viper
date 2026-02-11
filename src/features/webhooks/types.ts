@@ -41,6 +41,7 @@ export const webhookResponseSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
 });
+export type WebhookResponse = z.infer<typeof webhookResponseSchema>;
 
 export const paginatedWebhooksResponseSchema = createPaginatedResponseSchema(
   webhookResponseSchema,

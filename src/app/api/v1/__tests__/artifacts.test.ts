@@ -74,7 +74,6 @@ describe("Artifacts Endpoint (/artifacts)", () => {
           /* already deleted */
         });
     });
-    console.log(remediation);
 
     const artifactId = remediation.artifacts[0].latestArtifact.id;
 

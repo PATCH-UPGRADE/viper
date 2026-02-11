@@ -46,7 +46,7 @@ export const SettingsLayout = ({ children }: { children: React.ReactNode }) => {
         <WebhookIcon /> Webhooks
       </>,
     ],
-  ];
+  ] as const;
 
   return (
     <div>

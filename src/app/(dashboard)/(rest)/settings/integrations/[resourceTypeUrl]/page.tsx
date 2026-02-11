@@ -7,7 +7,10 @@ import {
 } from "@/features/integrations/components/integrations";
 import { paginationParamsLoader } from "@/features/integrations/server/params-loader";
 import { prefetchIntegrations } from "@/features/integrations/server/prefetch";
-import { integrationsMapping } from "@/features/integrations/types";
+import {
+  integrationsMapping,
+  isValidIntegrationKey,
+} from "@/features/integrations/types";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
 
@@ -22,9 +25,7 @@ const Page = async ({ params }: PageProps) => {
   const { resourceTypeUrl, ...searchParams } = await params;
 
   // Validate resourceType
-  const validPages = Object.keys(integrationsMapping);
-  if (!validPages.includes(resourceTypeUrl)) {
-    console.log(validPages, resourceTypeUrl);
+  if (!isValidIntegrationKey(resourceTypeUrl)) {
     return <h1>404</h1>; // TODO use an actual error
   }
 

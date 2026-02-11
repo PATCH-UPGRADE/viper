@@ -12,13 +12,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { AuthenticationInputType } from "@/features/integrations/types";
-import type { Webhook } from "@/generated/prisma";
 import { useRemoveWebhook, useUpdateWebhook } from "../hooks/use-webhooks";
-import { type WebhookFormValues, webhookInputSchema } from "../types";
+import {
+  type WebhookFormValues,
+  type WebhookResponse,
+  webhookInputSchema,
+} from "../types";
 import { triggerDescriptions, WebhookCreateModal } from "./webhooks";
 
-export const columns: ColumnDef<Webhook>[] = [
+export const columns: ColumnDef<WebhookResponse>[] = [
   {
     id: "name",
     accessorKey: "name",
@@ -75,7 +77,6 @@ export const columns: ColumnDef<Webhook>[] = [
           callbackUrl: data.callbackUrl,
           triggers: data.triggers,
           authType: data.authType,
-          authentication: data.authentication as AuthenticationInputType,
         },
       });
 

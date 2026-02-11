@@ -28,8 +28,8 @@ const integrationsInclude = {
       errorMessage: true,
     },
     orderBy: {
-      syncedAt: 'desc' // newest first
-    }
+      syncedAt: "desc", // newest first
+    },
   },
   _count: {
     select: {
@@ -135,7 +135,7 @@ export const integrationsRouter = createTRPCRouter({
         select: { apiKeyId: true, name: true, userId: true },
       });
 
-      console.log("HEY", integration, input, integration.apiKeyId)
+      console.log("HEY", integration, input, integration.apiKeyId);
 
       // delete the existing API key if it exists
       if (integration.apiKeyId) {
@@ -178,7 +178,7 @@ export const integrationsRouter = createTRPCRouter({
         where: { id },
         data: {
           ...data,
-          authentication: data.authentication ?? undefined
+          authentication: data.authentication ?? undefined,
         },
         include: integrationsInclude,
       });

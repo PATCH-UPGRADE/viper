@@ -1,5 +1,4 @@
 import {
-  IntegrationsContainer,
   IntegrationsError,
   IntegrationsList,
   IntegrationsLoading,
@@ -7,7 +6,6 @@ import {
 import { paginationParamsLoader } from "@/features/integrations/server/params-loader";
 import { prefetchIntegrations } from "@/features/integrations/server/prefetch";
 import { integrationsMapping } from "@/features/integrations/types";
-import { ResourceType } from "@/generated/prisma";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
 import { Suspense } from "react";

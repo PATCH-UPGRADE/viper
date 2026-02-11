@@ -16,8 +16,10 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -47,31 +49,78 @@ import {
 import { AuthType, TriggerEnum, type Webhook } from "@/generated/prisma";
 import { usePaginationParams } from "@/lib/pagination";
 import { type WebhookFormValues, webhookInputSchema } from "../types";
+import { mainPadding } from "@/config/constants";
+import { SettingsSubheader } from "@/features/settings/components/settings-layout";
+import { ComputerIcon, CpuIcon, FileIcon, PlusIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { AuthenticationFields } from "@/components/auth-form";
+import { DataTable } from "@/components/ui/data-table";
+import { columns } from "./columns";
 
-const triggerDescriptions = {
-  [TriggerEnum.Artifact_Created]: "When an Artifact is created",
-  [TriggerEnum.Artifact_Updated]: "When an Artifact is updated",
-  [TriggerEnum.DeviceArtifact_Created]: "When a Device Artifact is created",
-  [TriggerEnum.DeviceArtifact_Updated]: "When a Device Artifact is updated",
-  [TriggerEnum.DeviceGroup_Created]: "When a Device Group is created",
-  [TriggerEnum.DeviceGroup_Updated]: "When a Device Group is updated",
+export const triggerDescriptions = {
+  [TriggerEnum.Artifact_Created]: (
+    <>
+      <FileIcon size={15} />{" "}
+      <span>
+        An <b>Artifact</b> is created
+      </span>
+    </>
+  ),
+  [TriggerEnum.Artifact_Updated]: (
+    <>
+      <FileIcon size={15} />{" "}
+      <span>
+        An <b>Artifact</b> is updated
+      </span>
+    </>
+  ),
+  [TriggerEnum.DeviceArtifact_Created]: (
+    <>
+      <CpuIcon size={15} />{" "}
+      <span>
+        A <b>Device Artifact</b> is created
+      </span>
+    </>
+  ),
+  [TriggerEnum.DeviceArtifact_Updated]: (
+    <>
+      <CpuIcon size={15} />{" "}
+      <span>
+        A <b>Device Artifact</b> is updated
+      </span>
+    </>
+  ),
+  [TriggerEnum.DeviceGroup_Created]: (
+    <>
+      <ComputerIcon size={15} />{" "}
+      <span>
+        A <b>Device Group</b> is created
+      </span>
+    </>
+  ),
+  [TriggerEnum.DeviceGroup_Updated]: (
+    <>
+      <ComputerIcon size={15} />{" "}
+      <span>
+        A <b>Device Group</b> is updated
+      </span>
+    </>
+  ),
 };
 
 export const WebhooksList = () => {
-  const webhooks = useSuspenseWebhooks();
+  const { data: webhooks, isFetching } = useSuspenseWebhooks();
 
   return (
-    <EntityList
-      items={webhooks.data.items}
-      getKey={(item) => item.id}
-      // @ts-expect-error - WebhookItem correctly expects trigger to be TriggerEnum[] but z.infer type expects it as string[]
-      renderItem={(webhook) => <WebhookItem data={webhook} />}
-      emptyView={<WebhooksEmpty />}
+    <DataTable
+      paginatedData={webhooks}
+      columns={columns}
+      isLoading={isFetching}
     />
   );
 };
 
-const WebhookCreateModal = ({
+export const WebhookCreateModal = ({
   form,
   handleCreate,
   open,
@@ -109,27 +158,33 @@ const WebhookCreateModal = ({
 
   const isPending = form.formState.isSubmitting;
   const authType = form.watch("authType");
-  const label = isUpdate ? "Update Webhook" : "Create Webhook";
+  const verbLabel = isUpdate ? "Update" : "Create";
+  const label = `${verbLabel} ${!isUpdate ? "New" : ""} Webhook`;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="p-6 rounded-2xl">
-        <DialogHeader>
+      <DialogContent className="p-0 rounded-2xl overflow-hidden">
+        <DialogHeader className="px-6 py-4 border-b gap-1">
           <DialogTitle className="text-xl">{label}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="grid gap-6">
+          <form
+            onSubmit={form.handleSubmit(onSubmit, (errors) =>
+              console.log(errors),
+            )}
+            className="px-6"
+          >
+            <div className="no-scrollbar -mx-6 px-6 py-4 max-h-[60vh] overflow-y-auto grid gap-6">
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>Webhook Name *</FormLabel>
                     <FormControl>
                       <Input
                         type="text"
-                        placeholder="Webhook name"
+                        placeholder="e.g., Hawksbill TA3 Webhook"
                         {...field}
                       />
                     </FormControl>
@@ -143,7 +198,7 @@ const WebhookCreateModal = ({
                 name="callbackUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Callback URL</FormLabel>
+                    <FormLabel>Webhook URL *</FormLabel>
                     <FormControl>
                       <Input
                         type="text"
@@ -156,129 +211,7 @@ const WebhookCreateModal = ({
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="authType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Authentication Type</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select authentication type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Auth Type</SelectLabel>
-                          {Object.keys(AuthType).map((authType) => (
-                            <SelectItem value={authType} key={authType}>
-                              {authType}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {authType === "Basic" && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="authentication.username"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Username</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="Username"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="authentication.password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="Password"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
-
-              {authType === "Bearer" && (
-                <FormField
-                  control={form.control}
-                  name="authentication.token"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Token</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="text"
-                          placeholder="Bearer token"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {authType === "Header" && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="authentication.header"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Header Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="X-API-Key"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="authentication.value"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Header Value</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="Header value"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
+              <AuthenticationFields form={form} />
 
               <FormField
                 control={form.control}
@@ -287,7 +220,7 @@ const WebhookCreateModal = ({
                   <FormItem>
                     <FormLabel>Send a notification when:</FormLabel>
                     <FormControl>
-                      <div>
+                      <div className="border-1 bg-muted p-4 flex flex-col gap-2">
                         {Object.entries(triggerDescriptions).map(
                           ([key, value], index) => (
                             <div key={index} className="flex gap-x-1 text-sm">
@@ -301,8 +234,9 @@ const WebhookCreateModal = ({
                                   field.onChange(updatedList);
                                 }}
                               />
-                              <span className="font-semibold">{key}</span>
-                              <span className="">- {value}</span>
+                              <span className="flex gap-1.5 items-center">
+                                {value}
+                              </span>
                             </div>
                           ),
                         )}
@@ -312,13 +246,21 @@ const WebhookCreateModal = ({
                   </FormItem>
                 )}
               />
-
-              <Button type="submit" className="w-full" disabled={isPending}>
-                {label}
-              </Button>
             </div>
           </form>
         </Form>
+        <DialogFooter className="px-6 py-4 bg-muted border-t justify-between!">
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button
+            type="submit"
+            onClick={form.handleSubmit(onSubmit)}
+            disabled={isPending}
+          >
+            {verbLabel} Integration
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -351,12 +293,20 @@ export const WebhooksHeader = () => {
 
   return (
     <>
-      <EntityHeader
-        title="Webhooks"
-        description="Manage Webhooks"
-        onNew={() => setOpen(true)}
-        newButtonLabel="New Webhook"
-      />
+      <div
+        className={cn(
+          mainPadding,
+          "bg-background flex justify-between items-center",
+        )}
+      >
+        <SettingsSubheader
+          title="Webhooks"
+          description="Manage where VIPER communicates data to"
+        />
+        <Button onClick={() => setOpen(true)}>
+          <PlusIcon /> New Webhook
+        </Button>
+      </div>
       <WebhookCreateModal
         form={form}
         open={open}
@@ -383,12 +333,10 @@ export const WebhooksPagination = () => {
 
 export const WebhooksContainer = ({ children }: PropsWithChildren) => {
   return (
-    <EntityContainer
-      header={<WebhooksHeader />}
-      pagination={<WebhooksPagination />}
-    >
-      {children}
-    </EntityContainer>
+    <>
+      <WebhooksHeader />
+      <div className={mainPadding}>{children}</div>
+    </>
   );
 };
 

@@ -63,7 +63,12 @@ export const EntityHeader = ({
   className,
 }: EntityHeaderProps) => {
   return (
-    <div className={cn("flex flex-row items-center justify-between gap-x-4", className)}>
+    <div
+      className={cn(
+        "flex flex-row items-center justify-between gap-x-4",
+        className,
+      )}
+    >
       <div className="flex flex-col">
         <h1 className={headerClass}>{title}</h1>
         {description && (

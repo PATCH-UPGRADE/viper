@@ -34,7 +34,7 @@ export const IntegrationsLayout = ({
   const [successOpen, setSuccessOpen] = useState(false);
   const [key, setKey] = useState<Apikey | undefined>(undefined);
 
-  const resourceType = integrationsMapping[activeTab].type
+  const resourceType = integrationsMapping[activeTab].type;
 
   const form = useForm<IntegrationFormValues>({
     resolver: zodResolver(integrationInputSchema),
@@ -62,25 +62,33 @@ export const IntegrationsLayout = ({
 
   return (
     <>
-    <div className={cn(mainPadding, "bg-background flex flex-col gap-4")}>
-      <SettingsSubheader
-        title="Integrations"
-        description="Manage external integrations to sync assets and vulnerabilities"
-      />
+      <div className={cn(mainPadding, "bg-background flex flex-col gap-4")}>
+        <SettingsSubheader
+          title="Integrations"
+          description="Manage external integrations to sync assets and vulnerabilities"
+        />
 
-      <Tabs value={activeTab} className="w-full flex flex-row! justify-between">
-        <TabsList variant="line">
-          {Object.entries(integrationsMapping).map(([key, value]) => (
-            <TabsTrigger value={key} key={key} asChild>
-              <Link href={`/settings/integrations/${key}`} className="data-[state=active]:text-primary!  [&[data-state=active]]:after:bg-primary!">
-                {value.name} Integrations
-              </Link>
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        <Button onClick={() => setOpen(true)}><PlusIcon /> New {resourceType} Integration</Button>
-      </Tabs>
-    </div>
+        <Tabs
+          value={activeTab}
+          className="w-full flex flex-row! justify-between"
+        >
+          <TabsList variant="line">
+            {Object.entries(integrationsMapping).map(([key, value]) => (
+              <TabsTrigger value={key} key={key} asChild>
+                <Link
+                  href={`/settings/integrations/${key}`}
+                  className="data-[state=active]:text-primary!  [&[data-state=active]]:after:bg-primary!"
+                >
+                  {value.name} Integrations
+                </Link>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <Button onClick={() => setOpen(true)}>
+            <PlusIcon /> New {resourceType} Integration
+          </Button>
+        </Tabs>
+      </div>
 
       <div className={mainPadding}>{children}</div>
 

@@ -10,6 +10,11 @@ import {
   webhookInputSchema,
   webhookResponseSchema,
 } from "../types";
+import { userIncludeSelect } from "@/lib/schemas";
+
+const webhooksInclude = {
+  user: userIncludeSelect,
+} as const;
 
 export const webhooksRouter = createTRPCRouter({
   // GET /api/webhooks - List all webhooks of the user
@@ -19,6 +24,7 @@ export const webhooksRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       return fetchPaginated(prisma.webhook, input, {
         where: { userId: ctx.auth.user.id },
+        include: webhooksInclude,
       });
     }),
   // POST /api/webhooks - Create a new Webhook
@@ -31,7 +37,7 @@ export const webhooksRouter = createTRPCRouter({
           ...input,
           userId: ctx.auth.user.id,
         },
-        include: { user: true },
+        include: webhooksInclude,
       });
     }),
   // PUT /api/webhooks - update an existing Webhook

@@ -1,5 +1,5 @@
 import type { SearchParams } from "nuqs/server";
-import { Suspense } from "react";
+import React, { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
@@ -14,7 +14,7 @@ export type ListPageConfig<TParams> = {
   /** Function to prefetch data on the server */
   prefetch: (params: TParams) => Promise<void> | void;
   /** Container component that wraps the page */
-  Container: React.ComponentType<{ children: React.ReactNode }>;
+  Container?: React.ComponentType<{ children: React.ReactNode }>;
   /** List component that displays the data */
   List: React.ComponentType;
   /** Loading fallback component */
@@ -48,8 +48,10 @@ export function createListPage<TParams>(
     const params = await config.paramsLoader(searchParams);
     await config.prefetch(params);
 
+    const Container = config.Container || React.Fragment;
+
     return (
-      <config.Container>
+      <Container>
         <HydrateClient>
           <ErrorBoundary fallback={<config.Error />}>
             <Suspense fallback={<config.Loading />}>
@@ -57,7 +59,7 @@ export function createListPage<TParams>(
             </Suspense>
           </ErrorBoundary>
         </HydrateClient>
-      </config.Container>
+      </Container>
     );
   };
 

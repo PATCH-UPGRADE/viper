@@ -10,7 +10,7 @@ export const webhookInputSchema = z
   .object({
     name: z.string().min(1),
     callbackUrl: safeUrlSchema,
-    triggers: triggerEnumArray,
+    triggers: triggerEnumArray.min(1, "At least one trigger is required"),
     authType: z.enum(AuthType),
     authentication: authenticationSchema.optional(),
   })

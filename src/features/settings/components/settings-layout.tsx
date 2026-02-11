@@ -34,21 +34,44 @@ export const SettingsLayout = ({ children }: { children: React.ReactNode }) => {
     : "webhooks";
 
   // path and name for tab
-  const tabs = [["integrations", <><PlugIcon /> Integrations</>], ["webhooks", <><WebhookIcon /> Webhooks</>]]
+  const tabs = [
+    [
+      "integrations",
+      <>
+        <PlugIcon /> Integrations
+      </>,
+    ],
+    [
+      "webhooks",
+      <>
+        <WebhookIcon /> Webhooks
+      </>,
+    ],
+  ];
 
   return (
     <div>
-      <div className={cn(mainPadding, "bg-background flex flex-col gap-4 border-b")}>
-      <h1 className={cn(headerClass, "text-2xl! font-bold")}>Settings</h1>
-      <Tabs value={activeTab} className="w-full">
-        <TabsList variant="line" className="gap-4">
-          {tabs.map(([path, name]) => (
-          <TabsTrigger value={path} key={path} asChild>
-            <Link href={`/settings/${path}`} className="data-[state=active]:text-primary!  [&[data-state=active]]:after:bg-primary! font-semibold">{name}</Link>
-          </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div
+        className={cn(
+          mainPadding,
+          "bg-background flex flex-col gap-4 border-b",
+        )}
+      >
+        <h1 className={cn(headerClass, "text-2xl! font-bold")}>Settings</h1>
+        <Tabs value={activeTab} className="w-full">
+          <TabsList variant="line" className="gap-4">
+            {tabs.map(([path, name]) => (
+              <TabsTrigger value={path} key={path} asChild>
+                <Link
+                  href={`/settings/${path}`}
+                  className="data-[state=active]:text-primary!  [&[data-state=active]]:after:bg-primary! font-semibold"
+                >
+                  {name}
+                </Link>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
 
       <div>{children}</div>

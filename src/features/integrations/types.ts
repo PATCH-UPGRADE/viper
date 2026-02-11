@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { safeUrlSchema, UserIncludeType } from "@/lib/schemas";
-import { Integration, ResourceType, SyncStatus } from "@/generated/prisma";
+import {
+  AuthType,
+  Integration,
+  ResourceType,
+  SyncStatus,
+} from "@/generated/prisma";
 import { inferOutput } from "@trpc/tanstack-react-query";
 import { trpc } from "@/trpc/server";
 
@@ -32,7 +37,7 @@ export const integrationInputSchema = z
     integrationUri: safeUrlSchema,
     isGeneric: z.boolean(),
     prompt: z.string().optional(),
-    authType: z.enum(["Basic", "Bearer", "Header", "None"]),
+    authType: z.enum(Object.values(AuthType)),
     resourceType: z.enum([
       "Asset",
       "Vulnerability",

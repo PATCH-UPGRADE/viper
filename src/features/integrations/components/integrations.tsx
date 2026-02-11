@@ -40,7 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiTokenSuccessModal } from "@/features/user/components/user";
 import {
@@ -68,8 +68,15 @@ import { DataTable } from "@/components/ui/data-table";
 import { getIntegrationColumns } from "@/features/integrations/components/columns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { CircleCheck, CircleDot, CircleX, SparkleIcon, Sparkles } from "lucide-react";
+import {
+  CircleCheck,
+  CircleDot,
+  CircleX,
+  SparkleIcon,
+  Sparkles,
+} from "lucide-react";
 import { DialogClose } from "@radix-ui/react-dialog";
+import { AuthenticationFields } from "@/components/auth-form";
 
 export const IntegrationsList = ({
   resourceType,
@@ -84,25 +91,41 @@ export const IntegrationsList = ({
   }, [resourceType]);
 
   return (
-      <DataTable
-        paginatedData={integrations}
-        columns={columns}
-        isLoading={isFetching}
-      />
+    <DataTable
+      paginatedData={integrations}
+      columns={columns}
+      isLoading={isFetching}
+    />
   );
 };
 
-export const SyncStatusIndicator = ({status} : {status?: SyncStatusEnum}) => {
+export const SyncStatusIndicator = ({
+  status,
+}: {
+  status?: SyncStatusEnum;
+}) => {
   const className = "flex gap-1 items-center font-semibold";
   switch (status) {
     case "Error":
-      return (<span className={cn(className, "text-destructive")}><CircleX size={15} /> Error</span>)
+      return (
+        <span className={cn(className, "text-destructive")}>
+          <CircleX size={15} /> Error
+        </span>
+      );
     case "Success":
-      return (<span className={cn(className, "text-emerald-600")}><CircleCheck size={15} /> Success</span>)
+      return (
+        <span className={cn(className, "text-emerald-600")}>
+          <CircleCheck size={15} /> Success
+        </span>
+      );
     default:
-      return (<span className={cn(className, "text-gray-500")}><CircleDot size={15} /> Pending</span>)
+      return (
+        <span className={cn(className, "text-gray-500")}>
+          <CircleDot size={15} /> Pending
+        </span>
+      );
   }
-}
+};
 
 export const IntegrationCreateModal = ({
   form,
@@ -134,113 +157,130 @@ export const IntegrationCreateModal = ({
       <DialogContent className="p-0 rounded-2xl w-6xl lg:max-w-2xl overflow-hidden">
         <DialogHeader className="px-6 py-4 border-b gap-1">
           <DialogTitle className="text-xl">{label}</DialogTitle>
-          <DialogDescription>Connect a standard integration or use AI to sync with any platform</DialogDescription>
+          <DialogDescription>
+            Connect a standard integration or use AI to sync with any platform
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="px-6">
-          <div className="no-scrollbar -mx-6 px-6 py-4 max-h-[60vh] overflow-y-auto grid gap-6">
+            <div className="no-scrollbar -mx-6 px-6 py-4 max-h-[60vh] overflow-y-auto grid gap-6">
+              <FormField
+                control={form.control}
+                name="isGeneric"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Integration Type *</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={(value) =>
+                          field.onChange(value === "true")
+                        }
+                        value={field.value ? "true" : "false"}
+                        className="grid grid-cols-2 gap-4"
+                      >
+                        <FormItem>
+                          <FormControl>
+                            <RadioGroupItem
+                              value="false"
+                              id="standard"
+                              className="sr-only"
+                            />
+                          </FormControl>
+                          <FormLabel
+                            htmlFor="standard"
+                            className={cn(
+                              "flex flex-col cursor-pointer rounded-lg border-2 p-6 hover:border-primary/50 transition-colors",
+                              field.value === false
+                                ? "border-primary bg-primary/5"
+                                : "border-border",
+                            )}
+                          >
+                            <div className="flex items-start gap-3 mb-3">
+                              <div
+                                className={cn(
+                                  "w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5",
+                                  field.value === false
+                                    ? "border-primary"
+                                    : "border-muted-foreground",
+                                )}
+                              >
+                                {field.value === false && (
+                                  <div className="w-3 h-3 rounded-full bg-primary" />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="text-md font-semibold mb-2">
+                                  Standard Integration
+                                </div>
+                                <div className="text-xs text-muted-foreground mb-3">
+                                  Pre-configured platforms with built-in support
+                                </div>
+                                <Badge className="text-xs">
+                                  e.g., BlueFlow, Helm
+                                </Badge>
+                              </div>
+                            </div>
+                          </FormLabel>
+                        </FormItem>
 
-<FormField
-  control={form.control}
-  name="isGeneric"
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>Integration Type *</FormLabel>
-      <FormControl>
-        <RadioGroup
-          onValueChange={(value) => field.onChange(value === "true")}
-          value={field.value ? "true" : "false"}
-          className="grid grid-cols-2 gap-4"
-        >
-          <FormItem>
-            <FormControl>
-              <RadioGroupItem value="false" id="standard" className="sr-only" />
-            </FormControl>
-            <FormLabel
-              htmlFor="standard"
-              className={cn(
-                "flex flex-col cursor-pointer rounded-lg border-2 p-6 hover:border-primary/50 transition-colors",
-                field.value === false
-                  ? "border-primary bg-primary/5"
-                  : "border-border"
-              )}
-            >
-              <div className="flex items-start gap-3 mb-3">
-                <div
-                  className={cn(
-                    "w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5",
-                    field.value === false
-                      ? "border-primary"
-                      : "border-muted-foreground"
-                  )}
-                >
-                  {field.value === false && (
-                    <div className="w-3 h-3 rounded-full bg-primary" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="text-md font-semibold mb-2">
-                    Standard Integration
-                  </div>
-                  <div className="text-xs text-muted-foreground mb-3">
-                    Pre-configured platforms with built-in support
-                  </div>
-                  <Badge className="text-xs">e.g., BlueFlow, Helm</Badge>
-                </div>
-              </div>
-            </FormLabel>
-          </FormItem>
-
-          <FormItem>
-            <FormControl>
-              <RadioGroupItem value="true" id="ai" className="sr-only" />
-            </FormControl>
-            <FormLabel
-              htmlFor="ai"
-              className={cn(
-                "flex flex-col cursor-pointer rounded-lg border-2 p-6 hover:border-primary/50 transition-colors",
-                field.value === true
-                  ? "border-primary bg-primary/5"
-                  : "border-border"
-              )}
-            >
-              <div className="flex items-start gap-3 mb-3">
-                <div
-                  className={cn(
-                    "w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5",
-                    field.value === true
-                      ? "border-primary"
-                      : "border-muted-foreground"
-                  )}
-                >
-                  {field.value === true && (
-                    <div className="w-3 h-3 rounded-full bg-primary" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="text-md font-semibold mb-2 flex gap-1">
-                    <Sparkles size={15} /> AI Integration
-                  </div>
-                  <div className="text-xs text-muted-foreground mb-3">
-                    Flexible setup for any custom platform
-                  </div>
-                  <Badge className="text-xs">Universal & Adaptive</Badge>
-                </div>
-              </div>
-            </FormLabel>
-          </FormItem>
-        </RadioGroup>
-      </FormControl>
-    </FormItem>
-  )}
-/>
+                        <FormItem>
+                          <FormControl>
+                            <RadioGroupItem
+                              value="true"
+                              id="ai"
+                              className="sr-only"
+                            />
+                          </FormControl>
+                          <FormLabel
+                            htmlFor="ai"
+                            className={cn(
+                              "flex flex-col cursor-pointer rounded-lg border-2 p-6 hover:border-primary/50 transition-colors",
+                              field.value === true
+                                ? "border-primary bg-primary/5"
+                                : "border-border",
+                            )}
+                          >
+                            <div className="flex items-start gap-3 mb-3">
+                              <div
+                                className={cn(
+                                  "w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5",
+                                  field.value === true
+                                    ? "border-primary"
+                                    : "border-muted-foreground",
+                                )}
+                              >
+                                {field.value === true && (
+                                  <div className="w-3 h-3 rounded-full bg-primary" />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="text-md font-semibold mb-2 flex gap-1">
+                                  <Sparkles size={15} /> AI Integration
+                                </div>
+                                <div className="text-xs text-muted-foreground mb-3">
+                                  Flexible setup for any custom platform
+                                </div>
+                                <Badge className="text-xs">
+                                  Universal & Adaptive
+                                </Badge>
+                              </div>
+                            </div>
+                          </FormLabel>
+                        </FormItem>
+                      </RadioGroup>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Integration Name *</FormLabel>
-                    <FormDescription>How this integration will appear in the platform</FormDescription>
+                    <FormDescription>
+                      How this integration will appear in the platform
+                    </FormDescription>
                     <FormControl>
                       <Input
                         type="text"
@@ -259,7 +299,9 @@ export const IntegrationCreateModal = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Integration URL *</FormLabel>
-                    <FormDescription>API endpoint for the integration</FormDescription>
+                    <FormDescription>
+                      API endpoint for the integration
+                    </FormDescription>
                     <FormControl>
                       <Input
                         type="text"
@@ -272,130 +314,7 @@ export const IntegrationCreateModal = ({
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="authType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Authentication Type *</FormLabel>
-                    <FormDescription>Authentication method for API access</FormDescription>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select authentication type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Authentication Type</SelectLabel>
-                          {Object.keys(AuthType).map((authType) => (
-                            <SelectItem value={authType} key={authType}>
-                              {authType}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {authType === "Basic" && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="authentication.username"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Username *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="Username"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="authentication.password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="Password"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
-
-              {authType === "Bearer" && (
-                <FormField
-                  control={form.control}
-                  name="authentication.token"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Token *</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="text"
-                          placeholder="Bearer token"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {authType === "Header" && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="authentication.header"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Header Name *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="X-API-Key"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="authentication.value"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Header Value *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="Header value"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
+              <AuthenticationFields form={form} />
 
               <FormField
                 control={form.control}
@@ -403,7 +322,9 @@ export const IntegrationCreateModal = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Sync Interval (seconds) *</FormLabel>
-                    <FormDescription>How often to syncrhonize with the integration</FormDescription>
+                    <FormDescription>
+                      How often to syncrhonize with the integration
+                    </FormDescription>
                     <FormControl>
                       <Input
                         type="number"
@@ -421,31 +342,43 @@ export const IntegrationCreateModal = ({
                 )}
               />
 
-            {isGeneric && (
+              {isGeneric && (
                 <FormField
                   control={form.control}
                   name="prompt"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Additional Instructions <span className="text-muted-foreground">(Optional)</span></FormLabel>
+                      <FormLabel>
+                        Additional Instructions{" "}
+                        <span className="text-muted-foreground">
+                          (Optional)
+                        </span>
+                      </FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="Provide any additional context, access instructions, or special considerations for the AI to understand your integration" />
+                        <Textarea
+                          {...field}
+                          placeholder="Provide any additional context, access instructions, or special considerations for the AI to understand your integration"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               )}
-</div>
+            </div>
           </form>
         </Form>
         <DialogFooter className="px-6 py-4 bg-muted border-t justify-between!">
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button type="submit" onClick={form.handleSubmit(onSubmit)} disabled={isPending}>
-                {verbLabel} Integration
-              </Button>
+          <Button
+            type="submit"
+            onClick={form.handleSubmit(onSubmit)}
+            disabled={isPending}
+          >
+            {verbLabel} Integration
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

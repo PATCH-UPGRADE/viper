@@ -5,6 +5,7 @@ import { formatDistanceToNow, formatDuration } from "date-fns";
 import {
   CopyIcon,
   MoreVertical,
+  RefreshCw,
   RotateCcwIcon,
   RotateCwIcon,
   SettingsIcon,
@@ -48,6 +49,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   IntegrationCreateModal,
   RotateIntegrationConfirmModal,
+  SyncStatusIndicator,
 } from "./integrations";
 import { ApiTokenSuccessModal } from "@/features/user/components/user";
 import ms from "ms";
@@ -64,6 +66,7 @@ export const getIntegrationColumns = (resourceType: ResourceType): ColumnDef<Int
       };
       return (
         <Button onClick={handleSync} disabled={triggerSync.isPending}>
+        <RefreshCw className={triggerSync.isPending ? "animate-spin" : ""} />
           {triggerSync.isPending ? "Syncing..." : "Sync Now"}
         </Button>
       );
@@ -99,7 +102,7 @@ export const getIntegrationColumns = (resourceType: ResourceType): ColumnDef<Int
       const syncStatus = row.original.syncStatus[0];
       return (
         <Tooltip>
-          <TooltipTrigger>{syncStatus?.status ?? "Pending"}</TooltipTrigger>
+          <TooltipTrigger><SyncStatusIndicator status={syncStatus?.status} /></TooltipTrigger>
           {syncStatus && syncStatus?.status === SyncStatusEnum.Error && (<TooltipContent>{syncStatus.errorMessage}</TooltipContent>)}
         </Tooltip>
       );
@@ -116,7 +119,7 @@ export const getIntegrationColumns = (resourceType: ResourceType): ColumnDef<Int
       return (
         <Tooltip>
           <TooltipTrigger>
-            {lastSynced ? formatDistanceToNow(lastSynced) : "Never"}
+            {lastSynced ? `${formatDistanceToNow(lastSynced)} ago` : "Never"}
           </TooltipTrigger>
           <TooltipContent>{lastSynced ? lastSynced.toLocaleString() : "Never"}</TooltipContent>
         </Tooltip>

@@ -4,10 +4,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { EntityContainer, EntityHeader } from "@/components/entity-components";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-export const SettingsHeader = () => {
-  return <EntityHeader title="Settings" />;
-};
+import { headerClass, mainPadding } from "@/config/constants";
+import { cn } from "@/lib/utils";
+import { PlugIcon, WebhookIcon } from "lucide-react";
 
 export const SettingsSubheader = ({
   title,
@@ -28,38 +27,31 @@ export const SettingsSubheader = ({
   );
 };
 
-export const SettingsContainer = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
-  return (
-    <EntityContainer header={<SettingsHeader />}>{children}</EntityContainer>
-  );
-};
-
 export const SettingsLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const activeTab = pathname.includes("integrations")
     ? "integrations"
     : "webhooks";
 
-  return (
-    <SettingsContainer>
-      <div className="container mx-auto">
-        <Tabs value={activeTab} className="w-full">
-          <TabsList variant="line">
-            <TabsTrigger value="integrations" asChild>
-              <Link href="/settings/integrations">Integrations</Link>
-            </TabsTrigger>
-            <TabsTrigger value="webhooks" asChild>
-              <Link href="/settings/webhooks">Webhooks</Link>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+  // path and name for tab
+  const tabs = [["integrations", <><PlugIcon /> Integrations</>], ["webhooks", <><WebhookIcon /> Webhooks</>]]
 
-        <div className="mt-6">{children}</div>
+  return (
+    <div>
+      <div className={cn(mainPadding, "bg-background flex flex-col gap-4 border-b")}>
+      <h1 className={cn(headerClass, "text-2xl! font-bold")}>Settings</h1>
+      <Tabs value={activeTab} className="w-full">
+        <TabsList variant="line" className="gap-4">
+          {tabs.map(([path, name]) => (
+          <TabsTrigger value={path} key={path} asChild>
+            <Link href={`/settings/${path}`} className="data-[state=active]:text-primary!  [&[data-state=active]]:after:bg-primary! font-semibold">{name}</Link>
+          </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       </div>
-    </SettingsContainer>
+
+      <div>{children}</div>
+    </div>
   );
 };

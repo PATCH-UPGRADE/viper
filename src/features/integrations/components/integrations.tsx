@@ -48,6 +48,7 @@ import {
   AuthType,
   type Integration,
   type ResourceType,
+  SyncStatusEnum,
 } from "@/generated/prisma";
 import { usePaginationParams } from "@/lib/pagination";
 import {
@@ -67,7 +68,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { getIntegrationColumns } from "@/features/integrations/components/columns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { SparkleIcon, Sparkles } from "lucide-react";
+import { CircleCheck, CircleDot, CircleX, SparkleIcon, Sparkles } from "lucide-react";
 import { DialogClose } from "@radix-ui/react-dialog";
 
 export const IntegrationsList = ({
@@ -90,6 +91,18 @@ export const IntegrationsList = ({
       />
   );
 };
+
+export const SyncStatusIndicator = ({status} : {status?: SyncStatusEnum}) => {
+  const className = "flex gap-1 items-center font-semibold";
+  switch (status) {
+    case "Error":
+      return (<span className={cn(className, "text-destructive")}><CircleX size={15} /> Error</span>)
+    case "Success":
+      return (<span className={cn(className, "text-emerald-600")}><CircleCheck size={15} /> Success</span>)
+    default:
+      return (<span className={cn(className, "text-gray-500")}><CircleDot size={15} /> Pending</span>)
+  }
+}
 
 export const IntegrationCreateModal = ({
   form,
@@ -118,14 +131,14 @@ export const IntegrationCreateModal = ({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="p-6 rounded-2xl w-6xl">
-        <DialogHeader>
+      <DialogContent className="p-0 rounded-2xl w-6xl lg:max-w-2xl overflow-hidden">
+        <DialogHeader className="px-6 py-4 border-b gap-1">
           <DialogTitle className="text-xl">{label}</DialogTitle>
           <DialogDescription>Connect a standard integration or use AI to sync with any platform</DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit, (errors) => console.log(errors))}>
-          <div className="no-scrollbar -mx-4 max-h-[50vh] overflow-y-auto px-4 grid gap-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="px-6">
+          <div className="no-scrollbar -mx-6 px-6 py-4 max-h-[60vh] overflow-y-auto grid gap-6">
 
 <FormField
   control={form.control}
@@ -226,7 +239,7 @@ export const IntegrationCreateModal = ({
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>Integration Name *</FormLabel>
                     <FormDescription>How this integration will appear in the platform</FormDescription>
                     <FormControl>
                       <Input
@@ -261,40 +274,18 @@ export const IntegrationCreateModal = ({
 
               <FormField
                 control={form.control}
-                name="syncEvery"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sync Interval (seconds) *</FormLabel>
-                    <FormDescription>How often to update assets in the platform</FormDescription>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="300"
-                        {...field}
-                        onChange={(e) => {
-                          const value = parseInt(e.target.value, 10);
-                          field.onChange(Number.isNaN(value) ? 300 : value);
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="authType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Authentication Type</FormLabel>
+                    <FormLabel>Authentication Type *</FormLabel>
+                    <FormDescription>Authentication method for API access</FormDescription>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select authentication type" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectLabel>Auth Type</SelectLabel>
+                          <SelectLabel>Authentication Type</SelectLabel>
                           {Object.keys(AuthType).map((authType) => (
                             <SelectItem value={authType} key={authType}>
                               {authType}
@@ -315,7 +306,7 @@ export const IntegrationCreateModal = ({
                     name="authentication.username"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Username</FormLabel>
+                        <FormLabel>Username *</FormLabel>
                         <FormControl>
                           <Input
                             type="text"
@@ -332,7 +323,7 @@ export const IntegrationCreateModal = ({
                     name="authentication.password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password</FormLabel>
+                        <FormLabel>Password *</FormLabel>
                         <FormControl>
                           <Input
                             type="password"
@@ -353,7 +344,7 @@ export const IntegrationCreateModal = ({
                   name="authentication.token"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Token</FormLabel>
+                      <FormLabel>Token *</FormLabel>
                       <FormControl>
                         <Input
                           type="text"
@@ -374,7 +365,7 @@ export const IntegrationCreateModal = ({
                     name="authentication.header"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Header Name</FormLabel>
+                        <FormLabel>Header Name *</FormLabel>
                         <FormControl>
                           <Input
                             type="text"
@@ -391,7 +382,7 @@ export const IntegrationCreateModal = ({
                     name="authentication.value"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Header Value</FormLabel>
+                        <FormLabel>Header Value *</FormLabel>
                         <FormControl>
                           <Input
                             type="text"
@@ -406,13 +397,37 @@ export const IntegrationCreateModal = ({
                 </>
               )}
 
+              <FormField
+                control={form.control}
+                name="syncEvery"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sync Interval (seconds) *</FormLabel>
+                    <FormDescription>How often to syncrhonize with the integration</FormDescription>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="300"
+                        {...field}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value, 10);
+                          field.onChange(Number.isNaN(value) ? 300 : value);
+                        }}
+                      />
+                    </FormControl>
+                    <FormDescription>Minimum: 60 seconds</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
             {isGeneric && (
                 <FormField
                   control={form.control}
                   name="prompt"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Additional Instructions (Optional)</FormLabel>
+                      <FormLabel>Additional Instructions <span className="text-muted-foreground">(Optional)</span></FormLabel>
                       <FormControl>
                         <Textarea {...field} placeholder="Provide any additional context, access instructions, or special considerations for the AI to understand your integration" />
                       </FormControl>
@@ -424,7 +439,7 @@ export const IntegrationCreateModal = ({
 </div>
           </form>
         </Form>
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4 bg-muted border-t justify-between!">
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>

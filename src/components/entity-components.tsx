@@ -37,6 +37,7 @@ import {
   EmptyTitle,
 } from "./ui/empty";
 import { Input } from "./ui/input";
+import { headerClass, mainPadding } from "@/config/constants";
 
 type EntityHeaderProps = {
   title: string;
@@ -44,6 +45,7 @@ type EntityHeaderProps = {
   newButtonLabel?: string;
   disabled?: boolean;
   isCreating?: boolean;
+  className?: string;
 } & (
   | { onNew: () => void; newButtonHref?: never }
   | { newButtonHref: string; onNew?: never }
@@ -58,11 +60,12 @@ export const EntityHeader = ({
   newButtonLabel,
   disabled,
   isCreating,
+  className,
 }: EntityHeaderProps) => {
   return (
-    <div className="flex flex-row items-center justify-between gap-x-4">
+    <div className={cn("flex flex-row items-center justify-between gap-x-4", className)}>
       <div className="flex flex-col">
-        <h1 className="text-lg md:text-xl font-semibold">{title}</h1>
+        <h1 className={headerClass}>{title}</h1>
         {description && (
           <p className="text-xs md:text-sm text-muted-foreground">
             {description}
@@ -92,6 +95,7 @@ type EntityContainerProps = {
   header?: React.ReactNode;
   search?: React.ReactNode;
   pagination?: React.ReactNode;
+  className?: string;
 };
 
 export const EntityContainer = ({
@@ -99,9 +103,10 @@ export const EntityContainer = ({
   header,
   search,
   pagination,
+  className,
 }: EntityContainerProps) => {
   return (
-    <div className="p-4 md:px-10 md:py-6 h-full">
+    <div className={cn(mainPadding, className)}>
       <div className="mx-auto max-w-screen-xl w-full flex flex-col gap-y-8 h-full">
         {header}
         <div className="flex flex-col gap-y-4 h-full">

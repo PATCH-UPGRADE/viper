@@ -18,6 +18,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { IntegrationCreateModal } from "./integrations";
 import { ApiTokenSuccessModal } from "@/features/user/components/user";
 import { PlusIcon } from "lucide-react";
+import { mainPadding } from "@/config/constants";
+import { cn } from "@/lib/utils";
 
 export const IntegrationsLayout = ({
   children,
@@ -59,26 +61,28 @@ export const IntegrationsLayout = ({
   };
 
   return (
-    <div>
+    <>
+    <div className={cn(mainPadding, "bg-background flex flex-col gap-4")}>
       <SettingsSubheader
         title="Integrations"
         description="Manage external integrations to sync assets and vulnerabilities"
       />
 
-      <Tabs value={activeTab} className="w-full">
+      <Tabs value={activeTab} className="w-full flex flex-row! justify-between">
         <TabsList variant="line">
           {Object.entries(integrationsMapping).map(([key, value]) => (
             <TabsTrigger value={key} key={key} asChild>
-              <Link href={`/settings/integrations/${key}`}>
+              <Link href={`/settings/integrations/${key}`} className="data-[state=active]:text-primary!  [&[data-state=active]]:after:bg-primary!">
                 {value.name} Integrations
               </Link>
             </TabsTrigger>
           ))}
-          <Button onClick={() => setOpen(true)}><PlusIcon /> New {resourceType} Integration</Button>
         </TabsList>
+        <Button onClick={() => setOpen(true)}><PlusIcon /> New {resourceType} Integration</Button>
       </Tabs>
+    </div>
 
-      <div className="mt-6">{children}</div>
+      <div className={mainPadding}>{children}</div>
 
       <IntegrationCreateModal
         resourceType={resourceType}
@@ -92,6 +96,6 @@ export const IntegrationsLayout = ({
         setOpen={setSuccessOpen}
         apiKey={key}
       />
-    </div>
+    </>
   );
 };

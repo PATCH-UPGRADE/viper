@@ -191,14 +191,14 @@ export function DataTable<TData, TValue>({
       </div>
       <div className="overflow-hidden rounded-md border">
         <Table className="bg-background">
-          <TableHeader>
+          <TableHeader className="bg-muted">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead
                       key={header.id}
-                      className="py-4 first-of-type:pl-4 last-of-type:pr-4 text-muted-foreground"
+                      className="py-2 first-of-type:pl-4 last-of-type:pr-4 text-muted-foreground"
                     >
                       {header.isPlaceholder
                         ? null

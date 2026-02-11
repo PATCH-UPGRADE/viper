@@ -123,7 +123,6 @@ export const artifactsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { wrapperId, ...artifactData } = input;
       const userId = ctx.auth.user.id;
-      const include = { latestArtifact: true };
 
       await requireOwnership(wrapperId, ctx.auth.user.id, "artifactWrapper");
 

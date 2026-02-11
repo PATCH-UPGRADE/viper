@@ -1,4 +1,5 @@
 import "server-only";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { IssueStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -9,7 +10,6 @@ import {
 } from "@/lib/pagination";
 import { deviceGroupSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireExistence } from "@/trpc/middleware";
 
 const issuePaginationInput = paginationInputSchema.extend({
   assetId: z.string(),
@@ -33,7 +33,21 @@ export const issuesRouter = createTRPCRouter({
           },
         },
       };
-      return await requireExistence(where, "issue", include);
+      // TODO: using requireExistence causes type issues with nested object includes
+      // return await requireExistence(where, "issue", include);
+      const issue = await prisma.issue.findUnique({
+        where,
+        include,
+      });
+
+      if (!issue) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Issue not found",
+        });
+      }
+
+      return issue;
     }),
 
   getManyByIds: protectedProcedure

@@ -22,9 +22,14 @@ export async function requireOwnership(
   userId: string,
   modelName: keyof typeof prisma,
 ) {
-  const resource = await requireExistence({ id: resourceId }, modelName, null, {
-    userId: true,
-  });
+  const resource = await requireExistence(
+    { id: resourceId },
+    modelName,
+    undefined,
+    {
+      userId: true,
+    },
+  );
 
   // TODO: Is this secure? Double check.
   if (resource.userId !== userId) {
@@ -37,8 +42,11 @@ export async function requireOwnership(
   return resource;
 }
 
+type optionalPrismaClause = Record<string, unknown> | undefined;
+
 /**
  * Error 404 wrapper for findUnique
+ * WARN: Deeply nested include objects will lose their type using this function
  * Throws NOT_FOUND if resource doesn't exist
  *
  * @param where - The Prisma where clause typically { id: input.id }
@@ -48,10 +56,10 @@ export async function requireOwnership(
  * @returns The found resource
  */
 export async function requireExistence(
-  where: any,
+  where: Record<string, string>,
   modelName: keyof typeof prisma,
-  include: any = undefined,
-  select: any = undefined,
+  include: optionalPrismaClause = undefined,
+  select: optionalPrismaClause = undefined,
 ) {
   const model = getPrismaModel(modelName);
   const resource = await model.findUnique({ where, include, select });

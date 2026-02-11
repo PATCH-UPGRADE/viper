@@ -64,7 +64,8 @@ export const artifactsRouter = createTRPCRouter({
     })
     .output(artifactWithUrlsSchema)
     .query(async ({ input }) => {
-      return requireExistence(input.id, "artifact", null);
+      const where = { id: input.id };
+      return requireExistence(where, "artifact");
     }),
 
   // PUT /api/artifacts/{id} - Update artifact metadata
@@ -122,17 +123,14 @@ export const artifactsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { wrapperId, ...artifactData } = input;
       const userId = ctx.auth.user.id;
+      const include = { latestArtifact: true };
 
       await requireOwnership(wrapperId, ctx.auth.user.id, "artifactWrapper");
 
       return prisma.$transaction(async (tx) => {
         // Get the wrapper with current latest artifact
-        const wrapper = await tx.artifactWrapper.findUniqueOrThrow({
-          where: { id: wrapperId },
-          include: {
-            latestArtifact: true,
-          },
-        });
+        const where = { id: wrapperId };
+        const wrapper = await requireExistence(where, "artifactWrapper", include);
 
         const currentLatest = wrapper.latestArtifact;
         const nextVersion = currentLatest ? currentLatest.versionNumber + 1 : 1;

@@ -20,6 +20,7 @@ export const issuesRouter = createTRPCRouter({
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
+      const where = { id: input.id };
       const include = {
         asset: {
           include: {
@@ -32,7 +33,7 @@ export const issuesRouter = createTRPCRouter({
           },
         },
       };
-      return requireExistence(input.id, "issue", include);
+      return requireExistence(where, "issue", include);
     }),
 
   getManyByIds: protectedProcedure

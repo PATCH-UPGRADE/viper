@@ -195,7 +195,8 @@ export const deviceArtifactsRouter = createTRPCRouter({
     })
     .output(deviceArtifactResponseSchema)
     .query(async ({ input }) => {
-      const deviceArtifact = requireExistence(input.id, "deviceArtifact", deviceArtifactInclude);
+      const where = { id: input.id };
+      const deviceArtifact = await requireExistence(where, "deviceArtifact", deviceArtifactInclude);
       return transformArtifactWrapper(deviceArtifact);
     }),
 

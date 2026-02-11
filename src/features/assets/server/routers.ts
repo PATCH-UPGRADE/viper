@@ -283,7 +283,8 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetResponseSchema)
     .query(async ({ input }) => {
-      return requireExistence(input.id, "asset", assetInclude);
+      const where = { id: input.id };
+      return requireExistence(where, "asset", assetInclude);
     }),
 
   // POST /api/assets - Create asset

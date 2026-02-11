@@ -22,20 +22,7 @@ export async function requireOwnership(
   userId: string,
   modelName: keyof typeof prisma,
 ) {
-  // Type assertion needed because Prisma client types are complex
-  const model = getPrismaModel(modelName);
-
-  const resource = await model.findUnique({
-    where: { id: resourceId },
-    select: { userId: true },
-  });
-
-  if (!resource) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: `${formatResourceName(String(modelName))} not found`,
-    });
-  }
+  const resource = await requireExistence({ id: resourceId }, modelName, null, { userId: true });
 
   // TODO: Is this secure? Double check.
   if (resource.userId !== userId) {
@@ -49,24 +36,18 @@ export async function requireOwnership(
 }
 
 /**
- * Error wrapper for findUnique to properly send 404 instead of 500 on not found
+ * Error wrapper for findUnique to send 404s instead of 500s when resource is not found
  * Throws NOT_FOUND if resource doesn't exist
  *
  * @param resourceId - The ID of the resource to check
  * @param modelName - The Prisma model name (e.g., 'asset', 'vulnerability')
- * @param include - Prisma include clause (e.g. { asset: true, deviceGroup: true } | null )
+ * @param include? - Prisma include clause (e.g. { asset: true, deviceGroup: true } | null )
+ * @param select? - Prisma select clause (e.g. { id: true, userId: true } | null )
  * @returns The found resource
  */
-export async function requireExistence(resourceId: string, modelName: keyof typeof prisma, include: any) {
+export async function requireExistence(where: any, modelName: keyof typeof prisma, include: any = null, select: any = null) {
   const model = getPrismaModel(modelName);
-  let params = { where: { id: resourceId } };
-
-  // include is optional
-  if (include) {
-    params = { ...params, ...include };
-  }
-
-  const resource = await model.findUnique(params);
+  const resource = await model.findUnique({ where, include, select });
 
   if (!resource) {
     throw new TRPCError({

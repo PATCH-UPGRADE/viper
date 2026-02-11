@@ -12,6 +12,7 @@ import {
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { integrationInputSchema } from "../types";
+import { requireExistence } from "@/trpc/middleware";
 
 const paginatedIntegrationsInputSchema = paginationInputSchema.extend({
   resourceType: z.enum([
@@ -111,11 +112,9 @@ export const integrationsRouter = createTRPCRouter({
   rotateKey: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // require ownership of integration to rotate an api key
-      const integration = await prisma.integration.findUniqueOrThrow({
-        where: { id: input.id, userId: ctx.auth.user.id },
-        select: { apiKeyId: true, name: true, userId: true },
-      });
+      const where = { id: input.id, userId: ctx.auth.user.id };
+      const select = { apiKeyId: true, name: true, userId: true };
+      const integration = await requireExistence(where, "integration", null, select);
 
       // delete the existing API key if it exists
       if (integration.apiKeyId) {

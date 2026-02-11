@@ -161,7 +161,8 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationResponseSchema)
     .query(async ({ input }) => {
-      const result = requireExistence(input.id, "remediation", remediationInclude);
+      const where = { id: input.id };
+      const result = await requireExistence(where, "remediation", remediationInclude);
       return transformArtifactWrapper(result);
     }),
 
@@ -187,15 +188,8 @@ export const remediationsRouter = createTRPCRouter({
 
       // Verify the vulnerability exists
       if (input.vulnerabilityId) {
-        const vuln = await prisma.vulnerability.findUnique({
-          where: { id: input.vulnerabilityId },
-        });
-        if (!vuln) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Vulnerability not found",
-          });
-        }
+        const where = { id: input.vulnerabilityId };
+        await requireExistence(where, "vulnerability");
       }
 
       // Create remediation with wrappers and initial artifacts in a transaction

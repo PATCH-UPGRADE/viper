@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import type { Edge, Node } from "@xyflow/react";
 import { generateSlug } from "random-word-slugs";
 import { z } from "zod";
@@ -10,15 +11,15 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { requireExistence } from "@/trpc/middleware";
 
 export const workflowsRouter = createTRPCRouter({
   // TODO: we probably don't need this code here
   execute: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const workflow = await prisma.workflow.findUniqueOrThrow({
-        where: { id: input.id, userId: ctx.auth.user.id },
-      });
+      const where = { id: input.id, userId: ctx.auth.user.id };
+      const workflow = await requireExistence(where, "workflow");
       await inngest.send({
         name: "workflows/execute.workflow",
         data: { workflowId: input.id },
@@ -75,9 +76,8 @@ export const workflowsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { id, nodes, edges } = input;
 
-      const workflow = await prisma.workflow.findUniqueOrThrow({
-        where: { id },
-      });
+      const where = { id };
+      const workflow = await requireExistence(where, "workflow");
 
       // Transaction to ensure consistency
       return await prisma.$transaction(async (tx) => {
@@ -129,10 +129,18 @@ export const workflowsRouter = createTRPCRouter({
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
-      const workflow = await prisma.workflow.findUniqueOrThrow({
+      // TODO: using requireExistence causes type issues with nested object includes
+      const workflow = await prisma.workflow.findUnique({
         where: { id: input.id },
         include: { nodes: true, connections: true },
       });
+
+      if (!workflow) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Workflow not found",
+        });
+      }
 
       // Transform server nodes to react-flow compatible nodes
       const nodes: Node[] = workflow.nodes.map((node) => ({

@@ -2,6 +2,11 @@ import { TRPCError } from "@trpc/server";
 import prisma from "@/lib/db";
 import { formatResourceName } from "@/lib/string-utils";
 
+// spliting this into its own function so linting only complains once
+const getPrismaModel = (modelName: keyof typeof prisma) => {
+  return prisma[modelName] as any;
+};
+
 /**
  * Verifies that a resource belongs to the current user
  * Throws NOT_FOUND if resource doesn't exist
@@ -17,26 +22,52 @@ export async function requireOwnership(
   userId: string,
   modelName: keyof typeof prisma,
 ) {
-  // Type assertion needed because Prisma client types are complex
-  const model = prisma[modelName] as any;
-
-  const resource = await model.findUnique({
-    where: { id: resourceId },
-    select: { userId: true },
-  });
-
-  if (!resource) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: `${formatResourceName(String(modelName))} not found`,
-    });
-  }
+  const resource = await requireExistence(
+    { id: resourceId },
+    modelName,
+    undefined,
+    {
+      userId: true,
+    },
+  );
 
   // TODO: Is this secure? Double check.
   if (resource.userId !== userId) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: `You can only modify ${String(modelName)}s that you created`,
+    });
+  }
+
+  return resource;
+}
+
+type optionalPrismaClause = Record<string, unknown> | undefined;
+
+/**
+ * Error 404 wrapper for findUnique
+ * WARN: Deeply nested include objects will lose their type using this function
+ * Throws NOT_FOUND if resource doesn't exist
+ *
+ * @param where - The Prisma where clause typically { id: input.id }
+ * @param modelName - The Prisma model name (e.g., 'asset', 'vulnerability')
+ * @param include - (optional) Prisma include clause e.g. { asset: true, deviceGroup: true } or can leave undefined / empty
+ * @param select - (optional) Prisma select clause e.g. { id: true, userId: true } or can leave undefined / empty
+ * @returns The found resource
+ */
+export async function requireExistence(
+  where: Record<string, string>,
+  modelName: keyof typeof prisma,
+  include: optionalPrismaClause = undefined,
+  select: optionalPrismaClause = undefined,
+) {
+  const model = getPrismaModel(modelName);
+  const resource = await model.findUnique({ where, include, select });
+
+  if (!resource) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: `${formatResourceName(String(modelName))} not found`,
     });
   }
 

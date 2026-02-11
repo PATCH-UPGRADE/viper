@@ -1,4 +1,5 @@
 import "server-only";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { IssueStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -19,21 +20,34 @@ export const issuesRouter = createTRPCRouter({
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
-      return prisma.issue.findUniqueOrThrow({
-        where: { id: input.id },
-        include: {
-          asset: {
-            include: {
-              deviceGroup: deviceGroupSelect,
-            },
-          },
-          vulnerability: {
-            include: {
-              affectedDeviceGroups: deviceGroupSelect,
-            },
+      const where = { id: input.id };
+      const include = {
+        asset: {
+          include: {
+            deviceGroup: deviceGroupSelect,
           },
         },
+        vulnerability: {
+          include: {
+            affectedDeviceGroups: deviceGroupSelect,
+          },
+        },
+      };
+      // TODO: using requireExistence causes type issues with nested object includes
+      // return await requireExistence(where, "issue", include);
+      const issue = await prisma.issue.findUnique({
+        where,
+        include,
       });
+
+      if (!issue) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Issue not found",
+        });
+      }
+
+      return issue;
     }),
 
   getManyByIds: protectedProcedure

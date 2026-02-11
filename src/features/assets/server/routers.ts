@@ -20,7 +20,7 @@ import {
   userSchema,
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership } from "@/trpc/middleware";
+import { requireExistence, requireOwnership } from "@/trpc/middleware";
 
 const AssetStatus = z.enum(["Active", "Decommissioned", "Maintenance"]);
 
@@ -241,7 +241,7 @@ export const assetsRouter = createTRPCRouter({
 
       const assetItems = await prisma.asset.findMany({
         where: where,
-        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
+        include: assetInclude,
         orderBy: { updatedAt: "desc" },
       });
 
@@ -283,10 +283,8 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetResponseSchema)
     .query(async ({ input }) => {
-      return prisma.asset.findUniqueOrThrow({
-        where: { id: input.id },
-        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
-      });
+      const where = { id: input.id };
+      return await requireExistence(where, "asset", assetInclude);
     }),
 
   // POST /api/assets - Create asset
@@ -312,7 +310,7 @@ export const assetsRouter = createTRPCRouter({
           deviceGroupId: deviceGroup.id,
           userId: ctx.auth.user.id,
         },
-        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
+        include: assetInclude,
       });
     }),
 
@@ -349,10 +347,7 @@ export const assetsRouter = createTRPCRouter({
               deviceGroupId: deviceGroups[index].id,
               userId: ctx.auth.user.id,
             },
-            include: {
-              user: userIncludeSelect,
-              deviceGroup: deviceGroupSelect,
-            },
+            include: assetInclude,
           });
         }),
       );
@@ -437,7 +432,7 @@ export const assetsRouter = createTRPCRouter({
 
       return prisma.asset.delete({
         where: { id: input.id },
-        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
+        include: assetInclude,
       });
     }),
 
@@ -467,7 +462,7 @@ export const assetsRouter = createTRPCRouter({
           deviceGroupId: deviceGroup.id,
           ...updateData,
         },
-        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
+        include: assetInclude,
       });
     }),
 });

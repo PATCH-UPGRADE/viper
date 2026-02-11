@@ -11,6 +11,7 @@ import {
   deviceGroupWithUrlsSchema,
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { requireExistence } from "@/trpc/middleware";
 
 const deviceGroupResponseSchema = deviceGroupWithUrlsSchema;
 const deviceGroupDetailsResponseSchema = deviceGroupWithDetailsSchema;
@@ -93,9 +94,8 @@ export const deviceGroupsRouter = createTRPCRouter({
     })
     .output(deviceGroupResponseSchema)
     .query(async ({ input }) => {
-      return prisma.deviceGroup.findUniqueOrThrow({
-        where: { id: input.id },
-      });
+      const where = { id: input.id };
+      return await requireExistence(where, "deviceGroup");
     }),
 
   // PUT /api/deviceGroups/{deviceGroupId} - Update DeviceGroup

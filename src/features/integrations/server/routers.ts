@@ -117,7 +117,7 @@ export const integrationsRouter = createTRPCRouter({
       const integration = await requireExistence(
         where,
         "integration",
-        null,
+        undefined,
         select,
       );
 

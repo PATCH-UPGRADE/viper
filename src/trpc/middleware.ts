@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import prisma from "@/lib/db";
 import { formatResourceName } from "@/lib/string-utils";
 
-// spliting this into it's own function so linting only complains once
+// spliting this into its own function so linting only complains once
 const getPrismaModel = (modelName: keyof typeof prisma) => {
   return prisma[modelName] as any;
 };
@@ -41,17 +41,17 @@ export async function requireOwnership(
  * Error 404 wrapper for findUnique
  * Throws NOT_FOUND if resource doesn't exist
  *
- * @param resourceId - The ID of the resource to check
+ * @param where - The Prisma where clause typically { id: input.id }
  * @param modelName - The Prisma model name (e.g., 'asset', 'vulnerability')
- * @param include - (optional) Prisma include clause e.g. { asset: true, deviceGroup: true } or can leave null / empty
- * @param select - (optional) Prisma select clause e.g. { id: true, userId: true } or can leave null / empty
+ * @param include - (optional) Prisma include clause e.g. { asset: true, deviceGroup: true } or can leave undefined / empty
+ * @param select - (optional) Prisma select clause e.g. { id: true, userId: true } or can leave undefined / empty
  * @returns The found resource
  */
 export async function requireExistence(
-  where: unknown,
+  where: any,
   modelName: keyof typeof prisma,
-  include: unknown = null,
-  select: unknown = null,
+  include: any = undefined,
+  select: any = undefined,
 ) {
   const model = getPrismaModel(modelName);
   const resource = await model.findUnique({ where, include, select });

@@ -302,7 +302,8 @@ model Artifact {
 
   name String?
   artifactType ArtifactType
-  downloadUrl String? @map("download-url") // could also be an S3 url we're responsible for hosting
+  downloadUrl String? @map("download-url") // Either provided by the performer or an artifact in S3 uploaded to us
+  hash  String? // Verify incomplete or invalid uploads
   size Int? // size in bytes
 
   prevVersionId String? @unique // null for v1

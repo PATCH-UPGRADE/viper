@@ -1,18 +1,26 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { type PropsWithChildren, useState } from "react";
-import { type UseFormReturn, useForm } from "react-hook-form";
+import { DialogClose } from "@radix-ui/react-dialog";
+import {
+  AlertCircleIcon,
+  CircleCheck,
+  CircleDot,
+  CircleX,
+  Sparkles,
+} from "lucide-react";
+import { useMemo } from "react";
+import type { UseFormReturn } from "react-hook-form";
+import { AuthenticationFields } from "@/components/auth-form";
 import {
   EmptyView,
-  EntityContainer,
-  EntityHeader,
-  EntityList,
-  EntityPagination,
+  EntitySearch,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
 import {
   Dialog,
   DialogContent,
@@ -24,74 +32,102 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { ApiTokenSuccessModal } from "@/features/user/components/user";
-import {
-  type Apikey,
-  AuthType,
-  type Integration,
-  type ResourceType,
-} from "@/generated/prisma";
+import { getIntegrationColumns } from "@/features/integrations/components/columns";
+import type { ResourceType, SyncStatusEnum } from "@/generated/prisma";
+import { useEntitySearch } from "@/hooks/use-entity-search";
 import { usePaginationParams } from "@/lib/pagination";
-import {
-  useCreateIntegration,
-  useRemoveIntegration,
-  useRotateIntegration,
-  useSuspenseIntegrations,
-  useTriggerSync,
-  useUpdateIntegration,
-} from "../hooks/use-integrations";
-import {
-  type AuthenticationInputType,
-  type IntegrationFormValues,
-  integrationInputSchema,
-} from "../types";
-//import { useApiTokenParams } from "../hooks/use-user-params";
-//import { type ApiTokenFormValues, apiTokenInputSchema } from "../types";
+import { cn } from "@/lib/utils";
+import { useSuspenseIntegrations } from "../hooks/use-integrations";
+import type { IntegrationFormValues } from "../types";
+
+export const IntegrationsSearch = () => {
+  const [params, setParams] = usePaginationParams();
+  const { searchValue, onSearchChange } = useEntitySearch({
+    params,
+    setParams,
+  });
+
+  return (
+    <EntitySearch
+      value={searchValue}
+      onChange={onSearchChange}
+      placeholder="Search integrations by name"
+    />
+  );
+};
 
 export const IntegrationsList = ({
   resourceType,
 }: {
   resourceType: ResourceType;
 }) => {
-  const integrations = useSuspenseIntegrations(resourceType);
+  const { data: integrations, isFetching } =
+    useSuspenseIntegrations(resourceType);
+
+  const columns = useMemo(() => {
+    return getIntegrationColumns(resourceType);
+  }, [resourceType]);
 
   return (
-    <EntityList
-      items={integrations.data.items}
-      getKey={(item) => item.id}
-      renderItem={(integration) => <IntegrationItem data={integration} />}
-      emptyView={<IntegrationsEmpty />}
+    <DataTable
+      search={<IntegrationsSearch />}
+      paginatedData={integrations}
+      columns={columns}
+      isLoading={isFetching}
     />
   );
 };
 
-const IntegrationCreateModal = ({
+export const SyncStatusIndicator = ({
+  status,
+}: {
+  status?: SyncStatusEnum;
+}) => {
+  const className = "flex gap-1 items-center font-semibold";
+  switch (status) {
+    case "Error":
+      return (
+        <span className={cn(className, "text-destructive")}>
+          <CircleX size={15} /> Error
+        </span>
+      );
+    case "Success":
+      return (
+        <span className={cn(className, "text-emerald-600")}>
+          <CircleCheck size={15} /> Success
+        </span>
+      );
+    default:
+      return (
+        <span className={cn(className, "text-gray-500")}>
+          <CircleDot size={15} /> Pending
+        </span>
+      );
+  }
+};
+
+export const IntegrationCreateModal = ({
   form,
   handleCreate,
   open,
   setOpen,
   isUpdate,
+  resourceType,
 }: {
   form: UseFormReturn<IntegrationFormValues>;
   handleCreate: (values: IntegrationFormValues) => void;
   open: boolean;
   setOpen: (open: boolean) => void;
+  resourceType?: ResourceType;
   isUpdate?: boolean;
 }) => {
   const onSubmit = (values: IntegrationFormValues) => {
@@ -99,47 +135,139 @@ const IntegrationCreateModal = ({
   };
 
   const isPending = form.formState.isSubmitting;
-  const authType = form.watch("authType");
   const isGeneric = form.watch("isGeneric");
-  const label = isUpdate ? "Update Integration" : "Create Integration";
+  const verbLabel = isUpdate ? "Update" : "Create";
+  const label = `${verbLabel} ${!isUpdate ? "New" : ""} ${resourceType || ""} Integration`;
+
+  const integrationTypes = [
+    {
+      value: false,
+      id: "standard",
+      title: "Standard Integration",
+      description: "Pre-configured platforms with built-in support",
+      badge: "e.g., BlueFlow, Helm",
+      icon: null,
+    },
+    {
+      value: true,
+      id: "ai",
+      title: "AI Integration",
+      description: "Flexible setup for any custom platform",
+      badge: "Universal & Adaptive",
+      icon: <Sparkles size={15} />,
+    },
+  ] as const;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="p-6 rounded-2xl">
-        <DialogHeader>
+      <DialogContent className="p-0 rounded-2xl w-6xl lg:max-w-2xl overflow-hidden">
+        <DialogHeader className="px-6 py-4 border-b gap-1">
           <DialogTitle className="text-xl">{label}</DialogTitle>
+          <DialogDescription>
+            Connect a standard integration or use AI to sync with any platform
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="grid gap-6">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            id="integration-form"
+            className="px-6"
+          >
+            <div className="no-scrollbar -mx-6 px-6 py-4 max-h-[60vh] overflow-y-auto grid gap-6">
+              <FormField
+                control={form.control}
+                name="isGeneric"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Integration Type *</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={(value) =>
+                          field.onChange(value === "true")
+                        }
+                        value={field.value ? "true" : "false"}
+                        className="grid grid-cols-2 gap-4"
+                      >
+                        {integrationTypes.map((type) => {
+                          const isSelected = field.value === type.value;
+
+                          return (
+                            <FormItem key={type.id}>
+                              <FormControl>
+                                <RadioGroupItem
+                                  value={String(type.value)}
+                                  id={type.id}
+                                  className="sr-only"
+                                />
+                              </FormControl>
+                              <FormLabel
+                                htmlFor={type.id}
+                                className={cn(
+                                  "flex flex-col cursor-pointer rounded-lg border-2 p-6 hover:border-primary/50 transition-colors",
+                                  isSelected
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border",
+                                )}
+                              >
+                                <div className="flex items-start gap-3 mb-3">
+                                  <div
+                                    className={cn(
+                                      "w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5",
+                                      isSelected
+                                        ? "border-primary"
+                                        : "border-muted-foreground",
+                                    )}
+                                  >
+                                    {isSelected && (
+                                      <div className="w-3 h-3 rounded-full bg-primary" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="text-md font-semibold mb-2 flex gap-1">
+                                      {type.icon}
+                                      {type.title}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground mb-3">
+                                      {type.description}
+                                    </div>
+                                    <Badge className="text-xs">
+                                      {type.badge}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </FormLabel>
+                            </FormItem>
+                          );
+                        })}
+                      </RadioGroup>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              {isGeneric && (
+                <Alert className="border-blue-200 bg-blue-50">
+                  <AlertCircleIcon className="stroke-blue-900" />
+                  <AlertDescription className="text-blue-900">
+                    <strong>AI-generated integrations:</strong> While our AI
+                    does its best to understand and sync with your platform, we
+                    recommend verifying synced data for accuracy.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>Integration Name *</FormLabel>
+                    <FormDescription>
+                      How this integration will appear in the platform
+                    </FormDescription>
                     <FormControl>
                       <Input
                         type="text"
-                        placeholder="Integration name"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="platform"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Platform (Optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        placeholder="Platform name"
+                        placeholder="e.g., Hospital Asset Inventory"
                         {...field}
                       />
                     </FormControl>
@@ -153,7 +281,10 @@ const IntegrationCreateModal = ({
                 name="integrationUri"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Integration URI</FormLabel>
+                    <FormLabel>Integration URL *</FormLabel>
+                    <FormDescription>
+                      API endpoint for the integration
+                    </FormDescription>
                     <FormControl>
                       <Input
                         type="text"
@@ -166,49 +297,18 @@ const IntegrationCreateModal = ({
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="isGeneric"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">
-                        ✨ AI Integration ✨
-                      </FormLabel>
-                    </div>
-                    <FormControl>
-                      <input
-                        type="checkbox"
-                        checked={field.value}
-                        onChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              {isGeneric && (
-                <FormField
-                  control={form.control}
-                  name="prompt"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Additional Instructions</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+              {/* @ts-expect-error this works, but ts doesn't want you to pass a partial form (extended types don't work) */}
+              <AuthenticationFields form={form} />
 
               <FormField
                 control={form.control}
                 name="syncEvery"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Sync Interval (seconds)</FormLabel>
+                    <FormLabel>Sync Interval (seconds) *</FormLabel>
+                    <FormDescription>
+                      How often to synchronize with the integration
+                    </FormDescription>
                     <FormControl>
                       <Input
                         type="number"
@@ -220,88 +320,29 @@ const IntegrationCreateModal = ({
                         }}
                       />
                     </FormControl>
+                    <FormDescription>Minimum: 60 seconds</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="authType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Authentication Type</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select authentication type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Auth Type</SelectLabel>
-                          {Object.keys(AuthType).map((authType) => (
-                            <SelectItem value={authType} key={authType}>
-                              {authType}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {authType === "Basic" && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="authentication.username"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Username</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="Username"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="authentication.password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="Password"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
-
-              {authType === "Bearer" && (
+              {isGeneric && (
                 <FormField
                   control={form.control}
-                  name="authentication.token"
+                  name="prompt"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Token</FormLabel>
+                      <FormLabel>
+                        Additional Instructions{" "}
+                        <span className="text-muted-foreground">
+                          (Optional)
+                        </span>
+                      </FormLabel>
                       <FormControl>
-                        <Input
-                          type="text"
-                          placeholder="Bearer token"
+                        <Textarea
                           {...field}
+                          placeholder="Provide any additional context, access instructions, or special considerations for the AI to understand your integration"
+                          rows={4}
                         />
                       </FormControl>
                       <FormMessage />
@@ -309,52 +350,22 @@ const IntegrationCreateModal = ({
                   )}
                 />
               )}
-
-              {authType === "Header" && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="authentication.header"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Header Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="X-API-Key"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="authentication.value"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Header Value</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="Header value"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
-
-              <Button type="submit" className="w-full" disabled={isPending}>
-                {label}
-              </Button>
             </div>
           </form>
         </Form>
+        <DialogFooter className="px-6 py-4 bg-muted border-t justify-between!">
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button
+            type="submit"
+            form="integration-form"
+            onClick={form.handleSubmit(onSubmit)}
+            disabled={isPending}
+          >
+            {verbLabel} Integration
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -398,97 +409,6 @@ export function RotateIntegrationConfirmModal({
   );
 }
 
-export const IntegrationsHeader = ({
-  resourceType,
-}: {
-  resourceType: ResourceType;
-}) => {
-  const createIntegration = useCreateIntegration();
-  const [open, setOpen] = useState(false);
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [key, setKey] = useState<Apikey | undefined>(undefined);
-
-  const form = useForm<IntegrationFormValues>({
-    resolver: zodResolver(integrationInputSchema),
-    defaultValues: {
-      name: "",
-      resourceType: resourceType,
-      isGeneric: false,
-      syncEvery: 300,
-      authType: AuthType.None,
-    },
-  });
-
-  const handleCreate = (item: IntegrationFormValues) => {
-    createIntegration.mutate(item, {
-      onSuccess: (data) => {
-        setOpen(false);
-        setKey(data.apiKey);
-        setSuccessOpen(true);
-      },
-      onError: () => {
-        setOpen(true);
-      },
-    });
-  };
-
-  return (
-    <>
-      <EntityHeader
-        title={`${resourceType} Integrations`}
-        description="Manage Integrations"
-        onNew={() => setOpen(true)}
-        newButtonLabel="New Integration"
-      />
-      <IntegrationCreateModal
-        form={form}
-        open={open}
-        setOpen={setOpen}
-        handleCreate={handleCreate}
-      />
-      <ApiTokenSuccessModal
-        open={successOpen}
-        setOpen={setSuccessOpen}
-        apiKey={key}
-      />
-    </>
-  );
-};
-
-export const IntegrationsPagination = ({
-  resourceType,
-}: {
-  resourceType: ResourceType;
-}) => {
-  const items = useSuspenseIntegrations(resourceType);
-  const [params, setParams] = usePaginationParams();
-
-  return (
-    <EntityPagination
-      disabled={items.isFetching}
-      totalPages={items.data.totalPages}
-      page={items.data.page}
-      onPageChange={(page) => setParams({ ...params, page })}
-    />
-  );
-};
-
-export const IntegrationsContainer = ({
-  resourceType,
-  children,
-}: PropsWithChildren<{
-  resourceType: ResourceType;
-}>) => {
-  return (
-    <EntityContainer
-      header={<IntegrationsHeader resourceType={resourceType} />}
-      pagination={<IntegrationsPagination resourceType={resourceType} />}
-    >
-      {children}
-    </EntityContainer>
-  );
-};
-
 export const IntegrationsLoading = () => {
   return <LoadingView message="Loading integrations..." />;
 };
@@ -499,128 +419,4 @@ export const IntegrationsError = () => {
 
 export const IntegrationsEmpty = () => {
   return <EmptyView message="No Integrations" />;
-};
-
-export const IntegrationItem = ({ data }: { data: Integration }) => {
-  const removeItem = useRemoveIntegration();
-
-  const handleRemove = () => {
-    removeItem.mutate({ id: data.id });
-  };
-
-  const updateIntegration = useUpdateIntegration();
-  const rotateIntegration = useRotateIntegration();
-  const triggerSync = useTriggerSync();
-  const [open, setOpen] = useState(false);
-  const [rotateOpen, setRotateOpen] = useState(false);
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [key, setKey] = useState<Apikey | undefined>(undefined);
-
-  const form = useForm<IntegrationFormValues>({
-    resolver: zodResolver(integrationInputSchema),
-    defaultValues: {
-      name: data.name,
-      platform: data.platform || "",
-      integrationUri: data.integrationUri,
-      isGeneric: data.isGeneric,
-      prompt: data.prompt || "",
-      authType: data.authType,
-      resourceType: data.resourceType,
-      syncEvery: data.syncEvery || 300,
-      authentication: data.authentication as AuthenticationInputType,
-    },
-  });
-
-  const handleUpdate = (item: IntegrationFormValues) => {
-    updateIntegration.mutate(
-      { id: data.id, data: item },
-      {
-        onSuccess: () => {
-          setOpen(false);
-        },
-        onError: () => {
-          setOpen(true);
-        },
-      },
-    );
-  };
-
-  const handleSync = async () => {
-    await triggerSync.mutateAsync({ id: data.id });
-  };
-
-  const handleRotate = () => {
-    rotateIntegration.mutate(
-      { id: data.id },
-      {
-        onSuccess: (data) => {
-          setKey(data.apiKey);
-          setSuccessOpen(true);
-        },
-        onError: () => {
-          setRotateOpen(true);
-        },
-      },
-    );
-  };
-
-  return (
-    <>
-      <div className="flex items-center gap-3 p-4 border rounded-lg">
-        <div className="flex-1 min-w-0">
-          <div className="flex gap-2">
-            <span>{data.name}</span>
-            <span>&bull;</span>
-            <span>{data.integrationUri}</span>
-          </div>
-          <p>{JSON.stringify(data)}</p>
-          <Button onClick={handleSync} disabled={triggerSync.isPending}>
-            {triggerSync.isPending ? "Syncing..." : "Sync Now"}
-          </Button>
-        </div>
-        <Button
-          size="sm"
-          onClick={() => setOpen(true)}
-          disabled={updateIntegration.isPending}
-        >
-          {updateIntegration.isPending ? "Updating..." : "Update"}
-        </Button>
-        <Button size="sm" onClick={() => setRotateOpen(true)}>
-          {"Rotate API Key"}
-        </Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={handleRemove}
-          disabled={removeItem.isPending}
-        >
-          {removeItem.isPending ? "Deleting..." : "Delete"}
-        </Button>
-      </div>
-
-      {open && (
-        <IntegrationCreateModal
-          form={form}
-          open={open}
-          setOpen={setOpen}
-          handleCreate={handleUpdate}
-          isUpdate={true}
-        />
-      )}
-      {rotateOpen && (
-        <RotateIntegrationConfirmModal
-          open={rotateOpen}
-          setOpen={setRotateOpen}
-          handleRotate={handleRotate}
-        />
-      )}
-      {successOpen && (
-        <ApiTokenSuccessModal
-          open={successOpen}
-          setOpen={setSuccessOpen}
-          apiKey={key}
-        />
-      )}
-    </>
-  );
 };

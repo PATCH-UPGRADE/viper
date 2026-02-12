@@ -121,7 +121,6 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const { search } = input;
 
       const searchFilter = createSearchFilter(search);
-      //return fetchPaginatedVulnerabilities(input, searchFilter);
       return fetchPaginated(prisma.vulnerability, input, {
         where: searchFilter,
         include: vulnerabilityInclude,

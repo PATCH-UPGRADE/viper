@@ -3,7 +3,10 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import type { RemediationResponse } from "@/features/remediations/server/routers";
 import { ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import type { DeviceGroupWithUrls } from "@/lib/schemas";
+import type {
+  ArtifactWrapperWithUrls,
+  DeviceGroupWithUrls,
+} from "@/lib/schemas";
 import { authHeader, BASE_URL, generateCPE } from "./test-config";
 
 describe("Remediations Endpoint (/remediations)", () => {
@@ -311,7 +314,7 @@ describe("Remediations Endpoint (/remediations)", () => {
 
     // Verify each artifact was created correctly
     const artifactTypes = createRes.body.artifacts.map(
-      (wrapper: any) => wrapper.latestArtifact.artifactType,
+      (wrapper: ArtifactWrapperWithUrls) => wrapper.latestArtifact.artifactType,
     );
     expect(artifactTypes).toContain(ArtifactType.Firmware);
     expect(artifactTypes).toContain(ArtifactType.Documentation);
@@ -396,7 +399,9 @@ describe("Remediations Endpoint (/remediations)", () => {
 
     expect(searchRes.status).toBe(200);
     expect(searchRes.body.items.length).toBeGreaterThan(0);
-    const found = searchRes.body.items.some((r: any) => r.id === remediationId);
+    const found = searchRes.body.items.some(
+      (r: RemediationResponse) => r.id === remediationId,
+    );
     expect(found).toBe(true);
   });
 });

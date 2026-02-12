@@ -1,26 +1,39 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
-import { headers } from "next/headers";
 import { z } from "zod";
+import { ResourceType } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
-import {
-  buildPaginationMeta,
-  createPaginatedResponse,
-  paginationInputSchema,
-} from "@/lib/pagination";
+import { paginationInputSchema } from "@/lib/pagination";
+import { fetchPaginated } from "@/lib/router-utils";
+import { userIncludeSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { integrationInputSchema } from "../types";
 
 const paginatedIntegrationsInputSchema = paginationInputSchema.extend({
-  resourceType: z.enum([
-    "Asset",
-    "Vulnerability",
-    "DeviceArtifact",
-    "Remediation",
-  ]),
+  resourceType: z.enum(Object.values(ResourceType)),
 });
+
+const integrationsInclude = {
+  user: userIncludeSelect,
+  syncStatus: {
+    select: {
+      status: true,
+      syncedAt: true,
+      errorMessage: true,
+    },
+    orderBy: {
+      syncedAt: "desc", // newest first
+    },
+  },
+  _count: {
+    select: {
+      assetMappings: true,
+      vulnerabilityMappings: true,
+    },
+  },
+} as const;
 
 // Helper function to create an API key for an integration
 async function createIntegrationApiKey(
@@ -58,22 +71,10 @@ export const integrationsRouter = createTRPCRouter({
         },
       };
 
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.integration.count({
+      return fetchPaginated(prisma.integration, input, {
         where: whereFilter,
+        include: integrationsInclude,
       });
-      const meta = buildPaginationMeta(input, totalCount);
-
-      // Fetch paginated items
-      const items = await prisma.integration.findMany({
-        skip: meta.skip,
-        take: meta.take,
-        where: whereFilter,
-        orderBy: { createdAt: "desc" },
-        include: { syncStatus: true },
-      });
-
-      return createPaginatedResponse(items, meta);
     }),
 
   create: protectedProcedure
@@ -98,7 +99,7 @@ export const integrationsRouter = createTRPCRouter({
           integrationUserId: integrationUser.id,
           apiKeyId: apiKey.id,
         },
-        include: { syncStatus: true },
+        include: integrationsInclude,
       });
 
       return {
@@ -111,37 +112,35 @@ export const integrationsRouter = createTRPCRouter({
   rotateKey: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // require ownership of integration to rotate an api key
-      const integration = await prisma.integration.findUniqueOrThrow({
-        where: { id: input.id, userId: ctx.auth.user.id },
-        select: { apiKeyId: true, name: true, userId: true },
+      const result = await prisma.$transaction(async (tx) => {
+        // Require ownership of integration to rotate an API key
+        const integration = await tx.integration.findUniqueOrThrow({
+          where: { id: input.id, userId: ctx.auth.user.id },
+          select: { apiKeyId: true, name: true, userId: true },
+        });
+
+        // Delete the existing API key if it exists
+        // use prisma to do this instead of better-auth since user doesn't own
+        //   the integration apikey, the integration user does
+        if (integration.apiKeyId) {
+          await tx.apikey.delete({
+            where: { id: integration.apiKeyId },
+          });
+        }
+        return { integrationName: integration.name };
       });
 
-      // delete the existing API key if it exists
-      if (integration.apiKeyId) {
-        await auth.api.deleteApiKey({
-          body: {
-            keyId: integration.apiKeyId,
-          },
-          headers: await headers(),
-        });
-      }
-
-      // generate a new API key
       const newApiKey = await createIntegrationApiKey(
-        integration.name,
+        result.integrationName,
         ctx.auth.user.id,
       );
 
-      // update integration with new key
       await prisma.integration.update({
         where: { id: input.id },
         data: { apiKeyId: newApiKey.id },
       });
 
-      return {
-        apiKey: newApiKey,
-      };
+      return { apiKey: newApiKey };
     }),
 
   // any user can intentionally update any integration
@@ -157,7 +156,7 @@ export const integrationsRouter = createTRPCRouter({
       return prisma.integration.update({
         where: { id },
         data,
-        include: { syncStatus: true },
+        include: integrationsInclude,
       });
     }),
 

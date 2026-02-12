@@ -1,5 +1,8 @@
+import type { inferInput } from "@trpc/tanstack-react-query";
 import { prefetch, trpc } from "@/trpc/server";
 
-export const prefetchWebhooks = () => {
-  return prefetch(trpc.webhooks.getMany.queryOptions({}));
+type Input = inferInput<typeof trpc.webhooks.getMany>;
+
+export const prefetchWebhooks = (params: Input) => {
+  return prefetch(trpc.webhooks.getMany.queryOptions(params));
 };

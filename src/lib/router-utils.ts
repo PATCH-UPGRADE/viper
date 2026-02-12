@@ -11,7 +11,7 @@ import {
   createPaginatedResponse,
   type PaginationInput,
 } from "./pagination";
-import type { IntegrationResponseType } from "./schemas";
+import type { IntegrationResponse } from "./schemas";
 
 // ============================================================================
 // PRISMA TYPES
@@ -155,7 +155,7 @@ export const handlePrismaError = (e: unknown): string => {
 
 async function upsertSyncStatus(
   integrationId: string,
-  response: IntegrationResponseType,
+  response: IntegrationResponse,
   lastSynced: Date,
 ): Promise<void> {
   // sync-integrations.ts shoudl create PENDING sync status
@@ -246,10 +246,10 @@ export async function processIntegrationSync<
   input: { items: TInputItem[] },
   userId: string,
   integrationId: string,
-): Promise<IntegrationResponseType> {
+): Promise<IntegrationResponse> {
   const lastSynced = new Date();
 
-  const response: IntegrationResponseType = {
+  const response: IntegrationResponse = {
     message: "success",
     createdItemsCount: 0,
     updatedItemsCount: 0,

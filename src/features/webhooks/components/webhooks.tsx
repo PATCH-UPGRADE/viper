@@ -1,21 +1,23 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ComputerIcon, CpuIcon, FileIcon, PlusIcon } from "lucide-react";
 import { type PropsWithChildren, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
+import { AuthenticationFields } from "@/components/auth-form";
 import {
   EmptyView,
-  EntityContainer,
-  EntityHeader,
-  EntityList,
-  EntityPagination,
+  EntitySearch,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
 import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -28,50 +30,100 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import type { AuthenticationInputType } from "@/features/integrations/types";
+import { mainPadding } from "@/config/constants";
+import { SettingsSubheader } from "@/features/settings/components/settings-layout";
 import {
   useCreateWebhook,
-  useRemoveWebhook,
   useSuspenseWebhooks,
-  useUpdateWebhook,
 } from "@/features/webhooks/hooks/use-webhooks";
-import { AuthType, TriggerEnum, type Webhook } from "@/generated/prisma";
+import { AuthType, TriggerEnum } from "@/generated/prisma";
+import { useEntitySearch } from "@/hooks/use-entity-search";
 import { usePaginationParams } from "@/lib/pagination";
+import { cn } from "@/lib/utils";
 import { type WebhookFormValues, webhookInputSchema } from "../types";
+import { columns } from "./columns";
 
-const triggerDescriptions = {
-  [TriggerEnum.Artifact_Created]: "When an Artifact is created",
-  [TriggerEnum.Artifact_Updated]: "When an Artifact is updated",
-  [TriggerEnum.DeviceArtifact_Created]: "When a Device Artifact is created",
-  [TriggerEnum.DeviceArtifact_Updated]: "When a Device Artifact is updated",
-  [TriggerEnum.DeviceGroup_Created]: "When a Device Group is created",
-  [TriggerEnum.DeviceGroup_Updated]: "When a Device Group is updated",
+export const triggerDescriptions = {
+  [TriggerEnum.Artifact_Created]: (
+    <>
+      <FileIcon size={15} />{" "}
+      <span>
+        An <b>Artifact</b> is created
+      </span>
+    </>
+  ),
+  [TriggerEnum.Artifact_Updated]: (
+    <>
+      <FileIcon size={15} />{" "}
+      <span>
+        An <b>Artifact</b> is updated
+      </span>
+    </>
+  ),
+  [TriggerEnum.DeviceArtifact_Created]: (
+    <>
+      <CpuIcon size={15} />{" "}
+      <span>
+        A <b>Device Artifact</b> is created
+      </span>
+    </>
+  ),
+  [TriggerEnum.DeviceArtifact_Updated]: (
+    <>
+      <CpuIcon size={15} />{" "}
+      <span>
+        A <b>Device Artifact</b> is updated
+      </span>
+    </>
+  ),
+  [TriggerEnum.DeviceGroup_Created]: (
+    <>
+      <ComputerIcon size={15} />{" "}
+      <span>
+        A <b>Device Group</b> is created
+      </span>
+    </>
+  ),
+  [TriggerEnum.DeviceGroup_Updated]: (
+    <>
+      <ComputerIcon size={15} />{" "}
+      <span>
+        A <b>Device Group</b> is updated
+      </span>
+    </>
+  ),
 };
 
-export const WebhooksList = () => {
-  const webhooks = useSuspenseWebhooks();
+export const WebhooksSearch = () => {
+  const [params, setParams] = usePaginationParams();
+  const { searchValue, onSearchChange } = useEntitySearch({
+    params,
+    setParams,
+  });
 
   return (
-    <EntityList
-      items={webhooks.data.items}
-      getKey={(item) => item.id}
-      // @ts-expect-error - WebhookItem correctly expects trigger to be TriggerEnum[] but z.infer type expects it as string[]
-      renderItem={(webhook) => <WebhookItem data={webhook} />}
-      emptyView={<WebhooksEmpty />}
+    <EntitySearch
+      value={searchValue}
+      onChange={onSearchChange}
+      placeholder="Search webhooks by name"
     />
   );
 };
 
-const WebhookCreateModal = ({
+export const WebhooksList = () => {
+  const { data: webhooks, isFetching } = useSuspenseWebhooks();
+
+  return (
+    <DataTable
+      search={<WebhooksSearch />}
+      paginatedData={webhooks}
+      columns={columns}
+      isLoading={isFetching}
+    />
+  );
+};
+
+export const WebhookCreateModal = ({
   form,
   handleCreate,
   open,
@@ -108,28 +160,32 @@ const WebhookCreateModal = ({
   };
 
   const isPending = form.formState.isSubmitting;
-  const authType = form.watch("authType");
-  const label = isUpdate ? "Update Webhook" : "Create Webhook";
+  const verbLabel = isUpdate ? "Update" : "Create";
+  const label = `${verbLabel} ${!isUpdate ? "New" : ""} Webhook`;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="p-6 rounded-2xl">
-        <DialogHeader>
+      <DialogContent className="p-0 rounded-2xl overflow-hidden">
+        <DialogHeader className="px-6 py-4 border-b gap-1">
           <DialogTitle className="text-xl">{label}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="grid gap-6">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            id="webhook-form"
+            className="px-6"
+          >
+            <div className="no-scrollbar -mx-6 px-6 py-4 max-h-[60vh] overflow-y-auto grid gap-6">
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>Webhook Name *</FormLabel>
                     <FormControl>
                       <Input
                         type="text"
-                        placeholder="Webhook name"
+                        placeholder="e.g., Hawksbill TA3 Webhook"
                         {...field}
                       />
                     </FormControl>
@@ -143,7 +199,7 @@ const WebhookCreateModal = ({
                 name="callbackUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Callback URL</FormLabel>
+                    <FormLabel>Webhook URL *</FormLabel>
                     <FormControl>
                       <Input
                         type="text"
@@ -156,129 +212,8 @@ const WebhookCreateModal = ({
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="authType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Authentication Type</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select authentication type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Auth Type</SelectLabel>
-                          {Object.keys(AuthType).map((authType) => (
-                            <SelectItem value={authType} key={authType}>
-                              {authType}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {authType === "Basic" && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="authentication.username"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Username</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="Username"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="authentication.password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="Password"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
-
-              {authType === "Bearer" && (
-                <FormField
-                  control={form.control}
-                  name="authentication.token"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Token</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="text"
-                          placeholder="Bearer token"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {authType === "Header" && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="authentication.header"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Header Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="X-API-Key"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="authentication.value"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Header Value</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="Header value"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
+              {/* @ts-expect-error this works, but ts doesn't want you to pass a partial form (extended types don't work) */}
+              <AuthenticationFields form={form} />
 
               <FormField
                 control={form.control}
@@ -287,10 +222,13 @@ const WebhookCreateModal = ({
                   <FormItem>
                     <FormLabel>Send a notification when:</FormLabel>
                     <FormControl>
-                      <div>
+                      <div className="border-1 bg-muted p-4 flex flex-col gap-2">
                         {Object.entries(triggerDescriptions).map(
                           ([key, value], index) => (
-                            <div key={index} className="flex gap-x-1 text-sm">
+                            <label
+                              key={index}
+                              className="flex gap-x-1 text-sm cursor-pointer"
+                            >
                               <input
                                 type="checkbox"
                                 checked={field.value.includes(
@@ -301,9 +239,10 @@ const WebhookCreateModal = ({
                                   field.onChange(updatedList);
                                 }}
                               />
-                              <span className="font-semibold">{key}</span>
-                              <span className="">- {value}</span>
-                            </div>
+                              <span className="flex gap-1.5 items-center ml-1">
+                                {value}
+                              </span>
+                            </label>
                           ),
                         )}
                       </div>
@@ -312,13 +251,22 @@ const WebhookCreateModal = ({
                   </FormItem>
                 )}
               />
-
-              <Button type="submit" className="w-full" disabled={isPending}>
-                {label}
-              </Button>
             </div>
           </form>
         </Form>
+        <DialogFooter className="px-6 py-4 bg-muted border-t justify-between!">
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button
+            type="submit"
+            form="webhook-form"
+            onClick={form.handleSubmit(onSubmit)}
+            disabled={isPending}
+          >
+            {verbLabel} Webhook
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -340,7 +288,8 @@ export const WebhooksHeader = () => {
 
   const handleCreate = (item: WebhookFormValues) => {
     createWebhook.mutate(item, {
-      onSuccess: (_data) => {
+      onSuccess: () => {
+        form.reset();
         setOpen(false);
       },
       onError: () => {
@@ -351,12 +300,20 @@ export const WebhooksHeader = () => {
 
   return (
     <>
-      <EntityHeader
-        title="Webhooks"
-        description="Manage Webhooks"
-        onNew={() => setOpen(true)}
-        newButtonLabel="New Webhook"
-      />
+      <div
+        className={cn(
+          mainPadding,
+          "bg-background flex justify-between items-center",
+        )}
+      >
+        <SettingsSubheader
+          title="Webhooks"
+          description="Manage where VIPER communicates data to"
+        />
+        <Button onClick={() => setOpen(true)}>
+          <PlusIcon /> New Webhook
+        </Button>
+      </div>
       <WebhookCreateModal
         form={form}
         open={open}
@@ -367,28 +324,12 @@ export const WebhooksHeader = () => {
   );
 };
 
-export const WebhooksPagination = () => {
-  const items = useSuspenseWebhooks();
-  const [params, setParams] = usePaginationParams();
-
-  return (
-    <EntityPagination
-      disabled={items.isFetching}
-      totalPages={items.data.totalPages}
-      page={items.data.page}
-      onPageChange={(page) => setParams({ ...params, page })}
-    />
-  );
-};
-
 export const WebhooksContainer = ({ children }: PropsWithChildren) => {
   return (
-    <EntityContainer
-      header={<WebhooksHeader />}
-      pagination={<WebhooksPagination />}
-    >
-      {children}
-    </EntityContainer>
+    <>
+      <WebhooksHeader />
+      <div className={mainPadding}>{children}</div>
+    </>
   );
 };
 
@@ -402,78 +343,4 @@ export const WebhooksError = () => {
 
 export const WebhooksEmpty = () => {
   return <EmptyView message="No Webhooks" />;
-};
-
-export const WebhookItem = ({ data }: { data: Webhook }) => {
-  const removeItem = useRemoveWebhook();
-
-  const handleRemove = () => {
-    removeItem.mutate({ id: data.id });
-  };
-
-  const updateWebhook = useUpdateWebhook();
-  const [open, setOpen] = useState(false);
-
-  const form = useForm<WebhookFormValues>({
-    resolver: zodResolver(webhookInputSchema),
-    defaultValues: {
-      name: data.name,
-      callbackUrl: data.callbackUrl,
-      triggers: data.triggers,
-      authType: data.authType,
-      authentication: data.authentication as AuthenticationInputType,
-    },
-  });
-
-  const handleUpdate = (item: WebhookFormValues) => {
-    updateWebhook.mutate(
-      { id: data.id, ...item },
-      {
-        onSuccess: () => {
-          setOpen(false);
-        },
-        onError: () => {
-          setOpen(true);
-        },
-      },
-    );
-  };
-
-  return (
-    <>
-      <div className="flex items-center gap-3 p-4 border rounded-lg">
-        <div className="flex-1 min-w-0">
-          <div className="flex gap-2">
-            <span>Name: {data.name}</span>
-          </div>
-          <p>{JSON.stringify(data)}</p>
-        </div>
-        <Button
-          size="sm"
-          onClick={() => setOpen(true)}
-          disabled={updateWebhook.isPending}
-        >
-          {updateWebhook.isPending ? "Updating..." : "Update"}
-        </Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={handleRemove}
-          disabled={removeItem.isPending}
-        >
-          {removeItem.isPending ? "Deleting..." : "Delete"}
-        </Button>
-      </div>
-
-      {open && (
-        <WebhookCreateModal
-          form={form}
-          open={open}
-          setOpen={setOpen}
-          handleCreate={handleUpdate}
-          isUpdate={true}
-        />
-      )}
-    </>
-  );
 };

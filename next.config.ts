@@ -10,6 +10,16 @@ const nextConfig: NextConfig = {
         destination: "/workflows",
         permanent: false,
       },
+      {
+        source: "/settings",
+        destination: "/settings/integrations",
+        permanent: false,
+      },
+      {
+        source: "/settings/integrations",
+        destination: "/settings/integrations/assets",
+        permanent: false,
+      },
     ];
   },
 };

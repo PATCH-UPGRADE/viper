@@ -156,6 +156,7 @@ export const getIntegrationColumns = (
       accessorFn: (row) => `Every ${ms(1000 * row.syncEvery)}`,
     },
     {
+      id: "createdItems",
       meta: { title: "Created Items" },
       header: resourceType,
       cell: ({ row }) => {

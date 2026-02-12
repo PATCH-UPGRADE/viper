@@ -168,7 +168,11 @@ export const IntegrationCreateModal = ({
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} id="integration-form" className="px-6">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            id="integration-form"
+            className="px-6"
+          >
             <div className="no-scrollbar -mx-6 px-6 py-4 max-h-[60vh] overflow-y-auto grid gap-6">
               <FormField
                 control={form.control}

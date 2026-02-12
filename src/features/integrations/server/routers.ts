@@ -5,15 +5,11 @@ import { ResourceType } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
-import {
-  buildPaginationMeta,
-  createPaginatedResponse,
-  paginationInputSchema,
-} from "@/lib/pagination";
+import { paginationInputSchema } from "@/lib/pagination";
+import { fetchPaginated } from "@/lib/router-utils";
 import { userIncludeSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { integrationInputSchema } from "../types";
-import { fetchPaginated } from "@/lib/router-utils";
 
 const paginatedIntegrationsInputSchema = paginationInputSchema.extend({
   resourceType: z.enum(Object.values(ResourceType)),
@@ -134,18 +130,18 @@ export const integrationsRouter = createTRPCRouter({
         return { integrationName: integration.name };
       });
 
-    const newApiKey = await createIntegrationApiKey(
-      result.integrationName,
-      ctx.auth.user.id,
-    );
+      const newApiKey = await createIntegrationApiKey(
+        result.integrationName,
+        ctx.auth.user.id,
+      );
 
-    await prisma.integration.update({
-      where: { id: input.id },
-      data: { apiKeyId: newApiKey.id },
-    });
+      await prisma.integration.update({
+        where: { id: input.id },
+        data: { apiKeyId: newApiKey.id },
+      });
 
-    return { apiKey: newApiKey };
-  }),
+      return { apiKey: newApiKey };
+    }),
 
   // any user can intentionally update any integration
   update: protectedProcedure

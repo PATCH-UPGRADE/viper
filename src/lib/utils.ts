@@ -1,17 +1,13 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import {
-  basicAuthSchema,
-  bearerAuthSchema,
-  headerAuthSchema,
-  type IntegrationWithStringDates,
-} from "@/features/integrations/types";
+import type { IntegrationWithStringDates } from "@/features/integrations/types";
 import {
   AuthType,
   type Integration,
   type TriggerEnum,
   type Webhook,
 } from "@/generated/prisma";
+import { basicAuthSchema, bearerAuthSchema, headerAuthSchema } from "./schemas";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

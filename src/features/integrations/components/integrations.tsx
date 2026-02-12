@@ -13,7 +13,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { AuthenticationFields } from "@/components/auth-form";
 import {
   EmptyView,
-  EntityPagination,
+  EntitySearch,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
@@ -43,10 +43,27 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { getIntegrationColumns } from "@/features/integrations/components/columns";
 import type { ResourceType, SyncStatusEnum } from "@/generated/prisma";
+import { useEntitySearch } from "@/hooks/use-entity-search";
 import { usePaginationParams } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 import { useSuspenseIntegrations } from "../hooks/use-integrations";
 import type { IntegrationFormValues } from "../types";
+
+export const IntegrationsSearch = () => {
+  const [params, setParams] = usePaginationParams();
+  const { searchValue, onSearchChange } = useEntitySearch({
+    params,
+    setParams,
+  });
+
+  return (
+    <EntitySearch
+      value={searchValue}
+      onChange={onSearchChange}
+      placeholder="Search integrations by name"
+    />
+  );
+};
 
 export const IntegrationsList = ({
   resourceType,
@@ -62,6 +79,7 @@ export const IntegrationsList = ({
 
   return (
     <DataTable
+      search={<IntegrationsSearch />}
       paginatedData={integrations}
       columns={columns}
       isLoading={isFetching}
@@ -385,24 +403,6 @@ export function RotateIntegrationConfirmModal({
     </Dialog>
   );
 }
-
-export const IntegrationsPagination = ({
-  resourceType,
-}: {
-  resourceType: ResourceType;
-}) => {
-  const items = useSuspenseIntegrations(resourceType);
-  const [params, setParams] = usePaginationParams();
-
-  return (
-    <EntityPagination
-      disabled={items.isFetching}
-      totalPages={items.data.totalPages}
-      page={items.data.page}
-      onPageChange={(page) => setParams({ ...params, page })}
-    />
-  );
-};
 
 export const IntegrationsLoading = () => {
   return <LoadingView message="Loading integrations..." />;

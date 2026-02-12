@@ -42,6 +42,8 @@ export const IntegrationsLayout = ({
     defaultValues: {
       name: "",
       resourceType,
+      integrationUri: "",
+      prompt: "",
       isGeneric: false,
       syncEvery: 300,
       authType: AuthType.None,
@@ -55,6 +57,7 @@ export const IntegrationsLayout = ({
   const handleCreate = (item: IntegrationFormValues) => {
     createIntegration.mutate(item, {
       onSuccess: (data) => {
+        form.reset();
         setOpen(false);
         setKey(data.apiKey);
         setSuccessOpen(true);

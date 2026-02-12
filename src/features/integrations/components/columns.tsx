@@ -34,6 +34,7 @@ import {
   type ResourceType,
   SyncStatusEnum,
 } from "@/generated/prisma";
+import type { AuthenticationInputType } from "@/lib/schemas";
 import {
   useRemoveIntegration,
   useRotateIntegration,
@@ -41,7 +42,6 @@ import {
   useUpdateIntegration,
 } from "../hooks/use-integrations";
 import {
-  type AuthenticationInputType,
   type IntegrationFormValues,
   type IntegrationWithRelations,
   integrationInputSchema,
@@ -106,7 +106,8 @@ export const getIntegrationColumns = (
       },
     },
     {
-      accessorKey: "status",
+      id: "status",
+      accessorFn: (row) => row.syncStatus[0]?.status,
       meta: { title: "Status" },
       header: ({ column }) => (
         <SortableHeader header="Status" column={column} />
@@ -126,7 +127,8 @@ export const getIntegrationColumns = (
       },
     },
     {
-      accessorKey: "lastSynced",
+      id: "lastSynced",
+      accessorFn: (row) => row.syncStatus[0]?.syncedAt,
       meta: { title: "Last Synced" },
       header: ({ column }) => (
         <SortableHeader header="Last Synced" column={column} />
@@ -207,6 +209,7 @@ export const getIntegrationColumns = (
             { id: data.id, data: item },
             {
               onSuccess: () => {
+                form.reset();
                 setOpen(false);
               },
               onError: () => {

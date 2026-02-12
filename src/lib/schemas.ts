@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ArtifactType } from "@/generated/prisma";
+import { ArtifactType, AuthType } from "@/generated/prisma";
 import { createPaginatedResponseWithLinksSchema } from "./pagination";
 
 /**
@@ -42,6 +42,43 @@ export const safeUrlSchema = z
 export const cpeSchema = z
   .string()
   .regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format");
+
+export const basicAuthSchema = z.object({
+  username: z.string(),
+  password: z.string(),
+});
+
+export const bearerAuthSchema = z.object({
+  token: z.string(),
+});
+
+export const headerAuthSchema = z.object({
+  header: z.string(),
+  value: z.string(),
+});
+
+export const authenticationSchema = z.union([
+  basicAuthSchema,
+  bearerAuthSchema,
+  headerAuthSchema,
+]);
+export type AuthenticationInputType = z.infer<typeof authenticationSchema>;
+
+export const authSchema = z
+  .object({
+    authType: z.enum(Object.values(AuthType)),
+    authentication: authenticationSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.authType !== "None" && !value.authentication) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Authentication details are required for the selected auth type.",
+        path: ["authentication"],
+      });
+    }
+  });
 
 /**
  * Shared user include/select pattern for Prisma queries

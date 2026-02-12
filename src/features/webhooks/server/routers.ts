@@ -22,8 +22,18 @@ export const webhooksRouter = createTRPCRouter({
     .input(paginationInputSchema)
     .output(paginatedWebhooksResponseSchema)
     .query(async ({ ctx, input }) => {
+      const { search } = input;
+
+      const where = {
+        name: {
+          contains: search,
+          mode: "insensitive" as const,
+        },
+        userId: ctx.auth.user.id,
+      };
+
       return fetchPaginated(prisma.webhook, input, {
-        where: { userId: ctx.auth.user.id },
+        where,
         include: webhooksInclude,
       });
     }),

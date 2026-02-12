@@ -13,17 +13,15 @@ import {
   isValidIntegrationKey,
 } from "@/features/integrations/types";
 import { requireAuth } from "@/lib/auth-utils";
+import type { CombinedPageProps } from "@/lib/page-types";
 import { HydrateClient } from "@/trpc/server";
 
-interface PageProps {
-  params: Promise<{
-    resourceTypeUrl: string;
-  }>;
-}
-
-const Page = async ({ params }: PageProps) => {
+const Page = async ({
+  params,
+  searchParams,
+}: CombinedPageProps<"resourceTypeUrl">) => {
   await requireAuth();
-  const { resourceTypeUrl, ...searchParams } = await params;
+  const { resourceTypeUrl } = await params;
 
   // Validate resourceType
   if (!isValidIntegrationKey(resourceTypeUrl)) {

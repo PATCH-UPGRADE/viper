@@ -18,19 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { integrationInputSchema } from "@/features/integrations/types";
 import { AuthType } from "@/generated/prisma";
+import type { authSchema } from "@/lib/schemas";
 
-// Extract just the authentication-related fields from the integration input schema
-export type AuthenticationFormValues = Pick<
-  z.infer<typeof integrationInputSchema>,
-  "authType" | "authentication"
->;
+type AuthenticationFormValues = z.infer<typeof authSchema>;
 
-interface AuthenticationFieldsProps<
-  T extends AuthenticationFormValues = AuthenticationFormValues,
-> {
-  form: UseFormReturn<T>;
+interface AuthenticationFieldsProps {
+  form: UseFormReturn<AuthenticationFormValues>;
 }
 
 export const AuthenticationFields = ({ form }: AuthenticationFieldsProps) => {

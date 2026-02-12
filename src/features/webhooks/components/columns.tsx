@@ -89,6 +89,7 @@ export const columns: ColumnDef<WebhookResponse>[] = [
           { id: data.id, ...item },
           {
             onSuccess: () => {
+              form.reset();
               setOpen(false);
             },
             onError: () => {

@@ -7,7 +7,7 @@ import { type UseFormReturn, useForm } from "react-hook-form";
 import { AuthenticationFields } from "@/components/auth-form";
 import {
   EmptyView,
-  EntityPagination,
+  EntitySearch,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
@@ -31,15 +31,13 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { mainPadding } from "@/config/constants";
-import type { AuthenticationInputType } from "@/features/integrations/types";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
 import {
   useCreateWebhook,
-  useRemoveWebhook,
   useSuspenseWebhooks,
-  useUpdateWebhook,
 } from "@/features/webhooks/hooks/use-webhooks";
-import { AuthType, TriggerEnum, type Webhook } from "@/generated/prisma";
+import { AuthType, TriggerEnum } from "@/generated/prisma";
+import { useEntitySearch } from "@/hooks/use-entity-search";
 import { usePaginationParams } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 import { type WebhookFormValues, webhookInputSchema } from "../types";
@@ -96,11 +94,28 @@ export const triggerDescriptions = {
   ),
 };
 
+export const WebhooksSearch = () => {
+  const [params, setParams] = usePaginationParams();
+  const { searchValue, onSearchChange } = useEntitySearch({
+    params,
+    setParams,
+  });
+
+  return (
+    <EntitySearch
+      value={searchValue}
+      onChange={onSearchChange}
+      placeholder="Search webhooks by name"
+    />
+  );
+};
+
 export const WebhooksList = () => {
   const { data: webhooks, isFetching } = useSuspenseWebhooks();
 
   return (
     <DataTable
+      search={<WebhooksSearch />}
       paginatedData={webhooks}
       columns={columns}
       isLoading={isFetching}
@@ -268,7 +283,8 @@ export const WebhooksHeader = () => {
 
   const handleCreate = (item: WebhookFormValues) => {
     createWebhook.mutate(item, {
-      onSuccess: (_data) => {
+      onSuccess: () => {
+        form.reset();
         setOpen(false);
       },
       onError: () => {
@@ -303,20 +319,6 @@ export const WebhooksHeader = () => {
   );
 };
 
-export const WebhooksPagination = () => {
-  const items = useSuspenseWebhooks();
-  const [params, setParams] = usePaginationParams();
-
-  return (
-    <EntityPagination
-      disabled={items.isFetching}
-      totalPages={items.data.totalPages}
-      page={items.data.page}
-      onPageChange={(page) => setParams({ ...params, page })}
-    />
-  );
-};
-
 export const WebhooksContainer = ({ children }: PropsWithChildren) => {
   return (
     <>
@@ -336,78 +338,4 @@ export const WebhooksError = () => {
 
 export const WebhooksEmpty = () => {
   return <EmptyView message="No Webhooks" />;
-};
-
-export const WebhookItem = ({ data }: { data: Webhook }) => {
-  const removeItem = useRemoveWebhook();
-
-  const handleRemove = () => {
-    removeItem.mutate({ id: data.id });
-  };
-
-  const updateWebhook = useUpdateWebhook();
-  const [open, setOpen] = useState(false);
-
-  const form = useForm<WebhookFormValues>({
-    resolver: zodResolver(webhookInputSchema),
-    defaultValues: {
-      name: data.name,
-      callbackUrl: data.callbackUrl,
-      triggers: data.triggers,
-      authType: data.authType,
-      authentication: data.authentication as AuthenticationInputType,
-    },
-  });
-
-  const handleUpdate = (item: WebhookFormValues) => {
-    updateWebhook.mutate(
-      { id: data.id, ...item },
-      {
-        onSuccess: () => {
-          setOpen(false);
-        },
-        onError: () => {
-          setOpen(true);
-        },
-      },
-    );
-  };
-
-  return (
-    <>
-      <div className="flex items-center gap-3 p-4 border rounded-lg">
-        <div className="flex-1 min-w-0">
-          <div className="flex gap-2">
-            <span>Name: {data.name}</span>
-          </div>
-          <p>{JSON.stringify(data)}</p>
-        </div>
-        <Button
-          size="sm"
-          onClick={() => setOpen(true)}
-          disabled={updateWebhook.isPending}
-        >
-          {updateWebhook.isPending ? "Updating..." : "Update"}
-        </Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={handleRemove}
-          disabled={removeItem.isPending}
-        >
-          {removeItem.isPending ? "Deleting..." : "Delete"}
-        </Button>
-      </div>
-
-      {open && (
-        <WebhookCreateModal
-          form={form}
-          open={open}
-          setOpen={setOpen}
-          handleCreate={handleUpdate}
-          isUpdate={true}
-        />
-      )}
-    </>
-  );
 };

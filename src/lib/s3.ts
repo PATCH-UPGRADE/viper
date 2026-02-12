@@ -31,6 +31,6 @@ export async function generateUploadUrl(fileName: string, hash: string, size: nu
     });
 
     const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // Expire upload URL after 1 hour
-    return { uploadUrl, s3Key }
+    return { uploadUrl, s3Key, requiredHeader: normalized_hash }
 
 }

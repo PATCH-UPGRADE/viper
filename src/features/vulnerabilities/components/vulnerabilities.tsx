@@ -1,7 +1,15 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
-import { BugIcon, ExternalLinkIcon } from "lucide-react";
+import {
+  BugIcon,
+  Clock,
+  ExternalLinkIcon,
+  Eye,
+  ShieldAlert,
+  ShieldClose,
+} from "lucide-react";
 import { type PropsWithChildren, Suspense, useState } from "react";
 import {
   EmptyView,
@@ -33,9 +41,26 @@ import type {
 import {
   useRemoveVulnerability,
   useSuspenseVulnerabilities,
+  useSuspenseVulnerabilitiesBySeverity,
+  useSuspenseVulnerabilitySeverityMetrics,
 } from "../hooks/use-vulnerabilities";
 import { useVulnerabilitiesParams } from "../hooks/use-vulnerabilities-params";
 import { columns } from "./columns";
+import { VulnerabilityWithRelations } from "../server/routers";
+import { PrioritizedVulnerabilityDrawer } from "./vulnerability-drawer";
+import { CollapsibleDataTable } from "./table";
+import { prioritizedColumns } from "./prioritized-columns";
+
+import {
+  Card,
+  CardAction,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { QuestionTooltip } from "@/components/ui/question-tooltip";
+import { Severity } from "@/generated/prisma";
 
 export const VulnerabilitiesSearch = () => {
   const [params, setParams] = useVulnerabilitiesParams();
@@ -74,6 +99,102 @@ export const VulnerabilitiesList = () => {
         columns={columns}
         isLoading={isFetching}
         search={<VulnerabilitiesSearch />}
+        rowOnclick={(row) => {
+          setDrawerOpen(true);
+          setVuln(row.original);
+        }}
+      />
+    </>
+  );
+};
+
+const SeveritiesExplained = {
+  Critical: {
+    help: "Immediate remediation required. Confirmed exploitation of high-impact vulnerabilities.",
+    icon: ShieldAlert,
+    color: "text-red-600",
+    colorBg: "bg-red-50",
+  },
+  High: {
+    help: "Scheduled remediation required. Predicted exploitation of high-impact vulnerabilities.",
+    icon: ShieldClose,
+    color: "text-orange-600",
+    colorBg: "bg-orange-50",
+  },
+  Medium: {
+    help: "Scheduled remediation required. Predicted exploitation of high-impact vulnerabilities.",
+    icon: Eye,
+    color: "text-yellow-600",
+    colorBg: "bg-yellow-50",
+  },
+  Low: {
+    help: "Scheduled remediation required. Predicted exploitation of high-impact vulnerabilities.",
+    icon: Clock,
+    color: "text-blue-600",
+    colorBg: "bg-blue-50",
+  },
+};
+
+export const VulnerabilitiesBySeverityMetrics = () => {
+  const { data } = useSuspenseVulnerabilitySeverityMetrics();
+  return (
+    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:grid-cols-4">
+      {Object.entries(data).map(([key, value]) => {
+        const explained =
+          SeveritiesExplained[key as keyof typeof SeveritiesExplained];
+        return (
+          <Card key={key} className={cn("@container/card", explained.colorBg)}>
+            <CardHeader>
+              <CardDescription className="gap-2 flex items-center font-bold text-foreground">
+                {key}
+                <QuestionTooltip>{explained.help}</QuestionTooltip>
+              </CardDescription>
+              <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+                {value.total}
+              </CardTitle>
+              <CardAction>
+                {<explained.icon className={explained.color} />}
+              </CardAction>
+            </CardHeader>
+            <CardFooter className="flex-col items-start gap-1.5 text-sm">
+              <div className="line-clamp-1 flex gap-2 font-medium text-muted-foreground">
+                {!!value.total && (
+                  <>
+                    {value.withRemediations} with remediations (
+                    {(value.withRemediations / value.total) * 100}%)
+                  </>
+                )}
+              </div>
+            </CardFooter>
+          </Card>
+        );
+      })}
+    </div>
+  );
+};
+
+export const PrioritizedVulnerabilitiesList = () => {
+  const { data, isFetching } = useSuspenseVulnerabilitiesBySeverity();
+  console.log("HEY", data);
+  const [vuln, setVuln] = useState<VulnerabilityWithRelations | undefined>(
+    undefined,
+  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  return (
+    <>
+      <VulnerabilitiesBySeverityMetrics />
+      {vuln && (
+        <PrioritizedVulnerabilityDrawer
+          vulnerability={vuln}
+          open={drawerOpen}
+          setOpen={setDrawerOpen}
+        />
+      )}
+      <CollapsibleDataTable
+        paginatedData={data}
+        columns={prioritizedColumns}
+        isLoading={isFetching}
         rowOnclick={(row) => {
           setDrawerOpen(true);
           setVuln(row.original);

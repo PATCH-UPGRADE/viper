@@ -5,7 +5,10 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
-import { useVulnerabilitiesParams } from "./use-vulnerabilities-params";
+import {
+  useVulnerabilitiesBySeverityParams,
+  useVulnerabilitiesParams,
+} from "./use-vulnerabilities-params";
 
 /**
  * Hook to fetch all vulnerabilities using suspense
@@ -16,6 +19,22 @@ export const useSuspenseVulnerabilities = () => {
 
   return useSuspenseQuery(
     trpc.vulnerabilities.getManyInternal.queryOptions(params),
+  );
+};
+
+export const useSuspenseVulnerabilitiesBySeverity = () => {
+  const trpc = useTRPC();
+  const [params] = useVulnerabilitiesBySeverityParams();
+
+  return useSuspenseQuery(
+    trpc.vulnerabilities.getManyBySeverityInternal.queryOptions(params),
+  );
+};
+
+export const useSuspenseVulnerabilitySeverityMetrics = () => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(
+    trpc.vulnerabilities.getSeverityMetricsInternal.queryOptions(),
   );
 };
 

@@ -1,6 +1,13 @@
 import { useQueryStates } from "nuqs";
-import { vulnerabilitiesParams } from "../params";
+import {
+  vulnerabilitiesBySeverityParams,
+  vulnerabilitiesParams,
+} from "../params";
 
 export const useVulnerabilitiesParams = () => {
   return useQueryStates(vulnerabilitiesParams);
+};
+
+export const useVulnerabilitiesBySeverityParams = () => {
+  return useQueryStates(vulnerabilitiesBySeverityParams);
 };

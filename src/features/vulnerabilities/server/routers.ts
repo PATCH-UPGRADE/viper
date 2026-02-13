@@ -6,7 +6,7 @@ import {
   fetchPaginated,
   processIntegrationSync,
 } from "@/lib/router-utils";
-import { integrationResponseSchema } from "@/lib/schemas";
+import { integrationResponseSchema, userIncludeSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
 import {
@@ -18,6 +18,8 @@ import {
   vulnerabilityInputSchema,
   vulnerabilityResponseSchema,
 } from "../types";
+import { Prisma, Severity } from "@/generated/prisma";
+import { deviceGroupSelect } from "@/features/device-groups/types";
 
 const createSearchFilter = (search: string) => {
   return search
@@ -41,6 +43,84 @@ const createSearchFilter = (search: string) => {
       }
     : {};
 };
+
+export const vulnerabilitiesBySeverityInputSchema =
+  paginationInputSchema.extend({
+    severity: z.enum(Object.values(Severity)),
+  });
+
+const vulnerabilityBySeverityInclude = {
+  user: userIncludeSelect,
+  affectedDeviceGroups: deviceGroupSelect,
+  issues: {
+    include: {
+      asset: {
+        select: {
+          id: true,
+          role: true,
+          location: true,
+        },
+      },
+    },
+  },
+  remediations: {
+    include: {
+      user: userIncludeSelect,
+      _count: {
+        select: {
+          artifacts: true,
+        },
+      },
+    },
+  },
+  _count: {
+    select: {
+      issues: true,
+      remediations: true,
+    },
+  },
+} satisfies Prisma.VulnerabilityInclude;
+
+export type VulnerabilityWithRelations = Prisma.VulnerabilityGetPayload<{
+  include: typeof vulnerabilityBySeverityInclude;
+}>;
+
+// Helper function to fetch paginated vulnerabilities for a specific severity
+async function fetchVulnerabilitiesBySeverity(
+  severity: Severity,
+  pagination: z.infer<typeof paginationInputSchema>,
+) {
+  const { page, pageSize, search, sort } = pagination;
+  const skip = (page - 1) * pageSize;
+
+  // Build where clause
+  const where = {
+    severity,
+    ...(search && {
+      OR: [
+        { cveId: { contains: search, mode: "insensitive" as const } },
+        { description: { contains: search, mode: "insensitive" as const } },
+      ],
+    }),
+  };
+
+  // Build orderBy clause
+  let orderBy: any = { createdAt: "desc" };
+  if (sort) {
+    const [field, order] = sort.split(",");
+    if (field && (order === "asc" || order === "desc")) {
+      orderBy = { [field]: order };
+    }
+  }
+
+  return fetchPaginated(prisma.vulnerability, pagination, {
+    where,
+    skip,
+    take: pageSize,
+    orderBy,
+    include: vulnerabilityBySeverityInclude,
+  });
+}
 
 export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/vulnerabilities - List all vulnerabilities (any authenticated user can see all)
@@ -357,4 +437,54 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         include: vulnerabilityInclude,
       });
     }),
+
+  getManyBySeverityInternal: protectedProcedure
+    .input(vulnerabilitiesBySeverityInputSchema)
+    .query(async ({ input }) => {
+      const { severity, ...pagination } = input;
+
+      const data = await fetchVulnerabilitiesBySeverity(severity, pagination);
+
+      return data;
+    }),
+
+  getSeverityMetricsInternal: protectedProcedure.query(async () => {
+    const [totalCounts, withRemediationCounts] = await Promise.all([
+      prisma.vulnerability.groupBy({
+        by: ["severity"],
+        _count: { severity: true },
+      }),
+      prisma.vulnerability.groupBy({
+        by: ["severity"],
+        where: {
+          remediations: { some: {} },
+        },
+        _count: { severity: true },
+      }),
+    ]);
+
+    const totals = Object.fromEntries(
+      totalCounts.map((item) => [item.severity, item._count.severity]),
+    );
+
+    const withRemediations = Object.fromEntries(
+      withRemediationCounts.map((item) => [
+        item.severity,
+        item._count.severity,
+      ]),
+    );
+
+    // Ensure all severity levels are present
+    return Object.values(Severity).reduce(
+      (acc, severity) => {
+        const key = severity;
+        acc[key] = {
+          total: totals[key] || 0,
+          withRemediations: withRemediations[key] || 0,
+        };
+        return acc;
+      },
+      {} as Record<string, { total: number; withRemediations: number }>,
+    );
+  }),
 });

@@ -1,4 +1,5 @@
 import {
+  PrioritizedVulnerabilitiesList,
   VulnerabilitiesContainer,
   VulnerabilitiesError,
   VulnerabilitiesList,
@@ -12,7 +13,8 @@ export default createListPage({
   paramsLoader: vulnerabilitiesParamsLoader,
   prefetch: prefetchVulnerabilities,
   Container: VulnerabilitiesContainer,
-  List: VulnerabilitiesList,
+  //List: VulnerabilitiesList,
+  List: PrioritizedVulnerabilitiesList,
   Loading: VulnerabilitiesLoading,
   Error: VulnerabilitiesError,
 });

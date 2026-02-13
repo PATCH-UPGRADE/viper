@@ -145,17 +145,14 @@ export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
         <DropdownMenuContent align="end">
           <DropdownMenuItem asChild>
             <Link href={`/assets/${row.original.asset.id}`}>
-              Go to Asset Details 
+              Go to Asset Details
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href={`/issues/${row.original.id}`}>
-              Go to Issue Details 
-            </Link>
+            <Link href={`/issues/${row.original.id}`}>Go to Issue Details</Link>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     ),
   },
 ];
-

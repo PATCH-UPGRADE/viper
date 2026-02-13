@@ -44,7 +44,10 @@ import {
   useSuspenseVulnerabilitiesBySeverity,
   useSuspenseVulnerabilitySeverityMetrics,
 } from "../hooks/use-vulnerabilities";
-import { useVulnerabilitiesBySeverityParams, useVulnerabilitiesParams } from "../hooks/use-vulnerabilities-params";
+import {
+  useVulnerabilitiesBySeverityParams,
+  useVulnerabilitiesParams,
+} from "../hooks/use-vulnerabilities-params";
 import { columns } from "./columns";
 import { VulnerabilityWithRelations } from "../server/routers";
 import { PrioritizedVulnerabilityDrawer } from "./vulnerability-drawer";
@@ -137,8 +140,11 @@ const SeveritiesExplained = {
   },
 };
 
-
-export const VulnerabilitiesBySeverityMetrics = ({data}: {data: VulnerabilitiesBySeverityCounts}) => {
+export const VulnerabilitiesBySeverityMetrics = ({
+  data,
+}: {
+  data: VulnerabilitiesBySeverityCounts;
+}) => {
   return (
     <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:grid-cols-4">
       {Object.entries(data).map(([key, value]) => {
@@ -187,23 +193,23 @@ export const PrioritizedVulnerabilitiesList = () => {
   const { severity } = params;
 
   const handleTabChange = (value: string) => {
-    setParams((prev) => ({ ...prev, severity: value as Severity }))
-  }
+    setParams((prev) => ({ ...prev, severity: value as Severity }));
+  };
 
   return (
     <>
       <VulnerabilitiesBySeverityMetrics data={counts} />
       <Tabs value={severity} onValueChange={handleTabChange}>
-      <TabsList variant="line">
-        {Object.values(Severity).map((sev) => (
-          <TabsTrigger key={sev} value={sev}>
-            <span className="font-semibold">{sev}</span>
-            <Badge variant="secondary" className="ml-2">
-              {counts[sev].total}
-            </Badge>
-          </TabsTrigger>
-        ))}
-      </TabsList>
+        <TabsList variant="line">
+          {Object.values(Severity).map((sev) => (
+            <TabsTrigger key={sev} value={sev}>
+              <span className="font-semibold">{sev}</span>
+              <Badge variant="secondary" className="ml-2">
+                {counts[sev].total}
+              </Badge>
+            </TabsTrigger>
+          ))}
+        </TabsList>
       </Tabs>
       {vuln && (
         <PrioritizedVulnerabilityDrawer
@@ -213,16 +219,16 @@ export const PrioritizedVulnerabilitiesList = () => {
         />
       )}
       <CollapsibleDataTable
-  columns={prioritizedColumns}
-  paginatedData={data}
-  nestedColumns={issueColumns}
-  nestedDataKey="issues"
-  isLoading={isFetching}
+        columns={prioritizedColumns}
+        paginatedData={data}
+        nestedColumns={issueColumns}
+        nestedDataKey="issues"
+        isLoading={isFetching}
         rowOnclick={(row) => {
           setDrawerOpen(true);
           setVuln(row.original);
         }}
-/>
+      />
     </>
   );
 };

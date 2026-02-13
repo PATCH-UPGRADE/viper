@@ -27,6 +27,7 @@ import {
   useSuspenseIssuesById,
   useUpdateIssueStatus,
 } from "../hooks/use-issues";
+import { CopyCode } from "@/components/ui/code";
 
 const statusDetails = {
   [IssueStatus.FALSE_POSITIVE]: {
@@ -214,22 +215,36 @@ export const IssuesSidebarList = ({
               )}
               size={16}
             />
-            {type === "vulnerabilities" ? (
-              <div className="text-xs flex-1">
-                <p className="font-semibold mb-2">
-                  {issuesMap[issue.id].vulnerability?.description}
-                </p>
-                <IssueStatusForm issue={issue} />
-              </div>
-            ) : (
-              <>
-                <p className="font-semibold">
-                  {issuesMap[issue.id].asset?.role}
-                </p>
-                {/*<CopyCode>{issue.id}</CopyCode>*/}
-                <IssueStatusForm className="ml-auto" issue={issue} />
-              </>
-            )}
+{type === "vulnerabilities" ? (
+  <div className="text-xs flex-1">
+    <p className="font-semibold mb-2">
+      {issuesMap[issue.id].vulnerability?.description}
+    </p>
+    <IssueStatusForm issue={issue} />
+  </div>
+) : (
+  <>
+    <div className="flex flex-col gap-1">
+      <p className="font-semibold">
+        {issuesMap[issue.id].asset?.role}
+      </p>
+      {issuesMap[issue.id].asset?.location && (
+        <p className="text-xs text-muted-foreground">
+          {[
+            issuesMap[issue.id].asset?.location?.facility,
+            issuesMap[issue.id].asset?.location?.building,
+            issuesMap[issue.id].asset?.location?.floor,
+            issuesMap[issue.id].asset?.location?.room,
+          ]
+            .filter(Boolean)
+            .join(" • ")}
+        </p>
+      )}
+    </div>
+    <IssueStatusForm className="ml-auto" issue={issue} />
+  </>
+)}
+
             <DropdownMenu>
               <DropdownMenuTrigger
                 asChild

@@ -45,7 +45,9 @@ export function CollapsibleDataTable<TData, TValue, TNestedData = any>({
 }: DataTableProps<TData, TValue, TNestedData>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [isPending, _startTransition] = React.useTransition();
-  const [expandedRows, setExpandedRows] = React.useState<Set<string>>(new Set());
+  const [expandedRows, setExpandedRows] = React.useState<Set<string>>(
+    new Set(),
+  );
 
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -115,7 +117,8 @@ export function CollapsibleDataTable<TData, TValue, TNestedData = any>({
                 const nestedData = hasNestedTable
                   ? (row.original[nestedDataKey] as TNestedData[])
                   : [];
-                const hasNestedData = Array.isArray(nestedData) && nestedData.length > 0;
+                const hasNestedData =
+                  Array.isArray(nestedData) && nestedData.length > 0;
 
                 return (
                   <React.Fragment key={row.id}>
@@ -144,7 +147,9 @@ export function CollapsibleDataTable<TData, TValue, TNestedData = any>({
                         <TableCell
                           key={cell.id}
                           className="py-4 first-of-type:pl-4 last-of-type:pr-4"
-                          onClick={rowOnclick ? () => rowOnclick(row) : undefined}
+                          onClick={
+                            rowOnclick ? () => rowOnclick(row) : undefined
+                          }
                         >
                           {flexRender(
                             cell.column.columnDef.cell,

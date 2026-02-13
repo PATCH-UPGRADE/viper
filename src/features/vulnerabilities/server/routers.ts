@@ -1,83 +1,23 @@
 import { z } from "zod";
 import prisma from "@/lib/db";
-import {
-  createPaginatedResponseSchema,
-  paginationInputSchema,
-} from "@/lib/pagination";
+import { paginationInputSchema } from "@/lib/pagination";
 import {
   cpesToDeviceGroups,
   fetchPaginated,
   processIntegrationSync,
 } from "@/lib/router-utils";
-import {
-  cpeSchema,
-  createIntegrationInputSchema,
-  deviceGroupSelect,
-  deviceGroupWithUrlsSchema,
-  integrationResponseSchema,
-  safeUrlSchema,
-  userIncludeSelect,
-  userSchema,
-} from "@/lib/schemas";
+import { integrationResponseSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
-
-// Validation schemas
-const severitySchema = z.enum(["Critical", "High", "Medium", "Low"]);
-
-const vulnerabilityInputSchema = z.object({
-  cpes: z.array(cpeSchema).min(1, "At least one CPE is required"),
-  sarif: z.any(), // JSON data - Prisma JsonValue type
-  cveId: z.string().min(1).optional(),
-  description: z.string().min(1).optional(),
-  narrative: z.string().min(1).optional(),
-  impact: z.string().min(1).optional(),
-  severity: severitySchema.optional(),
-  cvssScore: z.number().min(0).max(10).optional(),
-  cvssVector: z.string().min(1).optional(),
-  affectedComponents: z.array(z.string().min(1)).optional(),
-  exploitUri: safeUrlSchema.optional(),
-  upstreamApi: safeUrlSchema.optional(),
-  deviceArtifactId: z.string().min(1).optional(),
-});
-
-const vulnerabilityArrayInputSchema = z.object({
-  vulnerabilities: z.array(vulnerabilityInputSchema).nonempty(),
-});
-
-const vulnerabilityResponseSchema = z.object({
-  id: z.string(),
-  sarif: z.any(), // JSON data - Prisma JsonValue type
-  affectedDeviceGroups: z.array(deviceGroupWithUrlsSchema),
-  exploitUri: z.string().nullable(),
-  upstreamApi: z.string().nullable(),
-  description: z.string().nullable(),
-  narrative: z.string().nullable(),
-  impact: z.string().nullable(),
-  cveId: z.string().nullable(),
-  cvssScore: z.number().nullable(),
-  severity: severitySchema,
-  affectedComponents: z.array(z.string()),
-  cvssVector: z.string().nullable(),
-  userId: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  user: userSchema,
-});
-
-const vulnerabilityArrayResponseSchema = z.array(vulnerabilityResponseSchema);
-
-const paginatedVulnerabilityResponseSchema = createPaginatedResponseSchema(
-  vulnerabilityResponseSchema,
-);
-
-export const integrationVulnerabilityInputSchema = createIntegrationInputSchema(
+import {
+  integrationVulnerabilityInputSchema,
+  paginatedVulnerabilityResponseSchema,
+  vulnerabilityArrayInputSchema,
+  vulnerabilityArrayResponseSchema,
+  vulnerabilityInclude,
   vulnerabilityInputSchema,
-);
-const vulnerabilityInclude = {
-  user: userIncludeSelect,
-  affectedDeviceGroups: deviceGroupSelect,
-};
+  vulnerabilityResponseSchema,
+} from "../types";
 
 const createSearchFilter = (search: string) => {
   return search
@@ -294,10 +234,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
               },
               userId: ctx.auth.user.id,
             },
-            include: {
-              user: userIncludeSelect,
-              affectedDeviceGroups: deviceGroupSelect,
-            },
+            include: vulnerabilityInclude,
           });
         }),
       );

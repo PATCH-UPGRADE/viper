@@ -34,7 +34,7 @@ import {
   useSuspenseRemediations,
 } from "../hooks/use-remediations";
 import { useRemediationsParams } from "../hooks/use-remediations-params";
-import type { RemediationResponse } from "../server/routers";
+import type { RemediationResponse } from "../types";
 
 export const RemediationsSearch = () => {
   const [params, setParams] = useRemediationsParams();

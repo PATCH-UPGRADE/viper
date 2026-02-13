@@ -1,29 +1,16 @@
 import { z } from "zod";
-import { ArtifactType, type Prisma } from "@/generated/prisma";
+import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import {
-  createPaginatedResponseSchema,
-  paginationInputSchema,
-} from "@/lib/pagination";
+import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
-import { artifactInputSchema, artifactWithUrlsSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireOwnership } from "@/trpc/middleware";
-
-const artifactUpdateSchema = z.object({
-  id: z.string(),
-  name: z.string().optional(),
-  artifactType: z.enum(ArtifactType).optional(),
-  size: z.number().optional(),
-});
-
-const createArtifactVersionSchema = artifactInputSchema.extend({
-  wrapperId: z.string(),
-});
-
-const paginatedArtifactResponseSchema = createPaginatedResponseSchema(
+import {
+  artifactUpdateSchema,
   artifactWithUrlsSchema,
-);
+  createArtifactVersionSchema,
+  paginatedArtifactResponseSchema,
+} from "../types";
 
 export const artifactsRouter = createTRPCRouter({
   // GET /api/artifacts/versions/{wrapperId} - List all versions in a wrapper

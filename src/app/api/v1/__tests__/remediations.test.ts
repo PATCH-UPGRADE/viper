@@ -1,12 +1,10 @@
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
-import type { RemediationResponse } from "@/features/remediations/server/routers";
+import type { ArtifactWrapperWithUrls } from "@/features/artifacts/types";
+import type { DeviceGroupWithUrls } from "@/features/device-groups/types";
+import type { RemediationResponse } from "@/features/remediations/types";
 import { ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import type {
-  ArtifactWrapperWithUrls,
-  DeviceGroupWithUrls,
-} from "@/lib/schemas";
 import { authHeader, BASE_URL, generateCPE } from "./test-config";
 
 describe("Remediations Endpoint (/remediations)", () => {

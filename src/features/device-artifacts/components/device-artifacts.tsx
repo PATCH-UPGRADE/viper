@@ -32,7 +32,7 @@ import {
   useSuspenseDeviceArtifacts,
 } from "../hooks/use-device-artifacts";
 import { useDeviceArtifactsParams } from "../hooks/use-device-artifacts-params";
-import type { DeviceArtifactResponse } from "../server/routers";
+import type { DeviceArtifactResponse } from "../types";
 
 export const DeviceArtifactsSearch = () => {
   const [params, setParams] = useDeviceArtifactsParams();

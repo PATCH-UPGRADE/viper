@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthType, TriggerEnum } from "@/generated/prisma";
 import { sendWebhook } from "@/lib/utils";
-import { AUTH_TOKEN, generateCPE } from "./test-config";
+import { AUTH_TOKEN } from "./test-config";
 
 // override fetch so it doesn't send real fetch calls
 global.fetch = vi.fn();
@@ -24,19 +24,6 @@ describe("Webhook Endpoints (/webhooks)", () => {
     userId: "someUserId",
     createdAt: new Date(),
     updatedAt: new Date(),
-  };
-
-  const _trpcWebhookPayload = {
-    "0": {
-      json: webhookPayload,
-    },
-  };
-
-  const _assetPayload = {
-    ip: "192.168.1.100",
-    cpe: generateCPE("asset_v1"),
-    role: "Primary Server",
-    upstreamApi: "https://api.hospital-upstream.com/v1",
   };
 
   afterEach(() => {

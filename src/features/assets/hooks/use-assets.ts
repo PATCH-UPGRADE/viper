@@ -5,7 +5,7 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
-import type { AssetsVulnsInput } from "../server/routers";
+import type { AssetsVulnsInput } from "../types";
 import { useAssetsParams } from "./use-asset-params";
 
 /**

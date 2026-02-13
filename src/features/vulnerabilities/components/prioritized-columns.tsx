@@ -2,104 +2,160 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
-import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
-import type { VulnerabilityWithIssues } from "@/lib/db";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { QuestionTooltip } from "@/components/ui/question-tooltip";
+import { VulnerabilityWithRelations } from "../server/routers";
 
-export const prioritizedColumns: ColumnDef<VulnerabilityWithIssues>[] = [
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { IssueStatusForm } from "@/features/issues/components/issue";
+
+export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
   {
-    accessorKey: "description",
+    accessorKey: "id",
+    header: ({ column }) => <SortableHeader header="ID" column={column} />,
+    cell: ({ row }) => (
+      <Link
+        href={`/vulnerabilities/${row.original.id}`}
+        className="text-primary underline hover:text-primary/80"
+      >
+        {row.original.id}
+      </Link>
+    ),
+  },
+  {
+    accessorKey: "cveId",
+    header: ({ column }) => <SortableHeader header="CVE ID" column={column} />,
+    cell: ({ row }) => row.original.cveId || "—",
+  },
+  {
+    accessorKey: "user.name",
     header: ({ column }) => (
-      <SortableHeader header="Description" column={column} />
+      <SortableHeader header="Source Tool" column={column} />
+    ),
+    cell: ({ row }) => row.original.user.name,
+  },
+  {
+    accessorKey: "createdAt",
+    header: ({ column }) => (
+      <SortableHeader header="First Seen" column={column} />
     ),
     cell: ({ row }) => (
-      <div className="max-w-[500px] overflow-hidden text-ellipsis">
-        {row.original.description}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            {formatDistanceToNow(row.original.createdAt, { addSuffix: true })}
+          </TooltipTrigger>
+          <TooltipContent>
+            {row.original.createdAt.toLocaleString()}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
+  },
+  {
+    accessorKey: "inKEV",
+    header: ({ column }) => (
+      <div className="flex items-center gap-2">
+        <SortableHeader header="In KEV?" column={column} />
+        <QuestionTooltip>
+          Known Exploited Vulnerabilities (KEV) - Vulnerabilities listed in
+          CISA's catalog of exploits actively used in the wild
+        </QuestionTooltip>
       </div>
     ),
+    cell: ({ row }) => (
+      <Badge variant={row.original.inKEV ? "destructive" : "outline"}>
+        {row.original.inKEV ? "True" : "False"}
+      </Badge>
+    ),
   },
   {
-    accessorKey: "issues",
+    accessorKey: "remediations",
     header: ({ column }) => (
-      <SortableHeader header="Affected Assets" column={column} />
+      <SortableHeader header="Remediations Available" column={column} />
     ),
     cell: ({ row }) => {
-      const numAssets = row.original.issues.length;
+      const count = row.original.remediations.length;
       return (
-        <div>
-          <Badge variant={numAssets === 0 ? "outline" : "destructive"}>
-            {numAssets >= 1 ? (
-              <>
-                {numAssets} Asset{numAssets === 1 ? "" : "s"}
-              </>
-            ) : (
-              "None"
-            )}
-          </Badge>
-        </div>
+        <Badge variant={count === 0 ? "destructive" : "secondary"}>
+          {count === 0 ? "None" : count}
+        </Badge>
       );
     },
   },
+];
+
+// Define the type for a single issue (extracted from VulnerabilityWithRelations)
+type VulnerabilityIssue = VulnerabilityWithRelations["issues"][number];
+
+export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
   {
-    accessorKey: "cpe",
-    meta: { title: "Group ID" },
-    header: ({ column }) => (
-      <SortableHeader header="Group ID" column={column} />
+    accessorKey: "id",
+    header: "ID",
+    cell: ({ row }) => (
+      <span className="font-mono text-sm">{row.original.id}</span>
     ),
-    cell: ({ row }) => {
-      return (
-        <CopyCode>
-          {row.original.affectedDeviceGroups
-            .map((group) => group.id)
-            .join(", ")}
-        </CopyCode>
-      );
-    },
+  },
+  {
+    accessorKey: "asset",
+    header: "Affected Asset",
+    cell: ({ row }) => row.original.asset.role,
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => (
+      <IssueStatusForm className="ml-auto" issue={row.original} />
+    ),
   },
   {
     accessorKey: "updatedAt",
-    meta: { title: "Last Updated" },
-    header: ({ column }) => (
-      <SortableHeader header="Last Updated" column={column} />
-    ),
-    accessorFn: (row) =>
-      formatDistanceToNow(row.updatedAt, { addSuffix: true }),
+    header: "Updated At",
+    cell: ({ row }) =>
+      formatDistanceToNow(row.original.updatedAt, { addSuffix: true }),
   },
-  /*{
+  {
     id: "actions",
-    enableHiding: false,
-    cell: ({ row }) => {
-      const asset = row.original;
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[200px]">
-            <DropdownMenuLabel>Quick Actions</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleCopy(asset.cpe)}>
-              <CopyIcon strokeWidth={3} /> Copy Group ID
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleCopy(asset.id)}>
-              <CopyIcon strokeWidth={3} /> Copy Asset ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => console.log("TODO")}
-              variant="destructive"
-            >
-              <TrashIcon strokeWidth={3} /> Delete Asset
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    },
-  }*/
+    header: "",
+    cell: ({ row }) => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link href={`/assets/${row.original.asset.id}`}>
+              Go to Asset Details 
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href={`/issues/${row.original.id}`}>
+              Go to Issue Details 
+            </Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
+  },
 ];
+

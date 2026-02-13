@@ -3,7 +3,7 @@
 import { BugIcon, ChevronDown, ComputerIcon, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   EntityContainer,
   ErrorView,
@@ -63,25 +63,29 @@ export const IssueStatusForm = ({
 }) => {
   const [status, setStatus] = useState<IssueStatus>(issue.status);
   const updateIssueStatus = useUpdateIssueStatus();
+  const lastSubmittedStatusRef = useRef<IssueStatus>(issue.status);
 
-  const handleSave = useCallback(async () => {
-    if (status === issue.status) {
+  useEffect(() => {
+    // Don't submit if status hasn't changed or if we already submitted this status
+    if (status === issue.status || status === lastSubmittedStatusRef.current) {
       return;
     }
 
-    try {
-      await updateIssueStatus.mutateAsync({
-        id: issue.id,
-        status: status,
-      });
-    } catch {
-      setStatus(issue.status);
-    }
-  }, [status, issue, updateIssueStatus]);
+    const updateStatus = async () => {
+      lastSubmittedStatusRef.current = status;
+      try {
+        await updateIssueStatus.mutateAsync({
+          id: issue.id,
+          status: status,
+        });
+      } catch {
+        setStatus(issue.status);
+        lastSubmittedStatusRef.current = issue.status;
+      }
+    };
 
-  useEffect(() => {
-    handleSave();
-  }, [handleSave]);
+    updateStatus();
+  }, [status, issue.id, issue.status, updateIssueStatus]);
 
   const statusDetail = statusDetails[status];
 

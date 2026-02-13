@@ -12,6 +12,8 @@ import {
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
 } from "../device-groups/types";
+import { trpc } from "@/trpc/server";
+import { inferOutput } from "@trpc/tanstack-react-query";
 
 // Validation schemas
 const severitySchema = z.enum(Object.values(Severity));
@@ -71,3 +73,7 @@ export const vulnerabilityInclude = {
   user: userIncludeSelect,
   affectedDeviceGroups: deviceGroupSelect,
 };
+
+export type VulnerabilitiesBySeverityCounts = inferOutput<
+  typeof trpc.vulnerabilities.getSeverityMetricsInternal
+>;

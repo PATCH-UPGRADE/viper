@@ -44,12 +44,12 @@ import {
   useSuspenseVulnerabilitiesBySeverity,
   useSuspenseVulnerabilitySeverityMetrics,
 } from "../hooks/use-vulnerabilities";
-import { useVulnerabilitiesParams } from "../hooks/use-vulnerabilities-params";
+import { useVulnerabilitiesBySeverityParams, useVulnerabilitiesParams } from "../hooks/use-vulnerabilities-params";
 import { columns } from "./columns";
 import { VulnerabilityWithRelations } from "../server/routers";
 import { PrioritizedVulnerabilityDrawer } from "./vulnerability-drawer";
 import { CollapsibleDataTable } from "./table";
-import { prioritizedColumns } from "./prioritized-columns";
+import { issueColumns, prioritizedColumns } from "./prioritized-columns";
 
 import {
   Card,
@@ -61,6 +61,8 @@ import {
 } from "@/components/ui/card";
 import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import { Severity } from "@/generated/prisma";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { VulnerabilitiesBySeverityCounts } from "../types";
 
 export const VulnerabilitiesSearch = () => {
   const [params, setParams] = useVulnerabilitiesParams();
@@ -135,8 +137,8 @@ const SeveritiesExplained = {
   },
 };
 
-export const VulnerabilitiesBySeverityMetrics = () => {
-  const { data } = useSuspenseVulnerabilitySeverityMetrics();
+
+export const VulnerabilitiesBySeverityMetrics = ({data}: {data: VulnerabilitiesBySeverityCounts}) => {
   return (
     <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:grid-cols-4">
       {Object.entries(data).map(([key, value]) => {
@@ -175,15 +177,34 @@ export const VulnerabilitiesBySeverityMetrics = () => {
 
 export const PrioritizedVulnerabilitiesList = () => {
   const { data, isFetching } = useSuspenseVulnerabilitiesBySeverity();
-  console.log("HEY", data);
+  const { data: counts } = useSuspenseVulnerabilitySeverityMetrics();
+
   const [vuln, setVuln] = useState<VulnerabilityWithRelations | undefined>(
     undefined,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [params, setParams] = useVulnerabilitiesBySeverityParams();
+  const { severity } = params;
+
+  const handleTabChange = (value: string) => {
+    setParams((prev) => ({ ...prev, severity: value as Severity }))
+  }
 
   return (
     <>
-      <VulnerabilitiesBySeverityMetrics />
+      <VulnerabilitiesBySeverityMetrics data={counts} />
+      <Tabs value={severity} onValueChange={handleTabChange}>
+      <TabsList variant="line">
+        {Object.values(Severity).map((sev) => (
+          <TabsTrigger key={sev} value={sev}>
+            <span className="font-semibold">{sev}</span>
+            <Badge variant="secondary" className="ml-2">
+              {counts[sev].total}
+            </Badge>
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      </Tabs>
       {vuln && (
         <PrioritizedVulnerabilityDrawer
           vulnerability={vuln}
@@ -192,14 +213,16 @@ export const PrioritizedVulnerabilitiesList = () => {
         />
       )}
       <CollapsibleDataTable
-        paginatedData={data}
-        columns={prioritizedColumns}
-        isLoading={isFetching}
+  columns={prioritizedColumns}
+  paginatedData={data}
+  nestedColumns={issueColumns}
+  nestedDataKey="issues"
+  isLoading={isFetching}
         rowOnclick={(row) => {
           setDrawerOpen(true);
           setVuln(row.original);
         }}
-      />
+/>
     </>
   );
 };

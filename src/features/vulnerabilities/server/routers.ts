@@ -9,7 +9,7 @@ import {
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership } from "@/trpc/middleware";
+import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   integrationVulnerabilityInputSchema,
   paginatedVulnerabilityResponseSchema,
@@ -170,10 +170,11 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(vulnerabilityResponseSchema)
     .query(async ({ input }) => {
-      return prisma.vulnerability.findUniqueOrThrow({
+      const vuln = await prisma.vulnerability.findUnique({
         where: { id: input.id },
         include: vulnerabilityInclude,
       });
+      return requireExistence(vuln, "Vulnerability");
     }),
 
   // POST /api/vulnerabilities - Create vulnerability

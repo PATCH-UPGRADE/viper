@@ -9,7 +9,7 @@ import {
   transformArtifactWrapper,
 } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership } from "@/trpc/middleware";
+import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   deviceArtifactInclude,
   deviceArtifactInputSchema,
@@ -145,11 +145,11 @@ export const deviceArtifactsRouter = createTRPCRouter({
     })
     .output(deviceArtifactResponseSchema)
     .query(async ({ input }) => {
-      const deviceArtifact = await prisma.deviceArtifact.findUniqueOrThrow({
+      const dA = await prisma.deviceArtifact.findUnique({
         where: { id: input.id },
         include: deviceArtifactInclude,
       });
-      return transformArtifactWrapper(deviceArtifact);
+      return transformArtifactWrapper(requireExistence(dA, "DeviceArtifact"));
     }),
 
   // POST /api/deviceArtifacts - Create deviceArtifact

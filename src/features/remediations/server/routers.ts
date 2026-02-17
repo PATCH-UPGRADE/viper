@@ -10,7 +10,7 @@ import {
   transformArtifactWrapper,
 } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership } from "@/trpc/middleware";
+import { requireOwnership, requireExistence } from "@/trpc/middleware";
 import {
   paginatedRemediationResponseSchema,
   remediationInclude,
@@ -96,11 +96,11 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationResponseSchema)
     .query(async ({ input }) => {
-      const result = await prisma.remediation.findUniqueOrThrow({
+      const rem = await prisma.remediation.findUnique({
         where: { id: input.id },
         include: remediationInclude,
       });
-      return transformArtifactWrapper(result);
+      return transformArtifactWrapper(requireExistence(rem, "Remediation"));
     }),
 
   // POST /api/remediations - Create remediation

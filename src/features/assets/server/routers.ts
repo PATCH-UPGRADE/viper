@@ -8,7 +8,7 @@ import {
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership } from "@/trpc/middleware";
+import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   assetArrayInputSchema,
   assetArrayResponseSchema,
@@ -211,10 +211,11 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetResponseSchema)
     .query(async ({ input }) => {
-      return prisma.asset.findUniqueOrThrow({
+      const asset = await prisma.asset.findUnique({
         where: { id: input.id },
         include: assetInclude,
       });
+      return requireExistence(asset, "Asset");
     }),
 
   // POST /api/assets - Create asset

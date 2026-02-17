@@ -10,15 +10,17 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { requireExistence } from "@/trpc/middleware";
 
 export const workflowsRouter = createTRPCRouter({
   // TODO: we probably don't need this code here
   execute: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const workflow = await prisma.workflow.findUniqueOrThrow({
+      const workflowOrNull = await prisma.workflow.findUnique({
         where: { id: input.id, userId: ctx.auth.user.id },
       });
+      const workflow = requireExistence(workflowOrNull, "Workflow");
       await inngest.send({
         name: "workflows/execute.workflow",
         data: { workflowId: input.id },
@@ -75,9 +77,11 @@ export const workflowsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { id, nodes, edges } = input;
 
-      const workflow = await prisma.workflow.findUniqueOrThrow({
+      const workflowOrNull = await prisma.workflow.findUnique({
         where: { id },
       });
+
+      const workflow = requireExistence(workflowOrNull, "Workflow");
 
       // Transaction to ensure consistency
       return await prisma.$transaction(async (tx) => {
@@ -129,10 +133,12 @@ export const workflowsRouter = createTRPCRouter({
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
-      const workflow = await prisma.workflow.findUniqueOrThrow({
+      const workflowOrNull = await prisma.workflow.findUnique({
         where: { id: input.id },
         include: { nodes: true, connections: true },
       });
+
+      const workflow = requireExistence(workflowOrNull, "Workflow");
 
       // Transform server nodes to react-flow compatible nodes
       const nodes: Node[] = workflow.nodes.map((node) => ({

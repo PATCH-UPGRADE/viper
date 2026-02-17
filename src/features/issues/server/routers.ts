@@ -9,6 +9,7 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { requireExistence } from "@/trpc/middleware";
 
 const issuePaginationInput = paginationInputSchema.extend({
   assetId: z.string(),
@@ -19,7 +20,7 @@ export const issuesRouter = createTRPCRouter({
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
-      return prisma.issue.findUniqueOrThrow({
+      const issue = await prisma.issue.findUnique({
         where: { id: input.id },
         include: {
           asset: {
@@ -34,6 +35,7 @@ export const issuesRouter = createTRPCRouter({
           },
         },
       });
+      return requireExistence(issue, "Issue");
     }),
 
   getManyByIds: protectedProcedure

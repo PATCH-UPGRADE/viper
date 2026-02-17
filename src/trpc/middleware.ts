@@ -25,12 +25,7 @@ export async function requireOwnership(
     select: { userId: true },
   });
 
-  if (!resource) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: `${formatResourceName(String(modelName))} not found`,
-    });
-  }
+  requireExistence(resource, String(modelName));
 
   // TODO: Is this secure? Double check.
   if (resource.userId !== userId) {
@@ -41,4 +36,14 @@ export async function requireOwnership(
   }
 
   return resource;
+}
+
+export function requireExistence<T>(item: T | null, modelName: string): T {
+  if (item === null) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: `${formatResourceName(modelName)} not found`,
+    });
+  }
+  return item;
 }

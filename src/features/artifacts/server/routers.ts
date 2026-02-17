@@ -4,7 +4,7 @@ import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership } from "@/trpc/middleware";
+import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   artifactUpdateSchema,
   artifactWithUrlsSchema,
@@ -51,9 +51,10 @@ export const artifactsRouter = createTRPCRouter({
     })
     .output(artifactWithUrlsSchema)
     .query(async ({ input }) => {
-      return prisma.artifact.findUniqueOrThrow({
+      const artifact = await prisma.artifact.findUnique({
         where: { id: input.id },
       });
+      return requireExistence(artifact, "Artifact");
     }),
 
   // PUT /api/artifacts/{id} - Update artifact metadata

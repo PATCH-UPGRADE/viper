@@ -1,6 +1,10 @@
+import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
-import { Severity } from "@/generated/prisma";
-import { createPaginatedResponseSchema } from "@/lib/pagination";
+import { type Prisma, Severity } from "@/generated/prisma";
+import {
+  createPaginatedResponseSchema,
+  paginationInputSchema,
+} from "@/lib/pagination";
 import {
   cpeSchema,
   createIntegrationInputSchema,
@@ -8,12 +12,11 @@ import {
   userIncludeSelect,
   userSchema,
 } from "@/lib/schemas";
+import type { trpc } from "@/trpc/server";
 import {
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
 } from "../device-groups/types";
-import { trpc } from "@/trpc/server";
-import { inferOutput } from "@trpc/tanstack-react-query";
 
 // Validation schemas
 const severitySchema = z.enum(Object.values(Severity));
@@ -69,11 +72,52 @@ export const integrationVulnerabilityInputSchema = createIntegrationInputSchema(
   vulnerabilityInputSchema,
 );
 
+export type VulnerabilitiesBySeverityCounts = inferOutput<
+  typeof trpc.vulnerabilities.getSeverityMetricsInternal
+>;
+
+export const vulnerabilitiesBySeverityInputSchema =
+  paginationInputSchema.extend({
+    severity: z.enum(Object.values(Severity)),
+  });
+
 export const vulnerabilityInclude = {
   user: userIncludeSelect,
   affectedDeviceGroups: deviceGroupSelect,
 };
 
-export type VulnerabilitiesBySeverityCounts = inferOutput<
-  typeof trpc.vulnerabilities.getSeverityMetricsInternal
->;
+export const vulnerabilityBySeverityInclude = {
+  user: userIncludeSelect,
+  affectedDeviceGroups: deviceGroupSelect,
+  issues: {
+    include: {
+      asset: {
+        select: {
+          id: true,
+          role: true,
+          location: true,
+        },
+      },
+    },
+  },
+  remediations: {
+    include: {
+      user: userIncludeSelect,
+      _count: {
+        select: {
+          artifacts: true,
+        },
+      },
+    },
+  },
+  _count: {
+    select: {
+      issues: true,
+      remediations: true,
+    },
+  },
+} satisfies Prisma.VulnerabilityInclude;
+
+export type VulnerabilityWithRelations = Prisma.VulnerabilityGetPayload<{
+  include: typeof vulnerabilityBySeverityInclude;
+}>;

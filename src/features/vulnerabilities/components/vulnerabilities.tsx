@@ -1,6 +1,5 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import {
   BugIcon,
@@ -21,8 +20,17 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { CopyCode } from "@/components/ui/code";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -30,14 +38,18 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
+import { Severity } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type {
   VulnerabilityWithDeviceGroups,
   VulnerabilityWithIssues,
 } from "@/lib/db";
+import { cn } from "@/lib/utils";
 import {
   useRemoveVulnerability,
   useSuspenseVulnerabilities,
@@ -48,25 +60,13 @@ import {
   useVulnerabilitiesBySeverityParams,
   useVulnerabilitiesParams,
 } from "../hooks/use-vulnerabilities-params";
+import type {
+  VulnerabilitiesBySeverityCounts,
+  VulnerabilityWithRelations,
+} from "../types";
 import { columns } from "./columns";
-import { VulnerabilityWithRelations } from "../server/routers";
-import { PrioritizedVulnerabilityDrawer } from "./vulnerability-drawer";
-import { CollapsibleDataTable } from "./table";
 import { issueColumns, prioritizedColumns } from "./prioritized-columns";
-
-import {
-  Card,
-  CardAction,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { QuestionTooltip } from "@/components/ui/question-tooltip";
-import { Severity } from "@/generated/prisma";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { VulnerabilitiesBySeverityCounts } from "../types";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PrioritizedVulnerabilityDrawer } from "./vulnerability-drawer";
 
 export const VulnerabilitiesSearch = () => {
   const [params, setParams] = useVulnerabilitiesParams();
@@ -244,7 +244,8 @@ export const PrioritizedVulnerabilitiesList = () => {
           </AlertDescription>
         </Alert>
       )}
-      <CollapsibleDataTable
+      <DataTable
+        search={<VulnerabilitiesSearch />}
         columns={prioritizedColumns}
         paginatedData={data}
         nestedColumns={issueColumns}

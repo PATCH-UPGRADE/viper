@@ -1,8 +1,8 @@
 "use client";
 
+import { parseAsStringEnum } from "nuqs";
 import { Severity } from "@/generated/prisma";
 import { createPaginationParams } from "@/lib/url-state";
-import { parseAsStringEnum } from "nuqs";
 
 export const vulnerabilitiesParams = createPaginationParams();
 

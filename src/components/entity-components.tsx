@@ -136,7 +136,7 @@ export const EntitySearch = ({
   placeholder = "Search",
 }: EntitySearchProps) => {
   return (
-    <div className="relative w-full max-w-md">
+    <div className="relative w-full">
       <SearchIcon className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
       <Input
         className="bg-background shadow-none border-border pl-8"

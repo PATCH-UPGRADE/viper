@@ -2,30 +2,27 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
+import { MoreVertical } from "lucide-react";
 import Link from "next/link";
-
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { SortableHeader } from "@/components/ui/data-table";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { QuestionTooltip } from "@/components/ui/question-tooltip";
-import { VulnerabilityWithRelations } from "../server/routers";
-
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MoreVertical } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { IssueStatusForm } from "@/features/issues/components/issue";
+import type { VulnerabilityWithRelations } from "../types";
 
 export const prioritizedColumns: ColumnDef<VulnerabilityWithRelations>[] = [
   {

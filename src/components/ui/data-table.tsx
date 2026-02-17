@@ -56,6 +56,10 @@ declare module "@tanstack/react-table" {
   }
 }
 
+// ---------------------------------------------------------------------------
+// SortableHeader
+// ---------------------------------------------------------------------------
+
 interface SortableHeaderProps<TData> {
   header: string;
   column: Column<TData>;
@@ -98,25 +102,37 @@ export function SortableHeader<TData>({
   );
 }
 
-interface DataTableProps<TData, TValue> {
+// ---------------------------------------------------------------------------
+// DataTable
+// ---------------------------------------------------------------------------
+
+interface DataTableProps<TData, TValue, TNestedData = any> {
   columns: ColumnDef<TData, TValue>[];
   paginatedData: PaginatedResponse<TData>;
   isLoading?: boolean;
   search?: React.ReactNode;
   rowOnclick?: (row: Row<TData>) => void;
+  /** When provided, rows become collapsible and render a nested table. */
+  nestedColumns?: ColumnDef<TNestedData, any>[];
+  /** Key on each row's data that holds the nested array. */
+  nestedDataKey?: keyof TData;
 }
 
-export function DataTable<TData, TValue>({
+export function DataTable<TData, TValue, TNestedData = any>({
   columns,
   paginatedData,
   isLoading,
   search,
   rowOnclick,
-}: DataTableProps<TData, TValue>) {
+  nestedColumns,
+  nestedDataKey,
+}: DataTableProps<TData, TValue, TNestedData>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [_params, setParams] = usePaginationParams();
   const [isPending, startTransition] = React.useTransition();
-
+  const [expandedRows, setExpandedRows] = React.useState<Set<string>>(
+    new Set(),
+  );
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
 
@@ -131,8 +147,6 @@ export function DataTable<TData, TValue>({
     const sortParam = sorting
       .map((s) => `${s.desc ? "-" : ""}${s.id}`)
       .join(",");
-
-    // Only update if sorting actually changed
     if (sortParam !== prevSortingRef.current) {
       prevSortingRef.current = sortParam;
       startTransition(() => {
@@ -148,19 +162,24 @@ export function DataTable<TData, TValue>({
     manualSorting: true,
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
-    state: {
-      sorting,
-      columnVisibility,
-      pagination,
-    },
-    //getPaginationRowModel: getPaginationRowModel(),
+    state: { sorting, columnVisibility, pagination },
     manualPagination: true,
     rowCount: paginatedData.totalCount,
   });
 
+  const hasNestedTable = nestedColumns && nestedDataKey;
+
+  const toggleRow = (rowId: string) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      next.has(rowId) ? next.delete(rowId) : next.add(rowId);
+      return next;
+    });
+  };
+
   return (
     <>
-      <div className="flex items-center py-4">
+      <div className="flex items-center py-4 gap-2">
         {search}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -172,72 +191,157 @@ export function DataTable<TData, TValue>({
             {table
               .getAllColumns()
               .filter((column) => column.getCanHide())
-              .map((column) => {
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) =>
-                      column.toggleVisibility(!!value)
-                    }
-                  >
-                    {column.columnDef.meta?.title || column.id}
-                  </DropdownMenuCheckboxItem>
-                );
-              })}
+              .map((column) => (
+                <DropdownMenuCheckboxItem
+                  key={column.id}
+                  className="capitalize"
+                  checked={column.getIsVisible()}
+                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                >
+                  {column.columnDef.meta?.title || column.id}
+                </DropdownMenuCheckboxItem>
+              ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
       <div className="overflow-hidden rounded-md border">
         <Table className="bg-background">
           <TableHeader className="bg-muted">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead
-                      key={header.id}
-                      className="py-2 first-of-type:pl-4 last-of-type:pr-4 text-muted-foreground"
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                    </TableHead>
-                  );
-                })}
+                {hasNestedTable && <TableHead className="w-12 py-2 pl-4" />}
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    className="py-2 first-of-type:pl-4 last-of-type:pr-4 text-muted-foreground"
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                  </TableHead>
+                ))}
               </TableRow>
             ))}
           </TableHeader>
+
           <TableBody className={isPending ? "opacity-50" : ""}>
             {!isLoading && table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  onClick={rowOnclick ? () => rowOnclick(row) : undefined}
-                  className={cn(rowOnclick ? "cursor-pointer" : "")}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className="py-4 first-of-type:pl-4 last-of-type:pr-4"
+              table.getRowModel().rows.map((row) => {
+                const nestedData = hasNestedTable
+                  ? (row.original[nestedDataKey] as TNestedData[])
+                  : [];
+                const hasNestedData =
+                  Array.isArray(nestedData) && nestedData.length > 0;
+                const isExpanded = expandedRows.has(row.id);
+
+                return (
+                  <React.Fragment key={row.id}>
+                    <TableRow
+                      data-state={row.getIsSelected() && "selected"}
+                      className={cn(rowOnclick ? "cursor-pointer" : "")}
                     >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
+                      {hasNestedTable && (
+                        <TableCell className="py-4 pl-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleRow(row.id)}
+                            className="h-8 w-8 p-0"
+                            disabled={!hasNestedData}
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
                       )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell
+                          key={cell.id}
+                          className="py-4 first-of-type:pl-4 last-of-type:pr-4"
+                          onClick={
+                            rowOnclick ? () => rowOnclick(row) : undefined
+                          }
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+
+                    {hasNestedTable && isExpanded && (
+                      <TableRow>
+                        <TableCell colSpan={columns.length + 1} className="p-0">
+                          <div className="overflow-x-auto pl-12 pr-4 py-4 bg-muted/50">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  {nestedColumns.map((column, index) => (
+                                    <TableHead key={index}>
+                                      {typeof column.header === "function"
+                                        ? column.header({
+                                            column: {} as any,
+                                            header: {} as any,
+                                            table: {} as any,
+                                          })
+                                        : column.header}
+                                    </TableHead>
+                                  ))}
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {hasNestedData ? (
+                                  nestedData.map((item, index) => (
+                                    <TableRow key={index}>
+                                      {nestedColumns.map((column, colIndex) => (
+                                        <TableCell key={colIndex}>
+                                          {typeof column.cell === "function"
+                                            ? column.cell({
+                                                row: { original: item } as any,
+                                                getValue: (() =>
+                                                  item) as () => any,
+                                                renderValue: (() =>
+                                                  item) as () => any,
+                                                cell: {} as any,
+                                                column: {} as any,
+                                                table: {} as any,
+                                              })
+                                            : null}
+                                        </TableCell>
+                                      ))}
+                                    </TableRow>
+                                  ))
+                                ) : (
+                                  <TableRow>
+                                    <TableCell
+                                      colSpan={nestedColumns.length}
+                                      className="text-center text-muted-foreground"
+                                    >
+                                      No nested data found
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={columns.length + (hasNestedTable ? 1 : 0)}
                   className="h-24 text-center"
                 >
                   {isLoading ? (
@@ -251,12 +355,17 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
+
       <div className="mt-2">
         <DataTablePagination table={table} />
       </div>
     </>
   );
 }
+
+// ---------------------------------------------------------------------------
+// DataTablePagination
+// ---------------------------------------------------------------------------
 
 interface DataTablePaginationProps<TData> {
   table: TableType<TData>;
@@ -268,27 +377,30 @@ export function DataTablePagination<TData>({
   const [params, setParams] = usePaginationParams();
 
   const handlePageSizeChange = React.useCallback(
-    (value: string) => {
-      setParams({ ...params, pageSize: Number(value), page: 1 });
-    },
+    (value: string) =>
+      setParams({ ...params, pageSize: Number(value), page: 1 }),
     [params, setParams],
   );
 
-  const handleFirstPage = React.useCallback(() => {
-    setParams({ ...params, page: 1 });
-  }, [params, setParams]);
+  const handleFirstPage = React.useCallback(
+    () => setParams({ ...params, page: 1 }),
+    [params, setParams],
+  );
 
-  const handlePreviousPage = React.useCallback(() => {
-    setParams({ ...params, page: params.page - 1 });
-  }, [params, setParams]);
+  const handlePreviousPage = React.useCallback(
+    () => setParams({ ...params, page: params.page - 1 }),
+    [params, setParams],
+  );
 
-  const handleNextPage = React.useCallback(() => {
-    setParams({ ...params, page: params.page + 1 });
-  }, [params, setParams]);
+  const handleNextPage = React.useCallback(
+    () => setParams({ ...params, page: params.page + 1 }),
+    [params, setParams],
+  );
 
-  const handleLastPage = React.useCallback(() => {
-    setParams({ ...params, page: table.getPageCount() });
-  }, [params, setParams, table]);
+  const handleLastPage = React.useCallback(
+    () => setParams({ ...params, page: table.getPageCount() }),
+    [params, setParams, table],
+  );
 
   return (
     <div className="flex items-center justify-end px-2">

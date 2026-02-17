@@ -3,7 +3,7 @@
 import { BugIcon, ChevronDown, ComputerIcon, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   EntityContainer,
   ErrorView,
@@ -18,16 +18,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AssetItem } from "@/features/assets/components/assets";
+import { locationSchema } from "@/features/assets/types";
 import { VulnerabilityItem } from "@/features/vulnerabilities/components/vulnerabilities";
 import { type Issue, IssueStatus } from "@/generated/prisma";
-import type { FullIssue } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import {
   useSuspenseIssue,
   useSuspenseIssuesById,
   useUpdateIssueStatus,
 } from "../hooks/use-issues";
-import { CopyCode } from "@/components/ui/code";
+import type { IssueWithRelations } from "../types";
 
 const statusDetails = {
   [IssueStatus.FALSE_POSITIVE]: {
@@ -59,7 +59,7 @@ export const IssueStatusForm = ({
   issue,
   className,
 }: {
-  issue: Issue | FullIssue;
+  issue: Issue | IssueWithRelations;
   className?: string;
 }) => {
   const [status, setStatus] = useState<IssueStatus>(issue.status);
@@ -155,38 +155,26 @@ export const IssuesSidebarList = ({
     ids: issues.map((i) => i.id),
     type,
   });
-  const issuesMap = issuesQuery.data.reduce<{ [key: string]: FullIssue }>(
-    (accumulator, currentObject) => {
-      accumulator[currentObject.id] = currentObject;
-      return accumulator;
-    },
-    {},
-  );
+  const issuesMap = issuesQuery.data.reduce<{
+    [key: string]: IssueWithRelations;
+  }>((acc, issue) => ({ ...acc, [issue.id]: issue }), {});
 
   if (issues.length === 0) return null;
 
   const assetId = issues[0].assetId;
-
   const isIssuesOverflow = issues.length > ACTIVE_ISSUES_SHOWN_MAX;
   const visibleIssues = issues.slice(
     0,
     isIssuesOverflow ? ACTIVE_ISSUES_SHOWN_MAX : issues.length,
   );
 
-  const nonActiveIssuesCount: { issueStatus: IssueStatus; count: number }[] =
-    [];
-  let showNonActiveIssueLinks = false;
-  for (const issueStatus of Object.values(IssueStatus)) {
-    if (issueStatus === IssueStatus.ACTIVE) {
-      continue;
-    }
-    const count = issues.filter((i) => i.status === issueStatus).length;
-    if (count === 0) {
-      continue;
-    }
-    nonActiveIssuesCount.push({ issueStatus, count });
-    showNonActiveIssueLinks = true;
-  }
+  const nonActiveIssuesCount = Object.values(IssueStatus)
+    .filter((status) => status !== IssueStatus.ACTIVE)
+    .map((issueStatus) => ({
+      issueStatus,
+      count: issues.filter((i) => i.status === issueStatus).length,
+    }))
+    .filter(({ count }) => count > 0);
 
   const Icon = type === "vulnerabilities" ? BugIcon : ComputerIcon;
 
@@ -196,136 +184,137 @@ export const IssuesSidebarList = ({
         Active Issues
       </h4>
       <ul className="flex flex-col gap-2">
-        {visibleIssues.map((issue) => (
-          <li
-            key={issue.id}
-            className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer hover:bg-muted transition-all"
-            onClick={() => router.push(`/issues/${issue.id}`)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                router.push(`/issues/${issue.id}`);
-              }
-            }}
-          >
-            <Icon
-              className={cn(
-                "min-w-4 min-h-4 h-4 w-4",
-                type === "vulnerabilities" ? "text-destructive" : "",
-              )}
-              size={16}
-            />
-            {type === "vulnerabilities" ? (
-              <div className="text-xs flex-1">
-                <p className="font-semibold mb-2">
-                  {issuesMap[issue.id].vulnerability?.description}
-                </p>
-                <IssueStatusForm issue={issue} />
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-col gap-1">
-                  <p className="font-semibold">
-                    {issuesMap[issue.id].asset?.role}
-                  </p>
-                  {issuesMap[issue.id].asset?.location && (
-                    <p className="text-xs text-muted-foreground">
-                      {[
-                        issuesMap[issue.id].asset?.location?.facility,
-                        issuesMap[issue.id].asset?.location?.building,
-                        issuesMap[issue.id].asset?.location?.floor,
-                        issuesMap[issue.id].asset?.location?.room,
-                      ]
-                        .filter(Boolean)
-                        .join(" • ")}
-                    </p>
-                  )}
-                </div>
-                <IssueStatusForm className="ml-auto" issue={issue} />
-              </>
-            )}
+        {visibleIssues.map((issue) => {
+          const issueData = issuesMap[issue.id];
+          const asset = issueData.asset;
+          const location = asset?.location
+            ? locationSchema.parse(asset.location)
+            : null;
+          const locationParts = [
+            location?.facility,
+            location?.building,
+            location?.floor,
+            location?.room,
+          ].filter(Boolean);
 
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                asChild
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[200px]">
-                <DropdownMenuItem
-                  onClick={(e) => e.stopPropagation()}
-                  className="cursor-pointer"
+          return (
+            <li
+              key={issue.id}
+              className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer hover:bg-muted transition-all"
+              onClick={() => router.push(`/issues/${issue.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  router.push(`/issues/${issue.id}`);
+                }
+              }}
+            >
+              <Icon
+                className={cn(
+                  "min-w-4 min-h-4 h-4 w-4",
+                  type === "vulnerabilities" ? "text-destructive" : "",
+                )}
+                size={16}
+              />
+              {type === "vulnerabilities" ? (
+                <div className="text-xs flex-1">
+                  <p className="font-semibold mb-2">
+                    {issueData.vulnerability?.description}
+                  </p>
+                  <IssueStatusForm issue={issue} />
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <p className="font-semibold">{asset?.role}</p>
+                    {locationParts.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {locationParts.join(" • ")}
+                      </p>
+                    )}
+                  </div>
+                  <IssueStatusForm className="ml-auto" issue={issue} />
+                </>
+              )}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger
                   asChild
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Link href={`/issues/${issue.id}`}>Go to Issue Details</Link>
-                </DropdownMenuItem>
-                {type === "vulnerabilities" && (
+                  <Button variant="ghost" className="h-8 w-8 p-0">
+                    <span className="sr-only">Open menu</span>
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[200px]">
                   <DropdownMenuItem
                     onClick={(e) => e.stopPropagation()}
                     className="cursor-pointer"
                     asChild
                   >
-                    <Link href={`/vulnerabilities/${issue.vulnerabilityId}`}>
-                      Go to Vulnerability Details
+                    <Link href={`/issues/${issue.id}`}>
+                      Go to Issue Details
                     </Link>
                   </DropdownMenuItem>
-                )}
-                {type === "assets" && (
-                  <DropdownMenuItem
-                    onClick={(e) => e.stopPropagation()}
-                    className="cursor-pointer"
-                    asChild
-                  >
-                    <Link href={`/assets/${issue.assetId}`}>
-                      Go to Asset Details
-                    </Link>
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </li>
-        ))}
+                  {type === "vulnerabilities" && (
+                    <DropdownMenuItem
+                      onClick={(e) => e.stopPropagation()}
+                      className="cursor-pointer"
+                      asChild
+                    >
+                      <Link href={`/vulnerabilities/${issue.vulnerabilityId}`}>
+                        Go to Vulnerability Details
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {type === "assets" && (
+                    <DropdownMenuItem
+                      onClick={(e) => e.stopPropagation()}
+                      className="cursor-pointer"
+                      asChild
+                    >
+                      <Link href={`/assets/${issue.assetId}`}>
+                        Go to Asset Details
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </li>
+          );
+        })}
       </ul>
 
       {isIssuesOverflow && (
-        <div className="flex flex-col gap-2 pt-2">
-          <div className="flex justify-between">
-            <p>
-              Viewing {ACTIVE_ISSUES_SHOWN_MAX} of {issues.length} Active Issues
-            </p>
-            <Link
-              className="text-primary hover:underline"
-              target="_blank"
-              rel="noopener noreferrer"
-              href={`/assets/${assetId}`}
-            >
-              View All Active Issues
-            </Link>
-          </div>
+        <div className="flex justify-between pt-2">
+          <p>
+            Viewing {ACTIVE_ISSUES_SHOWN_MAX} of {issues.length} Active Issues
+          </p>
+          <Link
+            className="text-primary hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
+            href={`/assets/${assetId}`}
+          >
+            View All Active Issues
+          </Link>
         </div>
       )}
 
-      {showNonActiveIssueLinks && (
+      {nonActiveIssuesCount.length > 0 && (
         <div className="flex flex-col gap-2 pt-2">
           <h5 className="font-bold">Non-Active Issues</h5>
-
-          {nonActiveIssuesCount.map((statusCountTuple, i) => (
+          {nonActiveIssuesCount.map(({ issueStatus, count }) => (
             <Link
-              key={i}
+              key={issueStatus}
               className="text-primary hover:underline"
               target="_blank"
               rel="noopener noreferrer"
-              href={`/assets/${assetId}?issueStatus=${statusCountTuple.issueStatus}`}
+              href={`/assets/${assetId}?issueStatus=${issueStatus}`}
             >
-              View {statusCountTuple.count}{" "}
-              {statusDetails[statusCountTuple.issueStatus].name} Issue
-              {statusCountTuple.count > 1 ? "s" : ""}
+              View {count} {statusDetails[issueStatus].name} Issue
+              {count > 1 ? "s" : ""}
             </Link>
           ))}
         </div>

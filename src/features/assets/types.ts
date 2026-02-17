@@ -15,7 +15,7 @@ import {
 
 const assetStatusSchema = z.enum(Object.values(AssetStatus));
 
-const locationSchema = z.object({
+export const locationSchema = z.object({
   facility: z.string().optional(),
   building: z.string().optional(),
   floor: z.string().optional(),

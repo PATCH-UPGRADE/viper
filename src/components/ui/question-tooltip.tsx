@@ -1,8 +1,8 @@
-import { cn } from "@/lib/utils";
-import type { PropsWithChildren } from "react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
-import { Button } from "./button";
 import { CircleQuestionMark } from "lucide-react";
+import type { PropsWithChildren } from "react";
+import { cn } from "@/lib/utils";
+import { Button } from "./button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 
 export function QuestionTooltip({
   className,

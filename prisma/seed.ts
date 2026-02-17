@@ -1,8 +1,8 @@
 import { hashPassword } from "better-auth/crypto";
 import {
-  Severity,
   type ArtifactType,
   type AssetStatus,
+  Severity,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 

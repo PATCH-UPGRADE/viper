@@ -112,16 +112,73 @@ export const remediationsRouter = createTRPCRouter({
         path: "/remediations",
         tags: ["Remediations"],
         summary: "Create Remediation",
-        description:
-          "Create a new remediation. The authenticated user will be recorded as the creator.",
+        description: `
+          Create a new remediation. The authenticated user will be recorded as the creator. 
+          
+          **Artifact hosting**
+          If you POST an artifact with a 'hash' (Base64 MD5) and 'size' (in bytes) but no 'downloadUrl', Viper will assume that you want it to host the artifact.
+          1. An S3 storage path will be created for your artifact.
+          2. This POST will return a presigned 'uploadUrl' and a 'requiredHeader' (Base64 MD5).
+          3. Use these values to PUT the file to S3 with the appropriate headers.
+
+          **Sample CURL command**
+          curl -i -X PUT \
+          -T "<myfile.ext>" \
+          -H "Content-Type: application/octet-stream" \
+          -H "Content-MD5: <requiredHeader>" \
+          "<uploadUrl>"
+
+          **For programmatic uploads, you may want to do something like:**
+
+          fetch(uploadUrl, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/octet-stream",
+              "Content-MD5": requiredHeader
+            },
+            body: yourFileBlob
+          });
+          
+          `.trim()
       },
     })
-    .output(remediationResponseSchema)
+    .output(remediationUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const { cpes, artifacts, ...dataInput } = input;
       const uniqueCpes = [...new Set(cpes)];
       const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
       const userId = ctx.auth.user.id;
+      
+      // Handle S3 URL -- if the user included a hash/size but no downloadUrl, they want us to host it
+      const uploadInstructions: {
+        artifactName: string;
+        uploadUrl: string;
+        requiredHeader: string;
+      }[] = [];
+
+      const processedArtifacts = await Promise.all(
+        artifacts.map(async (art) => {
+          if (art.hash && art.size && !art.downloadUrl) {
+            const { uploadUrl, s3Key, requiredHeader } = await generateUploadUrl(
+              art.name ?? "artifact",
+              art.hash,
+              art.size
+            );
+            uploadInstructions.push({
+              artifactName: art.name ?? "artifact",
+              uploadUrl,
+              requiredHeader,
+            })
+
+            return {
+              ...art,
+              downloadUrl: buildDownloadUrl(s3Key),
+            };
+          }
+            // Do nothing if a downloadUrl was already provided (they are hosting it, not us)
+            return art;
+        })
+      );
 
       // Verify the vulnerability exists
       if (input.vulnerabilityId) {
@@ -152,19 +209,28 @@ export const remediationsRouter = createTRPCRouter({
         // Create a wrapper and artifact for each input artifact
         await createArtifactWrappers(
           tx,
-          artifacts,
+          processedArtifacts,
           remediation.id,
           "remediationId",
           userId,
         );
 
         // Fetch the complete remediation with includes
-        return tx.remediation.findUniqueOrThrow({
+        const data = await tx.remediation.findUniqueOrThrow({
           where: { id: remediation.id },
           include: remediationInclude,
         });
+
+        return {
+          data,
+          uploadInstructions
+        }
       });
-      return transformArtifactWrapper(result);
+
+      return {
+        remediation: transformArtifactWrapper(result.data),
+        uploadInstructions: uploadInstructions,
+      };
     }),
 
   // DELETE /api/remediations/{id} - Delete remediation (only creator can delete)

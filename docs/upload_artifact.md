@@ -6,10 +6,10 @@
 
 1. Ensure that you have generated a Viper API key and can call its endpoints.
 
-2. Obtain the size (in bytes) and MD5 hash of the file you wish to upload. Here's an example of how that might be done: 
+2. Obtain the size (in bytes) and Base64 MD5 hash of the file you wish to upload. Here's an example of how that might be done: 
     - SIZE:
         - `stat -c %s vw61-architecture.drawio`
-    - MD5 Hash:
+    - Base64 MD5 Hash:
         - `md5_hash=$(openssl dgst -md5 -binary vw61-architecture.drawio | openssl enc -base64) && echo $md5_hash` 
 
 3. POST against the Viper /remediations API endpoint and include both an artifact hash and the size (in bytes), but *NOT* a downloadUrl

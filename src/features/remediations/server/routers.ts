@@ -116,6 +116,8 @@ export const remediationsRouter = createTRPCRouter({
           Create a new remediation. The authenticated user will be recorded as the creator. 
           
           **Artifact hosting**
+          See docs/upload_artifact.md
+          
           If you POST an artifact with a 'hash' (Base64 MD5) and 'size' (in bytes) but no 'downloadUrl', Viper will assume that you want it to host the artifact.
           1. An S3 storage path will be created for your artifact.
           2. This POST will return a presigned 'uploadUrl' and a 'requiredHeader' (Base64 MD5).

@@ -34,3 +34,7 @@ export async function generateUploadUrl(fileName: string, hash: string, size: nu
     return { uploadUrl, s3Key, requiredHeader: normalized_hash }
 
 }
+
+export function buildDownloadUrl(key: string): string {
+    return `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
+}

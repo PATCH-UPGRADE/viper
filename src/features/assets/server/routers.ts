@@ -20,7 +20,7 @@ import {
   userSchema,
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership } from "@/trpc/middleware";
+import { requireExistence, requireOwnership } from "@/trpc/middleware";
 
 const AssetStatus = z.enum(["Active", "Decommissioned", "Maintenance"]);
 
@@ -283,10 +283,11 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetResponseSchema)
     .query(async ({ input }) => {
-      return prisma.asset.findUniqueOrThrow({
+      const asset = await prisma.asset.findUnique({
         where: { id: input.id },
         include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
       });
+      return requireExistence(asset, "Asset");
     }),
 
   // POST /api/assets - Create asset

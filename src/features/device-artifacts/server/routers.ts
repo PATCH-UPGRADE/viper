@@ -23,7 +23,7 @@ import {
   userSchema,
 } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership } from "@/trpc/middleware";
+import { requireExistence, requireOwnership } from "@/trpc/middleware";
 
 const deviceArtifactInputSchema = z.object({
   cpe: cpeSchema,
@@ -195,11 +195,11 @@ export const deviceArtifactsRouter = createTRPCRouter({
     })
     .output(deviceArtifactResponseSchema)
     .query(async ({ input }) => {
-      const deviceArtifact = await prisma.deviceArtifact.findUniqueOrThrow({
+      const dA = await prisma.deviceArtifact.findUnique({
         where: { id: input.id },
         include: deviceArtifactInclude,
       });
-      return transformArtifactWrapper(deviceArtifact);
+      return transformArtifactWrapper(requireExistence(dA, "DeviceArtifacts"));
     }),
 
   // POST /api/deviceArtifacts - Create deviceArtifact

@@ -8,7 +8,7 @@ import {
 import { fetchPaginated } from "@/lib/router-utils";
 import { artifactInputSchema, artifactWithUrlsSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership } from "@/trpc/middleware";
+import { requireExistence, requireOwnership } from "@/trpc/middleware";
 
 const artifactUpdateSchema = z.object({
   id: z.string(),
@@ -64,9 +64,11 @@ export const artifactsRouter = createTRPCRouter({
     })
     .output(artifactWithUrlsSchema)
     .query(async ({ input }) => {
-      return prisma.artifact.findUniqueOrThrow({
+      const artifact = prisma.artifact.findUnique({
         where: { id: input.id },
       });
+      requireExistence(artifact, "artifact");
+      return artifact;
     }),
 
   // PUT /api/artifacts/{id} - Update artifact metadata

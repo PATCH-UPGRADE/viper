@@ -99,3 +99,5 @@
      -H "Content-MD5: WknCHrZ5WeXj1IimWmsSMQ==" \
      "https://northeasterntest0226.s3.us-east-1.amazonaws.com/artifacts/e4b437fa-1b29-40a1-ba37-cefe2d28d2b1-vw61-architecture.drawio?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIAS54JWPVTND4BLWNO%2F20260217%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260217T205304Z&X-Amz-Expires=3600&X-Amz-Signature=509498cb3e7074a6bad312a4809dcf1d56f9d0d45aa85becc5308ab54ec27474&X-Amz-SignedHeaders=content-length%3Bcontent-md5%3Bhost&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject"
     ```
+
+5. Once the artifact is uploaded, go to Viper -> Remediations and test the link to your new remediation artifact.

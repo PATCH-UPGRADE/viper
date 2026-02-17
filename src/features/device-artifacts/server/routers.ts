@@ -199,7 +199,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
         where: { id: input.id },
         include: deviceArtifactInclude,
       });
-      return transformArtifactWrapper(requireExistence(dA, "DeviceArtifacts"));
+      return transformArtifactWrapper(requireExistence(dA, "DeviceArtifact"));
     }),
 
   // POST /api/deviceArtifacts - Create deviceArtifact

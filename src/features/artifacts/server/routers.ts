@@ -64,11 +64,10 @@ export const artifactsRouter = createTRPCRouter({
     })
     .output(artifactWithUrlsSchema)
     .query(async ({ input }) => {
-      const artifact = prisma.artifact.findUnique({
+      const artifact = await prisma.artifact.findUnique({
         where: { id: input.id },
       });
-      requireExistence(artifact, "artifact");
-      return artifact;
+      return requireExistence(artifact, "Artifact");
     }),
 
   // PUT /api/artifacts/{id} - Update artifact metadata

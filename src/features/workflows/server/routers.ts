@@ -17,10 +17,10 @@ export const workflowsRouter = createTRPCRouter({
   execute: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const workflow = await prisma.workflow.findUnique({
+      const workflowOrNull = await prisma.workflow.findUnique({
         where: { id: input.id, userId: ctx.auth.user.id },
       });
-      requireExistence(workflow, "workflow");
+      const workflow = requireExistence(workflowOrNull, "Workflow");
       await inngest.send({
         name: "workflows/execute.workflow",
         data: { workflowId: input.id },
@@ -77,11 +77,11 @@ export const workflowsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { id, nodes, edges } = input;
 
-      const workflow = await prisma.workflow.findUnique({
+      const workflowOrNull = await prisma.workflow.findUnique({
         where: { id },
       });
 
-      requireExistence(workflow, "workflow");
+      const workflow = requireExistence(workflowOrNull, "Workflow");
 
       // Transaction to ensure consistency
       return await prisma.$transaction(async (tx) => {
@@ -138,7 +138,7 @@ export const workflowsRouter = createTRPCRouter({
         include: { nodes: true, connections: true },
       });
 
-      const workflow = requireExistence(workflowOrNull, "workflow");
+      const workflow = requireExistence(workflowOrNull, "Workflow");
 
       // Transform server nodes to react-flow compatible nodes
       const nodes: Node[] = workflow.nodes.map((node) => ({

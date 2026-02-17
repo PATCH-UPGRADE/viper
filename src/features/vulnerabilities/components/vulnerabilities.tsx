@@ -64,8 +64,9 @@ import {
 } from "@/components/ui/card";
 import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import { Severity } from "@/generated/prisma";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VulnerabilitiesBySeverityCounts } from "../types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const VulnerabilitiesSearch = () => {
   const [params, setParams] = useVulnerabilitiesParams();
@@ -119,24 +120,38 @@ const SeveritiesExplained = {
     icon: ShieldAlert,
     color: "text-red-600",
     colorBg: "bg-red-50",
+    alertHeader: "Critical - Immediate Remediation",
+    // NOTE: / TODO: This description doesn't match the "Critical" definition of CVSS, but it's in line with VW-75
+    alertBody:
+      "These vulnerabilities have confirmed exploitation of high-impact systems and require immediate action. They pose the highest risk to patient safety and data security.",
   },
   High: {
     help: "Scheduled remediation required. Predicted exploitation of high-impact vulnerabilities.",
     icon: ShieldClose,
     color: "text-orange-600",
     colorBg: "bg-orange-50",
+    alertHeader: "High - Scheduled Remediation",
+    // NOTE: / TODO: This description doesn't match the "High" definition of CVSS, but it's in line with VW-75
+    alertBody:
+      "These vulnerabilities indicate predicted exploitation of high-impact systems. Plan and schedule remediation activities within your next maintenance window.",
   },
   Medium: {
-    help: "Scheduled remediation required. Predicted exploitation of high-impact vulnerabilities.",
+    help: "Track for changes in threat landscape or impact assessment.",
     icon: Eye,
     color: "text-yellow-600",
     colorBg: "bg-yellow-50",
+    alertHeader: "",
+    alertBody: "",
+    //TODO: VW-75 change to Monitor
   },
   Low: {
-    help: "Scheduled remediation required. Predicted exploitation of high-impact vulnerabilities.",
+    help: "Standard patching. No exploitation evidence, can be addressed through standard patching cycles.",
     icon: Clock,
     color: "text-blue-600",
     colorBg: "bg-blue-50",
+    alertHeader: "",
+    alertBody: "",
+    //TODO: VW-75 change to Defer
   },
 };
 
@@ -196,6 +211,9 @@ export const PrioritizedVulnerabilitiesList = () => {
     setParams((prev) => ({ ...prev, severity: value as Severity }));
   };
 
+  const explained =
+    SeveritiesExplained[severity as keyof typeof SeveritiesExplained];
+
   return (
     <>
       <VulnerabilitiesBySeverityMetrics data={counts} />
@@ -217,6 +235,14 @@ export const PrioritizedVulnerabilitiesList = () => {
           open={drawerOpen}
           setOpen={setDrawerOpen}
         />
+      )}
+      {explained.alertBody && explained.alertHeader && (
+        <Alert className={explained.colorBg}>
+          {<explained.icon className={explained.color} />}
+          <AlertDescription className="text-foreground">
+            <strong>{explained.alertHeader}</strong> {explained.alertBody}.
+          </AlertDescription>
+        </Alert>
       )}
       <CollapsibleDataTable
         columns={prioritizedColumns}

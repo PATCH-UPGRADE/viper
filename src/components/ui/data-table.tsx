@@ -78,7 +78,7 @@ export function SortableHeader<TData>({
       variant="link"
       className="text-muted-foreground px-0!"
       onClick={() => column.toggleSorting(undefined, true)}
-      aria-label={`Sort by ${header}${sorted ? (isAscending ? ", sorted ascending" : ", sorted descending") : ""}`}
+      aria-label={`Sort by ${header}${sorted ? (isAscending ? ", ascending" : ", descending") : ""}`}
     >
       {header}
       {sorted ? (
@@ -122,7 +122,7 @@ function NestedTable<TNestedData, TNestedValue>({
   });
 
   return (
-    <Table>
+    <Table aria-label="Nested details">
       <TableHeader>
         {table.getHeaderGroups().map((headerGroup) => (
           <TableRow key={headerGroup.id}>
@@ -259,7 +259,7 @@ export function DataTable<
 
   return (
     <>
-      <div className="flex items-center py-4">
+      <div className="flex items-center py-4 gap-2">
         {search}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -344,9 +344,9 @@ export function DataTable<
                             aria-expanded={isExpanded}
                           >
                             {isExpanded ? (
-                              <ChevronDown className="h-4 w-4" />
+                              <ChevronDown className="h-4 w-4" aria-hidden="true" />
                             ) : (
-                              <ChevronRight className="h-4 w-4" />
+                              <ChevronRight className="h-4 w-4" aria-hidden="true" />
                             )}
                           </Button>
                         </TableCell>

@@ -1,6 +1,6 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
-import { type Prisma, Severity } from "@/generated/prisma";
+import { type Prisma, Priority, Severity } from "@/generated/prisma";
 import {
   createPaginatedResponseSchema,
   paginationInputSchema,
@@ -76,13 +76,13 @@ export const integrationVulnerabilityInputSchema = createIntegrationInputSchema(
   vulnerabilityInputSchema,
 );
 
-export type VulnerabilitiesBySeverityCounts = inferOutput<
-  typeof trpc.vulnerabilities.getSeverityMetricsInternal
+export type VulnerabilitiesByPriorityCounts = inferOutput<
+  typeof trpc.vulnerabilities.getPriorityMetricsInternal
 >;
 
-export const vulnerabilitiesBySeverityInputSchema =
+export const vulnerabilitiesByPriorityInputSchema =
   paginationInputSchema.extend({
-    severity: z.enum(Object.values(Severity)),
+    priority: z.enum(Object.values(Priority)),
   });
 
 export const vulnerabilityInclude = {
@@ -90,7 +90,7 @@ export const vulnerabilityInclude = {
   affectedDeviceGroups: deviceGroupSelect,
 };
 
-export const vulnerabilityBySeverityInclude = {
+export const vulnerabilityByPriorityInclude = {
   user: userIncludeSelect,
   affectedDeviceGroups: deviceGroupSelect,
   issues: {
@@ -123,5 +123,5 @@ export const vulnerabilityBySeverityInclude = {
 } satisfies Prisma.VulnerabilityInclude;
 
 export type VulnerabilityWithRelations = Prisma.VulnerabilityGetPayload<{
-  include: typeof vulnerabilityBySeverityInclude;
+  include: typeof vulnerabilityByPriorityInclude;
 }>;

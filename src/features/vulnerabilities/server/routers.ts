@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Severity } from "@/generated/prisma";
+import { Priority } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
@@ -13,10 +13,10 @@ import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   integrationVulnerabilityInputSchema,
   paginatedVulnerabilityResponseSchema,
-  vulnerabilitiesBySeverityInputSchema,
+  vulnerabilitiesByPriorityInputSchema,
   vulnerabilityArrayInputSchema,
   vulnerabilityArrayResponseSchema,
-  vulnerabilityBySeverityInclude,
+  vulnerabilityByPriorityInclude,
   vulnerabilityInclude,
   vulnerabilityInputSchema,
   vulnerabilityResponseSchema,
@@ -362,15 +362,14 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       });
     }),
 
-  getManyBySeverityInternal: protectedProcedure
-    .input(vulnerabilitiesBySeverityInputSchema)
+  getManyByPriorityInternal: protectedProcedure
+    .input(vulnerabilitiesByPriorityInputSchema)
     .query(async ({ input }) => {
-      const { severity, ...pagination } = input;
+      const { priority, ...pagination } = input;
       const { search } = pagination;
 
-      // Build where clause
       const where = {
-        severity: severity as Severity,
+        priority: priority as Priority,
         ...(search && {
           OR: [
             { cveId: { contains: search, mode: "insensitive" as const } },
@@ -381,47 +380,46 @@ export const vulnerabilitiesRouter = createTRPCRouter({
 
       return fetchPaginated(prisma.vulnerability, pagination, {
         where,
-        include: vulnerabilityBySeverityInclude,
+        include: vulnerabilityByPriorityInclude,
       });
     }),
 
-  getSeverityMetricsInternal: protectedProcedure.query(async () => {
+  getPriorityMetricsInternal: protectedProcedure.query(async () => {
     const [totalCounts, withRemediationCounts] = await Promise.all([
       prisma.vulnerability.groupBy({
-        by: ["severity"],
-        _count: { severity: true },
+        by: ["priority"],
+        _count: { priority: true },
       }),
       prisma.vulnerability.groupBy({
-        by: ["severity"],
+        by: ["priority"],
         where: {
           remediations: { some: {} },
         },
-        _count: { severity: true },
+        _count: { priority: true },
       }),
     ]);
 
     const totals = Object.fromEntries(
-      totalCounts.map((item) => [item.severity, item._count.severity]),
+      totalCounts.map((item) => [item.priority, item._count.priority]),
     );
 
     const withRemediations = Object.fromEntries(
       withRemediationCounts.map((item) => [
-        item.severity,
-        item._count.severity,
+        item.priority,
+        item._count.priority,
       ]),
     );
 
-    // Ensure all severity levels are present
-    return Object.values(Severity).reduce(
-      (acc, severity) => {
-        const key = severity;
+    return Object.values(Priority).reduce(
+      (acc, priority) => {
+        const key = priority;
         acc[key] = {
           total: totals[key] ?? 0,
           withRemediations: withRemediations[key] ?? 0,
         };
         return acc;
       },
-      {} as Record<Severity, { total: number; withRemediations: number }>,
+      {} as Record<Priority, { total: number; withRemediations: number }>,
     );
   }),
 });

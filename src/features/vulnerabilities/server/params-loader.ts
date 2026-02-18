@@ -1,11 +1,11 @@
 import { createLoader } from "nuqs/server";
 import {
-  vulnerabilitiesBySeverityParams,
+  vulnerabilitiesByPriorityParams,
   vulnerabilitiesParams,
 } from "../params";
 
 export const vulnerabilitiesParamsLoader = createLoader(vulnerabilitiesParams);
 
-export const vulnerabilitiesBySeverityParamsLoader = createLoader(
-  vulnerabilitiesBySeverityParams,
+export const vulnerabilitiesByPriorityParamsLoader = createLoader(
+  vulnerabilitiesByPriorityParams,
 );

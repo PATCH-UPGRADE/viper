@@ -4,13 +4,13 @@ import {
   VulnerabilitiesError,
   VulnerabilitiesLoading,
 } from "@/features/vulnerabilities/components/vulnerabilities";
-import { vulnerabilitiesBySeverityParamsLoader } from "@/features/vulnerabilities/server/params-loader";
-import { prefetchVulnerabilitiesBySeverity } from "@/features/vulnerabilities/server/prefetch";
+import { vulnerabilitiesByPriorityParamsLoader } from "@/features/vulnerabilities/server/params-loader";
+import { prefetchVulnerabilitiesByPriority } from "@/features/vulnerabilities/server/prefetch";
 import { createListPage } from "@/lib/page-factory";
 
 export default createListPage({
-  paramsLoader: vulnerabilitiesBySeverityParamsLoader,
-  prefetch: prefetchVulnerabilitiesBySeverity,
+  paramsLoader: vulnerabilitiesByPriorityParamsLoader,
+  prefetch: prefetchVulnerabilitiesByPriority,
   Container: VulnerabilitiesContainer,
   List: PrioritizedVulnerabilitiesList,
   Loading: VulnerabilitiesLoading,

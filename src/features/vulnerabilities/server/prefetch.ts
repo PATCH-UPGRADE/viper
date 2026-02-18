@@ -10,12 +10,12 @@ export const prefetchVulnerabilities = (params: Input) => {
   return prefetch(trpc.vulnerabilities.getMany.queryOptions(params));
 };
 
-type InputBySeverity = inferInput<
-  typeof trpc.vulnerabilities.getManyBySeverityInternal
+type InputByPriority = inferInput<
+  typeof trpc.vulnerabilities.getManyByPriorityInternal
 >;
-export const prefetchVulnerabilitiesBySeverity = (params: InputBySeverity) => {
+export const prefetchVulnerabilitiesByPriority = (params: InputByPriority) => {
   return prefetch(
-    trpc.vulnerabilities.getManyBySeverityInternal.queryOptions(params),
+    trpc.vulnerabilities.getManyByPriorityInternal.queryOptions(params),
   );
 };
 

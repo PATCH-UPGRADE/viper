@@ -10,7 +10,7 @@ import {
   transformArtifactWrapper,
 } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership, requireExistence } from "@/trpc/middleware";
+import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   paginatedRemediationResponseSchema,
   remediationInclude,

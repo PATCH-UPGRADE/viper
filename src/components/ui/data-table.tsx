@@ -103,22 +103,96 @@ export function SortableHeader<TData>({
 }
 
 // ---------------------------------------------------------------------------
+// NestedTable — owns a real useReactTable instance so all renderers get
+// proper context (column.id, getValue(), toggleSorting(), etc.)
+// ---------------------------------------------------------------------------
+
+interface NestedTableProps<TNestedData, TNestedValue> {
+  columns: ColumnDef<TNestedData, TNestedValue>[];
+  data: TNestedData[];
+}
+
+function NestedTable<TNestedData, TNestedValue>({
+  columns,
+  data,
+}: NestedTableProps<TNestedData, TNestedValue>) {
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  return (
+    <Table>
+      <TableHeader>
+        {table.getHeaderGroups().map((headerGroup) => (
+          <TableRow key={headerGroup.id}>
+            {headerGroup.headers.map((header) => (
+              <TableHead key={header.id}>
+                {header.isPlaceholder
+                  ? null
+                  : flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )}
+              </TableHead>
+            ))}
+          </TableRow>
+        ))}
+      </TableHeader>
+      <TableBody>
+        {table.getRowModel().rows.length ? (
+          table.getRowModel().rows.map((row) => (
+            <TableRow key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))
+        ) : (
+          <TableRow>
+            <TableCell
+              colSpan={columns.length}
+              className="text-center text-muted-foreground"
+            >
+              No data found
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // DataTable
 // ---------------------------------------------------------------------------
 
-interface DataTableProps<TData, TValue, TNestedData = any> {
+interface DataTableProps<
+  TData,
+  TValue,
+  TNestedData = unknown,
+  TNestedValue = unknown,
+> {
   columns: ColumnDef<TData, TValue>[];
   paginatedData: PaginatedResponse<TData>;
   isLoading?: boolean;
   search?: React.ReactNode;
   rowOnclick?: (row: Row<TData>) => void;
   /** When provided, rows become collapsible and render a nested table. */
-  nestedColumns?: ColumnDef<TNestedData, any>[];
+  nestedColumns?: ColumnDef<TNestedData, TNestedValue>[];
   /** Key on each row's data that holds the nested array. */
   nestedDataKey?: keyof TData;
 }
 
-export function DataTable<TData, TValue, TNestedData = any>({
+export function DataTable<
+  TData,
+  TValue,
+  TNestedData = unknown,
+  TNestedValue = unknown,
+>({
   columns,
   paginatedData,
   isLoading,
@@ -126,7 +200,7 @@ export function DataTable<TData, TValue, TNestedData = any>({
   rowOnclick,
   nestedColumns,
   nestedDataKey,
-}: DataTableProps<TData, TValue, TNestedData>) {
+}: DataTableProps<TData, TValue, TNestedData, TNestedValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [_params, setParams] = usePaginationParams();
   const [isPending, startTransition] = React.useTransition();
@@ -179,7 +253,7 @@ export function DataTable<TData, TValue, TNestedData = any>({
 
   return (
     <>
-      <div className="flex items-center py-4 gap-2">
+      <div className="flex items-center py-4">
         {search}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -243,6 +317,7 @@ export function DataTable<TData, TValue, TNestedData = any>({
                     <TableRow
                       data-state={row.getIsSelected() && "selected"}
                       className={cn(rowOnclick ? "cursor-pointer" : "")}
+                      onClick={rowOnclick ? () => rowOnclick(row) : undefined}
                     >
                       {hasNestedTable && (
                         <TableCell className="py-4 pl-4">
@@ -252,6 +327,12 @@ export function DataTable<TData, TValue, TNestedData = any>({
                             onClick={() => toggleRow(row.id)}
                             className="h-8 w-8 p-0"
                             disabled={!hasNestedData}
+                            aria-label={
+                              isExpanded
+                                ? "Collapse nested data"
+                                : "Expand nested data"
+                            }
+                            aria-expanded={isExpanded}
                           >
                             {isExpanded ? (
                               <ChevronDown className="h-4 w-4" />
@@ -265,9 +346,6 @@ export function DataTable<TData, TValue, TNestedData = any>({
                         <TableCell
                           key={cell.id}
                           className="py-4 first-of-type:pl-4 last-of-type:pr-4"
-                          onClick={
-                            rowOnclick ? () => rowOnclick(row) : undefined
-                          }
                         >
                           {flexRender(
                             cell.column.columnDef.cell,
@@ -281,56 +359,10 @@ export function DataTable<TData, TValue, TNestedData = any>({
                       <TableRow>
                         <TableCell colSpan={columns.length + 1} className="p-0">
                           <div className="overflow-x-auto pl-12 pr-4 py-4 bg-muted/50">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  {nestedColumns.map((column, index) => (
-                                    <TableHead key={index}>
-                                      {typeof column.header === "function"
-                                        ? column.header({
-                                            column: {} as any,
-                                            header: {} as any,
-                                            table: {} as any,
-                                          })
-                                        : column.header}
-                                    </TableHead>
-                                  ))}
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {hasNestedData ? (
-                                  nestedData.map((item, index) => (
-                                    <TableRow key={index}>
-                                      {nestedColumns.map((column, colIndex) => (
-                                        <TableCell key={colIndex}>
-                                          {typeof column.cell === "function"
-                                            ? column.cell({
-                                                row: { original: item } as any,
-                                                getValue: (() =>
-                                                  item) as () => any,
-                                                renderValue: (() =>
-                                                  item) as () => any,
-                                                cell: {} as any,
-                                                column: {} as any,
-                                                table: {} as any,
-                                              })
-                                            : null}
-                                        </TableCell>
-                                      ))}
-                                    </TableRow>
-                                  ))
-                                ) : (
-                                  <TableRow>
-                                    <TableCell
-                                      colSpan={nestedColumns.length}
-                                      className="text-center text-muted-foreground"
-                                    >
-                                      No nested data found
-                                    </TableCell>
-                                  </TableRow>
-                                )}
-                              </TableBody>
-                            </Table>
+                            <NestedTable<TNestedData, TNestedValue>
+                              columns={nestedColumns}
+                              data={nestedData ?? []}
+                            />
                           </div>
                         </TableCell>
                       </TableRow>

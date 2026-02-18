@@ -45,12 +45,6 @@ const createSearchFilter = (search: string) => {
     : {};
 };
 
-// Helper function to fetch paginated vulnerabilities for a specific severity
-async function _fetchVulnerabilitiesBySeverity(
-  _severity: Severity,
-  _pagination: z.infer<typeof paginationInputSchema>,
-) {}
-
 export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/vulnerabilities - List all vulnerabilities (any authenticated user can see all)
   getMany: protectedProcedure
@@ -376,7 +370,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
 
       // Build where clause
       const where = {
-        severity,
+        severity: severity as Severity,
         ...(search && {
           OR: [
             { cveId: { contains: search, mode: "insensitive" as const } },
@@ -422,12 +416,12 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       (acc, severity) => {
         const key = severity;
         acc[key] = {
-          total: totals[key] || 0,
-          withRemediations: withRemediations[key] || 0,
+          total: totals[key] ?? 0,
+          withRemediations: withRemediations[key] ?? 0,
         };
         return acc;
       },
-      {} as Record<string, { total: number; withRemediations: number }>,
+      {} as Record<Severity, { total: number; withRemediations: number }>,
     );
   }),
 });

@@ -15,6 +15,7 @@ export function QuestionTooltip({
           variant="ghost"
           size="icon-sm"
           className={cn(className, "cursor-help")}
+          aria-label="More information"
         >
           <CircleQuestionMark />
         </Button>

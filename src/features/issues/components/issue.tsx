@@ -2,7 +2,6 @@
 
 import { BugIcon, ChevronDown, ComputerIcon, MoreVertical } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   EntityContainer,
@@ -150,14 +149,16 @@ export const IssuesSidebarList = ({
   issues: Issue[];
   type: "assets" | "vulnerabilities";
 }) => {
-  const router = useRouter();
   const issuesQuery = useSuspenseIssuesById({
     ids: issues.map((i) => i.id),
     type,
   });
   const issuesMap = issuesQuery.data.reduce<{
     [key: string]: IssueWithRelations;
-  }>((acc, issue) => ({ ...acc, [issue.id]: issue }), {});
+  }>((acc, issue) => {
+    acc[issue.id] = issue;
+    return acc;
+  }, {});
 
   if (issues.length === 0) return null;
 
@@ -187,9 +188,10 @@ export const IssuesSidebarList = ({
         {visibleIssues.map((issue) => {
           const issueData = issuesMap[issue.id];
           const asset = issueData.asset;
-          const location = asset?.location
-            ? locationSchema.parse(asset.location)
+          const locationResult = asset?.location
+            ? locationSchema.safeParse(asset.location)
             : null;
+          const location = locationResult?.success ? locationResult.data : null;
           const locationParts = [
             location?.facility,
             location?.building,
@@ -198,89 +200,87 @@ export const IssuesSidebarList = ({
           ].filter(Boolean);
 
           return (
-            <li
-              key={issue.id}
-              className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer hover:bg-muted transition-all"
-              onClick={() => router.push(`/issues/${issue.id}`)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  router.push(`/issues/${issue.id}`);
-                }
-              }}
-            >
-              <Icon
-                className={cn(
-                  "min-w-4 min-h-4 h-4 w-4",
-                  type === "vulnerabilities" ? "text-destructive" : "",
-                )}
-                size={16}
-              />
-              {type === "vulnerabilities" ? (
-                <div className="text-xs flex-1">
-                  <p className="font-semibold mb-2">
-                    {issueData.vulnerability?.description}
-                  </p>
-                  <IssueStatusForm issue={issue} />
-                </div>
-              ) : (
-                <>
-                  <div className="flex flex-col gap-1">
-                    <p className="font-semibold">{asset?.role}</p>
-                    {locationParts.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {locationParts.join(" • ")}
-                      </p>
-                    )}
+            <li key={issue.id}>
+              <Link
+                href={`/issues/${issue.id}`}
+                className="flex py-3 px-4 items-center gap-4 rounded-md border-1 border-accent cursor-pointer hover:bg-muted transition-all"
+                aria-label="Navigate to issue"
+              >
+                <Icon
+                  className={cn(
+                    "min-w-4 min-h-4 h-4 w-4",
+                    type === "vulnerabilities" ? "text-destructive" : "",
+                  )}
+                  size={16}
+                />
+                {type === "vulnerabilities" ? (
+                  <div className="text-xs flex-1">
+                    <p className="font-semibold mb-2">
+                      {issueData.vulnerability?.description}
+                    </p>
+                    <IssueStatusForm issue={issue} />
                   </div>
-                  <IssueStatusForm className="ml-auto" issue={issue} />
-                </>
-              )}
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <p className="font-semibold">{asset?.role}</p>
+                      {locationParts.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {locationParts.join(" • ")}
+                        </p>
+                      )}
+                    </div>
+                    <IssueStatusForm className="ml-auto" issue={issue} />
+                  </>
+                )}
 
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  asChild
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Button variant="ghost" className="h-8 w-8 p-0">
-                    <span className="sr-only">Open menu</span>
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[200px]">
-                  <DropdownMenuItem
-                    onClick={(e) => e.stopPropagation()}
-                    className="cursor-pointer"
+                <DropdownMenu>
+                  <DropdownMenuTrigger
                     asChild
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <Link href={`/issues/${issue.id}`}>
-                      Go to Issue Details
-                    </Link>
-                  </DropdownMenuItem>
-                  {type === "vulnerabilities" && (
+                    <Button variant="ghost" className="h-8 w-8 p-0">
+                      <span className="sr-only">Open menu</span>
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[200px]">
                     <DropdownMenuItem
                       onClick={(e) => e.stopPropagation()}
                       className="cursor-pointer"
                       asChild
                     >
-                      <Link href={`/vulnerabilities/${issue.vulnerabilityId}`}>
-                        Go to Vulnerability Details
+                      <Link href={`/issues/${issue.id}`}>
+                        Go to Issue Details
                       </Link>
                     </DropdownMenuItem>
-                  )}
-                  {type === "assets" && (
-                    <DropdownMenuItem
-                      onClick={(e) => e.stopPropagation()}
-                      className="cursor-pointer"
-                      asChild
-                    >
-                      <Link href={`/assets/${issue.assetId}`}>
-                        Go to Asset Details
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    {type === "vulnerabilities" && (
+                      <DropdownMenuItem
+                        onClick={(e) => e.stopPropagation()}
+                        className="cursor-pointer"
+                        asChild
+                      >
+                        <Link
+                          href={`/vulnerabilities/${issue.vulnerabilityId}`}
+                        >
+                          Go to Vulnerability Details
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
+                    {type === "assets" && (
+                      <DropdownMenuItem
+                        onClick={(e) => e.stopPropagation()}
+                        className="cursor-pointer"
+                        asChild
+                      >
+                        <Link href={`/assets/${issue.assetId}`}>
+                          Go to Asset Details
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </Link>
             </li>
           );
         })}

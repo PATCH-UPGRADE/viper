@@ -184,7 +184,8 @@ export const VulnerabilitiesBySeverityMetrics = ({
                 {!!value.total && (
                   <>
                     {value.withRemediations} with remediations (
-                    {(value.withRemediations / value.total) * 100}%)
+                    {((value.withRemediations / value.total) * 100).toFixed(0)}
+                    %)
                   </>
                 )}
               </div>
@@ -240,7 +241,7 @@ export const PrioritizedVulnerabilitiesList = () => {
         <Alert className={explained.colorBg}>
           {<explained.icon className={explained.color} />}
           <AlertDescription className="text-foreground">
-            <strong>{explained.alertHeader}</strong> {explained.alertBody}.
+            <strong>{explained.alertHeader}</strong> {explained.alertBody}
           </AlertDescription>
         </Alert>
       )}

@@ -78,7 +78,7 @@ export function SortableHeader<TData>({
       variant="link"
       className="text-muted-foreground px-0!"
       onClick={() => column.toggleSorting(undefined, true)}
-      aria-label={`Sort ${header} ${sorted ? (isAscending ? "descending" : "ascending") : "neutral"}`}
+      aria-label={`Sort by ${header}${sorted ? (isAscending ? ", sorted ascending" : ", sorted descending") : ""}`}
     >
       {header}
       {sorted ? (
@@ -208,7 +208,7 @@ export function DataTable<
   );
 
   // Reset expanded rows when the page data changes
-  //biome-ignore lint/correctness/useExhaustiveDependencies: do use paginated data as dependency here to trigger on page change
+  // biome-ignore lint/correctness/useExhaustiveDependencies: do use paginated data as dependency here to trigger on page change
   React.useEffect(() => {
     setExpandedRows(new Set());
   }, [paginatedData.page]);

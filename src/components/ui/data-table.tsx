@@ -324,7 +324,10 @@ export function DataTable<
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => toggleRow(row.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleRow(row.id);
+                            }}
                             className="h-8 w-8 p-0"
                             disabled={!hasNestedData}
                             aria-label={

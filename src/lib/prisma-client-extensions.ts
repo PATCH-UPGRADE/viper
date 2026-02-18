@@ -1,5 +1,6 @@
 import { Prisma, TriggerEnum } from "@/generated/prisma";
 import type { PayloadToResult } from "@/generated/prisma/runtime/library";
+import { inngest } from "@/inngest/client";
 import prisma from "./db";
 import { getBaseUrl } from "./url-utils";
 import { sendWebhook } from "./utils";
@@ -98,6 +99,11 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
               })),
             });
           }
+
+          await inngest.send({
+            name: "vulnerability/enrich.requested",
+            data: { vulnerabilityId },
+          });
 
           return vulnerability;
         },

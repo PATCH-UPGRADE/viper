@@ -363,6 +363,14 @@ enum Severity {
   Low
 }
 
+enum Priority {
+  Critical
+  High
+  Monitor
+  Defer
+  Unsorted
+}
+
 model Vulnerability {
   id                   String        @id @default(cuid())
   cveId                String?
@@ -386,6 +394,8 @@ model Vulnerability {
   inKEV                Boolean       @default(false) // Whether in CISA KEV catalog
   updatedInKev         DateTime?     // When KEV status was last checked/updated
 
+  priority             Priority      @default(Unsorted)
+
   deviceArtifactId String?
   deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
 
@@ -404,6 +414,7 @@ model Vulnerability {
   @@index([severity])
   @@index([epss])
   @@index([inKEV])
+  @@index([priority])
   @@map("vulnerability")
 }
 

@@ -344,9 +344,15 @@ export function DataTable<
                             aria-expanded={isExpanded}
                           >
                             {isExpanded ? (
-                              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                              <ChevronDown
+                                className="h-4 w-4"
+                                aria-hidden="true"
+                              />
                             ) : (
-                              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                              <ChevronRight
+                                className="h-4 w-4"
+                                aria-hidden="true"
+                              />
                             )}
                           </Button>
                         </TableCell>

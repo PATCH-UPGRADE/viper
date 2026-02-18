@@ -1,9 +1,9 @@
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
-import type { DeviceArtifactResponse } from "@/features/device-artifacts/server/routers";
+import type { ArtifactWrapperWithUrls } from "@/features/artifacts/types";
+import type { DeviceArtifactResponse } from "@/features/device-artifacts/types";
 import { ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import type { ArtifactWrapperWithUrls } from "@/lib/schemas";
 import { authHeader, BASE_URL, generateCPE } from "./test-config";
 
 describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {

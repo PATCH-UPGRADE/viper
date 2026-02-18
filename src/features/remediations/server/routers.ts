@@ -2,73 +2,22 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import {
-  createPaginatedResponseSchema,
-  paginationInputSchema,
-} from "@/lib/pagination";
+import { paginationInputSchema } from "@/lib/pagination";
 import {
   cpesToDeviceGroups,
   createArtifactWrappers,
   fetchPaginated,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
-import {
-  artifactInputSchema,
-  artifactWrapperSelect,
-  artifactWrapperWithUrlsSchema,
-  cpeSchema,
-  deviceGroupSchema,
-  deviceGroupSelect,
-  safeUrlSchema,
-  userIncludeSelect,
-  userSchema,
-} from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
-
-// Validation schemas
-const remediationInputSchema = z.object({
-  cpes: z.array(cpeSchema).min(1),
-  vulnerabilityId: z.string().optional(),
-  description: z.string().optional(),
-  narrative: z.string().optional(),
-  upstreamApi: safeUrlSchema.optional(),
-  artifacts: z
-    .array(artifactInputSchema)
-    .min(1, "at least one artifact is required"),
-});
-
-const remediationUpdateSchema = z.object({
-  id: z.string(),
-  cpes: z.array(cpeSchema).optional(),
-  vulnerabilityId: z.string().optional(),
-  description: z.string().optional(),
-  narrative: z.string().optional(),
-  upstreamApi: safeUrlSchema.optional(),
-});
-
-const vulnerabilitySchema = z.object({
-  id: z.string(),
-  url: z.string(),
-});
-
-const remediationResponseSchema = z.object({
-  id: z.string(),
-  affectedDeviceGroups: z.array(deviceGroupSchema),
-  upstreamApi: z.string().optional().nullable(),
-  description: z.string().optional().nullable(),
-  narrative: z.string().optional().nullable(),
-  vulnerability: vulnerabilitySchema.optional().nullable(),
-  user: userSchema,
-  artifacts: z.array(artifactWrapperWithUrlsSchema),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-});
-export type RemediationResponse = z.infer<typeof remediationResponseSchema>;
-
-const paginatedRemediationResponseSchema = createPaginatedResponseSchema(
+import {
+  paginatedRemediationResponseSchema,
+  remediationInclude,
+  remediationInputSchema,
   remediationResponseSchema,
-);
+  remediationUpdateSchema,
+} from "../types";
 
 const createSearchFilter = (search: string) => {
   return search
@@ -100,20 +49,6 @@ const createSearchFilter = (search: string) => {
         ],
       }
     : {};
-};
-
-const remediationVulnerabilitySelect = {
-  select: {
-    id: true,
-    url: true,
-  },
-} as const;
-
-const remediationInclude = {
-  user: userIncludeSelect,
-  vulnerability: remediationVulnerabilitySelect,
-  affectedDeviceGroups: deviceGroupSelect,
-  artifacts: artifactWrapperSelect,
 };
 
 export const remediationsRouter = createTRPCRouter({

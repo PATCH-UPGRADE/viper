@@ -1,5 +1,9 @@
 import { hashPassword } from "better-auth/crypto";
-import type { ArtifactType, AssetStatus } from "@/generated/prisma";
+import {
+  type ArtifactType,
+  type AssetStatus,
+  Severity,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 
 // Seed user credentials
@@ -515,8 +519,14 @@ const SAMPLE_ASSETS = [
 ];
 
 // Sample hospital vulnerability data
+
 const SAMPLE_VULNERABILITIES = [
   {
+    cveId: "CVE-2024-1234",
+    severity: Severity.Critical,
+    cvssScore: 9.8,
+    epss: 0.89, // High EPSS - critical vuln with public exploit
+    inKEV: true,
     sarif: {
       version: "2.1.0",
       runs: [
@@ -545,6 +555,11 @@ const SAMPLE_VULNERABILITIES = [
       "Critical patient safety risk. Compromised monitors could display false vital signs (heart rate, blood pressure, oxygen saturation) leading to incorrect clinical decisions. Alarm suppression could prevent detection of patient deterioration in ICU settings.",
   },
   {
+    cveId: "CVE-2024-5678",
+    severity: Severity.High,
+    cvssScore: 8.1,
+    epss: 0.72,
+    inKEV: true,
     sarif: {
       version: "2.1.0",
       runs: [
@@ -573,6 +588,11 @@ const SAMPLE_VULNERABILITIES = [
       "Life-threatening medication errors. Altered drug libraries could allow dangerous overdoses or underdoses. Modified rate limits could enable fatal medication administration. Suppressed alarms prevent clinical staff from detecting improper infusions.",
   },
   {
+    cveId: "CVE-2024-9012",
+    severity: Severity.Critical,
+    cvssScore: 9.1,
+    epss: 0.85,
+    inKEV: true,
     sarif: {
       version: "2.1.0",
       runs: [
@@ -599,6 +619,11 @@ const SAMPLE_VULNERABILITIES = [
       "HIPAA violation and patient safety risk. Attackers could access protected health information (PHI) including patient demographics and medical images. Modified or deleted imaging studies could lead to misdiagnosis. Altered reports could result in inappropriate treatment decisions.",
   },
   {
+    cveId: "CVE-2024-3456",
+    severity: Severity.High,
+    cvssScore: 7.5,
+    epss: 0.45,
+    inKEV: false,
     sarif: {
       version: "2.1.0",
       runs: [
@@ -625,6 +650,11 @@ const SAMPLE_VULNERABILITIES = [
       "Massive HIPAA breach potential. Compromised EMR data includes complete medical histories, social security numbers, insurance information, and treatment plans. Exposure affects entire patient population. Regulatory fines and loss of patient trust.",
   },
   {
+    cveId: "CVE-2024-7890",
+    cvssScore: 10.0,
+    epss: 0.95, // Very high - critical RCE with public exploit
+    inKEV: true,
+    severity: Severity.Critical,
     sarif: {
       version: "2.1.0",
       runs: [
@@ -651,6 +681,11 @@ const SAMPLE_VULNERABILITIES = [
       "Patient safety and equipment damage risk. Compromised MRI could alter scan parameters (gradient strength, RF power) causing patient harm or equipment damage. Modified images could lead to misdiagnosis. Scanner downtime disrupts radiology workflow and delays critical imaging.",
   },
   {
+    cveId: "CVE-2024-2345",
+    cvssScore: 8.8,
+    severity: Severity.High,
+    epss: 0.68,
+    inKEV: true,
     sarif: {
       version: "2.1.0",
       runs: [
@@ -677,6 +712,11 @@ const SAMPLE_VULNERABILITIES = [
       "Lab result integrity compromised. Attackers could modify test results before transmission to EMR, leading to incorrect diagnoses and treatment. Altered QC data could hide equipment malfunction. False critical values could trigger unnecessary interventions.",
   },
   {
+    cveId: "CVE-2024-6789",
+    severity: Severity.Critical,
+    cvssScore: 9.0,
+    epss: 0.78,
+    inKEV: true,
     sarif: {
       version: "2.1.0",
       runs: [
@@ -976,8 +1016,9 @@ async function seedVulnerabilities(userId: string) {
 
   const vulnerabilities = await Promise.all(
     SAMPLE_VULNERABILITIES.map(async (vulnerability) => {
+      const { cpe, ...data } = vulnerability;
       const deviceGroup = await prisma.deviceGroup.findFirst({
-        where: { cpe: vulnerability.cpe },
+        where: { cpe },
       });
 
       if (!deviceGroup) {
@@ -987,12 +1028,7 @@ async function seedVulnerabilities(userId: string) {
 
       return prisma.vulnerability.create({
         data: {
-          sarif: vulnerability.sarif,
-          exploitUri: vulnerability.exploitUri,
-          upstreamApi: vulnerability.upstreamApi,
-          description: vulnerability.description,
-          narrative: vulnerability.narrative,
-          impact: vulnerability.impact,
+          ...data,
           userId,
           affectedDeviceGroups: {
             connect: { id: deviceGroup.id },

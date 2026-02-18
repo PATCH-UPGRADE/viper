@@ -1,8 +1,8 @@
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
+import type { ArtifactWithUrls } from "@/features/artifacts/types";
 import { ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import type { ArtifactWithUrls } from "@/lib/schemas";
 import { authHeader, BASE_URL, generateCPE } from "./test-config";
 
 describe("Artifacts Endpoint (/artifacts)", () => {

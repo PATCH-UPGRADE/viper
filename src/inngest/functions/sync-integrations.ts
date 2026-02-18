@@ -1,8 +1,8 @@
 import "server-only";
 import { z } from "zod";
-import { integrationAssetInputSchema } from "@/features/assets/server/routers";
+import { integrationAssetInputSchema } from "@/features/assets/types";
 import type { IntegrationWithStringDates } from "@/features/integrations/types";
-import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/server/routers";
+import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/types";
 import type { ResourceType } from "@/generated/prisma";
 import { AuthType, SyncStatusEnum } from "@/generated/prisma";
 import { auth } from "@/lib/auth";

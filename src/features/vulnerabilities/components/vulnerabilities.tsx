@@ -1,7 +1,14 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { BugIcon, ExternalLinkIcon } from "lucide-react";
+import {
+  BugIcon,
+  Clock,
+  ExternalLinkIcon,
+  Eye,
+  ShieldAlert,
+  ShieldClose,
+} from "lucide-react";
 import { type PropsWithChildren, Suspense, useState } from "react";
 import {
   EmptyView,
@@ -13,8 +20,17 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { CopyCode } from "@/components/ui/code";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -22,20 +38,35 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
+import { Severity } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type {
   VulnerabilityWithDeviceGroups,
   VulnerabilityWithIssues,
 } from "@/lib/db";
+import { cn } from "@/lib/utils";
 import {
   useRemoveVulnerability,
   useSuspenseVulnerabilities,
+  useSuspenseVulnerabilitiesBySeverity,
+  useSuspenseVulnerabilitySeverityMetrics,
 } from "../hooks/use-vulnerabilities";
-import { useVulnerabilitiesParams } from "../hooks/use-vulnerabilities-params";
+import {
+  useVulnerabilitiesBySeverityParams,
+  useVulnerabilitiesParams,
+} from "../hooks/use-vulnerabilities-params";
+import type {
+  VulnerabilitiesBySeverityCounts,
+  VulnerabilityWithRelations,
+} from "../types";
 import { columns } from "./columns";
+import { issueColumns, prioritizedColumns } from "./prioritized-columns";
+import { PrioritizedVulnerabilityDrawer } from "./vulnerability-drawer";
 
 export const VulnerabilitiesSearch = () => {
   const [params, setParams] = useVulnerabilitiesParams();
@@ -74,6 +105,153 @@ export const VulnerabilitiesList = () => {
         columns={columns}
         isLoading={isFetching}
         search={<VulnerabilitiesSearch />}
+        rowOnclick={(row) => {
+          setDrawerOpen(true);
+          setVuln(row.original);
+        }}
+      />
+    </>
+  );
+};
+
+const SeveritiesExplained = {
+  Critical: {
+    help: "Immediate remediation required. Confirmed exploitation of high-impact vulnerabilities.",
+    icon: ShieldAlert,
+    color: "text-red-600",
+    colorBg: "bg-red-50",
+    alertHeader: "Critical - Immediate Remediation",
+    // NOTE: / TODO: This description doesn't match the "Critical" definition of CVSS, but it's in line with VW-75
+    alertBody:
+      "These vulnerabilities have confirmed exploitation of high-impact systems and require immediate action. They pose the highest risk to patient safety and data security.",
+  },
+  High: {
+    help: "Scheduled remediation required. Predicted exploitation of high-impact vulnerabilities.",
+    icon: ShieldClose,
+    color: "text-orange-600",
+    colorBg: "bg-orange-50",
+    alertHeader: "High - Scheduled Remediation",
+    // NOTE: / TODO: This description doesn't match the "High" definition of CVSS, but it's in line with VW-75
+    alertBody:
+      "These vulnerabilities indicate predicted exploitation of high-impact systems. Plan and schedule remediation activities within your next maintenance window.",
+  },
+  Medium: {
+    help: "Track for changes in threat landscape or impact assessment.",
+    icon: Eye,
+    color: "text-yellow-600",
+    colorBg: "bg-yellow-50",
+    alertHeader: "",
+    alertBody: "",
+    //TODO: VW-75 change to Monitor
+  },
+  Low: {
+    help: "Standard patching. No exploitation evidence, can be addressed through standard patching cycles.",
+    icon: Clock,
+    color: "text-blue-600",
+    colorBg: "bg-blue-50",
+    alertHeader: "",
+    alertBody: "",
+    //TODO: VW-75 change to Defer
+  },
+};
+
+export const VulnerabilitiesBySeverityMetrics = ({
+  data,
+}: {
+  data: VulnerabilitiesBySeverityCounts;
+}) => {
+  return (
+    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:grid-cols-4">
+      {Object.entries(data).map(([key, value]) => {
+        const explained =
+          SeveritiesExplained[key as keyof typeof SeveritiesExplained];
+        return (
+          <Card key={key} className={cn("@container/card", explained.colorBg)}>
+            <CardHeader>
+              <CardDescription className="gap-2 flex items-center font-bold text-foreground">
+                {key}
+                <QuestionTooltip>{explained.help}</QuestionTooltip>
+              </CardDescription>
+              <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+                {value.total}
+              </CardTitle>
+              <CardAction>
+                {<explained.icon className={explained.color} />}
+              </CardAction>
+            </CardHeader>
+            <CardFooter className="flex-col items-start gap-1.5 text-sm">
+              <div className="line-clamp-1 flex gap-2 font-medium text-muted-foreground">
+                {!!value.total && (
+                  <>
+                    {value.withRemediations} with remediations (
+                    {((value.withRemediations / value.total) * 100).toFixed(0)}
+                    %)
+                  </>
+                )}
+              </div>
+            </CardFooter>
+          </Card>
+        );
+      })}
+    </div>
+  );
+};
+
+export const PrioritizedVulnerabilitiesList = () => {
+  const { data, isFetching } = useSuspenseVulnerabilitiesBySeverity();
+  const { data: counts } = useSuspenseVulnerabilitySeverityMetrics();
+
+  const [vuln, setVuln] = useState<VulnerabilityWithRelations | undefined>(
+    undefined,
+  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [params, setParams] = useVulnerabilitiesBySeverityParams();
+  const { severity } = params;
+
+  const handleTabChange = (value: string) => {
+    setParams((prev) => ({ ...prev, severity: value as Severity, page: null }));
+  };
+
+  const explained =
+    SeveritiesExplained[severity as keyof typeof SeveritiesExplained];
+
+  return (
+    <>
+      <VulnerabilitiesBySeverityMetrics data={counts} />
+      <Tabs value={severity} onValueChange={handleTabChange}>
+        <TabsList variant="line">
+          {Object.values(Severity).map((sev) => (
+            <TabsTrigger key={sev} value={sev}>
+              <span className="font-semibold">{sev}</span>
+              <Badge variant="secondary" className="ml-2">
+                {counts[sev].total}
+              </Badge>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      {vuln && (
+        <PrioritizedVulnerabilityDrawer
+          vulnerability={vuln}
+          open={drawerOpen}
+          setOpen={setDrawerOpen}
+        />
+      )}
+      {explained.alertBody && explained.alertHeader && (
+        <Alert className={explained.colorBg}>
+          {<explained.icon className={explained.color} />}
+          <AlertDescription className="text-foreground">
+            <strong>{explained.alertHeader}</strong> {explained.alertBody}
+          </AlertDescription>
+        </Alert>
+      )}
+      <DataTable
+        search={<VulnerabilitiesSearch />}
+        columns={prioritizedColumns}
+        paginatedData={data}
+        nestedColumns={issueColumns}
+        nestedDataKey="issues"
+        isLoading={isFetching}
         rowOnclick={(row) => {
           setDrawerOpen(true);
           setVuln(row.original);

@@ -6,12 +6,12 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
+import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { requireExistence } from "@/trpc/middleware";
 import {
   deviceGroupWithDetailsSchema,
   deviceGroupWithUrlsSchema,
-} from "@/lib/schemas";
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireExistence } from "@/trpc/middleware";
+} from "../types";
 
 const deviceGroupResponseSchema = deviceGroupWithUrlsSchema;
 const deviceGroupDetailsResponseSchema = deviceGroupWithDetailsSchema;

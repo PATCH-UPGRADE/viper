@@ -1,97 +1,25 @@
 import { z } from "zod";
 import prisma from "@/lib/db";
-import {
-  createPaginatedResponseSchema,
-  paginationInputSchema,
-} from "@/lib/pagination";
+import { paginationInputSchema } from "@/lib/pagination";
 import {
   cpeToDeviceGroup,
   fetchPaginated,
   processIntegrationSync,
 } from "@/lib/router-utils";
-import {
-  cpeSchema,
-  createIntegrationInputSchema,
-  deviceGroupSelect,
-  deviceGroupWithUrlsSchema,
-  integrationResponseSchema,
-  safeUrlSchema,
-  userIncludeSelect,
-  userSchema,
-} from "@/lib/schemas";
+import { integrationResponseSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
-
-const AssetStatus = z.enum(["Active", "Decommissioned", "Maintenance"]);
-
-const assetInputSchema = z.object({
-  ip: z.string().min(1),
-  networkSegment: z.string().optional(),
-  cpe: cpeSchema,
-  role: z.string().min(1),
-  upstreamApi: safeUrlSchema,
-  hostname: z.string().optional(),
-  macAddress: z.string().optional(),
-  serialNumber: z.string().optional(),
-  location: z
-    .object({
-      facility: z.string().optional(),
-      building: z.string().optional(),
-      floor: z.string().optional(),
-      room: z.string().optional(),
-    })
-    .optional(),
-  status: AssetStatus.optional(),
-});
-
-const updateAssetSchema = assetInputSchema.extend({
-  id: z.string(),
-});
-
-// NOTE: tRPC / OpenAPI doesn't allow for arrays as the INPUT schema
-// if you try it will default to a single asset schema
-// to get around that wrap the array of assets in an object
-const assetArrayInputSchema = z.object({
-  assets: z.array(assetInputSchema).nonempty(),
-});
-
-const assetResponseSchema = z.object({
-  id: z.string(),
-  ip: z.string(),
-  deviceGroup: deviceGroupWithUrlsSchema,
-  role: z.string(),
-  upstreamApi: z.string(),
-  networkSegment: z.string().nullable(),
-  hostname: z.string().nullable(),
-  macAddress: z.string().nullable(),
-  serialNumber: z.string().nullable(),
-  location: z.unknown().nullable(),
-  status: AssetStatus.nullable(),
-  userId: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  user: userSchema,
-});
-export type AssetResponseSchemaType = z.infer<typeof assetResponseSchema>;
-
-const assetArrayResponseSchema = z.array(assetResponseSchema);
-
-const paginatedAssetResponseSchema =
-  createPaginatedResponseSchema(assetResponseSchema);
-
-export const integrationAssetInputSchema =
-  createIntegrationInputSchema(assetInputSchema);
-
-const assetsVulnsInputSchema = z.object({
-  assetIds: z.array(z.string()).optional(),
-  cpes: z.array(cpeSchema).optional(),
-});
-export type AssetsVulnsInput = z.infer<typeof assetsVulnsInputSchema>;
-
-const assetInclude = {
-  user: userIncludeSelect,
-  deviceGroup: deviceGroupSelect,
-};
+import {
+  assetArrayInputSchema,
+  assetArrayResponseSchema,
+  assetInclude,
+  assetInputSchema,
+  assetResponseSchema,
+  assetsVulnsInputSchema,
+  integrationAssetInputSchema,
+  paginatedAssetResponseSchema,
+  updateAssetSchema,
+} from "../types";
 
 const createSearchFilter = (search: string) => {
   return search
@@ -241,7 +169,7 @@ export const assetsRouter = createTRPCRouter({
 
       const assetItems = await prisma.asset.findMany({
         where: where,
-        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
+        include: assetInclude,
         orderBy: { updatedAt: "desc" },
       });
 
@@ -285,7 +213,7 @@ export const assetsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const asset = await prisma.asset.findUnique({
         where: { id: input.id },
-        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
+        include: assetInclude,
       });
       return requireExistence(asset, "Asset");
     }),
@@ -313,7 +241,7 @@ export const assetsRouter = createTRPCRouter({
           deviceGroupId: deviceGroup.id,
           userId: ctx.auth.user.id,
         },
-        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
+        include: assetInclude,
       });
     }),
 
@@ -350,10 +278,7 @@ export const assetsRouter = createTRPCRouter({
               deviceGroupId: deviceGroups[index].id,
               userId: ctx.auth.user.id,
             },
-            include: {
-              user: userIncludeSelect,
-              deviceGroup: deviceGroupSelect,
-            },
+            include: assetInclude,
           });
         }),
       );
@@ -438,7 +363,7 @@ export const assetsRouter = createTRPCRouter({
 
       return prisma.asset.delete({
         where: { id: input.id },
-        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
+        include: assetInclude,
       });
     }),
 
@@ -468,7 +393,7 @@ export const assetsRouter = createTRPCRouter({
           deviceGroupId: deviceGroup.id,
           ...updateData,
         },
-        include: { user: userIncludeSelect, deviceGroup: deviceGroupSelect },
+        include: assetInclude,
       });
     }),
 });

@@ -152,35 +152,7 @@ export const remediationsRouter = createTRPCRouter({
       const userId = ctx.auth.user.id;
       
       // Handle S3 URL -- if the user included a hash/size but no downloadUrl, they want us to host it
-      const uploadInstructions: {
-        artifactName: string;
-        uploadUrl: string;
-        requiredHeader: string;
-      }[] = [];
-
-      const processedArtifacts = await Promise.all(
-        artifacts.map(async (art) => {
-          if (art.hash && art.size && !art.downloadUrl) {
-            const { uploadUrl, s3Key, requiredHeader } = await generateUploadUrl(
-              art.name ?? "artifact",
-              art.hash,
-              art.size
-            );
-            uploadInstructions.push({
-              artifactName: art.name ?? "artifact",
-              uploadUrl,
-              requiredHeader,
-            })
-
-            return {
-              ...art,
-              downloadUrl: buildDownloadUrl(s3Key),
-            };
-          }
-            // Do nothing if a downloadUrl was already provided (they are hosting it, not us)
-            return art;
-        })
-      );
+      const { processedArtifacts, uploadInstructions } = await processArtifactHosting(artifacts);
 
       // Verify the vulnerability exists
       if (input.vulnerabilityId) {
@@ -218,19 +190,14 @@ export const remediationsRouter = createTRPCRouter({
         );
 
         // Fetch the complete remediation with includes
-        const data = await tx.remediation.findUniqueOrThrow({
+        return await tx.remediation.findUniqueOrThrow({
           where: { id: remediation.id },
           include: remediationInclude,
         });
-
-        return {
-          data,
-          uploadInstructions
-        }
       });
 
       return {
-        remediation: transformArtifactWrapper(result.data),
+        remediation: transformArtifactWrapper(result),
         uploadInstructions: uploadInstructions,
       };
     }),

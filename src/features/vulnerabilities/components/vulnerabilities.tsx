@@ -209,7 +209,7 @@ export const PrioritizedVulnerabilitiesList = () => {
   const { severity } = params;
 
   const handleTabChange = (value: string) => {
-    setParams((prev) => ({ ...prev, severity: value as Severity }));
+    setParams((prev) => ({ ...prev, severity: value as Severity, page: null }));
   };
 
   const explained =

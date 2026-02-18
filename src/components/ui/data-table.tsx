@@ -103,8 +103,7 @@ export function SortableHeader<TData>({
 }
 
 // ---------------------------------------------------------------------------
-// NestedTable — owns a real useReactTable instance so all renderers get
-// proper context (column.id, getValue(), toggleSorting(), etc.)
+// NestedTable
 // ---------------------------------------------------------------------------
 
 interface NestedTableProps<TNestedData, TNestedValue> {
@@ -207,6 +206,13 @@ export function DataTable<
   const [expandedRows, setExpandedRows] = React.useState<Set<string>>(
     new Set(),
   );
+
+  // Reset expanded rows when the page data changes
+  //biome-ignore lint/correctness/useExhaustiveDependencies: do use paginated data as dependency here to trigger on page change
+  React.useEffect(() => {
+    setExpandedRows(new Set());
+  }, [paginatedData.page]);
+
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
 
@@ -409,32 +415,33 @@ interface DataTablePaginationProps<TData> {
 export function DataTablePagination<TData>({
   table,
 }: DataTablePaginationProps<TData>) {
-  const [params, setParams] = usePaginationParams();
+  const [_params, setParams] = usePaginationParams();
 
   const handlePageSizeChange = React.useCallback(
     (value: string) =>
-      setParams({ ...params, pageSize: Number(value), page: 1 }),
-    [params, setParams],
+      setParams((prev) => ({ ...prev, pageSize: Number(value), page: 1 })),
+    [setParams],
   );
 
   const handleFirstPage = React.useCallback(
-    () => setParams({ ...params, page: 1 }),
-    [params, setParams],
+    () => setParams((prev) => ({ ...prev, page: 1 })),
+    [setParams],
   );
 
   const handlePreviousPage = React.useCallback(
-    () => setParams({ ...params, page: params.page - 1 }),
-    [params, setParams],
+    () => setParams((prev) => ({ ...prev, page: prev.page - 1 })),
+    [setParams],
   );
 
   const handleNextPage = React.useCallback(
-    () => setParams({ ...params, page: params.page + 1 }),
-    [params, setParams],
+    () => setParams((prev) => ({ ...prev, page: prev.page + 1 })),
+
+    [setParams],
   );
 
   const handleLastPage = React.useCallback(
-    () => setParams({ ...params, page: table.getPageCount() }),
-    [params, setParams, table],
+    () => setParams((prev) => ({ ...prev, page: table.getPageCount() })),
+    [setParams, table],
   );
 
   return (

@@ -187,6 +187,7 @@ export const IssuesSidebarList = ({
       <ul className="flex flex-col gap-2">
         {visibleIssues.map((issue) => {
           const issueData = issuesMap[issue.id];
+          if (!issueData) return null;
           const asset = issueData.asset;
           const locationResult = asset?.location
             ? locationSchema.safeParse(asset.location)

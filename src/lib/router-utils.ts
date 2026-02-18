@@ -103,6 +103,7 @@ export async function createArtifactWrappers(
     artifactType: ArtifactType;
     downloadUrl?: string | null;
     size?: number | null;
+    hash?: string | null; 
   }>,
   parentId: string,
   parentField: "deviceArtifactId" | "remediationId",
@@ -125,6 +126,7 @@ export async function createArtifactWrappers(
         artifactType: artifactInput.artifactType,
         downloadUrl: artifactInput.downloadUrl,
         size: artifactInput.size || null,
+        hash: artifactInput.hash || null,
         versionNumber: 1,
         userId,
       },

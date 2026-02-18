@@ -549,8 +549,7 @@ const SAMPLE_VULNERABILITIES = [
     },
     cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
     exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2024-21762",
-    upstreamApi:
-      "https://www.fortiguard.com/psirt/FG-IR-24-015",
+    upstreamApi: "https://www.fortiguard.com/psirt/FG-IR-24-015",
     description:
       "Out-of-bounds write vulnerability in Fortinet FortiOS SSL VPN daemon allows unauthenticated remote code execution via specially crafted HTTP requests",
     narrative:
@@ -593,14 +592,13 @@ const SAMPLE_VULNERABILITIES = [
     impact:
       "Hospital network segmentation failure. Compromised core switches allow attackers to reconfigure VLANs, bypass network access controls, and gain access to isolated medical device networks. Lateral movement enables interception of patient data, disruption of PACS/EMR traffic, and potential manipulation of clinical systems.",
   },
-  // --- High priority: predicted exploitation, high CVSS, in KEV ---
   {
     cveId: "CVE-2024-1709",
     severity: Severity.Critical,
     cvssScore: 10.0,
     epss: 0.944,
     inKEV: true,
-    priority: Priority.High,
+    priority: Priority.Critical,
     sarif: {
       version: "2.1.0",
       runs: [
@@ -633,9 +631,9 @@ const SAMPLE_VULNERABILITIES = [
     cveId: "CVE-2024-47575",
     severity: Severity.Critical,
     cvssScore: 9.8,
-    epss: 0.50,
+    epss: 0.5,
     inKEV: true,
-    priority: Priority.High,
+    priority: Priority.Critical,
     sarif: {
       version: "2.1.0",
       runs: [
@@ -655,8 +653,7 @@ const SAMPLE_VULNERABILITIES = [
     },
     cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
     exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2024-47575",
-    upstreamApi:
-      "https://www.fortiguard.com/psirt/FG-IR-24-423",
+    upstreamApi: "https://www.fortiguard.com/psirt/FG-IR-24-423",
     description:
       "Missing authentication vulnerability in FortiManager (FortiJump) allows unauthenticated remote code execution and exfiltration of managed firewall configurations",
     narrative:
@@ -664,14 +661,13 @@ const SAMPLE_VULNERABILITIES = [
     impact:
       "Compromise of the firewall management platform exposes all managed FortiGate configurations, security policies, VPN credentials, and network topology. Attackers can modify firewall rules to open backdoor access or disable security controls across the entire hospital network perimeter.",
   },
-  // --- Monitor priority: moderate EPSS, worth tracking ---
   {
     cveId: "CVE-2024-38014",
     severity: Severity.High,
     cvssScore: 7.8,
     epss: 0.15,
     inKEV: true,
-    priority: Priority.Monitor,
+    priority: Priority.Critical,
     sarif: {
       version: "2.1.0",
       runs: [
@@ -862,8 +858,7 @@ const SAMPLE_REMEDIATIONS = [
       "FortiOS firmware upgrade to 7.4.3+ patches the out-of-bounds write vulnerability (CVE-2024-21762) in the SSL VPN daemon.",
     narrative:
       "Schedule maintenance window during low-traffic period (Sunday 2-6 AM). Backup FortiGate configuration via FortiManager. Upgrade firmware to FortiOS 7.4.3 or later. If immediate upgrade is not possible, disable SSL VPN as an interim mitigation — disabling webmode alone is not sufficient. Post-upgrade: verify VPN connectivity, firewall rules, and VLAN routing. Monitor logs for 48 hours.",
-    upstreamApi:
-      "https://www.fortinet.com/products/next-generation-firewall",
+    upstreamApi: "https://www.fortinet.com/products/next-generation-firewall",
   },
   {
     cpe: "cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*",
@@ -889,8 +884,7 @@ const SAMPLE_REMEDIATIONS = [
   },
   {
     cpe: "cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*",
-    fixUri:
-      "https://www.siemens-healthineers.com/services/cybersecurity",
+    fixUri: "https://www.siemens-healthineers.com/services/cybersecurity",
     description:
       "Network segmentation and DICOM TLS configuration to encrypt MRI scanner traffic and prevent passive interception of patient imaging data.",
     narrative:

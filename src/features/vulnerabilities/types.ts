@@ -1,6 +1,6 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
-import { type Prisma, Priority, Severity } from "@/generated/prisma";
+import { Priority, type Prisma, Severity } from "@/generated/prisma";
 import {
   createPaginatedResponseSchema,
   paginationInputSchema,

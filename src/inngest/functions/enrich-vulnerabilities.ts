@@ -9,20 +9,16 @@ export function computeVulnerabilityPriority(
   inKEV: boolean,
 ): Priority {
   // See this paper https://arxiv.org/pdf/2506.01220#figure.1
-  if (!epss || !cvssScore)
-    return "Unsorted";
+  if (epss === null || cvssScore === null) return "Unsorted";
   if (inKEV) {
-    if (cvssScore >= 7.0)
-      return "Critical"
-    return "Monitor"
-  } 
-  else {
+    if (cvssScore >= 7.0) return "Critical";
+    return "Monitor";
+  } else {
     if (epss >= 0.088) {
-      if (cvssScore >= 7.0)
-        return "High"
-      return "Monitor"
+      if (cvssScore >= 7.0) return "High";
+      return "Monitor";
     }
-    return "Defer" // not in KEV, epss < 0.088
+    return "Defer"; // not in KEV, epss < 0.088
   }
 }
 
@@ -43,21 +39,49 @@ async function fetchEpss(cveId: string): Promise<number | null> {
   return Number.isNaN(score) ? null : score;
 }
 
-async function fetchKevStatus(cveId: string): Promise<boolean> {
+const KEV_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+interface KevCache {
+  ids: Set<string>;
+  fetchedAt: number;
+}
+
+let kevCache: KevCache | null = null;
+
+async function fetchKevSet(): Promise<Set<string>> {
+  const now = Date.now();
+  if (kevCache && now - kevCache.fetchedAt < KEV_CACHE_TTL_MS) {
+    return kevCache.ids;
+  }
+
   const res = await fetch(
     "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
     { signal: AbortSignal.timeout(30000) },
   );
-  if (!res.ok) return false;
+
+  if (!res.ok) {
+    // Return stale cache rather than treating every CVE as not in KEV.
+    if (kevCache) return kevCache.ids;
+    return new Set();
+  }
 
   const json = (await res.json()) as {
     vulnerabilities?: { cveID?: string }[];
   };
-  return (
-    json.vulnerabilities?.some(
-      (v) => v.cveID?.toUpperCase() === cveId.toUpperCase(),
-    ) ?? false
+
+  const ids = new Set(
+    (json.vulnerabilities ?? [])
+      .map((v) => v.cveID?.toUpperCase())
+      .filter((id): id is string => Boolean(id)),
   );
+
+  kevCache = { ids, fetchedAt: now };
+  return ids;
+}
+
+async function fetchKevStatus(cveId: string): Promise<boolean> {
+  const kevSet = await fetchKevSet();
+  return kevSet.has(cveId.toUpperCase());
 }
 
 export const enrichVulnerability = inngest.createFunction(

@@ -100,10 +100,17 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
             });
           }
 
-          await inngest.send({
-            name: "vulnerability/enrich.requested",
-            data: { vulnerabilityId },
-          });
+          inngest
+            .send({
+              name: "vulnerability/enrich.requested",
+              data: { vulnerabilityId },
+            })
+            .catch((err) => {
+              console.error(
+                "Failed to dispatch vulnerability enrichment event:",
+                err,
+              );
+            });
 
           return vulnerability;
         },

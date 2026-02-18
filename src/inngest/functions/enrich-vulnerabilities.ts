@@ -33,7 +33,7 @@ async function fetchEpss(cveId: string): Promise<number | null> {
     data?: { epss?: string | number }[];
   };
   const entry = json.data?.[0];
-  if (!entry?.epss) return null;
+  if (entry?.epss === undefined || entry?.epss === null) return null;
 
   const score = Number(entry.epss);
   return Number.isNaN(score) ? null : score;

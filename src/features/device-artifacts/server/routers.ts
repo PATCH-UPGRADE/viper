@@ -6,9 +6,11 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import {
+  cpesToDeviceGroups,
   cpeToDeviceGroup,
   createArtifactWrappers,
   fetchPaginated,
+  processIntegrationSync,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
 import {
@@ -16,8 +18,10 @@ import {
   artifactWrapperSelect,
   artifactWrapperWithUrlsSchema,
   cpeSchema,
+  createIntegrationInputSchema,
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
+  integrationResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -34,6 +38,9 @@ const deviceArtifactInputSchema = z.object({
     .array(artifactInputSchema)
     .min(1, "at least one artifact is required"),
 });
+
+export const integrationDeviceArtifactInputSchema =
+  createIntegrationInputSchema(deviceArtifactInputSchema);
 
 const deviceArtifactUpdateSchema = z.object({
   id: z.string(),
@@ -249,6 +256,64 @@ export const deviceArtifactsRouter = createTRPCRouter({
       });
 
       return transformArtifactWrapper(result);
+    }),
+
+  processIntegrationCreate: protectedProcedure
+    .input(integrationDeviceArtifactInputSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/deviceArtifacts/integrationUpload",
+        tags: ["DeviceArtifacts"],
+        summary: "Synchronize Device Artifact with integration",
+        description:
+          "Synchronize Device Artifacts on VIPER from a partnered platform",
+      },
+    })
+    .output(integrationResponseSchema)
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.auth.user.id;
+      const integration = await prisma.deviceArtifact.findFirst({
+        // @ts-expect-error ctx.auth.key.id is defined if logging in with api key
+        where: { apiKey: { id: ctx.auth.key?.id } },
+        select: { id: true },
+      });
+
+      const integrationId = requireExistence(integration, "Integration").id;
+
+      return processIntegrationSync(
+        prisma,
+        {
+          model: prisma.deviceArtifact,
+          mappingModel: prisma.externalDeviceArtifactMapping,
+          transformInputItem: async (item, userId) => {
+            const { cpes, vendorId: _vendorId, ...itemData } = item;
+            const uniqueCpes = [...new Set(cpes)];
+            const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
+
+            return {
+              createData: {
+                ...itemData,
+                userId,
+                affectedDeviceGroups: {
+                  connect: deviceGroups.map((dg) => ({ id: dg.id })),
+                },
+              },
+              updateData: {
+                ...itemData,
+                affectedDeviceGroups: {
+                  set: deviceGroups.map((dg) => ({ id: dg.id })),
+                },
+              },
+              uniqueFieldConditions: [],
+              // ^always create unmapped vulns
+            };
+          },
+        },
+        input,
+        userId,
+        integrationId,
+      );
     }),
 
   // DELETE /api/deviceArtifacts/{deviceArtifact_id} - Delete deviceArtifact (only creator can delete)

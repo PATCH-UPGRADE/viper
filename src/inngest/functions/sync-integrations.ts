@@ -1,7 +1,9 @@
 import "server-only";
 import { z } from "zod";
 import { integrationAssetInputSchema } from "@/features/assets/server/routers";
+import { integrationDeviceArtifactInputSchema } from "@/features/device-artifacts/server/routers";
 import type { IntegrationWithStringDates } from "@/features/integrations/types";
+import { integrationRemediationInputSchema } from "@/features/remediations/server/routers";
 import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/server/routers";
 import type { ResourceType } from "@/generated/prisma";
 import { AuthType, SyncStatusEnum } from "@/generated/prisma";
@@ -60,15 +62,21 @@ const getResponseConfig = (resourceType: ResourceType) => {
         path: "/assets/integrationUpload",
         schema: z.toJSONSchema(integrationAssetInputSchema),
       };
+    case "DeviceArtifact":
+      return {
+        path: "/deviceArtifacts/integrationUpload",
+        schema: z.toJSONSchema(integrationDeviceArtifactInputSchema),
+      };
+    case "Remediation":
+      return {
+        path: "/remediations/integrationUpload",
+        schema: z.toJSONSchema(integrationRemediationInputSchema),
+      };
     case "Vulnerability":
       return {
         path: "/vulnerabilities/integrationUpload",
         schema: z.toJSONSchema(integrationVulnerabilityInputSchema),
       };
-    // TODO
-    case "DeviceArtifact":
-    case "Remediation":
-      throw new Error(`ResourceType ${resourceType} is not supported yet`);
     default:
       throw new Error(`Unhandled ResourceType: ${resourceType}`);
   }

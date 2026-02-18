@@ -311,20 +311,21 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         method: "POST",
         path: "/vulnerabilities/integrationUpload",
         tags: ["Vulnerabilities"],
-        summary: "Synchronize vulnerabilities with integration",
+        summary: "Synchronize Vulnerabilities with integration",
         description:
-          "Synchronize vulnerabilities on VIPER from a partnered platform",
+          "Synchronize Vulnerabilities on VIPER from a partnered platform",
       },
     })
     .output(integrationResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.auth.user.id;
-      const foundIntegration = await prisma.integration.findFirstOrThrow({
+      const integration = await prisma.integration.findFirst({
         // @ts-expect-error ctx.auth.key.id is defined if logging in with api key
         where: { apiKey: { id: ctx.auth.key?.id } },
         select: { id: true },
       });
-      const integrationId = foundIntegration.id;
+
+      const integrationId = requireExistence(integration, "Integration").id;
 
       return processIntegrationSync(
         prisma,

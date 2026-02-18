@@ -174,8 +174,8 @@ model DeviceGroup {
   deviceGroupHistories DeviceGroupHistory[]
   assets               Asset[]
   vulnerabilities      Vulnerability[]      @relation("VulnerabilityDeviceGroups")
-  remediations         Remediation[] @relation("RemediationDeviceGroups")
-  deviceArtifacts DeviceArtifact[]
+  remediations         Remediation[]        @relation("RemediationDeviceGroups")
+  deviceArtifacts      DeviceArtifact[]
 
   @@index([cpe])
   @@map("device_group")
@@ -236,7 +236,7 @@ model ExternalAssetMapping {
   id            String      @id @default(cuid())
   itemId        String
   integrationId String
-  externalId    String // the id the asset has on say, Blueflow
+  externalId    String      // the id the asset has on say, Blueflow
   // Relationships
   item          Asset       @relation(fields: [itemId], references: [id], onDelete: Cascade)
   integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
@@ -252,7 +252,41 @@ model ExternalAssetMapping {
   @@map("external_asset_mappings")
 }
 
-// duplicate model for type safety and performance
+// duplicate models for type safety and performance
+model ExternalDeviceArtifactMapping {
+  id            String         @id @default(cuid())
+  itemId        String
+  integrationId String
+  externalId    String
+  item          DeviceArtifact @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  integration   Integration    @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  lastSynced    DateTime?
+
+  @@unique([itemId, integrationId], name: "external_device_artifact_mappings_item_integration_key")
+  @@unique([integrationId, externalId], name: "external_device_artifact_mappings_integration_external_key")
+  @@index([itemId])
+  @@map("external_device_artifact_mappings")
+}
+
+model ExternalRemediationMapping {
+  id            String        @id @default(cuid())
+  itemId        String
+  integrationId String
+  externalId    String
+  item          Remediation   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  integration   Integration   @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  lastSynced    DateTime?
+
+  @@unique([itemId, integrationId], name: "external_remediation_mappings_item_integration_key")
+  @@unique([integrationId, externalId], name: "external_remediation_mappings_integration_external_key")
+  @@index([itemId])
+  @@map("external_remediation_mappings")
+}
+
 model ExternalVulnerabilityMapping {
   id            String        @id @default(cuid())
   itemId        String
@@ -333,24 +367,25 @@ enum ArtifactType {
   Other
 }
 
-
 model DeviceArtifact {
-  id            String      @id @default(cuid())
-  artifacts ArtifactWrapper[]
+  id               String            @id @default(cuid())
+  deviceGroupId    String
+  deviceGroup      DeviceGroup       @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  deviceGroupId String
-  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artifacts        ArtifactWrapper[]
+  vulnerability    Vulnerability[]
 
-  vulnerability Vulnerability[]
+  upstreamApi      String?           @map("upstream-api")
+  description      String?           @db.Text
+  role             String?
 
-  upstreamApi          String?        @map("upstream-api")
-  description String?  @db.Text
-  role String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  externalMappings ExternalDeviceArtifactMapping[]
+
   @@index([deviceGroupId])
   @@index([userId])
   @@map("device_artifact")
@@ -364,32 +399,33 @@ enum Severity {
 }
 
 model Vulnerability {
-  id                   String        @id @default(cuid())
-  cveId                String?       @unique
-  description          String?       @db.Text
-  narrative            String?       @db.Text
-  impact               String?       @db.Text
-  severity             Severity      @default(Medium)
+  id                   String          @id @default(cuid())
+  cveId                String?         @unique
+  description          String?         @db.Text
+  narrative            String?         @db.Text
+  impact               String?         @db.Text
+  severity             Severity        @default(Medium)
   cvssScore            Float?
   cvssVector           String?
   sarif                Json
-  affectedComponents   String[]      @default([])
-  affectedDeviceGroups DeviceGroup[] @relation("VulnerabilityDeviceGroups")
-  exploitUri           String?       @map("exploit-uri")
-  upstreamApi          String?       @map("upstream-api")
+  affectedComponents   String[]        @default([])
+  affectedDeviceGroups DeviceGroup[]   @relation("VulnerabilityDeviceGroups")
+  exploitUri           String?         @map("exploit-uri")
+  upstreamApi          String?         @map("upstream-api")
 
-  deviceArtifactId String?
-  deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
+  deviceArtifactId     String?
+  deviceArtifact       DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  remediations Remediation[]
-  issues       Issue[]
+  remediations         Remediation[]
+  issues               Issue[]
 
-  createdAt        DateTime                       @default(now())
-  updatedAt        DateTime                       @updatedAt
-  externalMappings ExternalVulnerabilityMapping[]
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  externalMappings     ExternalVulnerabilityMapping[]
 
   @@index([userId])
   @@index([deviceArtifactId])
@@ -443,6 +479,8 @@ model Remediation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  externalMappings ExternalRemediationMapping[]
+
   @@index([vulnerabilityId])
   @@index([userId])
   @@map("remediation")
@@ -489,37 +527,39 @@ model Apikey {
 }
 
 model Integration {
-  id             String       @id @default(cuid())
-  name           String
-  platform       String? // The name of the integration platform, e.g "BlueFlow"
-  integrationUri String       @map("integration-uri")
-  isGeneric      Boolean
+  id                     String       @id @default(cuid())
+  name                   String
+  platform               String?      // The name of the integration platform, e.g "BlueFlow"
+  integrationUri         String       @map("integration-uri")
+  isGeneric              Boolean
   // ^a generic integration uses AI to pull data
   // if generic is false, the integration will respond to one of our endpoints
   //  with structured data
-  prompt         String?      @db.Text // optional, additional instructions for AI
-  authType       AuthType
-  resourceType   ResourceType
-  authentication Json? // TODO: this needs to be encrypted
-  syncEvery      Int // e.g 300, sync every 300 seconds
-  syncStatus     SyncStatus[]
-  apiKeyId       String?      @unique
-  apiKey         Apikey?      @relation(fields: [apiKeyId], references: [id])
+  prompt                 String?      @db.Text // optional, additional instructions for AI
+  authType               AuthType
+  resourceType           ResourceType
+  authentication         Json?        // TODO: this needs to be encrypted
+  syncEvery              Int          // e.g 300, sync every 300 seconds
+  syncStatus             SyncStatus[]
+  apiKeyId               String?      @unique
+  apiKey                 Apikey?      @relation(fields: [apiKeyId], references: [id])
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   // The user who created the integration
+  userId                 String
+  user                   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  integrationUserId String?
-  integrationUser   User?   @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
   // the user that this integration creates
-  // TODO: should this be required? leaving it optional for migration 
+  // TODO: should this be required? leaving it optional for migration
+  integrationUserId      String?
+  integrationUser        User?        @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
 
-  assetMappings         ExternalAssetMapping[]
-  vulnerabilityMappings ExternalVulnerabilityMapping[]
+  assetMappings          ExternalAssetMapping[]
+  deviceArtifactMappings ExternalDeviceArtifactMapping[]
+  remediationMappings    ExternalRemediationMapping[]
+  vulnerabilityMappings  ExternalVulnerabilityMapping[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
 
   @@index([userId])
   @@index([integrationUserId])

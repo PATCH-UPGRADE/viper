@@ -39,56 +39,35 @@ async function fetchEpss(cveId: string): Promise<number | null> {
   return Number.isNaN(score) ? null : score;
 }
 
-const KEV_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
-
-interface KevCache {
-  ids: Set<string>;
-  fetchedAt: number;
-}
-
-let kevCache: KevCache | null = null;
-
+// Pure fetcher — no module-level state. Returns uppercase CVE IDs.
 async function fetchKevSet(): Promise<Set<string>> {
-  const now = Date.now();
-  if (kevCache && now - kevCache.fetchedAt < KEV_CACHE_TTL_MS) {
-    return kevCache.ids;
-  }
-
   const res = await fetch(
     "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
     { signal: AbortSignal.timeout(30000) },
   );
-
-  if (!res.ok) {
-    // Return stale cache rather than treating every CVE as not in KEV.
-    if (kevCache) return kevCache.ids;
-    return new Set();
-  }
+  if (!res.ok) return new Set();
 
   const json = (await res.json()) as {
     vulnerabilities?: { cveID?: string }[];
   };
 
-  const ids = new Set(
+  return new Set(
     (json.vulnerabilities ?? [])
       .map((v) => v.cveID?.toUpperCase())
       .filter((id): id is string => Boolean(id)),
   );
-
-  kevCache = { ids, fetchedAt: now };
-  return ids;
-}
-
-async function fetchKevStatus(cveId: string): Promise<boolean> {
-  const kevSet = await fetchKevSet();
-  return kevSet.has(cveId.toUpperCase());
 }
 
 export const enrichVulnerability = inngest.createFunction(
   { id: "enrich-vulnerability" },
   { event: "vulnerability/enrich.requested" },
   async ({ event, step }) => {
-    const { vulnerabilityId } = event.data;
+    // kevIds is present when triggered from enrichAllVulnerabilities (batch path).
+    // It is absent when the event is dispatched directly (standalone path).
+    const { vulnerabilityId, kevIds } = event.data as {
+      vulnerabilityId: string;
+      kevIds?: string[];
+    };
 
     const vulnerability = await step.run("fetch-vulnerability", async () => {
       return prisma.vulnerability.findUnique({
@@ -105,7 +84,15 @@ export const enrichVulnerability = inngest.createFunction(
 
     const epss = await step.run("lookup-epss", () => fetchEpss(cveId));
 
-    const inKEV = await step.run("lookup-kev", () => fetchKevStatus(cveId));
+    // Batch path: use the pre-fetched set from the event payload (no network call).
+    // Standalone path: fetch the KEV feed once for this single invocation.
+    const inKEV: boolean =
+      kevIds !== undefined
+        ? new Set(kevIds).has(cveId.toUpperCase())
+        : await step.run("lookup-kev", async () => {
+            const kevSet = await fetchKevSet();
+            return kevSet.has(cveId.toUpperCase());
+          });
 
     const priority = computeVulnerabilityPriority(
       epss,
@@ -120,7 +107,7 @@ export const enrichVulnerability = inngest.createFunction(
         data: {
           epss,
           updatedEpss: now,
-          inKEV: inKEV,
+          inKEV,
           updatedInKev: now,
           priority,
         },
@@ -135,15 +122,20 @@ export const enrichAllVulnerabilities = inngest.createFunction(
   { id: "enrich-all-vulnerabilities" },
   { cron: "0 2 * * *" },
   async ({ step }) => {
-    const vulnerabilities = await step.run(
-      "fetch-vulnerabilities-with-cve",
-      async () => {
-        return prisma.vulnerability.findMany({
+    // Fetch the vulnerability list and the KEV feed in parallel.
+    // fetchKevSet runs exactly once per batch regardless of how many CVEs exist.
+    const [vulnerabilities, kevIds] = await Promise.all([
+      step.run("fetch-vulnerabilities-with-cve", () =>
+        prisma.vulnerability.findMany({
           where: { cveId: { not: null } },
           select: { id: true },
-        });
-      },
-    );
+        }),
+      ),
+      step.run("fetch-kev-set", async () => {
+        const kevSet = await fetchKevSet();
+        return Array.from(kevSet);
+      }),
+    ]);
 
     if (vulnerabilities.length === 0) {
       return { enrichedCount: 0 };
@@ -153,7 +145,7 @@ export const enrichAllVulnerabilities = inngest.createFunction(
       "trigger-enrichments",
       vulnerabilities.map((v) => ({
         name: "vulnerability/enrich.requested" as const,
-        data: { vulnerabilityId: v.id },
+        data: { vulnerabilityId: v.id, kevIds },
       })),
     );
 

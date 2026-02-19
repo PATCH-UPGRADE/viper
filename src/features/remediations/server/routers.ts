@@ -119,7 +119,7 @@ export const remediationsRouter = createTRPCRouter({
           
           **Artifact hosting**
           See docs/upload_artifact.md
-          `.trim()
+          `.trim(),
       },
     })
     .output(remediationUploadResponseSchema)
@@ -128,9 +128,10 @@ export const remediationsRouter = createTRPCRouter({
       const uniqueCpes = [...new Set(cpes)];
       const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
       const userId = ctx.auth.user.id;
-      
+
       // Handle S3 URL -- if the user included a hash/size but no downloadUrl, they want us to host it
-      const { processedArtifacts, uploadInstructions } = await processArtifactHosting(artifacts);
+      const { processedArtifacts, uploadInstructions } =
+        await processArtifactHosting(artifacts);
 
       // Verify the vulnerability exists
       if (input.vulnerabilityId) {
@@ -219,7 +220,7 @@ export const remediationsRouter = createTRPCRouter({
           
           **Artifact hosting**
           See docs/upload_artifact.md
-          `.trim()
+          `.trim(),
       },
     })
     .output(remediationUploadResponseSchema)
@@ -230,10 +231,10 @@ export const remediationsRouter = createTRPCRouter({
       const { id, cpes, artifacts = [], ...updateData } = input;
 
       // Prepare update data
-      const { processedArtifacts, uploadInstructions } = await processArtifactHosting(artifacts);
+      const { processedArtifacts, uploadInstructions } =
+        await processArtifactHosting(artifacts);
 
       const result = await prisma.$transaction(async (tx) => {
-
         const data: Prisma.RemediationUpdateInput = {
           ...(updateData.narrative !== undefined && {
             narrative: updateData.narrative,
@@ -269,7 +270,7 @@ export const remediationsRouter = createTRPCRouter({
             processedArtifacts,
             id,
             "remediationId",
-            ctx.auth.user.id
+            ctx.auth.user.id,
           );
         }
 
@@ -278,9 +279,9 @@ export const remediationsRouter = createTRPCRouter({
           include: remediationInclude,
         });
       });
-    return {
-      remediation: transformArtifactWrapper(result),
-      uploadInstructions,
-    };
-  }),
+      return {
+        remediation: transformArtifactWrapper(result),
+        uploadInstructions,
+      };
+    }),
 });

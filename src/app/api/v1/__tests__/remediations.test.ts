@@ -190,11 +190,11 @@ describe("Remediations Endpoint (/remediations)", () => {
       });
 
     expect(updateRes.status).toBe(200);
-    
+
     // TODO: Remediation PUT now returns { remediation, uploadInstructions }
     // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
     updateRes.body = updateRes.body.remediation;
-    
+
     expect(updateRes.body.id).toBe(remediationId);
     expect(updateRes.body.description).toBe("Updated description");
     expect(updateRes.body.narrative).toBe("Updated narrative");
@@ -210,11 +210,11 @@ describe("Remediations Endpoint (/remediations)", () => {
       });
 
     expect(updateCpesRes.status).toBe(200);
-    
+
     // TODO: Remediation PUT now returns { remediation, uploadInstructions }
     // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
     updateCpesRes.body = updateCpesRes.body.remediation;
-    
+
     expect(updateCpesRes.body.affectedDeviceGroups.length).toBe(2);
     const cpes = updateCpesRes.body.affectedDeviceGroups.map(
       (dg: DeviceGroupWithUrls) => dg.cpe,
@@ -403,11 +403,11 @@ describe("Remediations Endpoint (/remediations)", () => {
       });
 
     expect(createRes.status).toBe(200);
-    
+
     // TODO: Remediation POST now returns { remediation, uploadInstructions }
     // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
     createRes.body = createRes.body.remediation;
-    
+
     const remediationId = createRes.body.id;
 
     onTestFinished(async () => {

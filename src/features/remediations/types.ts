@@ -32,7 +32,7 @@ export const remediationUpdateSchema = z.object({
   description: z.string().optional(),
   narrative: z.string().optional(),
   upstreamApi: safeUrlSchema.optional(),
-  artifacts: z.array(artifactInputSchema).optional()
+  artifacts: z.array(artifactInputSchema).optional(),
 });
 
 export const vulnerabilitySchema = z.object({
@@ -62,12 +62,12 @@ const uploadInstructionsSchema = z.object({
   artifactName: z.string(),
   uploadUrl: z.string().url(),
   requiredHeader: z.string(),
-})
+});
 
 export const remediationUploadResponseSchema = z.object({
   remediation: remediationResponseSchema,
-  uploadInstructions: z.array(uploadInstructionsSchema)
-})
+  uploadInstructions: z.array(uploadInstructionsSchema),
+});
 
 const remediationVulnerabilitySelect = {
   select: {

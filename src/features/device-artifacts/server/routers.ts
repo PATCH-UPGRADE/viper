@@ -273,7 +273,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.auth.user.id;
-      const integration = await prisma.deviceArtifact.findFirst({
+      const integration = await prisma.integration.findFirst({
         // @ts-expect-error ctx.auth.key.id is defined if logging in with api key
         where: { apiKey: { id: ctx.auth.key?.id } },
         select: { id: true },
@@ -287,26 +287,26 @@ export const deviceArtifactsRouter = createTRPCRouter({
           model: prisma.deviceArtifact,
           mappingModel: prisma.externalDeviceArtifactMapping,
           transformInputItem: async (item, userId) => {
-            const { cpes, vendorId: _vendorId, ...itemData } = item;
-            const uniqueCpes = [...new Set(cpes)];
-            const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
+            const { cpe, vendorId: _vendorId, artifacts: _artifacts, ...itemData } = item;
+            const newDeviceGroup = await cpeToDeviceGroup(cpe);
 
             return {
               createData: {
                 ...itemData,
-                userId,
-                affectedDeviceGroups: {
-                  connect: deviceGroups.map((dg) => ({ id: dg.id })),
+                user: {
+                  connect: { id: userId },
+                },
+                deviceGroup: {
+                  connect: { id: newDeviceGroup.id },
                 },
               },
               updateData: {
                 ...itemData,
-                affectedDeviceGroups: {
-                  set: deviceGroups.map((dg) => ({ id: dg.id })),
+                deviceGroup: {
+                  set: newDeviceGroup.id,
                 },
               },
               uniqueFieldConditions: [],
-              // ^always create unmapped vulns
             };
           },
         },

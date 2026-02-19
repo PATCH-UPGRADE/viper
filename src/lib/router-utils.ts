@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
 import "server-only";
-import { type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
+import { Artifact, type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
@@ -150,6 +150,7 @@ export const handlePrismaError = (e: unknown): string => {
     return e.message;
   }
 
+  return e.message;
   return "Internal Server Error";
 };
 
@@ -310,19 +311,32 @@ export async function processIntegrationSync<
     // If no Item, we need to create the Item and ExternalItemMapping
     if (!foundItem) {
       try {
-        await config.model.create({
-          data: {
-            ...createData,
-            ...(config.additionalCreateFields?.(userId) || {}),
-            externalMappings: {
-              create: {
-                integrationId,
-                externalId: vendorId,
-                lastSynced,
+        await prisma.$transaction(async (tx) => {
+          const createdItem = await config.model.create({
+            data: {
+              ...createData,
+              ...(config.additionalCreateFields?.(userId) || {}),
+              externalMappings: {
+                create: {
+                  integrationId,
+                  externalId: vendorId,
+                  lastSynced,
+                },
               },
             },
-          },
+          });
+
+          if (item.artifacts) {
+            await createArtifactWrappers(
+              tx,
+              item.artifacts,
+              createdItem.id,
+              "remediationId",
+              userId,
+            );
+          }
         });
+        
       } catch (error: unknown) {
         console.error("no existing Item", error);
         response.message = handlePrismaError(error);

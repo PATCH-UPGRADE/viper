@@ -14,6 +14,7 @@ import type {
   DeviceGroupWithUrls,
 } from "@/lib/schemas";
 import {
+  AUTH_TOKEN,
   authHeader,
   BASE_URL,
   generateCPE,
@@ -52,33 +53,40 @@ describe("Remediations Endpoint (/remediations)", () => {
     platform: "mockIntegrationPlatform",
     integrationUri: "https://mock-vuln-upstream-api.com/",
     isGeneric: false,
-    resourceType: ResourceType.Vulnerability,
+    authType: AuthType.Bearer,
+    resourceType: ResourceType.Remediation,
+    authentication: {
+      token: AUTH_TOKEN,
+    },
     syncEvery: 300,
-    authType: AuthType.None,
   };
-
-  // description   String?      @db.Text
-  // narrative     String?      @db.Text
-  // upstreamApi   String?      @map("upstream-api")
 
   const remediationIntegrationPayload = {
     vendor: "mockRemediationIntegrationVendor",
     items: [
       {
         cpes: ["cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*"],
-        upstreamApi: "https://mock-vuln-upstream-api.com/",
-        description: "Mock -- Critical buffer overflow in imaging device",
+        upstreamApi: "https://mock-rem-upstream-api.com/",
+        description: "Mock -- run apt update",
         narrative: "Discovered during security audit",
-        vendorId: "mockVuln-1",
+        vendorId: "mockRemediation-1",
+        artifacts: [{
+          name: "mock-remediation-artifact-1",
+          artifactType: ArtifactType.Documentation,
+          downloadUrl: "http://mock.example.com",
+        }],
       },
       {
-        sarif: { tool: { driver: { name: "MockScanner" } } },
-        cpes: ["cpe:2.3:h:mock:brive_ct315:*:*:*:*:*:*:*"],
-        upstreamApi: "https://mock-vuln-upstream-api.com/",
-        description: "Mock -- Authentication bypass vulnerability",
-        narrative: "Found in network scan",
-        impact: "High",
-        vendorId: "mockVuln-2",
+        cpes: ["cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*"],
+        upstreamApi: "https://mock-rem-upstream-api.com/",
+        description: "Mock - Turn it off and on again",
+        narrative: "Discovered during security audit",
+        vendorId: "mockRemediation-2",
+        artifacts: [{
+          name: "mock-remediation-artifact-2",
+          artifactType: ArtifactType.Documentation,
+          downloadUrl: "http://mock.example.com",
+        }],
       },
     ],
     page: 1,
@@ -121,6 +129,15 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   // it("DELETE /remediations/{id} - Without auth, should 401", async () => {
   //   const res = await request(BASE_URL).delete("/remediations/foo");
+
+  //   expect(res.status).toBe(401);
+  //   expect(res.body.code).toBe("UNAUTHORIZED");
+  // });
+
+  // it("GET /remediations/integrationUpload - Without auth, should be 401", async () => {
+  //   const res = await request(BASE_URL).get(
+  //     `/remediations/integrationUpload`,
+  //   );
 
   //   expect(res.status).toBe(401);
   //   expect(res.body.code).toBe("UNAUTHORIZED");
@@ -469,7 +486,6 @@ describe("Remediations Endpoint (/remediations)", () => {
       .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(noRemediations);
-    console.log(createRemResp);
 
     expect(createRemResp.status).toBe(200);
     expect(createRemResp.body.createdItemsCount).toBe(0);
@@ -478,7 +494,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(createRemResp.body.message).toBe("success");
   });
 
-  it("create Remediatoin uploadIntegration endpoint int test", async () => {
+  it("create Remediation uploadIntegration endpoint int test", async () => {
     const { integration: createdIntegration, apiKey } =
       await setupMockIntegration(mockIntegrationPayload);
 
@@ -499,6 +515,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(remediationIntegrationPayload);
+    console.log(integrationRes);
 
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);

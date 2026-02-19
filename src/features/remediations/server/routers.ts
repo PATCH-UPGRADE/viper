@@ -246,7 +246,7 @@ export const remediationsRouter = createTRPCRouter({
         method: "POST",
         path: "/remediations/integrationUpload",
         tags: ["Remediations"],
-        summary: "Synchronize remediation with integration",
+        summary: "Synchronize Remediations with integration",
         description:
           "Synchronize Remediations on VIPER from a partnered platform",
       },
@@ -254,7 +254,7 @@ export const remediationsRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.auth.user.id;
-      const integration = await prisma.remediation.findFirst({
+      const integration = await prisma.integration.findFirst({
         // @ts-expect-error ctx.auth.key.id is defined if logging in with api key
         where: { apiKey: { id: ctx.auth.key?.id } },
         select: { id: true },
@@ -268,7 +268,7 @@ export const remediationsRouter = createTRPCRouter({
           model: prisma.remediation,
           mappingModel: prisma.externalRemediationMapping,
           transformInputItem: async (item, userId) => {
-            const { cpes, vendorId: _vendorId, ...itemData } = item;
+            const { cpes, vendorId: _vendorId, artifacts: _artifacts, ...itemData } = item;
             const uniqueCpes = [...new Set(cpes)];
             const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
 
@@ -287,7 +287,6 @@ export const remediationsRouter = createTRPCRouter({
                 },
               },
               uniqueFieldConditions: [],
-              // ^always create unmapped vulns
             };
           },
         },

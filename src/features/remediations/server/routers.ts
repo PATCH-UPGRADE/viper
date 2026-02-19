@@ -240,43 +240,65 @@ export const remediationsRouter = createTRPCRouter({
           "Update a remediation. Only the user who created the remediation can update it.",
       },
     })
-    .output(remediationResponseSchema)
+    .output(remediationUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
       // Verify ownership and get current data
       await requireOwnership(input.id, ctx.auth.user.id, "remediation");
 
-      const { id, cpes, ...updateData } = input;
+      const { id, cpes, artifacts = [], ...updateData } = input;
 
       // Prepare update data
-      const data: Prisma.RemediationUpdateInput = {
-        ...(updateData.narrative !== undefined && {
-          narrative: updateData.narrative,
-        }),
-        ...(updateData.description !== undefined && {
-          description: updateData.description,
-        }),
-        ...(updateData.upstreamApi !== undefined && {
-          upstreamApi: updateData.upstreamApi,
-        }),
-        ...(updateData.vulnerabilityId !== undefined && {
-          vulnerabilityId: updateData.vulnerabilityId,
-        }),
-      };
+      const { processedArtifacts, uploadInstructions } = await processArtifactHosting(artifacts);
 
-      // Handle CPE/device group update if provided
-      if (cpes) {
-        const uniqueCpes = [...new Set(cpes)];
-        const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
-        data.affectedDeviceGroups = {
-          set: deviceGroups.map((dg) => ({ id: dg.id })),
+      const result = await prisma.$transaction(async (tx) => {
+
+        const data: Prisma.RemediationUpdateInput = {
+          ...(updateData.narrative !== undefined && {
+            narrative: updateData.narrative,
+          }),
+          ...(updateData.description !== undefined && {
+            description: updateData.description,
+          }),
+          ...(updateData.upstreamApi !== undefined && {
+            upstreamApi: updateData.upstreamApi,
+          }),
+          ...(updateData.vulnerabilityId !== undefined && {
+            vulnerabilityId: updateData.vulnerabilityId,
+          }),
         };
-      }
 
-      const result = await prisma.remediation.update({
-        where: { id },
-        data,
-        include: remediationInclude,
+        // Handle CPE/device group update if provided
+        if (cpes) {
+          const uniqueCpes = [...new Set(cpes)];
+          const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
+          data.affectedDeviceGroups = {
+            set: deviceGroups.map((dg) => ({ id: dg.id })),
+          };
+        }
+
+        await tx.remediation.update({
+          where: { id },
+          data,
+        });
+
+        if (processedArtifacts.length > 0) {
+          await createArtifactWrappers(
+            tx,
+            processedArtifacts,
+            id,
+            "remediationId",
+            ctx.auth.user.id
+          );
+        }
+
+        return await tx.remediation.findUniqueOrThrow({
+          where: { id },
+          include: remediationInclude,
+        });
       });
-      return transformArtifactWrapper(result);
-    }),
+    return {
+      remediation: transformArtifactWrapper(result),
+      uploadInstructions,
+    };
+  }),
 });

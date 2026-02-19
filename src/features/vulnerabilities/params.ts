@@ -1,14 +1,14 @@
 "use client";
 
 import { parseAsStringEnum } from "nuqs";
-import { Severity } from "@/generated/prisma";
+import { Priority } from "@/generated/prisma";
 import { createPaginationParams } from "@/lib/url-state";
 
 export const vulnerabilitiesParams = createPaginationParams();
 
-export const vulnerabilitiesBySeverityParams = {
+export const vulnerabilitiesByPriorityParams = {
   ...createPaginationParams(),
-  severity: parseAsStringEnum(Object.values(Severity))
+  priority: parseAsStringEnum(Object.values(Priority))
     .withDefault("Critical")
     .withOptions({ clearOnDefault: true }),
 };

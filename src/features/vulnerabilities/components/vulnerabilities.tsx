@@ -43,7 +43,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
-import { Severity } from "@/generated/prisma";
+import { Priority } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type {
   VulnerabilityWithDeviceGroups,
@@ -53,15 +53,15 @@ import { cn } from "@/lib/utils";
 import {
   useRemoveVulnerability,
   useSuspenseVulnerabilities,
-  useSuspenseVulnerabilitiesBySeverity,
-  useSuspenseVulnerabilitySeverityMetrics,
+  useSuspenseVulnerabilitiesByPriority,
+  useSuspenseVulnerabilityPriorityMetrics,
 } from "../hooks/use-vulnerabilities";
 import {
-  useVulnerabilitiesBySeverityParams,
+  useVulnerabilitiesByPriorityParams,
   useVulnerabilitiesParams,
 } from "../hooks/use-vulnerabilities-params";
 import type {
-  VulnerabilitiesBySeverityCounts,
+  VulnerabilitiesByPriorityCounts,
   VulnerabilityWithRelations,
 } from "../types";
 import { columns } from "./columns";
@@ -114,14 +114,13 @@ export const VulnerabilitiesList = () => {
   );
 };
 
-const SeveritiesExplained = {
+const PrioritiesExplained = {
   Critical: {
     help: "Immediate remediation required. Confirmed exploitation of high-impact vulnerabilities.",
     icon: ShieldAlert,
     color: "text-red-600",
     colorBg: "bg-red-50",
     alertHeader: "Critical - Immediate Remediation",
-    // NOTE: / TODO: This description doesn't match the "Critical" definition of CVSS, but it's in line with VW-75
     alertBody:
       "These vulnerabilities have confirmed exploitation of high-impact systems and require immediate action. They pose the highest risk to patient safety and data security.",
   },
@@ -131,40 +130,50 @@ const SeveritiesExplained = {
     color: "text-orange-600",
     colorBg: "bg-orange-50",
     alertHeader: "High - Scheduled Remediation",
-    // NOTE: / TODO: This description doesn't match the "High" definition of CVSS, but it's in line with VW-75
     alertBody:
       "These vulnerabilities indicate predicted exploitation of high-impact systems. Plan and schedule remediation activities within your next maintenance window.",
   },
-  Medium: {
+  Monitor: {
     help: "Track for changes in threat landscape or impact assessment.",
     icon: Eye,
     color: "text-yellow-600",
     colorBg: "bg-yellow-50",
-    alertHeader: "",
-    alertBody: "",
-    //TODO: VW-75 change to Monitor
+    alertHeader: "Monitor - Track Changes",
+    alertBody:
+      "These vulnerabilities should be monitored for changes in threat landscape or impact assessment. No immediate action required.",
   },
-  Low: {
+  Defer: {
     help: "Standard patching. No exploitation evidence, can be addressed through standard patching cycles.",
     icon: Clock,
     color: "text-blue-600",
     colorBg: "bg-blue-50",
+    alertHeader: "Defer - Standard Patching",
+    alertBody:
+      "These vulnerabilities have no exploitation evidence and can be addressed through standard patching cycles.",
+  },
+  Unsorted: {
+    help: "Not yet prioritized. Awaiting enrichment data or manual triage.",
+    icon: BugIcon,
+    color: "text-gray-500",
+    colorBg: "bg-gray-50",
     alertHeader: "",
     alertBody: "",
-    //TODO: VW-75 change to Defer
   },
 };
 
-export const VulnerabilitiesBySeverityMetrics = ({
+export const VulnerabilitiesByPriorityMetrics = ({
   data,
 }: {
-  data: VulnerabilitiesBySeverityCounts;
+  data: VulnerabilitiesByPriorityCounts;
 }) => {
   return (
-    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:grid-cols-4">
+    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-2 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs md:grid-cols-3 2xl:grid-cols-4">
       {Object.entries(data).map(([key, value]) => {
         const explained =
-          SeveritiesExplained[key as keyof typeof SeveritiesExplained];
+          PrioritiesExplained[key as keyof typeof PrioritiesExplained];
+        if (key === "Unsorted" && value.total === 0) {
+          return null;
+        }
         return (
           <Card key={key} className={cn("@container/card", explained.colorBg)}>
             <CardHeader>
@@ -198,33 +207,33 @@ export const VulnerabilitiesBySeverityMetrics = ({
 };
 
 export const PrioritizedVulnerabilitiesList = () => {
-  const { data, isFetching } = useSuspenseVulnerabilitiesBySeverity();
-  const { data: counts } = useSuspenseVulnerabilitySeverityMetrics();
+  const { data, isFetching } = useSuspenseVulnerabilitiesByPriority();
+  const { data: counts } = useSuspenseVulnerabilityPriorityMetrics();
 
   const [vuln, setVuln] = useState<VulnerabilityWithRelations | undefined>(
     undefined,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [params, setParams] = useVulnerabilitiesBySeverityParams();
-  const { severity } = params;
+  const [params, setParams] = useVulnerabilitiesByPriorityParams();
+  const { priority } = params;
 
   const handleTabChange = (value: string) => {
-    setParams((prev) => ({ ...prev, severity: value as Severity, page: null }));
+    setParams((prev) => ({ ...prev, priority: value as Priority, page: null }));
   };
 
   const explained =
-    SeveritiesExplained[severity as keyof typeof SeveritiesExplained];
+    PrioritiesExplained[priority as keyof typeof PrioritiesExplained];
 
   return (
     <>
-      <VulnerabilitiesBySeverityMetrics data={counts} />
-      <Tabs value={severity} onValueChange={handleTabChange}>
+      <VulnerabilitiesByPriorityMetrics data={counts} />
+      <Tabs value={priority} onValueChange={handleTabChange}>
         <TabsList variant="line">
-          {Object.values(Severity).map((sev) => (
-            <TabsTrigger key={sev} value={sev}>
-              <span className="font-semibold">{sev}</span>
+          {Object.values(Priority).map((p) => (
+            <TabsTrigger key={p} value={p}>
+              <span className="font-semibold">{p}</span>
               <Badge variant="secondary" className="ml-2">
-                {counts[sev].total}
+                {counts[p].total}
               </Badge>
             </TabsTrigger>
           ))}

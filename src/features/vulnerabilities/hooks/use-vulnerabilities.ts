@@ -6,7 +6,7 @@ import {
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import {
-  useVulnerabilitiesBySeverityParams,
+  useVulnerabilitiesByPriorityParams,
   useVulnerabilitiesParams,
 } from "./use-vulnerabilities-params";
 
@@ -22,19 +22,19 @@ export const useSuspenseVulnerabilities = () => {
   );
 };
 
-export const useSuspenseVulnerabilitiesBySeverity = () => {
+export const useSuspenseVulnerabilitiesByPriority = () => {
   const trpc = useTRPC();
-  const [params] = useVulnerabilitiesBySeverityParams();
+  const [params] = useVulnerabilitiesByPriorityParams();
 
   return useSuspenseQuery(
-    trpc.vulnerabilities.getManyBySeverityInternal.queryOptions(params),
+    trpc.vulnerabilities.getManyByPriorityInternal.queryOptions(params),
   );
 };
 
-export const useSuspenseVulnerabilitySeverityMetrics = () => {
+export const useSuspenseVulnerabilityPriorityMetrics = () => {
   const trpc = useTRPC();
   return useSuspenseQuery(
-    trpc.vulnerabilities.getSeverityMetricsInternal.queryOptions(),
+    trpc.vulnerabilities.getPriorityMetricsInternal.queryOptions(),
   );
 };
 

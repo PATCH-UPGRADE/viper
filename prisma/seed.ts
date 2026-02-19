@@ -2,6 +2,7 @@ import { hashPassword } from "better-auth/crypto";
 import {
   type ArtifactType,
   type AssetStatus,
+  Priority,
   Severity,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -521,202 +522,14 @@ const SAMPLE_ASSETS = [
 // Sample hospital vulnerability data
 
 const SAMPLE_VULNERABILITIES = [
+  // --- Critical priority: confirmed exploitation, high CVSS, high EPSS, in KEV ---
   {
-    cveId: "CVE-2024-1234",
+    cveId: "CVE-2024-21762",
     severity: Severity.Critical,
     cvssScore: 9.8,
-    epss: 0.89, // High EPSS - critical vuln with public exploit
+    epss: 0.91,
     inKEV: true,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "NVD Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2024-1234",
-              level: "error",
-              message: {
-                text: "Buffer overflow in Philips IntelliVue patient monitor firmware",
-              },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:philips:intellivue_mp70:*:*:*:*:*:*:*:*",
-    exploitUri: "https://github.com/security-research/cve-2024-1234-poc",
-    upstreamApi: "https://nvd.nist.gov/vuln/detail/CVE-2024-1234",
-    description:
-      "Buffer overflow vulnerability in Philips IntelliVue MP70 patient monitor firmware allows remote code execution",
-    narrative:
-      "An attacker on the hospital network could send specially crafted packets to the monitor, causing a buffer overflow. This allows execution of arbitrary code with system privileges, enabling the attacker to manipulate vital sign readings or disable alarm functions.",
-    impact:
-      "Critical patient safety risk. Compromised monitors could display false vital signs (heart rate, blood pressure, oxygen saturation) leading to incorrect clinical decisions. Alarm suppression could prevent detection of patient deterioration in ICU settings.",
-  },
-  {
-    cveId: "CVE-2024-5678",
-    severity: Severity.High,
-    cvssScore: 8.1,
-    epss: 0.72,
-    inKEV: true,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "ICS-CERT Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2024-5678",
-              level: "warning",
-              message: {
-                text: "Authentication bypass in Baxter infusion pump",
-              },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:baxter:infusion_pump:sigma_spectrum:*:*:*:*:*:*:*",
-    exploitUri: "https://github.com/medical-security/baxter-auth-bypass",
-    upstreamApi: "https://www.cisa.gov/ics-cert/advisories/icsa-24-001",
-    description:
-      "Authentication bypass vulnerability in Baxter Sigma Spectrum infusion pump allows unauthorized access to drug library",
-    narrative:
-      "An attacker with physical or network access could bypass authentication mechanisms and modify the drug library parameters. This includes changing maximum dose limits, infusion rates, and alarm thresholds without proper credentials.",
-    impact:
-      "Life-threatening medication errors. Altered drug libraries could allow dangerous overdoses or underdoses. Modified rate limits could enable fatal medication administration. Suppressed alarms prevent clinical staff from detecting improper infusions.",
-  },
-  {
-    cveId: "CVE-2024-9012",
-    severity: Severity.Critical,
-    cvssScore: 9.1,
-    epss: 0.85,
-    inKEV: true,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "FDA Cybersecurity Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2024-9012",
-              level: "error",
-              message: { text: "SQL injection in GE Healthcare PACS system" },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:ge_healthcare:optima_ct660:*:*:*:*:*:*:*:*",
-    exploitUri: "https://github.com/healthcare-vulns/ge-pacs-sqli",
-    upstreamApi: "https://nvd.nist.gov/vuln/detail/CVE-2024-9012",
-    description:
-      "SQL injection vulnerability in GE Healthcare CT scanner PACS interface allows database manipulation",
-    narrative:
-      "An authenticated user could inject SQL commands through the PACS query interface. This allows reading, modifying, or deleting patient imaging records, exam metadata, and radiologist reports stored in the imaging database.",
-    impact:
-      "HIPAA violation and patient safety risk. Attackers could access protected health information (PHI) including patient demographics and medical images. Modified or deleted imaging studies could lead to misdiagnosis. Altered reports could result in inappropriate treatment decisions.",
-  },
-  {
-    cveId: "CVE-2024-3456",
-    severity: Severity.High,
-    cvssScore: 7.5,
-    epss: 0.45,
-    inKEV: false,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "MITRE Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2024-3456",
-              level: "warning",
-              message: { text: "Weak encryption in Epic EMR interface" },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:a:epic:emr:2023:*:*:*:*:*:*:*",
-    exploitUri: "https://github.com/ehr-security/epic-encryption-weakness",
-    upstreamApi: "https://nvd.nist.gov/vuln/detail/CVE-2024-3456",
-    description:
-      "Weak encryption in Epic EMR HL7 interface allows interception of patient data",
-    narrative:
-      "The HL7 messaging interface uses deprecated encryption (DES) for patient data transmission. An attacker with network access could intercept and decrypt messages containing patient demographics, diagnoses, medications, and lab results.",
-    impact:
-      "Massive HIPAA breach potential. Compromised EMR data includes complete medical histories, social security numbers, insurance information, and treatment plans. Exposure affects entire patient population. Regulatory fines and loss of patient trust.",
-  },
-  {
-    cveId: "CVE-2024-7890",
-    cvssScore: 10.0,
-    epss: 0.95, // Very high - critical RCE with public exploit
-    inKEV: true,
-    severity: Severity.Critical,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Vendor Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2024-7890",
-              level: "error",
-              message: { text: "Remote code execution in Siemens MRI scanner" },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*",
-    exploitUri: "https://github.com/imaging-vulns/siemens-mri-rce",
-    upstreamApi: "https://cert.vde.com/en/advisories/VDE-2024-001",
-    description:
-      "Remote code execution vulnerability in Siemens Magnetom Aera MRI scanner control software",
-    narrative:
-      "Unauthenticated remote attacker could send malicious DICOM messages to the MRI scanner, triggering a stack overflow in the image processing module. This allows arbitrary code execution with SYSTEM privileges on the scanner workstation.",
-    impact:
-      "Patient safety and equipment damage risk. Compromised MRI could alter scan parameters (gradient strength, RF power) causing patient harm or equipment damage. Modified images could lead to misdiagnosis. Scanner downtime disrupts radiology workflow and delays critical imaging.",
-  },
-  {
-    cveId: "CVE-2024-2345",
-    cvssScore: 8.8,
-    severity: Severity.High,
-    epss: 0.68,
-    inKEV: true,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Lab Equipment Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2024-2345",
-              level: "warning",
-              message: { text: "Default credentials in Roche Cobas analyzer" },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:roche:cobas_6000:*:*:*:*:*:*:*:*",
-    exploitUri: "https://github.com/lab-security/roche-default-creds",
-    upstreamApi: "https://nvd.nist.gov/vuln/detail/CVE-2024-2345",
-    description:
-      "Hardcoded default credentials in Roche Cobas 6000 laboratory analyzer",
-    narrative:
-      "The analyzer ships with hardcoded administrative credentials that cannot be changed. An attacker with network access could log in using these credentials and access all analyzer functions including result reporting and quality control data.",
-    impact:
-      "Lab result integrity compromised. Attackers could modify test results before transmission to EMR, leading to incorrect diagnoses and treatment. Altered QC data could hide equipment malfunction. False critical values could trigger unnecessary interventions.",
-  },
-  {
-    cveId: "CVE-2024-6789",
-    severity: Severity.Critical,
-    cvssScore: 9.0,
-    epss: 0.78,
-    inKEV: true,
+    priority: Priority.Critical,
     sarif: {
       version: "2.1.0",
       runs: [
@@ -724,10 +537,44 @@ const SAMPLE_VULNERABILITIES = [
           tool: { driver: { name: "Network Scanner" } },
           results: [
             {
-              ruleId: "CVE-2024-6789",
+              ruleId: "CVE-2024-21762",
               level: "error",
               message: {
-                text: "Privilege escalation in Cisco hospital network switch",
+                text: "Out-of-bounds write in Fortinet FortiOS SSL VPN allows unauthenticated remote code execution",
+              },
+            },
+          ],
+        },
+      ],
+    },
+    cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
+    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2024-21762",
+    upstreamApi: "https://www.fortiguard.com/psirt/FG-IR-24-015",
+    description:
+      "Out-of-bounds write vulnerability in Fortinet FortiOS SSL VPN daemon allows unauthenticated remote code execution via specially crafted HTTP requests",
+    narrative:
+      "An unauthenticated attacker can send crafted HTTP requests to the SSL VPN service on the hospital perimeter firewall, triggering an out-of-bounds write that leads to arbitrary code execution. This vulnerability is actively exploited in the wild by multiple threat actors and requires no user interaction.",
+    impact:
+      "Complete hospital network perimeter compromise. Attackers gain root-level access to the edge firewall, enabling interception of all network traffic, disabling of security policies, and lateral movement into clinical VLANs containing medical devices, EMR systems, and patient data stores.",
+  },
+  {
+    cveId: "CVE-2023-20198",
+    severity: Severity.Critical,
+    cvssScore: 10.0,
+    epss: 0.87,
+    inKEV: true,
+    priority: Priority.Critical,
+    sarif: {
+      version: "2.1.0",
+      runs: [
+        {
+          tool: { driver: { name: "Network Scanner" } },
+          results: [
+            {
+              ruleId: "CVE-2023-20198",
+              level: "error",
+              message: {
+                text: "Cisco IOS XE Web UI privilege escalation allows unauthenticated admin account creation",
               },
             },
           ],
@@ -735,15 +582,190 @@ const SAMPLE_VULNERABILITIES = [
       ],
     },
     cpe: "cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*",
-    exploitUri: "https://github.com/network-exploits/cisco-priv-esc",
+    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2023-20198",
     upstreamApi:
-      "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-2024-001",
+      "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-iosxe-webui-privesc-j22SaA4z",
     description:
-      "Local privilege escalation vulnerability in Cisco Catalyst 9300 switch firmware",
+      "Privilege escalation vulnerability in Cisco IOS XE Web UI allows unauthenticated remote attackers to create administrative accounts",
     narrative:
-      "An authenticated user with low privileges could exploit a logic flaw in the CLI command parser to escalate to administrative privileges. This allows complete control over network switch configuration, VLAN assignments, and port security.",
+      "An unauthenticated remote attacker can exploit the web UI feature of Cisco IOS XE to create a local administrator account with privilege level 15. This is the first stage of a two-stage attack chain (combined with CVE-2023-20273) that ultimately grants root access to the network switch operating system. Over 1,800 devices were compromised in mass exploitation campaigns.",
     impact:
-      "Hospital network segmentation failure. Compromised network infrastructure could allow lateral movement between clinical and administrative networks. Attackers could access isolated medical device VLANs, intercept patient data, or disrupt critical network services including PACS, EMR, and pharmacy systems.",
+      "Hospital network segmentation failure. Compromised core switches allow attackers to reconfigure VLANs, bypass network access controls, and gain access to isolated medical device networks. Lateral movement enables interception of patient data, disruption of PACS/EMR traffic, and potential manipulation of clinical systems.",
+  },
+  {
+    cveId: "CVE-2024-1709",
+    severity: Severity.Critical,
+    cvssScore: 10.0,
+    epss: 0.944,
+    inKEV: true,
+    priority: Priority.Critical,
+    sarif: {
+      version: "2.1.0",
+      runs: [
+        {
+          tool: { driver: { name: "Endpoint Scanner" } },
+          results: [
+            {
+              ruleId: "CVE-2024-1709",
+              level: "error",
+              message: {
+                text: "ConnectWise ScreenConnect authentication bypass on clinical workstations",
+              },
+            },
+          ],
+        },
+      ],
+    },
+    cpe: "cpe:2.3:h:dell:optiplex_7090:*:*:*:*:*:*:*:*",
+    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2024-1709",
+    upstreamApi:
+      "https://www.connectwise.com/company/trust/security-bulletins/connectwise-screenconnect-23.9.8",
+    description:
+      "Authentication bypass in ConnectWise ScreenConnect allows unauthenticated attackers to create administrator accounts on clinical workstations used for remote EMR support",
+    narrative:
+      "ConnectWise ScreenConnect, deployed on clinical workstations for remote IT support of EMR systems, contains an authentication bypass vulnerability. Unauthenticated attackers can create admin-level accounts, gaining full control of any connected workstation. Public exploits and Metasploit modules are available. Used in ransomware campaigns targeting healthcare.",
+    impact:
+      "Clinical workstation compromise across the hospital. Attackers gain remote desktop access to nurse stations and clinical PCs with active EMR sessions, exposing patient records, enabling ransomware deployment, and potentially disrupting clinical workflows during patient care.",
+  },
+  {
+    cveId: "CVE-2024-47575",
+    severity: Severity.Critical,
+    cvssScore: 9.8,
+    epss: 0.5,
+    inKEV: true,
+    priority: Priority.Critical,
+    sarif: {
+      version: "2.1.0",
+      runs: [
+        {
+          tool: { driver: { name: "Network Scanner" } },
+          results: [
+            {
+              ruleId: "CVE-2024-47575",
+              level: "error",
+              message: {
+                text: "Missing authentication in FortiManager allows remote code execution via crafted requests",
+              },
+            },
+          ],
+        },
+      ],
+    },
+    cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
+    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2024-47575",
+    upstreamApi: "https://www.fortiguard.com/psirt/FG-IR-24-423",
+    description:
+      "Missing authentication vulnerability in FortiManager (FortiJump) allows unauthenticated remote code execution and exfiltration of managed firewall configurations",
+    narrative:
+      "The hospital's FortiManager instance, which centrally manages all FortiGate firewalls, has a missing authentication flaw. Threat actor UNC5820 exploited this vulnerability to register rogue FortiManager devices and exfiltrate configuration data including hashed passwords and firewall rules from over 50 managed devices in similar environments.",
+    impact:
+      "Compromise of the firewall management platform exposes all managed FortiGate configurations, security policies, VPN credentials, and network topology. Attackers can modify firewall rules to open backdoor access or disable security controls across the entire hospital network perimeter.",
+  },
+  {
+    cveId: "CVE-2024-38014",
+    severity: Severity.High,
+    cvssScore: 7.8,
+    epss: 0.15,
+    inKEV: true,
+    priority: Priority.Critical,
+    sarif: {
+      version: "2.1.0",
+      runs: [
+        {
+          tool: { driver: { name: "Endpoint Scanner" } },
+          results: [
+            {
+              ruleId: "CVE-2024-38014",
+              level: "warning",
+              message: {
+                text: "Windows Installer privilege escalation on nurse station workstations",
+              },
+            },
+          ],
+        },
+      ],
+    },
+    cpe: "cpe:2.3:h:hp:elitedesk_800:*:*:*:*:*:*:*:*",
+    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2024-38014",
+    upstreamApi:
+      "https://msrc.microsoft.com/update-guide/vulnerability/CVE-2024-38014",
+    description:
+      "Windows Installer privilege escalation vulnerability allows local attackers to gain SYSTEM privileges on nurse station workstations",
+    narrative:
+      "A local attacker (or malware running under a standard user account) can exploit the Windows Installer service to escalate privileges to SYSTEM level. While requiring local access, this vulnerability is actively exploited and could be chained with remote access vulnerabilities to achieve full workstation compromise.",
+    impact:
+      "Local privilege escalation on nurse station PCs. An attacker with limited user access can gain full system control, install persistent backdoors, access cached credentials, and pivot to other systems on the clinical network. Risk is moderated by requiring initial local access.",
+  },
+  // --- Defer priority: low EPSS, no active exploitation ---
+  {
+    cveId: "CVE-2024-48974",
+    severity: Severity.Critical,
+    cvssScore: 9.3,
+    epss: 0.04,
+    inKEV: false,
+    priority: Priority.Defer,
+    sarif: {
+      version: "2.1.0",
+      runs: [
+        {
+          tool: { driver: { name: "FDA Cybersecurity Scanner" } },
+          results: [
+            {
+              ruleId: "CVE-2024-48974",
+              level: "warning",
+              message: {
+                text: "Ventilator firmware update integrity verification bypass",
+              },
+            },
+          ],
+        },
+      ],
+    },
+    cpe: "cpe:2.3:h:draeger:evita_v500:*:*:*:*:*:*:*:*",
+    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2024-48974",
+    upstreamApi:
+      "https://www.cisa.gov/news-events/ics-medical-advisories/icsma-24-319-01",
+    description:
+      "Ventilator does not perform proper file integrity checks when adopting firmware updates, allowing unauthorized configuration changes via compromised firmware",
+    narrative:
+      "The ventilator's firmware update mechanism lacks proper integrity verification, meaning a malicious firmware image could be loaded if an attacker gains physical or network access to the update interface. While the CVSS score is critical due to potential patient safety impact, no exploitation has been observed in the wild and the attack requires specialized access to the device.",
+    impact:
+      "Potential patient safety risk if exploited — unauthorized firmware could alter ventilator behavior. However, exploitation requires physical access or highly specialized network position. Risk is mitigated by network segmentation of ICU devices and physical access controls.",
+  },
+  // --- Unsorted priority: not yet enriched ---
+  {
+    cveId: null,
+    severity: Severity.Medium,
+    cvssScore: null,
+    epss: null,
+    inKEV: false,
+    priority: Priority.Unsorted,
+    sarif: {
+      version: "2.1.0",
+      runs: [
+        {
+          tool: { driver: { name: "Internal Audit" } },
+          results: [
+            {
+              ruleId: "INTERNAL-2024-001",
+              level: "note",
+              message: {
+                text: "Unencrypted DICOM traffic observed from MRI scanner",
+              },
+            },
+          ],
+        },
+      ],
+    },
+    cpe: "cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*",
+    exploitUri: null,
+    upstreamApi: null,
+    description:
+      "Unencrypted DICOM traffic from Siemens MRI scanner exposes patient imaging data on the radiology network",
+    narrative:
+      "Internal security audit detected that the Siemens Magnetom Aera transmits DICOM images and patient metadata in cleartext across the radiology VLAN. An attacker with network access could passively capture patient imaging studies, demographics, and referring physician information.",
+    impact:
+      "HIPAA compliance risk. Patient imaging data including names, dates of birth, and medical images could be intercepted. No CVE has been assigned yet; awaiting vendor response and formal vulnerability assessment.",
   },
 ];
 
@@ -827,77 +849,48 @@ const SAMPLE_DEVICE_ARTIFACTS = [
   },
 ];
 
-// Sample remediation data
+// Sample remediation data (matched to seed vulnerability CPEs)
 const SAMPLE_REMEDIATIONS = [
   {
-    cpe: "cpe:2.3:h:philips:intellivue_mp70:*:*:*:*:*:*:*:*",
-    fixUri: "https://github.com/philips-healthcare/intellivue-firmware-v8.2.1",
+    cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
+    fixUri: "https://www.fortiguard.com/psirt/FG-IR-24-015",
     description:
-      "Firmware update v8.2.1 patches buffer overflow vulnerability (CVE-2024-1234) by implementing input validation and bounds checking in network packet processing.",
+      "FortiOS firmware upgrade to 7.4.3+ patches the out-of-bounds write vulnerability (CVE-2024-21762) in the SSL VPN daemon.",
     narrative:
-      "Download firmware v8.2.1 from Philips ServiceNow portal. Schedule 30-minute maintenance window per ICU monitor. Backup current configuration via service menu. Apply firmware via USB in service mode. Verify patient monitoring resumes correctly. Update requires monitor reboot - coordinate with clinical staff to ensure backup monitoring during update.",
-    upstreamApi:
-      "https://www.philips.com/healthcare/product/HC865350/intellivue-mp70-patient-monitor",
-  },
-  {
-    cpe: "cpe:2.3:h:baxter:infusion_pump:sigma_spectrum:*:*:*:*:*:*:*",
-    fixUri: "https://github.com/baxter-medical/sigma-spectrum-patch-2024-001",
-    description:
-      "Security patch adds multi-factor authentication and encrypted credential storage to drug library access controls.",
-    narrative:
-      "Deploy patch via Baxter Infusion Pump Manager software. Pumps auto-update during nightly sync window (2-4 AM). Biomedical engineering must verify drug library integrity post-patch. Clinical pharmacy validates dose limits unchanged. Requires nursing staff re-training on new authentication workflow - expect 5 min additional time for first library update.",
-    upstreamApi:
-      "https://www.baxter.com/healthcare-professionals/infusion-systems/sigma-spectrum-infusion-system",
-  },
-  {
-    cpe: "cpe:2.3:h:ge_healthcare:optima_ct660:*:*:*:*:*:*:*:*",
-    fixUri: "https://github.com/ge-healthcare/pacs-security-update-q1-2024",
-    description:
-      "PACS interface security update implements parameterized SQL queries and input sanitization to prevent injection attacks.",
-    narrative:
-      "IT must apply SQL patch during imaging system maintenance window (typically Sunday 6-10 AM). PACS workstation will be offline for approximately 2 hours. Radiology workflow switches to offline worklist during update. After update, run PACS connectivity test with 5 sample exams. Verify DICOM query/retrieve functions correctly. Coordinate with radiology manager to reschedule non-urgent imaging.",
-    upstreamApi:
-      "https://www.gehealthcare.com/products/computed-tomography/optima-ct660",
-  },
-  {
-    cpe: "cpe:2.3:a:epic:emr:2023:*:*:*:*:*:*:*",
-    fixUri: "https://github.com/epic-systems/hl7-encryption-upgrade-2024",
-    description:
-      "HL7 interface upgrade replaces deprecated DES encryption with AES-256-GCM for all patient data transmissions.",
-    narrative:
-      "Epic technical team must schedule upgrade during EMR maintenance window (quarterly, usually Sunday midnight-6 AM). All HL7 interfaces (lab, pharmacy, radiology) will be offline during 4-hour upgrade. Clinical systems revert to downtime procedures. After upgrade, validate all interface transactions for 24 hours. Monitor HL7 error logs. Test critical workflows: lab orders, medication orders, radiology results.",
-    upstreamApi: "https://www.epic.com/software",
-  },
-  {
-    cpe: "cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*",
-    fixUri:
-      "https://github.com/siemens-healthineers/magnetom-syngo-patch-VE11C",
-    description:
-      "Syngo MR VE11C software patch adds DICOM message validation and input sanitization to prevent stack overflow exploits.",
-    narrative:
-      "Siemens field service engineer required for installation. Schedule 4-hour service visit during low-volume imaging time. MRI scanner offline during patch application. Backup magnet scheduling to other scanners. After patch, engineer performs image quality validation and safety interlock tests. Radiologist reviews test images for artifacts. 48-hour monitoring period for any scan quality issues.",
-    upstreamApi:
-      "https://www.siemens-healthineers.com/magnetic-resonance-imaging/1-5t-mri-scanner/magnetom-aera",
-  },
-  {
-    cpe: "cpe:2.3:h:roche:cobas_6000:*:*:*:*:*:*:*:*",
-    fixUri: "https://github.com/roche-diagnostics/cobas-credential-update-2024",
-    description:
-      "Security update enables custom password configuration and removes hardcoded administrative credentials.",
-    narrative:
-      "Lab IT and biomedical engineering coordinate update during low-volume period (typically weekends). Analyzer offline for 1 hour. Lab workflows switch to backup analyzer or reference lab for urgent tests. Post-update: set unique admin password per hospital security policy, document in asset management system, update runbooks. Lab manager validates QC results unchanged. Clinical staff training on new login procedures.",
-    upstreamApi:
-      "https://diagnostics.roche.com/global/en/products/instruments/cobas-6000.html",
+      "Schedule maintenance window during low-traffic period (Sunday 2-6 AM). Backup FortiGate configuration via FortiManager. Upgrade firmware to FortiOS 7.4.3 or later. If immediate upgrade is not possible, disable SSL VPN as an interim mitigation — disabling webmode alone is not sufficient. Post-upgrade: verify VPN connectivity, firewall rules, and VLAN routing. Monitor logs for 48 hours.",
+    upstreamApi: "https://www.fortinet.com/products/next-generation-firewall",
   },
   {
     cpe: "cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*",
-    fixUri: "https://github.com/cisco/ios-xe-security-patch-2024",
+    fixUri:
+      "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-iosxe-webui-privesc-j22SaA4z",
     description:
-      "IOS-XE software update fixes privilege escalation vulnerability through CLI parser hardening and command authorization improvements.",
+      "IOS-XE software update patches the Web UI privilege escalation vulnerability (CVE-2023-20198) by hardening authentication on the HTTP server.",
     narrative:
-      "Network team applies patch via centralized management (Cisco DNA Center). Staged rollout: test VLAN first, then non-clinical switches, finally clinical network. Each switch requires 10-minute reboot - plan for brief network interruptions. Update during change control window (typically Tuesday/Thursday 10 PM-2 AM). Monitor syslog for errors. Verify VLAN connectivity and medical device network access post-patch. Critical systems (OR, ICU) updated last with anesthesia/nursing present.",
+      "Immediately disable the HTTP/HTTPS server on all Catalyst 9300 switches as an interim mitigation (no ip http server / no ip http secure-server). Schedule staged firmware rollout via Cisco DNA Center: test VLAN first, then non-clinical, then clinical switches. Each switch requires a 10-minute reboot. Update during change control window (Tuesday/Thursday 10 PM-2 AM). Post-upgrade: re-enable web UI only if required, verify VLAN connectivity and medical device network access.",
     upstreamApi:
       "https://www.cisco.com/c/en/us/products/switches/catalyst-9300-series-switches/index.html",
+  },
+  {
+    cpe: "cpe:2.3:h:dell:optiplex_7090:*:*:*:*:*:*:*:*",
+    fixUri:
+      "https://www.connectwise.com/company/trust/security-bulletins/connectwise-screenconnect-23.9.8",
+    description:
+      "ConnectWise ScreenConnect upgrade to version 23.9.8 patches the authentication bypass vulnerability (CVE-2024-1709) on clinical workstations.",
+    narrative:
+      "Push ScreenConnect 23.9.8 update to all clinical workstations via SCCM/Intune. On-premise ScreenConnect server must be updated first. Verify all connected agents auto-update within 24 hours. For workstations that cannot be updated immediately, disable the ScreenConnect service. Post-update: verify remote support connectivity, audit for any unauthorized admin accounts created before patch.",
+    upstreamApi:
+      "https://www.connectwise.com/platform/unified-management/control",
+  },
+  {
+    cpe: "cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*",
+    fixUri: "https://www.siemens-healthineers.com/services/cybersecurity",
+    description:
+      "Network segmentation and DICOM TLS configuration to encrypt MRI scanner traffic and prevent passive interception of patient imaging data.",
+    narrative:
+      "Work with Siemens field service to enable DICOM TLS on the Magnetom Aera (requires Syngo software update). Configure dedicated radiology VLAN with ACLs restricting traffic to PACS servers only. Deploy network monitoring to detect any remaining unencrypted DICOM traffic. Verify image transfer performance is not degraded after TLS enablement. Radiologist validates image quality post-change.",
+    upstreamApi:
+      "https://www.siemens-healthineers.com/magnetic-resonance-imaging/1-5t-mri-scanner/magnetom-aera",
   },
 ];
 

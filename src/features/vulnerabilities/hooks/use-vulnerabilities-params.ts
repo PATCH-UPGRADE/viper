@@ -1,6 +1,6 @@
 import { useQueryStates } from "nuqs";
 import {
-  vulnerabilitiesBySeverityParams,
+  vulnerabilitiesByPriorityParams,
   vulnerabilitiesParams,
 } from "../params";
 
@@ -8,6 +8,6 @@ export const useVulnerabilitiesParams = () => {
   return useQueryStates(vulnerabilitiesParams);
 };
 
-export const useVulnerabilitiesBySeverityParams = () => {
-  return useQueryStates(vulnerabilitiesBySeverityParams);
+export const useVulnerabilitiesByPriorityParams = () => {
+  return useQueryStates(vulnerabilitiesByPriorityParams);
 };

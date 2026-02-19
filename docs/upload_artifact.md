@@ -1,6 +1,6 @@
 # Uploading artifacts to Viper
 
-- When adding an artifact such as a remediation, an external downloadUrl can be provided (IE to a GitHub patch).
+- When adding an artifact such as a remediation, an external downloadUrl can be provided (e.g. to a GitHub patch).
 
 - If a downloadUrl is not available, Viper is also able to host an artifact via S3. Here's an example workflow:
 

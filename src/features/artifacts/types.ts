@@ -30,15 +30,14 @@ export const artifactWrapperSelect = {
   },
 } as const;
 
-export const artifactInputSchema = z
-  .object({
-    id: z.string().optional(),
-    name: z.string().optional(),
-    artifactType: z.enum(ArtifactType),
-    downloadUrl: safeUrlSchema.optional(),
-    hash: z.string().optional(),
-    size: z.number().optional(),
-  });
+export const artifactInputSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  artifactType: z.enum(ArtifactType),
+  downloadUrl: safeUrlSchema.optional(),
+  hash: z.string().optional(),
+  size: z.number().optional(),
+});
 
 export const artifactWithUrlsSchema = z.object({
   id: z.string(),

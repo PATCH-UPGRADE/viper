@@ -117,30 +117,6 @@ export const remediationsRouter = createTRPCRouter({
           
           **Artifact hosting**
           See docs/upload_artifact.md
-          
-          If you POST an artifact with a 'hash' (Base64 MD5) and 'size' (in bytes) but no 'downloadUrl', Viper will assume that you want it to host the artifact.
-          1. An S3 storage path will be created for your artifact.
-          2. This POST will return a presigned 'uploadUrl' and a 'requiredHeader' (Base64 MD5).
-          3. Use these values to PUT the file to S3 with the appropriate headers.
-
-          **Sample CURL command**
-          curl -i -X PUT \
-          -T "<myfile.ext>" \
-          -H "Content-Type: application/octet-stream" \
-          -H "Content-MD5: <requiredHeader>" \
-          "<uploadUrl>"
-
-          **For programmatic uploads, you may want to do something like:**
-
-          fetch(uploadUrl, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/octet-stream",
-              "Content-MD5": requiredHeader
-            },
-            body: yourFileBlob
-          });
-          
           `.trim()
       },
     })
@@ -236,8 +212,12 @@ export const remediationsRouter = createTRPCRouter({
         path: "/remediations/{id}",
         tags: ["Remediations"],
         summary: "Update Remediation",
-        description:
-          "Update a remediation. Only the user who created the remediation can update it.",
+        description: `
+          Update a remediation. Only the user who created the remediation can update it. 
+          
+          **Artifact hosting**
+          See docs/upload_artifact.md
+          `.trim()
       },
     })
     .output(remediationUploadResponseSchema)

@@ -52,6 +52,9 @@ export type AssetWithDeviceGroup = Prisma.AssetGetPayload<{
   };
 }>;
 
+// TODO: these should eventually get moved to /types.ts
+// However, I'm not touching them now becuase I think we're retiring everything these are currently
+// being used for (VulnerabilityItem / VulnerabilityDrawer)
 export type VulnerabilityWithIssues = Prisma.VulnerabilityGetPayload<{
   include: {
     issues: true;
@@ -73,8 +76,4 @@ export type VulnerabilityWithDeviceGroups = Prisma.VulnerabilityGetPayload<{
       };
     };
   };
-}>;
-
-export type FullIssue = Prisma.IssueGetPayload<{
-  include: { asset: true; vulnerability: true };
 }>;

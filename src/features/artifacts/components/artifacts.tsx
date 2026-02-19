@@ -1,6 +1,6 @@
 import { ExternalLinkIcon } from "lucide-react";
-import type { ArtifactWrapperWithUrls } from "@/lib/schemas";
 import { formatFileSize } from "@/lib/utils";
+import type { ArtifactWrapperWithUrls } from "../types";
 
 export const ArtifactsDrawerEntry = ({
   artifacts,

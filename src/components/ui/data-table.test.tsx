@@ -295,7 +295,7 @@ describe("SortableHeader", () => {
       />,
     );
 
-    const button = getByLabelText("Sort clickable header neutral");
+    const button = getByLabelText("Sort by clickable header");
     expect(button).toBeInTheDocument();
   });
 
@@ -312,7 +312,7 @@ describe("SortableHeader", () => {
       />,
     );
 
-    const button = getByLabelText("Sort Test Header descending");
+    const button = getByLabelText("Sort by Test Header, ascending");
     expect(button).toBeInTheDocument();
     expect(button.querySelector("svg")).toBeInTheDocument();
   });
@@ -330,7 +330,7 @@ describe("SortableHeader", () => {
       />,
     );
 
-    const button = getByLabelText("Sort Test Header ascending");
+    const button = getByLabelText("Sort by Test Header, descending");
     expect(button).toBeInTheDocument();
     expect(button.querySelector("svg")).toBeInTheDocument();
   });

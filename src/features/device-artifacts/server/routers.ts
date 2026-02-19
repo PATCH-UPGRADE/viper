@@ -1,73 +1,25 @@
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { paginationInputSchema } from "@/lib/pagination";
 import {
-  createPaginatedResponseSchema,
-  paginationInputSchema,
-} from "@/lib/pagination";
-import {
-  cpesToDeviceGroups,
   cpeToDeviceGroup,
   createArtifactWrappers,
   fetchPaginated,
   processIntegrationSync,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
-import {
-  artifactInputSchema,
-  artifactWrapperSelect,
-  artifactWrapperWithUrlsSchema,
-  cpeSchema,
-  createIntegrationInputSchema,
-  deviceGroupSelect,
-  deviceGroupWithUrlsSchema,
-  integrationResponseSchema,
-  safeUrlSchema,
-  userIncludeSelect,
-  userSchema,
-} from "@/lib/schemas";
+import { integrationResponseSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
-
-const deviceArtifactInputSchema = z.object({
-  cpe: cpeSchema,
-  role: z.string().min(1, "Role is required"),
-  description: z.string().min(1, "Description is required"),
-  upstreamApi: safeUrlSchema.optional(),
-  artifacts: z
-    .array(artifactInputSchema)
-    .min(1, "at least one artifact is required"),
-});
-
-export const integrationDeviceArtifactInputSchema =
-  createIntegrationInputSchema(deviceArtifactInputSchema);
-
-const deviceArtifactUpdateSchema = z.object({
-  id: z.string(),
-  role: z.string().min(1, "Role is required").optional(),
-  description: z.string().optional(),
-  upstreamApi: safeUrlSchema.optional(),
-  cpe: cpeSchema.optional(),
-});
-
-const deviceArtifactResponseSchema = z.object({
-  id: z.string(),
-  role: z.string(),
-  upstreamApi: z.string().nullable(),
-  description: z.string().nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  user: userSchema,
-  deviceGroup: deviceGroupWithUrlsSchema,
-  artifacts: z.array(artifactWrapperWithUrlsSchema),
-});
-export type DeviceArtifactResponse = z.infer<
-  typeof deviceArtifactResponseSchema
->;
-
-const paginatedDeviceArtifactResponseSchema = createPaginatedResponseSchema(
+import {
+  deviceArtifactInclude,
+  deviceArtifactInputSchema,
   deviceArtifactResponseSchema,
-);
+  deviceArtifactUpdateSchema,
+  integrationDeviceArtifactInputSchema,
+  paginatedDeviceArtifactResponseSchema,
+} from "../types";
 
 // TODO: do something DRY with `createSearchFilter` in other routers
 const createSearchFilter = (search: string) => {
@@ -100,12 +52,6 @@ const createSearchFilter = (search: string) => {
         ],
       }
     : {};
-};
-
-const deviceArtifactInclude = {
-  user: userIncludeSelect,
-  deviceGroup: deviceGroupSelect,
-  artifacts: artifactWrapperSelect,
 };
 
 export const deviceArtifactsRouter = createTRPCRouter({
@@ -287,7 +233,12 @@ export const deviceArtifactsRouter = createTRPCRouter({
           model: prisma.deviceArtifact,
           mappingModel: prisma.externalDeviceArtifactMapping,
           transformInputItem: async (item, userId) => {
-            const { cpe, vendorId: _vendorId, artifacts: _artifacts, ...itemData } = item;
+            const {
+              cpe,
+              vendorId: _vendorId,
+              artifacts: _artifacts,
+              ...itemData
+            } = item;
             const newDeviceGroup = await cpeToDeviceGroup(cpe);
 
             return {

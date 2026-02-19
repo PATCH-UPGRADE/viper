@@ -10,6 +10,15 @@ export const prefetchVulnerabilities = (params: Input) => {
   return prefetch(trpc.vulnerabilities.getMany.queryOptions(params));
 };
 
+type InputByPriority = inferInput<
+  typeof trpc.vulnerabilities.getManyByPriorityInternal
+>;
+export const prefetchVulnerabilitiesByPriority = (params: InputByPriority) => {
+  return prefetch(
+    trpc.vulnerabilities.getManyByPriorityInternal.queryOptions(params),
+  );
+};
+
 /**
  * Prefetch a single vulnerability
  */

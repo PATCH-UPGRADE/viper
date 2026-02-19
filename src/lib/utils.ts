@@ -13,6 +13,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function plural(s: string, count: number): string {
+  if (count === 1) {
+    return s;
+  }
+  // handle y
+  if (s.endsWith("y")) {
+    const secondLastChar = s.charAt(s.length - 2);
+    // example: vulnerability -> vulnerabilities, but day -> days
+    if (/[^aeiou]/i.test(secondLastChar)) {
+      return `${s.slice(0, -1)}ies`;
+    }
+    return `${s}s`;
+  }
+  return `${s}s`;
+}
+
 export const parseAuthenticationJson = (
   itemWithAuth: Integration | IntegrationWithStringDates | Webhook,
 ) => {

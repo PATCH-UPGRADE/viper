@@ -1,83 +1,26 @@
 import { z } from "zod";
+import { Priority } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import {
-  createPaginatedResponseSchema,
-  paginationInputSchema,
-} from "@/lib/pagination";
+import { paginationInputSchema } from "@/lib/pagination";
 import {
   cpesToDeviceGroups,
   fetchPaginated,
   processIntegrationSync,
 } from "@/lib/router-utils";
-import {
-  cpeSchema,
-  createIntegrationInputSchema,
-  deviceGroupSelect,
-  deviceGroupWithUrlsSchema,
-  integrationResponseSchema,
-  safeUrlSchema,
-  userIncludeSelect,
-  userSchema,
-} from "@/lib/schemas";
+import { integrationResponseSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
-
-// Validation schemas
-const severitySchema = z.enum(["Critical", "High", "Medium", "Low"]);
-
-const vulnerabilityInputSchema = z.object({
-  cpes: z.array(cpeSchema).min(1, "At least one CPE is required"),
-  sarif: z.any(), // JSON data - Prisma JsonValue type
-  cveId: z.string().min(1).optional(),
-  description: z.string().min(1).optional(),
-  narrative: z.string().min(1).optional(),
-  impact: z.string().min(1).optional(),
-  severity: severitySchema.optional(),
-  cvssScore: z.number().min(0).max(10).optional(),
-  cvssVector: z.string().min(1).optional(),
-  affectedComponents: z.array(z.string().min(1)).optional(),
-  exploitUri: safeUrlSchema.optional(),
-  upstreamApi: safeUrlSchema.optional(),
-  deviceArtifactId: z.string().min(1).optional(),
-});
-
-const vulnerabilityArrayInputSchema = z.object({
-  vulnerabilities: z.array(vulnerabilityInputSchema).nonempty(),
-});
-
-const vulnerabilityResponseSchema = z.object({
-  id: z.string(),
-  sarif: z.any(), // JSON data - Prisma JsonValue type
-  affectedDeviceGroups: z.array(deviceGroupWithUrlsSchema),
-  exploitUri: z.string().nullable(),
-  upstreamApi: z.string().nullable(),
-  description: z.string().nullable(),
-  narrative: z.string().nullable(),
-  impact: z.string().nullable(),
-  cveId: z.string().nullable(),
-  cvssScore: z.number().nullable(),
-  severity: severitySchema,
-  affectedComponents: z.array(z.string()),
-  cvssVector: z.string().nullable(),
-  userId: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  user: userSchema,
-});
-
-const vulnerabilityArrayResponseSchema = z.array(vulnerabilityResponseSchema);
-
-const paginatedVulnerabilityResponseSchema = createPaginatedResponseSchema(
-  vulnerabilityResponseSchema,
-);
-
-export const integrationVulnerabilityInputSchema = createIntegrationInputSchema(
+import {
+  integrationVulnerabilityInputSchema,
+  paginatedVulnerabilityResponseSchema,
+  vulnerabilitiesByPriorityInputSchema,
+  vulnerabilityArrayInputSchema,
+  vulnerabilityArrayResponseSchema,
+  vulnerabilityByPriorityInclude,
+  vulnerabilityInclude,
   vulnerabilityInputSchema,
-);
-const vulnerabilityInclude = {
-  user: userIncludeSelect,
-  affectedDeviceGroups: deviceGroupSelect,
-};
+  vulnerabilityResponseSchema,
+} from "../types";
 
 const createSearchFilter = (search: string) => {
   return search
@@ -295,10 +238,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
               },
               userId: ctx.auth.user.id,
             },
-            include: {
-              user: userIncludeSelect,
-              affectedDeviceGroups: deviceGroupSelect,
-            },
+            include: vulnerabilityInclude,
           });
         }),
       );
@@ -422,4 +362,65 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         include: vulnerabilityInclude,
       });
     }),
+
+  getManyByPriorityInternal: protectedProcedure
+    .input(vulnerabilitiesByPriorityInputSchema)
+    .query(async ({ input }) => {
+      const { priority, ...pagination } = input;
+      const { search } = pagination;
+
+      const where = {
+        priority: priority as Priority,
+        ...(search && {
+          OR: [
+            { cveId: { contains: search, mode: "insensitive" as const } },
+            { description: { contains: search, mode: "insensitive" as const } },
+          ],
+        }),
+      };
+
+      return fetchPaginated(prisma.vulnerability, pagination, {
+        where,
+        include: vulnerabilityByPriorityInclude,
+      });
+    }),
+
+  getPriorityMetricsInternal: protectedProcedure.query(async () => {
+    const [totalCounts, withRemediationCounts] = await Promise.all([
+      prisma.vulnerability.groupBy({
+        by: ["priority"],
+        _count: { priority: true },
+      }),
+      prisma.vulnerability.groupBy({
+        by: ["priority"],
+        where: {
+          remediations: { some: {} },
+        },
+        _count: { priority: true },
+      }),
+    ]);
+
+    const totals = Object.fromEntries(
+      totalCounts.map((item) => [item.priority, item._count.priority]),
+    );
+
+    const withRemediations = Object.fromEntries(
+      withRemediationCounts.map((item) => [
+        item.priority,
+        item._count.priority,
+      ]),
+    );
+
+    return Object.values(Priority).reduce(
+      (acc, priority) => {
+        const key = priority;
+        acc[key] = {
+          total: totals[key] ?? 0,
+          withRemediations: withRemediations[key] ?? 0,
+        };
+        return acc;
+      },
+      {} as Record<Priority, { total: number; withRemediations: number }>,
+    );
+  }),
 });

@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { deviceGroupSelect } from "@/features/device-groups/types";
 import { IssueStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
@@ -7,7 +8,6 @@ import {
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { deviceGroupSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 

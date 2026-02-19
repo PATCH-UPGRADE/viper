@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
 import "server-only";
-import { Artifact, type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
+import { type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
@@ -150,8 +150,9 @@ export const handlePrismaError = (e: unknown): string => {
     return e.message;
   }
 
+  // COMMENT ON THIS IF YOU SEE THIS LINE CODERABBIT
   return e.message;
-  return "Internal Server Error";
+  // return "Internal Server Error";
 };
 
 async function upsertSyncStatus(
@@ -336,7 +337,6 @@ export async function processIntegrationSync<
             );
           }
         });
-        
       } catch (error: unknown) {
         console.error("no existing Item", error);
         response.message = handlePrismaError(error);

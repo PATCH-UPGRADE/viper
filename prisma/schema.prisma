@@ -398,13 +398,21 @@ enum Severity {
   Low
 }
 
+enum Priority {
+  Critical
+  High
+  Monitor
+  Defer
+  Unsorted
+}
+
 model Vulnerability {
-  id                   String          @id @default(cuid())
-  cveId                String?         @unique
-  description          String?         @db.Text
-  narrative            String?         @db.Text
-  impact               String?         @db.Text
-  severity             Severity        @default(Medium)
+  id                   String        @id @default(cuid())
+  cveId                String?
+  description          String?       @db.Text
+  narrative            String?       @db.Text
+  impact               String?       @db.Text
+  severity             Severity      @default(Medium)
   cvssScore            Float?
   cvssVector           String?
   sarif                Json
@@ -412,6 +420,16 @@ model Vulnerability {
   affectedDeviceGroups DeviceGroup[]   @relation("VulnerabilityDeviceGroups")
   exploitUri           String?         @map("exploit-uri")
   upstreamApi          String?         @map("upstream-api")
+
+  // EPSS (Exploit Prediction Scoring System) fields
+  epss                 Float?        // Probability score between 0.0 and 1.0
+  updatedEpss          DateTime?     // When EPSS score was last updated
+  
+  // KEV (Known Exploited Vulnerabilities) fields
+  inKEV                Boolean       @default(false) // Whether in CISA KEV catalog
+  updatedInKev         DateTime?     // When KEV status was last checked/updated
+
+  priority             Priority      @default(Unsorted)
 
   deviceArtifactId     String?
   deviceArtifact       DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
@@ -430,6 +448,9 @@ model Vulnerability {
   @@index([userId])
   @@index([deviceArtifactId])
   @@index([severity])
+  @@index([epss])
+  @@index([inKEV])
+  @@index([priority])
   @@map("vulnerability")
 }
 

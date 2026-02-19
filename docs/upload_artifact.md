@@ -106,7 +106,7 @@
     - See http://localhost:3000/api/openapi-ui#tag/remediations/put/remediationsid
     - Example payload:
         ```json
-        "id": cmkojdbwb002iy95bcw2ujerl
+        "id": "cmkojdbwb002iy95bcw2ujerl"
         {
             "artifacts": [
                 {

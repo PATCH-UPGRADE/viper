@@ -17,7 +17,9 @@ import {
   remediationInputSchema,
   remediationResponseSchema,
   remediationUpdateSchema,
+  remediationUploadResponseSchema,
 } from "../types";
+import { processArtifactHosting } from "@/lib/s3";
 
 const createSearchFilter = (search: string) => {
   return search

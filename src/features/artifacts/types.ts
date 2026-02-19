@@ -38,9 +38,6 @@ export const artifactInputSchema = z
     downloadUrl: safeUrlSchema.optional(),
     hash: z.string().optional(),
     size: z.number().optional(),
-  })
-  .refine((data) => data.downloadUrl !== undefined || data.hash !== undefined, {
-    message: "Either downloadUrl or hash must be provided",
   });
 
 export const artifactWithUrlsSchema = z.object({

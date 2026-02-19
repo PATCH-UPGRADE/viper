@@ -341,7 +341,7 @@ export async function processIntegrationSync<
                 artifactWrapperParentField,
                 userId,
               );
-            }
+            });
           }
       } catch (error: unknown) {
         console.error("no existing Item", error);

@@ -67,7 +67,7 @@
                 "name": "vw61-architecture.drawio",
                 "artifactType": "Documentation",
                 "downloadUrl": "https://northeasterntest0226.s3.us-east-1.amazonaws.com/artifacts/e4b437fa-1b29-40a1-ba37-cefe2d28d2b1-vw61-architecture.drawio",
-                "hash": null,
+                "hash": "WknCHrZ5WeXj1IimWmsSMQ==",
                 "size": 7883,
                 "versionNumber": 1,
                 "createdAt": "2026-02-17T20:53:05.558Z",
@@ -83,7 +83,7 @@
         "uploadInstructions": [
             {
             "artifactName": "vw61-architecture.drawio",
-            "uploadUrl": "https://northeasterntest0226.s3.us-east-1.amazonaws.com/artifacts/e4b437fa-1b29-40a1-ba37-cefe2d28d2b1-vw61-architecture.drawio?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIAS54JWPVTND4BLWNO%2F20260217%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260217T205304Z&X-Amz-Expires=3600&X-Amz-Signature=509498cb3e7074a6bad312a4809dcf1d56f9d0d45aa85becc5308ab54ec27474&X-Amz-SignedHeaders=content-length%3Bcontent-md5%3Bhost&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject",
+            "uploadUrl": "https://my-provided-URL",
             "requiredHeader": "WknCHrZ5WeXj1IimWmsSMQ=="
             }
         ]
@@ -97,16 +97,15 @@
      -T "vw61-architecture.drawio" \
      -H "Content-Type: application/octet-stream" \
      -H "Content-MD5: WknCHrZ5WeXj1IimWmsSMQ==" \
-     "https://northeasterntest0226.s3.us-east-1.amazonaws.com/artifacts/e4b437fa-1b29-40a1-ba37-cefe2d28d2b1-vw61-architecture.drawio?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIAS54JWPVTND4BLWNO%2F20260217%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260217T205304Z&X-Amz-Expires=3600&X-Amz-Signature=509498cb3e7074a6bad312a4809dcf1d56f9d0d45aa85becc5308ab54ec27474&X-Amz-SignedHeaders=content-length%3Bcontent-md5%3Bhost&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject"
+     "https://my-provided-URL"
     ```
 
 5. Once the artifact is uploaded, go to Viper -> Remediations and test the link to your new remediation artifact.
 
 6. PUT against Viper /remediations/{id}
     - See http://localhost:3000/api/openapi-ui#tag/remediations/put/remediationsid
-    - Example payload:
+    - Example payload to 'id' "cmkojdbwb002iy95bcw2ujerl":
         ```json
-        "id": "cmkojdbwb002iy95bcw2ujerl"
         {
             "artifacts": [
                 {
@@ -205,7 +204,7 @@
             "uploadInstructions": [
                 {
                 "artifactName": "vw61-architecture.drawio",
-                "uploadUrl": "https://northeasterntest0226.s3.us-east-1.amazonaws.com/artifacts/edd3d6a1-891e-47e9-bb88-6277c8054d95-vw61-architecture.drawio?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIAS54JWPVTND4BLWNO%2F20260219%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260219T174749Z&X-Amz-Expires=3600&X-Amz-Signature=4b21f1bee330a9e52b9270fdeebda1e7548463270d41ff2e7005f307899f0826&X-Amz-SignedHeaders=content-length%3Bcontent-md5%3Bhost&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-id=PutObject",
+                "uploadUrl": "https://my-provided-URL",
                 "requiredHeader": "WknCHrZ5WeXj1IimWmsSMQ=="
                 }
             ]
@@ -226,7 +225,7 @@
     ```
 
 
-### Initial setup 
+## Initial setup 
 - Note that the following env vars must exist (also see .env.example):
 
 ```bash

@@ -9,6 +9,7 @@ import {
   fetchPaginated,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
+import { processArtifactHosting } from "@/lib/s3";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
@@ -19,7 +20,6 @@ import {
   remediationUpdateSchema,
   remediationUploadResponseSchema,
 } from "../types";
-import { processArtifactHosting } from "@/lib/s3";
 
 const createSearchFilter = (search: string) => {
   return search

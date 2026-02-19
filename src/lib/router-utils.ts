@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
 import "server-only";
-import { type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
+import { Artifact, type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
@@ -95,7 +95,7 @@ export const transformArtifactWrapper = (item: any) => {
   };
 };
 
-type ArtifactWrapperParentIdOptions = "deviceArtifactId" | "remediationId";
+type ArtifactWrapperParentFieldOptions = "deviceArtifactId" | "remediationId";
 
 // Helper function to create ArtifactWrapper s
 export async function createArtifactWrappers(
@@ -107,7 +107,7 @@ export async function createArtifactWrappers(
     size?: number | null;
   }>,
   parentId: string,
-  parentField: ArtifactWrapperParentIdOptions,
+  parentField: ArtifactWrapperParentFieldOptions,
   userId: string,
 ): Promise<void> {
   for (const artifactInput of artifacts) {
@@ -220,12 +220,11 @@ interface SyncConfig<
     createData: TCreateData;
     updateData: TUpdateData;
     uniqueFieldConditions: Array<Record<string, any>>;
-    artifactWrapperParentId: ArtifactWrapperParentIdOptions;
+    artifactWrapperParentField: ArtifactWrapperParentFieldOptions | undefined;
   }>;
 
   // Optional: Additional fields to include in create
   additionalCreateFields?: (userId: string) => Record<string, any>;
-  artifactWrapperParentId?: ArtifactWrapperParentIdOptions;
 }
 
 /**
@@ -280,7 +279,7 @@ export async function processIntegrationSync<
       createData,
       updateData,
       uniqueFieldConditions,
-      artifactWrapperParentId,
+      artifactWrapperParentField,
     } = await config.transformInputItem(item, userId);
 
     // If we have a ExternalItemMapping, update the sync time and item
@@ -317,7 +316,7 @@ export async function processIntegrationSync<
     // If no Item, we need to create the Item and ExternalItemMapping
     if (!foundItem) {
       try {
-        await prisma.$transaction(async (tx) => {
+        
           const createdItem = await config.model.create({
             data: {
               ...createData,
@@ -332,16 +331,18 @@ export async function processIntegrationSync<
             },
           });
 
-          if (item.artifacts) {
-            await createArtifactWrappers(
-              tx,
-              item.artifacts,
-              createdItem.id,
-              artifactWrapperParentId,
-              userId,
-            );
+          // TODO: Make this better
+          if (item.artifacts && artifactWrapperParentField) {
+            await prisma.$transaction(async (tx) => {
+              await createArtifactWrappers(
+                tx,
+                item.artifacts,
+                createdItem.id,
+                artifactWrapperParentField,
+                userId,
+              );
+            }
           }
-        });
       } catch (error: unknown) {
         console.error("no existing Item", error);
         response.message = handlePrismaError(error);

@@ -223,7 +223,7 @@ export const remediationsRouter = createTRPCRouter({
                 },
               },
               uniqueFieldConditions: [],
-              artifactWrapperParentId: "remediationId",
+              artifactWrapperParentField: "remediationId",
             };
           },
         },

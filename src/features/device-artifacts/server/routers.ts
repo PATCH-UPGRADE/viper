@@ -258,6 +258,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
                 },
               },
               uniqueFieldConditions: [],
+              artifactWrapperParentId: "deviceArtifactId",
             };
           },
         },

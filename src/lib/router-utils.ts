@@ -95,6 +95,8 @@ export const transformArtifactWrapper = (item: any) => {
   };
 };
 
+type ArtifactWrapperParentIdOptions = "deviceArtifactId" | "remediationId";
+
 // Helper function to create ArtifactWrapper s
 export async function createArtifactWrappers(
   tx: TransactionClient,
@@ -105,7 +107,7 @@ export async function createArtifactWrappers(
     size?: number | null;
   }>,
   parentId: string,
-  parentField: "deviceArtifactId" | "remediationId",
+  parentField: ArtifactWrapperParentIdOptions,
   userId: string,
 ): Promise<void> {
   for (const artifactInput of artifacts) {
@@ -149,10 +151,7 @@ export const handlePrismaError = (e: unknown): string => {
   ) {
     return e.message;
   }
-
-  // COMMENT ON THIS IF YOU SEE THIS LINE CODERABBIT
-  return e.message as string;
-  // return "Internal Server Error";
+  return "Internal Server Error";
 };
 
 async function upsertSyncStatus(
@@ -221,10 +220,12 @@ interface SyncConfig<
     createData: TCreateData;
     updateData: TUpdateData;
     uniqueFieldConditions: Array<Record<string, any>>;
+    artifactWrapperParentId: ArtifactWrapperParentIdOptions;
   }>;
 
   // Optional: Additional fields to include in create
   additionalCreateFields?: (userId: string) => Record<string, any>;
+  artifactWrapperParentId?: ArtifactWrapperParentIdOptions;
 }
 
 /**
@@ -275,8 +276,12 @@ export async function processIntegrationSync<
     });
 
     // Transform the input item to get create/update data and unique conditions
-    const { createData, updateData, uniqueFieldConditions } =
-      await config.transformInputItem(item, userId);
+    const {
+      createData,
+      updateData,
+      uniqueFieldConditions,
+      artifactWrapperParentId,
+    } = await config.transformInputItem(item, userId);
 
     // If we have a ExternalItemMapping, update the sync time and item
     if (foundMapping) {
@@ -332,7 +337,7 @@ export async function processIntegrationSync<
               tx,
               item.artifacts,
               createdItem.id,
-              "remediationId", // figure out how to distinguish between remediationId and deviceArtifactId
+              artifactWrapperParentId,
               userId,
             );
           }

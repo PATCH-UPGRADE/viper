@@ -516,8 +516,6 @@ describe("Remediations Endpoint (/remediations)", () => {
       .set(jsonHeader)
       .send(remediationIntegrationPayload);
 
-    // console.log(integrationRes);
-
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);
     expect(integrationRes.body.updatedItemsCount).toBe(0);

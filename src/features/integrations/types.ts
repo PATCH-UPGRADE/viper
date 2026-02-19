@@ -36,7 +36,7 @@ export const integrationsMapping = {
     type: ResourceType.DeviceArtifact,
   },
   remediations: {
-    name: "Remediations",
+    name: "Remediation",
     type: ResourceType.Remediation,
   },
   vulnerabilities: {

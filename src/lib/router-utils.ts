@@ -151,7 +151,7 @@ export const handlePrismaError = (e: unknown): string => {
   }
 
   // COMMENT ON THIS IF YOU SEE THIS LINE CODERABBIT
-  return e.message;
+  return e.message as string;
   // return "Internal Server Error";
 };
 
@@ -332,7 +332,7 @@ export async function processIntegrationSync<
               tx,
               item.artifacts,
               createdItem.id,
-              "remediationId",
+              "remediationId", // figure out how to distinguish between remediationId and deviceArtifactId
               userId,
             );
           }

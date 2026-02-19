@@ -36,7 +36,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
   };
 
   const mockIntegrationPayload = {
-    name: "mockVulnIntegration",
+    name: "mockDeviceArtifactIntegration",
     platform: "mockIntegrationPlatform",
     integrationUri: "https://mock-deviceArtifact-upstream-api.com/",
     isGeneric: false,

@@ -254,7 +254,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
               updateData: {
                 ...itemData,
                 deviceGroup: {
-                  set: newDeviceGroup.id,
+                  connect: { id: newDeviceGroup.id },
                 },
               },
               uniqueFieldConditions: [],

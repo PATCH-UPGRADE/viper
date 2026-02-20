@@ -63,7 +63,7 @@ export const assetResponseSchema = z.object({
   updatedAt: z.date(),
   user: userSchema,
 });
-export type AssetResponseSchemaType = z.infer<typeof assetResponseSchema>;
+export type AssetResponse = z.infer<typeof assetResponseSchema>;
 
 export const assetArrayResponseSchema = z.array(assetResponseSchema);
 

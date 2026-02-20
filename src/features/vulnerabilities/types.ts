@@ -64,6 +64,7 @@ export const vulnerabilityResponseSchema = z.object({
   updatedAt: z.date(),
   user: userSchema,
 });
+export type VulnerabilityResponse = z.infer<typeof vulnerabilityResponseSchema>;
 
 export const vulnerabilityArrayResponseSchema = z.array(
   vulnerabilityResponseSchema,

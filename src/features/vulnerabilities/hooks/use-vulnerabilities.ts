@@ -49,10 +49,9 @@ export const useCreateVulnerability = () => {
     trpc.vulnerabilities.create.mutationOptions({
       onSuccess: () => {
         toast.success("Vulnerability created");
-        // Invalidate all getMany queries regardless of params (page, search, etc.)
         queryClient.invalidateQueries({
           predicate: (query) => {
-            const baseKey = trpc.vulnerabilities.getManyInternal.queryKey();
+            const baseKey = trpc.vulnerabilities.getMany.queryKey();
             return query.queryKey[0] === baseKey[0];
           },
         });
@@ -75,14 +74,12 @@ export const useUpdateVulnerability = () => {
     trpc.vulnerabilities.update.mutationOptions({
       onSuccess: (_data) => {
         toast.success("Vulnerability updated");
-        // Invalidate all getMany queries regardless of params
         queryClient.invalidateQueries({
           predicate: (query) => {
-            const getManyInternalKey =
-              trpc.vulnerabilities.getManyInternal.queryKey();
+            const getManyKey = trpc.vulnerabilities.getMany.queryKey();
             const getOneKey = trpc.vulnerabilities.getOne.queryKey();
             return (
-              query.queryKey[0] === getManyInternalKey[0] ||
+              query.queryKey[0] === getManyKey[0] ||
               query.queryKey[0] === getOneKey[0]
             );
           },
@@ -106,14 +103,12 @@ export const useRemoveVulnerability = () => {
     trpc.vulnerabilities.remove.mutationOptions({
       onSuccess: (_data) => {
         toast.success("Vulnerability removed");
-        // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({
           predicate: (query) => {
-            const getManyInternalKey =
-              trpc.vulnerabilities.getManyInternal.queryKey();
+            const getManyKey = trpc.vulnerabilities.getMany.queryKey();
             const getOneKey = trpc.vulnerabilities.getOne.queryKey();
             return (
-              query.queryKey[0] === getManyInternalKey[0] ||
+              query.queryKey[0] === getManyKey[0] ||
               query.queryKey[0] === getOneKey[0]
             );
           },

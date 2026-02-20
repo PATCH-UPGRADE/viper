@@ -4,8 +4,8 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
 import { CopyIcon, MoreVertical, TrashIcon } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
 import {
   DropdownMenu,
@@ -15,42 +15,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { handleCopy } from "@/lib/copy";
-import type { AssetWithIssues } from "@/lib/db";
+import { AssetResponse } from "../types";
 
-export const columns: ColumnDef<AssetWithIssues>[] = [
+export const columns: ColumnDef<AssetResponse>[] = [
   {
     id: "role",
     accessorKey: "role",
     header: ({ column }) => <SortableHeader header="Role" column={column} />,
-  },
-  {
-    id: "issues",
-    accessorKey: "issues",
-    header: ({ column }) => (
-      <SortableHeader header="Active Vulnerabilities" column={column} />
-    ),
-    cell: ({ row }) => {
-      const numVulns = row.original.issues.length;
-      return (
-        <div>
-          <Badge variant={numVulns === 0 ? "outline" : "destructive"}>
-            {numVulns >= 1 ? (
-              <>
-                {numVulns} Vuln{numVulns === 1 ? "" : "s"}.
-              </>
-            ) : (
-              "None"
-            )}
-          </Badge>
-        </div>
-      );
-    },
   },
   {
     meta: { title: "IP Address" },
@@ -59,18 +31,17 @@ export const columns: ColumnDef<AssetWithIssues>[] = [
   },
   {
     accessorKey: "cpe",
-    meta: { title: "Class" },
-    header: ({ column }) => <SortableHeader header="Class" column={column} />,
+    meta: { title: "CPE" },
+    header: ({ column }) => <SortableHeader header="CPE" column={column} />,
     cell: ({ row }) => {
-      return (
-        <Tooltip>
-          <TooltipTrigger>
-            {row.original.deviceGroup.cpe.split(":").slice(3, 5).join(" ")}
-          </TooltipTrigger>
-          <TooltipContent>{row.original.deviceGroup.cpe}</TooltipContent>
-        </Tooltip>
-      );
+      return <CopyCode>{row.original.deviceGroup.cpe}</CopyCode>;
     },
+  },
+  {
+    accessorKey: "userId",
+    meta: { title: "Source Tool" },
+    header: "Source Tool", 
+    accessorFn: (row) => row.user.name,
   },
   {
     accessorKey: "updatedAt",

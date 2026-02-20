@@ -9,7 +9,7 @@ import {
   ShieldAlert,
   ShieldClose,
 } from "lucide-react";
-import { type PropsWithChildren, Suspense, useState } from "react";
+import { type PropsWithChildren, useState } from "react";
 import {
   EmptyView,
   EntityContainer,
@@ -40,15 +40,9 @@ import {
 } from "@/components/ui/drawer";
 import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { Priority } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
-import type {
-  VulnerabilityWithDeviceGroups,
-  VulnerabilityWithIssues,
-} from "@/lib/db";
 import { cn } from "@/lib/utils";
 import {
   useRemoveVulnerability,
@@ -62,6 +56,7 @@ import {
 } from "../hooks/use-vulnerabilities-params";
 import type {
   VulnerabilitiesByPriorityCounts,
+  VulnerabilityResponse,
   VulnerabilityWithRelations,
 } from "../types";
 import { columns } from "./columns";
@@ -86,7 +81,7 @@ export const VulnerabilitiesSearch = () => {
 
 export const VulnerabilitiesList = () => {
   const { data: vulnerabilities, isFetching } = useSuspenseVulnerabilities();
-  const [vuln, setVuln] = useState<VulnerabilityWithIssues | undefined>(
+  const [vuln, setVuln] = useState<VulnerabilityResponse | undefined>(
     undefined,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -307,18 +302,11 @@ export const VulnerabilitiesEmpty = () => {
   );
 };
 
-function isVulnerabilityWithIssues(
-  data: VulnerabilityWithDeviceGroups | VulnerabilityWithIssues,
-): data is VulnerabilityWithIssues {
-  return (data as VulnerabilityWithIssues).issues !== undefined;
-}
-
 export const VulnerabilityItem = ({
   data,
 }: {
-  data: VulnerabilityWithIssues | VulnerabilityWithDeviceGroups;
+  data: VulnerabilityResponse;
 }) => {
-  const hasIssues = isVulnerabilityWithIssues(data);
   const removeVulnerability = useRemoveVulnerability();
 
   const handleRemove = () => {
@@ -338,15 +326,6 @@ export const VulnerabilityItem = ({
           {(data.description ?? "").substring(0, 100)}
           {(data.description ?? "").length > 100 ? "..." : ""} &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
-          {hasIssues && data.issues.length >= 1 && (
-            <>
-              {" "}
-              &bull;{" "}
-              <span className="text-red-500">
-                {data.issues.length} issue(s)
-              </span>
-            </>
-          )}
         </div>
       </div>
       <Button
@@ -362,7 +341,7 @@ export const VulnerabilityItem = ({
 };
 
 interface VulnerabilityDrawerProps extends Omit<EntityDrawerProps, "trigger"> {
-  vulnerability: VulnerabilityWithIssues | VulnerabilityWithDeviceGroups;
+  vulnerability: VulnerabilityResponse;
 }
 
 export function VulnerabilityDrawer({
@@ -370,8 +349,6 @@ export function VulnerabilityDrawer({
   children,
   ...props
 }: PropsWithChildren<VulnerabilityDrawerProps>) {
-  const hasIssues = isVulnerabilityWithIssues(vulnerability);
-
   return (
     <EntityDrawer trigger={children} {...props}>
       <DrawerHeader className="gap-1">
@@ -395,7 +372,6 @@ export function VulnerabilityDrawer({
       </DrawerHeader>
 
       <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4 text-sm">
-        {/* Description */}
         <div className="flex flex-col gap-2">
           <h3 className="font-semibold">Description</h3>
           <p className="text-muted-foreground">{vulnerability.description}</p>
@@ -403,7 +379,6 @@ export function VulnerabilityDrawer({
 
         <Separator />
 
-        {/* Exploit Narrative */}
         <div className="flex flex-col gap-2">
           <h3 className="font-semibold">Exploit Narrative</h3>
           <p className="text-muted-foreground">{vulnerability.narrative}</p>
@@ -411,21 +386,13 @@ export function VulnerabilityDrawer({
 
         <Separator />
 
-        {/* Clinical Impact */}
         <div className="flex flex-col gap-2">
           <h3 className="font-semibold text-destructive">Clinical Impact</h3>
           <p className="text-muted-foreground">{vulnerability.impact}</p>
-          {/* Issues */}
-          {hasIssues && (
-            <Suspense fallback={<Skeleton className="h-16 w-full" />}>
-              <IssuesSidebarList issues={vulnerability.issues} type="assets" />
-            </Suspense>
-          )}
         </div>
 
         <Separator />
 
-        {/* Technical Details */}
         <div className="flex flex-col gap-3">
           <h3 className="font-semibold">Technical Details</h3>
 
@@ -479,7 +446,6 @@ export function VulnerabilityDrawer({
 
         <Separator />
 
-        {/* SARIF Data */}
         <div className="flex flex-col gap-2">
           <h3 className="font-semibold">SARIF Data</h3>
           <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">

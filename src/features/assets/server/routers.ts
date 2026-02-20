@@ -12,6 +12,7 @@ import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   assetArrayInputSchema,
   assetArrayResponseSchema,
+  assetDashboardInclude,
   assetInclude,
   assetInputSchema,
   assetResponseSchema,
@@ -128,6 +129,34 @@ export const assetsRouter = createTRPCRouter({
       return fetchPaginated(prisma.asset, input, {
         where: where,
         include: { ...assetInclude, issues: true },
+        orderBy: sort
+          ? [
+              ...sort.split(",").map((s) => {
+                return { [s.replace("-", "")]: getSortValue(s) };
+              }),
+              { updatedAt: "desc" },
+            ]
+          : { updatedAt: "desc" },
+      });
+    }),
+
+  getManyDashboardInternal: protectedProcedure
+    .input(paginationInputSchema)
+    .query(async ({ input }) => {
+      const { search, sort } = input;
+      const where = createSearchFilter(search);
+
+      function getSortValue(sort: string) {
+        const sortValue = sort.startsWith("-") ? "desc" : "asc";
+        if (sort === "issues" || sort === "-issues") {
+          return { _count: sortValue };
+        }
+        return sortValue;
+      }
+
+      return fetchPaginated(prisma.asset, input, {
+        where,
+        include: assetDashboardInclude,
         orderBy: sort
           ? [
               ...sort.split(",").map((s) => {

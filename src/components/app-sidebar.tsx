@@ -49,14 +49,14 @@ const mainItems = [
   //   url: "/executions",
   // },
   {
-    title: "Vulnerabilities",
-    icon: BugIcon,
-    url: "/vulnerabilities",
-  },
-  {
     title: "Assets",
     icon: ComputerIcon,
     url: "/assets",
+  },
+  {
+    title: "Vulnerabilities",
+    icon: BugIcon,
+    url: "/vulnerabilities",
   },
   {
     title: "Recommendations",

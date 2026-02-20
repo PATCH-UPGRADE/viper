@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AssetStatus } from "@/generated/prisma";
+import { AssetStatus, type Prisma } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   cpeSchema,
@@ -83,3 +83,24 @@ export const assetInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
 };
+
+export const assetDashboardInclude = {
+  user: userIncludeSelect,
+  deviceGroup: deviceGroupSelect,
+  issues: {
+    include: {
+      vulnerability: {
+        select: {
+          id: true,
+          severity: true,
+          cveId: true,
+          description: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.AssetInclude;
+
+export type AssetWithIssueRelations = Prisma.AssetGetPayload<{
+  include: typeof assetDashboardInclude;
+}>;

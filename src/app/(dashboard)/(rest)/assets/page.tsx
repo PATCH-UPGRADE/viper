@@ -1,18 +1,18 @@
 import {
+  AssetDashboardList,
   AssetsContainer,
   AssetsError,
-  AssetsList,
   AssetsLoading,
 } from "@/features/assets/components/assets";
 import { assetsParamsLoader } from "@/features/assets/server/params-loader";
-import { prefetchAssets } from "@/features/assets/server/prefetch";
+import { prefetchAssetsDashboard } from "@/features/assets/server/prefetch";
 import { createListPage } from "@/lib/page-factory";
 
 export default createListPage({
   paramsLoader: assetsParamsLoader,
-  prefetch: prefetchAssets,
+  prefetch: prefetchAssetsDashboard,
   Container: AssetsContainer,
-  List: AssetsList,
+  List: AssetDashboardList,
   Loading: AssetsLoading,
   Error: AssetsError,
 });

@@ -106,7 +106,7 @@ type VulnerabilityIssue = VulnerabilityWithRelations["issues"][number];
 export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
   {
     accessorKey: "id",
-    header: "ID",
+    header: "Issue ID",
     cell: ({ row }) => (
       <span className="font-mono text-sm">{row.original.id}</span>
     ),

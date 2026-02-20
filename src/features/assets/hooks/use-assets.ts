@@ -18,6 +18,15 @@ export const useSuspenseAssets = () => {
   return useSuspenseQuery(trpc.assets.getManyInternal.queryOptions(params));
 };
 
+export const useSuspenseAssetsDashboard = () => {
+  const trpc = useTRPC();
+  const [params] = useAssetsParams();
+
+  return useSuspenseQuery(
+    trpc.assets.getManyDashboardInternal.queryOptions(params),
+  );
+};
+
 /**
  * Hook to fetch all assets with matching vulnerabilities using suspense
  */

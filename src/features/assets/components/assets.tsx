@@ -28,8 +28,16 @@ import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type { AssetWithDeviceGroup, AssetWithIssues } from "@/lib/db";
 import { useAssetsParams } from "../hooks/use-asset-params";
-import { useRemoveAsset, useSuspenseAssets } from "../hooks/use-assets";
+import {
+  useRemoveAsset,
+  useSuspenseAssets,
+  useSuspenseAssetsDashboard,
+} from "../hooks/use-assets";
 import { columns } from "./columns";
+import {
+  assetIssueColumns,
+  dashboardColumns,
+} from "./dashboard-columns";
 
 export const AssetsSearch = () => {
   const [params, setParams] = useAssetsParams();
@@ -68,6 +76,21 @@ export const AssetsList = () => {
         }}
       />
     </>
+  );
+};
+
+export const AssetDashboardList = () => {
+  const { data, isFetching } = useSuspenseAssetsDashboard();
+
+  return (
+    <DataTable
+      paginatedData={data}
+      columns={dashboardColumns}
+      nestedColumns={assetIssueColumns}
+      nestedDataKey="issues"
+      isLoading={isFetching}
+      search={<AssetsSearch />}
+    />
   );
 };
 

@@ -368,7 +368,9 @@ describe("Remediations Endpoint (/remediations)", () => {
     );
 
     const createResults = await Promise.all(createPromises);
-    const remediationIds = createResults.map((r) => r.body.id);
+    // TODO: Remediation POST now returns { remediation, uploadInstructions }
+    // This may be cleaned back up to r.body.id in the future once a more permanent S3 artifact upload solution is in place
+    const remediationIds = createResults.map((r) => r.body.remediation.id);
 
     onTestFinished(async () => {
       await Promise.all(

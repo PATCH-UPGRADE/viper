@@ -199,12 +199,7 @@ export const remediationsRouter = createTRPCRouter({
           model: prisma.remediation,
           mappingModel: prisma.externalRemediationMapping,
           transformInputItem: async (item, userId) => {
-            const {
-              cpes,
-              vendorId: _vendorId,
-              artifacts: _artifacts,
-              ...itemData
-            } = item;
+            const { cpes, vendorId: _vendorId, artifacts, ...itemData } = item;
             const uniqueCpes = [...new Set(cpes)];
             const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
 
@@ -223,7 +218,10 @@ export const remediationsRouter = createTRPCRouter({
                 },
               },
               uniqueFieldConditions: [],
-              artifactWrapperParentField: "remediationId",
+              artifactsData: {
+                artifacts,
+                artifactWrapperParentField: "remediationId",
+              },
             };
           },
         },

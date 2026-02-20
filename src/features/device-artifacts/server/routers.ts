@@ -233,12 +233,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
           model: prisma.deviceArtifact,
           mappingModel: prisma.externalDeviceArtifactMapping,
           transformInputItem: async (item, userId) => {
-            const {
-              cpe,
-              vendorId: _vendorId,
-              artifacts: _artifacts,
-              ...itemData
-            } = item;
+            const { cpe, vendorId: _vendorId, artifacts, ...itemData } = item;
             const newDeviceGroup = await cpeToDeviceGroup(cpe);
 
             return {
@@ -258,7 +253,10 @@ export const deviceArtifactsRouter = createTRPCRouter({
                 },
               },
               uniqueFieldConditions: [],
-              artifactWrapperParentField: "deviceArtifactId",
+              artifactsData: {
+                artifacts,
+                artifactWrapperParentField: "deviceArtifactId",
+              },
             };
           },
         },

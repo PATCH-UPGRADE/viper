@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
 import "server-only";
-import { Artifact, type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
+import { type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
@@ -195,6 +195,16 @@ async function upsertSyncStatus(
   });
 }
 
+interface ArtifactsContent {
+  artifacts: Array<{
+    name?: string | null;
+    artifactType: ArtifactType;
+    downloadUrl: string;
+    size?: number | null;
+  }>;
+  artifactWrapperParentField: ArtifactWrapperParentFieldOptions;
+}
+
 /**
  * Configuration for the sync helper
  */
@@ -220,7 +230,7 @@ interface SyncConfig<
     createData: TCreateData;
     updateData: TUpdateData;
     uniqueFieldConditions: Array<Record<string, any>>;
-    artifactWrapperParentField: ArtifactWrapperParentFieldOptions | undefined;
+    artifactsData: ArtifactsContent | undefined;
   }>;
 
   // Optional: Additional fields to include in create
@@ -275,12 +285,8 @@ export async function processIntegrationSync<
     });
 
     // Transform the input item to get create/update data and unique conditions
-    const {
-      createData,
-      updateData,
-      uniqueFieldConditions,
-      artifactWrapperParentField,
-    } = await config.transformInputItem(item, userId);
+    const { createData, updateData, uniqueFieldConditions, artifactsData } =
+      await config.transformInputItem(item, userId);
 
     // If we have a ExternalItemMapping, update the sync time and item
     if (foundMapping) {
@@ -316,33 +322,35 @@ export async function processIntegrationSync<
     // If no Item, we need to create the Item and ExternalItemMapping
     if (!foundItem) {
       try {
-        
-          const createdItem = await config.model.create({
-            data: {
-              ...createData,
-              ...(config.additionalCreateFields?.(userId) || {}),
-              externalMappings: {
-                create: {
-                  integrationId,
-                  externalId: vendorId,
-                  lastSynced,
-                },
+        const createdItem = await config.model.create({
+          data: {
+            ...createData,
+            ...(config.additionalCreateFields?.(userId) || {}),
+            externalMappings: {
+              create: {
+                integrationId,
+                externalId: vendorId,
+                lastSynced,
               },
             },
-          });
+          },
+        });
 
-          // TODO: Make this better
-          if (item.artifacts && artifactWrapperParentField) {
-            await prisma.$transaction(async (tx) => {
-              await createArtifactWrappers(
-                tx,
-                item.artifacts,
-                createdItem.id,
-                artifactWrapperParentField,
-                userId,
-              );
-            });
-          }
+        // Remediation and DeviceArtifacts integrations contain artifacts that need processing
+        if (
+          artifactsData?.artifacts &&
+          artifactsData.artifactWrapperParentField
+        ) {
+          await prisma.$transaction(async (tx: any) => {
+            await createArtifactWrappers(
+              tx,
+              artifactsData.artifacts,
+              createdItem.id,
+              artifactsData.artifactWrapperParentField,
+              userId,
+            );
+          });
+        }
       } catch (error: unknown) {
         console.error("no existing Item", error);
         response.message = handlePrismaError(error);

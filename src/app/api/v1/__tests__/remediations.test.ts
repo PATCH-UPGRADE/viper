@@ -535,6 +535,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       },
       include: {
         affectedDeviceGroups: true,
+        artifacts: true,
       },
     });
 
@@ -546,6 +547,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(foundRem1.upstreamApi).toBe(remPayload1.upstreamApi);
     expect(foundRem1.affectedDeviceGroups.length).toBe(remPayload1.cpes.length);
     expect(foundRem1.affectedDeviceGroups[0].cpe).toBe(remPayload1.cpes[0]);
+    expect(foundRem1.artifacts.length).toBe(1);
 
     const remPayload2 = remediationIntegrationPayload.items[1];
     const mapping2 = await prisma.externalRemediationMapping.findFirstOrThrow({
@@ -560,6 +562,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       },
       include: {
         affectedDeviceGroups: true,
+        artifacts: true,
       },
     });
 
@@ -571,6 +574,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(foundRem2.upstreamApi).toBe(remPayload2.upstreamApi);
     expect(foundRem2.affectedDeviceGroups.length).toBe(remPayload2.cpes.length);
     expect(foundRem2.affectedDeviceGroups[0].cpe).toBe(remPayload2.cpes[0]);
+    expect(foundRem2.artifacts.length).toBe(1);
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {
       fail("lastSynced values should not be null");

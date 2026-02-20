@@ -293,8 +293,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
               },
               uniqueFieldConditions: [],
               // ^always create unmapped vulns
-              artifactWrapperParentField: undefined,
-              // ^used for Remediations and DeviceArtifacts
+              artifactsData: undefined,
+              // ^vulnerability integrations do not include artifacts
             };
           },
         },

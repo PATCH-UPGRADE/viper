@@ -335,8 +335,8 @@ export const assetsRouter = createTRPCRouter({
                 deviceGroupId: deviceGroup.id,
               },
               uniqueFieldConditions,
-              artifactWrapperParentField: undefined,
-              // ^used for Remediations and DeviceArtifacts
+              artifactsData: undefined,
+              // ^vulnerability integrations do not include artifacts
             };
           },
         },

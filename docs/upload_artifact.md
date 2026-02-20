@@ -66,7 +66,7 @@
                 "id": "cmlr2yavq000wov7rfkgaev3k",
                 "name": "vw61-architecture.drawio",
                 "artifactType": "Documentation",
-                "downloadUrl": "https://northeasterntest0226.s3.us-east-1.amazonaws.com/artifacts/e4b437fa-1b29-40a1-ba37-cefe2d28d2b1-vw61-architecture.drawio",
+                "downloadUrl": "https://test-s3-bucket-name.s3.us-east-1.amazonaws.com/artifacts/e4b437fa-1b29-40a1-ba37-cefe2d28d2b1-vw61-architecture.drawio",
                 "hash": "WknCHrZ5WeXj1IimWmsSMQ==",
                 "size": 7883,
                 "versionNumber": 1,
@@ -103,7 +103,7 @@
 5. Once the artifact is uploaded, go to Viper -> Remediations and test the link to your new remediation artifact.
 
 6. PUT against Viper /remediations/{id}
-    - See http://localhost:3000/api/openapi-ui#tag/remediations/put/remediationsid
+    - See https://viper-xi.vercel.app/api/openapi-ui#tag/remediations/put/remediationsid
     - Example payload to 'id' "cmkojdbwb002iy95bcw2ujerl":
         ```json
         {
@@ -151,7 +151,7 @@
                     "id": "cmltqzoga000wov8o3e4ubuds",
                     "name": "Test",
                     "artifactType": "Source",
-                    "downloadUrl": "https://northeasterntest0226.s3.us-east-1.amazonaws.com/artifacts/eccbf6f5-533a-4742-868e-dc6df4a6c2f7-Test",
+                    "downloadUrl": "https://test-s3-bucket-name.s3.us-east-1.amazonaws.com/artifacts/eccbf6f5-533a-4742-868e-dc6df4a6c2f7-Test",
                     "hash": "WknCHrZ5WeXj1IimWmsSMQ==",
                     "size": 7883,
                     "versionNumber": 1,
@@ -187,7 +187,7 @@
                     "id": "cmltr7r3g0016ov8o7ud5g7g3",
                     "name": "vw61-architecture.drawio",
                     "artifactType": "Source",
-                    "downloadUrl": "https://northeasterntest0226.s3.us-east-1.amazonaws.com/artifacts/edd3d6a1-891e-47e9-bb88-6277c8054d95-vw61-architecture.drawio",
+                    "downloadUrl": "https://test-s3-bucket-name.s3.us-east-1.amazonaws.com/artifacts/edd3d6a1-891e-47e9-bb88-6277c8054d95-vw61-architecture.drawio",
                     "hash": "WknCHrZ5WeXj1IimWmsSMQ==",
                     "size": 7883,
                     "versionNumber": 1,
@@ -246,7 +246,7 @@ S3_BUCKET_NAME=
             "Effect": "Allow",
             "Principal": "*",
             "Action": "s3:GetObject",
-            "Resource": "arn:aws:s3:::northeasterntest0226/*"
+            "Resource": "arn:aws:s3:::test-s3-bucket-name/*"
         }
     ]
 }

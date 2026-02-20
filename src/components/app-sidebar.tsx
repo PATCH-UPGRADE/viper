@@ -2,10 +2,12 @@
 
 import {
   BugIcon,
+  ChevronDownIcon,
   ComputerIcon,
   CpuIcon,
   ExternalLink,
   HeartIcon,
+  PlugIcon,
   SettingsIcon,
   ShieldCheckIcon,
   WorkflowIcon,
@@ -13,6 +15,13 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -25,58 +34,67 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { NavUser } from "./nav-user";
+import { Separator } from "./ui/separator";
 
-const menuItems = [
+const mainItems = [
   {
-    title: "Main",
-    items: [
-      {
-        title: "Workflows",
-        icon: WorkflowIcon,
-        url: "/workflows",
-      },
-      // Hiding for now can bring it back if/when feature is ready
-      // {
-      //   title: "Simulations",
-      //   icon: HistoryIcon,
-      //   url: "/executions",
-      // },
-      {
-        title: "Assets",
-        icon: ComputerIcon,
-        url: "/assets",
-      },
-      {
-        title: "Vulnerabilities",
-        icon: BugIcon,
-        url: "/vulnerabilities",
-      },
-      {
-        title: "Device Artifacts",
-        icon: CpuIcon,
-        url: "/deviceArtifacts",
-      },
-      {
-        title: "Remediations",
-        icon: HeartIcon,
-        url: "/remediations",
-      },
-      {
-        title: "Recommendations",
-        icon: ShieldCheckIcon,
-        url: "/recommendations",
-      },
-      {
-        title: "Settings",
-        icon: SettingsIcon,
-        url: "/settings",
-      },
-    ],
+    title: "Workflows",
+    icon: WorkflowIcon,
+    url: "/workflows",
+  },
+  // Hiding for now can bring it back if/when feature is ready
+  // {
+  //   title: "Simulations",
+  //   icon: HistoryIcon,
+  //   url: "/executions",
+  // },
+  {
+    title: "Recommendations",
+    icon: ShieldCheckIcon,
+    url: "/recommendations",
+  },
+  {
+    title: "Settings",
+    icon: SettingsIcon,
+    url: "/settings",
   },
 ];
 
+const connectorItems = [
+  {
+    title: "Assets",
+    icon: ComputerIcon,
+    url: "/assets",
+    count: 1,
+  },
+  {
+    title: "Vulnerabilities",
+    icon: BugIcon,
+    url: "/vulnerabilities",
+    count: 1,
+  },
+  {
+    title: "Device Artifacts",
+    icon: CpuIcon,
+    url: "/deviceArtifacts",
+    count: 1,
+  },
+  {
+    title: "Remediations",
+    icon: HeartIcon,
+    url: "/remediations",
+    count: 1,
+  },
+];
+
+const totalConnectors = connectorItems.reduce(
+  (sum, item) => sum + item.count,
+  0,
+);
+
 export const AppSidebar = () => {
   const pathname = usePathname();
+  const [connectorsOpen, setConnectorsOpen] = useState(true);
 
   return (
     <Sidebar collapsible="icon">
@@ -91,36 +109,81 @@ export const AppSidebar = () => {
         </SidebarMenuItem>
       </SidebarHeader>
       <SidebarContent>
-        {menuItems.map((group) => (
-          <SidebarGroup key={group.title}>
-            <SidebarGroupContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {mainItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    isActive={
+                      item.url === "/"
+                        ? pathname === "/"
+                        : pathname.startsWith(item.url)
+                    }
+                    asChild
+                    className="gap-x-4 h-10 px-4"
+                  >
+                    <Link href={item.url} prefetch>
+                      <item.icon className="size-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <Collapsible
+            open={connectorsOpen}
+            onOpenChange={setConnectorsOpen}
+            className="group/connectors"
+          >
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton
+                  tooltip="Connectors"
+                  className="gap-x-4 h-10 px-4"
+                >
+                  <PlugIcon className="size-4" />
+                  <span>Connectors</span>
+                  <Badge variant="secondary" className="ml-auto mr-1 text-xs">
+                    {totalConnectors}
+                  </Badge>
+                  <ChevronDownIcon className="size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/connectors:rotate-180" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+            </SidebarMenuItem>
+            <CollapsibleContent>
               <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
+                {connectorItems.map((item) => (
+                  <SidebarMenuItem key={item.title} className="ml-4">
                     <SidebarMenuButton
                       tooltip={item.title}
-                      isActive={
-                        item.url === "/"
-                          ? pathname === "/"
-                          : pathname.startsWith(item.url)
-                      }
+                      isActive={pathname.startsWith(item.url)}
                       asChild
                       className="gap-x-4 h-10 px-4"
                     >
                       <Link href={item.url} prefetch>
                         <item.icon className="size-4" />
                         <span>{item.title}</span>
+                        {/*<Badge
+                          variant="secondary"
+                          className="ml-auto text-xs"
+                        >
+                          {item.count}
+                        </Badge>*/}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
-      </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
+            </CollapsibleContent>
+          </Collapsible>
+          <Separator className="my-2" />
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <a

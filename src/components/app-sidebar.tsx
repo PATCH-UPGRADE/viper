@@ -49,6 +49,16 @@ const mainItems = [
   //   url: "/executions",
   // },
   {
+    title: "Vulnerabilities",
+    icon: BugIcon,
+    url: "/vulnerabilities",
+  },
+  {
+    title: "Assets",
+    icon: ComputerIcon,
+    url: "/assets",
+  },
+  {
     title: "Recommendations",
     icon: ShieldCheckIcon,
     url: "/recommendations",
@@ -64,25 +74,25 @@ const connectorItems = [
   {
     title: "Assets",
     icon: ComputerIcon,
-    url: "/assets",
+    url: "/connectors/assets",
     count: 1,
   },
   {
     title: "Vulnerabilities",
     icon: BugIcon,
-    url: "/vulnerabilities",
+    url: "/connectors/vulnerabilities",
     count: 1,
   },
   {
     title: "Device Artifacts",
     icon: CpuIcon,
-    url: "/deviceArtifacts",
+    url: "/connectors/deviceArtifacts",
     count: 1,
   },
   {
     title: "Remediations",
     icon: HeartIcon,
-    url: "/remediations",
+    url: "/connectors/remediations",
     count: 1,
   },
 ];

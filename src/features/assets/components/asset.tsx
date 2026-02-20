@@ -304,7 +304,7 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
         <Breadcrumb className="pb-6">
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/assets">All Assets</BreadcrumbLink>
+              <BreadcrumbLink href="/connectors/assets">All Assets</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator>
               <SlashIcon />

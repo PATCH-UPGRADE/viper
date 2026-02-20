@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   cpeSchema,
+  createIntegrationInputSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -24,6 +25,10 @@ export const remediationInputSchema = z.object({
     .array(artifactInputSchema)
     .min(1, "at least one artifact is required"),
 });
+
+export const integrationRemediationInputSchema = createIntegrationInputSchema(
+  remediationInputSchema,
+);
 
 export const remediationUpdateSchema = z.object({
   id: z.string(),

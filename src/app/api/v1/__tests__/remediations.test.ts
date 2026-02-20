@@ -1,11 +1,24 @@
+import { fail } from "node:assert";
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
 import type { ArtifactWrapperWithUrls } from "@/features/artifacts/types";
 import type { DeviceGroupWithUrls } from "@/features/device-groups/types";
 import type { RemediationResponse } from "@/features/remediations/types";
-import { ArtifactType } from "@/generated/prisma";
+import {
+  ArtifactType,
+  AuthType,
+  ResourceType,
+  SyncStatusEnum,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { authHeader, BASE_URL, generateCPE } from "./test-config";
+import {
+  AUTH_TOKEN,
+  authHeader,
+  BASE_URL,
+  generateCPE,
+  jsonHeader,
+  setupMockIntegration,
+} from "./test-config";
 
 describe("Remediations Endpoint (/remediations)", () => {
   const payload = {
@@ -31,6 +44,59 @@ describe("Remediations Endpoint (/remediations)", () => {
     description: "Mock -- Critical vulnerability requiring remediation",
     narrative: "Found during security audit.",
     impact: "Critical",
+  };
+
+  const mockIntegrationPayload = {
+    name: "mockVulnIntegration",
+    platform: "mockIntegrationPlatform",
+    integrationUri: "https://mock-vuln-upstream-api.com/",
+    isGeneric: false,
+    authType: AuthType.Bearer,
+    resourceType: ResourceType.Remediation,
+    authentication: {
+      token: AUTH_TOKEN,
+    },
+    syncEvery: 300,
+  };
+
+  const remediationIntegrationPayload = {
+    vendor: "mockRemediationIntegrationVendor",
+    items: [
+      {
+        cpes: ["cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*"],
+        upstreamApi: "https://mock-rem-upstream-api.com/",
+        description: "Mock -- run apt update",
+        narrative: "Discovered during security audit",
+        vendorId: "mockRemediation-1",
+        artifacts: [
+          {
+            name: "mock-remediation-artifact-1",
+            artifactType: ArtifactType.Documentation,
+            downloadUrl: "http://mock.example.com",
+          },
+        ],
+      },
+      {
+        cpes: ["cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*"],
+        upstreamApi: "https://mock-rem-upstream-api.com/",
+        description: "Mock - Turn it off and on again",
+        narrative: "Discovered during security audit",
+        vendorId: "mockRemediation-2",
+        artifacts: [
+          {
+            name: "mock-remediation-artifact-2",
+            artifactType: ArtifactType.Documentation,
+            downloadUrl: "http://mock.example.com",
+          },
+        ],
+      },
+    ],
+    page: 1,
+    pageSize: 100,
+    totalCount: 2,
+    totalPages: 1,
+    next: null,
+    previous: null,
   };
 
   it("POST /remediations - Without auth, should get a 401", async () => {
@@ -65,6 +131,13 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   it("DELETE /remediations/{id} - Without auth, should 401", async () => {
     const res = await request(BASE_URL).delete("/remediations/foo");
+
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("UNAUTHORIZED");
+  });
+
+  it("GET /remediations/integrationUpload - Without auth, should be 401", async () => {
+    const res = await request(BASE_URL).get(`/remediations/integrationUpload`);
 
     expect(res.status).toBe(401);
     expect(res.body.code).toBe("UNAUTHORIZED");
@@ -433,5 +506,121 @@ describe("Remediations Endpoint (/remediations)", () => {
       (r: RemediationResponse) => r.id === remediationId,
     );
     expect(found).toBe(true);
+  });
+
+  it("empty Remediation uploadIntegration endpoint int test", async () => {
+    const { apiKey } = await setupMockIntegration(mockIntegrationPayload);
+
+    // this should succeed and nothing should be created
+    const noRemediations = { ...remediationIntegrationPayload, items: [] };
+    const createRemResp = await request(BASE_URL)
+      .post("/remediations/integrationUpload")
+      .set({ Authorization: apiKey.key })
+      .set(jsonHeader)
+      .send(noRemediations);
+
+    expect(createRemResp.status).toBe(200);
+    expect(createRemResp.body.createdItemsCount).toBe(0);
+    expect(createRemResp.body.updatedItemsCount).toBe(0);
+    expect(createRemResp.body.shouldRetry).toBe(false);
+    expect(createRemResp.body.message).toBe("success");
+  });
+
+  it("create Remediation uploadIntegration endpoint int test", async () => {
+    const { integration: createdIntegration, apiKey } =
+      await setupMockIntegration(mockIntegrationPayload);
+
+    onTestFinished(async () => {
+      // this won't throw errors if it misses, which messes up the onTestFinished stack
+      await prisma.remediation.deleteMany({
+        where: {
+          description: {
+            contains: "mock",
+            mode: "insensitive" as const,
+          },
+        },
+      });
+    });
+
+    const integrationRes = await request(BASE_URL)
+      .post("/remediations/integrationUpload")
+      .set({ Authorization: apiKey.key })
+      .set(jsonHeader)
+      .send(remediationIntegrationPayload);
+
+    expect(integrationRes.status).toBe(200);
+    expect(integrationRes.body.createdItemsCount).toBe(2);
+    expect(integrationRes.body.updatedItemsCount).toBe(0);
+    expect(integrationRes.body.shouldRetry).toBe(false);
+    expect(integrationRes.body.message).toBe("success");
+
+    const remPayload1 = remediationIntegrationPayload.items[0];
+    const mapping1 = await prisma.externalRemediationMapping.findFirstOrThrow({
+      where: {
+        externalId: remPayload1.vendorId,
+      },
+    });
+
+    const foundRem1 = await prisma.remediation.findFirstOrThrow({
+      where: {
+        id: mapping1.itemId,
+      },
+      include: {
+        affectedDeviceGroups: true,
+        artifacts: true,
+      },
+    });
+
+    expect(mapping1.integrationId).toBe(createdIntegration.id);
+    expect(mapping1.externalId).toBe(remPayload1.vendorId);
+
+    expect(foundRem1.description).toBe(remPayload1.description);
+    expect(foundRem1.narrative).toBe(remPayload1.narrative);
+    expect(foundRem1.upstreamApi).toBe(remPayload1.upstreamApi);
+    expect(foundRem1.affectedDeviceGroups.length).toBe(remPayload1.cpes.length);
+    expect(foundRem1.affectedDeviceGroups[0].cpe).toBe(remPayload1.cpes[0]);
+    expect(foundRem1.artifacts.length).toBe(1);
+
+    const remPayload2 = remediationIntegrationPayload.items[1];
+    const mapping2 = await prisma.externalRemediationMapping.findFirstOrThrow({
+      where: {
+        externalId: remPayload2.vendorId,
+      },
+    });
+
+    const foundRem2 = await prisma.remediation.findFirstOrThrow({
+      where: {
+        id: mapping2.itemId,
+      },
+      include: {
+        affectedDeviceGroups: true,
+        artifacts: true,
+      },
+    });
+
+    expect(mapping2.integrationId).toBe(createdIntegration.id);
+    expect(mapping2.externalId).toBe(remPayload2.vendorId);
+
+    expect(foundRem2.description).toBe(remPayload2.description);
+    expect(foundRem2.narrative).toBe(remPayload2.narrative);
+    expect(foundRem2.upstreamApi).toBe(remPayload2.upstreamApi);
+    expect(foundRem2.affectedDeviceGroups.length).toBe(remPayload2.cpes.length);
+    expect(foundRem2.affectedDeviceGroups[0].cpe).toBe(remPayload2.cpes[0]);
+    expect(foundRem2.artifacts.length).toBe(1);
+
+    if (!mapping1.lastSynced || !mapping2.lastSynced) {
+      fail("lastSynced values should not be null");
+    }
+
+    expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
+
+    const foundSync = await prisma.syncStatus.findFirstOrThrow({
+      where: { syncedAt: mapping1.lastSynced },
+    });
+
+    expect(foundSync.integrationId).toBe(createdIntegration.id);
+    expect(foundSync.status).toBe(SyncStatusEnum.Success);
+    expect(foundSync.errorMessage).toBeNullable();
+    expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
   });
 });

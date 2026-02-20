@@ -27,10 +27,17 @@ export function isValidIntegrationKey(
 }
 
 export const integrationsMapping = {
-  // TODO: extend with deviceArtifact and remediations
   assets: {
     name: "Asset",
     type: ResourceType.Asset,
+  },
+  deviceArtifacts: {
+    name: "Device Artifact",
+    type: ResourceType.DeviceArtifact,
+  },
+  remediations: {
+    name: "Remediation",
+    type: ResourceType.Remediation,
   },
   vulnerabilities: {
     name: "Vulnerability",

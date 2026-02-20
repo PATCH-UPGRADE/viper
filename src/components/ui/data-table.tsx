@@ -26,6 +26,12 @@ import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -53,6 +59,9 @@ declare module "@tanstack/react-table" {
   // biome-ignore lint/correctness/noUnusedVariables: required for declaration merging
   interface ColumnMeta<TData extends RowData, TValue> {
     title: string;
+    headerClassName?: string;
+    cellClassName?: string;
+    colSpan?: (row: Row<TData>) => number;
   }
 }
 
@@ -63,22 +72,24 @@ declare module "@tanstack/react-table" {
 interface SortableHeaderProps<TData> {
   header: string;
   column: Column<TData>;
+  tooltip?: string;
 }
 
 export function SortableHeader<TData>({
   header,
   column,
+  tooltip,
 }: SortableHeaderProps<TData>) {
   const iconClassName = "ml-2 h-4 w-4";
   const sorted = column.getIsSorted();
   const isAscending = sorted === "asc";
 
-  return (
+  const button = (
     <Button
       variant="link"
       className="text-muted-foreground px-0!"
       onClick={() => column.toggleSorting(undefined, true)}
-      aria-label={`Sort by ${header}${sorted ? (isAscending ? ", ascending" : ", descending") : ""}`}
+      aria-label={`Sort by ${tooltip ?? header}${sorted ? (isAscending ? ", ascending" : ", descending") : ""}`}
     >
       {header}
       {sorted ? (
@@ -99,6 +110,17 @@ export function SortableHeader<TData>({
         <ArrowUpDown className={iconClassName} aria-hidden="true" />
       )}
     </Button>
+  );
+
+  if (!tooltip) return button;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent>{tooltip}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -294,7 +316,10 @@ export function DataTable<
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="py-2 first-of-type:pl-4 last-of-type:pr-4 text-muted-foreground"
+                    className={cn(
+                      "py-2 first-of-type:pl-4 last-of-type:pr-4 text-muted-foreground",
+                      header.column.columnDef.meta?.headerClassName,
+                    )}
                   >
                     {header.isPlaceholder
                       ? null
@@ -357,17 +382,35 @@ export function DataTable<
                           </Button>
                         </TableCell>
                       )}
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          className="py-4 first-of-type:pl-4 last-of-type:pr-4"
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </TableCell>
-                      ))}
+                      {(() => {
+                        const cells = row.getVisibleCells();
+                        const rendered: React.ReactNode[] = [];
+                        let skip = 0;
+                        for (const cell of cells) {
+                          if (skip > 0) {
+                            skip--;
+                            continue;
+                          }
+                          const colSpan =
+                            cell.column.columnDef.meta?.colSpan?.(row) ?? 1;
+                          if (colSpan > 1) {
+                            skip = colSpan - 1;
+                          }
+                          rendered.push(
+                            <TableCell
+                              key={cell.id}
+                              colSpan={colSpan > 1 ? colSpan : undefined}
+                              className={cn("py-4 first-of-type:pl-4 last-of-type:pr-4", cell.column.columnDef.meta?.cellClassName)}
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext(),
+                              )}
+                            </TableCell>,
+                          );
+                        }
+                        return rendered;
+                      })()}
                     </TableRow>
 
                     {hasNestedTable && isExpanded && (

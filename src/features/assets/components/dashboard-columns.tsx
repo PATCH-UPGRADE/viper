@@ -62,6 +62,8 @@ const severityConfig = {
   },
 } as const;
 
+const SEVERITY_COL_COUNT = 4;
+
 function createSeverityColumn(
   severity: Severity,
   isFirst: boolean,
@@ -69,15 +71,22 @@ function createSeverityColumn(
   const config = severityConfig[severity];
   return {
     id: `severity_${severity}`,
-    header: () => (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="cursor-default font-medium">{config.short}</span>
-          </TooltipTrigger>
-          <TooltipContent>{config.label}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+    meta: {
+      title: config.label,
+      headerClassName: "w-10",
+      ...(isFirst && {
+        colSpan: (row) => {
+          const active = totalActiveIssues(row.original.issues);
+          return active === 0 ? SEVERITY_COL_COUNT : 1;
+        },
+      }),
+    },
+    header: ({ column }) => (
+      <SortableHeader
+        header={config.short}
+        column={column}
+        tooltip={config.label}
+      />
     ),
     cell: ({ row }) => {
       const issues = row.original.issues;
@@ -86,7 +95,7 @@ function createSeverityColumn(
       if (active === 0) {
         if (isFirst) {
           return (
-            <Badge className="bg-green-600 hover:bg-green-600 text-white whitespace-nowrap">
+            <Badge className="bg-green-600 hover:bg-green-600 text-white whitespace-nowrap w-full">
               No active issues
             </Badge>
           );
@@ -134,8 +143,16 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
       </TooltipProvider>
     ),
   },
+  createSeverityColumn(Severity.Critical, true),
+  createSeverityColumn(Severity.High, false),
+  createSeverityColumn(Severity.Medium, false),
+  createSeverityColumn(Severity.Low, false),
   {
-    meta: { title: "IP Address" },
+    meta: { 
+      title: "IP Address",
+      headerClassName: "pl-6",
+      cellClassName: "pl-6",
+    },
     accessorKey: "ip",
     header: "IP Address",
   },
@@ -145,10 +162,6 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
     header: "Source Tool",
     accessorFn: (row) => row.user.name,
   },
-  createSeverityColumn(Severity.Critical, true),
-  createSeverityColumn(Severity.High, false),
-  createSeverityColumn(Severity.Medium, false),
-  createSeverityColumn(Severity.Low, false),
   {
     id: "remediations",
     header: ({ column }) => (

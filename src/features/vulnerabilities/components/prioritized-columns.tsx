@@ -108,7 +108,12 @@ export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
     accessorKey: "id",
     header: "Issue ID",
     cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.original.id}</span>
+      <Link
+        href={`/issues/${row.original.id}`}
+        className="font-mono text-sm text-primary underline hover:text-primary/80"
+      >
+        {row.original.id}
+      </Link>
     ),
   },
   {

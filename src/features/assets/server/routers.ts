@@ -1,6 +1,11 @@
 import { z } from "zod";
+import { IssueStatus, Severity } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { paginationInputSchema } from "@/lib/pagination";
+import {
+  buildPaginationMeta,
+  createPaginatedResponse,
+  paginationInputSchema,
+} from "@/lib/pagination";
 import {
   cpeToDeviceGroup,
   fetchPaginated,
@@ -146,26 +151,109 @@ export const assetsRouter = createTRPCRouter({
       const { search, sort } = input;
       const where = createSearchFilter(search);
 
-      function getSortValue(sort: string) {
-        const sortValue = sort.startsWith("-") ? "desc" : "asc";
-        if (sort === "issues" || sort === "-issues") {
-          return { _count: sortValue };
+      const computedKeys = [
+        "severity_Critical",
+        "severity_High",
+        "severity_Medium",
+        "severity_Low",
+        "remediations",
+      ];
+      const sortFields = sort ? sort.split(",").filter(Boolean) : [];
+      const hasComputedSort = sortFields.some((s) =>
+        computedKeys.some((key) => s === key || s === `-${key}`),
+      );
+
+      if (!hasComputedSort) {
+        function getSortValue(sort: string) {
+          const sortValue = sort.startsWith("-") ? "desc" : "asc";
+          if (sort === "issues" || sort === "-issues") {
+            return { _count: sortValue };
+          }
+          return sortValue;
         }
-        return sortValue;
+
+        return fetchPaginated(prisma.asset, input, {
+          where,
+          include: assetDashboardInclude,
+          orderBy: sort
+            ? [
+                ...sort.split(",").map((s) => {
+                  return { [s.replace("-", "")]: getSortValue(s) };
+                }),
+                { updatedAt: "desc" },
+              ]
+            : { updatedAt: "desc" },
+        });
       }
 
-      return fetchPaginated(prisma.asset, input, {
+      const totalCount = await prisma.asset.count({ where });
+      const meta = buildPaginationMeta(input, totalCount);
+
+      const allAssets = await prisma.asset.findMany({
         where,
         include: assetDashboardInclude,
-        orderBy: sort
-          ? [
-              ...sort.split(",").map((s) => {
-                return { [s.replace("-", "")]: getSortValue(s) };
-              }),
-              { updatedAt: "desc" },
-            ]
-          : { updatedAt: "desc" },
       });
+
+      type AssetRow = (typeof allAssets)[number];
+
+      function activeBySeverity(asset: AssetRow, severity: Severity): number {
+        return asset.issues.filter(
+          (i) =>
+            i.status === IssueStatus.ACTIVE &&
+            i.vulnerability.severity === severity,
+        ).length;
+      }
+
+      function remediationCount(asset: AssetRow): number {
+        const seen = new Set<string>();
+        let total = 0;
+        for (const issue of asset.issues) {
+          if (
+            issue.status === IssueStatus.ACTIVE &&
+            !seen.has(issue.vulnerabilityId)
+          ) {
+            seen.add(issue.vulnerabilityId);
+            total += issue.vulnerability._count.remediations;
+          }
+        }
+        return total;
+      }
+
+      function getComputedValue(asset: AssetRow, key: string): number | string {
+        if (key.startsWith("severity_")) {
+          const severity = key.replace("severity_", "") as Severity;
+          return activeBySeverity(asset, severity);
+        }
+        if (key === "remediations") {
+          return remediationCount(asset);
+        }
+        const val = (asset as Record<string, unknown>)[key];
+        return typeof val === "string" ? val : String(val ?? "");
+      }
+
+      allAssets.sort((a, b) => {
+        for (const field of sortFields) {
+          const desc = field.startsWith("-");
+          const key = desc ? field.slice(1) : field;
+          const aVal = getComputedValue(a, key);
+          const bVal = getComputedValue(b, key);
+
+          let cmp: number;
+          if (typeof aVal === "number" && typeof bVal === "number") {
+            cmp = aVal - bVal;
+          } else {
+            cmp = String(aVal).localeCompare(String(bVal));
+          }
+
+          if (cmp !== 0) return desc ? -cmp : cmp;
+        }
+        return (
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+      });
+
+      const items = allAssets.slice(meta.skip, meta.skip + meta.take);
+      return createPaginatedResponse(items, meta);
     }),
 
   // Internal API for asset vulnerability matching

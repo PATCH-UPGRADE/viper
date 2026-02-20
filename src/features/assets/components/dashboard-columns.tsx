@@ -176,6 +176,25 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
       );
     },
   },
+  {
+    id: "actions",
+    enableHiding: false,
+    header: "",
+    cell: ({ row }) => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link href={`/assets/${row.original.id}`}>Go to Asset Details</Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
+  },
 ];
 
 export const assetIssueColumns: ColumnDef<AssetIssue>[] = [
@@ -183,7 +202,12 @@ export const assetIssueColumns: ColumnDef<AssetIssue>[] = [
     accessorKey: "id",
     header: "Issue ID",
     cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.original.id}</span>
+      <Link
+        href={`/issues/${row.original.id}`}
+        className="font-mono text-sm text-primary underline hover:text-primary/80"
+      >
+        {row.original.id}
+      </Link>
     ),
   },
   {

@@ -3,6 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
 import { CopyIcon, MoreVertical, TrashIcon } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CopyCode } from "@/components/ui/code";
@@ -30,7 +31,7 @@ export const columns: ColumnDef<AssetResponse>[] = [
     header: "IP Address",
   },
   {
-    accessorKey: "cpe",
+    accessorKey: "deviceGroupId",
     meta: { title: "CPE" },
     header: ({ column }) => <SortableHeader header="CPE" column={column} />,
     cell: ({ row }) => {
@@ -67,6 +68,10 @@ export const columns: ColumnDef<AssetResponse>[] = [
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[200px]">
+            <DropdownMenuItem asChild>
+              <Link href={`/assets/${asset.id}`}>Go to Asset Details</Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuLabel>Quick Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem

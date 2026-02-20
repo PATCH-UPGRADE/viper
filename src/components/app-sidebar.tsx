@@ -51,7 +51,7 @@ const mainItems = [
   {
     title: "Assets",
     icon: ComputerIcon,
-    url: "/assets",
+    url: "/assets?sort=-severity_Critical%2C-remediations",
   },
   {
     title: "Vulnerabilities",

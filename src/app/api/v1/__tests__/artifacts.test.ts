@@ -27,7 +27,10 @@ describe("Artifacts Endpoint (/artifacts)", () => {
       .set(authHeader)
       .send(payload);
 
-    return res.body;
+    // TODO: Remediation POST now returns { remediation, uploadInstructions }
+    // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
+    expect(res.status).toBe(200);
+    return res.body.remediation;
   };
 
   it("GET /artifacts/{id} - Without auth, should 401", async () => {

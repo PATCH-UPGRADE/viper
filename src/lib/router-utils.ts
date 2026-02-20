@@ -95,14 +95,15 @@ export const transformArtifactWrapper = (item: any) => {
   };
 };
 
-// Helper function to create ArtifactWrapper s
+// Helper function to create ArtifactWrappers
 export async function createArtifactWrappers(
   tx: TransactionClient,
   artifacts: Array<{
     name?: string | null;
     artifactType: ArtifactType;
-    downloadUrl: string;
+    downloadUrl?: string | null;
     size?: number | null;
+    hash?: string | null;
   }>,
   parentId: string,
   parentField: "deviceArtifactId" | "remediationId",
@@ -125,6 +126,7 @@ export async function createArtifactWrappers(
         artifactType: artifactInput.artifactType,
         downloadUrl: artifactInput.downloadUrl,
         size: artifactInput.size || null,
+        hash: artifactInput.hash || null,
         versionNumber: 1,
         userId,
       },

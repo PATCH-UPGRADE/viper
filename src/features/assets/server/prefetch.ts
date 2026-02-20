@@ -10,14 +10,10 @@ export const prefetchAssets = (params: Input) => {
   return prefetch(trpc.assets.getMany.queryOptions(params));
 };
 
-type DashboardInput = inferInput<
-  typeof trpc.assets.getManyDashboardInternal
->;
+type DashboardInput = inferInput<typeof trpc.assets.getManyDashboardInternal>;
 
 export const prefetchAssetsDashboard = (params: DashboardInput) => {
-  return prefetch(
-    trpc.assets.getManyDashboardInternal.queryOptions(params),
-  );
+  return prefetch(trpc.assets.getManyDashboardInternal.queryOptions(params));
 };
 
 /**

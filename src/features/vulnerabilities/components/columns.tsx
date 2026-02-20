@@ -5,15 +5,13 @@ import { formatDistanceToNow } from "date-fns";
 
 import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
-import { VulnerabilityResponse } from "../types";
+import type { VulnerabilityResponse } from "../types";
 
 export const columns: ColumnDef<VulnerabilityResponse>[] = [
   {
     accessorKey: "cveId",
     meta: { title: "CVE ID" },
-    header: ({ column }) => (
-      <SortableHeader header="CVE ID" column={column} />
-    ),
+    header: ({ column }) => <SortableHeader header="CVE ID" column={column} />,
     cell: ({ row }) => (
       <span className="font-mono text-xs">{row.original.cveId ?? "—"}</span>
     ),
@@ -46,7 +44,7 @@ export const columns: ColumnDef<VulnerabilityResponse>[] = [
   {
     accessorKey: "userId",
     meta: { title: "Source Tool" },
-    header: "Source Tool", 
+    header: "Source Tool",
     accessorFn: (row) => row.user.name,
   },
   {

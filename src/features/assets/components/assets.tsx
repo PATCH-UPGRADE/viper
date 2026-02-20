@@ -34,10 +34,7 @@ import {
   useSuspenseAssetsDashboard,
 } from "../hooks/use-assets";
 import { columns } from "./columns";
-import {
-  assetIssueColumns,
-  dashboardColumns,
-} from "./dashboard-columns";
+import { assetIssueColumns, dashboardColumns } from "./dashboard-columns";
 
 export const AssetsSearch = () => {
   const [params, setParams] = useAssetsParams();

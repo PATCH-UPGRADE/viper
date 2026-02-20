@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { handleCopy } from "@/lib/copy";
-import { AssetResponse } from "../types";
+import type { AssetResponse } from "../types";
 
 export const columns: ColumnDef<AssetResponse>[] = [
   {
@@ -40,7 +40,7 @@ export const columns: ColumnDef<AssetResponse>[] = [
   {
     accessorKey: "userId",
     meta: { title: "Source Tool" },
-    header: "Source Tool", 
+    header: "Source Tool",
     accessorFn: (row) => row.user.name,
   },
   {

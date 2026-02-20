@@ -10,6 +10,7 @@ import {
   processIntegrationSync,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
+import { processArtifactHosting } from "@/lib/s3";
 import { integrationResponseSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
@@ -20,6 +21,7 @@ import {
   remediationInputSchema,
   remediationResponseSchema,
   remediationUpdateSchema,
+  remediationUploadResponseSchema,
 } from "../types";
 
 const createSearchFilter = (search: string) => {
@@ -115,16 +117,24 @@ export const remediationsRouter = createTRPCRouter({
         path: "/remediations",
         tags: ["Remediations"],
         summary: "Create Remediation",
-        description:
-          "Create a new remediation. The authenticated user will be recorded as the creator.",
+        description: `
+          Create a new remediation. The authenticated user will be recorded as the creator. 
+          
+          **Artifact hosting**
+          See docs/upload_artifact.md
+          `.trim(),
       },
     })
-    .output(remediationResponseSchema)
+    .output(remediationUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const { cpes, artifacts, ...dataInput } = input;
       const uniqueCpes = [...new Set(cpes)];
       const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
       const userId = ctx.auth.user.id;
+
+      // Handle S3 URL -- if the user included a hash/size but no downloadUrl, they want us to host it
+      const { processedArtifacts, uploadInstructions } =
+        await processArtifactHosting(artifacts);
 
       // Verify the vulnerability exists
       if (input.vulnerabilityId) {
@@ -155,19 +165,23 @@ export const remediationsRouter = createTRPCRouter({
         // Create a wrapper and artifact for each input artifact
         await createArtifactWrappers(
           tx,
-          artifacts,
+          processedArtifacts,
           remediation.id,
           "remediationId",
           userId,
         );
 
         // Fetch the complete remediation with includes
-        return tx.remediation.findUniqueOrThrow({
+        return await tx.remediation.findUniqueOrThrow({
           where: { id: remediation.id },
           include: remediationInclude,
         });
       });
-      return transformArtifactWrapper(result);
+
+      return {
+        remediation: transformArtifactWrapper(result),
+        uploadInstructions: uploadInstructions,
+      };
     }),
 
   processIntegrationCreate: protectedProcedure
@@ -265,47 +279,73 @@ export const remediationsRouter = createTRPCRouter({
         path: "/remediations/{id}",
         tags: ["Remediations"],
         summary: "Update Remediation",
-        description:
-          "Update a remediation. Only the user who created the remediation can update it.",
+        description: `
+          Update a remediation. Only the user who created the remediation can update it. 
+          
+          **Artifact hosting**
+          See docs/upload_artifact.md
+          `.trim(),
       },
     })
-    .output(remediationResponseSchema)
+    .output(remediationUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
       // Verify ownership and get current data
       await requireOwnership(input.id, ctx.auth.user.id, "remediation");
 
-      const { id, cpes, ...updateData } = input;
+      const { id, cpes, artifacts = [], ...updateData } = input;
 
       // Prepare update data
-      const data: Prisma.RemediationUpdateInput = {
-        ...(updateData.narrative !== undefined && {
-          narrative: updateData.narrative,
-        }),
-        ...(updateData.description !== undefined && {
-          description: updateData.description,
-        }),
-        ...(updateData.upstreamApi !== undefined && {
-          upstreamApi: updateData.upstreamApi,
-        }),
-        ...(updateData.vulnerabilityId !== undefined && {
-          vulnerabilityId: updateData.vulnerabilityId,
-        }),
-      };
+      const { processedArtifacts, uploadInstructions } =
+        await processArtifactHosting(artifacts);
 
-      // Handle CPE/device group update if provided
-      if (cpes) {
-        const uniqueCpes = [...new Set(cpes)];
-        const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
-        data.affectedDeviceGroups = {
-          set: deviceGroups.map((dg) => ({ id: dg.id })),
+      const result = await prisma.$transaction(async (tx) => {
+        const data: Prisma.RemediationUpdateInput = {
+          ...(updateData.narrative !== undefined && {
+            narrative: updateData.narrative,
+          }),
+          ...(updateData.description !== undefined && {
+            description: updateData.description,
+          }),
+          ...(updateData.upstreamApi !== undefined && {
+            upstreamApi: updateData.upstreamApi,
+          }),
+          ...(updateData.vulnerabilityId !== undefined && {
+            vulnerabilityId: updateData.vulnerabilityId,
+          }),
         };
-      }
 
-      const result = await prisma.remediation.update({
-        where: { id },
-        data,
-        include: remediationInclude,
+        // Handle CPE/device group update if provided
+        if (cpes) {
+          const uniqueCpes = [...new Set(cpes)];
+          const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
+          data.affectedDeviceGroups = {
+            set: deviceGroups.map((dg) => ({ id: dg.id })),
+          };
+        }
+
+        await tx.remediation.update({
+          where: { id },
+          data,
+        });
+
+        if (processedArtifacts.length > 0) {
+          await createArtifactWrappers(
+            tx,
+            processedArtifacts,
+            id,
+            "remediationId",
+            ctx.auth.user.id,
+          );
+        }
+
+        return await tx.remediation.findUniqueOrThrow({
+          where: { id },
+          include: remediationInclude,
+        });
       });
-      return transformArtifactWrapper(result);
+      return {
+        remediation: transformArtifactWrapper(result),
+        uploadInstructions,
+      };
     }),
 });

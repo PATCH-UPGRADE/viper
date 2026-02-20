@@ -189,6 +189,11 @@ describe("Remediations Endpoint (/remediations)", () => {
       .send(payload);
 
     expect(createRes.status).toBe(200);
+
+    // TODO: Remediation POST now returns { remediation, uploadInstructions }
+    // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
+    createRes.body = createRes.body.remediation;
+
     expect(createRes.body).toHaveProperty("id");
     const remediationId = createRes.body.id;
 
@@ -258,6 +263,11 @@ describe("Remediations Endpoint (/remediations)", () => {
       });
 
     expect(updateRes.status).toBe(200);
+
+    // TODO: Remediation PUT now returns { remediation, uploadInstructions }
+    // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
+    updateRes.body = updateRes.body.remediation;
+
     expect(updateRes.body.id).toBe(remediationId);
     expect(updateRes.body.description).toBe("Updated description");
     expect(updateRes.body.narrative).toBe("Updated narrative");
@@ -273,6 +283,11 @@ describe("Remediations Endpoint (/remediations)", () => {
       });
 
     expect(updateCpesRes.status).toBe(200);
+
+    // TODO: Remediation PUT now returns { remediation, uploadInstructions }
+    // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
+    updateCpesRes.body = updateCpesRes.body.remediation;
+
     expect(updateCpesRes.body.affectedDeviceGroups.length).toBe(2);
     const cpes = updateCpesRes.body.affectedDeviceGroups.map(
       (dg: DeviceGroupWithUrls) => dg.cpe,
@@ -321,6 +336,11 @@ describe("Remediations Endpoint (/remediations)", () => {
       .send(payloadWithVuln);
 
     expect(createRes.status).toBe(200);
+
+    // TODO: Remediation POST now returns { remediation, uploadInstructions }
+    // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
+    createRes.body = createRes.body.remediation;
+
     expect(createRes.body.vulnerability).toBeDefined();
     expect(createRes.body.vulnerability?.id).toBe(vulnerabilityId);
 
@@ -381,6 +401,11 @@ describe("Remediations Endpoint (/remediations)", () => {
       .send(multiArtifactPayload);
 
     expect(createRes.status).toBe(200);
+
+    // TODO: Remediation POST now returns { remediation, uploadInstructions }
+    // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
+    createRes.body = createRes.body.remediation;
+
     expect(createRes.body.artifacts.length).toBe(3);
 
     // Verify each artifact was created correctly
@@ -416,7 +441,9 @@ describe("Remediations Endpoint (/remediations)", () => {
     );
 
     const createResults = await Promise.all(createPromises);
-    const remediationIds = createResults.map((r) => r.body.id);
+    // TODO: Remediation POST now returns { remediation, uploadInstructions }
+    // This may be cleaned back up to r.body.id in the future once a more permanent S3 artifact upload solution is in place
+    const remediationIds = createResults.map((r) => r.body.remediation.id);
 
     onTestFinished(async () => {
       await Promise.all(
@@ -451,6 +478,11 @@ describe("Remediations Endpoint (/remediations)", () => {
       });
 
     expect(createRes.status).toBe(200);
+
+    // TODO: Remediation POST now returns { remediation, uploadInstructions }
+    // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
+    createRes.body = createRes.body.remediation;
+
     const remediationId = createRes.body.id;
 
     onTestFinished(async () => {

@@ -14,6 +14,7 @@ export const artifactWrapperSelect = {
         artifactType: true,
         downloadUrl: true,
         size: true,
+        hash: true,
         versionNumber: true,
         createdAt: true,
         updatedAt: true,
@@ -30,10 +31,11 @@ export const artifactWrapperSelect = {
 } as const;
 
 export const artifactInputSchema = z.object({
+  id: z.string().optional(),
   name: z.string().optional(),
   artifactType: z.enum(ArtifactType),
-  downloadUrl: safeUrlSchema,
-  // ^TODO: currently required, although we want to add file uploads. see VW-61
+  downloadUrl: safeUrlSchema.optional(),
+  hash: z.string().optional(),
   size: z.number().optional(),
 });
 
@@ -42,6 +44,7 @@ export const artifactWithUrlsSchema = z.object({
   name: z.string().nullable(),
   artifactType: z.enum(ArtifactType),
   downloadUrl: z.string().nullable(),
+  hash: z.string().nullable(),
   size: z.number().nullable(),
   versionNumber: z.number(), // maps to versionNumber
   createdAt: z.date(),

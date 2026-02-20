@@ -6,7 +6,6 @@ import { MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
 import {
   DropdownMenu,
@@ -102,32 +101,67 @@ function createSeverityColumn(
   };
 }
 
+function countUniqueRemediations(issues: AssetIssue[]): number {
+  const ids = new Set<string>();
+  for (const issue of issues) {
+    if (issue.status === IssueStatus.ACTIVE) {
+      ids.add(issue.vulnerabilityId);
+    }
+  }
+  let total = 0;
+  for (const issue of issues) {
+    if (ids.has(issue.vulnerabilityId)) {
+      total += issue.vulnerability._count.remediations;
+      ids.delete(issue.vulnerabilityId);
+    }
+  }
+  return total;
+}
+
 export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
   {
     id: "role",
     accessorKey: "role",
     header: ({ column }) => <SortableHeader header="Role" column={column} />,
+    cell: ({ row }) => (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-default">{row.original.role}</span>
+          </TooltipTrigger>
+          <TooltipContent>{row.original.deviceGroup.cpe}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
   },
-  createSeverityColumn(Severity.Critical, true),
-  createSeverityColumn(Severity.High, false),
-  createSeverityColumn(Severity.Medium, false),
-  createSeverityColumn(Severity.Low, false),
   {
     meta: { title: "IP Address" },
     accessorKey: "ip",
     header: "IP Address",
   },
   {
-    accessorKey: "cpe",
-    meta: { title: "CPE" },
-    header: ({ column }) => <SortableHeader header="CPE" column={column} />,
-    cell: ({ row }) => <CopyCode>{row.original.deviceGroup.cpe}</CopyCode>,
-  },
-  {
     accessorKey: "userId",
     meta: { title: "Source Tool" },
     header: "Source Tool",
     accessorFn: (row) => row.user.name,
+  },
+  createSeverityColumn(Severity.Critical, true),
+  createSeverityColumn(Severity.High, false),
+  createSeverityColumn(Severity.Medium, false),
+  createSeverityColumn(Severity.Low, false),
+  {
+    id: "remediations",
+    header: ({ column }) => (
+      <SortableHeader header="Remediations Available" column={column} />
+    ),
+    cell: ({ row }) => {
+      const count = countUniqueRemediations(row.original.issues);
+      return (
+        <Badge variant={count === 0 ? "destructive" : "secondary"}>
+          {count === 0 ? "None" : count}
+        </Badge>
+      );
+    },
   },
 ];
 

@@ -234,3 +234,20 @@ AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
 S3_BUCKET_NAME=
 ```
+
+- An S3 IAM user will need to exist with access to the relevant bucket used for Viper. 
+- The bucket will also need to allow public artifact downloads: 
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowPublicDownloadOnly",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::northeasterntest0226/*"
+        }
+    ]
+}
+```

@@ -166,7 +166,9 @@ export function InfoColumn({ sections }: { sections: InfoColumnSection[] }) {
           <Fragment key={`${i}-${section.header}`}>
             {i > 0 && <Separator />}
             <div className="flex flex-col gap-3">
-              <h3 className="font-semibold sticky top-0 bg-background">{section.header}</h3>
+              <h3 className="font-semibold sticky top-0 bg-background">
+                {section.header}
+              </h3>
               <div className="grid grid-cols-1 gap-3">
                 {section.items.map(({ header, content }) => (
                   <div key={header}>

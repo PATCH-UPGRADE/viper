@@ -61,12 +61,27 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(paginatedVulnerabilityResponseSchema)
     .query(async ({ input }) => {
-      const { search } = input;
+      const { search, sort } = input;
 
       const searchFilter = createSearchFilter(search);
+
+      // TODO: sorting should eventually be moved to fetchPaginated, right?
+      function getSortValue(sort: string) {
+        const sortValue = sort.startsWith("-") ? "desc" : "asc";
+        return sortValue;
+      }
+
       return fetchPaginated(prisma.vulnerability, input, {
         where: searchFilter,
         include: vulnerabilityInclude,
+        orderBy: sort
+          ? [
+              ...sort.split(",").map((s) => {
+                return { [s.replace("-", "")]: getSortValue(s) };
+              }),
+              { updatedAt: "desc" },
+            ]
+          : { updatedAt: "desc" },
       });
     }),
 
@@ -114,35 +129,6 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       return fetchPaginated(prisma.vulnerability, input, {
         where: whereFilter,
         include: vulnerabilityInclude,
-      });
-    }),
-
-  getManyInternal: protectedProcedure
-    .input(paginationInputSchema)
-    .query(async ({ input }) => {
-      const { search, sort } = input;
-
-      const searchFilter = createSearchFilter(search);
-
-      function getSortValue(sort: string) {
-        const sortValue = sort.startsWith("-") ? "desc" : "asc";
-        if (sort === "issues" || sort === "-issues") {
-          return { _count: sortValue };
-        }
-        return sortValue;
-      }
-
-      return fetchPaginated(prisma.vulnerability, input, {
-        where: searchFilter,
-        include: vulnerabilityInclude,
-        orderBy: sort
-          ? [
-              ...sort.split(",").map((s) => {
-                return { [s.replace("-", "")]: getSortValue(s) };
-              }),
-              { updatedAt: "desc" },
-            ]
-          : { updatedAt: "desc" },
       });
     }),
 

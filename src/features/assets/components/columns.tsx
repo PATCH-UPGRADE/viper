@@ -50,8 +50,8 @@ export const columns: ColumnDef<AssetResponse>[] = [
     header: ({ column }) => (
       <SortableHeader header="Last Updated" column={column} />
     ),
-    accessorFn: (row) =>
-      formatDistanceToNow(row.updatedAt, { addSuffix: true }),
+    cell: ({ row }) =>
+      formatDistanceToNow(row.original.updatedAt, { addSuffix: true }),
   },
   {
     id: "actions",

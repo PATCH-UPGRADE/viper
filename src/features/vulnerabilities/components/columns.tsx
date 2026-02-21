@@ -36,7 +36,7 @@ export const columns: ColumnDef<VulnerabilityResponse>[] = [
       <SortableHeader header="Description" column={column} />
     ),
     cell: ({ row }) => (
-      <div className="max-w-[500px] overflow-hidden text-ellipsis">
+      <div className="max-w-[500px] overflow-hidden text-ellipsis whitespace-nowrap">
         {row.original.description}
       </div>
     ),

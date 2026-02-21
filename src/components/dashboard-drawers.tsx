@@ -163,7 +163,7 @@ export function InfoColumn({ sections }: { sections: InfoColumnSection[] }) {
     <ScrollArea className="h-full">
       <div className="flex flex-col gap-6 overflow-y-auto p-4 text-sm">
         {sections.map((section, i) => (
-          <Fragment key={section.header}>
+          <Fragment key={`${i}-${section.header}`}>
             {i > 0 && <Separator />}
             <div className="flex flex-col gap-3">
               <h3 className="font-semibold sticky top-0">{section.header}</h3>

@@ -331,6 +331,7 @@ export const EntityItem = ({
                     variant="ghost"
                     onClick={(e) => e.stopPropagation()}
                   >
+                    <span className="sr-only">Open menu</span>
                     <MoreVerticalIcon className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>

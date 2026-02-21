@@ -184,6 +184,7 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <span className="sr-only">Open menu</span>
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -244,6 +245,7 @@ export const assetIssueColumns: ColumnDef<AssetIssue>[] = [
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <span className="sr-only">Open menu</span>
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>

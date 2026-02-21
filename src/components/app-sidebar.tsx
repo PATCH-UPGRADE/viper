@@ -147,12 +147,12 @@ export const AppSidebar = () => {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
-          <Collapsible
-            open={connectorsOpen}
-            onOpenChange={setConnectorsOpen}
-            className="group/connectors"
-          >
-            <SidebarMenuItem>
+          <SidebarMenuItem>
+            <Collapsible
+              open={connectorsOpen}
+              onOpenChange={setConnectorsOpen}
+              className="group/connectors"
+            >
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton
                   tooltip="Connectors"
@@ -166,34 +166,36 @@ export const AppSidebar = () => {
                   <ChevronDownIcon className="size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/connectors:rotate-180" />
                 </SidebarMenuButton>
               </CollapsibleTrigger>
-            </SidebarMenuItem>
-            <CollapsibleContent>
-              <SidebarMenu>
-                {connectorItems.map((item) => (
-                  <SidebarMenuItem key={item.title} className="ml-4">
-                    <SidebarMenuButton
-                      tooltip={item.title}
-                      isActive={pathname.startsWith(item.url)}
-                      asChild
-                      className="gap-x-4 h-10 px-4"
-                    >
-                      <Link href={item.url} prefetch>
-                        <item.icon className="size-4" />
-                        <span>{item.title}</span>
-                        {/*<Badge
-                          variant="secondary"
-                          className="ml-auto text-xs"
-                        >
-                          {item.count}
-                        </Badge>*/}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </CollapsibleContent>
-          </Collapsible>
-          <Separator className="my-2" />
+              <CollapsibleContent>
+                <SidebarMenu>
+                  {connectorItems.map((item) => (
+                    <SidebarMenuItem key={item.title} className="ml-4">
+                      <SidebarMenuButton
+                        tooltip={item.title}
+                        isActive={pathname.startsWith(item.url)}
+                        asChild
+                        className="gap-x-4 h-10 px-4"
+                      >
+                        <Link href={item.url} prefetch>
+                          <item.icon className="size-4" />
+                          <span>{item.title}</span>
+                          {/*<Badge
+                            variant="secondary"
+                            className="ml-auto text-xs"
+                          >
+                            {item.count}
+                          </Badge>*/}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </CollapsibleContent>
+            </Collapsible>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <Separator className="my-2" />
+        <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <a

@@ -145,6 +145,8 @@ export const assetsRouter = createTRPCRouter({
       });
     }),
 
+  // TODO: VW-82 -- do sorting in SQL, not by loading all assets and doing it manually
+  // big scalability concern, but I'm leaving this here for now before demo
   getManyDashboardInternal: protectedProcedure
     .input(paginationInputSchema)
     .query(async ({ input }) => {

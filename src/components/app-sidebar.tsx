@@ -135,7 +135,7 @@ export const AppSidebar = () => {
                     className="gap-x-4 h-10 px-4"
                   >
                     <Link href={item.url} prefetch>
-                      <item.icon className="size-4" />
+                      <item.icon className="size-4" aria-hidden="true" />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>

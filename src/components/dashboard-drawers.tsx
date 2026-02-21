@@ -2,8 +2,8 @@
 
 import type { LucideIcon } from "lucide-react";
 import { MessageSquare } from "lucide-react";
-import { Fragment } from "react";
 import type { ReactNode } from "react";
+import { Fragment } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

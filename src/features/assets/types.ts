@@ -14,6 +14,7 @@ import {
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
 } from "../device-groups/types";
+import { remediationCardInclude } from "../remediations/types";
 
 const assetStatusSchema = z.enum(Object.values(AssetStatus));
 
@@ -104,10 +105,7 @@ export const assetDashboardInclude = {
           description: true,
           _count: { select: { remediations: true } },
           remediations: {
-            include: {
-              user: userIncludeSelect,
-              _count: { select: { artifacts: true } },
-            },
+            include: remediationCardInclude,
           },
         },
       },

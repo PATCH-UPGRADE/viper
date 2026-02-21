@@ -15,6 +15,7 @@ import {
 } from "@/components/entity-components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Drawer,
   DrawerClose,
@@ -29,12 +30,16 @@ import { Separator } from "@/components/ui/separator";
 import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { plural } from "@/lib/utils";
 import {
   useRemoveRemediation,
   useSuspenseRemediations,
 } from "../hooks/use-remediations";
 import { useRemediationsParams } from "../hooks/use-remediations-params";
-import type { RemediationResponse } from "../types";
+import type {
+  RemediationCard as RemediationCardType,
+  RemediationResponse,
+} from "../types";
 
 export const RemediationsSearch = () => {
   const [params, setParams] = useRemediationsParams();
@@ -277,3 +282,41 @@ function RemediationDrawer({
     </Drawer>
   );
 }
+
+export const RemediationCard = ({
+  remediation,
+}: {
+  remediation: RemediationCardType;
+}) => {
+  return (
+    <Card key={remediation.id}>
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <CardTitle className="text-base font-medium">
+            Remediation {remediation.id}
+          </CardTitle>
+          <Badge variant="outline">
+            {remediation._count.artifacts}{" "}
+            {plural("Artifact", remediation._count.artifacts)}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {remediation.description && (
+          <p className="text-sm text-muted-foreground">
+            {remediation.description}
+          </p>
+        )}
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <span>By {remediation.user.name}</span>
+          <span>•</span>
+          <span>
+            {formatDistanceToNow(remediation.createdAt, {
+              addSuffix: true,
+            })}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};

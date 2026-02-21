@@ -17,11 +17,10 @@ import {
   type InfoColumnSection,
 } from "@/components/dashboard-drawers";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CopyCode } from "@/components/ui/code";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
-import { plural } from "@/lib/utils";
+import { RemediationCard } from "@/features/remediations/components/remediations";
 import { type AssetWithIssueRelations, locationSchema } from "../types";
 
 // ============================================================================
@@ -117,35 +116,10 @@ function RemediationsSection({ asset }: { asset: AssetWithIssueRelations }) {
   return (
     <div className="space-y-4">
       {remediations.map((remediation) => (
-        <Card key={remediation.id}>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <CardTitle className="text-base font-medium">
-                Remediation {remediation.id}
-              </CardTitle>
-              <Badge variant="outline">
-                {remediation._count.artifacts}{" "}
-                {plural("Artifact", remediation._count.artifacts)}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {remediation.description && (
-              <p className="text-sm text-muted-foreground">
-                {remediation.description}
-              </p>
-            )}
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span>By {remediation.user.name}</span>
-              <span>•</span>
-              <span>
-                {formatDistanceToNow(remediation.createdAt, {
-                  addSuffix: true,
-                })}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+        <RemediationCard
+          remediation={remediation}
+          key={`remediation-${remediation.id}`}
+        />
       ))}
     </div>
   );

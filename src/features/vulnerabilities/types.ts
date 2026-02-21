@@ -17,6 +17,7 @@ import {
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
 } from "../device-groups/types";
+import { remediationCardInclude } from "../remediations/types";
 
 // Validation schemas
 const severitySchema = z.enum(Object.values(Severity));
@@ -106,14 +107,7 @@ export const vulnerabilityByPriorityInclude = {
     },
   },
   remediations: {
-    include: {
-      user: userIncludeSelect,
-      _count: {
-        select: {
-          artifacts: true,
-        },
-      },
-    },
+    include: remediationCardInclude,
   },
   _count: {
     select: {

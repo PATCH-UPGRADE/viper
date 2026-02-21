@@ -89,6 +89,11 @@ export const assetInclude = {
 export const assetDashboardInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
+  externalMappings: {
+    include: {
+      integration: { select: { id: true, name: true } },
+    },
+  },
   issues: {
     include: {
       vulnerability: {
@@ -98,6 +103,12 @@ export const assetDashboardInclude = {
           cveId: true,
           description: true,
           _count: { select: { remediations: true } },
+          remediations: {
+            include: {
+              user: userIncludeSelect,
+              _count: { select: { artifacts: true } },
+            },
+          },
         },
       },
     },

@@ -11,6 +11,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { type PropsWithChildren, Suspense, useState } from "react";
+import { AssetDashboardDrawer } from "./asset-drawer";
 import {
   EmptyView,
   EntityContainer,
@@ -53,7 +54,7 @@ import {
   useSuspenseAssets,
   useSuspenseAssetsDashboard,
 } from "../hooks/use-assets";
-import type { AssetIssueMetricsCounts } from "../types";
+import type { AssetIssueMetricsCounts, AssetWithIssueRelations } from "../types";
 import { columns } from "./columns";
 import { assetIssueColumns, dashboardColumns } from "./dashboard-columns";
 
@@ -116,7 +117,7 @@ export const AssetIssueMetrics = ({
             available
           </span>
         </div>
-        <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-2 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs md:grid-cols-4">
+        <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-2 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs 2xl:grid-cols-4">
           {severities.map((severity) => {
             const explained = SeveritiesExplained[severity];
             const { active, activeWithRemediations } = data[severity];
@@ -160,7 +161,7 @@ export const AssetIssueMetrics = ({
             {totalRemediated} total
           </span>
         </div>
-        <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-2 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs md:grid-cols-4">
+        <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-2 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs 2xl:grid-cols-4">
           {severities.map((severity) => {
             const explained = SeveritiesExplained[severity];
             const { remediated } = data[severity];
@@ -234,9 +235,21 @@ export const AssetDashboardList = () => {
   const { data, isFetching } = useSuspenseAssetsDashboard();
   const { data: metrics } = useSuspenseAssetIssueMetrics();
 
+  const [asset, setAsset] = useState<AssetWithIssueRelations | undefined>(
+    undefined,
+  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   return (
     <>
       <AssetIssueMetrics data={metrics} />
+      {asset && (
+        <AssetDashboardDrawer
+          asset={asset}
+          open={drawerOpen}
+          setOpen={setDrawerOpen}
+        />
+      )}
       <DataTable
         paginatedData={data}
         columns={dashboardColumns}
@@ -244,6 +257,10 @@ export const AssetDashboardList = () => {
         nestedDataKey="issues"
         isLoading={isFetching}
         search={<AssetsSearch />}
+        rowOnclick={(row) => {
+          setDrawerOpen(true);
+          setAsset(row.original);
+        }}
       />
     </>
   );
@@ -254,7 +271,6 @@ export const AssetsHeader = ({ disabled }: { disabled?: boolean }) => {
     <EntityHeader
       title="Assets"
       description="Manage your hospital assets and devices"
-      newButtonLabel="New asset"
       disabled={disabled}
     />
   );

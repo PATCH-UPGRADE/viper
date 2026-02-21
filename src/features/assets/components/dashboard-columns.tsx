@@ -167,6 +167,7 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
     header: ({ column }) => (
       <SortableHeader header="Remediations Available" column={column} />
     ),
+    accessorFn: (row) => countUniqueRemediations(row.issues),
     cell: ({ row }) => {
       const count = countUniqueRemediations(row.original.issues);
       return (

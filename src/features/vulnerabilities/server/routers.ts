@@ -45,6 +45,19 @@ const createSearchFilter = (search: string) => {
     : {};
 };
 
+const ALLOWED_SORT_FIELDS = new Set([
+  "createdAt",
+  "updatedAt",
+  "priority",
+  "cveId",
+  "description",
+  "inKEV",
+] as const);
+
+function getSortValue(segment: string): "asc" | "desc" {
+  return segment.startsWith("-") ? "desc" : "asc";
+}
+
 export const vulnerabilitiesRouter = createTRPCRouter({
   // GET /api/vulnerabilities - List all vulnerabilities (any authenticated user can see all)
   getMany: protectedProcedure
@@ -66,22 +79,21 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const searchFilter = createSearchFilter(search);
 
       // TODO: sorting should eventually be moved to fetchPaginated, right?
-      function getSortValue(sort: string) {
-        const sortValue = sort.startsWith("-") ? "desc" : "asc";
-        return sortValue;
-      }
+      const sortClauses = sort
+        ? sort.split(",").flatMap((s) => {
+            const field = s.replace("-", "");
+            if (!ALLOWED_SORT_FIELDS.has(field as never)) return [];
+            return [{ [field]: getSortValue(s) }];
+          })
+        : [];
 
       return fetchPaginated(prisma.vulnerability, input, {
         where: searchFilter,
         include: vulnerabilityInclude,
-        orderBy: sort
-          ? [
-              ...sort.split(",").map((s) => {
-                return { [s.replace("-", "")]: getSortValue(s) };
-              }),
-              { updatedAt: "desc" },
-            ]
-          : { updatedAt: "desc" },
+        orderBy:
+          sortClauses.length > 0
+            ? [...sortClauses, { updatedAt: "desc" }]
+            : { updatedAt: "desc" },
       });
     }),
 

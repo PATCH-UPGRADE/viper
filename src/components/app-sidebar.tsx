@@ -158,12 +158,15 @@ export const AppSidebar = () => {
                   tooltip="Connectors"
                   className="gap-x-4 h-10 px-4"
                 >
-                  <PlugIcon className="size-4" />
+                  <PlugIcon className="size-4" aria-hidden="true" />
                   <span>Connectors</span>
                   <Badge variant="secondary" className="ml-auto mr-1 text-xs">
                     {totalConnectors}
                   </Badge>
-                  <ChevronDownIcon className="size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/connectors:rotate-180" />
+                  <ChevronDownIcon
+                    className="size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/connectors:rotate-180"
+                    aria-hidden="true"
+                  />
                 </SidebarMenuButton>
               </CollapsibleTrigger>
               <CollapsibleContent>

@@ -73,7 +73,7 @@ export function DashboardDrawerShell({
       onOpenChange={setOpen}
     >
       {children && <DrawerTrigger asChild>{children}</DrawerTrigger>}
-      <DrawerContent className={isMobile ? "max-w-lg" : "max-w-[70%]!"}>
+      <DrawerContent className={isMobile ? "max-h-[85svh]" : "max-w-[70%]!"}>
         <DrawerHeader className="border-b">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
@@ -161,12 +161,12 @@ export function AIChatSection() {
 export function InfoColumn({ sections }: { sections: InfoColumnSection[] }) {
   return (
     <ScrollArea className="h-full">
-      <div className="flex flex-col gap-6 overflow-y-auto p-4 text-sm">
+      <div className="flex flex-col gap-6 p-4 text-sm">
         {sections.map((section, i) => (
           <Fragment key={`${i}-${section.header}`}>
             {i > 0 && <Separator />}
             <div className="flex flex-col gap-3">
-              <h3 className="font-semibold sticky top-0">{section.header}</h3>
+              <h3 className="font-semibold sticky top-0 bg-background">{section.header}</h3>
               <div className="grid grid-cols-1 gap-3">
                 {section.items.map(({ header, content }) => (
                   <div key={header}>

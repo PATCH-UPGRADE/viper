@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import { MessageSquare } from "lucide-react";
 import { Fragment } from "react";
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,22 +34,22 @@ export interface DrawerTab {
   label: string;
   icon: LucideIcon;
   count?: number;
-  content: React.ReactNode;
+  content: ReactNode;
 }
 
 export interface InfoColumnSection {
   header: string;
-  items: Array<{ header: string; content: React.ReactNode }>;
+  items: Array<{ header: string; content: ReactNode }>;
 }
 
 interface DashboardDrawerShellProps {
   open: boolean;
   setOpen: (open: boolean) => void;
   title: string;
-  description: React.ReactNode;
+  description: ReactNode;
   tabs: DrawerTab[];
-  infoColumn: React.ReactNode;
-  children?: React.ReactNode;
+  infoColumn: ReactNode;
+  children?: ReactNode;
 }
 
 // ============================================================================

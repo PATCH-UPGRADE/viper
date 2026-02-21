@@ -25,7 +25,7 @@ import type { AssetWithIssueRelations } from "../types";
 
 type AssetIssue = AssetWithIssueRelations["issues"][number];
 
-function countActiveByseverity(
+function countActiveBySeverity(
   issues: AssetIssue[],
   severity: Severity,
 ): number {
@@ -103,7 +103,7 @@ function createSeverityColumn(
         return null;
       }
 
-      const count = countActiveByseverity(issues, severity);
+      const count = countActiveBySeverity(issues, severity);
       if (count === 0) return <span className="text-muted-foreground">—</span>;
       return <Badge className={config.badgeClass}>{count}</Badge>;
     },
@@ -157,7 +157,7 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
     header: "IP Address",
   },
   {
-    accessorKey: "userId",
+    id: "sourceTool",
     meta: { title: "Source Tool" },
     header: "Source Tool",
     accessorFn: (row) => row.user.name,

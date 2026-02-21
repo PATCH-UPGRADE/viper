@@ -49,12 +49,12 @@ const mainItems = [
   //   url: "/executions",
   // },
   {
-    title: "Assets",
+    title: "Asset Dashboard",
     icon: ComputerIcon,
-    url: "/assets?sort=-severity_Critical%2C-remediations",
+    url: "/assets",
   },
   {
-    title: "Vulnerabilities",
+    title: "Vulnerability Dashboard",
     icon: BugIcon,
     url: "/vulnerabilities",
   },

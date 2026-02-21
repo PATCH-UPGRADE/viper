@@ -22,7 +22,7 @@ import { CopyCode } from "@/components/ui/code";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { plural } from "@/lib/utils";
-import { locationSchema, type AssetWithIssueRelations } from "../types";
+import { type AssetWithIssueRelations, locationSchema } from "../types";
 
 // ============================================================================
 // Types
@@ -155,9 +155,7 @@ function RemediationsSection({ asset }: { asset: AssetWithIssueRelations }) {
 // Vulnerabilities Section
 // ============================================================================
 
-function VulnerabilitiesSection({
-  asset,
-}: { asset: AssetWithIssueRelations }) {
+function VulnerabilitiesSection({ asset }: { asset: AssetWithIssueRelations }) {
   const issues = asset.issues;
 
   if (issues.length === 0) {

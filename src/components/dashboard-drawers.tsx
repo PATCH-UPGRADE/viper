@@ -90,7 +90,10 @@ export function DashboardDrawerShell({
 
         <ResizablePanelGroup direction="horizontal" className="flex-1">
           <ResizablePanel defaultSize={60} minSize={30}>
-            <Tabs defaultValue={tabs[0]?.value} className="flex flex-col h-full">
+            <Tabs
+              defaultValue={tabs[0]?.value}
+              className="flex flex-col h-full"
+            >
               <TabsList className="w-full justify-start rounded-none border-b bg-muted">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;

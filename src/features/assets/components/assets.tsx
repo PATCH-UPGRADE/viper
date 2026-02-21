@@ -11,7 +11,6 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { type PropsWithChildren, Suspense, useState } from "react";
-import { AssetDashboardDrawer } from "./asset-drawer";
 import {
   EmptyView,
   EntityContainer,
@@ -54,7 +53,11 @@ import {
   useSuspenseAssets,
   useSuspenseAssetsDashboard,
 } from "../hooks/use-assets";
-import type { AssetIssueMetricsCounts, AssetWithIssueRelations } from "../types";
+import type {
+  AssetIssueMetricsCounts,
+  AssetWithIssueRelations,
+} from "../types";
+import { AssetDashboardDrawer } from "./asset-drawer";
 import { columns } from "./columns";
 import { assetIssueColumns, dashboardColumns } from "./dashboard-columns";
 

@@ -148,7 +148,7 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
   createSeverityColumn(Severity.Medium, false),
   createSeverityColumn(Severity.Low, false),
   {
-    meta: { 
+    meta: {
       title: "IP Address",
       headerClassName: "pl-6",
       cellClassName: "pl-6",

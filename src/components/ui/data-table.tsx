@@ -13,24 +13,17 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table";
 import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  ChevronsUpDown,
+  ChevronUp,
 } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -52,6 +45,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { type PaginatedResponse, usePaginationParams } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 
@@ -94,20 +93,20 @@ export function SortableHeader<TData>({
       {header}
       {sorted ? (
         isAscending ? (
-          <ArrowUp
+          <ChevronUp
             strokeWidth={3}
             className={iconClassName}
             aria-hidden="true"
           />
         ) : (
-          <ArrowDown
+          <ChevronDown
             strokeWidth={3}
             className={iconClassName}
             aria-hidden="true"
           />
         )
       ) : (
-        <ArrowUpDown className={iconClassName} aria-hidden="true" />
+        <ChevronsUpDown className={iconClassName} aria-hidden="true" />
       )}
     </Button>
   );
@@ -400,7 +399,10 @@ export function DataTable<
                             <TableCell
                               key={cell.id}
                               colSpan={colSpan > 1 ? colSpan : undefined}
-                              className={cn("py-4 first-of-type:pl-4 last-of-type:pr-4", cell.column.columnDef.meta?.cellClassName)}
+                              className={cn(
+                                "py-4 first-of-type:pl-4 last-of-type:pr-4",
+                                cell.column.columnDef.meta?.cellClassName,
+                              )}
                             >
                               {flexRender(
                                 cell.column.columnDef.cell,

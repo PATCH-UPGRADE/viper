@@ -27,6 +27,11 @@ export const useSuspenseAssetsDashboard = () => {
   );
 };
 
+export const useSuspenseAssetIssueMetrics = () => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(trpc.assets.getIssueMetricsInternal.queryOptions());
+};
+
 /**
  * Hook to fetch all assets with matching vulnerabilities using suspense
  */

@@ -1,7 +1,15 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { ExternalLinkIcon, ServerIcon } from "lucide-react";
+import {
+  CircleAlert,
+  CircleArrowDown,
+  CircleArrowUp,
+  CircleMinus,
+  ExternalLinkIcon,
+  ServerIcon,
+  ShieldCheck,
+} from "lucide-react";
 import { type PropsWithChildren, Suspense, useState } from "react";
 import {
   EmptyView,
@@ -15,6 +23,14 @@ import {
 } from "@/components/entity-components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { CopyCode } from "@/components/ui/code";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -22,19 +38,157 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
+import { Severity } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type { AssetWithDeviceGroup, AssetWithIssues } from "@/lib/db";
+import { cn } from "@/lib/utils";
 import { useAssetsParams } from "../hooks/use-asset-params";
 import {
   useRemoveAsset,
+  useSuspenseAssetIssueMetrics,
   useSuspenseAssets,
   useSuspenseAssetsDashboard,
 } from "../hooks/use-assets";
+import type { AssetIssueMetricsCounts } from "../types";
 import { columns } from "./columns";
 import { assetIssueColumns, dashboardColumns } from "./dashboard-columns";
+
+const SeveritiesExplained = {
+  Critical: {
+    help: "Exploitable vulnerabilities with severe impact on patient safety or data integrity.",
+    icon: CircleAlert,
+    color: "text-red-600",
+    colorBg: "bg-red-50",
+  },
+  High: {
+    help: "High-impact vulnerabilities requiring scheduled remediation.",
+    icon: CircleArrowUp,
+    color: "text-orange-600",
+    colorBg: "bg-orange-50",
+  },
+  Medium: {
+    help: "Moderate-impact vulnerabilities to address during standard patching.",
+    icon: CircleMinus,
+    color: "text-yellow-600",
+    colorBg: "bg-yellow-50",
+  },
+  Low: {
+    help: "Low-impact vulnerabilities with minimal risk.",
+    icon: CircleArrowDown,
+    color: "text-blue-600",
+    colorBg: "bg-blue-50",
+  },
+} as const;
+
+export const AssetIssueMetrics = ({
+  data,
+}: {
+  data: AssetIssueMetricsCounts;
+}) => {
+  const severities = [
+    Severity.Critical,
+    Severity.High,
+    Severity.Medium,
+    Severity.Low,
+  ] as const;
+
+  const totalActive = severities.reduce((sum, s) => sum + data[s].active, 0);
+  const totalActiveWithRem = severities.reduce(
+    (sum, s) => sum + data[s].activeWithRemediations,
+    0,
+  );
+  const totalRemediated = severities.reduce(
+    (sum, s) => sum + data[s].remediated,
+    0,
+  );
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <div className="mb-3 flex items-baseline gap-3">
+          <h3 className="text-sm font-semibold">Active Issues</h3>
+          <span className="text-xs text-muted-foreground">
+            {totalActive} total &middot; {totalActiveWithRem} with remediations
+            available
+          </span>
+        </div>
+        <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-2 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs md:grid-cols-4">
+          {severities.map((severity) => {
+            const explained = SeveritiesExplained[severity];
+            const { active, activeWithRemediations } = data[severity];
+            return (
+              <Card
+                key={severity}
+                className={cn("@container/card", explained.colorBg)}
+              >
+                <CardHeader>
+                  <CardDescription className="flex items-center gap-2 font-bold text-foreground">
+                    {severity}
+                    <QuestionTooltip>{explained.help}</QuestionTooltip>
+                  </CardDescription>
+                  <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+                    {active}
+                  </CardTitle>
+                  <CardAction>
+                    <explained.icon className={explained.color} />
+                  </CardAction>
+                </CardHeader>
+                <CardFooter className="flex-col items-start gap-1.5 text-sm">
+                  <div className="line-clamp-1 flex gap-2 font-medium text-muted-foreground">
+                    {active > 0 && (
+                      <>
+                        {activeWithRemediations} with remediations (
+                        {((activeWithRemediations / active) * 100).toFixed(0)}%)
+                      </>
+                    )}
+                  </div>
+                </CardFooter>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-3 flex items-baseline gap-3">
+          <h3 className="text-sm font-semibold">Remediated Issues</h3>
+          <span className="text-xs text-muted-foreground">
+            {totalRemediated} total
+          </span>
+        </div>
+        <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-2 gap-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs md:grid-cols-4">
+          {severities.map((severity) => {
+            const explained = SeveritiesExplained[severity];
+            const { remediated } = data[severity];
+            return (
+              <Card
+                key={severity}
+                className={cn("@container/card", explained.colorBg)}
+              >
+                <CardHeader>
+                  <CardDescription className="flex items-center gap-2 font-bold text-foreground">
+                    {severity}
+                    <QuestionTooltip>{explained.help}</QuestionTooltip>
+                  </CardDescription>
+                  <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+                    {remediated}
+                  </CardTitle>
+                  <CardAction>
+                    <ShieldCheck className="text-green-600" />
+                  </CardAction>
+                </CardHeader>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const AssetsSearch = () => {
   const [params, setParams] = useAssetsParams();
@@ -78,16 +232,20 @@ export const AssetsList = () => {
 
 export const AssetDashboardList = () => {
   const { data, isFetching } = useSuspenseAssetsDashboard();
+  const { data: metrics } = useSuspenseAssetIssueMetrics();
 
   return (
-    <DataTable
-      paginatedData={data}
-      columns={dashboardColumns}
-      nestedColumns={assetIssueColumns}
-      nestedDataKey="issues"
-      isLoading={isFetching}
-      search={<AssetsSearch />}
-    />
+    <>
+      <AssetIssueMetrics data={metrics} />
+      <DataTable
+        paginatedData={data}
+        columns={dashboardColumns}
+        nestedColumns={assetIssueColumns}
+        nestedDataKey="issues"
+        isLoading={isFetching}
+        search={<AssetsSearch />}
+      />
+    </>
   );
 };
 

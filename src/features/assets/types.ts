@@ -1,3 +1,4 @@
+import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 import { AssetStatus, type Prisma } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
@@ -8,6 +9,7 @@ import {
   userIncludeSelect,
   userSchema,
 } from "@/lib/schemas";
+import type { trpc } from "@/trpc/server";
 import {
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
@@ -105,3 +107,7 @@ export const assetDashboardInclude = {
 export type AssetWithIssueRelations = Prisma.AssetGetPayload<{
   include: typeof assetDashboardInclude;
 }>;
+
+export type AssetIssueMetricsCounts = inferOutput<
+  typeof trpc.assets.getIssueMetricsInternal
+>;

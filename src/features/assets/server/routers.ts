@@ -256,6 +256,59 @@ export const assetsRouter = createTRPCRouter({
       return createPaginatedResponse(items, meta);
     }),
 
+  getIssueMetricsInternal: protectedProcedure.query(async () => {
+    const severities = Object.values(Severity);
+
+    const [activeResults, activeWithRemResults, remediatedResults] =
+      await Promise.all([
+        Promise.all(
+          severities.map((s) =>
+            prisma.issue.count({
+              where: {
+                status: IssueStatus.ACTIVE,
+                vulnerability: { severity: s },
+              },
+            }),
+          ),
+        ),
+        Promise.all(
+          severities.map((s) =>
+            prisma.issue.count({
+              where: {
+                status: IssueStatus.ACTIVE,
+                vulnerability: { severity: s, remediations: { some: {} } },
+              },
+            }),
+          ),
+        ),
+        Promise.all(
+          severities.map((s) =>
+            prisma.issue.count({
+              where: {
+                status: IssueStatus.REMEDIATED,
+                vulnerability: { severity: s },
+              },
+            }),
+          ),
+        ),
+      ]);
+
+    return severities.reduce(
+      (acc, severity, i) => {
+        acc[severity] = {
+          active: activeResults[i],
+          activeWithRemediations: activeWithRemResults[i],
+          remediated: remediatedResults[i],
+        };
+        return acc;
+      },
+      {} as Record<
+        Severity,
+        { active: number; activeWithRemediations: number; remediated: number }
+      >,
+    );
+  }),
+
   // Internal API for asset vulnerability matching
   getManyWithVulns: protectedProcedure
     .input(assetsVulnsInputSchema)

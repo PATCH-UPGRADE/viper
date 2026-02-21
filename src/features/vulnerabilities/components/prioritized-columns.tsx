@@ -106,9 +106,14 @@ type VulnerabilityIssue = VulnerabilityWithRelations["issues"][number];
 export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
   {
     accessorKey: "id",
-    header: "ID",
+    header: "Issue ID",
     cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.original.id}</span>
+      <Link
+        href={`/issues/${row.original.id}`}
+        className="font-mono text-sm text-primary underline hover:text-primary/80"
+      >
+        {row.original.id}
+      </Link>
     ),
   },
   {
@@ -136,6 +141,7 @@ export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <span className="sr-only">Open menu</span>
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>

@@ -4,26 +4,7 @@ import { PAGINATION } from "@/config/constants";
 import { IssueStatus } from "@/generated/prisma";
 import { createPaginationParams } from "@/lib/url-state";
 
-export enum SortableAssetColumns {
-  role = "role",
-  roleDesc = "-role",
-  vulns = "issues",
-  vulnsDesc = "-issues",
-  class = "cpe",
-  classDesc = "-cpe",
-  null = "",
-}
-
-export const assetsParams = {
-  ...createPaginationParams(),
-  ...{
-    sort: parseAsStringEnum<SortableAssetColumns>(
-      Object.values(SortableAssetColumns),
-    )
-      .withDefault(SortableAssetColumns.null)
-      .withOptions({ clearOnDefault: true }),
-  },
-};
+export const assetsParams = createPaginationParams();
 
 const issueStatusPageParams: Record<string, SingleParserBuilder<number>> = {};
 for (const status of Object.values(IssueStatus)) {

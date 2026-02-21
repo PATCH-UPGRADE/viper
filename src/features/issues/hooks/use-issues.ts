@@ -27,6 +27,9 @@ export const useUpdateIssueStatus = () => {
             assetId: data.assetId,
           }),
         );
+        queryClient.invalidateQueries(
+          trpc.assets.getIssueMetricsInternal.queryFilter(),
+        );
       },
       onError: (error) => {
         toast.error(`Failed to update issue status: ${error.message}`);

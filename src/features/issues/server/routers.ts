@@ -1,6 +1,8 @@
 import "server-only";
 import { z } from "zod";
+import { assetInclude } from "@/features/assets/types";
 import { deviceGroupSelect } from "@/features/device-groups/types";
+import { vulnerabilityInclude } from "@/features/vulnerabilities/types";
 import { IssueStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
@@ -24,14 +26,10 @@ export const issuesRouter = createTRPCRouter({
         where: { id: input.id },
         include: {
           asset: {
-            include: {
-              deviceGroup: deviceGroupSelect,
-            },
+            include: assetInclude,
           },
           vulnerability: {
-            include: {
-              affectedDeviceGroups: deviceGroupSelect,
-            },
+            include: vulnerabilityInclude,
           },
         },
       });

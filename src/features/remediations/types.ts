@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Prisma } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   cpeSchema,
@@ -82,3 +83,16 @@ export const remediationInclude = {
   affectedDeviceGroups: deviceGroupSelect,
   artifacts: artifactWrapperSelect,
 };
+
+export const remediationCardInclude = {
+  user: userIncludeSelect,
+  _count: {
+    select: {
+      artifacts: true,
+    },
+  },
+} as const;
+
+export type RemediationCard = Prisma.RemediationGetPayload<{
+  include: typeof remediationCardInclude;
+}>;

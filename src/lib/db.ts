@@ -66,14 +66,3 @@ export type VulnerabilityWithIssues = Prisma.VulnerabilityGetPayload<{
     };
   };
 }>;
-
-export type VulnerabilityWithDeviceGroups = Prisma.VulnerabilityGetPayload<{
-  include: {
-    affectedDeviceGroups: {
-      select: {
-        id: true;
-        cpe: true;
-      };
-    };
-  };
-}>;

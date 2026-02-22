@@ -1,5 +1,6 @@
+import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
-import { AssetStatus } from "@/generated/prisma";
+import { AssetStatus, type Prisma } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   cpeSchema,
@@ -8,10 +9,12 @@ import {
   userIncludeSelect,
   userSchema,
 } from "@/lib/schemas";
+import type { trpc } from "@/trpc/server";
 import {
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
 } from "../device-groups/types";
+import { remediationCardInclude } from "../remediations/types";
 
 const assetStatusSchema = z.enum(Object.values(AssetStatus));
 
@@ -63,7 +66,7 @@ export const assetResponseSchema = z.object({
   updatedAt: z.date(),
   user: userSchema,
 });
-export type AssetResponseSchemaType = z.infer<typeof assetResponseSchema>;
+export type AssetResponse = z.infer<typeof assetResponseSchema>;
 
 export const assetArrayResponseSchema = z.array(assetResponseSchema);
 
@@ -83,3 +86,37 @@ export const assetInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
 };
+
+export const assetDashboardInclude = {
+  user: userIncludeSelect,
+  deviceGroup: deviceGroupSelect,
+  externalMappings: {
+    include: {
+      integration: { select: { id: true, name: true } },
+    },
+  },
+  issues: {
+    include: {
+      vulnerability: {
+        select: {
+          id: true,
+          severity: true,
+          cveId: true,
+          description: true,
+          _count: { select: { remediations: true } },
+          remediations: {
+            include: remediationCardInclude,
+          },
+        },
+      },
+    },
+  },
+} satisfies Prisma.AssetInclude;
+
+export type AssetWithIssueRelations = Prisma.AssetGetPayload<{
+  include: typeof assetDashboardInclude;
+}>;
+
+export type AssetIssueMetricsCounts = inferOutput<
+  typeof trpc.assets.getIssueMetricsInternal
+>;

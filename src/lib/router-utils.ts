@@ -95,6 +95,8 @@ export const transformArtifactWrapper = (item: any) => {
   };
 };
 
+type ArtifactWrapperParentFieldOptions = "deviceArtifactId" | "remediationId";
+
 // Helper function to create ArtifactWrappers
 export async function createArtifactWrappers(
   tx: TransactionClient,
@@ -106,7 +108,7 @@ export async function createArtifactWrappers(
     hash?: string | null;
   }>,
   parentId: string,
-  parentField: "deviceArtifactId" | "remediationId",
+  parentField: ArtifactWrapperParentFieldOptions,
   userId: string,
 ): Promise<void> {
   for (const artifactInput of artifacts) {
@@ -151,7 +153,6 @@ export const handlePrismaError = (e: unknown): string => {
   ) {
     return e.message;
   }
-
   return "Internal Server Error";
 };
 
@@ -196,6 +197,17 @@ async function upsertSyncStatus(
   });
 }
 
+interface ArtifactsContent {
+  artifacts: Array<{
+    name?: string | null;
+    artifactType: ArtifactType;
+    downloadUrl?: string | null;
+    size?: number | null;
+    hash?: string | null;
+  }>;
+  artifactWrapperParentField: ArtifactWrapperParentFieldOptions;
+}
+
 /**
  * Configuration for the sync helper
  */
@@ -221,6 +233,7 @@ interface SyncConfig<
     createData: TCreateData;
     updateData: TUpdateData;
     uniqueFieldConditions: Array<Record<string, any>>;
+    artifactsData: ArtifactsContent | undefined;
   }>;
 
   // Optional: Additional fields to include in create
@@ -275,7 +288,7 @@ export async function processIntegrationSync<
     });
 
     // Transform the input item to get create/update data and unique conditions
-    const { createData, updateData, uniqueFieldConditions } =
+    const { createData, updateData, uniqueFieldConditions, artifactsData } =
       await config.transformInputItem(item, userId);
 
     // If we have a ExternalItemMapping, update the sync time and item
@@ -312,7 +325,7 @@ export async function processIntegrationSync<
     // If no Item, we need to create the Item and ExternalItemMapping
     if (!foundItem) {
       try {
-        await config.model.create({
+        const createdItem = await config.model.create({
           data: {
             ...createData,
             ...(config.additionalCreateFields?.(userId) || {}),
@@ -325,6 +338,22 @@ export async function processIntegrationSync<
             },
           },
         });
+
+        // Remediation and DeviceArtifacts integrations contain artifacts that need processing
+        if (
+          artifactsData?.artifacts &&
+          artifactsData.artifactWrapperParentField
+        ) {
+          await prisma.$transaction(async (tx: any) => {
+            await createArtifactWrappers(
+              tx,
+              artifactsData.artifacts,
+              createdItem.id,
+              artifactsData.artifactWrapperParentField,
+              userId,
+            );
+          });
+        }
       } catch (error: unknown) {
         console.error("no existing Item", error);
         response.message = handlePrismaError(error);

@@ -6,8 +6,10 @@ import {
   cpeToDeviceGroup,
   createArtifactWrappers,
   fetchPaginated,
+  processIntegrationSync,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
+import { integrationResponseSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
@@ -15,6 +17,7 @@ import {
   deviceArtifactInputSchema,
   deviceArtifactResponseSchema,
   deviceArtifactUpdateSchema,
+  integrationDeviceArtifactInputSchema,
   paginatedDeviceArtifactResponseSchema,
 } from "../types";
 
@@ -199,6 +202,68 @@ export const deviceArtifactsRouter = createTRPCRouter({
       });
 
       return transformArtifactWrapper(result);
+    }),
+
+  processIntegrationCreate: protectedProcedure
+    .input(integrationDeviceArtifactInputSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/deviceArtifacts/integrationUpload",
+        tags: ["DeviceArtifacts"],
+        summary: "Synchronize Device Artifact with integration",
+        description:
+          "Synchronize Device Artifacts on VIPER from a partnered platform",
+      },
+    })
+    .output(integrationResponseSchema)
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.auth.user.id;
+      const integration = await prisma.integration.findFirst({
+        // @ts-expect-error ctx.auth.key.id is defined if logging in with api key
+        where: { apiKey: { id: ctx.auth.key?.id } },
+        select: { id: true },
+      });
+
+      const integrationId = requireExistence(integration, "Integration").id;
+
+      return processIntegrationSync(
+        prisma,
+        {
+          model: prisma.deviceArtifact,
+          mappingModel: prisma.externalDeviceArtifactMapping,
+          transformInputItem: async (item, userId) => {
+            const { cpe, vendorId: _vendorId, artifacts, ...itemData } = item;
+            const newDeviceGroup = await cpeToDeviceGroup(cpe);
+
+            return {
+              createData: {
+                ...itemData,
+                user: {
+                  connect: { id: userId },
+                },
+                deviceGroup: {
+                  connect: { id: newDeviceGroup.id },
+                },
+              },
+              updateData: {
+                ...itemData,
+                deviceGroup: {
+                  connect: { id: newDeviceGroup.id },
+                },
+              },
+              uniqueFieldConditions: [],
+              artifactsData: {
+                artifacts,
+                artifactWrapperParentField: "deviceArtifactId",
+              },
+            };
+          },
+        },
+        input,
+        userId,
+        integrationId,
+      );
     }),
 
   // DELETE /api/deviceArtifacts/{deviceArtifact_id} - Delete deviceArtifact (only creator can delete)

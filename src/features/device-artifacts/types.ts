@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   cpeSchema,
+  createIntegrationInputSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -25,6 +26,9 @@ export const deviceArtifactInputSchema = z.object({
     .array(artifactInputSchema)
     .min(1, "at least one artifact is required"),
 });
+
+export const integrationDeviceArtifactInputSchema =
+  createIntegrationInputSchema(deviceArtifactInputSchema);
 
 export const deviceArtifactUpdateSchema = z.object({
   id: z.string(),

@@ -7,12 +7,15 @@ import {
   cpesToDeviceGroups,
   createArtifactWrappers,
   fetchPaginated,
+  processIntegrationSync,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
 import { processArtifactHosting } from "@/lib/s3";
+import { integrationResponseSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
+  integrationRemediationInputSchema,
   paginatedRemediationResponseSchema,
   remediationInclude,
   remediationInputSchema,
@@ -179,6 +182,67 @@ export const remediationsRouter = createTRPCRouter({
         remediation: transformArtifactWrapper(result),
         uploadInstructions: uploadInstructions,
       };
+    }),
+
+  processIntegrationCreate: protectedProcedure
+    .input(integrationRemediationInputSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/remediations/integrationUpload",
+        tags: ["Remediations"],
+        summary: "Synchronize Remediations with integration",
+        description:
+          "Synchronize Remediations on VIPER from a partnered platform",
+      },
+    })
+    .output(integrationResponseSchema)
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.auth.user.id;
+      const integration = await prisma.integration.findFirst({
+        // @ts-expect-error ctx.auth.key.id is defined if logging in with api key
+        where: { apiKey: { id: ctx.auth.key?.id } },
+        select: { id: true },
+      });
+
+      const integrationId = requireExistence(integration, "Integration").id;
+
+      return processIntegrationSync(
+        prisma,
+        {
+          model: prisma.remediation,
+          mappingModel: prisma.externalRemediationMapping,
+          transformInputItem: async (item, userId) => {
+            const { cpes, vendorId: _vendorId, artifacts, ...itemData } = item;
+            const uniqueCpes = [...new Set(cpes)];
+            const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
+
+            return {
+              createData: {
+                ...itemData,
+                userId,
+                affectedDeviceGroups: {
+                  connect: deviceGroups.map((dg) => ({ id: dg.id })),
+                },
+              },
+              updateData: {
+                ...itemData,
+                affectedDeviceGroups: {
+                  set: deviceGroups.map((dg) => ({ id: dg.id })),
+                },
+              },
+              uniqueFieldConditions: [],
+              artifactsData: {
+                artifacts,
+                artifactWrapperParentField: "remediationId",
+              },
+            };
+          },
+        },
+        input,
+        userId,
+        integrationId,
+      );
     }),
 
   // DELETE /api/remediations/{id} - Delete remediation (only creator can delete)

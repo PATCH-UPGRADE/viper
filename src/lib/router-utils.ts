@@ -201,8 +201,9 @@ interface ArtifactsContent {
   artifacts: Array<{
     name?: string | null;
     artifactType: ArtifactType;
-    downloadUrl: string;
+    downloadUrl?: string | null;
     size?: number | null;
+    hash?: string | null;
   }>;
   artifactWrapperParentField: ArtifactWrapperParentFieldOptions;
 }

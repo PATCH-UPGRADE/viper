@@ -360,7 +360,7 @@ export const IntegrationCreateModal = ({
           <Button
             type="submit"
             form="integration-form"
-            onClick={form.handleSubmit(onSubmit)}
+            onClick={form.handleSubmit(onSubmit, (e) => console.error(e))}
             disabled={isPending}
           >
             {verbLabel} Integration

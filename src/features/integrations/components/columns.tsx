@@ -201,7 +201,8 @@ export const getIntegrationColumns = (
             authType: data.authType,
             resourceType: data.resourceType,
             syncEvery: data.syncEvery || 300,
-            authentication: data.authentication as AuthenticationInputType,
+            authentication:
+              (data.authentication as AuthenticationInputType) ?? undefined,
           },
         });
 

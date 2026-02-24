@@ -169,7 +169,7 @@ export const IntegrationCreateModal = ({
         </DialogHeader>
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={form.handleSubmit(onSubmit, (e) => console.error(e))}
             id="integration-form"
             className="px-6"
           >
@@ -357,12 +357,7 @@ export const IntegrationCreateModal = ({
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button
-            type="submit"
-            form="integration-form"
-            onClick={form.handleSubmit(onSubmit)}
-            disabled={isPending}
-          >
+          <Button type="submit" form="integration-form" disabled={isPending}>
             {verbLabel} Integration
           </Button>
         </DialogFooter>

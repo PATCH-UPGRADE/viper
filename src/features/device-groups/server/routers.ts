@@ -1,24 +1,18 @@
 import "server-only";
 import { z } from "zod";
 import prisma from "@/lib/db";
-import {
-  createPaginatedResponseSchema,
-  paginationInputSchema,
-} from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 import {
   deviceGroupWithDetailsSchema,
   deviceGroupWithUrlsSchema,
+  paginatedDeviceGroupResponseSchema,
+  paginationInputWithUpdatedAtFilterFields,
 } from "../types";
 
 const deviceGroupResponseSchema = deviceGroupWithUrlsSchema;
 const deviceGroupDetailsResponseSchema = deviceGroupWithDetailsSchema;
-
-const paginatedDeviceGroupResponseSchema = createPaginatedResponseSchema(
-  deviceGroupResponseSchema,
-);
 
 const deviceGroupInputSchema = z
   .object({
@@ -43,7 +37,7 @@ const deviceGroupInputHelmIdSchema = z.object({
 export const deviceGroupsRouter = createTRPCRouter({
   // GET /api/deviceGroups - List all device groups (any authenticated user can see all)
   getMany: protectedProcedure
-    .input(paginationInputSchema)
+    .input(paginationInputWithUpdatedAtFilterFields)
     .meta({
       openapi: {
         method: "GET",
@@ -58,6 +52,17 @@ export const deviceGroupsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { search } = input;
 
+      const updatedAt: { gte?: Date; lte?: Date } = {};
+      if (input.updatedAtStartTime) {
+        updatedAt.gte = input.updatedAtStartTime;
+      }
+
+      if (input.updatedAtEndTime) {
+        updatedAt.lte = input.updatedAtEndTime;
+      }
+
+      console.log("updatedAt", updatedAt);
+
       // Build search filter across multiple fields
       const where = search
         ? {
@@ -71,8 +76,10 @@ export const deviceGroupsRouter = createTRPCRouter({
               },
               { modelName: { contains: search, mode: "insensitive" as const } },
             ],
+            updatedAt,
           }
-        : {};
+        : { updatedAt };
+      console.log("where", where);
 
       return fetchPaginated(prisma.deviceGroup, input, {
         where: where,

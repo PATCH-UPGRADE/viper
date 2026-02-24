@@ -1,5 +1,7 @@
+import { addSeconds, subSeconds } from "date-fns";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
+import prisma from "@/lib/db";
 import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
 
 describe("Device Groups Endpoint (/deviceGroups)", () => {
@@ -86,6 +88,13 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .send(assetPayload);
     expect(assetRes.status).toBe(200);
     expect(assetRes.body).toHaveProperty("deviceGroup");
+
+    onTestFinished(async () => {
+      await prisma.asset
+        .delete({ where: { id: assetRes.body.id } })
+        .catch(() => {});
+    });
+
     const assetDeviceGroupId = assetRes.body.deviceGroup.id;
 
     // Get a list of device groups
@@ -158,5 +167,81 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     expect(updateDeviceGroupHelmId.body.helmSbomId).toBe(
       updateDeviceGroupHelmIdPayload.helmSbomId,
     );
+  });
+
+  it("filter DeviceGroup getMany by time test", async () => {
+    // First, post an asset, which should create a device group (if one doesn't exist already)
+    const assetRes = await request(BASE_URL)
+      .post("/assets")
+      .set(authHeader)
+      .send(assetPayload);
+
+    expect(assetRes.status).toBe(200);
+    expect(assetRes.body).toHaveProperty("updatedAt");
+    expect(assetRes.body).toHaveProperty("deviceGroup");
+
+    onTestFinished(async () => {
+      await prisma.asset
+        .delete({ where: { id: assetRes.body.id } })
+        .catch(() => {});
+    });
+
+    const deviceGroupUpdatedAt = new Date(assetRes.body.updatedAt);
+    const secondsDiff = 5;
+    const start = subSeconds(deviceGroupUpdatedAt, secondsDiff).toISOString();
+    const end = addSeconds(deviceGroupUpdatedAt, secondsDiff).toISOString();
+
+    const getManyPayload = {
+      page: 1,
+      pageSize: 10,
+      updatedAtStartTime: start,
+      updatedAtEndTime: end,
+    };
+
+    // Get a list of device groups
+    const listRes = await request(BASE_URL)
+      .get("/deviceGroups")
+      .query(getManyPayload)
+      .set(authHeader);
+
+    // console.log(listRes);
+    expect(listRes.body.items.length).toBe(1);
+  });
+
+  it("filter DeviceGroup getMany by time empty case test", async () => {
+    // First, post an asset, which should create a device group (if one doesn't exist already)
+    const assetRes = await request(BASE_URL)
+      .post("/assets")
+      .set(authHeader)
+      .send(assetPayload);
+
+    expect(assetRes.status).toBe(200);
+    expect(assetRes.body).toHaveProperty("updatedAt");
+    expect(assetRes.body).toHaveProperty("deviceGroup");
+
+    onTestFinished(async () => {
+      await prisma.asset
+        .delete({ where: { id: assetRes.body.id } })
+        .catch(() => {});
+    });
+
+    const deviceGroupUpdatedAt = new Date(assetRes.body.updatedAt);
+    const secondsDiff = 0;
+    const start = subSeconds(deviceGroupUpdatedAt, secondsDiff).toISOString();
+    const end = addSeconds(deviceGroupUpdatedAt, secondsDiff).toISOString();
+
+    const getManyPayload = {
+      page: 1,
+      pageSize: 10,
+      updatedAtStartTime: start,
+      updatedAtEndTime: end,
+    };
+
+    const listRes = await request(BASE_URL)
+      .get("/deviceGroups")
+      .query(getManyPayload)
+      .set(authHeader);
+
+    expect(listRes.body.items.length).toBe(0);
   });
 });

@@ -321,7 +321,7 @@ describe("Assets Endpoint (/assets)", () => {
       .send(assetIntegrationPayload);
 
     // endpoint requires the user to create an Integration (db model) first
-    expect(integrationResp.status).toBe(500);
+    expect(integrationResp.status).toBe(404);
   });
 
   it("empty Assets uploadIntegration endpoint int test", async () => {

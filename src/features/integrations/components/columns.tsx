@@ -164,11 +164,12 @@ export const getIntegrationColumns = (
         switch (resourceType) {
           case "Asset":
             return counts.assetMappings;
+          case "DeviceArtifact":
+            return counts.deviceArtifactMappings;
+          case "Remediation":
+            return counts.remediationMappings;
           case "Vulnerability":
             return counts.vulnerabilityMappings;
-          case "DeviceArtifact":
-          case "Remediation":
-            return "TODO";
         }
       },
     },

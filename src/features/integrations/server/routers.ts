@@ -30,6 +30,8 @@ const integrationsInclude = {
   _count: {
     select: {
       assetMappings: true,
+      deviceArtifactMappings: true,
+      remediationMappings: true,
       vulnerabilityMappings: true,
     },
   },

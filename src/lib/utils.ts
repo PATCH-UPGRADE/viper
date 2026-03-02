@@ -81,7 +81,7 @@ export const sendWebhook = async (
     signal: AbortSignal.timeout(30000),
     body: JSON.stringify({
       webhookTrigger: triggerType.toString(),
-      timestamp: timestamp.toISOString(),
+      timestamp: timestamp.getTime(),
     }),
   });
 };

@@ -21,6 +21,8 @@ export const paginationInputSchema = z.object({
     .default(PAGINATION.DEFAULT_PAGE_SIZE),
   search: z.string().default(""),
   sort: z.string().default(""),
+  lastUpdatedStartTime: z.number().int().optional(),
+  lastUpdatedEndTime: z.number().int().optional(),
 });
 
 export type PaginationInput = z.infer<typeof paginationInputSchema>;

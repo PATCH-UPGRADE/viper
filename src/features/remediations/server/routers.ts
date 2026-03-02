@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import type { Prisma } from "@/generated/prisma";
+import type { AlohaStatus, Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
@@ -11,12 +11,13 @@ import {
   transformArtifactWrapper,
 } from "@/lib/router-utils";
 import { processArtifactHosting } from "@/lib/s3";
-import { integrationResponseSchema } from "@/lib/schemas";
+import { alohaInputSchema, integrationResponseSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   integrationRemediationInputSchema,
   paginatedRemediationResponseSchema,
+  remediationAlohaResponseSchema,
   remediationInclude,
   remediationInputSchema,
   remediationResponseSchema,
@@ -243,6 +244,61 @@ export const remediationsRouter = createTRPCRouter({
         userId,
         integrationId,
       );
+    }),
+
+  // GET /api/remediations/{id}/aloha - Get aloha data for a remediation
+  getAloha: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/remediations/{id}/aloha",
+        tags: ["Remediations"],
+        summary: "Get Remediation Aloha",
+        description:
+          "Get aloha status and log for a remediation. Any authenticated user can access.",
+      },
+    })
+    .output(remediationAlohaResponseSchema)
+    .query(async ({ input }) => {
+      const rem = await prisma.remediation.findUnique({
+        where: { id: input.id },
+        include: remediationInclude,
+      });
+      const found = requireExistence(rem, "Remediation");
+      return {
+        remediation: transformArtifactWrapper(found),
+        aloha: { status: found.alohaStatus, log: found.alohaLog },
+      };
+    }),
+
+  // PUT /api/remediations/{id}/aloha - Update aloha data for a remediation
+  updateAloha: protectedProcedure
+    .input(z.object({ id: z.string(), data: alohaInputSchema }))
+    .meta({
+      openapi: {
+        method: "PUT",
+        path: "/remediations/{id}/aloha",
+        tags: ["Remediations"],
+        summary: "Update Remediation Aloha",
+        description:
+          "Update aloha status and log for a remediation. Any authenticated user can update.",
+      },
+    })
+    .output(remediationAlohaResponseSchema)
+    .mutation(async ({ input }) => {
+      const rem = await prisma.remediation.update({
+        where: { id: input.id },
+        data: {
+          alohaStatus: input.data.status as AlohaStatus,
+          alohaLog: input.data.log ?? {},
+        },
+        include: remediationInclude,
+      });
+      return {
+        remediation: transformArtifactWrapper(rem),
+        aloha: { status: rem.alohaStatus, log: rem.alohaLog },
+      };
     }),
 
   // DELETE /api/remediations/{id} - Delete remediation (only creator can delete)

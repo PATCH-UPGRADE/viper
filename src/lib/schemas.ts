@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AuthType } from "@/generated/prisma";
+import { AlohaStatus, AuthType } from "@/generated/prisma";
 import { createPaginatedResponseWithLinksSchema } from "./pagination";
 
 /**
@@ -109,3 +109,13 @@ export const createIntegrationInputSchema = <T extends z.ZodRawShape>(
   });
   return createPaginatedResponseWithLinksSchema(integrationInputSchema);
 };
+
+export const alohaInputSchema = z.object({
+  status: z.enum(Object.keys(AlohaStatus)),
+  log: z.any().optional(),
+});
+
+export const alohaResponseSchema = z.object({
+  status: z.enum(Object.values(AlohaStatus)).nullable(),
+  log: z.any(),
+});

@@ -6,6 +6,7 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import {
+  alohaResponseSchema,
   cpeSchema,
   createIntegrationInputSchema,
   safeUrlSchema,
@@ -120,3 +121,8 @@ export const vulnerabilityByPriorityInclude = {
 export type VulnerabilityWithRelations = Prisma.VulnerabilityGetPayload<{
   include: typeof vulnerabilityByPriorityInclude;
 }>;
+
+export const vulnerabilityAlohaResponseSchema = z.object({
+  vulnerability: vulnerabilityResponseSchema,
+  aloha: alohaResponseSchema,
+});

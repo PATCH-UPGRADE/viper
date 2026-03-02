@@ -61,8 +61,6 @@ export const deviceGroupsRouter = createTRPCRouter({
         updatedAt.lte = input.updatedAtEndTime;
       }
 
-      console.log("updatedAt", updatedAt);
-
       // Build search filter across multiple fields
       const where = search
         ? {
@@ -79,7 +77,6 @@ export const deviceGroupsRouter = createTRPCRouter({
             updatedAt,
           }
         : { updatedAt };
-      console.log("where", where);
 
       return fetchPaginated(prisma.deviceGroup, input, {
         where: where,

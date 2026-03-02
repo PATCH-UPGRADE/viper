@@ -204,7 +204,6 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .query(getManyPayload)
       .set(authHeader);
 
-    // console.log(listRes);
     expect(listRes.body.items.length).toBe(1);
   });
 

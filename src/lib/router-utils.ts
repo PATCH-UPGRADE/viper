@@ -63,15 +63,29 @@ export async function fetchPaginated<
   input: PaginationInput,
   args: Omit<TArgs, "skip" | "take">,
 ) {
-  const totalCount = await delegate.count({
-    where: args.where,
-  });
+  const updatedAtFilter: Record<string, Date> = {};
+  if (input.lastUpdatedStartTime) {
+    updatedAtFilter.gte = new Date(input.lastUpdatedStartTime);
+  }
+  if (input.lastUpdatedEndTime) {
+    updatedAtFilter.lte = new Date(input.lastUpdatedEndTime);
+  }
+
+  const where = {
+    ...args.where,
+    ...(Object.keys(updatedAtFilter).length > 0 && {
+      updatedAt: updatedAtFilter,
+    }),
+  };
+
+  const totalCount = await delegate.count({ where });
 
   const meta = buildPaginationMeta(input, totalCount);
 
   const items = await delegate.findMany({
     orderBy: { createdAt: "desc" },
     ...args,
+    where,
     skip: meta.skip,
     take: meta.take,
   } as TArgs);

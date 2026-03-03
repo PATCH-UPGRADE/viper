@@ -182,12 +182,12 @@ export const AppSidebar = () => {
                         <Link href={item.url} prefetch>
                           <item.icon className="size-4" aria-hidden="true" />
                           <span>{item.title}</span>
-                          {/*<Badge
+                          <Badge
                             variant="secondary"
                             className="ml-auto text-xs"
                           >
                             {item.count}
-                          </Badge>*/}
+                          </Badge>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

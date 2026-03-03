@@ -6,7 +6,7 @@ This document describes the end-to-end workflow for integrating **ALOHA** (the I
 
 All VIPER API calls require an API key passed as a Bearer token:
 
-```
+```http
 Authorization: Bearer <API_KEY>
 ```
 
@@ -81,14 +81,14 @@ Use the `lastUpdatedStartTime` query parameter set to the webhook `timestamp` to
 
 ### Vulnerabilities
 
-```
+```http
 GET /api/v1/vulnerabilities?lastUpdatedStartTime=2026-03-03T12:00:00.000Z
 Authorization: Bearer <API_KEY>
 ```
 
 ### Remediations
 
-```
+```http
 GET /api/v1/remediations?lastUpdatedStartTime=2026-03-03T12:00:00.000Z
 Authorization: Bearer <API_KEY>
 ```
@@ -110,7 +110,7 @@ After running IV&V tests, ALOHA reports results back to VIPER using the ALOHA up
 
 ### Update vulnerability ALOHA status
 
-```
+```http
 PUT /api/v1/vulnerabilities/{id}/aloha
 Authorization: Bearer <API_KEY>
 Content-Type: application/json
@@ -135,7 +135,7 @@ Content-Type: application/json
 
 ### Update remediation ALOHA status
 
-```
+```http
 PUT /api/v1/remediations/{id}/aloha
 Authorization: Bearer <API_KEY>
 Content-Type: application/json
@@ -165,14 +165,14 @@ ALOHA can verify the persisted status of any vulnerability or remediation at any
 
 ### Get vulnerability ALOHA status
 
-```
+```http
 GET /api/v1/vulnerabilities/{id}/aloha
 Authorization: Bearer <API_KEY>
 ```
 
 ### Get remediation ALOHA status
 
-```
+```http
 GET /api/v1/remediations/{id}/aloha
 Authorization: Bearer <API_KEY>
 ```

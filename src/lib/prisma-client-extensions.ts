@@ -184,7 +184,8 @@ const createWebhookHandlers = (
   // biome-ignore lint/suspicious/noExplicitAny: Prisma query/args types vary per model but the webhook logic is identical
   async updateMany({ args, query }: { args: any; query: any }) {
     const items = await query(args);
-    sendWebhooks(updatedTrigger, new Date());
+    if (items.count > 0)
+      sendWebhooks(updatedTrigger, new Date());
     return items;
   },
   // biome-ignore lint/suspicious/noExplicitAny: Prisma query/args types vary per model but the webhook logic is identical
@@ -201,7 +202,8 @@ const createWebhookHandlers = (
   // biome-ignore lint/suspicious/noExplicitAny: Prisma query/args types vary per model but the webhook logic is identical
   async createMany({ args, query }: { args: any; query: any }) {
     const items = await query(args);
-    sendWebhooks(createdTrigger, new Date());
+    if (items.count > 0)
+      sendWebhooks(createdTrigger, new Date());
     return items;
   },
   // biome-ignore lint/suspicious/noExplicitAny: Prisma query/args types vary per model but the webhook logic is identical

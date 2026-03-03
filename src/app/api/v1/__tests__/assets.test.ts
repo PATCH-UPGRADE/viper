@@ -22,9 +22,9 @@ describe("Assets Endpoint (/assets)", () => {
 
   const payload2 = {
     ip: "192.168.1.101",
-    cpe: generateCPE("asset_v1"),
+    cpe: generateCPE("asset_v2"),
     role: "Primary Server",
-    upstreamApi: "https://api.hospital-upstream.com/v1",
+    upstreamApi: "https://api.hospital-upstream.com/v2",
   };
 
   const mockIntegrationPayload = {
@@ -46,7 +46,7 @@ describe("Assets Endpoint (/assets)", () => {
       {
         ip: "172.20.15.244",
         networkSegment: "Mock Medical Imaging VLAN",
-        cpe: "cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*",
+        cpe: "cpe:2.3:h:mock:asset_integration_v10:*:*:*:*:*:*:*",
         role: "CT Scanner",
         upstreamApi: "https://mock-upstream-api.com/",
         hostname: "med-mock-00001.hospital.local",
@@ -64,7 +64,7 @@ describe("Assets Endpoint (/assets)", () => {
       {
         ip: "172.20.15.245",
         networkSegment: "Mock Medical Imaging VLAN",
-        cpe: "cpe:2.3:h:mock:brive_ct315:*:*:*:*:*:*:*",
+        cpe: "cpe:2.3:h:mock:asset_integration_v11:*:*:*:*:*:*:*",
         role: "CT Scanner",
         upstreamApi: "https://mock-upstream-api.com/",
         hostname: "med-mock-00002.hospital.local",
@@ -368,9 +368,15 @@ describe("Assets Endpoint (/assets)", () => {
       .set(jsonHeader)
       .send(assetIntegrationPayload);
 
-    if (integrationRes.status !== 200) {
-      console.log(integrationRes);
-    }
+    onTestFinished(async () => {
+      await prisma.deviceGroup.deleteMany({
+        where: {
+          cpe: {
+            contains: "asset_integration_",
+          },
+        },
+      });
+    });
 
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);

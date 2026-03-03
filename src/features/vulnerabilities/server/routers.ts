@@ -196,7 +196,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         include: vulnerabilityInclude,
       });
 
-      console.log(data);
+      console.log("created new vuln with id:", data.id);
       return data;
     }),
 

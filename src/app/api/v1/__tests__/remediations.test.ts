@@ -63,7 +63,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     vendor: "mockRemediationIntegrationVendor",
     items: [
       {
-        cpes: ["cpe:2.3:h:mock:rem_integration_v1:*:*:*:*:*:*:*"],
+        cpes: ["cpe:2.3:h:mock:rem_integration_v10:*:*:*:*:*:*:*"],
         upstreamApi: "https://mock-rem-upstream-api.com/",
         description: "Mock -- run apt update",
         narrative: "Discovered during security audit",
@@ -77,7 +77,7 @@ describe("Remediations Endpoint (/remediations)", () => {
         ],
       },
       {
-        cpes: ["cpe:2.3:h:mock:rem_integration_v1:*:*:*:*:*:*:*"],
+        cpes: ["cpe:2.3:h:mock:rem_integration_v11:*:*:*:*:*:*:*"],
         upstreamApi: "https://mock-rem-upstream-api.com/",
         description: "Mock - Turn it off and on again",
         narrative: "Discovered during security audit",
@@ -337,7 +337,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     const vulnRes = await request(BASE_URL)
       .post("/vulnerabilities")
       .set(authHeader)
-      .send({ ...vulnerabilityPayload, cpes: [newCpe] });
+      .send(vulnerabilityPayload);
 
     expect(vulnRes.status).toBe(200);
     const vulnerabilityId = vulnRes.body.id;
@@ -351,7 +351,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     const createRes = await request(BASE_URL)
       .post("/remediations")
       .set(authHeader)
-      .send({ ...payloadWithVuln, cpes: [newCpe] });
+      .send(payloadWithVuln);
 
     onTestFinished(async () => {
       await prisma.vulnerability
@@ -369,11 +369,6 @@ describe("Remediations Endpoint (/remediations)", () => {
         },
       });
     });
-
-    if (createRes.status !== 200) {
-      console.log(createRes);
-      console.log("vulnerabilityId:", vulnerabilityId);
-    }
 
     expect(createRes.status).toBe(200);
 
@@ -596,9 +591,15 @@ describe("Remediations Endpoint (/remediations)", () => {
       .set(jsonHeader)
       .send(remediationIntegrationPayload);
 
-    if (integrationRes.status !== 200) {
-      console.log(integrationRes);
-    }
+    onTestFinished(async () => {
+      await prisma.deviceGroup.deleteMany({
+        where: {
+          cpe: {
+            contains: "rem_integration_",
+          },
+        },
+      });
+    });
 
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);

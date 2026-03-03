@@ -24,7 +24,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
 
   const assetPayload = {
     ip: "192.168.1.100",
-    cpe: generateCPE("vuln_v1"),
+    cpe: generateCPE("vuln_asset_v1"),
     role: "Primary Server",
     upstreamApi: "https://api.hospital-upstream.com/v1",
   };
@@ -44,7 +44,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     items: [
       {
         sarif: { tool: { driver: { name: "MockScanner" } } },
-        cpes: ["cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*"],
+        cpes: ["cpe:2.3:h:mock:vuln_integration_v10:*:*:*:*:*:*:*"],
         exploitUri: "https://mock-exploit-db.com/vuln-001",
         upstreamApi: "https://mock-vuln-upstream-api.com/",
         description: "Mock -- Critical buffer overflow in imaging device",
@@ -54,7 +54,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       },
       {
         sarif: { tool: { driver: { name: "MockScanner" } } },
-        cpes: ["cpe:2.3:h:mock:brive_ct315:*:*:*:*:*:*:*"],
+        cpes: ["cpe:2.3:h:mock:vuln_integration_v11:*:*:*:*:*:*:*"],
         exploitUri: "https://mock-exploit-db.com/vuln-002",
         upstreamApi: "https://mock-vuln-upstream-api.com/",
         description: "Mock -- Authentication bypass vulnerability",
@@ -107,19 +107,25 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       .set(authHeader)
       .send(assetPayload);
 
+    console.log("postAssetRes:", postAssetRes.body);
+
     expect(postAssetRes.status).toBe(200);
     expect(postAssetRes.body).toHaveProperty("id");
 
-    // onTestFinished(async () => {
-    //   await prisma.asset.delete({
-    //     where: { id: postAssetRes.body.id },
-    //   }).catch(() => {});
-    // });
+    onTestFinished(async () => {
+      await prisma.asset
+        .delete({
+          where: { id: postAssetRes.body.id },
+        })
+        .catch(() => {});
+    });
 
     const res = await request(BASE_URL)
       .post("/vulnerabilities")
       .set(authHeader)
       .send(payload);
+
+    console.log("vulnRes:", res.body);
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("id");
@@ -129,8 +135,6 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       .get(`/vulnerabilities/${vulnerabilityId}`)
       .set(authHeader);
 
-    console.log(detailRes);
-
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.id).toBe(vulnerabilityId);
 
@@ -139,6 +143,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
         vulnerabilityId: detailRes.body.id,
       },
     });
+    console.log("foundIssues:", foundIssue);
 
     expect(foundIssue.length).toBe(1);
     expect(foundIssue[0].assetId).toBe(postAssetRes.body.id);
@@ -202,9 +207,15 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       .set(jsonHeader)
       .send(vulnerabilityIntegrationPayload);
 
-    if (integrationRes.status !== 200) {
-      console.log(integrationRes);
-    }
+    onTestFinished(async () => {
+      await prisma.deviceGroup.deleteMany({
+        where: {
+          cpe: {
+            contains: "vuln_integration_",
+          },
+        },
+      });
+    });
 
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);

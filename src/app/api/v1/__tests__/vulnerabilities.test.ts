@@ -24,7 +24,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
 
   const assetPayload = {
     ip: "192.168.1.100",
-    cpe: generateCPE("vuln_asset_v1"),
+    cpe: generateCPE("vuln_v1"),
     role: "Primary Server",
     upstreamApi: "https://api.hospital-upstream.com/v1",
   };
@@ -107,25 +107,19 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       .set(authHeader)
       .send(assetPayload);
 
-    console.log("postAssetRes:", postAssetRes.body);
-
     expect(postAssetRes.status).toBe(200);
     expect(postAssetRes.body).toHaveProperty("id");
 
     onTestFinished(async () => {
-      await prisma.asset
-        .delete({
-          where: { id: postAssetRes.body.id },
-        })
-        .catch(() => {});
+      await prisma.asset.delete({
+        where: { id: postAssetRes.body.id },
+      });
     });
 
     const res = await request(BASE_URL)
       .post("/vulnerabilities")
       .set(authHeader)
       .send(payload);
-
-    console.log("vulnRes:", res.body);
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("id");
@@ -143,7 +137,6 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
         vulnerabilityId: detailRes.body.id,
       },
     });
-    console.log("foundIssues:", foundIssue);
 
     expect(foundIssue.length).toBe(1);
     expect(foundIssue[0].assetId).toBe(postAssetRes.body.id);

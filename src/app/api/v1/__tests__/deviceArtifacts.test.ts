@@ -52,7 +52,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     vendor: "mockDeviceArtifactIntegrationVendor",
     items: [
       {
-        cpe: "cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*",
+        cpe: "cpe:2.3:h:mock:dev_art_integration_v1:*:*:*:*:*:*:*",
         role: "mock-deviceArtifact",
         upstreamApi: "https://mock-deviceArtifact-upstream-api.com/",
         description: "Mock -- run apt update",
@@ -66,7 +66,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         ],
       },
       {
-        cpe: "cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*",
+        cpe: "cpe:2.3:h:mock:dev_art_integration_v1:*:*:*:*:*:*:*",
         role: "mock-deviceArtifact",
         upstreamApi: "https://mock-deviceArtifact-upstream-api.com/",
         description: "Mock - Turn it off and on again",
@@ -394,9 +394,9 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       await prisma.deviceGroup.deleteMany({
         where: {
           cpe: {
-            contains: cpeName
-          }
-        }
+            contains: cpeName,
+          },
+        },
       });
     });
 

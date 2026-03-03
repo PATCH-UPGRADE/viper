@@ -196,8 +196,14 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
 
     const assetUpdatedAt = new Date(assetRes.body.deviceGroup.updatedAt);
     const secondsDiff = 0;
-    const updatedAtStartTime = subSeconds(assetUpdatedAt, secondsDiff).toISOString();
-    const updatedAtEndTime = addSeconds(assetUpdatedAt, secondsDiff).toISOString();
+    const updatedAtStartTime = subSeconds(
+      assetUpdatedAt,
+      secondsDiff,
+    ).toISOString();
+    const updatedAtEndTime = addSeconds(
+      assetUpdatedAt,
+      secondsDiff,
+    ).toISOString();
 
     const getManyPayload = {
       page: 1,

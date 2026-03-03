@@ -1,4 +1,3 @@
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -138,7 +137,7 @@ export const remediationsRouter = createTRPCRouter({
 
       // Verify the vulnerability exists
       if (input.vulnerabilityId) {
-        console.log("vulnerabilityId:", input.vulnerabilityId)
+        console.log("vulnerabilityId:", input.vulnerabilityId);
         const vuln = await prisma.vulnerability.findUnique({
           where: { id: input.vulnerabilityId },
         });

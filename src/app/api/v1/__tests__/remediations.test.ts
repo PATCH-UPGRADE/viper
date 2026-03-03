@@ -63,7 +63,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     vendor: "mockRemediationIntegrationVendor",
     items: [
       {
-        cpes: ["cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*"],
+        cpes: ["cpe:2.3:h:mock:rem_integration_v1:*:*:*:*:*:*:*"],
         upstreamApi: "https://mock-rem-upstream-api.com/",
         description: "Mock -- run apt update",
         narrative: "Discovered during security audit",
@@ -77,7 +77,7 @@ describe("Remediations Endpoint (/remediations)", () => {
         ],
       },
       {
-        cpes: ["cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*"],
+        cpes: ["cpe:2.3:h:mock:rem_integration_v1:*:*:*:*:*:*:*"],
         upstreamApi: "https://mock-rem-upstream-api.com/",
         description: "Mock - Turn it off and on again",
         narrative: "Discovered during security audit",
@@ -159,9 +159,9 @@ describe("Remediations Endpoint (/remediations)", () => {
       await prisma.deviceGroup.deleteMany({
         where: {
           cpe: {
-            contains: invalidPayload.cpes[0]
-          }
-        }
+            contains: invalidPayload.cpes[0],
+          },
+        },
       });
     });
 
@@ -219,9 +219,9 @@ describe("Remediations Endpoint (/remediations)", () => {
       await prisma.deviceGroup.deleteMany({
         where: {
           cpe: {
-            contains: payload.cpes[0]
-          }
-        }
+            contains: payload.cpes[0],
+          },
+        },
       });
     });
 
@@ -303,9 +303,9 @@ describe("Remediations Endpoint (/remediations)", () => {
       await prisma.deviceGroup.deleteMany({
         where: {
           cpe: {
-            contains: newCpe
-          }
-        }
+            contains: newCpe,
+          },
+        },
       });
     });
 
@@ -364,9 +364,9 @@ describe("Remediations Endpoint (/remediations)", () => {
       await prisma.deviceGroup.deleteMany({
         where: {
           cpe: {
-            contains: newCpe
-          }
-        }
+            contains: newCpe,
+          },
+        },
       });
     });
 
@@ -374,7 +374,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       console.log(createRes);
       console.log("vulnerabilityId:", vulnerabilityId);
     }
-    
+
     expect(createRes.status).toBe(200);
 
     onTestFinished(async () => {
@@ -497,9 +497,9 @@ describe("Remediations Endpoint (/remediations)", () => {
       await prisma.deviceGroup.deleteMany({
         where: {
           cpe: {
-            contains: cpeName
-          }
-        }
+            contains: cpeName,
+          },
+        },
       });
     });
 

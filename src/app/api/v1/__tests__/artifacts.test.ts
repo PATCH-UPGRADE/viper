@@ -37,16 +37,16 @@ describe("Artifacts Endpoint (/artifacts)", () => {
       await prisma.deviceGroup.deleteMany({
         where: {
           cpe: {
-            contains: cpeName
-          }
-        }
+            contains: cpeName,
+          },
+        },
       });
     });
 
     // TODO: Remediation POST now returns { remediation, uploadInstructions }
     // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
 
-    if (res.status == 500) {
+    if (res.status === 500) {
       console.log(res);
     }
 

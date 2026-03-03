@@ -185,7 +185,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const uniqueCpes = [...new Set(cpes)];
       const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
 
-      return prisma.vulnerability.create({
+      const data = await prisma.vulnerability.create({
         data: {
           ...dataInput,
           affectedDeviceGroups: {
@@ -195,6 +195,9 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         },
         include: vulnerabilityInclude,
       });
+
+      console.log(data);
+      return data;
     }),
 
   // POST /api/vulnerabilities/bulk - Create one or more vulnerabilities

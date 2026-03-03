@@ -368,6 +368,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
   it("GET /deviceArtifacts - Pagination test", async () => {
     // Create multiple device artifacts
+    const cpeName = "dev_art_pagination_";
     const createPromises = Array.from({ length: 5 }, (_, i) =>
       request(BASE_URL)
         .post("/deviceArtifacts")
@@ -375,7 +376,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         .send({
           ...payload,
           description: `Test device artifact ${i}`,
-          cpe: generateCPE(`dev_art_pagination_${i}`),
+          cpe: generateCPE(`${cpeName}${i}`),
         }),
     );
 
@@ -390,6 +391,13 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
           }),
         ),
       );
+      await prisma.deviceGroup.deleteMany({
+        where: {
+          cpe: {
+            contains: cpeName
+          }
+        }
+      });
     });
 
     // Test pagination
@@ -548,6 +556,10 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(deviceArtifactsIntegrationPayload);
+
+    if (integrationRes.status !== 200) {
+      console.log(integrationRes);
+    }
 
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);

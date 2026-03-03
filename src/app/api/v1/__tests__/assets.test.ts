@@ -368,6 +368,10 @@ describe("Assets Endpoint (/assets)", () => {
       .set(jsonHeader)
       .send(assetIntegrationPayload);
 
+    if (integrationRes.status !== 200) {
+      console.log(integrationRes);
+    }
+
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);
     expect(integrationRes.body.updatedItemsCount).toBe(0);

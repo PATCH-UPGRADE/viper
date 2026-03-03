@@ -7,9 +7,10 @@ import { AUTH_TOKEN, BASE_URL, generateCPE } from "./test-config";
 describe("Device Groups Endpoint (/deviceGroups)", () => {
   const authHeader = { Authorization: AUTH_TOKEN };
 
+  const cpeName = "test_asset_v1";
   const assetPayload = {
     ip: "192.168.1.100",
-    cpe: generateCPE("asset_v1"),
+    cpe: generateCPE(cpeName),
     role: "Primary Server",
     upstreamApi: "https://api.hospital-upstream.com/v1",
   };
@@ -62,6 +63,13 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .post("/assets")
       .set(authHeader)
       .send(assetPayload);
+
+    onTestFinished(async () => {
+      await prisma.asset
+        .delete({ where: { id: assetRes.body.id } })
+        .catch(() => {});
+    });
+
     expect(assetRes.status).toBe(200);
     expect(assetRes.body).toHaveProperty("deviceGroup");
 
@@ -176,26 +184,26 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .set(authHeader)
       .send(assetPayload);
 
-    expect(assetRes.status).toBe(200);
-    expect(assetRes.body).toHaveProperty("updatedAt");
-    expect(assetRes.body).toHaveProperty("deviceGroup");
-
     onTestFinished(async () => {
       await prisma.asset
         .delete({ where: { id: assetRes.body.id } })
         .catch(() => {});
     });
 
-    const deviceGroupUpdatedAt = new Date(assetRes.body.updatedAt);
-    const secondsDiff = 5;
-    const start = subSeconds(deviceGroupUpdatedAt, secondsDiff).toISOString();
-    const end = addSeconds(deviceGroupUpdatedAt, secondsDiff).toISOString();
+    expect(assetRes.status).toBe(200);
+    expect(assetRes.body).toHaveProperty("updatedAt");
+    expect(assetRes.body).toHaveProperty("deviceGroup");
+
+    const assetUpdatedAt = new Date(assetRes.body.deviceGroup.updatedAt);
+    const secondsDiff = 0;
+    const updatedAtStartTime = subSeconds(assetUpdatedAt, secondsDiff).toISOString();
+    const updatedAtEndTime = addSeconds(assetUpdatedAt, secondsDiff).toISOString();
 
     const getManyPayload = {
       page: 1,
       pageSize: 10,
-      updatedAtStartTime: start,
-      updatedAtEndTime: end,
+      updatedAtStartTime,
+      updatedAtEndTime,
     };
 
     // Get a list of device groups

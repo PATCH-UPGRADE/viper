@@ -155,6 +155,16 @@ describe("Remediations Endpoint (/remediations)", () => {
       .set(authHeader)
       .send(invalidPayload);
 
+    onTestFinished(async () => {
+      await prisma.deviceGroup.deleteMany({
+        where: {
+          cpe: {
+            contains: invalidPayload.cpes[0]
+          }
+        }
+      });
+    });
+
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("BAD_REQUEST");
   });
@@ -206,6 +216,13 @@ describe("Remediations Endpoint (/remediations)", () => {
         .catch(() => {
           /* already deleted */
         });
+      await prisma.deviceGroup.deleteMany({
+        where: {
+          cpe: {
+            contains: payload.cpes[0]
+          }
+        }
+      });
     });
 
     // Verify the response structure
@@ -282,6 +299,16 @@ describe("Remediations Endpoint (/remediations)", () => {
         cpes: [payload.cpes[0], newCpe],
       });
 
+    onTestFinished(async () => {
+      await prisma.deviceGroup.deleteMany({
+        where: {
+          cpe: {
+            contains: newCpe
+          }
+        }
+      });
+    });
+
     expect(updateCpesRes.status).toBe(200);
 
     // TODO: Remediation PUT now returns { remediation, uploadInstructions }
@@ -306,23 +333,14 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   it("POST /remediations - Create with vulnerability reference", async () => {
     // First create a vulnerability
+    const newCpe = generateCPE("rem_with_vuln_v1");
     const vulnRes = await request(BASE_URL)
       .post("/vulnerabilities")
       .set(authHeader)
-      .send(vulnerabilityPayload);
+      .send({ ...vulnerabilityPayload, cpes: [newCpe] });
 
     expect(vulnRes.status).toBe(200);
     const vulnerabilityId = vulnRes.body.id;
-
-    onTestFinished(async () => {
-      await prisma.vulnerability
-        .delete({
-          where: { id: vulnerabilityId },
-        })
-        .catch(() => {
-          /* already deleted */
-        });
-    });
 
     // Create remediation linked to the vulnerability
     const payloadWithVuln = {
@@ -333,16 +351,31 @@ describe("Remediations Endpoint (/remediations)", () => {
     const createRes = await request(BASE_URL)
       .post("/remediations")
       .set(authHeader)
-      .send(payloadWithVuln);
+      .send({ ...payloadWithVuln, cpes: [newCpe] });
 
+    onTestFinished(async () => {
+      await prisma.vulnerability
+        .delete({
+          where: { id: vulnerabilityId },
+        })
+        .catch(() => {
+          /* already deleted */
+        });
+      await prisma.deviceGroup.deleteMany({
+        where: {
+          cpe: {
+            contains: newCpe
+          }
+        }
+      });
+    });
+
+    if (createRes.status !== 200) {
+      console.log(createRes);
+      console.log("vulnerabilityId:", vulnerabilityId);
+    }
+    
     expect(createRes.status).toBe(200);
-
-    // TODO: Remediation POST now returns { remediation, uploadInstructions }
-    // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
-    createRes.body = createRes.body.remediation;
-
-    expect(createRes.body.vulnerability).toBeDefined();
-    expect(createRes.body.vulnerability?.id).toBe(vulnerabilityId);
 
     onTestFinished(async () => {
       await prisma.remediation
@@ -353,6 +386,13 @@ describe("Remediations Endpoint (/remediations)", () => {
           /* already deleted */
         });
     });
+
+    // TODO: Remediation POST now returns { remediation, uploadInstructions }
+    // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
+    createRes.body = createRes.body.remediation;
+
+    expect(createRes.body.vulnerability).toBeDefined();
+    expect(createRes.body.vulnerability?.id).toBe(vulnerabilityId);
   });
 
   it("POST /remediations - Create with invalid vulnerability ID should fail", async () => {
@@ -429,6 +469,7 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   it("GET /remediations - Pagination test", async () => {
     // Create multiple remediations
+    const cpeName = "rem_pagination_";
     const createPromises = Array.from({ length: 5 }, (_, i) =>
       request(BASE_URL)
         .post("/remediations")
@@ -436,7 +477,7 @@ describe("Remediations Endpoint (/remediations)", () => {
         .send({
           ...payload,
           description: `Test remediation ${i}`,
-          cpes: [generateCPE(`rem_pagination_${i}`)],
+          cpes: [generateCPE(`${cpeName}${i}`)],
         }),
     );
 
@@ -453,6 +494,13 @@ describe("Remediations Endpoint (/remediations)", () => {
           }),
         ),
       );
+      await prisma.deviceGroup.deleteMany({
+        where: {
+          cpe: {
+            contains: cpeName
+          }
+        }
+      });
     });
 
     // Test pagination
@@ -547,6 +595,10 @@ describe("Remediations Endpoint (/remediations)", () => {
       .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(remediationIntegrationPayload);
+
+    if (integrationRes.status !== 200) {
+      console.log(integrationRes);
+    }
 
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);

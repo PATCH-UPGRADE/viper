@@ -110,11 +110,11 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(postAssetRes.status).toBe(200);
     expect(postAssetRes.body).toHaveProperty("id");
 
-    onTestFinished(async () => {
-      await prisma.asset.delete({
-        where: { id: postAssetRes.body.id },
-      });
-    });
+    // onTestFinished(async () => {
+    //   await prisma.asset.delete({
+    //     where: { id: postAssetRes.body.id },
+    //   }).catch(() => {});
+    // });
 
     const res = await request(BASE_URL)
       .post("/vulnerabilities")
@@ -128,6 +128,8 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     const detailRes = await request(BASE_URL)
       .get(`/vulnerabilities/${vulnerabilityId}`)
       .set(authHeader);
+
+    console.log(detailRes);
 
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.id).toBe(vulnerabilityId);
@@ -199,6 +201,10 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(vulnerabilityIntegrationPayload);
+
+    if (integrationRes.status !== 200) {
+      console.log(integrationRes);
+    }
 
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);

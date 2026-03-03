@@ -137,7 +137,6 @@ export const remediationsRouter = createTRPCRouter({
 
       // Verify the vulnerability exists
       if (input.vulnerabilityId) {
-        console.log("requested vulnerabilityId:", input.vulnerabilityId);
         const vuln = await prisma.vulnerability.findUnique({
           where: { id: input.vulnerabilityId },
         });

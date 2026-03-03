@@ -38,7 +38,7 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   const vulnerabilityPayload = {
     sarif: { tool: { driver: { name: "TestScanner" } } },
-    cpes: [generateCPE("rem_v1")],
+    cpes: [generateCPE("rem_vuln_v1")],
     exploitUri: "https://exploit-db.com/5678",
     upstreamApi: "https://nvd.nist.gov/api",
     description: "Mock -- Critical vulnerability requiring remediation",

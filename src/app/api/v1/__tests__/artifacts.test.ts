@@ -45,11 +45,6 @@ describe("Artifacts Endpoint (/artifacts)", () => {
 
     // TODO: Remediation POST now returns { remediation, uploadInstructions }
     // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
-
-    if (res.status === 500) {
-      console.log(res);
-    }
-
     expect(res.status).toBe(200);
     return res.body.remediation;
   };

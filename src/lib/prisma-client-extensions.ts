@@ -171,21 +171,23 @@ const handleUpsertQuery = (
   sendWebhooks(trigger, timestamp);
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: Prisma query/args types vary per model but the webhook logic is identical
 const createWebhookHandlers = (
   createdTrigger: TriggerEnum,
   updatedTrigger: TriggerEnum,
 ) => ({
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma query/args types vary per model but the webhook logic is identical
   async update({ args, query }: { args: any; query: any }) {
     const item = await query(args);
     handleSimpleQuery(updatedTrigger, item.updatedAt);
     return item;
   },
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma query/args types vary per model but the webhook logic is identical
   async updateMany({ args, query }: { args: any; query: any }) {
     const items = await query(args);
     sendWebhooks(updatedTrigger, new Date());
     return items;
   },
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma query/args types vary per model but the webhook logic is identical
   async upsert({ args, query }: { args: any; query: any }) {
     const item = await query(args);
     handleUpsertQuery(
@@ -196,11 +198,13 @@ const createWebhookHandlers = (
     );
     return item;
   },
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma query/args types vary per model but the webhook logic is identical
   async createMany({ args, query }: { args: any; query: any }) {
     const items = await query(args);
     sendWebhooks(createdTrigger, new Date());
     return items;
   },
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma query/args types vary per model but the webhook logic is identical
   async create({ args, query }: { args: any; query: any }) {
     const item = await query(args);
     handleSimpleQuery(createdTrigger, item.createdAt);

@@ -1,7 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ComputerIcon, CpuIcon, FileIcon, PlusIcon, WrenchIcon } from "lucide-react";
+import {
+  ComputerIcon,
+  CpuIcon,
+  FileIcon,
+  PlusIcon,
+  WrenchIcon,
+} from "lucide-react";
 import { type PropsWithChildren, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { AuthenticationFields } from "@/components/auth-form";

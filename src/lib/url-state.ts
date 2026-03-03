@@ -15,7 +15,11 @@ export function createPaginationParams() {
       .withOptions({ clearOnDefault: true }),
     search: parseAsString.withDefault("").withOptions({ clearOnDefault: true }),
     sort: parseAsString.withDefault("").withOptions({ clearOnDefault: true }),
-    lastUpdatedStartTime: parseAsInteger.withOptions({ clearOnDefault: true }),
-    lastUpdatedEndTime: parseAsInteger.withOptions({ clearOnDefault: true }),
+    lastUpdatedStartTime: parseAsString
+      .withDefault("")
+      .withOptions({ clearOnDefault: true }),
+    lastUpdatedEndTime: parseAsString
+      .withDefault("")
+      .withOptions({ clearOnDefault: true }),
   };
 }

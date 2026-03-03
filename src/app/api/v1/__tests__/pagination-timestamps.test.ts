@@ -38,6 +38,7 @@ describe("Pagination timestamp filters (GET /vulnerabilities)", () => {
     });
 
     const afterCreation = Date.now();
+    const afterCreationIso = new Date(afterCreation).toISOString();
 
     const updateRes = await request(BASE_URL)
       .put(`/vulnerabilities/${vuln2Id}`)
@@ -45,7 +46,8 @@ describe("Pagination timestamp filters (GET /vulnerabilities)", () => {
       .send({
         data: {
           ...vulnPayload2,
-          description: "Mock -- Pagination timestamp test vulnerability 2 (updated)",
+          description:
+            "Mock -- Pagination timestamp test vulnerability 2 (updated)",
         },
       });
     expect(updateRes.status).toBe(200);
@@ -55,13 +57,15 @@ describe("Pagination timestamp filters (GET /vulnerabilities)", () => {
       .query({
         page: 1,
         pageSize: 100,
-        lastUpdatedStartTime: afterCreation,
+        lastUpdatedStartTime: afterCreationIso,
       })
       .set(authHeader);
 
     expect(listWithStart.status).toBe(200);
     expect(listWithStart.body).toHaveProperty("items");
-    const idsWithStart = listWithStart.body.items.map((v: { id: string }) => v.id);
+    const idsWithStart = listWithStart.body.items.map(
+      (v: { id: string }) => v.id,
+    );
     expect(idsWithStart).toContain(vuln2Id);
     expect(idsWithStart).not.toContain(vuln1Id);
 
@@ -70,7 +74,7 @@ describe("Pagination timestamp filters (GET /vulnerabilities)", () => {
       .query({
         page: 1,
         pageSize: 100,
-        lastUpdatedEndTime: afterCreation - 1,
+        lastUpdatedEndTime: new Date(afterCreation - 1).toISOString(),
       })
       .set(authHeader);
 

@@ -4,18 +4,20 @@ import { type Integration, ResourceType } from "@/generated/prisma";
 import { authSchema, safeUrlSchema } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
 
+export const resourceTypeSchema = z.enum([
+  "Asset",
+  "Vulnerability",
+  "DeviceArtifact",
+  "Remediation",
+]);
+
 export const integrationInputSchema = authSchema.safeExtend({
   name: z.string().min(1, "Name is required"),
   platform: z.string().optional(),
   integrationUri: safeUrlSchema,
   isGeneric: z.boolean(),
   prompt: z.string().optional(),
-  resourceType: z.enum([
-    "Asset",
-    "Vulnerability",
-    "DeviceArtifact",
-    "Remediation",
-  ]),
+  resourceType: resourceTypeSchema,
   syncEvery: z.number().int().positive().min(60),
 });
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;

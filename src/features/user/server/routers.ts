@@ -59,6 +59,21 @@ export const userRouter = createTRPCRouter({
           //permissions, // server-only
         },
       });
+
+      await prisma.apiKeyConnector.create({
+        data: {
+          name: input.name,
+          resourceType: input.resourceType,
+          lastRequest: data.lastRequest,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+          apiKey: {
+            connect: {
+              id: data.id
+            }
+          }
+        },
+      });
       return data;
     }),
 

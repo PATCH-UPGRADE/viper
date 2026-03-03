@@ -554,7 +554,8 @@ model Apikey {
   permissions         String?
   metadata            String?
 
-  integration Integration?
+  connector           ApiKeyConnector?
+  integration         Integration?
 
   @@map("apikey")
 }
@@ -574,8 +575,10 @@ model Integration {
   authentication         Json?        // TODO: this needs to be encrypted
   syncEvery              Int          // e.g 300, sync every 300 seconds
   syncStatus             SyncStatus[]
+
   apiKeyId               String?      @unique
   apiKey                 Apikey?      @relation(fields: [apiKeyId], references: [id])
+  apiKeyConnector        ApiKeyConnector?
 
   // The user who created the integration
   userId                 String
@@ -599,6 +602,25 @@ model Integration {
   @@map("integration")
 }
 
+// seperate out to preserve between ApiKey rotations
+model ApiKeyConnector {
+  id                  String           @id @default(cuid())
+
+  name                String?
+  resourceType        ResourceType?
+  lastRequest         DateTime?
+  createdAt           DateTime
+  updatedAt           DateTime
+
+  apiKeyId            String?          @unique
+  apiKey              Apikey?          @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+
+  integrationId       String?          @unique
+  integration         Integration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+
+  @@map("api_key_resource_type")
+}
+
 enum SyncStatusEnum {
   Error
   Pending
@@ -616,7 +638,7 @@ model SyncStatus {
   @@map("sync_status")
 }
 
-model Webhook {
+model                                                                                                                                                                                                                                        {
   id             String        @id @default(cuid())
   userId         String
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)

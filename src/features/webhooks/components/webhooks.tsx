@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  BugIcon,
   ComputerIcon,
   CpuIcon,
   FileIcon,
@@ -111,6 +112,22 @@ export const triggerDescriptions = {
       <WrenchIcon size={15} />{" "}
       <span>
         A <b>Remediation</b> is updated
+      </span>
+    </>
+  ),
+  [TriggerEnum.Vulnerability_Created]: (
+    <>
+      <BugIcon size={15} />{" "}
+      <span>
+        A <b>Vulnerability</b> is created
+      </span>
+    </>
+  ),
+  [TriggerEnum.Vulnerability_Updated]: (
+    <>
+      <BugIcon size={15} />{" "}
+      <span>
+        A <b>Vulnerability</b> is updated
       </span>
     </>
   ),

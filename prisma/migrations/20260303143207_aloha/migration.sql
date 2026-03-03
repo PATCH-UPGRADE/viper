@@ -11,6 +11,8 @@ CREATE TYPE "AlohaStatus" AS ENUM ('Confirmed', 'Unsure');
 
 ALTER TYPE "TriggerEnum" ADD VALUE 'Remediation_Created';
 ALTER TYPE "TriggerEnum" ADD VALUE 'Remediation_Updated';
+ALTER TYPE "TriggerEnum" ADD VALUE 'Vulnerability_Created';
+ALTER TYPE "TriggerEnum" ADD VALUE 'Vulnerability_Updated';
 
 -- AlterTable
 ALTER TABLE "remediation" ADD COLUMN     "alohaLog" JSONB NOT NULL DEFAULT '{}',

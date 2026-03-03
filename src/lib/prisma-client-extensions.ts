@@ -231,5 +231,9 @@ export const sendWebhooksExtension = Prisma.defineExtension({
       TriggerEnum.Remediation_Created,
       TriggerEnum.Remediation_Updated,
     ),
+    vulnerability: createWebhookHandlers(
+      TriggerEnum.Vulnerability_Created,
+      TriggerEnum.Vulnerability_Updated,
+    ),
   },
 });

@@ -642,6 +642,8 @@ enum TriggerEnum {
   DeviceGroup_Updated
   Remediation_Created
   Remediation_Updated
+  Vulnerability_Created
+  Vulnerability_Updated
 }
 
 enum AuthType {

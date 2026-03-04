@@ -9,7 +9,6 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
     testTimeout: 60_000,
-    // maxWorkers: 10,
   },
   resolve: {
     alias: {

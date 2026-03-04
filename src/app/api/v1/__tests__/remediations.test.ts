@@ -1,5 +1,4 @@
 import { fail } from "node:assert";
-import { sleep } from "@trpc/server/unstable-core-do-not-import";
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
 import type { ArtifactWrapperWithUrls } from "@/features/artifacts/types";

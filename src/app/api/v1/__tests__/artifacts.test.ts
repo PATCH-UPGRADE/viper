@@ -30,7 +30,7 @@ describe("Artifacts Endpoint (/artifacts)", () => {
 
     onTestFinished(async () => {
       await prisma.remediation
-        .delete({ where: { id: res.body.id } })
+        .delete({ where: { id: res.body.remediation.id } })
         .catch(() => {
           /* already deleted */
         });

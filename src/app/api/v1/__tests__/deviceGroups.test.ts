@@ -33,6 +33,13 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     expect(res.body.code).toBe("UNAUTHORIZED");
   });
 
+  it("GET /deviceGroups/{id}/sbom - Without auth, should be 401", async () => {
+    const res = await request(BASE_URL).get(`/deviceGroups/foo/sbom`);
+
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("UNAUTHORIZED");
+  });
+
   it("GET /deviceGroups/{id} - Without auth, should be 401", async () => {
     const res = await request(BASE_URL).get(`/deviceGroups/foo`);
 

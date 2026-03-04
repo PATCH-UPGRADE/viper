@@ -107,29 +107,28 @@ export const deviceGroupsRouter = createTRPCRouter({
     }),
 
   // GET /api/deviceGroups/{deviceGroupId/sbom} - Get device group SBOM proxied through Helm
-  // WIP
   getDeviceGroupSbom: protectedProcedure
-  .input(z.object({ id: z.string().min(1) }))
-  .meta({
-    openapi: {
-      method: "GET",
-      path: "/deviceGroups/{id}/sbom",
-      tags: ["DeviceGroups"],
-      summary: "Get Device Group SBOM from Helm",
-      description: "Get a single Device Group's SBOM via Helm. Any authenticated user can pull a Device Group's SBOM.",
-    },
-  })
-  .output(helmSbomResponseSchema)
-  .query(async ({ input }) => {
-    try {
-      const data = await fetchSbom(input.id);
-      return data;
-    } catch (error) {
-      console.error("Failed to fetch SBOM: ", error)
-      throw error;
-    }
-  }),
-
+    .input(z.object({ id: z.string().min(1) }))
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/deviceGroups/{id}/sbom",
+        tags: ["DeviceGroups"],
+        summary: "Get Device Group SBOM from Helm",
+        description:
+          "Get a single Device Group's SBOM via Helm. Any authenticated user can pull a Device Group's SBOM.",
+      },
+    })
+    .output(helmSbomResponseSchema)
+    .query(async ({ input }) => {
+      try {
+        const data = await fetchSbom(input.id);
+        return data;
+      } catch (error) {
+        console.error("Failed to fetch SBOM: ", error);
+        throw error;
+      }
+    }),
 
   // PUT /api/deviceGroups/{deviceGroupId} - Update DeviceGroup
   update: protectedProcedure

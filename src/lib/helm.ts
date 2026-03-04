@@ -1,6 +1,6 @@
 import "server-only";
-import type { helmSbomResponseSchema } from "@/features/device-groups/types";
 import { z } from "zod";
+import { helmSbomResponseSchema } from "@/features/device-groups/types";
 
 type helmSbomResponse = z.infer<typeof helmSbomResponseSchema>;
 
@@ -14,6 +14,9 @@ export async function fetchSbom(
     throw new Error("HELM_TOKEN is missing in Viper's environment variables");
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // Max wait of 15 seconds for Helm to respond
+
   const res = await fetch(`${URL}`, {
     method: "POST",
     headers: {
@@ -23,7 +26,9 @@ export async function fetchSbom(
     body: JSON.stringify({
       device_group_id: deviceGroupId,
     }),
+    signal: controller.signal,
   });
+  clearTimeout(timeoutId);
 
   // Helm responds with a different schema for a 404. Normalizing it so that Viper's responses stay consistent.
   if (res.status === 404) {
@@ -38,5 +43,6 @@ export async function fetchSbom(
     throw new Error(`Helm API responded with ${res.status}`);
   }
 
-  return res.json();
+  const json = await res.json();
+  return helmSbomResponseSchema.parse(json);
 }

@@ -37,12 +37,12 @@ export const deviceGroupInputHelmIdSchema = z.object({
 
 export const helmSbomResponseSchema = z.discriminatedUnion("success", [
   z.object({
-  success: z.boolean(),
-  sbom: z.json().nullish(),
-  product_name: z.string().nullish(),
-  version: z.string().nullish(),
-  product_uuid: z.string().nullish(),
-  product_version_uuid: z.string().nullish(),
+    success: z.boolean(),
+    sbom: z.json().nullish(),
+    product_name: z.string().nullish(),
+    version: z.string().nullish(),
+    product_uuid: z.string().nullish(),
+    product_version_uuid: z.string().nullish(),
   }),
   z.object({
     success: z.literal(false),

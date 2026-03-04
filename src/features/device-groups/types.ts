@@ -35,14 +35,21 @@ export const deviceGroupInputHelmIdSchema = z.object({
   helmSbomId: z.string(),
 });
 
-export const helmSbomResponseSchema = z.object({
+export const helmSbomResponseSchema = z.discriminatedUnion("success", [
+  z.object({
   success: z.boolean(),
-  sbom: z.json(),
-  product_name: z.string(),
-  version: z.string(),
-  product_uuid: z.string(),
-  product_version_uuid: z.string(),
-})
+  sbom: z.json().nullish(),
+  product_name: z.string().nullish(),
+  version: z.string().nullish(),
+  product_uuid: z.string().nullish(),
+  product_version_uuid: z.string().nullish(),
+  }),
+  z.object({
+    success: z.literal(false),
+    error_type: z.string(),
+    message: z.string(),
+  }),
+]);
 
 export type DeviceGroupIncludeType = z.infer<typeof deviceGroupSchema>;
 

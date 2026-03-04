@@ -350,36 +350,10 @@ describe("Remediations Endpoint (/remediations)", () => {
       vulnerabilityId,
     };
 
-    sleep(2000);
-
-    const getVuln1 = await request(BASE_URL)
-      .get(`/vulnerabilities/${vulnerabilityId}`)
-      .set(authHeader);
-    if (getVuln1.status !== 200) {
-      console.log(getVuln1);
-    }
-
     const createRes = await request(BASE_URL)
       .post("/remediations")
       .set(authHeader)
       .send(payloadWithVuln);
-
-    const getVuln2 = await request(BASE_URL)
-      .get(`/vulnerabilities/${vulnerabilityId}`)
-      .set(authHeader);
-
-    if (getVuln2.status !== 200) {
-      console.log(getVuln2);
-      console.log("vuln check 2 failed");
-    }
-
-    if (getVuln1.status !== 200) {
-      console.log("vuln check 1 failed", getVuln2.status);
-    }
-
-    console.log("created Vuln status:", vulnRes.status);
-    console.log("VulnId:", vulnerabilityId);
-    console.log("created Rem status:", createRes.status);
 
     onTestFinished(async () => {
       await prisma.vulnerability

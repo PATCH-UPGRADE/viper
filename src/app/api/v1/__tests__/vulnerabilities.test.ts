@@ -39,7 +39,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     authType: AuthType.None,
   };
 
-  const descDeleteKeyWord = "super-mock";
+  const descDeleteKeyWord = "mock-vuln-integration-test";
   const vulnerabilityIntegrationPayload = {
     vendor: "mockVulnIntegrationVendor",
     items: [

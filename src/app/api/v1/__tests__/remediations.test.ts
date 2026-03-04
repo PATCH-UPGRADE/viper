@@ -1,4 +1,5 @@
 import { fail } from "node:assert";
+import { sleep } from "@trpc/server/unstable-core-do-not-import";
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
 import type { ArtifactWrapperWithUrls } from "@/features/artifacts/types";
@@ -333,11 +334,11 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   it("POST /remediations - Create with vulnerability reference", async () => {
     // First create a vulnerability
-    const newCpe = generateCPE("rem_with_vuln_v1");
+    const newCpe = generateCPE("rem_with_vuln_ref_v1");
     const vulnRes = await request(BASE_URL)
       .post("/vulnerabilities")
       .set(authHeader)
-      .send(vulnerabilityPayload);
+      .send({ ...vulnerabilityPayload, cpes: [newCpe] });
 
     expect(vulnRes.status).toBe(200);
     const vulnerabilityId = vulnRes.body.id;
@@ -345,13 +346,40 @@ describe("Remediations Endpoint (/remediations)", () => {
     // Create remediation linked to the vulnerability
     const payloadWithVuln = {
       ...payload,
+      cpes: [newCpe],
       vulnerabilityId,
     };
+
+    sleep(2000);
+
+    const getVuln1 = await request(BASE_URL)
+      .get(`/vulnerabilities/${vulnerabilityId}`)
+      .set(authHeader);
+    if (getVuln1.status !== 200) {
+      console.log(getVuln1);
+    }
 
     const createRes = await request(BASE_URL)
       .post("/remediations")
       .set(authHeader)
       .send(payloadWithVuln);
+
+    const getVuln2 = await request(BASE_URL)
+      .get(`/vulnerabilities/${vulnerabilityId}`)
+      .set(authHeader);
+
+    if (getVuln2.status !== 200) {
+      console.log(getVuln2);
+      console.log("vuln check 2 failed");
+    }
+
+    if (getVuln1.status !== 200) {
+      console.log("vuln check 1 failed", getVuln2.status);
+    }
+
+    console.log("created Vuln status:", vulnRes.status);
+    console.log("VulnId:", vulnerabilityId);
+    console.log("created Rem status:", createRes.status);
 
     onTestFinished(async () => {
       await prisma.vulnerability
@@ -361,13 +389,13 @@ describe("Remediations Endpoint (/remediations)", () => {
         .catch(() => {
           /* already deleted */
         });
-      await prisma.deviceGroup.deleteMany({
-        where: {
-          cpe: {
-            contains: newCpe,
+      await prisma.deviceGroup
+        .delete({
+          where: {
+            cpe: newCpe,
           },
-        },
-      });
+        })
+        .catch(() => {});
     });
 
     expect(createRes.status).toBe(200);

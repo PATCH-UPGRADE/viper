@@ -39,6 +39,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     authType: AuthType.None,
   };
 
+  const descDeleteKeyWord = "super-mock";
   const vulnerabilityIntegrationPayload = {
     vendor: "mockVulnIntegrationVendor",
     items: [
@@ -47,7 +48,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
         cpes: ["cpe:2.3:h:mock:vuln_integration_v10:*:*:*:*:*:*:*"],
         exploitUri: "https://mock-exploit-db.com/vuln-001",
         upstreamApi: "https://mock-vuln-upstream-api.com/",
-        description: "Mock -- Critical buffer overflow in imaging device",
+        description: `${descDeleteKeyWord} -- Critical buffer overflow in imaging device`,
         narrative: "Discovered during security audit",
         impact: "Critical",
         vendorId: "mockVuln-1",
@@ -57,7 +58,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
         cpes: ["cpe:2.3:h:mock:vuln_integration_v11:*:*:*:*:*:*:*"],
         exploitUri: "https://mock-exploit-db.com/vuln-002",
         upstreamApi: "https://mock-vuln-upstream-api.com/",
-        description: "Mock -- Authentication bypass vulnerability",
+        description: `${descDeleteKeyWord} -- Authentication bypass vulnerability`,
         narrative: "Found in network scan",
         impact: "High",
         vendorId: "mockVuln-2",
@@ -182,18 +183,6 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     const { integration: createdIntegration, apiKey } =
       await setupMockIntegration(mockIntegrationPayload);
 
-    onTestFinished(async () => {
-      // this won't throw errors if it misses, which messes up the onTestFinished stack
-      await prisma.vulnerability.deleteMany({
-        where: {
-          description: {
-            contains: "mock",
-            mode: "insensitive" as const,
-          },
-        },
-      });
-    });
-
     const integrationRes = await request(BASE_URL)
       .post("/vulnerabilities/integrationUpload")
       .set({ Authorization: apiKey.key })
@@ -201,6 +190,13 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       .send(vulnerabilityIntegrationPayload);
 
     onTestFinished(async () => {
+      await prisma.vulnerability.deleteMany({
+        where: {
+          description: {
+            contains: descDeleteKeyWord,
+          },
+        },
+      });
       await prisma.deviceGroup.deleteMany({
         where: {
           cpe: {

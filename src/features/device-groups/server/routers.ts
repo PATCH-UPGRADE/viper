@@ -125,7 +125,8 @@ export const deviceGroupsRouter = createTRPCRouter({
       const data = await fetchSbom(input.id);
       return data;
     } catch (error) {
-      throw new Error("Failed to fetch SBOM");
+      console.error("Failed to fetch SBOM: ", error)
+      throw error;
     }
   }),
 

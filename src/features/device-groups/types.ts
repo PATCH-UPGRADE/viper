@@ -35,6 +35,15 @@ export const deviceGroupInputHelmIdSchema = z.object({
   helmSbomId: z.string(),
 });
 
+export const helmSbomResponseSchema = z.object({
+  success: z.boolean(),
+  sbom: z.json(),
+  product_name: z.string(),
+  version: z.string(),
+  product_uuid: z.string(),
+  product_version_uuid: z.string(),
+})
+
 export type DeviceGroupIncludeType = z.infer<typeof deviceGroupSchema>;
 
 export const deviceGroupWithUrlsSchema = deviceGroupSchema.extend({

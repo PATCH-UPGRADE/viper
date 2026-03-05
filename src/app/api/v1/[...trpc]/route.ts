@@ -11,13 +11,6 @@ const handler = (req: NextRequest) => {
     router: appRouter,
     createContext: createOpenApiContext,
     req,
-    // Useful for debugging in development
-    onError: ({ path, error }) => {
-      console.error(
-        `tRPC caught an error with path: [${path}] with error:`,
-        error,
-      );
-    },
   });
 };
 

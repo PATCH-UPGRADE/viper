@@ -45,9 +45,10 @@ export const userRouter = createTRPCRouter({
   createApiToken: protectedProcedure
     .input(apiTokenInputSchema)
     .mutation(async ({ ctx, input }) => {
+      const { name, resourceType } = input;
       const data = await auth.api.createApiKey({
         body: {
-          name: input.name,
+          name,
           expiresIn: input.expiresIn,
           userId: ctx.auth.user.id,
           remaining: 100, // server-only
@@ -62,16 +63,16 @@ export const userRouter = createTRPCRouter({
 
       await prisma.apiKeyConnector.create({
         data: {
-          name: input.name,
-          resourceType: input.resourceType,
+          name,
+          resourceType,
           lastRequest: data.lastRequest,
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
           apiKey: {
             connect: {
-              id: data.id
-            }
-          }
+              id: data.id,
+            },
+          },
         },
       });
       return data;

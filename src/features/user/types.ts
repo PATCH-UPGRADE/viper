@@ -1,5 +1,5 @@
-import { resourceTypeSchema } from "../integrations/types";
 import { z } from "zod";
+import { resourceTypeSchema } from "../integrations/types";
 
 export const apiTokenInputSchema = z.object({
   name: z.string().min(1, "Name is required"),

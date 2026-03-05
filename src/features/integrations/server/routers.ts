@@ -82,17 +82,15 @@ export const integrationsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(integrationInputSchema)
     .mutation(async ({ ctx, input }) => {
+      const { name, resourceType } = input;
       const integrationUser = await prisma.user.create({
         data: {
           id: crypto.randomUUID(),
-          name: input.name,
+          name,
         },
       });
 
-      const apiKey = await createIntegrationApiKey(
-        input.name,
-        integrationUser.id,
-      );
+      const apiKey = await createIntegrationApiKey(name, integrationUser.id);
 
       const integration = await prisma.integration.create({
         data: {
@@ -100,6 +98,16 @@ export const integrationsRouter = createTRPCRouter({
           userId: ctx.auth.user.id,
           integrationUserId: integrationUser.id,
           apiKeyId: apiKey.id,
+          apiKeyConnector: {
+            create: {
+              name,
+              resourceType,
+              lastRequest: apiKey.lastRequest,
+              createdAt: apiKey.createdAt,
+              updatedAt: apiKey.updatedAt,
+              apiKeyId: apiKey.id,
+            },
+          },
         },
         include: integrationsInclude,
       });

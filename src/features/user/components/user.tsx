@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -48,7 +49,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ResourceType, type Apikey } from "@/generated/prisma";
+import { type Apikey, ResourceType } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { handleCopy } from "@/lib/copy";
 import {
@@ -58,7 +59,6 @@ import {
 } from "../hooks/use-user";
 import { useApiTokenParams } from "../hooks/use-user-params";
 import { type ApiTokenFormValues, apiTokenInputSchema } from "../types";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export const ApiTokensSearch = () => {
   const [params, setParams] = useApiTokenParams();
@@ -186,7 +186,10 @@ const ApiTokenCreateModal = ({
 
   const isPending = form.formState.isSubmitting;
   const nullResourceType = "None / Other";
-  const resourceTypeWithOther = [...Object.values(ResourceType), nullResourceType];
+  const resourceTypeWithOther = [
+    ...Object.values(ResourceType),
+    nullResourceType,
+  ];
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -258,32 +261,31 @@ const ApiTokenCreateModal = ({
 
               <FormField
                 control={form.control}
-                
                 name="resourceType"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Use Case</FormLabel>
                     <FormControl>
                       <RadioGroup
-                        onValueChange={(value) =>
-                          field.onChange(value)
-                        }
+                        onValueChange={(value) => field.onChange(value)}
                         value={field.value}
                       >
-                          {Object.values(resourceTypeWithOther).map((type, i) => (
-                            <div key={i} className="flex cursor-pointer gap-x-2 hover:border-primary/50 transition-colors">
+                        {Object.values(resourceTypeWithOther).map((type, i) => (
+                          <div
+                            key={i}
+                            className="flex cursor-pointer gap-x-2 hover:border-primary/50 transition-colors"
+                          >
                             <FormItem key={i} className="">
                               <FormControl>
-                                <RadioGroupItem value={type} className="rounded-lg border-2 border-primary hover:border-primary/50"/>
+                                <RadioGroupItem
+                                  value={type}
+                                  className="rounded-lg border-2 border-primary hover:border-primary/50"
+                                />
                               </FormControl>
-                              
                             </FormItem>
-                            <FormLabel className="">
-                              {type}
-                            </FormLabel>
-                            </div>
-                          ))}
-                          
+                            <FormLabel className="">{type}</FormLabel>
+                          </div>
+                        ))}
                       </RadioGroup>
                     </FormControl>
                     <FormMessage />

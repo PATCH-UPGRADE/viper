@@ -7,6 +7,7 @@ import {
   CpuIcon,
   ExternalLink,
   HeartIcon,
+  type LucideIcon,
   PlugIcon,
   SettingsIcon,
   ShieldCheckIcon,
@@ -33,6 +34,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { useSuspenseConnectors } from "@/features/api-key-connectors/hooks/use-connectors";
+import { ResourceType } from "@/generated/prisma";
 import { NavUser } from "./nav-user";
 import { Separator } from "./ui/separator";
 
@@ -70,41 +73,56 @@ const mainItems = [
   },
 ];
 
-const connectorItems = [
-  {
+interface ConnectorSidebarEntry {
+  title: string;
+  icon: LucideIcon;
+  url: string;
+  count: number;
+}
+
+const connectorItems: { [type: string]: ConnectorSidebarEntry } = {
+  [ResourceType.Asset]: {
     title: "Assets",
     icon: ComputerIcon,
     url: "/connectors/assets",
-    count: 1,
+    count: 0,
   },
-  {
+  [ResourceType.Vulnerability]: {
     title: "Vulnerabilities",
     icon: BugIcon,
     url: "/connectors/vulnerabilities",
-    count: 1,
+    count: 0,
   },
-  {
+  [ResourceType.DeviceArtifact]: {
     title: "Device Artifacts",
     icon: CpuIcon,
     url: "/connectors/deviceArtifacts",
-    count: 1,
+    count: 0,
   },
-  {
+  [ResourceType.Remediation]: {
     title: "Remediations",
     icon: HeartIcon,
     url: "/connectors/remediations",
-    count: 1,
+    count: 0,
   },
-];
-
-const totalConnectors = connectorItems.reduce(
-  (sum, item) => sum + item.count,
-  0,
-);
+};
 
 export const AppSidebar = () => {
   const pathname = usePathname();
   const [connectorsOpen, setConnectorsOpen] = useState(true);
+  const connectorsResult = useSuspenseConnectors();
+
+  let totalConnectors = 0;
+  // counts = [{ resourceType: string, _count: { resourceType: number }}]
+  for (const typeCount of connectorsResult.data.counts) {
+    if (!typeCount.resourceType) {
+      continue;
+    }
+
+    const count = typeCount._count.resourceType;
+    connectorItems[typeCount.resourceType].count = count;
+    totalConnectors = totalConnectors + count;
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -171,7 +189,7 @@ export const AppSidebar = () => {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenu>
-                  {connectorItems.map((item) => (
+                  {Object.values(connectorItems).map((item) => (
                     <SidebarMenuItem key={item.title} className="ml-4">
                       <SidebarMenuButton
                         tooltip={item.title}

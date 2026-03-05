@@ -38,8 +38,9 @@ yarn-error.log*
 # Container-specific
 /docker/env/db.env
 /docker/env/viper.env
-/docker/viper-stamps/
-/docker/pgdata/
+/docker/env/inngest.env
+/docker/viper/viper-stamps/
+/docker/db/pgdata/
 
 # vercel
 .vercel

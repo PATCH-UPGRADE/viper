@@ -10,7 +10,7 @@ services:
       timeout: 5s
       retries: 3
     volumes: 
-      - ./pgdata:/var/lib/postgresql/data
+      - ./db/pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
 
@@ -18,9 +18,19 @@ services:
     build: ./viper
     env_file: ./env/viper.env
     volumes:
-      - ./viper-stamps:/srv/stamps
+      - ./viper/viper-stamps:/srv/stamps
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
+
+  inngest:
+    build: ./inngest
+    env_file: ./env/inngest.env
+    ports:
+      - "8288:8288"
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["inngest dev -u $$INNGEST_BOOTSTRAP_URL"]
+    depends_on:
+      - viper

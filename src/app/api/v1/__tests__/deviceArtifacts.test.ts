@@ -52,7 +52,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     vendor: "mockDeviceArtifactIntegrationVendor",
     items: [
       {
-        cpe: "cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*",
+        cpe: "cpe:2.3:h:mock:dev_art_integration_v10:*:*:*:*:*:*:*",
         role: "mock-deviceArtifact",
         upstreamApi: "https://mock-deviceArtifact-upstream-api.com/",
         description: "Mock -- run apt update",
@@ -66,7 +66,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         ],
       },
       {
-        cpe: "cpe:2.3:h:mock:hispeed_ct_e:*:*:*:*:*:*:*",
+        cpe: "cpe:2.3:h:mock:dev_art_integration_v11:*:*:*:*:*:*:*",
         role: "mock-deviceArtifact",
         upstreamApi: "https://mock-deviceArtifact-upstream-api.com/",
         description: "Mock - Turn it off and on again",
@@ -368,6 +368,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
   it("GET /deviceArtifacts - Pagination test", async () => {
     // Create multiple device artifacts
+    const cpeName = "dev_art_pagination_";
     const createPromises = Array.from({ length: 5 }, (_, i) =>
       request(BASE_URL)
         .post("/deviceArtifacts")
@@ -375,7 +376,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         .send({
           ...payload,
           description: `Test device artifact ${i}`,
-          cpe: generateCPE(`dev_art_pagination_${i}`),
+          cpe: generateCPE(`${cpeName}${i}`),
         }),
     );
 
@@ -390,6 +391,13 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
           }),
         ),
       );
+      await prisma.deviceGroup.deleteMany({
+        where: {
+          cpe: {
+            contains: cpeName,
+          },
+        },
+      });
     });
 
     // Test pagination
@@ -548,6 +556,16 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       .set({ Authorization: apiKey.key })
       .set(jsonHeader)
       .send(deviceArtifactsIntegrationPayload);
+
+    onTestFinished(async () => {
+      await prisma.deviceGroup.deleteMany({
+        where: {
+          cpe: {
+            contains: "dev_art_integration_",
+          },
+        },
+      });
+    });
 
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);

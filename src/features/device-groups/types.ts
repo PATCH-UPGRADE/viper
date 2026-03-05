@@ -43,6 +43,8 @@ export const deviceGroupWithUrlsSchema = deviceGroupSchema.extend({
   vulnerabilitiesUrl: z.string(),
   deviceArtifactsUrl: z.string(),
   assetsUrl: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
 });
 
 export type DeviceGroupWithUrls = z.infer<typeof deviceGroupWithUrlsSchema>;
@@ -71,5 +73,7 @@ export const deviceGroupSelect = {
     vulnerabilitiesUrl: true,
     assetsUrl: true,
     deviceArtifactsUrl: true,
+    createdAt: true,
+    updatedAt: true,
   },
 } as const;

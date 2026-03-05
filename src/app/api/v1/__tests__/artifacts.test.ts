@@ -7,9 +7,10 @@ import { authHeader, BASE_URL, generateCPE } from "./test-config";
 
 describe("Artifacts Endpoint (/artifacts)", () => {
   // Helper function to create a remediation with artifacts for testing
+  const cpeName = "rem_artifact_test";
   const createRemediationWithArtifacts = async () => {
     const payload = {
-      cpes: [generateCPE("artifact_test")],
+      cpes: [generateCPE(cpeName)],
       description: "Test remediation for artifact testing",
       narrative: "Used to test artifact endpoints",
       artifacts: [
@@ -26,6 +27,21 @@ describe("Artifacts Endpoint (/artifacts)", () => {
       .post("/remediations")
       .set(authHeader)
       .send(payload);
+
+    onTestFinished(async () => {
+      await prisma.remediation
+        .delete({ where: { id: res.body.remediation.id } })
+        .catch(() => {
+          /* already deleted */
+        });
+      await prisma.deviceGroup.deleteMany({
+        where: {
+          cpe: {
+            contains: cpeName,
+          },
+        },
+      });
+    });
 
     // TODO: Remediation POST now returns { remediation, uploadInstructions }
     // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place

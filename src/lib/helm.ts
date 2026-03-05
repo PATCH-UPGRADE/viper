@@ -4,6 +4,9 @@ import { helmSbomResponseSchema } from "@/features/device-groups/types";
 
 type helmSbomResponse = z.infer<typeof helmSbomResponseSchema>;
 
+/**
+ * Fetches an SBOM from Helm via the deviceGroupId
+ */
 export async function fetchSbom(
   deviceGroupId: string,
 ): Promise<helmSbomResponse> {

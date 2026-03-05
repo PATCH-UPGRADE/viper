@@ -8,9 +8,9 @@ services:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
     volumes: 
-      - ./db/pgdata:/var/lib/postgresql/data
+      - /srv/pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
 
@@ -18,7 +18,7 @@ services:
     build: ./viper
     env_file: ./env/viper.env
     volumes:
-      - ./viper/viper-stamps:/srv/stamps
+      - /srv/viper-stamps:/srv/stamps
     ports:
       - "3000:3000"
     depends_on:

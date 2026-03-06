@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+.vscode
 
 # debug
 npm-debug.log*
@@ -33,6 +34,13 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+
+# Container-specific
+/docker/env/db.env
+/docker/env/viper.env
+/docker/env/inngest.env
+/docker/viper/viper-stamps/
+/docker/db/pgdata/
 
 # vercel
 .vercel

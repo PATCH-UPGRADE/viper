@@ -1,0 +1,60 @@
+name: Viper
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: docker/db/Dockerfile
+    env_file: docker/env/db.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes: 
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  viper:
+    build:
+      context: .
+      dockerfile: docker/viper/Dockerfile
+    env_file: docker/env/viper.env
+    volumes:
+      - viper-stamps:/srv/stamps
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  inngest:
+    build:
+      context: .
+      dockerfile: docker/inngest/Dockerfile
+    env_file: docker/env/inngest.env
+    ports:
+      - "8288:8288"
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["inngest dev -u $$INNGEST_BOOTSTRAP_URL"]
+    depends_on:
+      - viper
+
+  prisma-studio:
+    build: 
+      context: .
+      dockerfile: docker/viper/Dockerfile
+    env_file: docker/env/viper.env
+    ports:
+      - "5555:5555"
+    profiles:
+      - dev
+    command: ["npx", "prisma", "studio", "--browser", "none"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  viper-stamps:

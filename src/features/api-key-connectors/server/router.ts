@@ -5,10 +5,8 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 const connectorCountResponseSchema = z.object({
   counts: z.array(
     z.object({
-      resourceType: z.string().nullable(), // nulls are filtered out in where clause but make this nullable to keep TS happy
-      _count: z.object({
-        resourceType: z.number(),
-      }),
+      resourceType: z.string(),
+      count: z.number(),
     }),
   ),
 });
@@ -16,19 +14,28 @@ const connectorCountResponseSchema = z.object({
 export const apiKeyConnectorsRouter = createTRPCRouter({
   getManyTypeCountInternal: protectedProcedure
     .output(connectorCountResponseSchema)
-    .query(async () => {
-      const counts = await prisma.apiKeyConnector.groupBy({
+    .query(async ({ ctx }) => {
+      const countsResult = await prisma.apiKeyConnector.groupBy({
         by: ["resourceType"],
         _count: {
           resourceType: true,
         },
         where: {
+          apiKeyId: { not: null },
           resourceType: { not: null },
+          apiKey: {
+            userId: ctx.auth.user.id,
+          },
         },
       });
 
-      return {
-        counts,
-      };
+      const counts = countsResult.map((conn) => {
+        return {
+          resourceType: conn.resourceType as string, // where clause filters out nulls
+          count: conn._count.resourceType,
+        };
+      });
+
+      return { counts };
     }),
 });

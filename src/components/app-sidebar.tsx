@@ -87,12 +87,6 @@ const connectorItems: { [type: string]: ConnectorSidebarEntry } = {
     url: "/connectors/assets",
     count: 0,
   },
-  [ResourceType.Vulnerability]: {
-    title: "Vulnerabilities",
-    icon: BugIcon,
-    url: "/connectors/vulnerabilities",
-    count: 0,
-  },
   [ResourceType.DeviceArtifact]: {
     title: "Device Artifacts",
     icon: CpuIcon,
@@ -105,6 +99,12 @@ const connectorItems: { [type: string]: ConnectorSidebarEntry } = {
     url: "/connectors/remediations",
     count: 0,
   },
+  [ResourceType.Vulnerability]: {
+    title: "Vulnerabilities",
+    icon: BugIcon,
+    url: "/connectors/vulnerabilities",
+    count: 0,
+  },
 };
 
 export const AppSidebar = () => {
@@ -113,13 +113,8 @@ export const AppSidebar = () => {
   const connectorsResult = useSuspenseConnectors();
 
   let totalConnectors = 0;
-  // counts = [{ resourceType: string, _count: { resourceType: number }}]
   for (const typeCount of connectorsResult.data.counts) {
-    if (!typeCount.resourceType) {
-      continue;
-    }
-
-    const count = typeCount._count.resourceType;
+    const count = typeCount.count;
     connectorItems[typeCount.resourceType].count = count;
     totalConnectors = totalConnectors + count;
   }

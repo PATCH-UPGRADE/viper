@@ -1,7 +1,7 @@
 FROM node:trixie as builder
 WORKDIR /srv
-RUN apt-get update && apt-get install -y openssl git
-RUN git clone --branch main https://github.com/PATCH-UPGRADE/viper.git .
+RUN apt-get update && apt-get install -y openssl
+COPY . .
 RUN npm ci
 RUN npx prisma generate
 RUN npm run build

@@ -82,17 +82,15 @@ export const integrationsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(integrationInputSchema)
     .mutation(async ({ ctx, input }) => {
+      const { name, resourceType } = input;
       const integrationUser = await prisma.user.create({
         data: {
           id: crypto.randomUUID(),
-          name: input.name,
+          name,
         },
       });
 
-      const apiKey = await createIntegrationApiKey(
-        input.name,
-        integrationUser.id,
-      );
+      const apiKey = await createIntegrationApiKey(name, integrationUser.id);
 
       const integration = await prisma.integration.create({
         data: {
@@ -100,6 +98,16 @@ export const integrationsRouter = createTRPCRouter({
           userId: ctx.auth.user.id,
           integrationUserId: integrationUser.id,
           apiKeyId: apiKey.id,
+          apiKeyConnector: {
+            create: {
+              name,
+              resourceType,
+              lastRequest: apiKey.lastRequest,
+              createdAt: apiKey.createdAt,
+              updatedAt: apiKey.updatedAt,
+              apiKeyId: apiKey.id,
+            },
+          },
         },
         include: integrationsInclude,
       });
@@ -118,7 +126,12 @@ export const integrationsRouter = createTRPCRouter({
         // Require ownership of integration to rotate an API key
         const integration = await tx.integration.findUniqueOrThrow({
           where: { id: input.id, userId: ctx.auth.user.id },
-          select: { apiKeyId: true, name: true, userId: true },
+          select: {
+            apiKeyId: true,
+            name: true,
+            userId: true,
+            apiKeyConnector: true,
+          },
         });
 
         // Delete the existing API key if it exists
@@ -129,11 +142,17 @@ export const integrationsRouter = createTRPCRouter({
             where: { id: integration.apiKeyId },
           });
         }
-        return { integrationName: integration.name };
+
+        return {
+          integrationName: integration.name,
+          apiKeyConnectorId: integration.apiKeyConnector?.id,
+        };
       });
 
+      const { integrationName, apiKeyConnectorId } = result;
+
       const newApiKey = await createIntegrationApiKey(
-        result.integrationName,
+        integrationName,
         ctx.auth.user.id,
       );
 
@@ -141,6 +160,17 @@ export const integrationsRouter = createTRPCRouter({
         where: { id: input.id },
         data: { apiKeyId: newApiKey.id },
       });
+
+      // integrations should always come with a connector even
+      // if connectors sometimes don't come with integrations
+      if (apiKeyConnectorId) {
+        await prisma.apiKeyConnector.update({
+          where: { id: apiKeyConnectorId },
+          data: {
+            apiKeyId: newApiKey.id,
+          },
+        });
+      }
 
       return { apiKey: newApiKey };
     }),

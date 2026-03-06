@@ -1,3 +1,4 @@
+import { apiKeyConnectorsRouter } from "@/features/api-key-connectors/server/router";
 import { artifactsRouter } from "@/features/artifacts/server/routers";
 import { assetsRouter } from "@/features/assets/server/routers";
 import { deviceArtifactsRouter } from "@/features/device-artifacts/server/routers";
@@ -23,6 +24,7 @@ export const appRouter = createTRPCRouter({
   deviceGroups: deviceGroupsRouter,
   webhooks: webhooksRouter,
   artifacts: artifactsRouter,
+  apiKeyConnectors: apiKeyConnectorsRouter,
 });
 // export type definition of API
 export type AppRouter = typeof appRouter;

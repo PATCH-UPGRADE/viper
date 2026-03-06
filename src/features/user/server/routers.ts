@@ -36,6 +36,13 @@ export const userRouter = createTRPCRouter({
         skip: meta.skip,
         take: meta.take,
         where: whereFilter,
+        include: {
+          connector: {
+            select: {
+              resourceType: true,
+            },
+          },
+        },
         orderBy: { createdAt: "desc" },
       });
 

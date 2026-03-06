@@ -168,6 +168,9 @@ export const ApiTokenSuccessModal = ({
   );
 };
 
+const noResourceType = "Other";
+const resourceTypeWithOther = [...Object.values(ResourceType), noResourceType];
+
 const ApiTokenCreateModal = ({
   form,
   handleCreate,
@@ -185,11 +188,6 @@ const ApiTokenCreateModal = ({
   };
 
   const isPending = form.formState.isSubmitting;
-  const nullResourceType = "None / Other";
-  const resourceTypeWithOther = [
-    ...Object.values(ResourceType),
-    nullResourceType,
-  ];
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -264,13 +262,17 @@ const ApiTokenCreateModal = ({
                 name="resourceType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Use Case</FormLabel>
+                    <FormLabel>API Key Purpose</FormLabel>
                     <FormControl>
                       <RadioGroup
-                        onValueChange={(value) => field.onChange(value)}
+                        onValueChange={(val: string) => {
+                          const newVal =
+                            val === noResourceType ? undefined : val;
+                          field.onChange(newVal);
+                        }}
                         value={field.value}
                       >
-                        {Object.values(resourceTypeWithOther).map((type, i) => (
+                        {resourceTypeWithOther.map((type, i) => (
                           <div
                             key={i}
                             className="flex cursor-pointer gap-x-2 hover:border-primary/50 transition-colors"
@@ -402,7 +404,15 @@ export const ApiTokensEmpty = () => {
   return <EmptyView message="No API tokens" />;
 };
 
-export const ApiTokenItem = ({ data }: { data: Apikey }) => {
+// type ApiKeyWithResourceType = Apikey & {
+//   connector: { resourceType?: string };
+// };
+
+interface ApiKeyWithResourceType extends Apikey {
+  connector?: { resourceType: string | null } | null;
+}
+
+export const ApiTokenItem = ({ data }: { data: ApiKeyWithResourceType }) => {
   const removeApiToken = useRemoveApiToken();
 
   const handleRemove = () => {
@@ -422,16 +432,19 @@ export const ApiTokenItem = ({ data }: { data: Apikey }) => {
         </div>
 
         <div className="text-xs text-muted-foreground mt-4">
-          Created {formatDistanceToNow(data.createdAt, { addSuffix: true })}
+          Purpose: {data.connector?.resourceType ?? "Other"}
         </div>
         <div className="text-xs text-muted-foreground mt-1">
-          Last used{" "}
+          Created: {formatDistanceToNow(data.createdAt, { addSuffix: true })}
+        </div>
+        <div className="text-xs text-muted-foreground mt-1">
+          Last used:{" "}
           {data.lastRequest
             ? formatDistanceToNow(data.lastRequest, { addSuffix: true })
             : "Never"}
         </div>
         <div className="text-xs text-muted-foreground mt-1">
-          Expires{" "}
+          Expires:{" "}
           {data.expiresAt
             ? formatDistanceToNow(data.expiresAt, { addSuffix: true })
             : "Never"}

@@ -550,41 +550,41 @@ model Apikey {
 }
 
 model Integration {
-  id                     String       @id @default(cuid())
+  id                     String            @id @default(cuid())
   name                   String
-  platform               String?      // The name of the integration platform, e.g "BlueFlow"
-  integrationUri         String       @map("integration-uri")
+  platform               String?           // The name of the integration platform, e.g "BlueFlow"
+  integrationUri         String            @map("integration-uri")
   isGeneric              Boolean
   // ^a generic integration uses AI to pull data
   // if generic is false, the integration will respond to one of our endpoints
   //  with structured data
-  prompt                 String?      @db.Text // optional, additional instructions for AI
+  prompt                 String?           @db.Text // optional, additional instructions for AI
   authType               AuthType
   resourceType           ResourceType
-  authentication         Json?        // TODO: this needs to be encrypted
-  syncEvery              Int          // e.g 300, sync every 300 seconds
+  authentication         Json?             // TODO: this needs to be encrypted
+  syncEvery              Int               // e.g 300, sync every 300 seconds
   syncStatus             SyncStatus[]
 
-  apiKeyId               String?      @unique
-  apiKey                 Apikey?      @relation(fields: [apiKeyId], references: [id])
+  apiKeyId               String?           @unique
+  apiKey                 Apikey?           @relation(fields: [apiKeyId], references: [id])
   apiKeyConnector        ApiKeyConnector?
 
   // The user who created the integration
   userId                 String
-  user                   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // the user that this integration creates
   // TODO: should this be required? leaving it optional for migration
   integrationUserId      String?
-  integrationUser        User?        @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
+  integrationUser        User?             @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
 
   assetMappings          ExternalAssetMapping[]
   deviceArtifactMappings ExternalDeviceArtifactMapping[]
   remediationMappings    ExternalRemediationMapping[]
   vulnerabilityMappings  ExternalVulnerabilityMapping[]
 
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
   @@index([userId])
   @@index([integrationUserId])
@@ -607,7 +607,9 @@ model ApiKeyConnector {
   integrationId       String?          @unique
   integration         Integration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
 
-  @@map("api_key_resource_type")
+  @@index([apiKeyId])
+  @@index([integrationId])
+  @@map("api_key_connector")
 }
 
 enum SyncStatusEnum {

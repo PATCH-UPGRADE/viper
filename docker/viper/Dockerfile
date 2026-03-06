@@ -9,8 +9,9 @@ RUN npm run build
 
 FROM node:trixie-slim
 WORKDIR /srv
-RUN apt-get update && apt-get install -y openssl
-COPY --from=builder /srv/ .
+RUN apt-get update && apt-get install -y openssl && mkdir -p /srv/stamps && chown -R node:node /srv 
+COPY --from=builder --chown=node:node /srv/ .
+USER node
 
 EXPOSE 3000
 

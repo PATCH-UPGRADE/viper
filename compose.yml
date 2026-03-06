@@ -50,7 +50,7 @@ services:
       - "5555:5555"
     profiles:
       - dev
-    command: sh -c "npx prisma studio --browser none"
+    command: ["npx", "prisma", "studio", "--browser", "none"]
     depends_on:
       postgres:
         condition: service_healthy

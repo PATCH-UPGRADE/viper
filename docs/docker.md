@@ -1,4 +1,6 @@
 # Deploying Viper with Docker Compose
+- Fill out and rename docker/env files appropriately
+
 - To spin up the core stack (Viper, DB, Inngest):
     - `docker compose up -d`
 

@@ -404,10 +404,6 @@ export const ApiTokensEmpty = () => {
   return <EmptyView message="No API tokens" />;
 };
 
-// type ApiKeyWithResourceType = Apikey & {
-//   connector: { resourceType?: string };
-// };
-
 interface ApiKeyWithResourceType extends Apikey {
   connector?: { resourceType: string | null } | null;
 }

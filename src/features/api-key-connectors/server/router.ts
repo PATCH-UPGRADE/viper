@@ -23,9 +23,8 @@ export const apiKeyConnectorsRouter = createTRPCRouter({
         where: {
           apiKeyId: { not: null },
           resourceType: { not: null },
-          apiKey: {
-            userId: ctx.auth.user.id,
-          },
+          // NOTE: integration keys are owned by the integration user so won't be counted
+          apiKey: { userId: ctx.auth.user.id },
         },
       });
 

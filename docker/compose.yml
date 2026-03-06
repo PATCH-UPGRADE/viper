@@ -34,3 +34,15 @@ services:
     command: ["inngest dev -u $$INNGEST_BOOTSTRAP_URL"]
     depends_on:
       - viper
+
+  prisma-studio:
+    build: ./viper
+    env_file: ./env/viper.env
+    ports:
+      - "5555:5555"
+    profiles:
+      - dev
+    command: sh -c "npx prisma studio --browser none"
+    depends_on:
+      postgres:
+        condition: service_healthy

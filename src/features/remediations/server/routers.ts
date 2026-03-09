@@ -1,4 +1,3 @@
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { AlohaStatus, Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -142,12 +141,7 @@ export const remediationsRouter = createTRPCRouter({
         const vuln = await prisma.vulnerability.findUnique({
           where: { id: input.vulnerabilityId },
         });
-        if (!vuln) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Vulnerability not found",
-          });
-        }
+        requireExistence(vuln, "Vulnerability");
       }
 
       // Create remediation with wrappers and initial artifacts in a transaction

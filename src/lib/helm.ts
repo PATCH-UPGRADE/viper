@@ -4,26 +4,28 @@ import { helmSbomResponseSchema } from "@/features/device-groups/types";
 
 type helmSbomResponse = z.infer<typeof helmSbomResponseSchema>;
 
+const HELM_URL = process.env.HELM_URL;
+const HELM_TOKEN = process.env.HELM_TOKEN;
+const HELM_TIMEOUT = 15 * 1000; // Max wait of 15 seconds for Helm to respond
+
 /**
  * Fetches an SBOM from Helm via the deviceGroupId
  */
 export async function fetchSbom(
   deviceGroupId: string,
 ): Promise<helmSbomResponse> {
-  const API_TOKEN = process.env.HELM_TOKEN;
-  const URL = "https://helm-api.com/api/helm-get-sbom";
 
-  if (!API_TOKEN) {
-    throw new Error("HELM_TOKEN is missing in Viper's environment variables");
+  if (!HELM_URL || !HELM_TOKEN) {
+    throw new Error("HELM URL and/or token missing from Viper's environment variables.");
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000); // Max wait of 15 seconds for Helm to respond
+  const timeoutId = setTimeout(() => controller.abort(), HELM_TIMEOUT);
 
-  const res = await fetch(`${URL}`, {
+  const res = await fetch(`${HELM_URL}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${API_TOKEN}`,
+      Authorization: `Bearer ${HELM_TOKEN}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({

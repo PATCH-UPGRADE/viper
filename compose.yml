@@ -5,7 +5,10 @@ services:
     build:
       context: .
       dockerfile: docker/db/Dockerfile
-    env_file: docker/env/db.env
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=viper
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
@@ -20,7 +23,7 @@ services:
     build:
       context: .
       dockerfile: docker/viper/Dockerfile
-    env_file: docker/env/viper.env
+    env_file: .env
     volumes:
       - viper-stamps:/srv/stamps
     ports:
@@ -33,7 +36,10 @@ services:
     build:
       context: .
       dockerfile: docker/inngest/Dockerfile
-    env_file: docker/env/inngest.env
+    environment:
+      - INNGEST_BOOTSTRAP_URL=http://viper:3000/api/inngest
+      - INNGEST_DEV=true
+      - INNGEST_PORT=8288
     ports:
       - "8288:8288"
     entrypoint: ["/bin/sh", "-c"]
@@ -45,7 +51,7 @@ services:
     build: 
       context: .
       dockerfile: docker/viper/Dockerfile
-    env_file: docker/env/viper.env
+    env_file: .env
     ports:
       - "5555:5555"
     profiles:

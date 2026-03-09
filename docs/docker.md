@@ -1,5 +1,6 @@
 # Deploying Viper with Docker Compose
-- Fill out and rename docker/env files appropriately
+- Take note of the database and inngest env vars in compose.yml and change if necessary
+- Also note the 'Used for containerized environments' section of .env.example
 
 - To spin up the core stack (Viper, DB, Inngest):
     - `docker compose up -d`
@@ -8,7 +9,7 @@
     - `docker compose --profile dev up -d`
 
 - To bring it down
-    - `docker compose down`
+    - `docker compose down` or `docker compose --profile dev down`
 
 - To also clean up volumes (so that the DB will re-seed)
     - `docker compose down -v`

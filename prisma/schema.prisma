@@ -598,14 +598,15 @@ model ApiKeyConnector {
   name                String?
   resourceType        ResourceType?
   lastRequest         DateTime?
-  createdAt           DateTime
-  updatedAt           DateTime
 
   apiKeyId            String?          @unique
   apiKey              Apikey?          @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
 
   integrationId       String?          @unique
   integration         Integration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
   @@index([apiKeyId])
   @@index([integrationId])

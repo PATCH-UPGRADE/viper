@@ -146,31 +146,44 @@ export const integrationsRouter = createTRPCRouter({
         return {
           integrationName: integration.name,
           apiKeyConnectorId: integration.apiKeyConnector?.id,
+          apiKeyLastRequest: integration.apiKeyConnector?.lastRequest
         };
       });
 
-      const { integrationName, apiKeyConnectorId } = result;
+      const { integrationName, apiKeyConnectorId, apiKeyLastRequest } = result;
 
       const newApiKey = await createIntegrationApiKey(
         integrationName,
         ctx.auth.user.id,
       );
 
-      await prisma.integration.update({
-        where: { id: input.id },
-        data: { apiKeyId: newApiKey.id },
-      });
+      const newApiKeyId = newApiKey.id;
 
-      // integrations should always come with a connector even
-      // if connectors sometimes don't come with integrations
-      if (apiKeyConnectorId) {
-        await prisma.apiKeyConnector.update({
-          where: { id: apiKeyConnectorId },
-          data: {
-            apiKeyId: newApiKey.id,
-          },
+      await prisma.$transaction(async () => {
+        await prisma.integration.update({
+          where: { id: input.id },
+          data: { apiKeyId: newApiKeyId },
         });
-      }
+
+        // integrations should always come with a connector even
+        // if connectors sometimes don't come with integrations
+        if (apiKeyConnectorId) {
+          await prisma.apiKeyConnector.update({
+            where: { id: apiKeyConnectorId },
+            data: {
+              apiKeyId: newApiKeyId,
+            },
+          });
+        }
+
+        // pass along any preserved data back to our new key
+        await prisma.apikey.update({
+          where: { id: newApiKeyId },
+          data: {
+            lastRequest: apiKeyLastRequest,
+          }
+        })
+      });
 
       return { apiKey: newApiKey };
     }),

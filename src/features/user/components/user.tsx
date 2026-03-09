@@ -277,7 +277,7 @@ const ApiTokenCreateModal = ({
                             key={i}
                             className="flex cursor-pointer gap-x-2 hover:border-primary/50 transition-colors"
                           >
-                            <FormItem key={i} className="">
+                            <FormItem>
                               <FormControl>
                                 <RadioGroupItem
                                   value={type}
@@ -285,7 +285,7 @@ const ApiTokenCreateModal = ({
                                 />
                               </FormControl>
                             </FormItem>
-                            <FormLabel className="">{type}</FormLabel>
+                            <FormLabel>{type}</FormLabel>
                           </div>
                         ))}
                       </RadioGroup>

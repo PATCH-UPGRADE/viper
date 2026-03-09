@@ -1,5 +1,5 @@
 import "server-only";
-import { z } from "zod";
+import type { z } from "zod";
 import { helmSbomResponseSchema } from "@/features/device-groups/types";
 
 type helmSbomResponse = z.infer<typeof helmSbomResponseSchema>;
@@ -14,9 +14,10 @@ const HELM_TIMEOUT = 15 * 1000; // Max wait of 15 seconds for Helm to respond
 export async function fetchSbom(
   deviceGroupId: string,
 ): Promise<helmSbomResponse> {
-
   if (!HELM_URL || !HELM_TOKEN) {
-    throw new Error("HELM URL and/or token missing from Viper's environment variables.");
+    throw new Error(
+      "HELM URL and/or token missing from Viper's environment variables.",
+    );
   }
 
   const controller = new AbortController();

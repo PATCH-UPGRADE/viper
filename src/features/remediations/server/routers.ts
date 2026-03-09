@@ -280,7 +280,9 @@ export const remediationsRouter = createTRPCRouter({
       },
     })
     .output(remediationAlohaResponseSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await requireOwnership(input.id, ctx.auth.user.id, "remediation");
+
       const rem = await prisma.remediation.update({
         where: { id: input.id },
         data: {

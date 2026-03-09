@@ -82,14 +82,14 @@ Use the `lastUpdatedStartTime` query parameter set to the webhook `timestamp` to
 ### Vulnerabilities
 
 ```http
-GET /api/v1/vulnerabilities?lastUpdatedStartTime=2026-03-03T12:00:00.000Z
+GET /api/v1/vulnerabilities?lastUpdatedStartTime=2026-03-03T12:00:00.000Z&lastUpdatedEndTime=2026-03-03T22:00:00.000Z
 Authorization: Bearer <API_KEY>
 ```
 
 ### Remediations
 
 ```http
-GET /api/v1/remediations?lastUpdatedStartTime=2026-03-03T12:00:00.000Z
+GET /api/v1/remediations?lastUpdatedStartTime=2026-03-03T12:00:00.000Z&lastUpdatedEndTime=2026-03-03T22:00:00.000Z
 Authorization: Bearer <API_KEY>
 ```
 

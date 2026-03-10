@@ -226,7 +226,7 @@ export const IssuesSidebarList = ({
                   <>
                     <div className="flex flex-col gap-1">
                       <p className="font-semibold">
-                        {getAssetRoleLabel(asset?.role)}
+                        {getAssetRoleLabel(asset)}
                       </p>
                       {locationParts.length > 0 && (
                         <p className="text-xs text-muted-foreground">

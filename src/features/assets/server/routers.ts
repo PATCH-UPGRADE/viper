@@ -436,7 +436,7 @@ export const assetsRouter = createTRPCRouter({
       // resolve all device groups in parallel
       const deviceGroupPromises = input.assets.map(async (asset) => {
         const { cpe } = asset;
-        return await cpeToDeviceGroup(cpe);
+        return await cpeToDeviceGroup(cpe ?? UNKNOWN_CPE_STRING);
       });
 
       const deviceGroups = await Promise.all(deviceGroupPromises);
@@ -486,7 +486,9 @@ export const assetsRouter = createTRPCRouter({
           mappingModel: prisma.externalAssetMapping,
           transformInputItem: async (item, userId) => {
             const { cpe, vendorId: _vendorId, ...itemData } = item;
-            const deviceGroup = await cpeToDeviceGroup(cpe);
+            const deviceGroup = await cpeToDeviceGroup(
+              cpe ?? UNKNOWN_CPE_STRING,
+            );
 
             const uniqueFields = [
               "hostname",

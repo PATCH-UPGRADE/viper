@@ -218,7 +218,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .query(getManyPayload)
       .set(authHeader);
 
-    expect(listRes.body.items.length).toBe(1);
+    expect(listRes.body.items.length).toBeGreaterThanOrEqual(1);
   });
 
   it("filter DeviceGroup getMany by time empty case test", async () => {

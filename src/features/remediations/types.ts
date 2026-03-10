@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Prisma } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
+  alohaResponseSchema,
   cpeSchema,
   createIntegrationInputSchema,
   safeUrlSchema,
@@ -101,3 +102,8 @@ export const remediationCardInclude = {
 export type RemediationCard = Prisma.RemediationGetPayload<{
   include: typeof remediationCardInclude;
 }>;
+
+export const remediationAlohaResponseSchema = z.object({
+  remediation: remediationResponseSchema,
+  aloha: alohaResponseSchema,
+});

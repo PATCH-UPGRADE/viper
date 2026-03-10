@@ -37,6 +37,10 @@ export const useCreateIntegration = () => {
             resourceType: data.integration.resourceType,
           }),
         );
+        // Need to recount # of active ApiKey Connectors
+        queryClient.invalidateQueries(
+          trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
+        );
         return data;
       },
       onError: (error) => {
@@ -88,6 +92,10 @@ export const useRemoveIntegration = () => {
           trpc.integrations.getMany.queryOptions({
             resourceType: data.resourceType,
           }),
+        );
+        // Need to recount # of active ApiKey Connectors
+        queryClient.invalidateQueries(
+          trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
         );
         return data;
       },

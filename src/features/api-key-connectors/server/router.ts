@@ -3,6 +3,7 @@ import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
+// { "Asset": 2, "Vulnerability": 5, "Remediation": 3, ... }
 const resourceTypeCountSchema = z.object(
   Object.fromEntries(
     Object.values(ResourceType).map((type) => [type, z.number()]),
@@ -41,12 +42,14 @@ export const apiKeyConnectorsRouter = createTRPCRouter({
       for (const conn of connectors) {
         const type = conn.resourceType as string; // where clause filters out nulls
         totalCount[type] += 1;
-        // active is when lastRequested & apiKey are not null
-        if (conn.lastRequest && conn.apiKeyId) {
+
+        // an active conn is if a key is present and it has been used at least once
+        if (conn.apiKeyId && conn.lastRequest) {
           activeCount[type] += 1;
         }
-        // also count the integration if present
+        // we also count the integration as active if present
         if (conn.integrationId) {
+          activeCount[type] += 1;
           totalCount[type] += 1;
         }
       }

@@ -131,8 +131,6 @@ export const AppSidebar = () => {
     totalActiveConnectors += activeCount;
   }
 
-  console.log(connectorsResult.data)
-
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -219,7 +217,10 @@ export const AppSidebar = () => {
                                   {item.activeCount}
                                 </Badge>
                               </TooltipTrigger>
-                              <TooltipContent className="flex flex-col" animated={false}>
+                              <TooltipContent
+                                className="flex flex-col"
+                                animated={false}
+                              >
                                 <span>Active: {item.activeCount}</span>
                                 <span>Total: {item.totalCount}</span>
                               </TooltipContent>

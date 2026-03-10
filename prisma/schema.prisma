@@ -15,27 +15,28 @@ datasource db {
 }
 
 model User {
-  id              String          @id
-  name            String
-  email           String?
-  emailVerified   Boolean         @default(false)
-  image           String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @default(now()) @updatedAt
-  sessions        Session[]
-  accounts        Account[]
-  workflows       Workflow[]
-  assets          Asset[]
-  vulnerabilities Vulnerability[]
-  remediations    Remediation[]
-  deviceArtifacts DeviceArtifact[]
-  artifacts Artifact[]
-  artifactWrappers ArtifactWrapper[]
+  id                        String           @id
+  name                      String
+  email                     String?
+  emailVerified             Boolean          @default(false)
+  image                     String?
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @default(now()) @updatedAt
+  sessions                  Session[]
+  accounts                  Account[]
+  workflows                 Workflow[]
+  assets                    Asset[]
+  vulnerabilities           Vulnerability[]
+  remediations              Remediation[]
+  deviceArtifacts           DeviceArtifact[]
+  artifacts                 Artifact[]
+  artifactWrappers          ArtifactWrapper[]
 
-  apikeys     Apikey[]
-  integration Integration[]
-  integrationUsers Integration[] @relation("integration_user")
-  webhooks    Webhook[]
+  apikeys                   Apikey[]
+  apiKeyConnectors          ApiKeyConnector[]
+  integration               Integration[]
+  integrationUsers          Integration[]     @relation("integration_user")
+  webhooks                  Webhook[]
 
   @@unique([email])
   @@map("user")
@@ -601,15 +602,17 @@ model ApiKeyConnector {
 
   apiKeyId            String?          @unique
   apiKey              Apikey?          @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
-
   integrationId       String?          @unique
   integration         Integration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  userId              String
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
 
   @@index([apiKeyId])
   @@index([integrationId])
+  @@index([userId])
   @@map("api_key_connector")
 }
 

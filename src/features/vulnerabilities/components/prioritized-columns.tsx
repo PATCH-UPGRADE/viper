@@ -21,6 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { getAssetRoleLabel } from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import type { VulnerabilityWithRelations } from "../types";
 
@@ -119,7 +120,7 @@ export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
   {
     accessorKey: "asset",
     header: "Affected Asset",
-    cell: ({ row }) => row.original.asset.role,
+    cell: ({ row }) => getAssetRoleLabel(row.original.asset),
   },
   {
     accessorKey: "status",

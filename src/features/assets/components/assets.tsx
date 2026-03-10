@@ -57,6 +57,7 @@ import type {
   AssetIssueMetricsCounts,
   AssetWithIssueRelations,
 } from "../types";
+import { getAssetRoleLabel } from "../utils";
 import { AssetDashboardDrawer } from "./asset-drawer";
 import { columns } from "./columns";
 import { assetIssueColumns, dashboardColumns } from "./dashboard-columns";
@@ -328,7 +329,7 @@ export const AssetItem = ({
         <ServerIcon className="size-5 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
-        <AssetDrawer asset={data}>{data.role}</AssetDrawer>
+        <AssetDrawer asset={data}>{getAssetRoleLabel(data)}</AssetDrawer>
         <div className="text-xs text-muted-foreground mt-1">
           {data.ip} &bull;{" "}
           {data.deviceGroup.cpe.split(":").slice(3, 5).join(" ")} &bull; Updated{" "}
@@ -370,7 +371,7 @@ export function AssetDrawer({
   return (
     <EntityDrawer trigger={children} {...props}>
       <DrawerHeader className="gap-1">
-        <DrawerTitle>{asset.role}</DrawerTitle>
+        <DrawerTitle>{getAssetRoleLabel(asset)}</DrawerTitle>
         <DrawerDescription className="flex items-center gap-2">
           <Badge variant="outline">
             <ServerIcon className="size-3 mr-1" />
@@ -392,7 +393,7 @@ export function AssetDrawer({
               <div className="text-xs font-medium text-muted-foreground mb-1">
                 Role
               </div>
-              <div className="text-sm">{asset.role}</div>
+              <div className="text-sm">{getAssetRoleLabel(asset)}</div>
             </div>
 
             <div>

@@ -329,7 +329,7 @@ export const AssetItem = ({
         <ServerIcon className="size-5 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
-        <AssetDrawer asset={data}>{data.role}</AssetDrawer>
+        <AssetDrawer asset={data}>{getAssetRoleLabel(data)}</AssetDrawer>
         <div className="text-xs text-muted-foreground mt-1">
           {data.ip} &bull;{" "}
           {data.deviceGroup.cpe.split(":").slice(3, 5).join(" ")} &bull; Updated{" "}

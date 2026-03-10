@@ -281,6 +281,12 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationAlohaResponseSchema)
     .mutation(async ({ input }) => {
+      const existing = await prisma.remediation.findUnique({
+        where: { id: input.id },
+        select: { id: true },
+      });
+      requireExistence(existing, "Remediation");
+
       const rem = await prisma.remediation.update({
         where: { id: input.id },
         data: {

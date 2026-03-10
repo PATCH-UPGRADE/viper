@@ -40,6 +40,23 @@ describe("Aloha Endpoints", () => {
       expect(res.body.code).toBe("UNAUTHORIZED");
     });
 
+    it("GET with nonexistant id returns 404", async () => {
+      const res = await request(BASE_URL)
+        .get("/vulnerabilities/nonexistent/aloha")
+        .set(authHeader);
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe("NOT_FOUND");
+    });
+
+    it("PUT with nonexistant id returns 404", async () => {
+      const res = await request(BASE_URL)
+        .put("/vulnerabilities/nonexistent/aloha")
+        .set(authHeader)
+        .send({ data: { status: "Unsure" } });
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe("NOT_FOUND");
+    });
+
     it("GET/PUT aloha integration test", async () => {
       const createRes = await request(BASE_URL)
         .post("/vulnerabilities")
@@ -104,6 +121,23 @@ describe("Aloha Endpoints", () => {
         .send({ data: { status: "Unsure" } });
       expect(res.status).toBe(401);
       expect(res.body.code).toBe("UNAUTHORIZED");
+    });
+
+    it("GET with nonexistant id returns 404", async () => {
+      const res = await request(BASE_URL)
+        .get("/remediations/nonexistent/aloha")
+        .set(authHeader);
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe("NOT_FOUND");
+    });
+
+    it("PUT with nonexistant id returns 404", async () => {
+      const res = await request(BASE_URL)
+        .put("/remediations/nonexistent/aloha")
+        .set(authHeader)
+        .send({ data: { status: "Unsure" } });
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe("NOT_FOUND");
     });
 
     it("GET/PUT aloha integration test", async () => {

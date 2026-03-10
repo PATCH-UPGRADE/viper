@@ -402,6 +402,12 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(vulnerabilityAlohaResponseSchema)
     .mutation(async ({ input }) => {
+      const existing = await prisma.vulnerability.findUnique({
+        where: { id: input.id },
+        select: { id: true },
+      });
+      requireExistence(existing, "Vulnerability");
+
       const vuln = await prisma.vulnerability.update({
         where: { id: input.id },
         data: {

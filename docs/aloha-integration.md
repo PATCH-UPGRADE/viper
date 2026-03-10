@@ -1,6 +1,6 @@
 # ALOHA Integration Guide
 
-This document describes the end-to-end workflow for integrating **ALOHA** (the IV&V testing system) with the **VIPER** Vulnerability Management Platform. ALOHA receives event notifications from VIPER via webhooks, queries for new or updated vulnerabilities and remediations, runs independent verification and validation (IV&V) testing, and reports results back through the ALOHA API endpoints.
+This document describes the end-to-end workflow for integrating **ALOHA** (the IV&V testing system) with the **VIPER** Vulnerability Management Platform. ALOHA receives event notifications from VIPER via webhooks, queries for new or updated vulnerabilities and remediations, runs IV&V testing, and reports results back through the VIPER ALOHA API endpoints.
 
 ## Authentication
 
@@ -10,32 +10,7 @@ All VIPER API calls require an API key passed as a Bearer token:
 Authorization: Bearer <API_KEY>
 ```
 
-API keys can be created through the VIPER settings interface or during database seeding. Every request to `/api/v1/*` must include this header.
-
-## Workflow Overview
-
-```mermaid
-sequenceDiagram
-    participant IVV as IV&V Team
-    participant UI as VIPER UI
-    participant VIPER as VIPER API
-    participant ALOHA as ALOHA System
-
-    IVV->>UI: Configure webhook at /settings/webhooks
-    Note over UI: Select triggers:<br/>Vulnerability_Created<br/>Remediation_Created
-
-    rect rgb(240, 240, 240)
-        Note over VIPER,ALOHA: Event-driven flow
-        VIPER->>ALOHA: POST webhook (trigger + timestamp)
-        ALOHA->>VIPER: GET /vulnerabilities?lastUpdatedStartTime=timestamp
-        VIPER-->>ALOHA: Paginated vulnerability list
-        Note over ALOHA: Parse & run IV&V tests
-        ALOHA->>VIPER: PUT /vulnerabilities/{id}/aloha
-        VIPER-->>ALOHA: Updated aloha status
-        ALOHA->>VIPER: GET /vulnerabilities/{id}/aloha (optional)
-        VIPER-->>ALOHA: Confirm persisted status
-    end
-```
+API keys can be created on the VIPER user settings page (`/user/settings`). Every request to `/api/v1/*` must include this header.
 
 ## Step 1: Configure Webhooks in VIPER
 
@@ -47,7 +22,7 @@ The IV&V team configures a webhook in the VIPER frontend to receive notification
    - **Webhook URL**: The ALOHA callback endpoint that will receive event notifications.
    - **Authentication**: Choose an auth type (`None`, `Basic`, `Bearer`, or `Header`) depending on how ALOHA authenticates inbound requests.
    - **Triggers**: Select one or more of the following:
-     - `Vulnerability_Created` -- fires when a new vulnerability is ingested.
+     - `Vulnerability_Created` -- fires when a new vulnerability is created.
      - `Vulnerability_Updated` -- fires when an existing vulnerability is modified.
      - `Remediation_Created` -- fires when a new remediation is created.
      - `Remediation_Updated` -- fires when an existing remediation is modified.
@@ -73,7 +48,7 @@ When a trigger fires, VIPER sends an HTTP `POST` to the configured callback URL.
 | `webhookTrigger` | `string` | The event that fired. One of: `Vulnerability_Created`, `Vulnerability_Updated`, `Remediation_Created`, `Remediation_Updated`. |
 | `timestamp` | `string` (ISO 8601) | The time the database mutation occurred. Use this value for subsequent queries. |
 
-The request includes a `Content-Type: application/json` header and any authentication headers configured on the webhook. VIPER enforces a 30-second timeout on webhook delivery.
+The request includes a `Content-Type: application/json` header and any authentication headers configured on the webhook.
 
 ## Step 3: Query for New or Updated Items
 
@@ -131,7 +106,7 @@ Content-Type: application/json
 }
 ```
 
-`log` has no restrictions and can take any JSON shape
+`log` has no restrictions and can take any JSON shape. The above is only an example.
 
 ### Update remediation ALOHA status
 
@@ -161,7 +136,7 @@ For remediations, "vulnerability" is of course replaced with "remediation".
 
 ## Step 6: Check ALOHA Status
 
-ALOHA can verify the persisted status of any vulnerability or remediation at any time using the GET endpoints.
+ALOHA can verify the status of any vulnerability or remediation at any time using the GET endpoints.
 
 ### Get vulnerability ALOHA status
 

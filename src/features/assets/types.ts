@@ -38,7 +38,7 @@ export const assetInputSchema = z.object({
   status: assetStatusSchema.optional(),
 });
 
-export const updateAssetSchema = assetInputSchema.extend({
+export const updateAssetSchema = assetInputSchema.partial().extend({
   id: z.string(),
 });
 

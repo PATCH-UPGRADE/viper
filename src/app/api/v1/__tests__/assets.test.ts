@@ -192,7 +192,7 @@ describe("Assets Endpoint (/assets)", () => {
     };
 
     const putRes = await request(BASE_URL)
-      .put(`/assets/${assetId}`)
+      .patch(`/assets/${assetId}`)
       .set(authHeader)
       .send(updatePayload);
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { UNKNOWN_CPE_STRING } from "@/config/constants";
 import { IssueStatus, Severity } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
@@ -406,7 +407,7 @@ export const assetsRouter = createTRPCRouter({
     .output(assetResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const { cpe, ...dataInput } = input;
-      const deviceGroup = await cpeToDeviceGroup(cpe);
+      const deviceGroup = await cpeToDeviceGroup(cpe ?? UNKNOWN_CPE_STRING);
       return prisma.asset.create({
         data: {
           ...dataInput,
@@ -542,30 +543,31 @@ export const assetsRouter = createTRPCRouter({
       });
     }),
 
-  // PUT /api/assets/{asset_id} - Update asset (only creator can update)
+  // PATCH /api/assets/{asset_id} - Partial update asset (only creator can update)
   update: protectedProcedure
     .input(updateAssetSchema)
     .meta({
       openapi: {
-        method: "PUT",
+        method: "PATCH",
         path: "/assets/{id}",
         tags: ["Assets"],
         summary: "Update Asset",
         description:
-          "Update an asset. Only the user who created the asset can update it.",
+          "Partially update an asset. Only the user who created the asset can update it.",
       },
     })
     .output(assetResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "asset");
 
       const { id, cpe, ...updateData } = input;
-      const deviceGroup = await cpeToDeviceGroup(cpe);
+      const deviceGroupUpdate = cpe
+        ? { deviceGroupId: (await cpeToDeviceGroup(cpe)).id }
+        : {};
       return prisma.asset.update({
         where: { id },
         data: {
-          deviceGroupId: deviceGroup.id,
+          ...deviceGroupUpdate,
           ...updateData,
         },
         include: assetInclude,

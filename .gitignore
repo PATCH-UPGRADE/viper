@@ -36,9 +36,6 @@ yarn-error.log*
 !.env.example
 
 # Container-specific
-/docker/env/db.env
-/docker/env/viper.env
-/docker/env/inngest.env
 /docker/viper/viper-stamps/
 /docker/db/pgdata/
 

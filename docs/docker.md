@@ -1,6 +1,6 @@
 # Deploying Viper with Docker Compose
 - Take note of the database and inngest env vars in compose.yml and change if necessary
-- Also note the 'Used for containerized environments' section of .env.example
+- Also note the '.db.env.example' and '.env.example' files. You must create '.db.env' and '.env' 
 
 - To spin up the core stack (Viper, DB, Inngest):
     - `docker compose up -d`

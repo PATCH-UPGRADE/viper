@@ -90,22 +90,21 @@ export const integrationsRouter = createTRPCRouter({
         },
       });
 
-      const apiKey = await createIntegrationApiKey(name, integrationUser.id);
+      const intUserId = integrationUser.id;
+      const apiKey = await createIntegrationApiKey(name, intUserId);
 
       const integration = await prisma.integration.create({
         data: {
           ...input,
           userId: ctx.auth.user.id,
-          integrationUserId: integrationUser.id,
+          integrationUserId: intUserId,
           apiKeyId: apiKey.id,
           apiKeyConnector: {
             create: {
               name,
               resourceType,
-              lastRequest: apiKey.lastRequest,
-              createdAt: apiKey.createdAt,
-              updatedAt: apiKey.updatedAt,
               apiKeyId: apiKey.id,
+              userId: intUserId,
             },
           },
         },
@@ -146,11 +145,11 @@ export const integrationsRouter = createTRPCRouter({
         return {
           integrationName: integration.name,
           apiKeyConnectorId: integration.apiKeyConnector?.id,
-          apiKeyLastRequest: integration.apiKeyConnector?.lastRequest
+          lastRequest: integration.apiKeyConnector?.lastRequest,
         };
       });
 
-      const { integrationName, apiKeyConnectorId, apiKeyLastRequest } = result;
+      const { integrationName, apiKeyConnectorId, lastRequest } = result;
 
       const newApiKey = await createIntegrationApiKey(
         integrationName,
@@ -176,13 +175,14 @@ export const integrationsRouter = createTRPCRouter({
           });
         }
 
-        // pass along any preserved data back to our new key
+        // pass back lastRequest to our new key so it can
+        // count as active by default if the old key was
         await prisma.apikey.update({
           where: { id: newApiKeyId },
           data: {
-            lastRequest: apiKeyLastRequest,
-          }
-        })
+            lastRequest,
+          },
+        });
       });
 
       return { apiKey: newApiKey };

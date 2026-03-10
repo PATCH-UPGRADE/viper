@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { RemediationCard } from "@/features/remediations/components/remediations";
 import { type AssetWithIssueRelations, locationSchema } from "../types";
+import { getAssetRoleLabel } from "../utils";
 
 // ============================================================================
 // Types
@@ -47,7 +48,7 @@ function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
   const sections = [
     {
       header: "Device Overview",
-      content: `${asset.role} — ${asset.deviceGroup.cpe}`,
+      content: `${getAssetRoleLabel(asset)} — ${asset.deviceGroup.cpe}`,
     },
     ...(location
       ? [
@@ -172,7 +173,7 @@ function AssetInfoColumn({ asset }: { asset: AssetWithIssueRelations }) {
       items: [
         {
           header: "Role",
-          content: <div className="text-sm">{asset.role}</div>,
+          content: <div className="text-sm">{getAssetRoleLabel(asset)}</div>,
         },
         {
           header: "CPE",
@@ -402,7 +403,7 @@ export function AssetDashboardDrawer({
     <DashboardDrawerShell
       open={open}
       setOpen={setOpen}
-      title={asset.role}
+      title={getAssetRoleLabel(asset)}
       description={description}
       tabs={tabs}
       infoColumn={<AssetInfoColumn asset={asset} />}

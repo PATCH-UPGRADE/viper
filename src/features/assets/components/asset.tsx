@@ -53,6 +53,7 @@ import {
 import type { PaginatedResponse } from "@/lib/pagination";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
+import { getAssetRoleLabel } from "../utils";
 
 export const AssetContainer = ({ children }: { children: React.ReactNode }) => {
   return <EntityContainer>{children}</EntityContainer>;
@@ -312,13 +313,13 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
               <SlashIcon />
             </BreadcrumbSeparator>
             <BreadcrumbItem>
-              <BreadcrumbPage>{asset.role}</BreadcrumbPage>
+              <BreadcrumbPage>{getAssetRoleLabel(asset)}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
 
         <h1 className="text-3xl font-semibold tracking-tight pb-2">
-          {asset.role}
+          {getAssetRoleLabel(asset)}
         </h1>
 
         <div className="flex items-center gap-2">
@@ -346,7 +347,7 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
                   <div className="text-xs font-medium text-muted-foreground mb-1">
                     Role
                   </div>
-                  <div className="text-sm">{asset.role}</div>
+                  <div className="text-sm">{getAssetRoleLabel(asset)}</div>
                 </div>
 
                 <div>

@@ -1,5 +1,6 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
 import "server-only";
+import { UNKNOWN_CPE_STRING } from "@/config/constants";
 import { type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
 import {
   PrismaClientKnownRequestError,
@@ -35,9 +36,10 @@ interface PrismaClientLike {
 // List / Detail view helpers
 // ============================================================================
 
-export async function cpeToDeviceGroup(cpe: string) {
+export async function cpeToDeviceGroup(cpe?: string) {
   // requires: cpe is properly formatted according to cpeSchema
   // outputs: the DeviceGroup model instance that `cpe` specifies (creates a new one if none exist)
+  if (cpe === undefined) cpe = UNKNOWN_CPE_STRING;
 
   // TODO: VW-38 create a cpe naming table here to standardize input
   // when creating a new device group, also populate Manufacturer, model name, version fields

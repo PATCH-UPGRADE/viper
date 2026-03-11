@@ -119,7 +119,7 @@ export function DashboardDrawerShell({
                 <TabsContent
                   key={tab.value}
                   value={tab.value}
-                  className="flex-1 m-0"
+                  className="flex-1 m-0 overflow-hidden"
                 >
                   {tab.rawContent ? (
                     tab.content
@@ -142,16 +142,6 @@ export function DashboardDrawerShell({
       </DrawerContent>
     </Drawer>
   );
-}
-
-// ============================================================================
-// AIChatSection
-// ============================================================================
-
-import { AIChat } from "@/features/chat/components/chat";
-
-export function AIChatSection({ systemPrompt }: { systemPrompt?: string }) {
-  return <AIChat systemPrompt={systemPrompt} />;
 }
 
 // ============================================================================

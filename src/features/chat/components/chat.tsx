@@ -10,10 +10,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { useChatAgent } from "../hooks/use-chat";
+import { USER_ROLES, type UserRole } from "../utils";
 
 const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
   api: {
@@ -32,14 +40,21 @@ const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
 
 interface AIChatProps {
   systemPrompt?: string;
+  suggestedQuestions?: Partial<Record<UserRole, string[]>>;
+  userRole: UserRole;
+  onUserRoleChange: (role: UserRole) => void;
 }
 
-export function AIChat({ systemPrompt }: AIChatProps) {
+export function AIChat({
+  systemPrompt,
+  suggestedQuestions,
+  userRole,
+  onUserRoleChange,
+}: AIChatProps) {
   const { data: session } = authClient.useSession();
   const userId = session?.user?.id;
   const user = session?.user ?? null;
 
-  // technically "dead code" because this should only be used on protected routes
   if (!userId) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -50,7 +65,13 @@ export function AIChat({ systemPrompt }: AIChatProps) {
 
   return (
     <AgentProvider userId={userId} transport={TRANSPORT_CONFIG}>
-      <ChatInner systemPrompt={systemPrompt} user={user} />
+      <ChatInner
+        systemPrompt={systemPrompt}
+        suggestedQuestions={suggestedQuestions}
+        userRole={userRole}
+        onUserRoleChange={onUserRoleChange}
+        user={user}
+      />
     </AgentProvider>
   );
 }
@@ -62,8 +83,17 @@ interface ChatUser {
 
 function ChatInner({
   systemPrompt,
+  suggestedQuestions,
+  userRole,
+  onUserRoleChange,
   user,
-}: { systemPrompt?: string; user: ChatUser | null }) {
+}: {
+  systemPrompt?: string;
+  suggestedQuestions?: Partial<Record<UserRole, string[]>>;
+  userRole: UserRole;
+  onUserRoleChange: (role: UserRole) => void;
+  user: ChatUser | null;
+}) {
   const { messages, sendMessage, status, error, clearError } = useChatAgent({
     systemPrompt,
   });
@@ -71,6 +101,7 @@ function ChatInner({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isDisabled = status !== "ready";
+  const visibleQuestions = suggestedQuestions?.[userRole] ?? [];
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -98,6 +129,21 @@ function ChatInner({
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
             <Bot className="size-8" />
             <p>Ask a question to get started.</p>
+            {visibleQuestions.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-2 mt-3 max-w-md">
+                {visibleQuestions.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={() => sendMessage(q)}
+                    className="rounded-full border bg-background px-3 py-1.5 text-xs text-foreground shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -202,7 +248,7 @@ function ChatInner({
       )}
 
       {/* Input */}
-      <form onSubmit={onSubmit} className="border-t p-4 flex gap-2">
+      <form onSubmit={onSubmit} className="border-t p-4 flex items-center gap-2">
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -219,6 +265,24 @@ function ChatInner({
         <Button type="submit" size="icon" disabled={isDisabled || !input.trim()}>
           <SendHorizontal className="size-4" />
         </Button>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+          <span>Ask as</span>
+          <Select
+            value={userRole}
+            onValueChange={(v) => onUserRoleChange(v as UserRole)}
+          >
+            <SelectTrigger size="sm" className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {USER_ROLES.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </form>
     </div>
   );

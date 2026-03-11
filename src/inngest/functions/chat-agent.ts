@@ -23,6 +23,7 @@ export const chatAgent = inngest.createFunction(
   {
     id: "chat-agent",
     name: "AI Chat Agent",
+    retries: 0,
   },
   { event: "agent/chat.requested" },
   async ({ event, publish }) => {

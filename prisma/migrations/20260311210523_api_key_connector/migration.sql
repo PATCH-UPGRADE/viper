@@ -20,12 +20,6 @@ CREATE UNIQUE INDEX "api_key_connector_apiKeyId_key" ON "api_key_connector"("api
 CREATE UNIQUE INDEX "api_key_connector_integrationId_key" ON "api_key_connector"("integrationId");
 
 -- CreateIndex
-CREATE INDEX "api_key_connector_apiKeyId_idx" ON "api_key_connector"("apiKeyId");
-
--- CreateIndex
-CREATE INDEX "api_key_connector_integrationId_idx" ON "api_key_connector"("integrationId");
-
--- CreateIndex
 CREATE INDEX "api_key_connector_userId_idx" ON "api_key_connector"("userId");
 
 -- AddForeignKey

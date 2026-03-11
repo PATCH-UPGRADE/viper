@@ -1,42 +1,71 @@
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { chatRequestSchema, realtimeRequestSchema } from "../types";
-import { inngest } from "@/inngest/client";
-
 import { getSubscriptionToken } from "@inngest/realtime";
 import { createChannel } from "@/app/api/inngest/realtime";
-
+import { inngest } from "@/inngest/client";
+import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import {
+  chatRequestSchema,
+  chatResponseSchema,
+  realtimeRequestSchema,
+  tokenResponseSchema,
+} from "../types";
 
 export const chatRouter = createTRPCRouter({
   chat: protectedProcedure
     .input(chatRequestSchema)
-    .query(async ({ ctx, input }) => {
-      try {
-        const { userMessage, threadId, channelKey } = input;
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/chat",
+        tags: ["Chat"],
+        summary: "Send Chat Message",
+        description:
+          "Send a user message to the AI chat agent via Inngest realtime.",
+      },
+    })
+    .output(chatResponseSchema)
+    .mutation(async ({ ctx, input }) => {
+      const { userMessage, threadId, channelKey, systemPrompt, history } =
+        input;
 
-        await inngest.send({
-          name: "agent/chat.requested",
-          data: {
-            userMessage,
-            threadId,
-            channelKey,
-            userId: ctx.auth.user.id,
-          },
-        });
-      } catch (error) {
-        console.error(error);
-        throw(error); // who cares
-      }
+      const resolvedThreadId = threadId ?? crypto.randomUUID();
+      const resolvedChannelKey = channelKey ?? ctx.auth.user.id;
+
+      await inngest.send({
+        name: "agent/chat.requested",
+        data: {
+          userMessage,
+          threadId: resolvedThreadId,
+          channelKey: resolvedChannelKey,
+          userId: ctx.auth.user.id,
+          systemPrompt,
+          history,
+        },
+      });
+
+      return { success: true, threadId: resolvedThreadId };
     }),
 
   token: protectedProcedure
-  .input(realtimeRequestSchema)
-  .query(async ({ input }) => {
-      const { channelKey } = input;
-      const token = await getSubscriptionToken(inngest, {
-      channel: createChannel(channelKey),
-      topics: ["agent_stream"],
-    });
+    .input(realtimeRequestSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/realtime/token",
+        tags: ["Chat"],
+        summary: "Get Realtime Token",
+        description:
+          "Generate a subscription token for the Inngest realtime channel.",
+      },
+    })
+    .output(tokenResponseSchema)
+    .mutation(async ({ ctx, input }) => {
+      const resolvedChannelKey = input.channelKey ?? ctx.auth.user.id;
 
-    return token;
-  }),
+      const result = await getSubscriptionToken(inngest, {
+        channel: createChannel(resolvedChannelKey),
+        topics: ["agent_stream"],
+      });
+
+      return result;
+    }),
 });

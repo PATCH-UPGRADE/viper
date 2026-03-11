@@ -342,6 +342,8 @@ export function AssetDashboardDrawer({
     asset.issues.flatMap((i) => i.vulnerability.remediations.map((r) => r.id)),
   ).size;
 
+  const chatSystemPrompt = `You are an AI assistant helping a hospital administrator understand asset "${asset.hostname ?? asset.ip}" (ID: ${asset.id}). Help them assess vulnerabilities, patch status, and clinical impact for this device.`;
+
   const tabs = [
     {
       value: "details",
@@ -353,7 +355,7 @@ export function AssetDashboardDrawer({
       value: "chat",
       label: "AI Chat",
       icon: MessageSquare,
-      content: <AIChatSection />,
+      content: <AIChatSection systemPrompt={chatSystemPrompt} />,
     },
     {
       value: "remediations",

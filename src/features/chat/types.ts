@@ -5,12 +5,29 @@ export const chatRequestSchema = z.object({
     id: z.string(),
     content: z.string(),
     role: z.literal("user"),
+    state: z.record(z.string(), z.unknown()).optional(),
   }),
   threadId: z.string().optional(),
-  channelKey: z.string(),
+  channelKey: z.string().optional(),
+  systemPrompt: z.string().optional(),
+  history: z.array(z.unknown()).optional(),
+  userId: z.string().optional(),
+  clientTimestamp: z.string().optional(),
+});
+
+export const chatResponseSchema = z.object({
+  success: z.boolean(),
+  threadId: z.string(),
 });
 
 export const realtimeRequestSchema = z.object({
   userId: z.string().optional(),
-  channelKey: z.string(),
+  channelKey: z.string().optional(),
+  threadId: z.string().optional(),
+});
+
+export const tokenResponseSchema = z.object({
+  key: z.string(),
+  channel: z.string(),
+  topics: z.array(z.string()),
 });

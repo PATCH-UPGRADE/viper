@@ -1,7 +1,6 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { MessageSquare } from "lucide-react";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -143,16 +142,10 @@ export function DashboardDrawerShell({
 // AIChatSection
 // ============================================================================
 
-// TODO: expand when committing to this design
-export function AIChatSection() {
-  return (
-    <div className="flex items-center justify-center h-full text-muted-foreground">
-      <div className="text-center space-y-2">
-        <MessageSquare className="h-12 w-12 mx-auto opacity-50" />
-        <p className="text-sm">AI Chat coming soon</p>
-      </div>
-    </div>
-  );
+import { AIChat } from "@/features/chat/components/chat";
+
+export function AIChatSection({ systemPrompt }: { systemPrompt?: string }) {
+  return <AIChat systemPrompt={systemPrompt} />;
 }
 
 // ============================================================================

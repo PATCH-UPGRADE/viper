@@ -28,6 +28,8 @@ export const realtimeRequestSchema = z.object({
 
 export const tokenResponseSchema = z.object({
   key: z.string().optional(),
-  channel: z.string(),
+  // TODO: I know this is `any`, but channel gets converted a string in an API response, getSubscriptionToken just refuses to acknowledge that.
+  // and if we don't leave this in typescript will throw  a fit :/
+  channel: z.any(),
   topics: z.array(z.string()),
 });

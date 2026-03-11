@@ -27,8 +27,14 @@ export const chatAgent = inngest.createFunction(
   },
   { event: "agent/chat.requested" },
   async ({ event, publish }) => {
-    const { userMessage, threadId, channelKey, userId, systemPrompt, history } =
-      event.data;
+    const { userMessage, threadId, channelKey, userId, history } = event.data;
+
+    // TODO: useAgent currentlly places system prompt in userMessage state, move that
+    // to event.data
+    const systemPrompt =
+      event.data.systemPrompt ??
+      userMessage?.state?.systemPrompt ??
+      DEFAULT_SYSTEM_PROMPT;
 
     if (!userId) {
       throw new Error("userId is required for chat agent execution");

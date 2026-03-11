@@ -8,6 +8,7 @@ import {
 } from "@inngest/use-agent";
 import { AlertCircle, Bot, Loader2, SendHorizontal, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import Markdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -144,7 +145,7 @@ function ChatMessage({
 
       <div
         className={cn(
-          "max-w-[80%] px-3 py-2 text-sm whitespace-pre-wrap",
+          "markdown max-w-[80%] px-3 py-2 text-sm",
           role === "user"
             ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm"
             : "bg-muted rounded-2xl rounded-bl-sm",
@@ -152,7 +153,7 @@ function ChatMessage({
       >
         {parts.map((part) =>
           part.type === "text" ? (
-            <span key={part.id}>{part.content}</span>
+            <Markdown key={part.id}>{part.content}</Markdown>
           ) : null,
         )}
       </div>

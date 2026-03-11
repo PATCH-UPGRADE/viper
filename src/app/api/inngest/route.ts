@@ -16,5 +16,6 @@ export const { GET, POST, PUT } = serve({
     syncIntegration,
     enrichVulnerability,
     enrichAllVulnerabilities,
+    // TODO:: connect the AI agent function here 
   ],
 });

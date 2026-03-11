@@ -5,57 +5,53 @@
 ```mermaid
 graph TB
     subgraph client ["Client Layer"]
-        ReactFlow["React Flow (XYFlow 12)\nNode-Based Workflow Editor"]
-        ShadcnUI["shadcn/ui + Radix UI\nComponent Library"]
-        TailwindCSS["Tailwind CSS 4\nStyling"]
-        Jotai["Jotai\nGlobal State"]
-        Nuqs["nuqs\nURL State"]
-        TanStackQuery["TanStack Query\nServer State"]
+        ShadcnUI["shadcn/ui + Radix UI<br/>Component Library"]
+        TailwindCSS["Tailwind CSS 4<br/>Styling"]
+        Nuqs["nuqs<br/>URL State"]
+        TanStackQuery["TanStack Query<br/>Server State"]
     end
 
     subgraph framework ["Framework Layer"]
-        NextJS["Next.js 15\nApp Router + Turbopack"]
-        TRPC["tRPC 11\nType-Safe API"]
-        OpenAPI["trpc-to-openapi\nOpenAPI Generation"]
-        BetterAuth["Better Auth\nEmail/Password, Google OAuth, API Keys"]
+        NextJS["Next.js 15<br/>App Router + Turbopack"]
+        TRPC["tRPC 11<br/>Type-Safe API"]
+        OpenAPI["trpc-to-openapi<br/>OpenAPI Generation"]
+        BetterAuth["Better Auth<br/>Email/Password, Google OAuth, API Keys"]
     end
 
     subgraph background ["Background Jobs"]
-        Inngest["Inngest\nDurable Functions"]
-        ChatAgent["Chat Agent\n@inngest/agent-kit"]
-        IntegrationSync["Integration Sync\nScheduled + Event-Driven"]
-        VulnEnrich["Vulnerability Enrichment\nEPSS / KEV"]
+        Inngest["Inngest<br/>Durable Functions"]
+        ChatAgent["Chat Agent<br/>@inngest/agent-kit"]
+        IntegrationSync["Integration Sync<br/>Scheduled + Event-Driven"]
+        VulnEnrich["Vulnerability Enrichment<br/>EPSS / KEV"]
     end
 
     subgraph ai ["AI Providers"]
         VercelAI["Vercel AI SDK"]
-        Anthropic["Anthropic\nClaude"]
-        OpenAIProvider["OpenAI\nGPT"]
-        Google["Google\nGemini"]
+        Anthropic["Anthropic<br/>Claude"]
+        OpenAIProvider["OpenAI<br/>GPT"]
+        Google["Google<br/>Gemini"]
     end
 
     subgraph external ["External Integrations"]
-        N8N["n8n\nWorkflow Automation"]
-        Webhooks["Webhooks\nEvent Push"]
-        ExternalAPI["OpenAPI Consumers\nExternal Providers"]
+        N8N["n8n<br/>Workflow Automation"]
+        Webhooks["Webhooks<br/>Event Push"]
+        ExternalAPI["OpenAPI Consumers<br/>External Providers"]
     end
 
     subgraph data ["Data Layer"]
-        Prisma["Prisma 6\nORM"]
-        PostgreSQL["PostgreSQL 17\nPrimary Database"]
+        Prisma["Prisma 6<br/>ORM"]
+        PostgreSQL["PostgreSQL 17<br/>Primary Database"]
     end
 
     subgraph infra ["Infrastructure"]
-        S3["AWS S3\nArtifact Storage"]
-        Sentry["Sentry\nError Tracking + Monitoring"]
+        S3["AWS S3<br/>Artifact Storage"]
+        Sentry["Sentry<br/>Error Tracking + Monitoring"]
     end
 
     React19["React 19"] --> client
 
-    ReactFlow --> NextJS
     ShadcnUI --> NextJS
     TailwindCSS --> NextJS
-    Jotai --> NextJS
     Nuqs --> NextJS
     TanStackQuery --> TRPC
 
@@ -98,18 +94,18 @@ graph TB
 ```mermaid
 graph LR
     subgraph vercelPath ["Vercel (Cloud)"]
-        VercelPlatform["Vercel\nNext.js Hosting"]
-        NeonDB["Neon / Managed PostgreSQL\nDatabase"]
-        InngestCloud["Inngest Cloud\nBackground Jobs"]
+        VercelPlatform["Vercel<br/>Next.js Hosting"]
+        NeonDB["Neon / Managed PostgreSQL<br/>Database"]
+        InngestCloud["Inngest Cloud<br/>Background Jobs"]
         VercelPlatform --> NeonDB
         VercelPlatform --> InngestCloud
     end
 
     subgraph dockerPath ["Docker Compose (Self-Hosted)"]
-        ViperContainer["viper\nNext.js App (Port 3000)"]
-        InngestContainer["inngest\nDev Server (Port 8288)"]
-        PostgresContainer["postgres\nPostgreSQL 17 (Port 5432)"]
-        PrismaStudio["prisma-studio\nDB GUI (Port 5555, dev profile)"]
+        ViperContainer["viper<br/>Next.js App (Port 3000)"]
+        InngestContainer["inngest<br/>Dev Server (Port 8288)"]
+        PostgresContainer["postgres<br/>PostgreSQL 17 (Port 5432)"]
+        PrismaStudio["prisma-studio<br/>DB GUI (Port 5555, dev profile)"]
         ViperContainer --> PostgresContainer
         ViperContainer --> InngestContainer
         InngestContainer --> ViperContainer

@@ -27,7 +27,7 @@ export const chatAgent = inngest.createFunction(
   },
   { event: "agent/chat.requested" },
   async ({ event, publish }) => {
-    const { userMessage, threadId, channelKey, userId, history } = event.data;
+    const { userMessage, threadId, userId, history } = event.data;
 
     // TODO: useAgent currentlly places system prompt in userMessage state, move that
     // to event.data
@@ -40,7 +40,7 @@ export const chatAgent = inngest.createFunction(
       throw new Error("userId is required for chat agent execution");
     }
 
-    const targetChannel = channelKey ?? userId;
+    const targetChannel = userId;
 
     const model = anthropic({
       model: MODEL_NAME,

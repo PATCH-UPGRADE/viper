@@ -9,11 +9,14 @@ interface UserAvatarProps {
 export function UserAvatar({ user, className }: UserAvatarProps) {
   return (
     <Avatar className={cn("h-8 w-8", className)}>
-      {user?.image && user?.name && (
-        <AvatarImage src={user.image} alt={user.name} />
+      {user?.image && (
+        <AvatarImage
+          src={user.image}
+          alt={user.name?.trim() || "User avatar"}
+        />
       )}
       <AvatarFallback>
-        {user?.name?.substring(0, 1).toUpperCase() ?? "U"}
+        {user?.name?.trim()?.[0]?.toUpperCase() || "U"}
       </AvatarFallback>
     </Avatar>
   );

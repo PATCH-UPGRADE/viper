@@ -6,7 +6,6 @@ import {
   chatRequestSchema,
   chatResponseSchema,
   realtimeRequestSchema,
-  tokenResponseSchema,
 } from "../types";
 
 export const chatRouter = createTRPCRouter({
@@ -57,7 +56,6 @@ export const chatRouter = createTRPCRouter({
           "Generate a subscription token for the Inngest realtime channel.",
       },
     })
-    .output(tokenResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const resolvedChannelKey = input.channelKey ?? ctx.auth.user.id;
 

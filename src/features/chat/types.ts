@@ -27,7 +27,7 @@ export const realtimeRequestSchema = z.object({
 });
 
 export const tokenResponseSchema = z.object({
-  key: z.string(),
+  key: z.string().optional(),
   channel: z.string(),
   topics: z.array(z.string()),
 });

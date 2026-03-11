@@ -5,4 +5,3 @@ export const inngest = new Inngest({
   id: "viper",
   middleware: [realtimeMiddleware()],
 });
-

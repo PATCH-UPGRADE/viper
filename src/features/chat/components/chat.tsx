@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  AgentProvider,
   type AgentError,
+  AgentProvider,
   type AgentStatus,
   type DefaultHttpTransportConfig,
 } from "@inngest/use-agent";
@@ -311,6 +311,7 @@ function ChatInner({
   const isDisabled = status !== "ready";
   const visibleQuestions = suggestedQuestions?.[userRole] ?? [];
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: want new messages to trigger scrolling
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);

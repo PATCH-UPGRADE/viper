@@ -15,11 +15,11 @@ import {
   InfoColumn,
   type InfoColumnSection,
 } from "@/components/dashboard-drawers";
-import { AIChat } from "@/features/chat/components/chat";
-import { buildAssetSystemPrompt, type UserRole } from "@/features/chat/utils";
 import { Badge } from "@/components/ui/badge";
 import { CopyCode } from "@/components/ui/code";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AIChat } from "@/features/chat/components/chat";
+import { buildAssetSystemPrompt, type UserRole } from "@/features/chat/utils";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { RemediationCard } from "@/features/remediations/components/remediations";
 import { type AssetWithIssueRelations, locationSchema } from "../types";

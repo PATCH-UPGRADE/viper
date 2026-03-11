@@ -34,6 +34,8 @@ export interface DrawerTab {
   icon: LucideIcon;
   count?: number;
   content: ReactNode;
+  /** When true, renders content directly without ScrollArea or padding wrapper. */
+  rawContent?: boolean;
 }
 
 export interface InfoColumnSection {
@@ -119,9 +121,13 @@ export function DashboardDrawerShell({
                   value={tab.value}
                   className="flex-1 m-0"
                 >
-                  <ScrollArea className="h-full">
-                    <div className="p-6">{tab.content}</div>
-                  </ScrollArea>
+                  {tab.rawContent ? (
+                    tab.content
+                  ) : (
+                    <ScrollArea className="h-full">
+                      <div className="p-6">{tab.content}</div>
+                    </ScrollArea>
+                  )}
                 </TabsContent>
               ))}
             </Tabs>

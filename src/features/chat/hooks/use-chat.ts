@@ -7,6 +7,9 @@ interface UseChatAgentConfig {
 }
 
 export function useChatAgent(config?: UseChatAgentConfig) {
+  // I love useAgent, this is great. Anyways `agent` this gives you the following
+  // const { messages, sendMessage, status, currentThreadId, switchToThread } = useAgent();
+  // https://agentkit.inngest.com/reference/use-agent#useagent
   const agent = useAgent({
     state: () => ({
       systemPrompt: config?.systemPrompt,

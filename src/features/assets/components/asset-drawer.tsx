@@ -356,6 +356,7 @@ export function AssetDashboardDrawer({
       label: "AI Chat",
       icon: MessageSquare,
       content: <AIChatSection systemPrompt={chatSystemPrompt} />,
+      rawContent: true,
     },
     {
       value: "remediations",

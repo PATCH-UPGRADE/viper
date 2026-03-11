@@ -8,7 +8,6 @@ export const chatRequestSchema = z.object({
     state: z.record(z.string(), z.unknown()).optional(),
   }),
   threadId: z.string().optional(),
-  channelKey: z.string().optional(),
   systemPrompt: z.string().optional(),
   history: z.array(z.unknown()).optional(),
   clientTimestamp: z.string().optional(),
@@ -20,7 +19,6 @@ export const chatResponseSchema = z.object({
 });
 
 export const realtimeRequestSchema = z.object({
-  channelKey: z.string().optional(),
   threadId: z.string().optional(),
 });
 

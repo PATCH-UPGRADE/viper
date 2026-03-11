@@ -24,18 +24,17 @@ export const chatRouter = createTRPCRouter({
     })
     .output(chatResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { userMessage, threadId, channelKey, systemPrompt, history } =
-        input;
+      const { userMessage, threadId, systemPrompt, history } = input;
 
       const resolvedThreadId = threadId ?? crypto.randomUUID();
-      const resolvedChannelKey = channelKey ?? ctx.auth.user.id;
+      const channelKey = ctx.auth.user.id;
 
       await inngest.send({
         name: "agent/chat.requested",
         data: {
           userMessage,
           threadId: resolvedThreadId,
-          channelKey: resolvedChannelKey,
+          channelKey,
           userId: ctx.auth.user.id,
           systemPrompt,
           history,
@@ -58,11 +57,11 @@ export const chatRouter = createTRPCRouter({
       },
     })
     .output(tokenResponseSchema)
-    .mutation(async ({ ctx, input }) => {
-      const resolvedChannelKey = input.channelKey ?? ctx.auth.user.id;
+    .mutation(async ({ ctx }) => {
+      const channelKey = ctx.auth.user.id;
 
       const result = await getSubscriptionToken(inngest, {
-        channel: createChannel(resolvedChannelKey),
+        channel: createChannel(channelKey),
         topics: ["agent_stream"],
       });
 

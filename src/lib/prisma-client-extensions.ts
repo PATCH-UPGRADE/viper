@@ -280,24 +280,27 @@ export const sendWebhooksExtension = Prisma.defineExtension({
   },
 });
 
-// updates the connector.lastRequest when apiKey.lastRequest is updated
-export const updateConnectorExtension = Prisma.defineExtension({
-  query: {
-    apikey: {
-      async update({ args, query }) {
-        const result = await query(args);
+// detects apiKey.lastRequest updates and then updates connector.lastRequest
+export const updateConnectorExtension = Prisma.defineExtension((client) =>
+  client.$extends({
+    name: "updateApiKeyConnectorLastRequest",
+    query: {
+      apikey: {
+        async update({ args, query }) {
+          const result = await query(args);
 
-        // only if lastRequest is part of the api key update
-        const lastRequest = args.data?.lastRequest;
-        if (lastRequest) {
-          await prisma.apiKeyConnector.update({
-            where: { apiKeyId: result.id },
-            data: { lastRequest },
-          });
-        }
+          // only if lastRequest is part of the api key update
+          const lastRequest = args.data?.lastRequest;
+          if (lastRequest) {
+            await prisma.apiKeyConnector.update({
+              where: { apiKeyId: result.id },
+              data: { lastRequest },
+            });
+          }
 
-        return result;
+          return result;
+        },
       },
     },
-  },
-});
+  }),
+);

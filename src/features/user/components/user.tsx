@@ -273,20 +273,18 @@ const ApiTokenCreateModal = ({
                         value={field.value}
                       >
                         {resourceTypeWithOther.map((type, i) => (
-                          <div
+                          <FormItem
                             key={i}
-                            className="flex cursor-pointer gap-x-2 hover:border-primary/50 transition-colors"
+                            className="flex gap-x-2 hover:border-primary/50 transition-colors"
                           >
-                            <FormItem>
-                              <FormControl>
-                                <RadioGroupItem
-                                  value={type}
-                                  className="rounded-lg border-2 border-primary hover:border-primary/50"
-                                />
-                              </FormControl>
-                            </FormItem>
-                            <FormLabel>{type}</FormLabel>
-                          </div>
+                            <FormControl>
+                              <RadioGroupItem
+                                value={type}
+                                className="rounded-lg border-2 border-primary hover:border-primary/50"
+                              />
+                            </FormControl>
+                            <FormLabel htmlFor={type}>{type}</FormLabel>
+                          </FormItem>
                         ))}
                       </RadioGroup>
                     </FormControl>

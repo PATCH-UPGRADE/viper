@@ -88,8 +88,8 @@ export const userRouter = createTRPCRouter({
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "apikey");
 
-      await prisma.$transaction(async () => {
-        const apiKeyResult = await prisma.apikey.findUniqueOrThrow({
+      await prisma.$transaction(async (tx) => {
+        const apiKeyResult = await tx.apikey.findUniqueOrThrow({
           where: { id: input.id },
           select: {
             lastRequest: true,
@@ -105,7 +105,7 @@ export const userRouter = createTRPCRouter({
         // if sometimes a connector doesn't have a key
         if (apiKeyResult.connector) {
           // pass values to the connector before deleting the key
-          await prisma.apiKeyConnector.update({
+          await tx.apiKeyConnector.update({
             where: { id: apiKeyResult.connector.id },
             data: {
               lastRequest: apiKeyResult.lastRequest,

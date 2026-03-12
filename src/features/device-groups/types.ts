@@ -55,7 +55,7 @@ export type DeviceGroupIncludeType = z.infer<typeof deviceGroupSchema>;
 
 export const deviceGroupWithUrlsSchema = deviceGroupSchema.extend({
   url: z.string(),
-  sbomUrl: z.string().nullable(), // TODO: VW-54
+  sbomUrl: z.string().nullable(),
   vulnerabilitiesUrl: z.string(),
   deviceArtifactsUrl: z.string(),
   assetsUrl: z.string(),

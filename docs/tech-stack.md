@@ -147,14 +147,6 @@ erDiagram
     User ||--o{ Account : "has"
     User ||--o{ Apikey : "has"
 
-    %% ── Workflows ──
-    User ||--o{ Workflow : "owns"
-    Workflow ||--o{ Node : "contains"
-    Workflow ||--o{ Connection : "contains"
-    NodeTemplate |o--o{ Node : "templates"
-    Node ||--o{ Connection : "from"
-    Node ||--o{ Connection : "to"
-
     %% ── Hospital Assets (DeviceGroup hierarchy) ──
     User ||--o{ Asset : "owns"
     DeviceGroup ||--o{ Asset : "groups"
@@ -206,7 +198,6 @@ erDiagram
 | Domain | Models | Purpose |
 |---|---|---|
 | **Auth** | User, Session, Account, Verification, Apikey | Better Auth identity, sessions, OAuth accounts, and API key access |
-| **Workflows** | Workflow, Node, NodeTemplate, Connection | Clinical and security workflow definitions in the node-based editor |
 | **Hospital Assets** | Asset, DeviceGroup, DeviceGroupHistory | Medical device inventory grouped by CPE; tracks group membership over time |
 | **Vuln Management** | Vulnerability, Issue, Remediation, IssueRemediation | CVE tracking with CVSS/EPSS/KEV scoring; Issues link a vulnerability to a specific asset; remediations can resolve multiple issues |
 | **Artifacts** | DeviceArtifact, ArtifactWrapper, Artifact | Versioned file uploads (firmware, emulators, docs) linked to device groups or remediations; version chain via self-referencing FK |

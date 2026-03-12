@@ -610,8 +610,6 @@ model ApiKeyConnector {
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
 
-  @@index([apiKeyId])
-  @@index([integrationId])
   @@index([userId])
   @@map("api_key_connector")
 }

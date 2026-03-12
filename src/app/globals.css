@@ -213,6 +213,14 @@
 .markdown {
   line-height: 1.5;
 }
+.markdown h2 {
+  font-size: 1.3rem;
+  margin: 0.5rem 0;
+}
+.markdown h3 {
+  font-size: 1.1rem;
+  margin: 0.5rem 0;
+}
 .markdown p {
   margin: 0.5rem 0;
 }

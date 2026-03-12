@@ -9,9 +9,8 @@ import {
   ServerIcon,
   Wrench,
 } from "lucide-react";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import {
-  AIChatSection,
   DashboardDrawerShell,
   InfoColumn,
   type InfoColumnSection,
@@ -19,6 +18,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CopyCode } from "@/components/ui/code";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AIChat } from "@/features/chat/components/chat";
+import { buildAssetSystemPrompt, type UserRole } from "@/features/chat/utils";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { RemediationCard } from "@/features/remediations/components/remediations";
 import { type AssetWithIssueRelations, locationSchema } from "../types";
@@ -338,9 +339,41 @@ export function AssetDashboardDrawer({
   setOpen,
   children,
 }: AssetDashboardDrawerProps) {
+  const [userRole, setUserRole] = useState<UserRole>("CISO");
+
   const uniqueRemediationCount = new Set(
     asset.issues.flatMap((i) => i.vulnerability.remediations.map((r) => r.id)),
   ).size;
+
+  const chatSystemPrompt = buildAssetSystemPrompt(asset, userRole);
+
+  const suggestedQuestions: Partial<Record<UserRole, string[]>> = {
+    CISO: [
+      "What is the overall risk posture of this asset?",
+      "Are there any compliance implications?",
+      "What is the potential business impact if this asset is compromised?",
+    ],
+    "Clinical Staff": [
+      "How does this asset affect patient care workflows?",
+      "What happens to patient monitoring if this device goes offline?",
+      "Are there any safety risks for patients?",
+    ],
+    "IT staff": [
+      "What patches are available for this asset?",
+      "What is the expected downtime for remediation?",
+      "Are there dependencies on other systems?",
+    ],
+    "hospital administration": [
+      "What is the cost impact of remediating this asset?",
+      "How does this affect our regulatory compliance?",
+      "What is the risk of delaying remediation?",
+    ],
+    "biomedical engineer": [
+      "What firmware versions are affected?",
+      "Are there manufacturer advisories for this device?",
+      "What is the clinical impact of applying this patch?",
+    ],
+  };
 
   const tabs = [
     {
@@ -353,7 +386,15 @@ export function AssetDashboardDrawer({
       value: "chat",
       label: "AI Chat",
       icon: MessageSquare,
-      content: <AIChatSection />,
+      content: (
+        <AIChat
+          systemPrompt={chatSystemPrompt}
+          suggestedQuestions={suggestedQuestions}
+          userRole={userRole}
+          onUserRoleChange={setUserRole}
+        />
+      ),
+      rawContent: true,
     },
     {
       value: "remediations",

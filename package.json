@@ -26,6 +26,8 @@
     "@aws-sdk/client-s3": "^3.995.0",
     "@aws-sdk/s3-request-presigner": "^3.995.0",
     "@hookform/resolvers": "^5.2.2",
+    "@inngest/agent-kit": "^0.13.2",
+    "@inngest/use-agent": "^0.4.0",
     "@paralleldrive/cuid2": "^2.3.1",
     "@polar-sh/better-auth": "^1.1.9",
     "@polar-sh/sdk": "^0.35.4",

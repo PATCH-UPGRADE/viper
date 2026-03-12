@@ -4,7 +4,6 @@ import { EllipsisVertical, LogOutIcon, UserIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +18,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
 import { Skeleton } from "./ui/skeleton";
 
@@ -49,14 +49,7 @@ export function NavUser() {
               {isPending || !user ? (
                 <Skeleton className="h-8 w-8 rounded-lg" />
               ) : (
-                <Avatar className="h-8 w-8 rounded-lg">
-                  {user.image && user.name && (
-                    <AvatarImage src={user.image} alt={user.name} />
-                  )}
-                  <AvatarFallback className="rounded-lg">
-                    {user.name?.substring(0, 1).toUpperCase() ?? "U"}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar user={user} className="rounded-lg" />
               )}
               <div className="grid flex-1 text-left text-sm leading-tight">
                 {isPending || !user ? (

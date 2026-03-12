@@ -1,12 +1,14 @@
 import "server-only";
 import { z } from "zod";
 import prisma from "@/lib/db";
+import { fetchSbom } from "@/lib/helm";
 import { fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 import {
   deviceGroupWithDetailsSchema,
   deviceGroupWithUrlsSchema,
+  helmSbomResponseSchema,
   paginatedDeviceGroupResponseSchema,
   paginationInputWithUpdatedAtFilterFields,
 } from "../types";
@@ -102,6 +104,30 @@ export const deviceGroupsRouter = createTRPCRouter({
         where: { id: input.id },
       });
       return requireExistence(deviceGroup, "DeviceGroup");
+    }),
+
+  // GET /api/deviceGroups/{helmSbomId}/sbom - Get device group SBOM proxied through Helm
+  getDeviceGroupSbom: protectedProcedure
+    .input(z.object({ helmSbomId: z.string().min(1) }))
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/deviceGroups/{helmSbomId}/sbom",
+        tags: ["DeviceGroups"],
+        summary: "Get Device Group SBOM from Helm",
+        description:
+          "Get a single SBOM via Helm using the helmSbomId. Any authenticated user can pull a Device Group's SBOM.",
+      },
+    })
+    .output(helmSbomResponseSchema)
+    .query(async ({ input }) => {
+      try {
+        const data = await fetchSbom(input.helmSbomId);
+        return data;
+      } catch (error) {
+        console.error("Failed to fetch SBOM: ", error);
+        throw error;
+      }
     }),
 
   // PUT /api/deviceGroups/{deviceGroupId} - Update DeviceGroup

@@ -17,9 +17,12 @@ export const deviceGroupExtension = Prisma.defineExtension({
         },
       },
       sbomUrl: {
-        needs: { id: true },
+        needs: { id: true, helmSbomId: true },
         compute(deviceGroup) {
-          return `TODO. ${deviceGroup.id}`; // VW-54
+          if (!deviceGroup.helmSbomId) {
+            return null;
+          }
+          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.helmSbomId}/sbom`;
         },
       },
       vulnerabilitiesUrl: {

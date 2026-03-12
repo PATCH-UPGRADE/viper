@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { integrationAssetInputSchema } from "@/features/assets/types";
 import { integrationDeviceArtifactInputSchema } from "@/features/device-artifacts/types";
-import type { IntegrationWithStringDates } from "@/features/integrations/types";
+import { IntegrationWithSyncStatus, syncStatusIntegrationInclude, type IntegrationWithStringDates } from "@/features/integrations/types";
 import { integrationRemediationInputSchema } from "@/features/remediations/types";
 import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/types";
 import type { ResourceType } from "@/generated/prisma";
@@ -20,12 +20,7 @@ export const syncAllIntegrations = inngest.createFunction(
     // Get all active integrations
     const integrations = await step.run("fetch-integrations", async () => {
       return prisma.integration.findMany({
-        include: {
-          syncStatus: {
-            orderBy: { syncedAt: "desc" },
-            take: 1,
-          },
-        },
+        include: syncStatusIntegrationInclude,
       });
     });
 
@@ -152,7 +147,7 @@ async function syncAiIntegration(
 
 // Helper function for Partner Integration
 async function syncPartnerIntegration(
-  integration: IntegrationWithStringDates,
+  integration: IntegrationWithSyncStatus,
 ): Promise<SyncResult> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -170,7 +165,7 @@ async function syncPartnerIntegration(
     headers,
     signal: AbortSignal.timeout(30000), // 30s timeout
     body: JSON.stringify({
-      last_sync: "TODO", // TODO: VW-36
+      last_sync: integration.syncStatus?.[0]?.syncedAt ?? null,
       page: 1,
       pageSize: 500,
       webhook_url: `${getBaseUrl()}/api/v1${responsePath}`,
@@ -194,6 +189,7 @@ export const syncIntegration = inngest.createFunction(
     const integration = await step.run("fetch-integration", async () => {
       return prisma.integration.findUnique({
         where: { id: integrationId },
+        include: syncStatusIntegrationInclude 
       });
     });
 

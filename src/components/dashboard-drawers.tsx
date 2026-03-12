@@ -1,7 +1,6 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { MessageSquare } from "lucide-react";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +34,8 @@ export interface DrawerTab {
   icon: LucideIcon;
   count?: number;
   content: ReactNode;
+  /** When true, renders content directly without ScrollArea or padding wrapper. */
+  rawContent?: boolean;
 }
 
 export interface InfoColumnSection {
@@ -118,11 +119,15 @@ export function DashboardDrawerShell({
                 <TabsContent
                   key={tab.value}
                   value={tab.value}
-                  className="flex-1 m-0"
+                  className="flex-1 m-0 overflow-hidden"
                 >
-                  <ScrollArea className="h-full">
-                    <div className="p-6">{tab.content}</div>
-                  </ScrollArea>
+                  {tab.rawContent ? (
+                    tab.content
+                  ) : (
+                    <ScrollArea className="h-full">
+                      <div className="p-6">{tab.content}</div>
+                    </ScrollArea>
+                  )}
                 </TabsContent>
               ))}
             </Tabs>
@@ -136,22 +141,6 @@ export function DashboardDrawerShell({
         </ResizablePanelGroup>
       </DrawerContent>
     </Drawer>
-  );
-}
-
-// ============================================================================
-// AIChatSection
-// ============================================================================
-
-// TODO: expand when committing to this design
-export function AIChatSection() {
-  return (
-    <div className="flex items-center justify-center h-full text-muted-foreground">
-      <div className="text-center space-y-2">
-        <MessageSquare className="h-12 w-12 mx-auto opacity-50" />
-        <p className="text-sm">AI Chat coming soon</p>
-      </div>
-    </div>
   );
 }
 

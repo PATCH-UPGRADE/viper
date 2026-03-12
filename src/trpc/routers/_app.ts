@@ -1,6 +1,7 @@
 import { apiKeyConnectorsRouter } from "@/features/api-key-connectors/server/router";
 import { artifactsRouter } from "@/features/artifacts/server/routers";
 import { assetsRouter } from "@/features/assets/server/routers";
+import { chatRouter } from "@/features/chat/server/routers";
 import { deviceArtifactsRouter } from "@/features/device-artifacts/server/routers";
 import { deviceGroupsRouter } from "@/features/device-groups/server/routers";
 import { integrationsRouter } from "@/features/integrations/server/routers";
@@ -24,6 +25,7 @@ export const appRouter = createTRPCRouter({
   deviceGroups: deviceGroupsRouter,
   webhooks: webhooksRouter,
   artifacts: artifactsRouter,
+  chat: chatRouter,
   apiKeyConnectors: apiKeyConnectorsRouter,
 });
 // export type definition of API

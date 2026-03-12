@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Priority } from "@/generated/prisma";
+import { type AlohaStatus, Priority } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
@@ -7,13 +7,14 @@ import {
   fetchPaginated,
   processIntegrationSync,
 } from "@/lib/router-utils";
-import { integrationResponseSchema } from "@/lib/schemas";
+import { alohaInputSchema, integrationResponseSchema } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   integrationVulnerabilityInputSchema,
   paginatedVulnerabilityResponseSchema,
   vulnerabilitiesByPriorityInputSchema,
+  vulnerabilityAlohaResponseSchema,
   vulnerabilityArrayInputSchema,
   vulnerabilityArrayResponseSchema,
   vulnerabilityByPriorityInclude,
@@ -358,6 +359,67 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         },
         include: vulnerabilityInclude,
       });
+    }),
+
+  // GET /api/vulnerabilities/{id}/aloha - Get aloha data for a vulnerability
+  getAloha: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/vulnerabilities/{id}/aloha",
+        tags: ["Vulnerabilities"],
+        summary: "Get Vulnerability Aloha",
+        description:
+          "Get aloha status and log for a vulnerability. Any authenticated user can access.",
+      },
+    })
+    .output(vulnerabilityAlohaResponseSchema)
+    .query(async ({ input }) => {
+      const vuln = await prisma.vulnerability.findUnique({
+        where: { id: input.id },
+        include: vulnerabilityInclude,
+      });
+      const found = requireExistence(vuln, "Vulnerability");
+      return {
+        vulnerability: found,
+        aloha: { status: found.alohaStatus, log: found.alohaLog },
+      };
+    }),
+
+  // PUT /api/vulnerabilities/{id}/aloha - Update aloha data for a vulnerability
+  updateAloha: protectedProcedure
+    .input(z.object({ id: z.string(), data: alohaInputSchema }))
+    .meta({
+      openapi: {
+        method: "PUT",
+        path: "/vulnerabilities/{id}/aloha",
+        tags: ["Vulnerabilities"],
+        summary: "Update Vulnerability Aloha",
+        description:
+          "Update aloha status and log for a vulnerability. Any authenticated user can update.",
+      },
+    })
+    .output(vulnerabilityAlohaResponseSchema)
+    .mutation(async ({ input }) => {
+      const existing = await prisma.vulnerability.findUnique({
+        where: { id: input.id },
+        select: { id: true },
+      });
+      requireExistence(existing, "Vulnerability");
+
+      const vuln = await prisma.vulnerability.update({
+        where: { id: input.id },
+        data: {
+          alohaStatus: input.data.status as AlohaStatus,
+          alohaLog: input.data.log ?? {},
+        },
+        include: vulnerabilityInclude,
+      });
+      return {
+        vulnerability: vuln,
+        aloha: { status: vuln.alohaStatus, log: vuln.alohaLog },
+      };
     }),
 
   getManyByPriorityInternal: protectedProcedure

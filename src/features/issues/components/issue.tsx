@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AssetItem } from "@/features/assets/components/assets";
 import { locationSchema } from "@/features/assets/types";
+import { getAssetRoleLabel } from "@/features/assets/utils";
 import { VulnerabilityItem } from "@/features/vulnerabilities/components/vulnerabilities";
 import { type Issue, IssueStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
@@ -224,7 +225,9 @@ export const IssuesSidebarList = ({
                 ) : (
                   <>
                     <div className="flex flex-col gap-1">
-                      <p className="font-semibold">{asset?.role}</p>
+                      <p className="font-semibold">
+                        {getAssetRoleLabel(asset)}
+                      </p>
                       {locationParts.length > 0 && (
                         <p className="text-xs text-muted-foreground">
                           {locationParts.join(" • ")}

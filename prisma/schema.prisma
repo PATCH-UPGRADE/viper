@@ -205,7 +205,7 @@ model Asset {
   id             String  @id @default(cuid())
   ip             String
   networkSegment String?
-  role           String
+  role           String?
   upstreamApi    String  @map("upstream-api")
 
   hostname     String?
@@ -408,12 +408,17 @@ enum Priority {
   Unsorted
 }
 
+enum AlohaStatus {
+  Confirmed
+  Unsure
+}
+
 model Vulnerability {
   id                   String        @id @default(cuid())
   cveId                String?
-  description          String?       @db.Text
-  narrative            String?       @db.Text
-  impact               String?       @db.Text
+  description          String?       @db.Text // description of vulnerability
+  narrative            String?       @db.Text // how a vulnerability could be exploited
+  impact               String?       @db.Text // clinical impact
   severity             Severity      @default(Medium)
   cvssScore            Float?
   cvssVector           String?
@@ -432,6 +437,9 @@ model Vulnerability {
   updatedInKev         DateTime?     // When KEV status was last checked/updated
 
   priority             Priority      @default(Unsorted)
+
+  alohaStatus AlohaStatus?
+  alohaLog Json @default("{}")
 
   deviceArtifactId     String?
   deviceArtifact       DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
@@ -487,8 +495,8 @@ model Remediation {
   artifacts ArtifactWrapper[]
 
   affectedDeviceGroups DeviceGroup[] @relation("RemediationDeviceGroups")
-  description   String?      @db.Text
-  narrative     String?      @db.Text
+  description   String?      @db.Text // description of remediation
+  narrative     String?      @db.Text // how a remediation can be applied 
   upstreamApi   String?      @map("upstream-api")
 
   vulnerabilityId String?
@@ -498,6 +506,9 @@ model Remediation {
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  alohaStatus AlohaStatus?
+  alohaLog Json @default("{}")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -655,6 +666,10 @@ enum TriggerEnum {
   DeviceArtifact_Updated
   DeviceGroup_Created
   DeviceGroup_Updated
+  Remediation_Created
+  Remediation_Updated
+  Vulnerability_Created
+  Vulnerability_Updated
 }
 
 enum AuthType {

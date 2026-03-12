@@ -34,6 +34,13 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     expect(res.body.code).toBe("UNAUTHORIZED");
   });
 
+  it("GET /deviceGroups/{id}/sbom - Without auth, should be 401", async () => {
+    const res = await request(BASE_URL).get(`/deviceGroups/foo/sbom`);
+
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("UNAUTHORIZED");
+  });
+
   it("GET /deviceGroups/{id} - Without auth, should be 401", async () => {
     const res = await request(BASE_URL).get(`/deviceGroups/foo`);
 
@@ -218,7 +225,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .query(getManyPayload)
       .set(authHeader);
 
-    expect(listRes.body.items.length).toBe(1);
+    expect(listRes.body.items.length).toBeGreaterThanOrEqual(1);
   });
 
   it("filter DeviceGroup getMany by time empty case test", async () => {

@@ -88,6 +88,27 @@ describe("Assets Endpoint (/assets)", () => {
     previous: null,
   };
 
+  it("POST /assets - should create asset with only ip and upstreamApi", async () => {
+    const minimalPayload = {
+      ip: "10.0.0.1",
+      upstreamApi: "https://api.hospital-upstream.com/v1",
+    };
+
+    const res = await request(BASE_URL)
+      .post("/assets")
+      .set(authHeader)
+      .send(minimalPayload);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("id");
+    expect(res.body.ip).toBe(minimalPayload.ip);
+    expect(res.body.role).toBeNull();
+
+    onTestFinished(async () => {
+      await request(BASE_URL).delete(`/assets/${res.body.id}`).set(authHeader);
+    });
+  });
+
   it("POST /assets - Without auth, should get a 401", async () => {
     const res = await request(BASE_URL).post("/assets").send(payload);
 
@@ -171,7 +192,7 @@ describe("Assets Endpoint (/assets)", () => {
     };
 
     const putRes = await request(BASE_URL)
-      .put(`/assets/${assetId}`)
+      .patch(`/assets/${assetId}`)
       .set(authHeader)
       .send(updatePayload);
 

@@ -106,23 +106,23 @@ export const deviceGroupsRouter = createTRPCRouter({
       return requireExistence(deviceGroup, "DeviceGroup");
     }),
 
-  // GET /api/deviceGroups/{deviceGroupId/sbom} - Get device group SBOM proxied through Helm
+  // GET /api/deviceGroups/{helmSbomId}/sbom - Get device group SBOM proxied through Helm
   getDeviceGroupSbom: protectedProcedure
-    .input(z.object({ id: z.string().min(1) }))
+    .input(z.object({ helmSbomId: z.string().min(1) }))
     .meta({
       openapi: {
         method: "GET",
-        path: "/deviceGroups/{id}/sbom",
+        path: "/deviceGroups/{helmSbomId}/sbom",
         tags: ["DeviceGroups"],
         summary: "Get Device Group SBOM from Helm",
         description:
-          "Get a single Device Group's SBOM via Helm. Any authenticated user can pull a Device Group's SBOM.",
+          "Get a single SBOM via Helm using the helmSbomId. Any authenticated user can pull a Device Group's SBOM.",
       },
     })
     .output(helmSbomResponseSchema)
     .query(async ({ input }) => {
       try {
-        const data = await fetchSbom(input.id);
+        const data = await fetchSbom(input.helmSbomId);
         return data;
       } catch (error) {
         console.error("Failed to fetch SBOM: ", error);

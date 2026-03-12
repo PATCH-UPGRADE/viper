@@ -9,10 +9,10 @@ const HELM_TOKEN = process.env.HELM_TOKEN;
 const HELM_TIMEOUT = 15 * 1000; // Max wait of 15 seconds for Helm to respond
 
 /**
- * Fetches an SBOM from Helm via the deviceGroupId
+ * Fetches an SBOM from Helm via the helmSbomId
  */
 export async function fetchSbom(
-  deviceGroupId: string,
+  helmSbomId: string,
 ): Promise<helmSbomResponse> {
   if (!HELM_URL || !HELM_TOKEN) {
     throw new Error(
@@ -30,7 +30,7 @@ export async function fetchSbom(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      device_group_id: deviceGroupId,
+      product_version_uuid: helmSbomId,
     }),
     signal: controller.signal,
   });

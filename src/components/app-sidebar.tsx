@@ -7,6 +7,7 @@ import {
   CpuIcon,
   ExternalLink,
   HeartIcon,
+  type LucideIcon,
   PlugIcon,
   SettingsIcon,
   ShieldCheckIcon,
@@ -33,8 +34,16 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useSuspenseConnectors } from "@/features/api-key-connectors/hooks/use-connectors";
+import { ResourceType } from "@/generated/prisma";
 import { NavUser } from "./nav-user";
 import { Separator } from "./ui/separator";
+import { TooltipProvider } from "./ui/tooltip";
 
 const mainItems = [
   {
@@ -70,41 +79,57 @@ const mainItems = [
   },
 ];
 
-const connectorItems = [
-  {
-    title: "Assets",
-    icon: ComputerIcon,
-    url: "/connectors/assets",
-    count: 1,
-  },
-  {
-    title: "Vulnerabilities",
-    icon: BugIcon,
-    url: "/connectors/vulnerabilities",
-    count: 1,
-  },
-  {
-    title: "Device Artifacts",
-    icon: CpuIcon,
-    url: "/connectors/deviceArtifacts",
-    count: 1,
-  },
-  {
-    title: "Remediations",
-    icon: HeartIcon,
-    url: "/connectors/remediations",
-    count: 1,
-  },
-];
-
-const totalConnectors = connectorItems.reduce(
-  (sum, item) => sum + item.count,
-  0,
-);
+interface ConnectorSidebarEntry {
+  title: string;
+  icon: LucideIcon;
+  url: string;
+  activeCount: number;
+  totalCount: number;
+}
 
 export const AppSidebar = () => {
   const pathname = usePathname();
   const [connectorsOpen, setConnectorsOpen] = useState(true);
+  const connectorsResult = useSuspenseConnectors();
+
+  const connectorItems: { [type: string]: ConnectorSidebarEntry } = {
+    [ResourceType.Asset]: {
+      title: "Assets",
+      icon: ComputerIcon,
+      url: "/connectors/assets",
+      activeCount: 0,
+      totalCount: 0,
+    },
+    [ResourceType.DeviceArtifact]: {
+      title: "Device Artifacts",
+      icon: CpuIcon,
+      url: "/connectors/deviceArtifacts",
+      activeCount: 0,
+      totalCount: 0,
+    },
+    [ResourceType.Remediation]: {
+      title: "Remediations",
+      icon: HeartIcon,
+      url: "/connectors/remediations",
+      activeCount: 0,
+      totalCount: 0,
+    },
+    [ResourceType.Vulnerability]: {
+      title: "Vulnerabilities",
+      icon: BugIcon,
+      url: "/connectors/vulnerabilities",
+      activeCount: 0,
+      totalCount: 0,
+    },
+  };
+
+  let totalActiveConnectors = 0;
+  for (const type of Object.values(ResourceType)) {
+    const activeCount = connectorsResult.data.activeCount[type];
+    connectorItems[type].activeCount = activeCount;
+    connectorItems[type].totalCount = connectorsResult.data.totalCount[type];
+    totalActiveConnectors += activeCount;
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -161,7 +186,7 @@ export const AppSidebar = () => {
                   <PlugIcon className="size-4" aria-hidden="true" />
                   <span>Connectors</span>
                   <Badge variant="secondary" className="ml-auto mr-1 text-xs">
-                    {totalConnectors}
+                    {totalActiveConnectors}
                   </Badge>
                   <ChevronDownIcon
                     className="size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/connectors:rotate-180"
@@ -171,7 +196,7 @@ export const AppSidebar = () => {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenu>
-                  {connectorItems.map((item) => (
+                  {Object.values(connectorItems).map((item) => (
                     <SidebarMenuItem key={item.title} className="ml-4">
                       <SidebarMenuButton
                         tooltip={item.title}
@@ -182,12 +207,25 @@ export const AppSidebar = () => {
                         <Link href={item.url} prefetch>
                           <item.icon className="size-4" aria-hidden="true" />
                           <span>{item.title}</span>
-                          {/*<Badge
-                            variant="secondary"
-                            className="ml-auto text-xs"
-                          >
-                            {item.count}
-                          </Badge>*/}
+                          <TooltipProvider delayDuration={500}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  variant="secondary"
+                                  className="ml-auto text-xs"
+                                >
+                                  {item.activeCount}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent
+                                className="flex flex-col"
+                                animated={false}
+                              >
+                                <span>Active: {item.activeCount}</span>
+                                <span>Total: {item.totalCount}</span>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

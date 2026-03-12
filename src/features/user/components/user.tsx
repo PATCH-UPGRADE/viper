@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -48,7 +49,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { Apikey } from "@/generated/prisma";
+import { type Apikey, ResourceType } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { handleCopy } from "@/lib/copy";
 import {
@@ -167,6 +168,9 @@ export const ApiTokenSuccessModal = ({
   );
 };
 
+const noResourceType = "Other";
+const resourceTypeWithOther = [...Object.values(ResourceType), noResourceType];
+
 const ApiTokenCreateModal = ({
   form,
   handleCreate,
@@ -252,6 +256,43 @@ const ApiTokenCreateModal = ({
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="resourceType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>API Key Purpose</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={(val: string) => {
+                          const newVal =
+                            val === noResourceType ? undefined : val;
+                          field.onChange(newVal);
+                        }}
+                        value={field.value}
+                      >
+                        {resourceTypeWithOther.map((type, i) => (
+                          <FormItem
+                            key={i}
+                            className="flex gap-x-2 hover:border-primary/50 transition-colors"
+                          >
+                            <FormControl>
+                              <RadioGroupItem
+                                value={type}
+                                className="rounded-lg border-2 border-primary hover:border-primary/50"
+                              />
+                            </FormControl>
+                            <FormLabel htmlFor={type}>{type}</FormLabel>
+                          </FormItem>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <Button type="submit" className="w-full" disabled={isPending}>
                 Create API Token
               </Button>
@@ -361,7 +402,11 @@ export const ApiTokensEmpty = () => {
   return <EmptyView message="No API tokens" />;
 };
 
-export const ApiTokenItem = ({ data }: { data: Apikey }) => {
+interface ApiKeyWithResourceType extends Apikey {
+  connector?: { resourceType: string | null } | null;
+}
+
+export const ApiTokenItem = ({ data }: { data: ApiKeyWithResourceType }) => {
   const removeApiToken = useRemoveApiToken();
 
   const handleRemove = () => {
@@ -381,16 +426,19 @@ export const ApiTokenItem = ({ data }: { data: Apikey }) => {
         </div>
 
         <div className="text-xs text-muted-foreground mt-4">
-          Created {formatDistanceToNow(data.createdAt, { addSuffix: true })}
+          Purpose: {data.connector?.resourceType ?? "Other"}
         </div>
         <div className="text-xs text-muted-foreground mt-1">
-          Last used{" "}
+          Created: {formatDistanceToNow(data.createdAt, { addSuffix: true })}
+        </div>
+        <div className="text-xs text-muted-foreground mt-1">
+          Last used:{" "}
           {data.lastRequest
             ? formatDistanceToNow(data.lastRequest, { addSuffix: true })
             : "Never"}
         </div>
         <div className="text-xs text-muted-foreground mt-1">
-          Expires{" "}
+          Expires:{" "}
           {data.expiresAt
             ? formatDistanceToNow(data.expiresAt, { addSuffix: true })
             : "Never"}

@@ -82,24 +82,31 @@ export const integrationsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(integrationInputSchema)
     .mutation(async ({ ctx, input }) => {
+      const { name, resourceType } = input;
       const integrationUser = await prisma.user.create({
         data: {
           id: crypto.randomUUID(),
-          name: input.name,
+          name,
         },
       });
 
-      const apiKey = await createIntegrationApiKey(
-        input.name,
-        integrationUser.id,
-      );
+      const integrationUserId = integrationUser.id;
+      const apiKey = await createIntegrationApiKey(name, integrationUserId);
 
       const integration = await prisma.integration.create({
         data: {
           ...input,
           userId: ctx.auth.user.id,
-          integrationUserId: integrationUser.id,
+          integrationUserId,
           apiKeyId: apiKey.id,
+          apiKeyConnector: {
+            create: {
+              name,
+              resourceType,
+              apiKeyId: apiKey.id,
+              userId: integrationUserId,
+            },
+          },
         },
         include: integrationsInclude,
       });
@@ -118,8 +125,24 @@ export const integrationsRouter = createTRPCRouter({
         // Require ownership of integration to rotate an API key
         const integration = await tx.integration.findUniqueOrThrow({
           where: { id: input.id, userId: ctx.auth.user.id },
-          select: { apiKeyId: true, name: true, userId: true },
+          select: {
+            apiKeyId: true,
+            name: true,
+            userId: true,
+            integrationUserId: true,
+            apiKeyConnector: true,
+          },
         });
+
+        // an integration should always have an integrationUserId
+        // but for right now it's technically an optional field
+        const integrationUserId = integration.integrationUserId;
+        if (!integrationUserId) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Integration user missing!",
+          });
+        }
 
         // Delete the existing API key if it exists
         // use prisma to do this instead of better-auth since user doesn't own
@@ -129,17 +152,54 @@ export const integrationsRouter = createTRPCRouter({
             where: { id: integration.apiKeyId },
           });
         }
-        return { integrationName: integration.name };
+
+        return {
+          integrationName: integration.name,
+          integrationUserId,
+          apiKeyConnectorId: integration.apiKeyConnector?.id,
+          lastRequest: integration.apiKeyConnector?.lastRequest,
+        };
       });
 
+      const {
+        integrationName,
+        integrationUserId,
+        apiKeyConnectorId,
+        lastRequest,
+      } = result;
+
       const newApiKey = await createIntegrationApiKey(
-        result.integrationName,
-        ctx.auth.user.id,
+        integrationName,
+        integrationUserId,
       );
 
-      await prisma.integration.update({
-        where: { id: input.id },
-        data: { apiKeyId: newApiKey.id },
+      const newApiKeyId = newApiKey.id;
+
+      await prisma.$transaction(async (tx) => {
+        await tx.integration.update({
+          where: { id: input.id },
+          data: { apiKeyId: newApiKeyId },
+        });
+
+        // integrations should always come with a connector even
+        // if connectors sometimes don't come with integrations
+        if (apiKeyConnectorId) {
+          await tx.apiKeyConnector.update({
+            where: { id: apiKeyConnectorId },
+            data: {
+              apiKeyId: newApiKeyId,
+            },
+          });
+        }
+
+        // pass back lastRequest to our new key so it can
+        // count as active by default if the old key was
+        await tx.apikey.update({
+          where: { id: newApiKeyId },
+          data: {
+            lastRequest,
+          },
+        });
       });
 
       return { apiKey: newApiKey };

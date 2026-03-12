@@ -29,6 +29,10 @@ export const useCreateApiToken = () => {
         queryClient.invalidateQueries(
           trpc.user.getManyApiTokens.queryOptions({}),
         );
+        // Need to recount # of active ApiKey Connectors
+        queryClient.invalidateQueries(
+          trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
+        );
         return data;
       },
       onError: (error) => {
@@ -52,6 +56,10 @@ export const useRemoveApiToken = () => {
         // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries(
           trpc.user.getManyApiTokens.queryOptions({}),
+        );
+        // Need to recount # of active ApiKey Connectors
+        queryClient.invalidateQueries(
+          trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
         );
         return data;
       },

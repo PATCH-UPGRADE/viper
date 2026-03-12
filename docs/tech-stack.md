@@ -138,217 +138,16 @@ This pathway suits local development, air-gapped hospital environments, or deplo
 
 ## Data Model
 
-Entity-relationship diagram of the Prisma schema (`prisma/schema.prisma`). Only key fields are shown per entity; timestamps and metadata columns are omitted for readability.
+Model relationships from the Prisma schema (`prisma/schema.prisma`), grouped by domain. Field details are omitted; see the schema file for column definitions.
 
 ```mermaid
 erDiagram
-    User {
-        string id PK
-        string name
-        string email UK
-        boolean emailVerified
-    }
-
-    Session {
-        string id PK
-        string token UK
-        string userId FK
-        datetime expiresAt
-    }
-
-    Account {
-        string id PK
-        string accountId
-        string providerId
-        string userId FK
-    }
-
-    Verification {
-        string id PK
-        string identifier
-        datetime expiresAt
-    }
-
-    Workflow {
-        string id PK
-        string name
-        string userId FK
-    }
-
-    NodeTemplate {
-        string id PK
-        string name
-        NodeType type
-        string icon
-    }
-
-    Node {
-        string id PK
-        string name
-        NodeType type
-        json position
-        string workflowId FK
-        string nodeTemplateId FK
-    }
-
-    Connection {
-        string id PK
-        string fromOutput
-        string toInput
-        string workflowId FK
-        string fromNodeId FK
-        string toNodeId FK
-    }
-
-    DeviceGroup {
-        string id PK
-        string cpe UK
-        string manufacturer
-        string modelName
-        string version
-    }
-
-    DeviceGroupHistory {
-        string id PK
-        string deviceGroupId FK
-        string assetId FK
-    }
-
-    Asset {
-        string id PK
-        string ip
-        string hostname
-        AssetStatus status
-        string deviceGroupId FK
-        string userId FK
-    }
-
-    DeviceArtifact {
-        string id PK
-        string description
-        string role
-        string deviceGroupId FK
-        string userId FK
-    }
-
-    Vulnerability {
-        string id PK
-        string cveId
-        Severity severity
-        float cvssScore
-        float epss
-        boolean inKEV
-        Priority priority
-        string deviceArtifactId FK
-        string userId FK
-    }
-
-    Issue {
-        string id PK
-        IssueStatus status
-        string assetId FK
-        string vulnerabilityId FK
-    }
-
-    IssueRemediation {
-        string issueId PK_FK
-        string remediationId PK_FK
-    }
-
-    Remediation {
-        string id PK
-        string description
-        string vulnerabilityId FK
-        string userId FK
-    }
-
-    ArtifactWrapper {
-        string id PK
-        string deviceArtifactId FK
-        string remediationId FK
-        string latestArtifactId FK
-        string userId FK
-    }
-
-    Artifact {
-        string id PK
-        string name
-        ArtifactType artifactType
-        int versionNumber
-        string wrapperId FK
-        string prevVersionId FK
-        string userId FK
-    }
-
-    Apikey {
-        string id PK
-        string name
-        string key
-        boolean enabled
-        string userId FK
-    }
-
-    Integration {
-        string id PK
-        string name
-        string platform
-        boolean isGeneric
-        AuthType authType
-        ResourceType resourceType
-        int syncEvery
-        string apiKeyId FK
-        string userId FK
-    }
-
-    SyncStatus {
-        string id PK
-        SyncStatusEnum status
-        string errorMessage
-        string integrationId FK
-    }
-
-    Webhook {
-        string id PK
-        string name
-        string callbackUrl
-        AuthType authType
-        string userId FK
-    }
-
-    ExternalAssetMapping {
-        string id PK
-        string externalId
-        string itemId FK
-        string integrationId FK
-    }
-
-    ExternalDeviceArtifactMapping {
-        string id PK
-        string externalId
-        string itemId FK
-        string integrationId FK
-    }
-
-    ExternalRemediationMapping {
-        string id PK
-        string externalId
-        string itemId FK
-        string integrationId FK
-    }
-
-    ExternalVulnerabilityMapping {
-        string id PK
-        string externalId
-        string itemId FK
-        string integrationId FK
-    }
-
-    %% Auth
+    %% ── Auth ──
     User ||--o{ Session : "has"
     User ||--o{ Account : "has"
     User ||--o{ Apikey : "has"
 
-    %% Workflows
+    %% ── Workflows ──
     User ||--o{ Workflow : "owns"
     Workflow ||--o{ Node : "contains"
     Workflow ||--o{ Connection : "contains"
@@ -356,16 +155,18 @@ erDiagram
     Node ||--o{ Connection : "from"
     Node ||--o{ Connection : "to"
 
-    %% Hospital assets
+    %% ── Hospital Assets (DeviceGroup hierarchy) ──
     User ||--o{ Asset : "owns"
     DeviceGroup ||--o{ Asset : "groups"
     DeviceGroup ||--o{ DeviceGroupHistory : "tracks"
     Asset ||--o{ DeviceGroupHistory : "tracks"
+    DeviceGroup ||--o{ DeviceArtifact : "has"
+    User ||--o{ DeviceArtifact : "owns"
 
-    %% Vulnerability management
+    %% ── Vulnerability Management ──
     User ||--o{ Vulnerability : "owns"
-    DeviceArtifact |o--o{ Vulnerability : "source of"
     DeviceGroup }o--o{ Vulnerability : "affected by"
+    DeviceArtifact |o--o{ Vulnerability : "source of"
     Vulnerability ||--o{ Issue : "raises"
     Asset ||--o{ Issue : "has"
     Issue ||--o{ IssueRemediation : "resolved via"
@@ -374,24 +175,22 @@ erDiagram
     DeviceGroup }o--o{ Remediation : "targets"
     User ||--o{ Remediation : "owns"
 
-    %% Artifacts
-    User ||--o{ DeviceArtifact : "owns"
-    DeviceGroup ||--o{ DeviceArtifact : "has"
-    DeviceArtifact |o--o{ ArtifactWrapper : "wraps"
-    Remediation |o--o{ ArtifactWrapper : "wraps"
+    %% ── Artifacts (ArtifactWrapper / Artifact hierarchy) ──
+    DeviceArtifact |o--o{ ArtifactWrapper : "has"
+    Remediation |o--o{ ArtifactWrapper : "has"
     User ||--o{ ArtifactWrapper : "owns"
     ArtifactWrapper ||--o{ Artifact : "versions"
     ArtifactWrapper |o--o| Artifact : "latest"
     Artifact |o--o| Artifact : "version chain"
     User ||--o{ Artifact : "owns"
 
-    %% Integrations
+    %% ── Integrations ──
     User ||--o{ Integration : "configures"
     Apikey |o--o| Integration : "authenticates"
     Integration ||--o{ SyncStatus : "logs"
     User ||--o{ Webhook : "configures"
 
-    %% External mappings
+    %% ── External Mappings ──
     Asset ||--o{ ExternalAssetMapping : "mapped by"
     Integration ||--o{ ExternalAssetMapping : "maps"
     DeviceArtifact ||--o{ ExternalDeviceArtifactMapping : "mapped by"

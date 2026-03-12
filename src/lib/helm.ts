@@ -11,9 +11,7 @@ const HELM_TIMEOUT = 15 * 1000; // Max wait of 15 seconds for Helm to respond
 /**
  * Fetches an SBOM from Helm via the helmSbomId
  */
-export async function fetchSbom(
-  helmSbomId: string,
-): Promise<helmSbomResponse> {
+export async function fetchSbom(helmSbomId: string): Promise<helmSbomResponse> {
   if (!HELM_URL || !HELM_TOKEN) {
     throw new Error(
       "HELM URL and/or token missing from Viper's environment variables.",

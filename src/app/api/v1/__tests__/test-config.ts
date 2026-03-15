@@ -41,7 +41,7 @@ export const setupMockIntegration = async (
 
   const responseData = createIntegrationRes.body[0]?.result?.data.json;
   expect(responseData).toHaveProperty("integration");
-  console.log("Integratoin responseData.apiKey", responseData.apiKey)
+  console.log("Integratoin responseData.apiKey", responseData.apiKey);
   expect(responseData).toHaveProperty("apiKey");
 
   const createdIntegration = responseData.integration;

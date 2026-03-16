@@ -130,7 +130,7 @@ jobs:
             sleep 10
           done
 
-          echo "Neon branch did not become available within 60 second timeout."
+          echo "Neon branch did not become available within 60 second timeout. This may indicate a missing or renamed preview branch, or an issue connecting to Neon."
           exit 1
 
       - name: Run Prisma migration

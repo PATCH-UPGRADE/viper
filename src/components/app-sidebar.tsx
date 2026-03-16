@@ -129,9 +129,9 @@ export const AppSidebar = () => {
       continue;
     }
 
-    const activeCount = connectorsResult.data.activeCount[type];
+    connectorItems[type].totalCount = connectorsResult.data.totalCount[type] ?? 0;
+    const activeCount = connectorsResult.data.activeCount[type] ?? 0;
     connectorItems[type].activeCount = activeCount;
-    connectorItems[type].totalCount = connectorsResult.data.totalCount[type];
     totalActiveConnectors += activeCount;
   }
 
@@ -212,7 +212,8 @@ export const AppSidebar = () => {
                           <item.icon className="size-4" aria-hidden="true" />
                           <span>{item.title}</span>
                           <span className="sr-only">
-                            {item.activeCount} Active Connectors, {item.totalCount} Total Connectors
+                            {item.activeCount} Active Connectors,{" "}
+                            {item.totalCount} Total Connectors
                           </span>
                           <TooltipProvider delayDuration={500}>
                             <Tooltip>

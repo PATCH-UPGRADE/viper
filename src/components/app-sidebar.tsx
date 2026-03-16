@@ -125,6 +125,10 @@ export const AppSidebar = () => {
 
   let totalActiveConnectors = 0;
   for (const type of Object.values(ResourceType)) {
+    if (!connectorItems[type]) {
+      continue;
+    }
+
     const activeCount = connectorsResult.data.activeCount[type];
     connectorItems[type].activeCount = activeCount;
     connectorItems[type].totalCount = connectorsResult.data.totalCount[type];

@@ -241,10 +241,17 @@ export const updateConnectorExtension = Prisma.defineExtension((client) =>
           // only if lastRequest is part of the api key update
           const lastRequest = args.data?.lastRequest;
           if (lastRequest) {
-            await prisma.apiKeyConnector.update({
-              where: { apiKeyId: result.id },
-              data: { lastRequest },
-            });
+            await client.apiKeyConnector
+              .update({
+                where: { apiKeyId: result.id },
+                data: { lastRequest },
+              })
+              .catch((error) => {
+                console.error(
+                  "updateConnectorExtension failed to update Api Key Connector",
+                  error.message,
+                );
+              });
           }
 
           return result;

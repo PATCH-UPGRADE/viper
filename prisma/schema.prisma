@@ -603,7 +603,7 @@ model Integration {
   @@map("integration")
 }
 
-// seperate out to preserve between ApiKey rotations
+// separate out to preserve between ApiKey rotations
 model ApiKeyConnector {
   id                  String           @id @default(cuid())
 

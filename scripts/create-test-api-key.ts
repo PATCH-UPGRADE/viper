@@ -36,6 +36,13 @@ async function main() {
     },
   });
 
+  await prisma.apiKeyConnector.create({
+    data: {
+      apiKeyId: result.id,
+      userId: user.id,
+    }
+  });
+
   const rawKey = result.key;
 
   console.log("\n========================================");

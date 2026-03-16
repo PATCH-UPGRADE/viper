@@ -129,7 +129,8 @@ export const AppSidebar = () => {
       continue;
     }
 
-    connectorItems[type].totalCount = connectorsResult.data.totalCount[type] ?? 0;
+    connectorItems[type].totalCount =
+      connectorsResult.data.totalCount[type] ?? 0;
     const activeCount = connectorsResult.data.activeCount[type] ?? 0;
     connectorItems[type].activeCount = activeCount;
     totalActiveConnectors += activeCount;

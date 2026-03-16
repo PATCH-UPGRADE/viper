@@ -40,7 +40,7 @@ async function main() {
     data: {
       apiKeyId: result.id,
       userId: user.id,
-    }
+    },
   });
 
   const rawKey = result.key;

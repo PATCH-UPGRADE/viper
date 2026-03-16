@@ -1,4 +1,4 @@
-name: Prisma migrations - preview
+name: Prisma migrations - test & preview
 
 env:
   NODE_VERSION: '20'
@@ -88,6 +88,9 @@ jobs:
   
   migrate-preview-branch:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.migrate_neon_preview_branch == 'run-preview-migration'
+    concurrency:
+      group: prisma-preview-migrations-${{ github.ref_name }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
 
     steps:

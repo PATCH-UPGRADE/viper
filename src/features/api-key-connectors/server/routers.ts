@@ -47,10 +47,13 @@ export const apiKeyConnectorsRouter = createTRPCRouter({
         if (conn.apiKeyId && conn.lastRequest) {
           activeCount[type] += 1;
         }
-        // we also count the integration if present
+        // we also additionally count the integration if present
         if (conn.integrationId) {
-          activeCount[type] += 1;
           totalCount[type] += 1;
+
+          if (conn.lastRequest) {
+            activeCount[type] += 1;
+          }
         }
       }
 

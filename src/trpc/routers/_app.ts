@@ -1,4 +1,4 @@
-import { apiKeyConnectorsRouter } from "@/features/api-key-connectors/server/router";
+import { apiKeyConnectorsRouter } from "@/features/api-key-connectors/server/routers";
 import { artifactsRouter } from "@/features/artifacts/server/routers";
 import { assetsRouter } from "@/features/assets/server/routers";
 import { chatRouter } from "@/features/chat/server/routers";

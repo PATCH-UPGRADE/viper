@@ -4,16 +4,24 @@ env:
   NODE_VERSION: '20'
   NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
   NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-  BRANCH_NAME: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}
 
 on:
   pull_request:
     paths:
       - 'prisma/schema.prisma'
       - 'prisma/migrations/**'
+  workflow_dispatch:
+    inputs:
+      migrate_neon_preview_branch:
+        description: "Type 'run-preview-migration' to auto-apply Prisma migrations against Vercel preview's Neon branch"
+        required: true
+        type: string
 
 jobs:
-  migrate-preview:
+  test-migrations:
+    if: github.event_name == 'pull_request'
+    env:
+      BRANCH_NAME: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -77,3 +85,50 @@ jobs:
           neonctl branches delete "$BRANCH_NAME" \
            --project-id "$NEON_PROJECT_ID" \
            --yes || echo "Branch already deleted or missing"
+  
+  migrate-preview-branch:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.migrate_neon_preview_branch == 'run-preview-migration'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install neonctl
+        run: npm install -g neonctl
+
+      - name: Get Neon preview branch URL
+        env:
+          BRANCH_NAME: preview/${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          echo "Waiting for Neon branch: $BRANCH_NAME"
+
+          for i in {1..6}; do
+            if CONNECTION_URL=$(neonctl connection-string "$BRANCH_NAME" \
+              --project-id "$NEON_PROJECT_ID" \
+              --role-name neondb_owner \
+              --database-name neondb); then
+              echo "Neon branch is ready"
+              echo "DATABASE_URL=$CONNECTION_URL" >> $GITHUB_ENV
+              exit 0
+            fi
+
+            echo "Attempt $i/6 to fetch Neon connection string failed. Retrying in 10 seconds..."
+            sleep 10
+          done
+
+          echo "Neon branch did not become available within 60 second timeout."
+          exit 1
+
+      - name: Run Prisma migration
+        run: npx prisma migrate deploy

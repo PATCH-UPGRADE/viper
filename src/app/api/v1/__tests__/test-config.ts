@@ -17,7 +17,7 @@ export const generateCPE = (suffix: string) =>
 
 describe("Configuration Tests", () => {
   it("dummy test", async () => {
-    console.log("AUTH_TOKEN:", AUTH_TOKEN);
+    console.log("AUTH_TOKEN:", AUTH_TOKEN.slice(0, 5), AUTH_TOKEN.length);
     expect(true).toBeTruthy();
   });
 });

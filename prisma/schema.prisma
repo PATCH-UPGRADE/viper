@@ -81,6 +81,7 @@ model Verification {
   id         String   @id
   identifier String
   value      String
+  testValue  String?
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt

@@ -1,7 +1,7 @@
 import z from "zod";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { baseProcedure, createTRPCRouter } from "@/trpc/init";
+import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 // { "Asset": 2, "Vulnerability": 5, "Remediation": 3, ... }
 const resourceTypeCountSchema = z.object(
@@ -16,7 +16,7 @@ const connectorCountResponseSchema = z.object({
 });
 
 export const apiKeyConnectorsRouter = createTRPCRouter({
-  getManyTypeCountInternal: baseProcedure
+  getManyTypeCountInternal: protectedProcedure
     .output(connectorCountResponseSchema)
     .query(async () => {
       const connectors = await prisma.apiKeyConnector.findMany({

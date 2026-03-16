@@ -37,13 +37,13 @@ import {
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useSuspenseConnectors } from "@/features/api-key-connectors/hooks/use-connectors";
 import { ResourceType } from "@/generated/prisma";
 import { NavUser } from "./nav-user";
 import { Separator } from "./ui/separator";
-import { TooltipProvider } from "./ui/tooltip";
 
 const mainItems = [
   {
@@ -211,12 +211,16 @@ export const AppSidebar = () => {
                         <Link href={item.url} prefetch>
                           <item.icon className="size-4" aria-hidden="true" />
                           <span>{item.title}</span>
+                          <span className="sr-only">
+                            {item.activeCount} Active Connectors, {item.totalCount} Total Connectors
+                          </span>
                           <TooltipProvider delayDuration={500}>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Badge
                                   variant="secondary"
                                   className="ml-auto text-xs"
+                                  aria-hidden="true"
                                 >
                                   {item.activeCount}
                                 </Badge>

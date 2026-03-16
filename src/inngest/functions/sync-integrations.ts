@@ -2,7 +2,11 @@ import "server-only";
 import { z } from "zod";
 import { integrationAssetInputSchema } from "@/features/assets/types";
 import { integrationDeviceArtifactInputSchema } from "@/features/device-artifacts/types";
-import { IntegrationWithSyncStatus, syncStatusIntegrationInclude, type IntegrationWithStringDates } from "@/features/integrations/types";
+import {
+  type IntegrationWithStringDates,
+  type IntegrationWithSyncStatus,
+  syncStatusIntegrationInclude,
+} from "@/features/integrations/types";
 import { integrationRemediationInputSchema } from "@/features/remediations/types";
 import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/types";
 import type { ResourceType } from "@/generated/prisma";
@@ -189,7 +193,7 @@ export const syncIntegration = inngest.createFunction(
     const integration = await step.run("fetch-integration", async () => {
       return prisma.integration.findUnique({
         where: { id: integrationId },
-        include: syncStatusIntegrationInclude 
+        include: syncStatusIntegrationInclude,
       });
     });
 

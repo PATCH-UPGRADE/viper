@@ -1,6 +1,10 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
-import { type Integration, ResourceType, Prisma, AuthType } from "@/generated/prisma";
+import {
+  type AuthType,
+  type Integration,
+  ResourceType,
+} from "@/generated/prisma";
 import { authSchema, safeUrlSchema } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
 

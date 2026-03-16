@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { IntegrationWithStringDates, IntegrationWithSyncStatus } from "@/features/integrations/types";
+import type { IntegrationWithSyncStatus } from "@/features/integrations/types";
 import {
   AuthType,
   type Integration,

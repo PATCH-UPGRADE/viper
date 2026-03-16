@@ -11,9 +11,6 @@ const handler = (req: NextRequest) => {
     router: appRouter,
     createContext: createOpenApiContext,
     req,
-    onError: ({ path, error }) => {
-      console.error(path, error);
-    },
   });
 };
 

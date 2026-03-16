@@ -17,7 +17,6 @@ export const generateCPE = (suffix: string) =>
 
 describe("Configuration Tests", () => {
   it("dummy test", async () => {
-    console.log("AUTH_TOKEN:", AUTH_TOKEN.slice(0, 12), AUTH_TOKEN.length);
     expect(true).toBeTruthy();
   });
 });
@@ -41,7 +40,6 @@ export const setupMockIntegration = async (
 
   const responseData = createIntegrationRes.body[0]?.result?.data.json;
   expect(responseData).toHaveProperty("integration");
-  console.log("Integratoin responseData.apiKey", responseData.apiKey);
   expect(responseData).toHaveProperty("apiKey");
 
   const createdIntegration = responseData.integration;

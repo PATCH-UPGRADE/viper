@@ -45,7 +45,6 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
 
   // @ts-expect-error
   const { valid, error, key } = await verifyApiKey(ctx.req as Request);
-  console.log("valid:", valid, "error:", error);
 
   if (valid && key && !error) {
     return next({ ctx: { ...ctx, auth: { user: { id: key.userId }, key } } });

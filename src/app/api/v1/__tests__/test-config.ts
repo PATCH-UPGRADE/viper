@@ -44,15 +44,19 @@ export const setupMockIntegration = async (
 
   const createdIntegration = responseData.integration;
   onTestFinished(async () => {
-    await prisma.integration.delete({
-      where: { id: createdIntegration.id },
-    });
+    await prisma.integration
+      .delete({
+        where: { id: createdIntegration.id },
+      })
+      .catch(() => {});
 
     // Clean up the integration user that was created
     if (createdIntegration.integrationUserId) {
-      await prisma.user.delete({
-        where: { id: createdIntegration.integrationUserId },
-      });
+      await prisma.user
+        .delete({
+          where: { id: createdIntegration.integrationUserId },
+        })
+        .catch(() => {});
     }
   });
 

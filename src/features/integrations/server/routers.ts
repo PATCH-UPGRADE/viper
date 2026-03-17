@@ -157,6 +157,7 @@ export const integrationsRouter = createTRPCRouter({
           integrationName: integration.name,
           integrationUserId,
           apiKeyConnectorId: integration.apiKeyConnector?.id,
+          lastRequest: integration.apiKeyConnector?.lastRequest,
         };
       });
 

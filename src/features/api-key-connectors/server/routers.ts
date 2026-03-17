@@ -43,15 +43,11 @@ export const apiKeyConnectorsRouter = createTRPCRouter({
         const type = conn.resourceType as string; // where clause filters out nulls
         totalCount[type] += 1;
 
-        // an active conn is if a key is present and it has been used at least once
-        if (conn.apiKeyId && conn.lastRequest) {
-          activeCount[type] += 1;
-        }
-        // we also additionally count the integration if present
-        if (conn.integrationId) {
-          totalCount[type] += 1;
-
+        // an active conn is if a key is present and in use OR has an integration
+        if (conn.apiKeyId) {
           if (conn.lastRequest) {
+            activeCount[type] += 1;
+          } else if (conn.integrationId) {
             activeCount[type] += 1;
           }
         }

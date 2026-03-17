@@ -104,7 +104,7 @@ export const integrationsRouter = createTRPCRouter({
               name,
               resourceType,
               apiKeyId: apiKey.id,
-              userId: integrationUserId,
+              userId: ctx.auth.user.id,
             },
           },
         },
@@ -157,7 +157,6 @@ export const integrationsRouter = createTRPCRouter({
           integrationName: integration.name,
           integrationUserId,
           apiKeyConnectorId: integration.apiKeyConnector?.id,
-          lastRequest: integration.apiKeyConnector?.lastRequest,
         };
       });
 
@@ -165,7 +164,6 @@ export const integrationsRouter = createTRPCRouter({
         integrationName,
         integrationUserId,
         apiKeyConnectorId,
-        lastRequest,
       } = result;
 
       const newApiKey = await createIntegrationApiKey(
@@ -191,15 +189,6 @@ export const integrationsRouter = createTRPCRouter({
             },
           });
         }
-
-        // pass back lastRequest to our new key so it can
-        // count as active by default if the old key was
-        await tx.apikey.update({
-          where: { id: newApiKeyId },
-          data: {
-            lastRequest,
-          },
-        });
       });
 
       return { apiKey: newApiKey };

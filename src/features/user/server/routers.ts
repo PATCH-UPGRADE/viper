@@ -92,6 +92,7 @@ export const userRouter = createTRPCRouter({
         const apiKeyResult = await tx.apikey.findUniqueOrThrow({
           where: { id: input.id },
           select: {
+            name: true,
             lastRequest: true,
             connector: {
               select: {
@@ -108,6 +109,7 @@ export const userRouter = createTRPCRouter({
           await tx.apiKeyConnector.update({
             where: { id: apiKeyResult.connector.id },
             data: {
+              name: apiKeyResult.name,
               lastRequest: apiKeyResult.lastRequest,
             },
           });

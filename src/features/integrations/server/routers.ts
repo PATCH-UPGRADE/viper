@@ -160,7 +160,12 @@ export const integrationsRouter = createTRPCRouter({
         };
       });
 
-      const { integrationName, integrationUserId, apiKeyConnectorId } = result;
+      const {
+        integrationName,
+        integrationUserId,
+        apiKeyConnectorId,
+        lastRequest,
+      } = result;
 
       const newApiKey = await createIntegrationApiKey(
         integrationName,
@@ -182,6 +187,7 @@ export const integrationsRouter = createTRPCRouter({
             where: { id: apiKeyConnectorId },
             data: {
               apiKeyId: newApiKeyId,
+              lastRequest,
             },
           });
         }

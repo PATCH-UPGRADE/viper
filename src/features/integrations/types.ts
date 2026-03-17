@@ -53,8 +53,9 @@ export type IntegrationWithRelations = inferOutput<
 
 export type IntegrationWithStringDates = Omit<
   Integration,
-  "createdAt" | "updatedAt"
+  "createdAt" | "updatedAt" | "lastSuccessfulSync"
 > & {
   createdAt: string;
   updatedAt: string;
+  lastSuccessfulSync: string | null;
 };

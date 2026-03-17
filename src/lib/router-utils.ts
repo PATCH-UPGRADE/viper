@@ -192,22 +192,30 @@ async function upsertSyncStatus(
     : SyncStatusEnum.Success;
   const errorMessage = response.shouldRetry ? response.message : undefined;
 
-  await prisma.syncStatus.upsert({
-    where: {
-      id: latestPending?.id || "-1",
-      // ^Use a non-existent ID to trigger creation if no Pending status found
-    },
-    update: {
-      status: statusToSet,
-      errorMessage: errorMessage,
-      syncedAt: lastSynced,
-    },
-    create: {
-      integrationId,
-      status: statusToSet,
-      errorMessage: errorMessage,
-      syncedAt: lastSynced,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.syncStatus.upsert({
+      where: {
+        id: latestPending?.id || "-1",
+      },
+      update: {
+        status: statusToSet,
+        errorMessage,
+        syncedAt: lastSynced,
+      },
+      create: {
+        integrationId,
+        status: statusToSet,
+        errorMessage,
+        syncedAt: lastSynced,
+      },
+    });
+
+    if (statusToSet === SyncStatusEnum.Success) {
+      await tx.integration.update({
+        where: { id: integrationId },
+        data: { lastSuccessfulSync: lastSynced },
+      });
+    }
   });
 }
 

@@ -576,6 +576,7 @@ model Integration {
   authentication         Json?             // TODO: this needs to be encrypted
   syncEvery              Int               // e.g 300, sync every 300 seconds
   syncStatus             SyncStatus[]
+  lastSuccessfulSync DateTime?
 
   apiKeyId               String?           @unique
   apiKey                 Apikey?           @relation(fields: [apiKeyId], references: [id])

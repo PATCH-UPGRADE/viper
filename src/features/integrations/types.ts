@@ -1,10 +1,6 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
-import {
-  type AuthType,
-  type Integration,
-  ResourceType,
-} from "@/generated/prisma";
+import { type Integration, ResourceType } from "@/generated/prisma";
 import { authSchema, safeUrlSchema } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
 
@@ -55,37 +51,9 @@ export type IntegrationWithRelations = inferOutput<
 
 export type IntegrationWithStringDates = Omit<
   Integration,
-  "createdAt" | "updatedAt"
+  "createdAt" | "updatedAt" | "lastSuccessfulSync"
 > & {
   createdAt: string;
   updatedAt: string;
-};
-
-export const syncStatusIntegrationInclude = {
-  syncStatus: {
-    select: {
-      status: true,
-      syncedAt: true,
-      errorMessage: true,
-    },
-    orderBy: {
-      syncedAt: "desc", // newest first
-    },
-  },
-} as const;
-
-// This was the cleanest thing I could come up with
-// I manually specify the fields instead of using something like
-// export type IntegrationWithSyncStatus = Prisma.IntegrationGetPayload<{
-//  include: typeof syncStatusIntegrationInclude;
-// }>;
-// That's because syncStatus gets converted from a date into a string in sync-integrations.ts
-export type IntegrationWithSyncStatus = {
-  authType: AuthType;
-  integrationUri: string;
-  resourceType: ResourceType;
-  syncStatus: {
-    syncedAt: string;
-  }[];
-  authentication: unknown;
+  lastSuccessfulSync: string | null;
 };

@@ -209,6 +209,17 @@ async function upsertSyncStatus(
       syncedAt: lastSynced,
     },
   });
+
+  if (statusToSet === "Success") {
+    await prisma.integration.update({
+      where: {
+        id: integrationId,
+      },
+      data: {
+        lastSuccessfulSync: lastSynced,
+      },
+    });
+  }
 }
 
 interface ArtifactsContent {

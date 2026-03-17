@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { IntegrationWithSyncStatus } from "@/features/integrations/types";
+import type { IntegrationWithStringDates } from "@/features/integrations/types";
 import {
   AuthType,
   type Integration,
@@ -30,7 +30,7 @@ export function plural(s: string, count: number): string {
 }
 
 export const parseAuthenticationJson = (
-  itemWithAuth: Integration | IntegrationWithSyncStatus | Webhook,
+  itemWithAuth: Integration | IntegrationWithStringDates | Webhook,
 ) => {
   if (itemWithAuth.authType === AuthType.Basic) {
     // TODO: authentication needs to be encrypted/protected somehow

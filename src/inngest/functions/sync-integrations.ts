@@ -2,11 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { integrationAssetInputSchema } from "@/features/assets/types";
 import { integrationDeviceArtifactInputSchema } from "@/features/device-artifacts/types";
-import {
-  type IntegrationWithStringDates,
-  type IntegrationWithSyncStatus,
-  syncStatusIntegrationInclude,
-} from "@/features/integrations/types";
+import type { IntegrationWithStringDates } from "@/features/integrations/types";
 import { integrationRemediationInputSchema } from "@/features/remediations/types";
 import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/types";
 import type { ResourceType } from "@/generated/prisma";
@@ -24,7 +20,12 @@ export const syncAllIntegrations = inngest.createFunction(
     // Get all active integrations
     const integrations = await step.run("fetch-integrations", async () => {
       return prisma.integration.findMany({
-        include: syncStatusIntegrationInclude,
+        include: {
+          syncStatus: {
+            orderBy: { syncedAt: "desc" },
+            take: 1,
+          },
+        },
       });
     });
 
@@ -151,7 +152,7 @@ async function syncAiIntegration(
 
 // Helper function for Partner Integration
 async function syncPartnerIntegration(
-  integration: IntegrationWithSyncStatus,
+  integration: IntegrationWithStringDates,
 ): Promise<SyncResult> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -164,16 +165,20 @@ async function syncPartnerIntegration(
 
   const { path: responsePath } = getResponseConfig(integration.resourceType);
 
+  const body = JSON.stringify({
+    // TODO: blueflow should be able to handle "null". for now though, if there's no date just send one in the past
+    last_sync:
+      integration.lastSuccessfulSync ?? new Date(1970, 0, 1).toISOString(),
+    page: 1,
+    pageSize: 500,
+    webhook_url: `${getBaseUrl()}/api/v1${responsePath}`,
+  });
+
   const response = await fetch(integration.integrationUri, {
     method: "POST",
     headers,
     signal: AbortSignal.timeout(30000), // 30s timeout
-    body: JSON.stringify({
-      last_sync: integration.syncStatus?.[0]?.syncedAt ?? null,
-      page: 1,
-      pageSize: 500,
-      webhook_url: `${getBaseUrl()}/api/v1${responsePath}`,
-    }),
+    body,
   });
 
   if (!response.ok) {
@@ -193,7 +198,6 @@ export const syncIntegration = inngest.createFunction(
     const integration = await step.run("fetch-integration", async () => {
       return prisma.integration.findUnique({
         where: { id: integrationId },
-        include: syncStatusIntegrationInclude,
       });
     });
 

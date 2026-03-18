@@ -1,10 +1,6 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
 import "server-only";
-import { type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
-import {
-  PrismaClientKnownRequestError,
-  PrismaClientValidationError,
-} from "@/generated/prisma/runtime/library";
+import { Prisma, type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
 import prisma, { type TransactionClient } from "@/lib/db";
 import {
   buildPaginationMeta,
@@ -162,8 +158,8 @@ export async function createArtifactWrappers(
 
 export const handlePrismaError = (e: unknown): string => {
   if (
-    e instanceof PrismaClientKnownRequestError ||
-    e instanceof PrismaClientValidationError
+    e instanceof Prisma.PrismaClientKnownRequestError ||
+    e instanceof Prisma.PrismaClientValidationError
   ) {
     return e.message;
   }

@@ -1,5 +1,5 @@
 import { Prisma, TriggerEnum } from "@/generated/prisma";
-import type { PayloadToResult } from "@/generated/prisma/runtime/library";
+import type { PayloadToResult } from "@/generated/prisma/runtime/library.js";
 import { inngest } from "@/inngest/client";
 import prisma from "./db";
 import { getBaseUrl } from "./url-utils";

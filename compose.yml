@@ -25,6 +25,8 @@ services:
       - INNGEST_DEV=1
       - INNGEST_BASE_URL=http://inngest:8288
       - PRISMA_CLIENT_ENGINE_TYPE=binary
+      - PRISMA_QUERY_ENGINE_BINARY=/srv/src/generated/prisma/query-engine-debian-openssl-3.0.x
+      - PRISMA_SCHEMA_ENGINE_BINARY=/srv/node_modules/@prisma/engines/schema-engine-debian-openssl-3.0.x
     volumes:
       - viper-stamps:/srv/stamps
     ports:
@@ -53,6 +55,10 @@ services:
       context: .
       dockerfile: docker/viper/Dockerfile
     env_file: .env
+    environment:
+      - PRISMA_CLIENT_ENGINE_TYPE=binary
+      - PRISMA_QUERY_ENGINE_BINARY=/srv/src/generated/prisma/query-engine-debian-openssl-3.0.x
+      - PRISMA_SCHEMA_ENGINE_BINARY=/srv/node_modules/@prisma/engines/schema-engine-debian-openssl-3.0.x
     ports:
       - "5555:5555"
     profiles:

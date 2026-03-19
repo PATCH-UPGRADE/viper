@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { DownloadIcon } from "lucide-react";
+import { DownloadIcon, ExternalLinkIcon } from "lucide-react";
 import {
   EmptyView,
   EntityContainer,
@@ -215,6 +215,23 @@ function DeviceArtifactDrawer({
                   {deviceArtifact.deviceGroup.cpe}
                 </code>
               </div>
+
+              {deviceArtifact.deviceGroup.sbomUrl && (
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                    SBOM
+                  </div>
+                  <a
+                    href={deviceArtifact.deviceGroup.sbomUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
+                  >
+                    View SBOM
+                    <ExternalLinkIcon className="size-3 flex-shrink-0" />
+                  </a>
+                </div>
+              )}
             </div>
           </div>
 

@@ -38,7 +38,6 @@ export type AssetWithIssues = Prisma.AssetGetPayload<{
       select: {
         id: true;
         cpe: true;
-        sbomUrl: true;
       };
     };
   };
@@ -50,7 +49,6 @@ export type AssetWithDeviceGroup = Prisma.AssetGetPayload<{
       select: {
         id: true;
         cpe: true;
-        sbomUrl: true;
       };
     };
   };

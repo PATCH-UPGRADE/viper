@@ -180,6 +180,24 @@ function AssetInfoColumn({ asset }: { asset: AssetWithIssueRelations }) {
           header: "CPE",
           content: <CopyCode>{asset.deviceGroup.cpe}</CopyCode>,
         },
+        ...(asset.deviceGroup.sbomUrl
+          ? [
+              {
+                header: "SBOM",
+                content: (
+                  <a
+                    href={asset.deviceGroup.sbomUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
+                  >
+                    View SBOM
+                    <ExternalLinkIcon className="size-3 flex-shrink-0" />
+                  </a>
+                ),
+              },
+            ]
+          : []),
         ...(asset.serialNumber
           ? [
               {

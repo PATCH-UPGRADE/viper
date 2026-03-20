@@ -26,17 +26,17 @@ const severitySchema = z.enum(Object.values(Severity));
 export const vulnerabilityInputSchema = z.object({
   cpes: z.array(cpeSchema).min(1, "At least one CPE is required"),
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  cveId: z.string().min(1).optional(),
-  description: z.string().min(1).optional(),
-  narrative: z.string().min(1).optional(),
-  impact: z.string().min(1).optional(),
+  cveId: z.string().min(1).nullish(),
+  description: z.string().min(1).nullish(),
+  narrative: z.string().min(1).nullish(),
+  impact: z.string().min(1).nullish(),
   severity: severitySchema.optional(),
-  cvssScore: z.number().min(0).max(10).optional(),
-  cvssVector: z.string().min(1).optional(),
+  cvssScore: z.number().min(0).max(10).nullish(),
+  cvssVector: z.string().min(1).nullish(),
   affectedComponents: z.array(z.string().min(1)).optional(),
-  exploitUri: safeUrlSchema.optional(),
-  upstreamApi: safeUrlSchema.optional(),
-  deviceArtifactId: z.string().min(1).optional(),
+  exploitUri: safeUrlSchema.nullish(),
+  upstreamApi: safeUrlSchema.nullish(),
+  deviceArtifactId: z.string().min(1).nullish(),
 });
 
 export const vulnerabilityArrayInputSchema = z.object({

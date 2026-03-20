@@ -1,8 +1,14 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import { formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { SortableHeader } from "@/components/ui/data-table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { ConnectorResponse } from "../types";
 
 export const columns: ColumnDef<ConnectorResponse>[] = [
@@ -25,8 +31,18 @@ export const columns: ColumnDef<ConnectorResponse>[] = [
     header: ({ column }) => (
       <SortableHeader header="Last Used" column={column} />
     ),
-    cell: ({ getValue }) => {
-      return getValue() ?? "Never";
+    cell: ({ row }) => {
+      const value = row.original.lastRequest;
+      return (
+        <Tooltip>
+          <TooltipTrigger>
+            {value ? `${formatDistanceToNow(value)} ago` : "Never"}
+          </TooltipTrigger>
+          <TooltipContent>
+            {value ? value.toLocaleString() : "Never"}
+          </TooltipContent>
+        </Tooltip>
+      );
     },
   },
   {

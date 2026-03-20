@@ -50,11 +50,11 @@ export const columns: ColumnDef<ConnectorResponse>[] = [
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => {
-      let text = "Active";
-      let color = "bg-green-300";
-      if (!row.original.apiKeyId) {
-        text = "Expired";
-        color = "bg-red-400";
+      let text = "Expired";
+      let color = "bg-red-400";
+      if (row.original.apiKeyId || row.original.integrationId) {
+        text = "Active";
+        color = "bg-green-300";
       }
 
       return (

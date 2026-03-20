@@ -1,21 +1,33 @@
-import z from "zod";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-
-// { "Asset": 2, "Vulnerability": 5, "Remediation": 3, ... }
-const resourceTypeCountSchema = z.object(
-  Object.fromEntries(
-    Object.values(ResourceType).map((type) => [type, z.number()]),
-  ),
-);
-
-const connectorCountResponseSchema = z.object({
-  activeCount: resourceTypeCountSchema,
-  totalCount: resourceTypeCountSchema,
-});
+import {
+  connectorCountResponseSchema,
+  connectorInclude,
+  paginatedConnectorInputSchema,
+  paginatedConnectorOutputSchema,
+} from "../types";
 
 export const apiKeyConnectorsRouter = createTRPCRouter({
+  getManyByTypeInternal: protectedProcedure
+    .input(paginatedConnectorInputSchema)
+    .output(paginatedConnectorOutputSchema)
+    .query(async ({ input }) => {
+      const { resourceType } = input;
+
+      const where = {
+        resourceType,
+      };
+
+      const data = await fetchPaginated(prisma.apiKeyConnector, input, {
+        where: where,
+        include: connectorInclude,
+      });
+
+      return data;
+    }),
+
   getManyTypeCountInternal: protectedProcedure
     .output(connectorCountResponseSchema)
     .query(async () => {

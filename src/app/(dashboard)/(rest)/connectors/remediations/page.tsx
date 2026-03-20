@@ -1,18 +1,18 @@
 import {
-  RemediationsContainer,
-  RemediationsError,
-  RemediationsList,
-  RemediationsLoading,
-} from "@/features/remediations/components/remediations";
-import { remediationsParamsLoader } from "@/features/remediations/server/params-loader";
-import { prefetchRemediations } from "@/features/remediations/server/prefetch";
+  ConnectorsError,
+  ConnectorsLoading,
+  RemediationConnectorList,
+  RemediationConnectorsContainer,
+} from "@/features/api-key-connectors/components/connectors";
+import { connectorsParamsLoader } from "@/features/api-key-connectors/server/params-loader";
+import { prefetchRemediationConnectors } from "@/features/api-key-connectors/server/prefetch";
 import { createListPage } from "@/lib/page-factory";
 
 export default createListPage({
-  paramsLoader: remediationsParamsLoader,
-  prefetch: prefetchRemediations,
-  Container: RemediationsContainer,
-  List: RemediationsList,
-  Loading: RemediationsLoading,
-  Error: RemediationsError,
+  paramsLoader: connectorsParamsLoader,
+  prefetch: prefetchRemediationConnectors,
+  Container: RemediationConnectorsContainer,
+  List: RemediationConnectorList,
+  Loading: ConnectorsLoading,
+  Error: ConnectorsError,
 });

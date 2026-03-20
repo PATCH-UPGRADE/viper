@@ -1,18 +1,18 @@
 import {
-  AssetsContainer,
-  AssetsError,
-  AssetsList,
-  AssetsLoading,
-} from "@/features/assets/components/assets";
-import { assetsParamsLoader } from "@/features/assets/server/params-loader";
-import { prefetchAssets } from "@/features/assets/server/prefetch";
+  AssetConnectorList,
+  AssetConnectorsContainer,
+  ConnectorsError,
+  ConnectorsLoading,
+} from "@/features/api-key-connectors/components/connectors";
+import { connectorsParamsLoader } from "@/features/api-key-connectors/server/params-loader";
+import { prefetchAssetConnectors } from "@/features/api-key-connectors/server/prefetch";
 import { createListPage } from "@/lib/page-factory";
 
 export default createListPage({
-  paramsLoader: assetsParamsLoader,
-  prefetch: prefetchAssets,
-  Container: AssetsContainer,
-  List: AssetsList,
-  Loading: AssetsLoading,
-  Error: AssetsError,
+  paramsLoader: connectorsParamsLoader,
+  prefetch: prefetchAssetConnectors,
+  Container: AssetConnectorsContainer,
+  List: AssetConnectorList,
+  Loading: ConnectorsLoading,
+  Error: ConnectorsError,
 });

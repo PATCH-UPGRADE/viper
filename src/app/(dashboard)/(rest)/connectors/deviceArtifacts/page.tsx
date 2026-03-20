@@ -1,18 +1,18 @@
 import {
-  DeviceArtifactsContainer,
-  DeviceArtifactsError,
-  DeviceArtifactsList,
-  DeviceArtifactsLoading,
-} from "@/features/device-artifacts/components/device-artifacts";
-import { deviceArtifactsParamsLoader } from "@/features/device-artifacts/server/params-loader";
-import { prefetchDeviceArtifacts } from "@/features/device-artifacts/server/prefetch";
+  ConnectorsError,
+  ConnectorsLoading,
+  DeviceArtifactConnectorList,
+  DeviceArtifactConnectorsContainer,
+} from "@/features/api-key-connectors/components/connectors";
+import { connectorsParamsLoader } from "@/features/api-key-connectors/server/params-loader";
+import { prefetchDeviceArtifactConnectors } from "@/features/api-key-connectors/server/prefetch";
 import { createListPage } from "@/lib/page-factory";
 
 export default createListPage({
-  paramsLoader: deviceArtifactsParamsLoader,
-  prefetch: prefetchDeviceArtifacts,
-  Container: DeviceArtifactsContainer,
-  List: DeviceArtifactsList,
-  Loading: DeviceArtifactsLoading,
-  Error: DeviceArtifactsError,
+  paramsLoader: connectorsParamsLoader,
+  prefetch: prefetchDeviceArtifactConnectors,
+  Container: DeviceArtifactConnectorsContainer,
+  List: DeviceArtifactConnectorList,
+  Loading: ConnectorsLoading,
+  Error: ConnectorsError,
 });

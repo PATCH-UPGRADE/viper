@@ -82,6 +82,8 @@ const ConnectorsList = ({ resourceType }: { resourceType: ResourceType }) => {
     resourceType,
   });
 
+  console.log("useSuspenseConnectorsByResourceType:", connectors);
+
   return (
     <DataTable
       paginatedData={connectors}

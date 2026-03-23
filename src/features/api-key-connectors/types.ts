@@ -1,11 +1,10 @@
-import { userSchema } from "better-auth";
 import z from "zod";
 import { ResourceType } from "@/generated/prisma";
 import {
   createPaginatedResponseSchema,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { userIncludeSelect } from "@/lib/schemas";
+import { userIncludeSelect, userSchema } from "@/lib/schemas";
 
 export const connectorResponseSchema = z.object({
   id: z.string(),

@@ -2,6 +2,7 @@ import { APIError, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { apiKey } from "better-auth/plugins";
 import prisma from "@/lib/db";
+import { sendEmail } from "@/lib/mail";
 
 // Domains allowed to create accounts
 // Note that only development environments will allow non-Google OAuth accounts
@@ -16,7 +17,7 @@ export const validateDomain = (email: string) => {
   if (!DOMAIN_WHITELIST.includes(domain)) {
     throw new APIError("FORBIDDEN", {
       message:
-        "Your Google domain has not been authorized to access Viper. Please contact the PATCH team for assistance.",
+        "Your domain has not been authorized to access Viper. Please contact the PATCH team for assistance.",
     });
   }
 };
@@ -49,8 +50,29 @@ export const auth = betterAuth({
     },
   },
   emailAndPassword: {
-    enabled: process.env.VERCEL_ENV !== "production",
-    autoSignIn: process.env.VERCEL_ENV !== "production",
+    enabled: true,
+    autoSignIn: true,
+    requireEmailVerification: true,
+  },
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      const subject = "Verify your email address to access Viper";
+
+      await sendEmail({
+        to: user.email,
+        subject,
+        text: `Welcome to Viper.\n\nVerify your email address to finish creating your account:\n${url}\n\nIf you did not sign up for Viper, you can ignore this email.`,
+        html: `
+          <p>Welcome to Viper.</p>
+          <p>
+            Verify your email address to finish creating your account:
+            <a href="${url}">${url}</a>
+          </p>
+          <p>If you did not sign up for Viper, you can ignore this email.</p>
+        `,
+      });
+    },
+    sendOnSignUp: true,
   },
   plugins: [apiKey()],
   socialProviders: {

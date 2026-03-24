@@ -260,3 +260,35 @@ export const updateConnectorExtension = Prisma.defineExtension((client) =>
     },
   }),
 );
+
+// change the name of the integration user ("source tool") if the integration name changes
+export const updateIntegrationExtension = Prisma.defineExtension((client) =>
+  client.$extends({
+    name: "updateIntegrationUpdateUserName",
+    query: {
+      integration: {
+        async update({ args, query }) {
+          const result = await query(args);
+
+          // if the update included a new name, propagate it to integration user
+          const newName = args.data?.name;
+          if (newName) {
+            await client.user
+              .update({
+                where: { integrationUserId: result.id },
+                data: { name: newName },
+              })
+              .catch((error) => {
+                console.error(
+                  "updateIntegrationExtension failed to update integrationUser name",
+                  error?.message ?? error,
+                );
+              });
+          }
+
+          return result;
+        },
+      },
+    },
+  }),
+);

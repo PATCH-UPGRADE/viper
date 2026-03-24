@@ -53,6 +53,14 @@ async function createIntegrationApiKey(
           : "Integration Key",
       expiresIn: null,
       userId,
+      // Better auth, for some reason, defaults to an API key that can only be
+      // used 10 times daily and never refills. Here are more sensible values.
+      remaining: 100,
+      refillAmount: 100,
+      refillInterval: 1000,
+      rateLimitTimeWindow: 1000,
+      rateLimitMax: 100,
+      rateLimitEnabled: true,
     },
   });
   return apiKey;
@@ -83,6 +91,9 @@ export const integrationsRouter = createTRPCRouter({
     .input(integrationInputSchema)
     .mutation(async ({ ctx, input }) => {
       const { name, resourceType } = input;
+
+      // createIntegrationApiKey can't run inside a transaction, so
+      // create user and API key first
       const integrationUser = await prisma.user.create({
         data: {
           id: crypto.randomUUID(),
@@ -93,22 +104,32 @@ export const integrationsRouter = createTRPCRouter({
       const integrationUserId = integrationUser.id;
       const apiKey = await createIntegrationApiKey(name, integrationUserId);
 
-      const integration = await prisma.integration.create({
-        data: {
-          ...input,
-          userId: ctx.auth.user.id,
-          integrationUserId,
-          apiKeyId: apiKey.id,
-          apiKeyConnector: {
-            create: {
-              name,
-              resourceType,
-              apiKeyId: apiKey.id,
-              userId: ctx.auth.user.id,
+      // create integration and link the user inside a tx
+      const integration = await prisma.$transaction(async (tx) => {
+        const integration = await tx.integration.create({
+          data: {
+            ...input,
+            userId: ctx.auth.user.id,
+            apiKeyId: apiKey.id,
+            apiKeyConnector: {
+              create: {
+                name,
+                resourceType,
+                apiKeyId: apiKey.id,
+                userId: ctx.auth.user.id,
+              },
             },
           },
-        },
-        include: integrationsInclude,
+          include: integrationsInclude,
+        });
+
+        // Link the integration user back to the integration
+        await tx.user.update({
+          where: { id: integrationUserId },
+          data: { integrationUserId: integration.id },
+        });
+
+        return integration;
       });
 
       return {
@@ -129,14 +150,13 @@ export const integrationsRouter = createTRPCRouter({
             apiKeyId: true,
             name: true,
             userId: true,
-            integrationUserId: true,
+            integrationUser: true,
             apiKeyConnector: true,
           },
         });
 
         // an integration should always have an integrationUserId
-        // but for right now it's technically an optional field
-        const integrationUserId = integration.integrationUserId;
+        const integrationUserId = integration.integrationUser?.id;
         if (!integrationUserId) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",

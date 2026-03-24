@@ -4,6 +4,7 @@ import {
   deviceGroupExtension,
   sendWebhooksExtension,
   updateConnectorExtension,
+  updateIntegrationExtension,
   vulnerabilityExtension,
 } from "./prisma-client-extensions";
 
@@ -13,7 +14,8 @@ const createPrismaClient = () =>
     .$extends(artifactExtension)
     .$extends(vulnerabilityExtension)
     .$extends(sendWebhooksExtension)
-    .$extends(updateConnectorExtension);
+    .$extends(updateConnectorExtension)
+    .$extends(updateIntegrationExtension);
 
 export type ExtendedPrismaClient = ReturnType<typeof createPrismaClient>;
 export type TransactionClient = Parameters<

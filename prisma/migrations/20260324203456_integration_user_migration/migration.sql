@@ -16,4 +16,4 @@ ALTER TABLE "integration" DROP COLUMN "integrationUserId";
 -- Add constraints on the new column
 CREATE UNIQUE INDEX "user_integrationUserId_key" ON "user"("integrationUserId");
 CREATE INDEX "user_integrationUserId_idx" ON "user"("integrationUserId");
-ALTER TABLE "user" ADD CONSTRAINT "user_integrationUserId_fkey" FOREIGN KEY ("integrationUserId") REFERENCES "integration"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "user" ADD CONSTRAINT "user_integrationUserId_fkey" FOREIGN KEY ("integrationUserId") REFERENCES "integration"("id") ON DELETE SET NULL ON UPDATE CASCADE;

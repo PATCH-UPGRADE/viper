@@ -36,10 +36,10 @@ model User {
   apiKeyConnectors          ApiKeyConnector[]
   integration               Integration[]
   //^integrations this user created
-  
+
   // if present, then this user was created because of an integration
   integrationUserId      String? @unique
-  integrationUser        Integration?        @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
+  integrationUser        Integration?        @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: SetNull)
   webhooks                  Webhook[]
 
   @@unique([email])

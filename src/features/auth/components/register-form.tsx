@@ -58,11 +58,11 @@ export function RegisterForm() {
         name: values.email,
         email: values.email,
         password: values.password,
-        callbackURL: "/",
+        callbackURL: "/login?verified=1",
       },
       {
         onSuccess: () => {
-          router.push("/");
+          router.push("/login?verification_email_sent=1");
         },
         onError: (ctx) => {
           toast.error(ctx.error.message);

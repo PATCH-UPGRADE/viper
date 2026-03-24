@@ -3,10 +3,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -49,6 +50,7 @@ export const handleSocialLogin = async (provider: "google") => {
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -77,6 +79,9 @@ export function LoginForm() {
   };
 
   const isPending = form.formState.isSubmitting;
+  const isVerified = searchParams.get("verified") === "1";
+  const verificationEmailSent =
+    searchParams.get("verification_email_sent") === "1";
 
   // Check if dev environment for email/password option
   const showEmailPassword = process.env.NEXT_PUBLIC_VERCEL_ENV !== "production";
@@ -89,6 +94,15 @@ export function LoginForm() {
           <CardDescription>Login to continue</CardDescription>
         </CardHeader>
         <CardContent>
+          {(isVerified || verificationEmailSent) && (
+            <Alert className="mb-6">
+              <AlertDescription>
+                {isVerified
+                  ? "Your email has been verified. Please log in to continue."
+                  : "Check your email for a verification link, then come back here to log in."}
+              </AlertDescription>
+            </Alert>
+          )}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <div className="grid gap-6">

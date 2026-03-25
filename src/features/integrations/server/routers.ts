@@ -53,6 +53,14 @@ async function createIntegrationApiKey(
           : "Integration Key",
       expiresIn: null,
       userId,
+      // Better auth, for some reason, defaults to an API key that can only be
+      // used 10 times daily and never refills. Here are more sensible values.
+      remaining: 100,
+      refillAmount: 100,
+      refillInterval: 1000,
+      rateLimitTimeWindow: 1000,
+      rateLimitMax: 100,
+      rateLimitEnabled: true,
     },
   });
   return apiKey;
@@ -207,10 +215,25 @@ export const integrationsRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       const { id, data } = input;
-      return prisma.integration.update({
-        where: { id },
-        data,
-        include: integrationsInclude,
+      return prisma.$transaction(async (tx) => {
+        // Update the integration
+        const integration = await tx.integration.update({
+          where: { id },
+          data,
+          include: integrationsInclude,
+        });
+
+        // If integration has a linked user, update their name
+        if (integration.integrationUserId && data.name) {
+          await tx.user.update({
+            where: { id: integration.integrationUserId },
+            data: {
+              name: data.name,
+            },
+          });
+        }
+
+        return integration;
       });
     }),
 

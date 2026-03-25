@@ -9,3 +9,5 @@ export const mainPadding = "p-4 md:px-10 md:py-6 h-full";
 export const headerClass = "text-lg md:text-xl font-semibold";
 
 export const UNKNOWN_CPE_STRING = "cpe:2.3:-:-:-";
+
+export const MIN_PASSWORD_LENGTH = 8;

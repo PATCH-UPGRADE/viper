@@ -26,13 +26,19 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { MIN_PASSWORD_LENGTH } from "@/config/constants";
 import { authClient } from "@/lib/auth-client";
 import { handleSocialLogin } from "./login-form";
 
 const registerSchema = z
   .object({
     email: z.email("Please enter a valid email address"),
-    password: z.string().min(1, "Password is required"),
+    password: z
+      .string()
+      .min(
+        MIN_PASSWORD_LENGTH,
+        `Password is required, and must be at least ${MIN_PASSWORD_LENGTH} characters`,
+      ),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -155,18 +161,18 @@ export function RegisterForm() {
                       </FormItem>
                     )}
                   />
+                  <Alert>
+                    <AlertCircle className="size-4" color="red" />
+                    <AlertDescription>
+                      VIPER is alpha software and not intended for production
+                      use. Passwords are hashed, but always choose a strong,
+                      unique password that you don’t reuse elsewhere.
+                    </AlertDescription>
+                  </Alert>
                   <Button type="submit" className="w-full" disabled={isPending}>
                     Sign up
                   </Button>
                 </div>
-                <Alert>
-                  <AlertCircle className="size-4" />
-                  <AlertDescription>
-                    VIPER is alpha software and not intended for production use.
-                    Passwords are hashed, but always choose a strong, unique
-                    password that you don’t reuse elsewhere.
-                  </AlertDescription>
-                </Alert>
                 <div className="text-center text-sm">
                   Already have an account?{" "}
                   <Link href="/login" className="underline underline-offset-4">

@@ -5,7 +5,6 @@ import prisma from "@/lib/db";
 import { sendEmail } from "@/lib/mail";
 
 // Domains allowed to create accounts
-// Note that only development environments will allow non-Google OAuth accounts
 export const DOMAIN_WHITELIST = (process.env.DOMAIN_WHITELIST || "")
   .split(",")
   .map((domain) => domain.trim().toLowerCase())

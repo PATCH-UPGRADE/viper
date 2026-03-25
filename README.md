@@ -69,7 +69,7 @@ After seeding, you can log in with:
 - Email: `user@example.com`
 - Password: (read the seed script)
 
-- In production, only accounts associated with whitelisted domains are able to authenticate. That whitelists exists in Vercel's env vars. 
+- In production, only accounts associated with whitelisted domains are able to authenticate. That whitelist exists in Vercel's env vars. 
 
 ## Tech Stack
 

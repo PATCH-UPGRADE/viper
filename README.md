@@ -69,8 +69,7 @@ After seeding, you can log in with:
 - Email: `user@example.com`
 - Password: (read the seed script)
 
-- Note that user/password auth is only enabled for development environments.
-- In production, only Google OAuth can be used, with a domain whitelist in Vercel's env vars.
+- In production, only accounts associated with whitelisted domains are able to authenticate. That whitelist exists in Vercel's env vars. 
 
 ## Tech Stack
 

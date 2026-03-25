@@ -1,12 +1,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -157,6 +159,14 @@ export function RegisterForm() {
                     Sign up
                   </Button>
                 </div>
+                <Alert>
+                  <AlertCircle className="size-4" />
+                  <AlertDescription>
+                    VIPER is alpha software and not intended for production use.
+                    Passwords are hashed, but always choose a strong, unique
+                    password that you don’t reuse elsewhere.
+                  </AlertDescription>
+                </Alert>
                 <div className="text-center text-sm">
                   Already have an account?{" "}
                   <Link href="/login" className="underline underline-offset-4">

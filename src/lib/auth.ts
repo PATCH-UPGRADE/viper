@@ -73,6 +73,8 @@ export const auth = betterAuth({
       });
     },
     sendOnSignUp: true,
+    sendOnSignIn: true, // Auto-resend the verification email if the user tries to sign in before verifying their account
+    autoSignInAfterVerification: true,
   },
   plugins: [apiKey()],
   socialProviders: {

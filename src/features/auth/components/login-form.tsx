@@ -39,7 +39,7 @@ type LoginFormProps = {
   verificationEmailSent?: boolean;
 };
 
-export const handleSocialLogin = async (provider: "google") => {
+export const handleSocialLogin = async (provider: "google" | "github") => {
   await authClient.signIn.social(
     {
       provider,
@@ -122,6 +122,21 @@ export function LoginForm({
                       height={20}
                     />
                     Continue with Google
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => handleSocialLogin("github")}
+                  >
+                    <Image
+                      alt="GitHub"
+                      src="/logos/github.svg"
+                      width={20}
+                      height={20}
+                    />
+                    Continue with GitHub
                   </Button>
                 </div>
                 <div className="grid gap-6">

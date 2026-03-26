@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataTable } from "@/components/ui/data-table";
 import {
   Drawer,
   DrawerClose,
@@ -40,6 +41,7 @@ import type {
   RemediationCard as RemediationCardType,
   RemediationResponse,
 } from "../types";
+import { columns } from "./columns";
 
 export const RemediationsSearch = () => {
   const [params, setParams] = useRemediationsParams();
@@ -66,6 +68,19 @@ export const RemediationsList = () => {
       getKey={(remediation) => remediation.id}
       renderItem={(remediation) => <RemediationItem data={remediation} />}
       emptyView={<RemediationsEmpty />}
+    />
+  );
+};
+
+export const RemediationsDataList = () => {
+  const { data: remediations, isFetching } = useSuspenseRemediations();
+
+  return (
+    <DataTable
+      paginatedData={remediations}
+      columns={columns}
+      isLoading={isFetching}
+      search={<RemediationsSearch />}
     />
   );
 };

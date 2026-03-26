@@ -31,7 +31,7 @@ export const ConnectorsEmpty = () => {
   );
 };
 
-const ConnectorsHeader = ({
+export const ConnectorsHeader = ({
   disabled,
   resourceType,
 }: {
@@ -77,12 +77,14 @@ const ConnectorsSearch = () => {
   );
 };
 
-const ConnectorsList = ({ resourceType }: { resourceType: ResourceType }) => {
+export const ConnectorsList = ({
+  resourceType,
+}: {
+  resourceType: ResourceType;
+}) => {
   const { data: connectors, isFetching } = useSuspenseConnectorsByResourceType({
     resourceType,
   });
-
-  console.log("useSuspenseConnectorsByResourceType:", connectors);
 
   return (
     <DataTable

@@ -53,53 +53,52 @@ export const columns: ColumnDef<AssetResponse>[] = [
     cell: ({ row }) =>
       formatDistanceToNow(row.original.updatedAt, { addSuffix: true }),
   },
-  {
-    id: "actions",
-    enableHiding: false,
-    cell: ({ row }) => {
-      const asset = row.original;
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[200px]">
-            <DropdownMenuItem asChild>
-              <Link href={`/assets/${asset.id}`}>Go to Asset Details</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>Quick Actions</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() =>
-                handleCopy(asset.deviceGroup.cpe, () =>
-                  toast.success("Copied!"),
-                )
-              }
-            >
-              <CopyIcon strokeWidth={3} /> Copy Group ID
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() =>
-                handleCopy(asset.id, () => toast.success("Copied!"))
-              }
-            >
-              <CopyIcon strokeWidth={3} /> Copy Asset ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => console.log("TODO")}
-              variant="destructive"
-            >
-              <TrashIcon strokeWidth={3} /> Delete Asset
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    },
-  },
 ];
+
+const actionsColumn: ColumnDef<AssetResponse> = {
+  id: "actions",
+  enableHiding: false,
+  cell: ({ row }) => {
+    const asset = row.original;
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-8 w-8 p-0">
+            <span className="sr-only">Open menu</span>
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-[200px]">
+          <DropdownMenuItem asChild>
+            <Link href={`/assets/${asset.id}`}>Go to Asset Details</Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Quick Actions</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() =>
+              handleCopy(asset.deviceGroup.cpe, () => toast.success("Copied!"))
+            }
+          >
+            <CopyIcon strokeWidth={3} /> Copy Group ID
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => handleCopy(asset.id, () => toast.success("Copied!"))}
+          >
+            <CopyIcon strokeWidth={3} /> Copy Asset ID
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => console.log("TODO")}
+            variant="destructive"
+          >
+            <TrashIcon strokeWidth={3} /> Delete Asset
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  },
+};
+
+export const columnsWithActions = [...columns, actionsColumn];

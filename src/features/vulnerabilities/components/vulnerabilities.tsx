@@ -81,6 +81,20 @@ export const VulnerabilitiesSearch = () => {
 
 export const VulnerabilitiesList = () => {
   const { data: vulnerabilities, isFetching } = useSuspenseVulnerabilities();
+
+  return (
+    <DataTable
+      paginatedData={vulnerabilities}
+      columns={columns}
+      isLoading={isFetching}
+      search={<VulnerabilitiesSearch />}
+    />
+  );
+};
+
+// if we use this again wrap ^VulnerabilitiesList with drawer logic
+export const VulnerabilitiesListWithDrawer = () => {
+  const { data: vulnerabilities, isFetching } = useSuspenseVulnerabilities();
   const [vuln, setVuln] = useState<VulnerabilityResponse | undefined>(
     undefined,
   );

@@ -34,7 +34,7 @@ export const useCreateIntegration = () => {
         toast.success("Integration created");
         queryClient.invalidateQueries(
           trpc.integrations.getMany.queryOptions({
-            resourceType: data.integration.resourceType,
+            resourceType: data.resourceType,
           }),
         );
         // Need to recount # of active ApiKey Connectors
@@ -101,25 +101,6 @@ export const useRemoveIntegration = () => {
       },
       onError: (error) => {
         toast.error(`Failed to remove Integration: ${error.message}`);
-      },
-    }),
-  );
-};
-
-/**
- * Hook to rotate Integration API Key
- */
-export const useRotateIntegration = () => {
-  const trpc = useTRPC();
-
-  return useMutation(
-    trpc.integrations.rotateKey.mutationOptions({
-      onSuccess: (data) => {
-        toast.success("Integration API key updated");
-        return data;
-      },
-      onError: (error) => {
-        toast.error(`Failed to rotate Integration API key: ${error.message}`);
       },
     }),
   );

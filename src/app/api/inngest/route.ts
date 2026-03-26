@@ -9,6 +9,7 @@ import {
   syncAllIntegrations,
   syncIntegration,
 } from "@/inngest/functions/sync-integrations";
+import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-user-tokens";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -18,5 +19,6 @@ export const { GET, POST, PUT } = serve({
     enrichVulnerability,
     enrichAllVulnerabilities,
     chatAgent,
+    purgeExpiredTokensFn,
   ],
 });

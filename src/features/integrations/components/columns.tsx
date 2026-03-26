@@ -6,7 +6,6 @@ import { formatDistanceToNow } from "date-fns";
 import {
   MoreVertical,
   RefreshCw,
-  RotateCwIcon,
   Sparkles,
   SquarePen,
   TrashIcon,
@@ -28,16 +27,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ApiTokenSuccessModal } from "@/features/user/components/user";
-import {
-  type Apikey,
-  type ResourceType,
-  SyncStatusEnum,
-} from "@/generated/prisma";
+import { type ResourceType, SyncStatusEnum } from "@/generated/prisma";
 import type { AuthenticationInputType } from "@/lib/schemas";
 import {
   useRemoveIntegration,
-  useRotateIntegration,
   useTriggerSync,
   useUpdateIntegration,
 } from "../hooks/use-integrations";
@@ -46,11 +39,7 @@ import {
   type IntegrationWithRelations,
   integrationInputSchema,
 } from "../types";
-import {
-  IntegrationCreateModal,
-  RotateIntegrationConfirmModal,
-  SyncStatusIndicator,
-} from "./integrations";
+import { IntegrationCreateModal, SyncStatusIndicator } from "./integrations";
 
 export const getIntegrationColumns = (
   resourceType: ResourceType,
@@ -185,11 +174,7 @@ export const getIntegrationColumns = (
         };
 
         const updateIntegration = useUpdateIntegration();
-        const rotateIntegration = useRotateIntegration();
         const [open, setOpen] = useState(false);
-        const [rotateOpen, setRotateOpen] = useState(false);
-        const [successOpen, setSuccessOpen] = useState(false);
-        const [key, setKey] = useState<Apikey | undefined>(undefined);
 
         const form = useForm<IntegrationFormValues>({
           resolver: zodResolver(integrationInputSchema),
@@ -222,21 +207,6 @@ export const getIntegrationColumns = (
           );
         };
 
-        const handleRotate = () => {
-          rotateIntegration.mutate(
-            { id: data.id },
-            {
-              onSuccess: (data) => {
-                setKey(data.apiKey);
-                setSuccessOpen(true);
-              },
-              onError: () => {
-                setRotateOpen(true);
-              },
-            },
-          );
-        };
-
         return (
           <>
             <DropdownMenu>
@@ -253,9 +223,6 @@ export const getIntegrationColumns = (
                 >
                   <SquarePen />
                   {updateIntegration.isPending ? "Updating..." : "Update"}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setRotateOpen(true)}>
-                  <RotateCwIcon /> Rotate API Key
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -275,20 +242,6 @@ export const getIntegrationColumns = (
                 setOpen={setOpen}
                 handleCreate={handleUpdate}
                 isUpdate={true}
-              />
-            )}
-            {rotateOpen && (
-              <RotateIntegrationConfirmModal
-                open={rotateOpen}
-                setOpen={setRotateOpen}
-                handleRotate={handleRotate}
-              />
-            )}
-            {successOpen && (
-              <ApiTokenSuccessModal
-                open={successOpen}
-                setOpen={setSuccessOpen}
-                apiKey={key}
               />
             )}
           </>

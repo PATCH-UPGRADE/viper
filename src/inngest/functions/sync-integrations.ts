@@ -15,7 +15,7 @@ import { inngest } from "../client";
 
 export const syncAllIntegrations = inngest.createFunction(
   { id: "sync-all-integrations" },
-  { cron: "*/1 * * * *" }, // Run every 1 minute
+  { cron: "*/5 * * * *" }, // Run every 5 minutes
   async ({ step }) => {
     // Get all active integrations
     const integrations = await step.run("fetch-integrations", async () => {

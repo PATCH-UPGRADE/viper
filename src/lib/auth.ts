@@ -77,7 +77,13 @@ export const auth = betterAuth({
     sendOnSignIn: true, // Auto-resend the verification email if the user tries to sign in before verifying their account
     autoSignInAfterVerification: true,
   },
-  plugins: [apiKey()],
+  plugins: [
+    apiKey({
+      keyExpiration: {
+        minExpiresIn: 0.5,
+      },
+    }),
+  ],
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_OAUTH_CLIENT_ID as string,

@@ -366,44 +366,6 @@ export const IntegrationCreateModal = ({
   );
 };
 
-interface RotateIntegrationConfirmModalProps {
-  open: boolean;
-  setOpen: (open: boolean) => void;
-  handleRotate: () => void;
-}
-
-export function RotateIntegrationConfirmModal({
-  open,
-  setOpen,
-  handleRotate,
-}: RotateIntegrationConfirmModalProps) {
-  const onConfirm = () => {
-    handleRotate();
-    setOpen(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Rotate API Key</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to rotate this API key? This will invalidate
-            the current key and generate a new one. Any applications using the
-            old key will need to be updated.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={onConfirm}>Rotate Key</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export const IntegrationsLoading = () => {
   return <LoadingView message="Loading integrations..." />;
 };

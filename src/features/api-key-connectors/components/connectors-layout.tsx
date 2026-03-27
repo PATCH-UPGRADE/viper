@@ -1,6 +1,12 @@
 "use client";
 
-import { ActivityIcon, PlugIcon } from "lucide-react";
+import {
+  BugIcon,
+  ComputerIcon,
+  CpuIcon,
+  HeartIcon,
+  PlugIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { notFound, usePathname } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +18,16 @@ import {
 import { ResourceType } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { ConnectorsHeader } from "./connectors";
+
+const resourceTypeIcons = {
+  [ResourceType.Asset]: { icon: <ComputerIcon />, name: "Assets" },
+  [ResourceType.DeviceArtifact]: {
+    icon: <CpuIcon />,
+    name: "Device Artifacts",
+  },
+  [ResourceType.Remediation]: { icon: <HeartIcon />, name: "Remediations" },
+  [ResourceType.Vulnerability]: { icon: <BugIcon />, name: "Vulnerabilities" },
+};
 
 export const ConnectorsLayout = ({
   children,
@@ -26,6 +42,8 @@ export const ConnectorsLayout = ({
     return notFound();
   }
 
+  const resourceType = integrationsMapping[resourceTypePlural].type;
+
   const tabs = [
     {
       name: "Connectors",
@@ -34,14 +52,13 @@ export const ConnectorsLayout = ({
       icon: <PlugIcon />,
     },
     {
-      name: "Items",
+      name: resourceTypeIcons[resourceType].name,
       value: "items",
       href: `/connectors/${resourceTypePlural}/items`,
-      icon: <ActivityIcon />,
+      icon: resourceTypeIcons[resourceType].icon,
     },
   ];
 
-  const resourceType = integrationsMapping[resourceTypePlural].type;
   const headerText =
     resourceType === ResourceType.DeviceArtifact
       ? "Device Artifact"
@@ -65,7 +82,7 @@ export const ConnectorsLayout = ({
             <TabsTrigger value={tab.value} key={tab.value} asChild>
               <Link
                 href={tab.href}
-                className="data-[state=active]:text-primary!  [&[data-state=active]]:after:bg-primary!"
+                className="font-semibold data-[state=active]:text-primary!  [&[data-state=active]]:after:bg-primary!"
               >
                 {tab.icon}
                 {tab.name}

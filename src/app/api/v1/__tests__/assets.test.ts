@@ -351,7 +351,10 @@ describe("Assets Endpoint (/assets)", () => {
 
     // this should succeed and nothing should be created
     const noAssets = { ...assetIntegrationPayload, items: [] };
-    const token = await createIntegrationToken(integration.integrationUserId, ResourceType.Asset);
+    const token = await createIntegrationToken(
+      integration.integrationUserId,
+      ResourceType.Asset,
+    );
     const createAssetResp = await request(BASE_URL)
       .post(`/assets/integrationUpload/${token}`)
       .set(jsonHeader)
@@ -365,8 +368,9 @@ describe("Assets Endpoint (/assets)", () => {
   });
 
   it("create Assets uploadIntegration endpoint int test", async () => {
-    const { integration: createdIntegration } =
-      await setupMockIntegration(mockIntegrationPayload);
+    const { integration: createdIntegration } = await setupMockIntegration(
+      mockIntegrationPayload,
+    );
 
     onTestFinished(async () => {
       // this won't throw errors if it misses, which messes up the onTestFinished stack
@@ -384,7 +388,10 @@ describe("Assets Endpoint (/assets)", () => {
       });
     });
 
-    const createToken = await createIntegrationToken(createdIntegration.integrationUserId, ResourceType.Asset);
+    const createToken = await createIntegrationToken(
+      createdIntegration.integrationUserId,
+      ResourceType.Asset,
+    );
     const integrationRes = await request(BASE_URL)
       .post(`/assets/integrationUpload/${createToken}`)
       .set(jsonHeader)
@@ -481,8 +488,9 @@ describe("Assets Endpoint (/assets)", () => {
   });
 
   it("update Assets uploadIntegration endpoint int test", async () => {
-    const { integration: createdIntegration } =
-      await setupMockIntegration(mockIntegrationPayload);
+    const { integration: createdIntegration } = await setupMockIntegration(
+      mockIntegrationPayload,
+    );
 
     onTestFinished(async () => {
       // this won't cause an error if it misses which messes up the onTestFinished stack
@@ -501,7 +509,10 @@ describe("Assets Endpoint (/assets)", () => {
     });
 
     // create the assets first
-    const createToken = await createIntegrationToken(createdIntegration.integrationUserId, ResourceType.Asset);
+    const createToken = await createIntegrationToken(
+      createdIntegration.integrationUserId,
+      ResourceType.Asset,
+    );
     const createAssetsReq = await request(BASE_URL)
       .post(`/assets/integrationUpload/${createToken}`)
       .set(jsonHeader)
@@ -522,7 +533,10 @@ describe("Assets Endpoint (/assets)", () => {
     updateAssetsPayload.items[0].upstreamApi = newUpstreamApi;
     updateAssetsPayload.items[1].upstreamApi = newUpstreamApi;
 
-    const updateToken = await createIntegrationToken(createdIntegration.integrationUserId, ResourceType.Asset);
+    const updateToken = await createIntegrationToken(
+      createdIntegration.integrationUserId,
+      ResourceType.Asset,
+    );
     const integrationRes = await request(BASE_URL)
       .post(`/assets/integrationUpload/${updateToken}`)
       .set(jsonHeader)
@@ -609,8 +623,9 @@ describe("Assets Endpoint (/assets)", () => {
   });
 
   it("mixed create+update Assets uploadIntegration endpoint int test", async () => {
-    const { integration: createdIntegration } =
-      await setupMockIntegration(mockIntegrationPayload);
+    const { integration: createdIntegration } = await setupMockIntegration(
+      mockIntegrationPayload,
+    );
 
     onTestFinished(async () => {
       // this won't throw errors if it misses, which messes up the onTestFinished stack
@@ -633,7 +648,10 @@ describe("Assets Endpoint (/assets)", () => {
       ...assetIntegrationPayload,
       items: assetIntegrationPayload.items.slice(1),
     };
-    const createToken = await createIntegrationToken(createdIntegration.integrationUserId, ResourceType.Asset);
+    const createToken = await createIntegrationToken(
+      createdIntegration.integrationUserId,
+      ResourceType.Asset,
+    );
     const createAssetResp = await request(BASE_URL)
       .post(`/assets/integrationUpload/${createToken}`)
       .set(jsonHeader)
@@ -650,7 +668,10 @@ describe("Assets Endpoint (/assets)", () => {
     const newUpstreamApi = "https://mock-upstream-api.com/v2";
     createWithUpdateAssets.items[0].upstreamApi = newUpstreamApi;
 
-    const updateToken = await createIntegrationToken(createdIntegration.integrationUserId, ResourceType.Asset);
+    const updateToken = await createIntegrationToken(
+      createdIntegration.integrationUserId,
+      ResourceType.Asset,
+    );
     const integrationResp = await request(BASE_URL)
       .post(`/assets/integrationUpload/${updateToken}`)
       .set(jsonHeader)
@@ -783,7 +804,10 @@ describe("Assets Endpoint (/assets)", () => {
     };
 
     // then run the endpoint which should update the asset and create the mapping
-    const integrationToken = await createIntegrationToken(createdIntegration.integrationUserId, ResourceType.Asset);
+    const integrationToken = await createIntegrationToken(
+      createdIntegration.integrationUserId,
+      ResourceType.Asset,
+    );
     const updateAssetResp = await request(BASE_URL)
       .post(`/assets/integrationUpload/${integrationToken}`)
       .set(jsonHeader)
@@ -893,7 +917,10 @@ describe("Assets Endpoint (/assets)", () => {
     };
 
     // this should create a new asset because all unique fields are missing
-    const allNullToken = await createIntegrationToken(integration.integrationUserId, ResourceType.Asset);
+    const allNullToken = await createIntegrationToken(
+      integration.integrationUserId,
+      ResourceType.Asset,
+    );
     const integrationRes = await request(BASE_URL)
       .post(`/assets/integrationUpload/${allNullToken}`)
       .set(jsonHeader)
@@ -955,7 +982,10 @@ describe("Assets Endpoint (/assets)", () => {
     };
 
     // this should produce an update based on serialNumber match
-    const partialNullToken = await createIntegrationToken(integration.integrationUserId, ResourceType.Asset);
+    const partialNullToken = await createIntegrationToken(
+      integration.integrationUserId,
+      ResourceType.Asset,
+    );
     const integrationRes = await request(BASE_URL)
       .post(`/assets/integrationUpload/${partialNullToken}`)
       .set(jsonHeader)

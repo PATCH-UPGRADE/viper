@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ResourceType, type Prisma } from "@/generated/prisma";
+import { type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
@@ -11,7 +11,11 @@ import {
   transformArtifactWrapper,
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
-import { baseProcedure, createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import {
+  baseProcedure,
+  createTRPCRouter,
+  protectedProcedure,
+} from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   deviceArtifactInclude,
@@ -21,7 +25,6 @@ import {
   integrationDeviceArtifactInputSchema,
   paginatedDeviceArtifactResponseSchema,
 } from "../types";
-import { consumeUserToken } from "@/lib/tokens";
 
 // TODO: do something DRY with `createSearchFilter` in other routers
 const createSearchFilter = (search: string) => {
@@ -221,7 +224,10 @@ export const deviceArtifactsRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const {userId, integrationId} = await processIntegrationToken(input.token, ResourceType.DeviceArtifact); 
+      const { userId, integrationId } = await processIntegrationToken(
+        input.token,
+        ResourceType.DeviceArtifact,
+      );
 
       return processIntegrationSync(
         prisma,

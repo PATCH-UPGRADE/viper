@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { ResourceType, type AlohaStatus, type Prisma } from "@/generated/prisma";
+import {
+  type AlohaStatus,
+  type Prisma,
+  ResourceType,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
@@ -12,7 +16,11 @@ import {
 } from "@/lib/router-utils";
 import { processArtifactHosting } from "@/lib/s3";
 import { alohaInputSchema, integrationResponseSchema } from "@/lib/schemas";
-import { baseProcedure, createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import {
+  baseProcedure,
+  createTRPCRouter,
+  protectedProcedure,
+} from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   integrationRemediationInputSchema,
@@ -194,7 +202,10 @@ export const remediationsRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const {userId, integrationId} = await processIntegrationToken(input.token, ResourceType.Remediation);
+      const { userId, integrationId } = await processIntegrationToken(
+        input.token,
+        ResourceType.Remediation,
+      );
 
       return processIntegrationSync(
         prisma,

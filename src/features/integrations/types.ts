@@ -1,5 +1,6 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
+import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
 import { type Integration, ResourceType } from "@/generated/prisma";
 import { authSchema, safeUrlSchema } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
@@ -18,7 +19,11 @@ export const integrationInputSchema = authSchema.safeExtend({
   isGeneric: z.boolean(),
   prompt: z.string().optional(),
   resourceType: resourceTypeSchema,
-  syncEvery: z.number().int().positive().min(60),
+  syncEvery: z
+    .number()
+    .int()
+    .positive()
+    .min(INTEGRATION_SYNC_EVERY_MIN * 60),
 });
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;
 

@@ -558,7 +558,10 @@ describe("Remediations Endpoint (/remediations)", () => {
 
     // this should succeed and nothing should be created
     const noRemediations = { ...remediationIntegrationPayload, items: [] };
-    const token = await createIntegrationToken(integration.integrationUserId, ResourceType.Remediation);
+    const token = await createIntegrationToken(
+      integration.integrationUserId,
+      ResourceType.Remediation,
+    );
     const createRemResp = await request(BASE_URL)
       .post(`/remediations/integrationUpload/${token}`)
       .set(jsonHeader)
@@ -572,8 +575,9 @@ describe("Remediations Endpoint (/remediations)", () => {
   });
 
   it("create Remediation uploadIntegration endpoint int test", async () => {
-    const { integration: createdIntegration } =
-      await setupMockIntegration(mockIntegrationPayload);
+    const { integration: createdIntegration } = await setupMockIntegration(
+      mockIntegrationPayload,
+    );
 
     onTestFinished(async () => {
       // this won't throw errors if it misses, which messes up the onTestFinished stack
@@ -587,7 +591,10 @@ describe("Remediations Endpoint (/remediations)", () => {
       });
     });
 
-    const createToken = await createIntegrationToken(createdIntegration.integrationUserId, ResourceType.Remediation);
+    const createToken = await createIntegrationToken(
+      createdIntegration.integrationUserId,
+      ResourceType.Remediation,
+    );
     const integrationRes = await request(BASE_URL)
       .post(`/remediations/integrationUpload/${createToken}`)
       .set(jsonHeader)

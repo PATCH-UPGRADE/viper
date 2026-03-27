@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { mainPadding } from "@/config/constants";
+import { INTEGRATION_SYNC_EVERY_MIN, mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
 import { AuthType } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
@@ -42,7 +42,7 @@ export const IntegrationsLayout = ({
       integrationUri: "",
       prompt: "",
       isGeneric: false,
-      syncEvery: 300,
+      syncEvery: INTEGRATION_SYNC_EVERY_MIN * 60,
       authType: AuthType.None,
     },
   });

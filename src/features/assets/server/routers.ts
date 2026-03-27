@@ -14,7 +14,11 @@ import {
   processIntegrationToken,
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
-import { baseProcedure, createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import {
+  baseProcedure,
+  createTRPCRouter,
+  protectedProcedure,
+} from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   assetArrayInputSchema,
@@ -458,7 +462,7 @@ export const assetsRouter = createTRPCRouter({
       );
     }),
 
-  processIntegrationCreate: baseProcedure 
+  processIntegrationCreate: baseProcedure
     .input(integrationAssetInputSchema)
     .meta({
       openapi: {
@@ -472,7 +476,10 @@ export const assetsRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const {userId, integrationId} = await processIntegrationToken(input.token, ResourceType.Asset);
+      const { userId, integrationId } = await processIntegrationToken(
+        input.token,
+        ResourceType.Asset,
+      );
 
       return processIntegrationSync(
         prisma,

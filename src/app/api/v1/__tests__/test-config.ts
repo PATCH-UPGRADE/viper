@@ -1,9 +1,9 @@
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
 import type { IntegrationFormValues } from "@/features/integrations/types";
+import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { createUserToken, DEFAULT_TOKEN_TTL_SECONDS } from "@/lib/tokens";
-import { auth } from "@/lib/auth";
 
 export const BASE_URL = "http://localhost:3000/api/v1";
 export const ROOT_API_URL = "http://localhost:3000/api";
@@ -75,14 +75,14 @@ export const setupMockIntegration = async (
   // this will be used to simulate previous integrationUpload runs
   const apiKey = await auth.api.createApiKey({
     body: {
-        name: 'integration-user-key',
-        userId: createdIntegration.integrationUserId,
+      name: "integration-user-key",
+      userId: createdIntegration.integrationUserId,
     },
   });
 
   return {
     integration: createdIntegration,
-    apiKey
+    apiKey,
   };
 };
 
@@ -90,5 +90,9 @@ export const createIntegrationToken = (
   integrationUserId: string,
   resourceType: string,
 ): Promise<string> => {
-  return createUserToken(integrationUserId, DEFAULT_TOKEN_TTL_SECONDS, resourceType);
+  return createUserToken(
+    integrationUserId,
+    DEFAULT_TOKEN_TTL_SECONDS,
+    resourceType,
+  );
 };

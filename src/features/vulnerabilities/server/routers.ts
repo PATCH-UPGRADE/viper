@@ -9,7 +9,11 @@ import {
   processIntegrationToken,
 } from "@/lib/router-utils";
 import { alohaInputSchema, integrationResponseSchema } from "@/lib/schemas";
-import { baseProcedure, createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import {
+  baseProcedure,
+  createTRPCRouter,
+  protectedProcedure,
+} from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   integrationVulnerabilityInputSchema,
@@ -241,7 +245,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       );
     }),
 
-  processIntegrationCreate: baseProcedure 
+  processIntegrationCreate: baseProcedure
     .input(integrationVulnerabilityInputSchema)
     .meta({
       openapi: {
@@ -256,7 +260,10 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const {userId, integrationId} = await processIntegrationToken(input.token, ResourceType.Vulnerability);
+      const { userId, integrationId } = await processIntegrationToken(
+        input.token,
+        ResourceType.Vulnerability,
+      );
 
       return processIntegrationSync(
         prisma,

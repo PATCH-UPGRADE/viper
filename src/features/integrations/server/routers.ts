@@ -3,7 +3,6 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { ResourceType } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
-import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";

@@ -41,6 +41,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
+import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
 import { getIntegrationColumns } from "@/features/integrations/components/columns";
 import type { ResourceType, SyncStatusEnum } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
@@ -320,7 +321,9 @@ export const IntegrationCreateModal = ({
                         }}
                       />
                     </FormControl>
-                    <FormDescription>Minimum: 60 seconds</FormDescription>
+                    <FormDescription>
+                      Minimum: {INTEGRATION_SYNC_EVERY_MIN * 60} seconds
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

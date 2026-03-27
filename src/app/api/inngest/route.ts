@@ -5,11 +5,11 @@ import {
   enrichAllVulnerabilities,
   enrichVulnerability,
 } from "@/inngest/functions/enrich-vulnerabilities";
+import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-user-tokens";
 import {
   syncAllIntegrations,
   syncIntegration,
 } from "@/inngest/functions/sync-integrations";
-import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-user-tokens";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,

@@ -524,7 +524,10 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       ...deviceArtifactsIntegrationPayload,
       items: [],
     };
-    const token = await createIntegrationToken(integration.integrationUserId, ResourceType.DeviceArtifact);
+    const token = await createIntegrationToken(
+      integration.integrationUserId,
+      ResourceType.DeviceArtifact,
+    );
     const createRes = await request(BASE_URL)
       .post(`/deviceArtifacts/integrationUpload/${token}`)
       .set(jsonHeader)
@@ -538,8 +541,9 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
   });
 
   it("create DeviceArtifact uploadIntegration endpoint int test", async () => {
-    const { integration: createdIntegration } =
-      await setupMockIntegration(mockIntegrationPayload);
+    const { integration: createdIntegration } = await setupMockIntegration(
+      mockIntegrationPayload,
+    );
 
     onTestFinished(async () => {
       await prisma.deviceArtifact.deleteMany({
@@ -552,7 +556,10 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       });
     });
 
-    const createToken = await createIntegrationToken(createdIntegration.integrationUserId, ResourceType.DeviceArtifact);
+    const createToken = await createIntegrationToken(
+      createdIntegration.integrationUserId,
+      ResourceType.DeviceArtifact,
+    );
     const integrationRes = await request(BASE_URL)
       .post(`/deviceArtifacts/integrationUpload/${createToken}`)
       .set(jsonHeader)

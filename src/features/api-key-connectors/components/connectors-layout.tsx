@@ -45,7 +45,7 @@ export const ConnectorsLayout = ({
   const headerText =
     resourceType === ResourceType.DeviceArtifact
       ? "Device Artifact"
-      : resourceType;
+      : resourceType.toString();
   const activeTab = pathname.includes(tabs[1].value)
     ? tabs[1].value
     : tabs[0].value;

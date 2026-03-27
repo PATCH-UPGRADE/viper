@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
-import { IssueStatus, Severity } from "@/generated/prisma";
+import { IssueStatus, ResourceType, Severity } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   buildPaginationMeta,
@@ -11,9 +11,10 @@ import {
   cpeToDeviceGroup,
   fetchPaginated,
   processIntegrationSync,
+  processIntegrationToken,
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { baseProcedure, createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   assetArrayInputSchema,
@@ -457,27 +458,21 @@ export const assetsRouter = createTRPCRouter({
       );
     }),
 
-  processIntegrationCreate: protectedProcedure
+  processIntegrationCreate: baseProcedure 
     .input(integrationAssetInputSchema)
     .meta({
       openapi: {
         method: "POST",
-        path: "/assets/integrationUpload",
+        path: "/assets/integrationUpload/{token}",
         tags: ["Assets"],
         summary: "Synchronize assets with integration",
         description: "Synchronize Assets on VIPER from a partnered platform",
       },
     })
     .output(integrationResponseSchema)
-    .mutation(async ({ ctx, input }) => {
-      const userId = ctx.auth.user.id;
-      const integration = await prisma.integration.findFirst({
-        // @ts-expect-error ctx.auth.key.id is defined if logging in with api key
-        where: { apiKey: { id: ctx.auth.key?.id } },
-        select: { id: true },
-      });
-
-      const integrationId = requireExistence(integration, "Integration").id;
+    .mutation(async ({ input }) => {
+      // Validate provided token or throw error
+      const {userId, integrationId} = await processIntegrationToken(input.token, ResourceType.Asset);
 
       return processIntegrationSync(
         prisma,

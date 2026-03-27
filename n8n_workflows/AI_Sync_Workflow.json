@@ -12,7 +12,10 @@
       "name": "Webhook Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [0, -416],
+      "position": [
+        0,
+        -416
+      ],
       "webhookId": "1741504f-8151-46a9-9ab9-52eea89e7087",
       "alwaysOutputData": false,
       "credentials": {
@@ -53,7 +56,10 @@
       "name": "Workflow Configuration",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [224, -416]
+      "position": [
+        224,
+        -416
+      ]
     },
     {
       "parameters": {
@@ -69,7 +75,10 @@
       "name": "OpenAI Chat Model",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
-      "position": [672, -192],
+      "position": [
+        672,
+        -192
+      ],
       "credentials": {
         "openAiApi": {
           "id": "j0mv3A9ieKbr7MtD",
@@ -85,8 +94,8 @@
         "headerParameters": {
           "parameters": [
             {
-              "name": "={{  $json.authType === \"Header\" ? $json.authentication.header : \"Authentication\" }}",
-              "value": "={{  $json.authType === \"Header\" ? $json.authentication.value : \"Bearer \" + $json.authentication.token  }}"
+              "name": "={{ $json.body.authType === \"Header\" ? $json.body.authentication.header : \"Authentication\" }}",
+              "value": "={{  $json.body.authType === \"Header\" ? $json.body.authentication.value : \"Bearer \" + $json.body.authentication.token  }}"
             }
           ]
         },
@@ -96,7 +105,10 @@
       "name": "HTTP Request Tool",
       "type": "n8n-nodes-base.httpRequestTool",
       "typeVersion": 4.3,
-      "position": [800, -192]
+      "position": [
+        800,
+        -192
+      ]
     },
     {
       "parameters": {
@@ -112,7 +124,10 @@
       "name": "OpenAI Model for Vulnerability Parser",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
-      "position": [1008, 16],
+      "position": [
+        1008,
+        16
+      ],
       "credentials": {
         "openAiApi": {
           "id": "j0mv3A9ieKbr7MtD",
@@ -133,7 +148,10 @@
       "name": "API Crawler - AI Agent",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3,
-      "position": [728, -416]
+      "position": [
+        736,
+        -416
+      ]
     },
     {
       "parameters": {
@@ -145,7 +163,10 @@
       "name": "JSON Schema Parser",
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
-      "position": [928, -192]
+      "position": [
+        928,
+        -192
+      ]
     },
     {
       "parameters": {
@@ -166,14 +187,15 @@
       "name": "Prepare Instructions",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [448, -416]
+      "position": [
+        448,
+        -416
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "={{ $('Workflow Configuration').first().json.apiBaseUrl + $('Workflow Configuration').first().json.responsePath }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBearerAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -192,15 +214,13 @@
       "name": "Send Data to VIPER API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [1296, -416],
-      "credentials": {
-        "httpBearerAuth": {
-          "id": "1M7bJlVV6osJ3KV0",
-          "name": "production viper auth"
-        }
-      }
+      "position": [
+        1296,
+        -416
+      ]
     }
   ],
+  "pinData": {},
   "connections": {
     "Webhook Trigger": {
       "main": [
@@ -291,11 +311,11 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "b1c40fa0-12d4-49b8-8878-fff285974aad",
+  "versionId": "6964a24b-ce7b-4d31-b193-dbc3fc5a5cb1",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "66207f7815720e24b39297468a019ba2a80d8e3ab7d395f296925a8d0e9081c5"

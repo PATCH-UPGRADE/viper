@@ -1,6 +1,6 @@
 import prisma from "@/lib/db";
 
-const DEFAULT_TTL_SECONDS = 15 * 60; // 15 minutes
+export const DEFAULT_TOKEN_TTL_SECONDS = 15 * 60; // 15 minutes
 
 function generateRawToken(): string {
   const bytes = new Uint8Array(32); // 256 bits
@@ -22,7 +22,7 @@ async function hashToken(raw: string): Promise<string> {
  */
 export async function createUserToken(
   userId: string,
-  ttlSeconds = DEFAULT_TTL_SECONDS,
+  ttlSeconds = DEFAULT_TOKEN_TTL_SECONDS,
   permissions?: string,
 ): Promise<string> {
   const raw = generateRawToken();

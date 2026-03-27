@@ -12,6 +12,7 @@ import prisma from "@/lib/db";
 import { getBaseUrl } from "@/lib/url-utils";
 import { parseAuthenticationJson } from "@/lib/utils";
 import { inngest } from "../client";
+import { createUserToken, DEFAULT_TOKEN_TTL_SECONDS } from "@/lib/tokens";
 
 export const syncAllIntegrations = inngest.createFunction(
   { id: "sync-all-integrations" },
@@ -55,26 +56,31 @@ export const syncAllIntegrations = inngest.createFunction(
   },
 );
 
-const getResponseConfig = (resourceType: ResourceType) => {
+/* Create a new User Token for an integration webhook response. Return the
+ * unique reponse path and the schema */
+const getResponseConfig = (integrationUserId : string, resourceType: ResourceType) => {
+  // create a user token for the integration user that can only be used for
+  // this resource type
+  const raw = createUserToken(integrationUserId, DEFAULT_TOKEN_TTL_SECONDS, resourceType)
   switch (resourceType) {
     case "Asset":
       return {
-        path: "/assets/integrationUpload",
+        path: `/assets/integrationUpload/${raw}`,
         schema: z.toJSONSchema(integrationAssetInputSchema),
       };
     case "DeviceArtifact":
       return {
-        path: "/deviceArtifacts/integrationUpload",
+        path: `/deviceArtifacts/integrationUpload/${raw}`,
         schema: z.toJSONSchema(integrationDeviceArtifactInputSchema),
       };
     case "Remediation":
       return {
-        path: "/remediations/integrationUpload",
+        path: `/remediations/integrationUpload/${raw}`,
         schema: z.toJSONSchema(integrationRemediationInputSchema),
       };
     case "Vulnerability":
       return {
-        path: "/vulnerabilities/integrationUpload",
+        path: `/vulnerabilities/integrationUpload/${raw}`,
         schema: z.toJSONSchema(integrationVulnerabilityInputSchema),
       };
     default:
@@ -99,27 +105,9 @@ async function syncAiIntegration(
 
   // get where n8n should respond, and what schema it should respond with
   const { schema: responseSchema, path: responsePath } = getResponseConfig(
+    integration.integrationUserId!,
     integration.resourceType,
   );
-
-  // generate an api key for the response
-  // TODO: this probably isn't great auth, use HMAC and a webhook secret later on
-  // put the integration user id in the payload
-  const apiKey = await auth.api.createApiKey({
-    body: {
-      userId: integration.userId,
-      name: "n8n response api key",
-      // we cannot create api keys that are shorter than 24 hrs
-      expiresIn: 60 * 60 * 24,
-      rateLimitEnabled: false,
-    },
-  });
-
-  // update integration with new key
-  await prisma.integration.update({
-    where: { id: integration.id },
-    data: { apiKeyId: apiKey.id },
-  });
 
   const response = await fetch(n8nWebhookUrl, {
     method: "POST",
@@ -131,7 +119,6 @@ async function syncAiIntegration(
     body: JSON.stringify({
       // If you're testing this locally and need webhooks, use NEXT_PUBLIC_APP_URL
       baseApiUrl: `${getBaseUrl()}/api/v1`,
-      responseApiKey: apiKey.key, // TODO: eventually switch to tokens or webhook secrets
       responsePath,
       responseSchema,
       resourceType: integration.resourceType,
@@ -163,7 +150,7 @@ async function syncPartnerIntegration(
     headers[header] = value;
   }
 
-  const { path: responsePath } = getResponseConfig(integration.resourceType);
+  const { path: responsePath } = getResponseConfig(integration.integrationUserId!, integration.resourceType);
 
   const body = JSON.stringify({
     // TODO: blueflow should be able to handle "null". for now though, if there's no date just send one in the past

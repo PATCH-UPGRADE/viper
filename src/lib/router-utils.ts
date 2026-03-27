@@ -221,7 +221,7 @@ async function upsertSyncStatus(
     }
 
     // integrations do not have api keys. update when the request was made here
-    await tx.apiKeyConnector.update({
+    await tx.apiKeyConnector.updateMany({
       where: { integrationId },
       data: { lastRequest: lastSynced },
     });

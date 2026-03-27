@@ -113,7 +113,7 @@ async function syncAiIntegration(
   // get where n8n should respond, and what schema it should respond with
   const { schema: responseSchema, path: responsePath } =
     await getResponseConfig(
-      integration.integrationUserId!,
+      integration.integrationUserId,
       integration.resourceType,
     );
 
@@ -159,7 +159,7 @@ async function syncPartnerIntegration(
   }
 
   const { path: responsePath } = await getResponseConfig(
-    integration.integrationUserId!,
+    integration.integrationUserId,
     integration.resourceType,
   );
 

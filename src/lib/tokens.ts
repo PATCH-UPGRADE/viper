@@ -46,7 +46,6 @@ export async function consumeUserToken(
 ): Promise<string | null> {
   const tokenHash = await hashToken(raw);
 
-  // Atomic find-and-delete so concurrent requests can't double-consume
   const record = await prisma.userToken.findUnique({
     where: { tokenHash },
   });

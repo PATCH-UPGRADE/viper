@@ -2,6 +2,7 @@
   Warnings:
 
   - You are about to drop the column `apiKeyId` on the `integration` table. All the data in the column will be lost.
+  - Made the column `integrationUserId` on table `integration` required. This step will fail if there are existing NULL values in that column.
 
 */
 -- DropForeignKey
@@ -11,7 +12,8 @@ ALTER TABLE "public"."integration" DROP CONSTRAINT "integration_apiKeyId_fkey";
 DROP INDEX "public"."integration_apiKeyId_key";
 
 -- AlterTable
-ALTER TABLE "integration" DROP COLUMN "apiKeyId";
+ALTER TABLE "integration" DROP COLUMN "apiKeyId",
+ALTER COLUMN "integrationUserId" SET NOT NULL;
 
 -- CreateTable
 CREATE TABLE "UserToken" (

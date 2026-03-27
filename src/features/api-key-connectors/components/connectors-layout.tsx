@@ -1,3 +1,5 @@
+"use client";
+
 import { ActivityIcon, PlugIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound, usePathname } from "next/navigation";
@@ -7,6 +9,7 @@ import {
   integrationsMapping,
   isValidResourceTypeKey,
 } from "@/features/integrations/types";
+import { ResourceType } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { ConnectorsHeader } from "./connectors";
 
@@ -23,8 +26,6 @@ export const ConnectorsLayout = ({
     return notFound();
   }
 
-  const resourceType = integrationsMapping[resourceTypePlural].type;
-
   const tabs = [
     {
       name: "Connectors",
@@ -40,6 +41,11 @@ export const ConnectorsLayout = ({
     },
   ];
 
+  const resourceType = integrationsMapping[resourceTypePlural].type;
+  const headerText =
+    resourceType === ResourceType.DeviceArtifact
+      ? "Device Artifact"
+      : resourceType;
   const activeTab = pathname.includes(tabs[1].value)
     ? tabs[1].value
     : tabs[0].value;
@@ -51,7 +57,7 @@ export const ConnectorsLayout = ({
         "px-20 bg-background flex flex-col gap-4 border-b",
       )}
     >
-      <ConnectorsHeader resourceType={resourceType} />
+      <ConnectorsHeader title={headerText} />
 
       <Tabs value={activeTab} className="w-full flex flex-row! justify-between">
         <TabsList variant="line">

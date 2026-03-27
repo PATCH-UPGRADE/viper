@@ -33,14 +33,14 @@ export const ConnectorsEmpty = () => {
 
 export const ConnectorsHeader = ({
   disabled,
-  resourceType,
+  title,
 }: {
   disabled?: boolean;
-  resourceType: string;
+  title: string;
 }) => {
   return (
     <EntityHeader
-      title={`${resourceType} Connectors`}
+      title={`${title} Connectors`}
       description={`View connectors that others are using`}
       disabled={disabled}
     />

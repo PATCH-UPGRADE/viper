@@ -20,6 +20,7 @@ import { prefetchRemediations } from "@/features/remediations/server/prefetch";
 import { VulnerabilitiesList } from "@/features/vulnerabilities/components/vulnerabilities";
 import { prefetchVulnerabilities } from "@/features/vulnerabilities/server/prefetch";
 import { ResourceType } from "@/generated/prisma";
+import { requireAuth } from "@/lib/auth-utils";
 import type { CombinedPageProps } from "@/lib/page-types";
 import type { PaginationInput } from "@/lib/pagination";
 import { HydrateClient } from "@/trpc/server";
@@ -52,7 +53,9 @@ const Page = async ({
   params,
   searchParams,
 }: CombinedPageProps<"resourceTypeUrl">) => {
+  await requireAuth();
   const { resourceTypeUrl } = await params;
+
   if (!isValidResourceTypeKey(resourceTypeUrl)) {
     return notFound();
   }
@@ -61,7 +64,7 @@ const Page = async ({
   const config = LIST_MAPPING[resourceType];
   const ListElement = config.listElement;
   const paginationParams = await paginationParamsLoader(searchParams);
-  config.prefetch({ ...paginationParams });
+  await config.prefetch({ ...paginationParams });
 
   return (
     <HydrateClient>

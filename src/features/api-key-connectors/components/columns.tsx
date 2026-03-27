@@ -20,9 +20,9 @@ export const columns: ColumnDef<ConnectorResponse>[] = [
     ),
   },
   {
-    accessorKey: "Username",
-    meta: { title: "Username" },
-    header: "Username",
+    accessorKey: "userId",
+    meta: { title: "Source Tool" },
+    header: "Source Tool",
     accessorFn: (row) => row.user.name,
   },
   {

@@ -9,9 +9,6 @@ const handler = (req: Request) =>
     router: appRouter,
     // @ts-expect-error
     createContext: createTRPCContext,
-    onError: ({ path, error }) => {
-      console.error(path, error);
-    },
   });
 
 export { handler as GET, handler as POST };

@@ -15,6 +15,7 @@ import {
   AUTH_TOKEN,
   authHeader,
   BASE_URL,
+  createIntegrationToken,
   generateCPE,
   jsonHeader,
   setupMockIntegration,
@@ -553,13 +554,13 @@ describe("Remediations Endpoint (/remediations)", () => {
   });
 
   it("empty Remediation uploadIntegration endpoint int test", async () => {
-    const { apiKey } = await setupMockIntegration(mockIntegrationPayload);
+    const { integration } = await setupMockIntegration(mockIntegrationPayload);
 
     // this should succeed and nothing should be created
     const noRemediations = { ...remediationIntegrationPayload, items: [] };
+    const token = await createIntegrationToken(integration.integrationUserId, ResourceType.Remediation);
     const createRemResp = await request(BASE_URL)
-      .post("/remediations/integrationUpload")
-      .set({ Authorization: apiKey.key })
+      .post(`/remediations/integrationUpload/${token}`)
       .set(jsonHeader)
       .send(noRemediations);
 
@@ -571,7 +572,7 @@ describe("Remediations Endpoint (/remediations)", () => {
   });
 
   it("create Remediation uploadIntegration endpoint int test", async () => {
-    const { integration: createdIntegration, apiKey } =
+    const { integration: createdIntegration } =
       await setupMockIntegration(mockIntegrationPayload);
 
     onTestFinished(async () => {
@@ -586,9 +587,9 @@ describe("Remediations Endpoint (/remediations)", () => {
       });
     });
 
+    const createToken = await createIntegrationToken(createdIntegration.integrationUserId, ResourceType.Remediation);
     const integrationRes = await request(BASE_URL)
-      .post("/remediations/integrationUpload")
-      .set({ Authorization: apiKey.key })
+      .post(`/remediations/integrationUpload/${createToken}`)
       .set(jsonHeader)
       .send(remediationIntegrationPayload);
 

@@ -246,7 +246,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .meta({
       openapi: {
         method: "POST",
-        path: "/vulnerabilities/integrationUpload/{raw}",
+        path: "/vulnerabilities/integrationUpload/{token}",
         tags: ["Vulnerabilities"],
         summary: "Synchronize Vulnerabilities with integration",
         description:

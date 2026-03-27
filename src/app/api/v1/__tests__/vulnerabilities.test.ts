@@ -6,6 +6,7 @@ import prisma from "@/lib/db";
 import {
   authHeader,
   BASE_URL,
+  createIntegrationToken,
   generateCPE,
   jsonHeader,
   setupMockIntegration,
@@ -162,13 +163,13 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
   });
 
   it("empty Vulnerabilities uploadIntegration endpoint int test", async () => {
-    const { apiKey } = await setupMockIntegration(mockIntegrationPayload);
+    const { integration } = await setupMockIntegration(mockIntegrationPayload);
 
     // this should succeed and nothing should be created
     const noVulnerabilities = { ...vulnerabilityIntegrationPayload, items: [] };
+    const token = await createIntegrationToken(integration.integrationUserId, ResourceType.Vulnerability);
     const createVulnResp = await request(BASE_URL)
-      .post("/vulnerabilities/integrationUpload")
-      .set({ Authorization: apiKey.key })
+      .post(`/vulnerabilities/integrationUpload/${token}`)
       .set(jsonHeader)
       .send(noVulnerabilities);
 
@@ -180,12 +181,12 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
   });
 
   it("create Vulnerabilities uploadIntegration endpoint int test", async () => {
-    const { integration: createdIntegration, apiKey } =
+    const { integration: createdIntegration } =
       await setupMockIntegration(mockIntegrationPayload);
 
+    const createToken = await createIntegrationToken(createdIntegration.integrationUserId, ResourceType.Vulnerability);
     const integrationRes = await request(BASE_URL)
-      .post("/vulnerabilities/integrationUpload")
-      .set({ Authorization: apiKey.key })
+      .post(`/vulnerabilities/integrationUpload/${createToken}`)
       .set(jsonHeader)
       .send(vulnerabilityIntegrationPayload);
 

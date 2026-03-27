@@ -1,0 +1,86 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+import { formatDistanceToNow } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { SortableHeader } from "@/components/ui/data-table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { ConnectorResponse } from "../types";
+
+export const columns: ColumnDef<ConnectorResponse>[] = [
+  {
+    id: "name",
+    accessorKey: "name",
+    header: ({ column }) => (
+      <SortableHeader header="Connector Name" column={column} />
+    ),
+  },
+  {
+    accessorKey: "userId",
+    meta: { title: "Source Tool" },
+    header: "Source Tool",
+    accessorFn: (row) => row.user.name,
+  },
+  {
+    id: "lastRequest",
+    accessorKey: "lastRequest",
+    header: ({ column }) => (
+      <SortableHeader header="Last Used" column={column} />
+    ),
+    cell: ({ row }) => {
+      const value = row.original.lastRequest;
+      return (
+        <Tooltip>
+          <TooltipTrigger>
+            {value ? `${formatDistanceToNow(value)} ago` : "Never"}
+          </TooltipTrigger>
+          <TooltipContent>
+            {value ? value.toLocaleString() : "Never"}
+          </TooltipContent>
+        </Tooltip>
+      );
+    },
+  },
+  {
+    id: "status",
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => {
+      let text = "Expired";
+      let color = "bg-red-400";
+      if (row.original.apiKeyId || row.original.integrationId) {
+        text = "Active";
+        color = "bg-green-300";
+      }
+
+      return (
+        <Badge variant="outline" className={color}>
+          {text}
+        </Badge>
+      );
+    },
+  },
+  {
+    id: "type",
+    accessorKey: "type",
+    header: "Type",
+    cell: ({ row }) => {
+      let text = "API Key";
+      let color = "bg-blue-300";
+      if (row.original.integrationId) {
+        text = "Integration";
+        color = "bg-yellow-300";
+      }
+
+      return (
+        <Badge variant="outline" className={color}>
+          {text}
+        </Badge>
+      );
+    },
+  },
+];

@@ -13,6 +13,7 @@ import {
   LoadingView,
 } from "@/components/entity-components";
 import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
 import {
   Drawer,
   DrawerClose,
@@ -33,6 +34,7 @@ import {
 } from "../hooks/use-device-artifacts";
 import { useDeviceArtifactsParams } from "../hooks/use-device-artifacts-params";
 import type { DeviceArtifactResponse } from "../types";
+import { columns } from "./columns";
 
 export const DeviceArtifactsSearch = () => {
   const [params, setParams] = useDeviceArtifactsParams();
@@ -61,6 +63,19 @@ export const DeviceArtifactsList = () => {
         <DeviceArtifactItem data={deviceArtifact} />
       )}
       emptyView={<DeviceArtifactsEmpty />}
+    />
+  );
+};
+
+export const DeviceArtifactsDataList = () => {
+  const { data: deviceArtifacts, isFetching } = useSuspenseDeviceArtifacts();
+
+  return (
+    <DataTable
+      paginatedData={deviceArtifacts}
+      columns={columns}
+      isLoading={isFetching}
+      search={<DeviceArtifactsSearch />}
     />
   );
 };

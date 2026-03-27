@@ -22,7 +22,7 @@ export const integrationInputSchema = authSchema.safeExtend({
 });
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;
 
-export function isValidIntegrationKey(
+export function isValidResourceTypeKey(
   key: string,
 ): key is keyof typeof integrationsMapping {
   return key in integrationsMapping;

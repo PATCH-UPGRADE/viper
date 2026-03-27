@@ -18,7 +18,7 @@ import {
   type IntegrationFormValues,
   integrationInputSchema,
   integrationsMapping,
-  isValidIntegrationKey,
+  isValidResourceTypeKey,
 } from "../types";
 import { IntegrationCreateModal } from "./integrations";
 
@@ -29,7 +29,7 @@ export const IntegrationsLayout = ({
 }) => {
   const pathname = usePathname();
   const pathTab = pathname.split("/").pop() || "assets";
-  const activeTab = isValidIntegrationKey(pathTab) ? pathTab : "assets";
+  const activeTab = isValidResourceTypeKey(pathTab) ? pathTab : "assets";
 
   const createIntegration = useCreateIntegration();
   const [open, setOpen] = useState(false);

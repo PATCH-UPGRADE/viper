@@ -4,7 +4,7 @@ import { createPaginatedResponseWithLinksSchema } from "./pagination";
 
 /**
  * Shared Zod schema for User responses
- * Matches Prisma User model (name and email are required, image is nullable)
+ * Matches Prisma User model (name is required, email and image are nullable)
  */
 export const userSchema = z.object({
   id: z.string(),

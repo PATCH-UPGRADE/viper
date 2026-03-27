@@ -59,7 +59,7 @@ import type {
 } from "../types";
 import { getAssetRoleLabel } from "../utils";
 import { AssetDashboardDrawer } from "./asset-drawer";
-import { columns } from "./columns";
+import { columns, columnsWithActions } from "./columns";
 import { assetIssueColumns, dashboardColumns } from "./dashboard-columns";
 
 const SeveritiesExplained = {
@@ -213,6 +213,20 @@ export const AssetsSearch = () => {
 
 export const AssetsList = () => {
   const { data: assets, isFetching } = useSuspenseAssets();
+
+  return (
+    <DataTable
+      paginatedData={assets}
+      columns={columns}
+      isLoading={isFetching}
+      search={<AssetsSearch />}
+    />
+  );
+};
+
+// if we use this again may be better to wrap ^AssetsList with drawer logic
+export const AssetsListWithDrawer = () => {
+  const { data: assets, isFetching } = useSuspenseAssets();
   const [asset, setAsset] = useState<AssetWithIssues | undefined>(undefined);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -223,7 +237,7 @@ export const AssetsList = () => {
       )}
       <DataTable
         paginatedData={assets}
-        columns={columns}
+        columns={columnsWithActions}
         isLoading={isFetching}
         search={<AssetsSearch />}
         rowOnclick={(row) => {

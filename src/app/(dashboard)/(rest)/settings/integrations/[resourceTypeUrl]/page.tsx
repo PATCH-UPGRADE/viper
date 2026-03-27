@@ -10,7 +10,7 @@ import { paginationParamsLoader } from "@/features/integrations/server/params-lo
 import { prefetchIntegrations } from "@/features/integrations/server/prefetch";
 import {
   integrationsMapping,
-  isValidIntegrationKey,
+  isValidResourceTypeKey,
 } from "@/features/integrations/types";
 import { requireAuth } from "@/lib/auth-utils";
 import type { CombinedPageProps } from "@/lib/page-types";
@@ -24,7 +24,7 @@ const Page = async ({
   const { resourceTypeUrl } = await params;
 
   // Validate resourceType
-  if (!isValidIntegrationKey(resourceTypeUrl)) {
+  if (!isValidResourceTypeKey(resourceTypeUrl)) {
     notFound();
   }
 

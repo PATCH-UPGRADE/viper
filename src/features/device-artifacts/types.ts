@@ -33,7 +33,7 @@ export const integrationDeviceArtifactInputSchema =
 export const deviceArtifactUpdateSchema = z.object({
   id: z.string(),
   role: z.string().min(1, "Role is required").optional(),
-  description: z.string().nullish(),
+  description: z.string().optional(),
   upstreamApi: safeUrlSchema.optional(),
   cpe: cpeSchema.optional(),
 });

@@ -34,7 +34,7 @@ export const integrationRemediationInputSchema = createIntegrationInputSchema(
 
 export const remediationUpdateSchema = z.object({
   id: z.string(),
-  cpes: z.array(cpeSchema).nullish(),
+  cpes: z.array(cpeSchema).optional(),
   vulnerabilityId: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),

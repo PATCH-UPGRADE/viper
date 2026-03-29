@@ -32,11 +32,11 @@ export const artifactWrapperSelect = {
 
 export const artifactInputSchema = z.object({
   id: z.string().optional(),
-  name: z.string().optional(),
+  name: z.string().nullish(),
   artifactType: z.enum(ArtifactType),
-  downloadUrl: safeUrlSchema.optional(),
-  hash: z.string().optional(),
-  size: z.number().optional(),
+  downloadUrl: safeUrlSchema.nullish(),
+  hash: z.string().nullish(),
+  size: z.number().nullish(),
 });
 
 export const artifactWithUrlsSchema = z.object({

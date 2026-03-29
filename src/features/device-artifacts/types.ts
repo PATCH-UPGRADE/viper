@@ -21,7 +21,7 @@ export const deviceArtifactInputSchema = z.object({
   cpe: cpeSchema,
   role: z.string().min(1, "Role is required"),
   description: z.string().min(1, "Description is required"),
-  upstreamApi: safeUrlSchema.optional(),
+  upstreamApi: safeUrlSchema.nullish(),
   artifacts: z
     .array(artifactInputSchema)
     .min(1, "at least one artifact is required"),
@@ -33,7 +33,7 @@ export const integrationDeviceArtifactInputSchema =
 export const deviceArtifactUpdateSchema = z.object({
   id: z.string(),
   role: z.string().min(1, "Role is required").optional(),
-  description: z.string().optional(),
+  description: z.string().nullish(),
   upstreamApi: safeUrlSchema.optional(),
   cpe: cpeSchema.optional(),
 });

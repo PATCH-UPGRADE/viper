@@ -34,7 +34,7 @@ export const assetInputSchema = z.object({
   hostname: z.string().nullish(),
   macAddress: z.string().nullish(),
   serialNumber: z.string().nullish(),
-  location: locationSchema.nullish(),
+  location: locationSchema.optional(),
   status: assetStatusSchema.nullish(),
 });
 

@@ -39,7 +39,7 @@ export const remediationUpdateSchema = z.object({
   description: z.string().nullish(),
   narrative: z.string().nullish(),
   upstreamApi: safeUrlSchema.nullish(),
-  artifacts: z.array(artifactInputSchema).nullish(),
+  artifacts: z.array(artifactInputSchema).optional(),
 });
 
 export const vulnerabilitySchema = z.object({

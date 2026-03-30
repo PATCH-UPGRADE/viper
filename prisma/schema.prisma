@@ -37,6 +37,7 @@ model User {
   integration               Integration[]
   integrationUser          Integration?     @relation("integration_user")
   webhooks                  Webhook[]
+  userTokens UserToken[]
 
   @@unique([email])
   @@map("user")
@@ -88,6 +89,19 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+model UserToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  permissions String? // what can the token be used for?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Workflow {
@@ -556,7 +570,6 @@ model Apikey {
   metadata            String?
 
   connector           ApiKeyConnector?
-  integration         Integration?
 
   @@map("apikey")
 }
@@ -578,8 +591,6 @@ model Integration {
   syncStatus             SyncStatus[]
   lastSuccessfulSync DateTime?
 
-  apiKeyId               String?           @unique
-  apiKey                 Apikey?           @relation(fields: [apiKeyId], references: [id])
   apiKeyConnector        ApiKeyConnector?
 
   // The user who created the integration
@@ -587,9 +598,8 @@ model Integration {
   user                   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // the user that this integration creates
-  // TODO: should this be required? leaving it optional for migration
-  integrationUserId      String? @unique
-  integrationUser        User?             @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
+  integrationUserId      String @unique
+  integrationUser        User             @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
 
   assetMappings          ExternalAssetMapping[]
   deviceArtifactMappings ExternalDeviceArtifactMapping[]

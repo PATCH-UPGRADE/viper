@@ -107,7 +107,12 @@ export const createIntegrationInputSchema = <T extends z.ZodRawShape>(
   const integrationInputSchema = inputSchema.extend({
     vendorId: z.string(),
   });
-  return createPaginatedResponseWithLinksSchema(integrationInputSchema);
+  const pagesWithLinksSchema = createPaginatedResponseWithLinksSchema(
+    integrationInputSchema,
+  );
+  return pagesWithLinksSchema.extend({
+    token: z.string(), // the user token calling this endpoint
+  });
 };
 
 export const alohaInputSchema = z.object({

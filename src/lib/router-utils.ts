@@ -1,17 +1,20 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
 import "server-only";
+import { TRPCError } from "@trpc/server";
 import { type ArtifactType, SyncStatusEnum } from "@/generated/prisma";
 import {
   PrismaClientKnownRequestError,
   PrismaClientValidationError,
 } from "@/generated/prisma/runtime/library";
 import prisma, { type TransactionClient } from "@/lib/db";
+import { requireExistence } from "@/trpc/middleware";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
   type PaginationInput,
 } from "./pagination";
 import type { IntegrationResponse } from "./schemas";
+import { consumeUserToken } from "./tokens";
 
 // ============================================================================
 // PRISMA TYPES
@@ -175,7 +178,7 @@ async function upsertSyncStatus(
   response: IntegrationResponse,
   lastSynced: Date,
 ): Promise<void> {
-  // sync-integrations.ts shoudl create PENDING sync status
+  // sync-integrations.ts should create PENDING sync status
   // update that if possible
   const latestPending = await prisma.syncStatus.findFirst({
     where: {
@@ -216,6 +219,12 @@ async function upsertSyncStatus(
         data: { lastSuccessfulSync: lastSynced },
       });
     }
+
+    // integrations do not have api keys. update when the request was made here
+    await tx.apiKeyConnector.updateMany({
+      where: { integrationId },
+      data: { lastRequest: lastSynced },
+    });
   });
 }
 
@@ -261,6 +270,30 @@ interface SyncConfig<
   // Optional: Additional fields to include in create
   additionalCreateFields?: (userId: string) => Record<string, any>;
 }
+
+/**
+ * Helper: return a userId and the associated integration, or throw an error
+ * if invalid
+ */
+export const processIntegrationToken = async (
+  token: string,
+  expectedPermissions: string,
+) => {
+  const userId = await consumeUserToken(token, expectedPermissions);
+  // TODO: probably need better error messages than this tbh
+  if (!userId) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Invalid token (couldn't find it, expired, or invalid permissions)`,
+    });
+  }
+  const integration = await prisma.integration.findUnique({
+    where: { integrationUserId: userId },
+    select: { id: true },
+  });
+  const integrationId = requireExistence(integration, "Integration").id;
+  return { userId, integrationId };
+};
 
 /**
  * Generic helper function for processing integration syncs

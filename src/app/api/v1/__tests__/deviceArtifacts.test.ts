@@ -14,6 +14,7 @@ import {
   AUTH_TOKEN,
   authHeader,
   BASE_URL,
+  createIntegrationToken,
   generateCPE,
   jsonHeader,
   setupMockIntegration,
@@ -516,16 +517,19 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
   });
 
   it("empty DeviceArtifact uploadIntegration endpoint int test", async () => {
-    const { apiKey } = await setupMockIntegration(mockIntegrationPayload);
+    const { integration } = await setupMockIntegration(mockIntegrationPayload);
 
     // this should succeed and nothing should be created
     const noDeviceArtifacts = {
       ...deviceArtifactsIntegrationPayload,
       items: [],
     };
+    const token = await createIntegrationToken(
+      integration.integrationUserId,
+      ResourceType.DeviceArtifact,
+    );
     const createRes = await request(BASE_URL)
-      .post("/deviceArtifacts/integrationUpload")
-      .set({ Authorization: apiKey.key })
+      .post(`/deviceArtifacts/integrationUpload/${token}`)
       .set(jsonHeader)
       .send(noDeviceArtifacts);
 
@@ -537,8 +541,9 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
   });
 
   it("create DeviceArtifact uploadIntegration endpoint int test", async () => {
-    const { integration: createdIntegration, apiKey } =
-      await setupMockIntegration(mockIntegrationPayload);
+    const { integration: createdIntegration } = await setupMockIntegration(
+      mockIntegrationPayload,
+    );
 
     onTestFinished(async () => {
       await prisma.deviceArtifact.deleteMany({
@@ -551,9 +556,12 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       });
     });
 
+    const createToken = await createIntegrationToken(
+      createdIntegration.integrationUserId,
+      ResourceType.DeviceArtifact,
+    );
     const integrationRes = await request(BASE_URL)
-      .post("/deviceArtifacts/integrationUpload")
-      .set({ Authorization: apiKey.key })
+      .post(`/deviceArtifacts/integrationUpload/${createToken}`)
       .set(jsonHeader)
       .send(deviceArtifactsIntegrationPayload);
 

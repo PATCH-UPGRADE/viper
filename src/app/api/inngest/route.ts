@@ -5,6 +5,7 @@ import {
   enrichAllVulnerabilities,
   enrichVulnerability,
 } from "@/inngest/functions/enrich-vulnerabilities";
+import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-user-tokens";
 import {
   syncAllIntegrations,
   syncIntegration,
@@ -18,5 +19,6 @@ export const { GET, POST, PUT } = serve({
     enrichVulnerability,
     enrichAllVulnerabilities,
     chatAgent,
+    purgeExpiredTokensFn,
   ],
 });

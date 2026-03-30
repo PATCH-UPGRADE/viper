@@ -8,10 +8,9 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { mainPadding } from "@/config/constants";
+import { INTEGRATION_SYNC_EVERY_MIN, mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
-import { ApiTokenSuccessModal } from "@/features/user/components/user";
-import { type Apikey, AuthType } from "@/generated/prisma";
+import { AuthType } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { useCreateIntegration } from "../hooks/use-integrations";
 import {
@@ -33,8 +32,6 @@ export const IntegrationsLayout = ({
 
   const createIntegration = useCreateIntegration();
   const [open, setOpen] = useState(false);
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [key, setKey] = useState<Apikey | undefined>(undefined);
 
   const resourceType = integrationsMapping[activeTab].type;
   const form = useForm<IntegrationFormValues>({
@@ -45,7 +42,7 @@ export const IntegrationsLayout = ({
       integrationUri: "",
       prompt: "",
       isGeneric: false,
-      syncEvery: 300,
+      syncEvery: INTEGRATION_SYNC_EVERY_MIN * 60,
       authType: AuthType.None,
     },
   });
@@ -56,11 +53,9 @@ export const IntegrationsLayout = ({
 
   const handleCreate = (item: IntegrationFormValues) => {
     createIntegration.mutate(item, {
-      onSuccess: (data) => {
+      onSuccess: () => {
         form.reset();
         setOpen(false);
-        setKey(data.apiKey);
-        setSuccessOpen(true);
       },
       onError: () => {
         setOpen(true);
@@ -106,11 +101,6 @@ export const IntegrationsLayout = ({
         open={open}
         setOpen={setOpen}
         handleCreate={handleCreate}
-      />
-      <ApiTokenSuccessModal
-        open={successOpen}
-        setOpen={setSuccessOpen}
-        apiKey={key}
       />
     </>
   );

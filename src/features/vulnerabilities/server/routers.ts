@@ -1,14 +1,19 @@
 import { z } from "zod";
-import { type AlohaStatus, Priority } from "@/generated/prisma";
+import { type AlohaStatus, Priority, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
   cpesToDeviceGroups,
   fetchPaginated,
   processIntegrationSync,
+  processIntegrationToken,
 } from "@/lib/router-utils";
 import { alohaInputSchema, integrationResponseSchema } from "@/lib/schemas";
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import {
+  baseProcedure,
+  createTRPCRouter,
+  protectedProcedure,
+} from "@/trpc/init";
 import { requireExistence, requireOwnership } from "@/trpc/middleware";
 import {
   integrationVulnerabilityInputSchema,
@@ -240,12 +245,12 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       );
     }),
 
-  processIntegrationCreate: protectedProcedure
+  processIntegrationCreate: baseProcedure
     .input(integrationVulnerabilityInputSchema)
     .meta({
       openapi: {
         method: "POST",
-        path: "/vulnerabilities/integrationUpload",
+        path: "/vulnerabilities/integrationUpload/{token}",
         tags: ["Vulnerabilities"],
         summary: "Synchronize Vulnerabilities with integration",
         description:
@@ -253,15 +258,12 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       },
     })
     .output(integrationResponseSchema)
-    .mutation(async ({ ctx, input }) => {
-      const userId = ctx.auth.user.id;
-      const integration = await prisma.integration.findFirst({
-        // @ts-expect-error ctx.auth.key.id is defined if logging in with api key
-        where: { apiKey: { id: ctx.auth.key?.id } },
-        select: { id: true },
-      });
-
-      const integrationId = requireExistence(integration, "Integration").id;
+    .mutation(async ({ input }) => {
+      // Validate provided token or throw error
+      const { userId, integrationId } = await processIntegrationToken(
+        input.token,
+        ResourceType.Vulnerability,
+      );
 
       return processIntegrationSync(
         prisma,

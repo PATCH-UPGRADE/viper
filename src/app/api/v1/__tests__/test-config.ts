@@ -1,7 +1,9 @@
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
 import type { IntegrationFormValues } from "@/features/integrations/types";
+import { auth } from "@/lib/auth";
 import prisma from "@/lib/db";
+import { createUserToken, DEFAULT_TOKEN_TTL_SECONDS } from "@/lib/tokens";
 
 export const BASE_URL = "http://localhost:3000/api/v1";
 export const ROOT_API_URL = "http://localhost:3000/api";
@@ -38,11 +40,9 @@ export const setupMockIntegration = async (
     .set(jsonHeader)
     .send(trpcPayload);
 
-  const responseData = createIntegrationRes.body[0]?.result?.data.json;
-  expect(responseData).toHaveProperty("integration");
-  expect(responseData).toHaveProperty("apiKey");
+  const createdIntegration = createIntegrationRes.body[0]?.result?.data.json;
+  expect(createdIntegration).toHaveProperty("id");
 
-  const createdIntegration = responseData.integration;
   onTestFinished(async () => {
     await prisma.integration
       .delete({
@@ -71,5 +71,28 @@ export const setupMockIntegration = async (
   );
   expect(createdIntegration.syncEvery).toBe(mockIntegrationPayload.syncEvery);
 
-  return responseData;
+  // create an api key for the integration user
+  // this will be used to simulate previous integrationUpload runs
+  const apiKey = await auth.api.createApiKey({
+    body: {
+      name: "integration-user-key",
+      userId: createdIntegration.integrationUserId,
+    },
+  });
+
+  return {
+    integration: createdIntegration,
+    apiKey,
+  };
+};
+
+export const createIntegrationToken = (
+  integrationUserId: string,
+  resourceType: string,
+): Promise<string> => {
+  return createUserToken(
+    integrationUserId,
+    DEFAULT_TOKEN_TTL_SECONDS,
+    resourceType,
+  );
 };

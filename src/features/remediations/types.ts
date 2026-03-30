@@ -19,10 +19,10 @@ import { deviceGroupSchema, deviceGroupSelect } from "../device-groups/types";
 // Validation schemas
 export const remediationInputSchema = z.object({
   cpes: z.array(cpeSchema).min(1),
-  vulnerabilityId: z.string().optional(),
-  description: z.string().optional(),
-  narrative: z.string().optional(),
-  upstreamApi: safeUrlSchema.optional(),
+  vulnerabilityId: z.string().nullish(),
+  description: z.string().nullish(),
+  narrative: z.string().nullish(),
+  upstreamApi: safeUrlSchema.nullish(),
   artifacts: z
     .array(artifactInputSchema)
     .min(1, "at least one artifact is required"),
@@ -35,10 +35,10 @@ export const integrationRemediationInputSchema = createIntegrationInputSchema(
 export const remediationUpdateSchema = z.object({
   id: z.string(),
   cpes: z.array(cpeSchema).optional(),
-  vulnerabilityId: z.string().optional(),
-  description: z.string().optional(),
-  narrative: z.string().optional(),
-  upstreamApi: safeUrlSchema.optional(),
+  vulnerabilityId: z.string().nullish(),
+  description: z.string().nullish(),
+  narrative: z.string().nullish(),
+  upstreamApi: safeUrlSchema.nullish(),
   artifacts: z.array(artifactInputSchema).optional(),
 });
 
@@ -50,10 +50,10 @@ export const vulnerabilitySchema = z.object({
 export const remediationResponseSchema = z.object({
   id: z.string(),
   affectedDeviceGroups: z.array(deviceGroupSchema),
-  upstreamApi: z.string().optional().nullable(),
-  description: z.string().optional().nullable(),
-  narrative: z.string().optional().nullable(),
-  vulnerability: vulnerabilitySchema.optional().nullable(),
+  upstreamApi: z.string().nullish(),
+  description: z.string().nullish(),
+  narrative: z.string().nullish(),
+  vulnerability: vulnerabilitySchema.nullish(),
   user: userSchema,
   artifacts: z.array(artifactWrapperWithUrlsSchema),
   createdAt: z.date(),

@@ -27,15 +27,15 @@ export const locationSchema = z.object({
 
 export const assetInputSchema = z.object({
   ip: z.string().min(1),
-  networkSegment: z.string().optional(),
-  cpe: cpeSchema.optional(),
-  role: z.string().min(1).optional(),
+  networkSegment: z.string().nullish(),
+  cpe: cpeSchema.nullish(),
+  role: z.string().min(1).nullish(),
   upstreamApi: safeUrlSchema,
-  hostname: z.string().optional(),
-  macAddress: z.string().optional(),
-  serialNumber: z.string().optional(),
+  hostname: z.string().nullish(),
+  macAddress: z.string().nullish(),
+  serialNumber: z.string().nullish(),
   location: locationSchema.optional(),
-  status: assetStatusSchema.optional(),
+  status: assetStatusSchema.nullish(),
 });
 
 export const updateAssetSchema = assetInputSchema.partial().extend({

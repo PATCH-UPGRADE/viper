@@ -18,9 +18,9 @@ export const paginationInputWithUpdatedAtFilterFields =
 export const deviceGroupInputSchema = z
   .object({
     id: z.string(),
-    manufacturer: z.string().nullable().optional(),
-    modelName: z.string().nullable().optional(),
-    version: z.string().nullable().optional(),
+    manufacturer: z.string().nullish(),
+    modelName: z.string().nullish(),
+    version: z.string().nullish(),
   })
   .refine(
     (data) =>

@@ -40,7 +40,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     name: "mockDeviceArtifactIntegration",
     platform: "mockIntegrationPlatform",
     integrationUri: "https://mock-deviceArtifact-upstream-api.com/",
-    isGeneric: false,
+    integrationType: "PARTNER",
     authType: AuthType.Bearer,
     resourceType: ResourceType.DeviceArtifact,
     authentication: {

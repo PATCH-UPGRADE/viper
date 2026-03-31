@@ -51,7 +51,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     name: "mockVulnIntegration",
     platform: "mockIntegrationPlatform",
     integrationUri: "https://mock-vuln-upstream-api.com/",
-    isGeneric: false,
+    integrationType: "PARTNER",
     authType: AuthType.Bearer,
     resourceType: ResourceType.Remediation,
     authentication: {

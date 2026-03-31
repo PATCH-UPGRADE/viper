@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { INTEGRATION_SYNC_EVERY_MIN, mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
-import { AuthType } from "@/generated/prisma";
+import { AuthType, IntegrationType } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { useCreateIntegration } from "../hooks/use-integrations";
 import {
@@ -41,7 +41,7 @@ export const IntegrationsLayout = ({
       resourceType,
       integrationUri: "",
       prompt: "",
-      isGeneric: false,
+      integrationType: IntegrationType.PARTNER,
       syncEvery: INTEGRATION_SYNC_EVERY_MIN * 60,
       authType: AuthType.None,
     },

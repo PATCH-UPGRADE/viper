@@ -27,7 +27,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { type ResourceType, SyncStatusEnum } from "@/generated/prisma";
+import {
+  IntegrationType,
+  type ResourceType,
+  SyncStatusEnum,
+} from "@/generated/prisma";
 import type { AuthenticationInputType } from "@/lib/schemas";
 import {
   useRemoveIntegration,
@@ -74,7 +78,9 @@ export const getIntegrationColumns = (
       cell: ({ row }) => {
         return (
           <div className="flex gap-1 items-center">
-            {row.original.isGeneric && <Sparkles size={15} />}
+            {row.original.integrationType === IntegrationType.AI && (
+              <Sparkles size={15} />
+            )}
             <div className="font-semibold max-w-60 overflow-ellipsis overflow-hidden">
               {row.original.name}
             </div>
@@ -182,7 +188,7 @@ export const getIntegrationColumns = (
             name: data.name,
             platform: data.platform || "",
             integrationUri: data.integrationUri,
-            isGeneric: data.isGeneric,
+            integrationType: data.integrationType,
             prompt: data.prompt || "",
             authType: data.authType,
             resourceType: data.resourceType,

@@ -31,6 +31,7 @@ model User {
   deviceArtifacts           DeviceArtifact[]
   artifacts                 Artifact[]
   artifactWrappers          ArtifactWrapper[]
+  advisories                Advisory[]
 
   apikeys                   Apikey[]
   apiKeyConnectors          ApiKeyConnector[]
@@ -191,6 +192,7 @@ model DeviceGroup {
   vulnerabilities      Vulnerability[]      @relation("VulnerabilityDeviceGroups")
   remediations         Remediation[]        @relation("RemediationDeviceGroups")
   deviceArtifacts      DeviceArtifact[]
+  advisories           Advisory[]           @relation("AdvisoryDeviceGroups")
 
   @@index([cpe])
   @@map("device_group")
@@ -439,6 +441,7 @@ model Vulnerability {
   sarif                Json
   affectedComponents   String[]        @default([])
   affectedDeviceGroups DeviceGroup[]   @relation("VulnerabilityDeviceGroups")
+  advisories           Advisory[]      @relation("AdvisoryVulnerabilities")
   exploitUri           String?         @map("exploit-uri")
   upstreamApi          String?         @map("upstream-api")
 
@@ -579,10 +582,10 @@ model Integration {
   name                   String
   platform               String?           // The name of the integration platform, e.g "BlueFlow"
   integrationUri         String            @map("integration-uri")
-  isGeneric              Boolean
-  // ^a generic integration uses AI to pull data
-  // if generic is false, the integration will respond to one of our endpoints
-  //  with structured data
+  integrationType        IntegrationType
+  // ^PARTNER: Helm, Blueflow. Follows VIPER standard 
+  // AI: uses AI to pull data from any platform
+  // CSAF: parses CSAF security advisories (Vulnerability resource type only)
   prompt                 String?           @db.Text // optional, additional instructions for AI
   authType               AuthType
   resourceType           ResourceType
@@ -605,6 +608,7 @@ model Integration {
   deviceArtifactMappings ExternalDeviceArtifactMapping[]
   remediationMappings    ExternalRemediationMapping[]
   vulnerabilityMappings  ExternalVulnerabilityMapping[]
+  advisoryMappings       ExternalAdvisoryMapping[]
 
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
@@ -695,4 +699,59 @@ enum ResourceType {
   Vulnerability
   DeviceArtifact
   Remediation
+}
+
+enum IntegrationType {
+  PARTNER
+  AI
+  CSAF
+}
+
+enum Tlp {
+  // TLP v1
+  WHITE
+  GREEN
+  AMBER
+  RED
+  // TLP v2
+  CLEAR
+  AMBER_STRICT
+}
+
+model Advisory {
+  id                        String          @id @default(cuid())
+  userId                    String
+  user                      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referencedVulnerabilities Vulnerability[] @relation("AdvisoryVulnerabilities")
+  affectedDeviceGroups      DeviceGroup[]   @relation("AdvisoryDeviceGroups")
+  csaf                      Json            @default("{}")
+  upstreamUrl               String?         @unique
+  severity                  Severity
+  summary                   String?         @db.Text
+  status                    IssueStatus     @default(ACTIVE)
+  tlp                       Tlp?
+  publishedAt               DateTime?
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
+  externalMappings          ExternalAdvisoryMapping[]
+
+  @@index([userId])
+  @@map("advisory")
+}
+
+model ExternalAdvisoryMapping {
+  id            String      @id @default(cuid())
+  itemId        String
+  integrationId String
+  externalId    String
+  item          Advisory    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  lastSynced    DateTime?
+
+  @@unique([itemId, integrationId], name: "external_advisory_mappings_itemId_integrationId_key")
+  @@unique([integrationId, externalId], name: "external_advisory_mappings_integrationId_externalId_key")
+  @@index([itemId])
+  @@map("external_advisory_mappings")
 }

@@ -7,7 +7,7 @@ import type { IntegrationWithStringDates } from "@/features/integrations/types";
 import { integrationRemediationInputSchema } from "@/features/remediations/types";
 import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/types";
 import type { ResourceType } from "@/generated/prisma";
-import { AuthType, SyncStatusEnum } from "@/generated/prisma";
+import { AuthType, IntegrationType, SyncStatusEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createUserToken, DEFAULT_TOKEN_TTL_SECONDS } from "@/lib/tokens";
 import { getBaseUrl } from "@/lib/url-utils";
@@ -204,7 +204,7 @@ export const syncIntegration = inngest.createFunction(
 
     const syncResult = await step.run("fetch-integration-data", async () => {
       try {
-        if (integration.isGeneric) {
+        if (integration.integrationType === IntegrationType.AI) {
           return await syncAiIntegration(integration);
         } else {
           return await syncPartnerIntegration(integration);

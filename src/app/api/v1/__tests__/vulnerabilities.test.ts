@@ -34,7 +34,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     name: "mockVulnIntegration",
     platform: "mockIntegrationPlatform",
     integrationUri: "https://mock-vuln-upstream-api.com/",
-    integrationType: "PARTNER",
+    integrationType: "PARTNER" as const,
     resourceType: ResourceType.Vulnerability,
     syncEvery: 300,
     authType: AuthType.None,

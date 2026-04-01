@@ -1,14 +1,13 @@
 "use client";
 
-import { BugIcon, ChevronDown, ComputerIcon, MoreVertical } from "lucide-react";
+import { BugIcon, ComputerIcon, MoreVertical } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
 import {
   EntityContainer,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import { Badge } from "@/components/ui/badge";
+import { StatusFormBase, statusDetails } from "@/components/status-form";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -29,19 +28,7 @@ import {
 } from "../hooks/use-issues";
 import type { IssueWithRelations } from "../types";
 
-const statusDetails = {
-  [IssueStatus.FALSE_POSITIVE]: {
-    name: "False Positive",
-    color: "bg-yellow-500",
-  },
-  [IssueStatus.ACTIVE]: { name: "Active", color: "bg-red-500" },
-  [IssueStatus.REMEDIATED]: { name: "Remediated", color: "bg-green-500" },
-};
-
-export const IssueStatusBadge = ({ status }: { status: IssueStatus }) => {
-  const statusDetail = statusDetails[status];
-  return <Badge className={statusDetail.color}>{statusDetail.name}</Badge>;
-};
+export { IssueStatusBadge } from "@/components/status-form";
 
 export const IssueLoading = () => {
   return <LoadingView message="Loading issue..." />;
@@ -62,63 +49,14 @@ export const IssueStatusForm = ({
   issue: Issue | IssueWithRelations;
   className?: string;
 }) => {
-  const [status, setStatus] = useState<IssueStatus>(issue.status);
   const updateIssueStatus = useUpdateIssueStatus();
-  const lastSubmittedStatusRef = useRef<IssueStatus>(issue.status);
-
-  useEffect(() => {
-    // Don't submit if status hasn't changed or if we already submitted this status
-    if (status === issue.status || status === lastSubmittedStatusRef.current) {
-      return;
-    }
-
-    const updateStatus = async () => {
-      lastSubmittedStatusRef.current = status;
-      try {
-        await updateIssueStatus.mutateAsync({
-          id: issue.id,
-          status: status,
-        });
-      } catch {
-        setStatus(issue.status);
-        lastSubmittedStatusRef.current = issue.status;
-      }
-    };
-
-    updateStatus();
-  }, [status, issue.id, issue.status, updateIssueStatus]);
-
-  const statusDetail = statusDetails[status];
-
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        asChild
-        onClick={(e) => {
-          e.stopPropagation();
-        }}
-        className={className}
-      >
-        <Badge className={statusDetail.color}>
-          {statusDetail.name} <ChevronDown className="ml-2" />
-        </Badge>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {Object.values(IssueStatus)
-          .filter((s) => s !== status)
-          .map((s) => (
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                setStatus(s);
-              }}
-              key={s}
-            >
-              <IssueStatusBadge status={s} />
-            </DropdownMenuItem>
-          ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <StatusFormBase
+      id={issue.id}
+      initialStatus={issue.status}
+      onUpdate={(input) => updateIssueStatus.mutateAsync(input)}
+      className={className}
+    />
   );
 };
 

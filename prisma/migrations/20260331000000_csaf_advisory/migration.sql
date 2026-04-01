@@ -84,6 +84,9 @@ CREATE INDEX "_AdvisoryVulnerabilities_B_index" ON "_AdvisoryVulnerabilities"("B
 -- CreateIndex
 CREATE INDEX "_AdvisoryDeviceGroups_B_index" ON "_AdvisoryDeviceGroups"("B");
 
+-- AddColumn
+ALTER TABLE "advisory" ADD COLUMN "title" TEXT;
+
 -- AddForeignKey
 ALTER TABLE "advisory" ADD CONSTRAINT "advisory_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

@@ -32,7 +32,7 @@ describe("Assets Endpoint (/assets)", () => {
     name: "mockIntegration",
     platform: "mockIntegrationPlatform",
     integrationUri: "https://mock-upstream-api.com/",
-    integrationType: "PARTNER",
+    integrationType: "PARTNER" as const,
     authType: AuthType.Bearer,
     resourceType: ResourceType.Asset,
     authentication: {

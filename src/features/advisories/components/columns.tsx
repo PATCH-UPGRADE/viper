@@ -2,10 +2,11 @@
 
 import type { ColumnDef } from "@tanstack/table-core";
 import { formatDistanceToNow } from "date-fns";
+import { SeverityBadge } from "@/components/severity-badge";
 import { SortableHeader } from "@/components/ui/data-table";
 import { IssueStatusBadge } from "@/features/issues/components/issue";
 import type { AdvisoryWithRelations } from "../types";
-import { SeverityBadge, TlpBadge } from "./advisories";
+import { TlpBadge } from "./advisories";
 
 type AdvisoryRow = AdvisoryWithRelations & { affectedAssetCount: number };
 

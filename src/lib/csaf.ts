@@ -13,6 +13,7 @@ export interface CsafReference {
 export interface CsafRemediation {
   category: string;
   details: string;
+  url?: string;
 }
 
 export interface CsafVulnerability {
@@ -88,6 +89,7 @@ export function parseCsaf(csaf: unknown): ParsedCsaf {
         return {
           category: asString(rem.category),
           details: asString(rem.details),
+          url: rem.url ? asString(rem.url) : undefined,
         };
       },
     );

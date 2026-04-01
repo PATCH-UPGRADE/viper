@@ -28,7 +28,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  IntegrationType,
   type ResourceType,
   SyncStatusEnum,
 } from "@/generated/prisma";
@@ -78,7 +77,7 @@ export const getIntegrationColumns = (
       cell: ({ row }) => {
         return (
           <div className="flex gap-1 items-center">
-            {row.original.integrationType === IntegrationType.AI && (
+            {row.original.integrationType === "AI" && (
               <Sparkles size={15} />
             )}
             <div className="font-semibold max-w-60 overflow-ellipsis overflow-hidden">

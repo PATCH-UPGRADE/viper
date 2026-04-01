@@ -43,8 +43,6 @@ export interface InfoColumnSection {
   header: string;
   items: Array<{
     header: string;
-    /** Optional ReactNode (e.g. QuestionTooltip) shown inline after the item label */
-    tooltip?: ReactNode;
     content: ReactNode;
   }>;
 }
@@ -172,11 +170,10 @@ export function InfoColumn({
                 {section.header}
               </h3>
               <div className="grid grid-cols-1 gap-3">
-                {section.items.map(({ header, tooltip, content }) => (
+                {section.items.map(({ header, content }) => (
                   <div key={header}>
-                    <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground mb-1">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">
                       {header}
-                      {tooltip}
                     </div>
                     {content}
                   </div>

@@ -4,6 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
 import { MoreVertical } from "lucide-react";
 import Link from "next/link";
+import { severityConfig } from "@/components/severity-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SortableHeader } from "@/components/ui/data-table";
@@ -38,29 +39,6 @@ function countActiveBySeverity(
 function totalActiveIssues(issues: AssetIssue[]): number {
   return issues.filter((i) => i.status === IssueStatus.ACTIVE).length;
 }
-
-const severityConfig = {
-  [Severity.Critical]: {
-    label: "Critical",
-    short: "C",
-    badgeClass: "bg-red-600 hover:bg-red-600 text-white",
-  },
-  [Severity.High]: {
-    label: "High",
-    short: "H",
-    badgeClass: "bg-orange-500 hover:bg-orange-500 text-white",
-  },
-  [Severity.Medium]: {
-    label: "Medium",
-    short: "M",
-    badgeClass: "bg-yellow-500 hover:bg-yellow-500 text-white",
-  },
-  [Severity.Low]: {
-    label: "Low",
-    short: "L",
-    badgeClass: "bg-blue-500 hover:bg-blue-500 text-white",
-  },
-} as const;
 
 const SEVERITY_COL_COUNT = 4;
 
@@ -105,7 +83,7 @@ function createSeverityColumn(
 
       const count = countActiveBySeverity(issues, severity);
       if (count === 0) return <span className="text-muted-foreground">—</span>;
-      return <Badge className={config.badgeClass}>{count}</Badge>;
+      return <Badge className={config.badgeClassName}>{count}</Badge>;
     },
   };
 }
@@ -223,7 +201,7 @@ export const assetIssueColumns: ColumnDef<AssetIssue>[] = [
     cell: ({ row }) => {
       const severity = row.original.vulnerability.severity;
       const config = severityConfig[severity];
-      return <Badge className={config.badgeClass}>{config.label}</Badge>;
+      return <Badge className={config.badgeClassName}>{config.label}</Badge>;
     },
   },
   {

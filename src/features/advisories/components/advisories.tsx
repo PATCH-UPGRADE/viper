@@ -14,6 +14,7 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { SeverityBadge } from "@/components/severity-badge";
 import { StatusFormBase } from "@/components/status-form";
 import {
   Accordion,
@@ -59,22 +60,6 @@ import {
 } from "../hooks/use-advisories";
 import { useAdvisoriesParams } from "../hooks/use-advisories-params";
 import { columns } from "./columns";
-
-// ---------------------------------------------------------------------------
-// Severity badge
-// ---------------------------------------------------------------------------
-
-const severityConfig: Record<Severity, { label: string; className: string }> = {
-  Critical: { label: "Critical", className: "bg-red-600 text-white" },
-  High: { label: "High", className: "bg-orange-500 text-white" },
-  Medium: { label: "Medium", className: "bg-yellow-500 text-black" },
-  Low: { label: "Low", className: "bg-blue-500 text-white" },
-};
-
-export const SeverityBadge = ({ severity }: { severity: Severity }) => {
-  const config = severityConfig[severity];
-  return <Badge className={config.className}>{config.label}</Badge>;
-};
 
 // ---------------------------------------------------------------------------
 // TLP badge — colors per https://www.first.org/tlp/
@@ -199,7 +184,7 @@ export const AdvisoryDetailError = () => {
 };
 
 // ---------------------------------------------------------------------------
-// Issue progress bar (JIRA epic style)
+// Issue progress bar
 // ---------------------------------------------------------------------------
 
 interface AdvisoryIssueProgressBarProps {
@@ -222,41 +207,55 @@ function AdvisoryIssueProgressBar({ issues, percentage }: AdvisoryIssueProgressB
   const remediatedPct = (remediated / total) * 100;
   const falsePosPct = (falsePos / total) * 100;
 
+  const legendItems = [
+    { count: remediated, label: "Remediated", colorClass: "bg-green-500" },
+    { count: falsePos, label: "False Positive", colorClass: "bg-yellow-500" },
+    { count: active, label: "Active", colorClass: "bg-muted-foreground" },
+  ];
+
   return (
     <div className="flex flex-col gap-1.5">
-      {/* Stacked bar */}
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted flex">
-        <div
-          className="h-full bg-green-500 transition-all"
-          style={{ width: `${remediatedPct}%` }}
-        />
-        <div
-          className="h-full bg-yellow-500 transition-all"
-          style={{ width: `${falsePosPct}%` }}
-        />
+      <div className="flex items-center gap-4">
+        {/* Stacked bar */}
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted-foreground flex">
+          <div
+            className="h-full bg-green-500 transition-all"
+            style={{ width: `${remediatedPct}%` }}
+          />
+          <div
+            className="h-full bg-yellow-500 transition-all"
+            style={{ width: `${falsePosPct}%` }}
+          />
+        </div>
+        <span className="text-sm font-medium">
+          {percentage}%&nbsp;remediated
+        </span>
       </div>
-      <span className="text-sm font-medium">
-        {percentage}% remediated
-      </span>
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block size-2 rounded-full bg-green-500" />
-          {remediated} Remediated
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block size-2 rounded-full bg-yellow-500" />
-          {falsePos} False Positive
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="bg-muted-foreground/40 inline-block size-2 rounded-full" />
-          {active} Active
-        </span>
+        {legendItems.map(({ count, label, colorClass }) => (
+          <span key={label} className="flex items-center gap-1.5">
+            <span className={`inline-block size-2 rounded-full ${colorClass}`} />
+            {count} {label}
+          </span>
+        ))}
         <span className="ml-auto font-medium text-foreground">
           {total} total
         </span>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Detail section card
+// ---------------------------------------------------------------------------
+
+function DetailSection({ children }: { children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3 rounded-md border bg-background p-6">
+      {children}
+    </section>
   );
 }
 
@@ -320,15 +319,15 @@ export const AdvisoryDetailPage = ({ id }: { id: string }) => {
         },
         {
           header: "TLP",
-          tooltip: (
+          content: (
+            <>{advisory.tlp ? <TlpBadge tlp={advisory.tlp} /> : null}
             <QuestionTooltip>
               TLP (Traffic Light Protocol) is a set of designations used to
               ensure that sensitive information is shared with the appropriate
               audience. RED = recipients only, AMBER = limited sharing, GREEN =
               community-wide, WHITE/CLEAR = unlimited.
-            </QuestionTooltip>
+            </QuestionTooltip></>
           ),
-          content: advisory.tlp ? <TlpBadge tlp={advisory.tlp} /> : null,
         },
         {
           header: "Progress",
@@ -400,14 +399,14 @@ export const AdvisoryDetailPage = ({ id }: { id: string }) => {
 
         {/* Summary */}
         {advisory.summary && (
-          <section className="flex flex-col gap-2 rounded-md border bg-background p-6">
+          <DetailSection>
             <h2 className="text-xl font-semibold">Summary</h2>
             <p className="text-sm text-muted-foreground">{advisory.summary}</p>
-          </section>
+          </DetailSection>
         )}
 
         {/* Affected Assets */}
-        <section className="flex flex-col gap-3 rounded-md border bg-background p-6">
+        <DetailSection>
           <h2 className="text-xl font-semibold">
             Affected Assets ({advisory.affectedAssetsWithIssues.length})
           </h2>
@@ -431,11 +430,11 @@ export const AdvisoryDetailPage = ({ id }: { id: string }) => {
               </div>
             </>
           )}
-        </section>
+        </DetailSection>
 
         {/* Notes */}
         {parsedCsaf.notes.length > 0 && (
-          <section className="flex flex-col gap-3 rounded-md border bg-background p-6">
+          <DetailSection>
             <h2 className="text-xl font-semibold">Notes</h2>
             <table className="w-full text-sm">
               <tbody>
@@ -451,12 +450,12 @@ export const AdvisoryDetailPage = ({ id }: { id: string }) => {
                 ))}
               </tbody>
             </table>
-          </section>
+          </DetailSection>
         )}
 
         {/* Vulnerabilities */}
         {vulnItems.length > 0 && (
-          <section className="flex flex-col gap-3 rounded-md border bg-background p-6">
+          <DetailSection>
             <h2 className="text-xl font-semibold">Vulnerabilities</h2>
             <Accordion type="multiple">
               {vulnItems.map((item) => (
@@ -520,7 +519,19 @@ export const AdvisoryDetailPage = ({ id }: { id: string }) => {
                                     </Badge>
                                   </td>
                                   <td className="py-2 text-muted-foreground align-top">
-                                    {r.details}
+                                    {r.url ? (
+                                      <a
+                                        href={r.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:underline flex items-center gap-1"
+                                      >
+                                        {r.details}
+                                        <ExternalLinkIcon className="size-3 shrink-0" />
+                                      </a>
+                                    ) : (
+                                      r.details
+                                    )}
                                   </td>
                                 </tr>
                               ))}
@@ -533,7 +544,7 @@ export const AdvisoryDetailPage = ({ id }: { id: string }) => {
                 </AccordionItem>
               ))}
             </Accordion>
-          </section>
+          </DetailSection>
         )}
       </main>
     </div>

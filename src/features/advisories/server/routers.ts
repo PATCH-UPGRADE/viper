@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { assetDashboardInclude } from "@/features/assets/types";
 import { IssueStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
@@ -61,9 +62,35 @@ export const advisoriesRouter = createTRPCRouter({
         include: advisoryInclude,
       });
       const found = requireExistence(advisory, "Advisory");
+
+      const vulnIds = found.referencedVulnerabilities.map((v) => v.id);
+      const affectedAssetIds = getAffectedAssets(found).map((a) => a.id);
+
+      const affectedAssetsWithIssues = await prisma.asset.findMany({
+        where: { id: { in: affectedAssetIds } },
+        include: {
+          ...assetDashboardInclude,
+          issues: {
+            where: { vulnerabilityId: { in: vulnIds } },
+            include: assetDashboardInclude.issues.include,
+          },
+        },
+      });
+
+      const allIssues = affectedAssetsWithIssues.flatMap((a) => a.issues);
+      const nonActiveCount = allIssues.filter(
+        (i) => i.status !== IssueStatus.ACTIVE,
+      ).length;
+      const progressPercent =
+        allIssues.length > 0
+          ? Math.round((nonActiveCount / allIssues.length) * 100)
+          : 0;
+
       return {
         ...found,
         affectedAssets: getAffectedAssets(found),
+        affectedAssetsWithIssues,
+        progressPercent,
       };
     }),
 

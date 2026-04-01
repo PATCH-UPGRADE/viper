@@ -23,6 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 // ============================================================================
 // Types
@@ -40,7 +41,12 @@ export interface DrawerTab {
 
 export interface InfoColumnSection {
   header: string;
-  items: Array<{ header: string; content: ReactNode }>;
+  items: Array<{
+    header: string;
+    /** Optional ReactNode (e.g. QuestionTooltip) shown inline after the item label */
+    tooltip?: ReactNode;
+    content: ReactNode;
+  }>;
 }
 
 interface DashboardDrawerShellProps {
@@ -148,9 +154,15 @@ export function DashboardDrawerShell({
 // InfoColumn
 // ============================================================================
 
-export function InfoColumn({ sections }: { sections: InfoColumnSection[] }) {
+export function InfoColumn({
+  sections,
+  className,
+}: {
+  sections: InfoColumnSection[];
+  className?: string;
+}) {
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className={cn("h-full", className)}>
       <div className="flex flex-col gap-6 p-4 text-sm">
         {sections.map((section, i) => (
           <Fragment key={`${i}-${section.header}`}>
@@ -160,10 +172,11 @@ export function InfoColumn({ sections }: { sections: InfoColumnSection[] }) {
                 {section.header}
               </h3>
               <div className="grid grid-cols-1 gap-3">
-                {section.items.map(({ header, content }) => (
+                {section.items.map(({ header, tooltip, content }) => (
                   <div key={header}>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
+                    <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground mb-1">
                       {header}
+                      {tooltip}
                     </div>
                     {content}
                   </div>

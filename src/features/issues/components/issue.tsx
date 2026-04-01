@@ -1,6 +1,6 @@
 "use client";
 
-import { BugIcon, ComputerIcon, MoreVertical } from "lucide-react";
+import { BugIcon, ComputerIcon } from "lucide-react";
 import Link from "next/link";
 import {
   EntityContainer,
@@ -8,13 +8,7 @@ import {
   LoadingView,
 } from "@/components/entity-components";
 import { StatusFormBase, statusDetails } from "@/components/status-form";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import { AssetItem } from "@/features/assets/components/assets";
 import { locationSchema } from "@/features/assets/types";
 import { getAssetRoleLabel } from "@/features/assets/utils";
@@ -176,52 +170,29 @@ export const IssuesSidebarList = ({
                   </>
                 )}
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    asChild
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <span className="sr-only">Open menu</span>
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-[200px]">
-                    <DropdownMenuItem
-                      onClick={(e) => e.stopPropagation()}
-                      className="cursor-pointer"
-                      asChild
-                    >
-                      <Link href={`/issues/${issue.id}`}>
-                        Go to Issue Details
-                      </Link>
-                    </DropdownMenuItem>
-                    {type === "vulnerabilities" && (
-                      <DropdownMenuItem
-                        onClick={(e) => e.stopPropagation()}
-                        className="cursor-pointer"
-                        asChild
-                      >
-                        <Link
-                          href={`/vulnerabilities/${issue.vulnerabilityId}`}
-                        >
-                          Go to Vulnerability Details
-                        </Link>
-                      </DropdownMenuItem>
-                    )}
-                    {type === "assets" && (
-                      <DropdownMenuItem
-                        onClick={(e) => e.stopPropagation()}
-                        className="cursor-pointer"
-                        asChild
-                      >
-                        <Link href={`/assets/${issue.assetId}`}>
-                          Go to Asset Details
-                        </Link>
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <MoreVerticalDropdownMenu
+                  contentClassName="w-[200px]"
+                  items={[
+                    {
+                      label: "Go to Issue Details",
+                      href: `/issues/${issue.id}`,
+                      stopPropagation: true,
+                      className: "cursor-pointer",
+                    },
+                    type === "vulnerabilities" && {
+                      label: "Go to Vulnerability Details",
+                      href: `/vulnerabilities/${issue.vulnerabilityId}`,
+                      stopPropagation: true,
+                      className: "cursor-pointer",
+                    },
+                    type === "assets" && {
+                      label: "Go to Asset Details",
+                      href: `/assets/${issue.assetId}`,
+                      stopPropagation: true,
+                      className: "cursor-pointer",
+                    },
+                  ]}
+                />
               </Link>
             </li>
           );

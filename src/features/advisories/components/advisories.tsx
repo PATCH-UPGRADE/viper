@@ -1,7 +1,6 @@
 "use client";
 
-import { ExternalLinkIcon, MoreVertical, SlashIcon } from "lucide-react";
-import Link from "next/link";
+import { ExternalLinkIcon, SlashIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   InfoColumn,
@@ -31,14 +30,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import {
   assetIssueColumns,
@@ -192,7 +185,10 @@ interface AdvisoryIssueProgressBarProps {
   percentage: number;
 }
 
-function AdvisoryIssueProgressBar({ issues, percentage }: AdvisoryIssueProgressBarProps) {
+function AdvisoryIssueProgressBar({
+  issues,
+  percentage,
+}: AdvisoryIssueProgressBarProps) {
   const total = issues.length;
   if (total === 0) return null;
 
@@ -235,7 +231,9 @@ function AdvisoryIssueProgressBar({ issues, percentage }: AdvisoryIssueProgressB
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         {legendItems.map(({ count, label, colorClass }) => (
           <span key={label} className="flex items-center gap-1.5">
-            <span className={`inline-block size-2 rounded-full ${colorClass}`} />
+            <span
+              className={`inline-block size-2 rounded-full ${colorClass}`}
+            />
             {count} {label}
           </span>
         ))}
@@ -320,13 +318,15 @@ export const AdvisoryDetailPage = ({ id }: { id: string }) => {
         {
           header: "TLP",
           content: (
-            <>{advisory.tlp ? <TlpBadge tlp={advisory.tlp} /> : null}
-            <QuestionTooltip>
-              TLP (Traffic Light Protocol) is a set of designations used to
-              ensure that sensitive information is shared with the appropriate
-              audience. RED = recipients only, AMBER = limited sharing, GREEN =
-              community-wide, WHITE/CLEAR = unlimited.
-            </QuestionTooltip></>
+            <>
+              {advisory.tlp ? <TlpBadge tlp={advisory.tlp} /> : null}
+              <QuestionTooltip>
+                TLP (Traffic Light Protocol) is a set of designations used to
+                ensure that sensitive information is shared with the appropriate
+                audience. RED = recipients only, AMBER = limited sharing, GREEN
+                = community-wide, WHITE/CLEAR = unlimited.
+              </QuestionTooltip>
+            </>
           ),
         },
         {
@@ -467,28 +467,15 @@ export const AdvisoryDetailPage = ({ id }: { id: string }) => {
                         <SeverityBadge severity={item.severity} />
                       )}
                       {item.viperObject && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="ml-auto h-7 w-7 p-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <span className="sr-only">Open menu</span>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link
-                                href={`/vulnerabilities/${item.viperObject.id}`}
-                              >
-                                Vulnerability Detail Page
-                              </Link>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <MoreVerticalDropdownMenu
+                          triggerClassName="ml-auto"
+                          items={[
+                            {
+                              label: "Vulnerability Detail Page",
+                              href: `/vulnerabilities/${item.viperObject.id}`,
+                            },
+                          ]}
+                        />
                       )}
                     </span>
                   </AccordionTrigger>

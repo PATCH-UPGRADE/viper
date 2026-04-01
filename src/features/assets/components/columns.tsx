@@ -2,20 +2,11 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
-import { CopyIcon, MoreVertical, TrashIcon } from "lucide-react";
-import Link from "next/link";
+import { CopyIcon, TrashIcon } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import { handleCopy } from "@/lib/copy";
 import type { AssetResponse } from "../types";
 
@@ -62,41 +53,45 @@ const actionsColumn: ColumnDef<AssetResponse> = {
     const asset = row.original;
 
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
-            <span className="sr-only">Open menu</span>
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[200px]">
-          <DropdownMenuItem asChild>
-            <Link href={`/assets/${asset.id}`}>Go to Asset Details</Link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>Quick Actions</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() =>
-              handleCopy(asset.deviceGroup.cpe, () => toast.success("Copied!"))
-            }
-          >
-            <CopyIcon strokeWidth={3} /> Copy Group ID
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handleCopy(asset.id, () => toast.success("Copied!"))}
-          >
-            <CopyIcon strokeWidth={3} /> Copy Asset ID
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => console.log("TODO")}
-            variant="destructive"
-          >
-            <TrashIcon strokeWidth={3} /> Delete Asset
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <MoreVerticalDropdownMenu
+        contentClassName="w-[200px]"
+        items={[
+          {
+            items: [
+              { label: "Go to Asset Details", href: `/assets/${asset.id}` },
+            ],
+          },
+          {
+            label: "Quick Actions",
+            items: [
+              {
+                label: "Copy Group ID",
+                icon: <CopyIcon strokeWidth={3} />,
+                onClick: () =>
+                  handleCopy(asset.deviceGroup.cpe, () =>
+                    toast.success("Copied!"),
+                  ),
+              },
+              {
+                label: "Copy Asset ID",
+                icon: <CopyIcon strokeWidth={3} />,
+                onClick: () =>
+                  handleCopy(asset.id, () => toast.success("Copied!")),
+              },
+            ],
+          },
+          {
+            items: [
+              {
+                label: "Delete Asset",
+                icon: <TrashIcon strokeWidth={3} />,
+                onClick: () => console.log("TODO"),
+                variant: "destructive",
+              },
+            ],
+          },
+        ]}
+      />
     );
   },
 };

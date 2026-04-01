@@ -1,5 +1,5 @@
-import { hashPassword } from "better-auth/crypto";
 import {
+  type AssetStatus,
   AuthType,
   IntegrationType,
   IssueStatus,
@@ -7,7 +7,6 @@ import {
   ResourceType,
   Severity,
   Tlp,
-  type AssetStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
@@ -37,7 +36,11 @@ async function createOrGetCisaIntegration(seedUserId: string) {
   });
 
   await prisma.integration.create({
-    data: { ...CISA_INTEGRATION, userId: seedUserId, integrationUserId: integrationUser.id },
+    data: {
+      ...CISA_INTEGRATION,
+      userId: seedUserId,
+      integrationUserId: integrationUser.id,
+    },
   });
 
   console.log("✅ Created CISA CSAF integration and integration user");

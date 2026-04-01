@@ -3,7 +3,6 @@
 import {
   AlertTriangleIcon,
   Loader2Icon,
-  MoreVerticalIcon,
   PackageOpenIcon,
   PlusIcon,
   SearchIcon,
@@ -23,12 +22,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardTitle } from "./ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+import { MoreVerticalDropdownMenu } from "./ui/dropdown-menu";
 import {
   Empty,
   EmptyContent,
@@ -324,27 +318,17 @@ export const EntityItem = ({
           <div className="flex gap-x-4 items-center">
             {actions}
             {onRemove && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <span className="sr-only">Open menu</span>
-                    <MoreVerticalIcon className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={handleRemove}
-                    disabled={isRemoving}
-                  >
-                    <TrashIcon className="mr-2 size-4" />
-                    {isRemoving ? "Removing..." : "Remove"}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <MoreVerticalDropdownMenu
+                items={[
+                  {
+                    label: isRemoving ? "Removing..." : "Remove",
+                    icon: <TrashIcon className="mr-2 size-4" />,
+                    onClick: handleRemove,
+                    disabled: isRemoving,
+                    variant: "destructive",
+                  },
+                ]}
+              />
             )}
           </div>
         )}

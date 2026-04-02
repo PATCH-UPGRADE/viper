@@ -12,19 +12,30 @@ export const resourceTypeSchema = z.enum([
   "Remediation",
 ]);
 
-export const integrationInputSchema = authSchema.safeExtend({
-  name: z.string().min(1, "Name is required"),
-  platform: z.string().optional(),
-  integrationUri: safeUrlSchema,
-  isGeneric: z.boolean(),
-  prompt: z.string().optional(),
-  resourceType: resourceTypeSchema,
-  syncEvery: z
-    .number()
-    .int()
-    .positive()
-    .min(INTEGRATION_SYNC_EVERY_MIN * 60),
-});
+export const integrationInputSchema = authSchema
+  .safeExtend({
+    name: z.string().min(1, "Name is required"),
+    platform: z.string().optional(),
+    integrationUri: safeUrlSchema,
+    integrationType: z.enum(["PARTNER", "AI", "CSAF"]),
+    prompt: z.string().optional(),
+    resourceType: resourceTypeSchema,
+    syncEvery: z
+      .number()
+      .int()
+      .positive()
+      .min(INTEGRATION_SYNC_EVERY_MIN * 60),
+  })
+  .refine(
+    (data) =>
+      data.integrationType !== "CSAF" ||
+      data.resourceType === ResourceType.Vulnerability,
+    {
+      message:
+        "CSAF integrations are only available for Vulnerability resource type",
+      path: ["integrationType"],
+    },
+  );
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;
 
 export function isValidResourceTypeKey(

@@ -1,14 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import {
-  BugIcon,
-  ExternalLinkIcon,
-  MoreVertical,
-  ServerIcon,
-  SlashIcon,
-} from "lucide-react";
-import Link from "next/link";
+import { BugIcon, ExternalLinkIcon, ServerIcon, SlashIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -25,15 +18,9 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CopyCode } from "@/components/ui/code";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import {
   Pagination,
   PaginationContent,
@@ -115,37 +102,21 @@ const VulnList = ({
               <IssueStatusForm issue={issue} />
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                asChild
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[200px]">
-                <DropdownMenuItem
-                  onClick={(e) => e.stopPropagation()}
-                  className="cursor-pointer"
-                  asChild
-                >
-                  <Link href={`/issues/${issue.id}`}>Go to Issue Details</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={(e) => e.stopPropagation()}
-                  className="cursor-pointer"
-                  asChild
-                >
-                  <Link href={`/vulnerabilities/${issue.vulnerabilityId}`}>
-                    Go to Vulnerability Details
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <MoreVerticalDropdownMenu
+              contentClassName="w-[200px]"
+              items={[
+                {
+                  label: "Go to Issue Details",
+                  href: `/issues/${issue.id}`,
+                  className: "cursor-pointer",
+                },
+                {
+                  label: "Go to Vulnerability Details",
+                  href: `/vulnerabilities/${issue.vulnerabilityId}`,
+                  className: "cursor-pointer",
+                },
+              ]}
+            />
           </li>
         ))}
       </ul>

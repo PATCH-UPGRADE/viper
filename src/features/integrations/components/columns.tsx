@@ -3,25 +3,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
-import {
-  MoreVertical,
-  RefreshCw,
-  Sparkles,
-  SquarePen,
-  TrashIcon,
-} from "lucide-react";
+import { RefreshCw, Sparkles, SquarePen, TrashIcon } from "lucide-react";
 import ms from "ms";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { SortableHeader } from "@/components/ui/data-table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -74,7 +62,7 @@ export const getIntegrationColumns = (
       cell: ({ row }) => {
         return (
           <div className="flex gap-1 items-center">
-            {row.original.isGeneric && <Sparkles size={15} />}
+            {row.original.integrationType === "AI" && <Sparkles size={15} />}
             <div className="font-semibold max-w-60 overflow-ellipsis overflow-hidden">
               {row.original.name}
             </div>
@@ -182,7 +170,7 @@ export const getIntegrationColumns = (
             name: data.name,
             platform: data.platform || "",
             integrationUri: data.integrationUri,
-            isGeneric: data.isGeneric,
+            integrationType: data.integrationType,
             prompt: data.prompt || "",
             authType: data.authType,
             resourceType: data.resourceType,
@@ -209,31 +197,34 @@ export const getIntegrationColumns = (
 
         return (
           <>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[200px]">
-                <DropdownMenuItem
-                  onClick={() => setOpen(true)}
-                  disabled={updateIntegration.isPending}
-                >
-                  <SquarePen />
-                  {updateIntegration.isPending ? "Updating..." : "Update"}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleRemove}
-                  disabled={removeItem.isPending}
-                  variant="destructive"
-                >
-                  <TrashIcon strokeWidth={3} /> Delete Integration
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <MoreVerticalDropdownMenu
+              contentClassName="w-[200px]"
+              items={[
+                {
+                  items: [
+                    {
+                      label: updateIntegration.isPending
+                        ? "Updating..."
+                        : "Update",
+                      icon: <SquarePen />,
+                      onClick: () => setOpen(true),
+                      disabled: updateIntegration.isPending,
+                    },
+                  ],
+                },
+                {
+                  items: [
+                    {
+                      label: "Delete Integration",
+                      icon: <TrashIcon strokeWidth={3} />,
+                      onClick: handleRemove,
+                      disabled: removeItem.isPending,
+                      variant: "destructive",
+                    },
+                  ],
+                },
+              ]}
+            />
 
             {open && (
               <IntegrationCreateModal

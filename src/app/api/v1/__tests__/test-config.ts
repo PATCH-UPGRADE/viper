@@ -65,7 +65,9 @@ export const setupMockIntegration = async (
   expect(createdIntegration.integrationUri).toBe(
     mockIntegrationPayload.integrationUri,
   );
-  expect(createdIntegration.isGeneric).toBe(mockIntegrationPayload.isGeneric);
+  expect(createdIntegration.integrationType).toBe(
+    mockIntegrationPayload.integrationType,
+  );
   expect(createdIntegration.resourceType).toBe(
     mockIntegrationPayload.resourceType,
   );

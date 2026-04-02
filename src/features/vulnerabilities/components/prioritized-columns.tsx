@@ -2,18 +2,10 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
-import { MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { SortableHeader } from "@/components/ui/data-table";
-
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import {
   Tooltip,
@@ -139,24 +131,15 @@ export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
     id: "actions",
     header: "",
     cell: ({ row }) => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <span className="sr-only">Open menu</span>
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            <Link href={`/assets/${row.original.asset.id}`}>
-              Go to Asset Details
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href={`/issues/${row.original.id}`}>Go to Issue Details</Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <MoreVerticalDropdownMenu
+        items={[
+          {
+            label: "Go to Asset Details",
+            href: `/assets/${row.original.asset.id}`,
+          },
+          { label: "Go to Issue Details", href: `/issues/${row.original.id}` },
+        ]}
+      />
     ),
   },
 ];

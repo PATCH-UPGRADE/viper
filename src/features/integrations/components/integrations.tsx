@@ -43,7 +43,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
 import { getIntegrationColumns } from "@/features/integrations/components/columns";
-import type { ResourceType, SyncStatusEnum } from "@/generated/prisma";
+import {
+  IntegrationType,
+  type ResourceType,
+  type SyncStatusEnum,
+} from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { usePaginationParams } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
@@ -136,28 +140,40 @@ export const IntegrationCreateModal = ({
   };
 
   const isPending = form.formState.isSubmitting;
-  const isGeneric = form.watch("isGeneric");
+  const integrationType = form.watch("integrationType");
   const verbLabel = isUpdate ? "Update" : "Create";
   const label = `${verbLabel} ${!isUpdate ? "New" : ""} ${resourceType || ""} Integration`;
 
   const integrationTypes = [
     {
-      value: false,
-      id: "standard",
+      value: IntegrationType.PARTNER,
+      id: "partner",
       title: "Standard Integration",
       description: "Pre-configured platforms with built-in support",
       badge: "e.g., BlueFlow, Helm",
       icon: null,
     },
     {
-      value: true,
+      value: IntegrationType.AI,
       id: "ai",
       title: "AI Integration",
       description: "Flexible setup for any custom platform",
       badge: "Universal & Adaptive",
       icon: <Sparkles size={15} />,
     },
-  ] as const;
+    ...(resourceType === "Vulnerability"
+      ? [
+          {
+            value: IntegrationType.CSAF,
+            id: "csaf",
+            title: "CSAF Integration",
+            description: "Parse machine-readable CSAF security advisories",
+            badge: "CSAF 2.0",
+            icon: null,
+          },
+        ]
+      : []),
+  ];
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -177,16 +193,14 @@ export const IntegrationCreateModal = ({
             <div className="no-scrollbar -mx-6 px-6 py-4 max-h-[60vh] overflow-y-auto grid gap-6">
               <FormField
                 control={form.control}
-                name="isGeneric"
+                name="integrationType"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Integration Type *</FormLabel>
                     <FormControl>
                       <RadioGroup
-                        onValueChange={(value) =>
-                          field.onChange(value === "true")
-                        }
-                        value={field.value ? "true" : "false"}
+                        onValueChange={field.onChange}
+                        value={field.value}
                         className="grid grid-cols-2 gap-4"
                       >
                         {integrationTypes.map((type) => {
@@ -245,7 +259,7 @@ export const IntegrationCreateModal = ({
                   </FormItem>
                 )}
               />
-              {isGeneric && (
+              {integrationType === IntegrationType.AI && (
                 <Alert className="border-blue-200 bg-blue-50">
                   <AlertCircleIcon className="stroke-blue-900" />
                   <AlertDescription className="text-blue-900">
@@ -329,7 +343,7 @@ export const IntegrationCreateModal = ({
                 )}
               />
 
-              {isGeneric && (
+              {integrationType === IntegrationType.AI && (
                 <FormField
                   control={form.control}
                   name="prompt"

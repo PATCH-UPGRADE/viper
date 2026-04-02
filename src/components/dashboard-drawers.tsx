@@ -23,6 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 // ============================================================================
 // Types
@@ -40,7 +41,10 @@ export interface DrawerTab {
 
 export interface InfoColumnSection {
   header: string;
-  items: Array<{ header: string; content: ReactNode }>;
+  items: Array<{
+    header: string;
+    content: ReactNode;
+  }>;
 }
 
 interface DashboardDrawerShellProps {
@@ -148,9 +152,15 @@ export function DashboardDrawerShell({
 // InfoColumn
 // ============================================================================
 
-export function InfoColumn({ sections }: { sections: InfoColumnSection[] }) {
+export function InfoColumn({
+  sections,
+  className,
+}: {
+  sections: InfoColumnSection[];
+  className?: string;
+}) {
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className={cn("h-full", className)}>
       <div className="flex flex-col gap-6 p-4 text-sm">
         {sections.map((section, i) => (
           <Fragment key={`${i}-${section.header}`}>

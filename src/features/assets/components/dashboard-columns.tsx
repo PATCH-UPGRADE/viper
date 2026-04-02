@@ -2,17 +2,11 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
-import { MoreVertical } from "lucide-react";
 import Link from "next/link";
+import { severityConfig } from "@/components/severity-badge";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { SortableHeader } from "@/components/ui/data-table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -38,29 +32,6 @@ function countActiveBySeverity(
 function totalActiveIssues(issues: AssetIssue[]): number {
   return issues.filter((i) => i.status === IssueStatus.ACTIVE).length;
 }
-
-const severityConfig = {
-  [Severity.Critical]: {
-    label: "Critical",
-    short: "C",
-    badgeClass: "bg-red-600 hover:bg-red-600 text-white",
-  },
-  [Severity.High]: {
-    label: "High",
-    short: "H",
-    badgeClass: "bg-orange-500 hover:bg-orange-500 text-white",
-  },
-  [Severity.Medium]: {
-    label: "Medium",
-    short: "M",
-    badgeClass: "bg-yellow-500 hover:bg-yellow-500 text-white",
-  },
-  [Severity.Low]: {
-    label: "Low",
-    short: "L",
-    badgeClass: "bg-blue-500 hover:bg-blue-500 text-white",
-  },
-} as const;
 
 const SEVERITY_COL_COUNT = 4;
 
@@ -105,7 +76,7 @@ function createSeverityColumn(
 
       const count = countActiveBySeverity(issues, severity);
       if (count === 0) return <span className="text-muted-foreground">—</span>;
-      return <Badge className={config.badgeClass}>{count}</Badge>;
+      return <Badge className={config.badgeClassName}>{count}</Badge>;
     },
   };
 }
@@ -182,19 +153,11 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
     enableHiding: false,
     header: "",
     cell: ({ row }) => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <span className="sr-only">Open menu</span>
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            <Link href={`/assets/${row.original.id}`}>Go to Asset Details</Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <MoreVerticalDropdownMenu
+        items={[
+          { label: "Go to Asset Details", href: `/assets/${row.original.id}` },
+        ]}
+      />
     ),
   },
 ];
@@ -223,7 +186,7 @@ export const assetIssueColumns: ColumnDef<AssetIssue>[] = [
     cell: ({ row }) => {
       const severity = row.original.vulnerability.severity;
       const config = severityConfig[severity];
-      return <Badge className={config.badgeClass}>{config.label}</Badge>;
+      return <Badge className={config.badgeClassName}>{config.label}</Badge>;
     },
   },
   {
@@ -243,24 +206,15 @@ export const assetIssueColumns: ColumnDef<AssetIssue>[] = [
     id: "actions",
     header: "",
     cell: ({ row }) => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <span className="sr-only">Open menu</span>
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            <Link href={`/vulnerabilities/${row.original.vulnerabilityId}`}>
-              Go to Vulnerability
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href={`/issues/${row.original.id}`}>Go to Issue Details</Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <MoreVerticalDropdownMenu
+        items={[
+          {
+            label: "Go to Vulnerability",
+            href: `/vulnerabilities/${row.original.vulnerabilityId}`,
+          },
+          { label: "Go to Issue Details", href: `/issues/${row.original.id}` },
+        ]}
+      />
     ),
   },
 ];

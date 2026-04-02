@@ -1,9 +1,16 @@
 "use client";
 
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
-import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
-import type * as React from "react";
+import {
+  CheckIcon,
+  ChevronRightIcon,
+  CircleIcon,
+  MoreVertical,
+} from "lucide-react";
+import Link from "next/link";
+import * as React from "react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 function DropdownMenu({
@@ -238,6 +245,139 @@ function DropdownMenuSubContent({
   );
 }
 
+export type MoreVerticalMenuItem = {
+  label: string;
+  href?: string;
+  onClick?: (e: React.MouseEvent) => void;
+  icon?: React.ReactNode;
+  disabled?: boolean;
+  variant?: "default" | "destructive";
+  stopPropagation?: boolean;
+  className?: string;
+};
+
+export type MoreVerticalMenuGroup = {
+  label?: string;
+  items: (MoreVerticalMenuItem | false | null | undefined)[];
+};
+
+type MoreVerticalDropdownMenuProps = {
+  items:
+    | (MoreVerticalMenuItem | false | null | undefined)[]
+    | MoreVerticalMenuGroup[];
+  align?: "start" | "center" | "end";
+  contentClassName?: string;
+  triggerClassName?: string;
+  stopPropagation?: boolean;
+  asSpan?: boolean;
+};
+
+function isMenuGroup(
+  item: MoreVerticalMenuItem | MoreVerticalMenuGroup | false | null | undefined,
+): item is MoreVerticalMenuGroup {
+  return !!item && typeof item === "object" && "items" in item;
+}
+
+function MoreVerticalDropdownMenu({
+  items,
+  align = "end",
+  contentClassName,
+  triggerClassName,
+  stopPropagation = true,
+  asSpan = false,
+}: MoreVerticalDropdownMenuProps) {
+  const firstTruthy = items.find(Boolean);
+  const groups: MoreVerticalMenuGroup[] = isMenuGroup(firstTruthy)
+    ? (items as MoreVerticalMenuGroup[])
+    : [
+        {
+          items: items as (MoreVerticalMenuItem | false | null | undefined)[],
+        },
+      ];
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          className={cn("h-8 w-8 p-0 cursor-pointer", triggerClassName)}
+          onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
+          asChild={asSpan}
+        >
+          <span>
+            <span className="sr-only">Open menu</span>
+            <MoreVertical className="h-4 w-4" />
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align={align} className={contentClassName}>
+        {groups.map((group, groupIndex) => {
+          const filteredItems = group.items.filter(
+            Boolean,
+          ) as MoreVerticalMenuItem[];
+          if (filteredItems.length === 0) return null;
+          return (
+            <React.Fragment key={groupIndex}>
+              {groupIndex > 0 && <DropdownMenuSeparator />}
+              {group.label && (
+                <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+              )}
+              {filteredItems.map((item, itemIndex) => {
+                const shouldStopPropagation =
+                  item.stopPropagation ?? stopPropagation;
+
+                const handleClick = shouldStopPropagation
+                  ? (e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      item.onClick?.(e);
+                    }
+                  : item.onClick;
+
+                if (item.href) {
+                  return (
+                    <DropdownMenuItem
+                      key={itemIndex}
+                      asChild
+                      disabled={item.disabled}
+                      className={item.className}
+                    >
+                      <Link
+                        href={item.href}
+                        onClick={
+                          shouldStopPropagation
+                            ? (e) => e.stopPropagation()
+                            : undefined
+                        }
+                      >
+                        {item.icon}
+                        {item.label}
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                }
+
+                return (
+                  <DropdownMenuItem
+                    key={itemIndex}
+                    onClick={handleClick}
+                    disabled={item.disabled}
+                    variant={item.variant}
+                    className={item.className}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </DropdownMenuItem>
+                );
+              })}
+            </React.Fragment>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export {
   DropdownMenu,
   DropdownMenuPortal,
@@ -254,4 +394,5 @@ export {
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  MoreVerticalDropdownMenu,
 };

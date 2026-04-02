@@ -1,21 +1,14 @@
 "use client";
 
-import { BugIcon, ChevronDown, ComputerIcon, MoreVertical } from "lucide-react";
+import { BugIcon, ComputerIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
 import {
   EntityContainer,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { StatusFormBase, statusDetails } from "@/components/status-form";
+import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import { AssetItem } from "@/features/assets/components/assets";
 import { locationSchema } from "@/features/assets/types";
 import { getAssetRoleLabel } from "@/features/assets/utils";
@@ -29,19 +22,7 @@ import {
 } from "../hooks/use-issues";
 import type { IssueWithRelations } from "../types";
 
-const statusDetails = {
-  [IssueStatus.FALSE_POSITIVE]: {
-    name: "False Positive",
-    color: "bg-yellow-500",
-  },
-  [IssueStatus.ACTIVE]: { name: "Active", color: "bg-red-500" },
-  [IssueStatus.REMEDIATED]: { name: "Remediated", color: "bg-green-500" },
-};
-
-export const IssueStatusBadge = ({ status }: { status: IssueStatus }) => {
-  const statusDetail = statusDetails[status];
-  return <Badge className={statusDetail.color}>{statusDetail.name}</Badge>;
-};
+export { IssueStatusBadge } from "@/components/status-form";
 
 export const IssueLoading = () => {
   return <LoadingView message="Loading issue..." />;
@@ -62,63 +43,14 @@ export const IssueStatusForm = ({
   issue: Issue | IssueWithRelations;
   className?: string;
 }) => {
-  const [status, setStatus] = useState<IssueStatus>(issue.status);
   const updateIssueStatus = useUpdateIssueStatus();
-  const lastSubmittedStatusRef = useRef<IssueStatus>(issue.status);
-
-  useEffect(() => {
-    // Don't submit if status hasn't changed or if we already submitted this status
-    if (status === issue.status || status === lastSubmittedStatusRef.current) {
-      return;
-    }
-
-    const updateStatus = async () => {
-      lastSubmittedStatusRef.current = status;
-      try {
-        await updateIssueStatus.mutateAsync({
-          id: issue.id,
-          status: status,
-        });
-      } catch {
-        setStatus(issue.status);
-        lastSubmittedStatusRef.current = issue.status;
-      }
-    };
-
-    updateStatus();
-  }, [status, issue.id, issue.status, updateIssueStatus]);
-
-  const statusDetail = statusDetails[status];
-
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        asChild
-        onClick={(e) => {
-          e.stopPropagation();
-        }}
-        className={className}
-      >
-        <Badge className={statusDetail.color}>
-          {statusDetail.name} <ChevronDown className="ml-2" />
-        </Badge>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {Object.values(IssueStatus)
-          .filter((s) => s !== status)
-          .map((s) => (
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                setStatus(s);
-              }}
-              key={s}
-            >
-              <IssueStatusBadge status={s} />
-            </DropdownMenuItem>
-          ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <StatusFormBase
+      id={issue.id}
+      initialStatus={issue.status}
+      onUpdate={(input) => updateIssueStatus.mutateAsync(input)}
+      className={className}
+    />
   );
 };
 
@@ -238,52 +170,26 @@ export const IssuesSidebarList = ({
                   </>
                 )}
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    asChild
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <span className="sr-only">Open menu</span>
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-[200px]">
-                    <DropdownMenuItem
-                      onClick={(e) => e.stopPropagation()}
-                      className="cursor-pointer"
-                      asChild
-                    >
-                      <Link href={`/issues/${issue.id}`}>
-                        Go to Issue Details
-                      </Link>
-                    </DropdownMenuItem>
-                    {type === "vulnerabilities" && (
-                      <DropdownMenuItem
-                        onClick={(e) => e.stopPropagation()}
-                        className="cursor-pointer"
-                        asChild
-                      >
-                        <Link
-                          href={`/vulnerabilities/${issue.vulnerabilityId}`}
-                        >
-                          Go to Vulnerability Details
-                        </Link>
-                      </DropdownMenuItem>
-                    )}
-                    {type === "assets" && (
-                      <DropdownMenuItem
-                        onClick={(e) => e.stopPropagation()}
-                        className="cursor-pointer"
-                        asChild
-                      >
-                        <Link href={`/assets/${issue.assetId}`}>
-                          Go to Asset Details
-                        </Link>
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <MoreVerticalDropdownMenu
+                  contentClassName="w-[200px]"
+                  items={[
+                    {
+                      label: "Go to Issue Details",
+                      href: `/issues/${issue.id}`,
+                      className: "cursor-pointer",
+                    },
+                    type === "vulnerabilities" && {
+                      label: "Go to Vulnerability Details",
+                      href: `/vulnerabilities/${issue.vulnerabilityId}`,
+                      className: "cursor-pointer",
+                    },
+                    type === "assets" && {
+                      label: "Go to Asset Details",
+                      href: `/assets/${issue.assetId}`,
+                      className: "cursor-pointer",
+                    },
+                  ]}
+                />
               </Link>
             </li>
           );

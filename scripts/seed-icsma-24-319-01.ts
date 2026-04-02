@@ -666,14 +666,22 @@ async function seedAdvisory(
 ) {
   console.log("\n🌱 Seeding advisory...");
 
+  const UPSTREAM_URL =
+    "https://raw.githubusercontent.com/cisagov/CSAF/develop/csaf_files/OT/white/2024/icsma-24-319-01.json";
+
+  const existing = await prisma.advisory.findFirst({
+    where: { upstreamUrl: UPSTREAM_URL },
+  });
+
+  if (existing) return existing;
+
   const advisory = await prisma.advisory.create({
     data: {
       userId,
       title: "Baxter Life2000 Ventilation System",
       severity: Severity.Critical,
       tlp: Tlp.WHITE,
-      upstreamUrl:
-        "https://raw.githubusercontent.com/cisagov/CSAF/develop/csaf_files/OT/white/2024/icsma-24-319-01.json",
+      upstreamUrl: UPSTREAM_URL,
       summary:
         "Successful exploitation of these vulnerabilities could lead to information disclosure and/or disruption of the device's function without detection.",
       publishedAt: new Date("2024-11-14T07:00:00.000Z"),

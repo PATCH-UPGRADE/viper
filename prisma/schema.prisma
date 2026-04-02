@@ -724,6 +724,9 @@ model Advisory {
   title                     String?
   user                      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   referencedVulnerabilities Vulnerability[] @relation("AdvisoryVulnerabilities")
+  // TODO: In the future, don't reference vulnerabilities directly, but consider using "match objects" that
+  // can reference ranges of vulnerabilities. `affectedDeviceGroups` is also currently unused, but left
+  // here in case we want to use it to cache searches to increase performance later.
   affectedDeviceGroups      DeviceGroup[]   @relation("AdvisoryDeviceGroups")
   csaf                      Json            @default("{}")
   upstreamUrl               String?         @unique

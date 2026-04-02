@@ -10,7 +10,7 @@ import {
 import Link from "next/link";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 function DropdownMenu({
@@ -295,18 +295,17 @@ function MoreVerticalDropdownMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className={cn("h-8 w-8 p-0 cursor-pointer", triggerClassName)}
-          onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
-          asChild
-        >
-          <span>
-            <span className="sr-only">Open menu</span>
-            <MoreVertical className="h-4 w-4" />
-          </span>
-        </Button>
+      <DropdownMenuTrigger
+        type="button"
+        className={cn(
+          buttonVariants({ variant: "ghost" }),
+          "h-8 w-8 p-0 cursor-pointer",
+          triggerClassName,
+        )}
+        onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
+      >
+        <span className="sr-only">Open menu</span>
+        <MoreVertical className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className={contentClassName}>
         {groups.map((group, groupIndex) => {
@@ -321,7 +320,10 @@ function MoreVerticalDropdownMenu({
                 <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
               )}
               {filteredItems.map((item, itemIndex) => {
-                const handleClick = item.stopPropagation
+                const shouldStopPropagation =
+                  item.stopPropagation ?? stopPropagation;
+
+                const handleClick = shouldStopPropagation
                   ? (e: React.MouseEvent) => {
                       e.stopPropagation();
                       item.onClick?.(e);
@@ -339,7 +341,7 @@ function MoreVerticalDropdownMenu({
                       <Link
                         href={item.href}
                         onClick={
-                          item.stopPropagation
+                          shouldStopPropagation
                             ? (e) => e.stopPropagation()
                             : undefined
                         }

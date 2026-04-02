@@ -223,9 +223,7 @@ function AdvisoryIssueProgressBar({
             style={{ width: `${falsePosPct}%` }}
           />
         </div>
-        <span className="text-sm font-medium">
-          {percentage}%&nbsp;remediated
-        </span>
+        <span className="text-sm font-medium">{percentage}%&nbsp;resolved</span>
       </div>
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -333,7 +331,7 @@ export const AdvisoryDetailPage = ({ id }: { id: string }) => {
           header: "Progress",
           content: (
             <span className="text-sm font-medium">
-              {advisory.progressPercent}% remediated
+              {advisory.progressPercent}% resolved
             </span>
           ),
         },
@@ -414,13 +412,7 @@ export const AdvisoryDetailPage = ({ id }: { id: string }) => {
             <p className="text-sm text-muted-foreground">No affected assets</p>
           ) : (
             <>
-              <DataTable
-                paginatedData={assetsPaginated}
-                columns={dashboardColumns}
-                nestedColumns={assetIssueColumns}
-                nestedDataKey="issues"
-              />
-              <div className="mt-4">
+              <div className="mb-4 mt-2">
                 <AdvisoryIssueProgressBar
                   issues={advisory.affectedAssetsWithIssues.flatMap(
                     (a) => a.issues,
@@ -428,6 +420,12 @@ export const AdvisoryDetailPage = ({ id }: { id: string }) => {
                   percentage={advisory.progressPercent}
                 />
               </div>
+              <DataTable
+                paginatedData={assetsPaginated}
+                columns={dashboardColumns}
+                nestedColumns={assetIssueColumns}
+                nestedDataKey="issues"
+              />
             </>
           )}
         </DetailSection>

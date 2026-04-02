@@ -206,8 +206,12 @@ export const syncIntegration = inngest.createFunction(
       try {
         if (integration.integrationType === IntegrationType.AI) {
           return await syncAiIntegration(integration);
-        } else {
+        } else if (integration.integrationType === IntegrationType.PARTNER) {
           return await syncPartnerIntegration(integration);
+        } else if (integration.integrationType === IntegrationType.CSAF) {
+          throw "TODO: VW-227";
+        } else {
+          throw "Invalid integration type";
         }
       } catch (error) {
         return {

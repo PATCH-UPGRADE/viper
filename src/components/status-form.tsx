@@ -38,6 +38,12 @@ export const StatusFormBase = ({
 }) => {
   const [status, setStatus] = useState<IssueStatus>(initialStatus);
   const lastSubmittedStatusRef = useRef<IssueStatus>(initialStatus);
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    setStatus(initialStatus);
+    lastSubmittedStatusRef.current = initialStatus;
+  }, [initialStatus]);
 
   useEffect(() => {
     // Don't submit if status hasn't changed or if we already submitted this status
@@ -45,11 +51,15 @@ export const StatusFormBase = ({
       return;
     }
 
+    const requestId = ++requestIdRef.current;
     const updateStatus = async () => {
       lastSubmittedStatusRef.current = status;
       try {
         await onUpdate({ id, status });
       } catch {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
         setStatus(initialStatus);
         lastSubmittedStatusRef.current = initialStatus;
       }

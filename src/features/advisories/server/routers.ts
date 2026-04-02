@@ -30,10 +30,9 @@ const createSearchFilter = (search: string) => {
 export const advisoriesRouter = createTRPCRouter({
   getMany: protectedProcedure
     .input(paginationInputSchema)
-    .query(async ({ ctx, input }) => {
+    .query(async ({ input }) => {
       const { search } = input;
-      const searchFilter = createSearchFilter(search);
-      const where = { userId: ctx.auth.user.id, ...searchFilter };
+      const where = createSearchFilter(search);
 
       const totalCount = await prisma.advisory.count({ where });
       const meta = buildPaginationMeta(input, totalCount);

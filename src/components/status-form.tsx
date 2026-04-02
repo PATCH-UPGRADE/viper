@@ -86,9 +86,9 @@ export const StatusFormBase = ({
           .filter((s) => s !== status)
           .map((s) => (
             <DropdownMenuItem
+              onSelect={() => setStatus(s)}
               onClick={(e) => {
                 e.stopPropagation();
-                setStatus(s);
               }}
               key={s}
             >

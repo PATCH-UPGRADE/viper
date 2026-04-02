@@ -8,7 +8,7 @@ import {
   Severity,
   Tlp,
 } from "@/generated/prisma";
-import prisma from "@/lib/db";
+import prisma from "../src/lib/db";
 
 const CISA_INTEGRATION = {
   name: "CISA CSAF",
@@ -623,15 +623,13 @@ async function seedAssets(userId: string, deviceGroupId: string) {
   console.log("\n🌱 Seeding assets...");
 
   const assets = await Promise.all(
-    ASSETS.map((asset) =>
-      prisma.asset.create({
-        data: {
-          ...asset,
-          deviceGroupId,
-          userId,
-        },
-      }),
-    ),
+    ASSETS.map(async (asset) => {
+      const existing = await prisma.asset.findFirst({
+        where: { serialNumber: asset.serialNumber },
+      });
+      if (existing) return existing;
+      return prisma.asset.create({ data: { ...asset, deviceGroupId, userId } });
+    }),
   );
 
   console.log(`✅ Seeded ${assets.length} assets`);
@@ -642,17 +640,19 @@ async function seedVulnerabilities(userId: string, deviceGroupId: string) {
   console.log("\n🌱 Seeding vulnerabilities...");
 
   const vulns = await Promise.all(
-    VULNERABILITIES.map(({ ...data }) =>
-      prisma.vulnerability.create({
+    VULNERABILITIES.map(async ({ ...data }) => {
+      const existing = await prisma.vulnerability.findFirst({
+        where: { cveId: data.cveId },
+      });
+      if (existing) return existing;
+      return prisma.vulnerability.create({
         data: {
           ...data,
           userId,
-          affectedDeviceGroups: {
-            connect: { id: deviceGroupId },
-          },
+          affectedDeviceGroups: { connect: { id: deviceGroupId } },
         },
-      }),
-    ),
+      });
+    }),
   );
 
   console.log(`✅ Seeded ${vulns.length} vulnerabilities`);
@@ -664,19 +664,30 @@ async function seedAdvisory(
   deviceGroupId: string,
   vulnIds: string[],
 ) {
-  console.log("\n🌱 Seeding advisory...");
+  console.log("\n🌱 Upserting advisory...");
 
   const UPSTREAM_URL =
     "https://raw.githubusercontent.com/cisagov/CSAF/develop/csaf_files/OT/white/2024/icsma-24-319-01.json";
 
-  const existing = await prisma.advisory.findFirst({
+  const advisory = await prisma.advisory.upsert({
     where: { upstreamUrl: UPSTREAM_URL },
-  });
-
-  if (existing) return existing;
-
-  const advisory = await prisma.advisory.create({
-    data: {
+    update: {
+      title: "Baxter Life2000 Ventilation System",
+      severity: Severity.Critical,
+      tlp: Tlp.WHITE,
+      summary:
+        "Successful exploitation of these vulnerabilities could lead to information disclosure and/or disruption of the device's function without detection.",
+      publishedAt: new Date("2024-11-14T07:00:00.000Z"),
+      status: IssueStatus.ACTIVE,
+      csaf: CSAF_JSON,
+      referencedVulnerabilities: {
+        set: vulnIds.map((id) => ({ id })),
+      },
+      affectedDeviceGroups: {
+        set: [{ id: deviceGroupId }],
+      },
+    },
+    create: {
       userId,
       title: "Baxter Life2000 Ventilation System",
       severity: Severity.Critical,
@@ -696,7 +707,7 @@ async function seedAdvisory(
     },
   });
 
-  console.log(`✅ Advisory created: ${advisory.title} (${advisory.id})`);
+  console.log(`✅ Advisory upserted: ${advisory.title} (${advisory.id})`);
   return advisory;
 }
 

@@ -10,7 +10,7 @@ import {
 import Link from "next/link";
 import * as React from "react";
 
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 function DropdownMenu({
@@ -269,6 +269,7 @@ type MoreVerticalDropdownMenuProps = {
   contentClassName?: string;
   triggerClassName?: string;
   stopPropagation?: boolean;
+  asSpan?: boolean;
 };
 
 function isMenuGroup(
@@ -283,6 +284,7 @@ function MoreVerticalDropdownMenu({
   contentClassName,
   triggerClassName,
   stopPropagation = true,
+  asSpan = false,
 }: MoreVerticalDropdownMenuProps) {
   const firstTruthy = items.find(Boolean);
   const groups: MoreVerticalMenuGroup[] = isMenuGroup(firstTruthy)
@@ -295,17 +297,19 @@ function MoreVerticalDropdownMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        type="button"
-        className={cn(
-          buttonVariants({ variant: "ghost" }),
-          "h-8 w-8 p-0 cursor-pointer",
-          triggerClassName,
-        )}
-        onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
-      >
-        <span className="sr-only">Open menu</span>
-        <MoreVertical className="h-4 w-4" />
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          className={cn("h-8 w-8 p-0 cursor-pointer", triggerClassName)}
+          onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
+          asChild={asSpan}
+        >
+          <span>
+            <span className="sr-only">Open menu</span>
+            <MoreVertical className="h-4 w-4" />
+          </span>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className={contentClassName}>
         {groups.map((group, groupIndex) => {

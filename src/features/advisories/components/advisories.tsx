@@ -473,6 +473,7 @@ export const AdvisoryDetailPage = ({ id }: { id: string }) => {
                               href: `/vulnerabilities/${item.viperObject.id}`,
                             },
                           ]}
+                          asSpan={true}
                         />
                       )}
                     </span>

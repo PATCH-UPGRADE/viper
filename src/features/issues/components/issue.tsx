@@ -176,19 +176,16 @@ export const IssuesSidebarList = ({
                     {
                       label: "Go to Issue Details",
                       href: `/issues/${issue.id}`,
-                      stopPropagation: true,
                       className: "cursor-pointer",
                     },
                     type === "vulnerabilities" && {
                       label: "Go to Vulnerability Details",
                       href: `/vulnerabilities/${issue.vulnerabilityId}`,
-                      stopPropagation: true,
                       className: "cursor-pointer",
                     },
                     type === "assets" && {
                       label: "Go to Asset Details",
                       href: `/assets/${issue.assetId}`,
-                      stopPropagation: true,
                       className: "cursor-pointer",
                     },
                   ]}

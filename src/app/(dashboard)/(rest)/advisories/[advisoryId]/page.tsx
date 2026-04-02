@@ -20,7 +20,7 @@ const Page = async ({ params }: PageProps) => {
 
   const { advisoryId } = await params;
 
-  prefetchAdvisory(advisoryId);
+  await prefetchAdvisory(advisoryId);
 
   return (
     <HydrateClient>

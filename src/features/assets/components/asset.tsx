@@ -108,13 +108,11 @@ const VulnList = ({
                 {
                   label: "Go to Issue Details",
                   href: `/issues/${issue.id}`,
-                  stopPropagation: true,
                   className: "cursor-pointer",
                 },
                 {
                   label: "Go to Vulnerability Details",
                   href: `/vulnerabilities/${issue.vulnerabilityId}`,
-                  stopPropagation: true,
                   className: "cursor-pointer",
                 },
               ]}

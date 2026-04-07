@@ -92,11 +92,7 @@ export const remediationInclude = {
 
 export const remediationCardInclude = {
   user: userIncludeSelect,
-  _count: {
-    select: {
-      artifacts: true,
-    },
-  },
+  artifacts: artifactWrapperSelect,
 } as const;
 
 export type RemediationCard = Prisma.RemediationGetPayload<{

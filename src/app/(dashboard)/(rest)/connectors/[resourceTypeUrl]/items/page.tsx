@@ -19,8 +19,8 @@ import {
   isValidResourceTypeKey,
 } from "@/features/integrations/types";
 import {
-  RemediationsDataList,
   RemediationsError,
+  RemediationsList,
   RemediationsLoading,
 } from "@/features/remediations/components/remediations";
 import { prefetchRemediations } from "@/features/remediations/server/prefetch";
@@ -58,7 +58,7 @@ const LIST_MAPPING: Record<string, ConnectorResourceTypeConfig> = {
   },
   [ResourceType.Remediation]: {
     errorElement: RemediationsError,
-    listElement: RemediationsDataList,
+    listElement: RemediationsList,
     loadingElement: RemediationsLoading,
     prefetch: prefetchRemediations,
   },

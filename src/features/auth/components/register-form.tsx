@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { ErrorContext } from "better-auth/react";
 import { AlertCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -29,7 +30,6 @@ import { Input } from "@/components/ui/input";
 import { MIN_PASSWORD_LENGTH } from "@/config/constants";
 import { authClient } from "@/lib/auth-client";
 import { handleSocialLogin } from "./login-form";
-import { ErrorContext } from "better-auth/react";
 
 const registerSchema = z
   .object({

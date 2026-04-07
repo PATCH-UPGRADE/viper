@@ -288,6 +288,10 @@ export const RemediationCard = ({
 }: {
   remediation: RemediationCardType;
 }) => {
+  const artifactsWithUrls = remediation.artifacts
+    .map((a) => a.latestArtifact)
+    .filter((a) => a != null);
+
   return (
     <Card key={remediation.id} className="gap-2">
       <CardHeader>
@@ -314,54 +318,46 @@ export const RemediationCard = ({
           </span>
         </div>
 
-        <div>
-          <h3 className="font-semibold py-2">Artifacts</h3>
-          {remediation.artifacts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No artifacts available
-            </p>
-          ) : (
+        {artifactsWithUrls.length > 0 && (
+          <div>
+            <h3 className="font-semibold py-2">Artifacts</h3>
             <div className="flex flex-col gap-3">
-              {remediation.artifacts.map((artifact) => (
+              {artifactsWithUrls.map((artifact) => (
                 <>
-                  {artifact.latestArtifact && (
-                    <div key={artifact.id} className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {artifact.latestArtifact.name ||
-                            artifact.latestArtifact.artifactType}
-                        </span>
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">
-                          v{artifact.latestArtifact.versionNumber}
-                        </span>
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                          {artifact.latestArtifact.artifactType}
-                        </span>
-                      </div>
-                      {artifact.latestArtifact.downloadUrl && (
-                        <a
-                          href={artifact.latestArtifact.downloadUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-                        >
-                          {artifact.latestArtifact.downloadUrl}
-                          <ExternalLinkIcon className="size-3 flex-shrink-0" />
-                        </a>
-                      )}
-                      {artifact.latestArtifact.size && (
-                        <span className="text-xs text-muted-foreground">
-                          Size:{" "}
-                          {formatFileSize(Number(artifact.latestArtifact.size))}
-                        </span>
-                      )}
+                  <div key={artifact.id} className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {artifact.name || artifact.artifactType}
+                      </span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">
+                        v{artifact.versionNumber}
+                      </span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        {artifact.artifactType}
+                      </span>
                     </div>
-                  )}
+                    {artifact.downloadUrl && (
+                      <a
+                        href={artifact.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
+                      >
+                        {artifact.downloadUrl}
+                        <ExternalLinkIcon className="size-3 flex-shrink-0" />
+                      </a>
+                    )}
+                    {artifact.size && (
+                      <span className="text-xs text-muted-foreground">
+                        Size: {formatFileSize(Number(artifact.size))}
+                      </span>
+                    )}
+                  </div>
                 </>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

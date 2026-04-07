@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
+import { ErrorContext } from "better-auth/react";
 
 const loginSchema = z.object({
   email: z.email("Please enter a valid email address"),
@@ -46,7 +47,7 @@ export const handleSocialLogin = async (provider: "google" | "github") => {
       callbackURL: "/",
     },
     {
-      onError: (ctx) => {
+      onError: (ctx: ErrorContext) => {
         toast.error(ctx.error.message);
       },
     },
@@ -78,7 +79,7 @@ export function LoginForm({
         onSuccess: () => {
           router.push("/");
         },
-        onError: (ctx) => {
+        onError: (ctx: ErrorContext) => {
           toast.error(ctx.error.message);
         },
       },

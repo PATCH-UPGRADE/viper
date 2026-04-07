@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { MIN_PASSWORD_LENGTH } from "@/config/constants";
 import { authClient } from "@/lib/auth-client";
 import { handleSocialLogin } from "./login-form";
+import { ErrorContext } from "better-auth/react";
 
 const registerSchema = z
   .object({
@@ -72,7 +73,7 @@ export function RegisterForm() {
         onSuccess: () => {
           router.push("/login?verification_email_sent=1");
         },
-        onError: (ctx) => {
+        onError: (ctx: ErrorContext) => {
           toast.error(ctx.error.message);
         },
       },

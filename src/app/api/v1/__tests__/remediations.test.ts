@@ -595,20 +595,20 @@ describe("Remediations Endpoint (/remediations)", () => {
       createdIntegration.integrationUserId,
       ResourceType.Remediation,
     );
+
+    await prisma.deviceGroup.deleteMany({
+      where: {
+        cpe: {
+          contains: "rem_integration_",
+        },
+      },
+    });
+
     const integrationRes = await request(BASE_URL)
       .post(`/remediations/integrationUpload/${createToken}`)
       .set(jsonHeader)
       .send(remediationIntegrationPayload);
 
-    onTestFinished(async () => {
-      await prisma.deviceGroup.deleteMany({
-        where: {
-          cpe: {
-            contains: "rem_integration_",
-          },
-        },
-      });
-    });
 
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);

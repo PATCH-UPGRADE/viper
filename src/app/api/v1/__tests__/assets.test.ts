@@ -392,20 +392,22 @@ describe("Assets Endpoint (/assets)", () => {
       createdIntegration.integrationUserId,
       ResourceType.Asset,
     );
+    const assetIntegrationPayloadCopy = { ...assetIntegrationPayload };
+    assetIntegrationPayloadCopy.items[0].vendorId = "mockAssetIntegration-1";
+    assetIntegrationPayloadCopy.items[1].vendorId = "mockAssetIntegration-2";
+
+    await prisma.deviceGroup.deleteMany({
+      where: {
+        cpe: {
+          contains: "asset_integration_",
+        },
+      },
+    });
+
     const integrationRes = await request(BASE_URL)
       .post(`/assets/integrationUpload/${createToken}`)
       .set(jsonHeader)
-      .send(assetIntegrationPayload);
-
-    onTestFinished(async () => {
-      await prisma.deviceGroup.deleteMany({
-        where: {
-          cpe: {
-            contains: "asset_integration_",
-          },
-        },
-      });
-    });
+      .send(assetIntegrationPayloadCopy);
 
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);

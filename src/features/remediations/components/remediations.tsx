@@ -16,7 +16,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable } from "@/components/ui/data-table";
 import {
   Drawer,
   DrawerClose,
@@ -31,7 +30,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { plural } from "@/lib/utils";
+import { formatFileSize } from "@/lib/utils";
 import {
   useRemoveRemediation,
   useSuspenseRemediations,
@@ -41,7 +40,6 @@ import type {
   RemediationCard as RemediationCardType,
   RemediationResponse,
 } from "../types";
-import { columns } from "./columns";
 
 export const RemediationsSearch = () => {
   const [params, setParams] = useRemediationsParams();
@@ -68,19 +66,6 @@ export const RemediationsList = () => {
       getKey={(remediation) => remediation.id}
       renderItem={(remediation) => <RemediationItem data={remediation} />}
       emptyView={<RemediationsEmpty />}
-    />
-  );
-};
-
-export const RemediationsDataList = () => {
-  const { data: remediations, isFetching } = useSuspenseRemediations();
-
-  return (
-    <DataTable
-      paginatedData={remediations}
-      columns={columns}
-      isLoading={isFetching}
-      search={<RemediationsSearch />}
     />
   );
 };
@@ -303,17 +288,18 @@ export const RemediationCard = ({
 }: {
   remediation: RemediationCardType;
 }) => {
+  const artifactsWithUrls = remediation.artifacts
+    .map((a) => a.latestArtifact)
+    .filter((a) => a != null);
+
   return (
-    <Card key={remediation.id}>
+    <Card key={remediation.id} className="gap-2">
       <CardHeader>
-        <div className="flex items-start justify-between">
+        <div className="flex items-start">
           <CardTitle className="text-base font-medium">
-            Remediation {remediation.id}
+            <span className="font-semibold">Remediation: </span>
+            {remediation.id}
           </CardTitle>
-          <Badge variant="outline">
-            {remediation._count.artifacts}{" "}
-            {plural("Artifact", remediation._count.artifacts)}
-          </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -331,6 +317,45 @@ export const RemediationCard = ({
             })}
           </span>
         </div>
+
+        {artifactsWithUrls.length > 0 && (
+          <div>
+            <h3 className="font-semibold py-2">Artifacts</h3>
+            <div className="flex flex-col gap-3">
+              {artifactsWithUrls.map((artifact) => (
+                <div key={artifact.id} className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {artifact.name || artifact.artifactType}
+                    </span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">
+                      v{artifact.versionNumber}
+                    </span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                      {artifact.artifactType}
+                    </span>
+                  </div>
+                  {artifact.downloadUrl && (
+                    <a
+                      href={artifact.downloadUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
+                    >
+                      {artifact.downloadUrl}
+                      <ExternalLinkIcon className="size-3 flex-shrink-0" />
+                    </a>
+                  )}
+                  {artifact.size && (
+                    <span className="text-xs text-muted-foreground">
+                      Size: {formatFileSize(Number(artifact.size))}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

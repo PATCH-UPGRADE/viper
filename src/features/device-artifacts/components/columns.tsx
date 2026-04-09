@@ -13,8 +13,14 @@ export const columns: ColumnDef<DeviceArtifactResponse>[] = [
   },
   {
     accessorKey: "description",
-    meta: { title: "Description" },
-    header: "Description",
+    header: ({ column }) => (
+      <SortableHeader header="Description" column={column} />
+    ),
+    cell: ({ row }) => (
+      <div className="max-w-[500px] overflow-hidden text-ellipsis whitespace-nowrap">
+        {row.original.description}
+      </div>
+    ),
   },
   {
     accessorKey: "userId",

@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { ErrorContext } from "better-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -46,7 +47,7 @@ export const handleSocialLogin = async (provider: "google" | "github") => {
       callbackURL: "/",
     },
     {
-      onError: (ctx) => {
+      onError: (ctx: ErrorContext) => {
         toast.error(ctx.error.message);
       },
     },
@@ -78,7 +79,7 @@ export function LoginForm({
         onSuccess: () => {
           router.push("/");
         },
-        onError: (ctx) => {
+        onError: (ctx: ErrorContext) => {
           toast.error(ctx.error.message);
         },
       },

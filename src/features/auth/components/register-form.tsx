@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { ErrorContext } from "better-auth/react";
 import { AlertCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -72,7 +73,7 @@ export function RegisterForm() {
         onSuccess: () => {
           router.push("/login?verification_email_sent=1");
         },
-        onError: (ctx) => {
+        onError: (ctx: ErrorContext) => {
           toast.error(ctx.error.message);
         },
       },

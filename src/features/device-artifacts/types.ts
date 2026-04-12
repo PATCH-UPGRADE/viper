@@ -53,6 +53,17 @@ export type DeviceArtifactResponse = z.infer<
   typeof deviceArtifactResponseSchema
 >;
 
+const uploadInstructionsSchema = z.object({
+  artifactName: z.string(),
+  uploadUrl: z.string().url(),
+  requiredHeader: z.string(),
+});
+
+export const deviceArtifactUploadResponseSchema = z.object({
+  deviceArtifact: deviceArtifactResponseSchema,
+  uploadInstructions: z.array(uploadInstructionsSchema),
+});
+
 export const paginatedDeviceArtifactResponseSchema =
   createPaginatedResponseSchema(deviceArtifactResponseSchema);
 

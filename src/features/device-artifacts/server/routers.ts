@@ -23,9 +23,9 @@ import {
   deviceArtifactInputSchema,
   deviceArtifactResponseSchema,
   deviceArtifactUpdateSchema,
+  deviceArtifactUploadResponseSchema,
   integrationDeviceArtifactInputSchema,
   paginatedDeviceArtifactResponseSchema,
-  deviceArtifactUploadResponseSchema,
 } from "../types";
 
 // TODO: do something DRY with `createSearchFilter` in other routers

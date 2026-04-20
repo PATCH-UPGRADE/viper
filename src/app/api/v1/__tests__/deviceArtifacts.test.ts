@@ -211,10 +211,12 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       .post("/deviceArtifacts")
       .set(authHeader)
       .send(payload);
+    const createdDeviceArtifact = createRes.body.deviceArtifact;
 
     expect(createRes.status).toBe(200);
-    expect(createRes.body).toHaveProperty("id");
-    const deviceArtifactId = createRes.body.id;
+    expect(createRes.body).toHaveProperty("deviceArtifact");
+    expect(createRes.body).toHaveProperty("uploadInstructions");
+    const deviceArtifactId = createdDeviceArtifact.id;
 
     onTestFinished(async () => {
       // Cleanup - delete the device artifact (which cascades to artifacts)
@@ -228,16 +230,16 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     });
 
     // Verify the response structure
-    expect(createRes.body).toHaveProperty("deviceGroup");
-    expect(createRes.body.deviceGroup).toEqual(
+    expect(createdDeviceArtifact).toHaveProperty("deviceGroup");
+    expect(createdDeviceArtifact.deviceGroup).toEqual(
       expect.objectContaining({ cpe: payload.cpe }),
     );
 
-    expect(createRes.body).toHaveProperty("artifacts");
-    expect(Array.isArray(createRes.body.artifacts)).toBe(true);
-    expect(createRes.body.artifacts.length).toBe(1);
-    expect(createRes.body.artifacts[0]).toHaveProperty("latestArtifact");
-    expect(createRes.body.artifacts[0].latestArtifact).toEqual(
+    expect(createdDeviceArtifact).toHaveProperty("artifacts");
+    expect(Array.isArray(createdDeviceArtifact.artifacts)).toBe(true);
+    expect(createdDeviceArtifact.artifacts.length).toBe(1);
+    expect(createdDeviceArtifact.artifacts[0]).toHaveProperty("latestArtifact");
+    expect(createdDeviceArtifact.artifacts[0].latestArtifact).toEqual(
       expect.objectContaining({
         name: payload.artifacts[0].name,
         artifactType: payload.artifacts[0].artifactType,
@@ -246,8 +248,8 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       }),
     );
 
-    expect(createRes.body.role).toBe(payload.role);
-    expect(createRes.body.description).toBe(payload.description);
+    expect(createdDeviceArtifact.role).toBe(payload.role);
+    expect(createdDeviceArtifact.description).toBe(payload.description);
 
     // Get single device artifact
     const getOneRes = await request(BASE_URL)
@@ -343,11 +345,12 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       .post("/deviceArtifacts")
       .set(authHeader)
       .send(multiArtifactPayload);
+    const createdDeviceArtifact = createRes.body.deviceArtifact;
 
     onTestFinished(async () => {
       await prisma.deviceArtifact
         .delete({
-          where: { id: createRes.body.id },
+          where: { id: createdDeviceArtifact.id },
         })
         .catch(() => {
           /* already deleted */
@@ -355,10 +358,11 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     });
 
     expect(createRes.status).toBe(200);
-    expect(createRes.body.artifacts.length).toBe(4);
+    expect(createRes.body).toHaveProperty("uploadInstructions");
+    expect(createdDeviceArtifact.artifacts.length).toBe(4);
 
     // Verify each artifact was created correctly
-    const artifactTypes = createRes.body.artifacts.map(
+    const artifactTypes = createdDeviceArtifact.artifacts.map(
       (wrapper: ArtifactWrapperWithUrls) => wrapper.latestArtifact.artifactType,
     );
     expect(artifactTypes).toContain(ArtifactType.Firmware);
@@ -382,7 +386,9 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     );
 
     const createResults = await Promise.all(createPromises);
-    const deviceArtifactIds = createResults.map((r) => r.body.id);
+    const deviceArtifactIds = createResults.map(
+      (r) => r.body.deviceArtifact.id,
+    );
 
     onTestFinished(async () => {
       await Promise.all(
@@ -424,7 +430,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       });
 
     expect(createRes.status).toBe(200);
-    const deviceArtifactId = createRes.body.id;
+    const deviceArtifactId = createRes.body.deviceArtifact.id;
 
     onTestFinished(async () => {
       await prisma.deviceArtifact
@@ -475,17 +481,17 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     expect(createRes1.status).toBe(200);
     expect(createRes2.status).toBe(200);
 
-    const deviceGroupId1 = createRes1.body.deviceGroup.id;
-    const deviceGroupId2 = createRes2.body.deviceGroup.id;
+    const deviceGroupId1 = createRes1.body.deviceArtifact.deviceGroup.id;
+    const deviceGroupId2 = createRes2.body.deviceArtifact.deviceGroup.id;
 
     onTestFinished(async () => {
       await prisma.deviceArtifact
-        .delete({ where: { id: createRes1.body.id } })
+        .delete({ where: { id: createRes1.body.deviceArtifact.id } })
         .catch(() => {
           /* already deleted */
         });
       await prisma.deviceArtifact
-        .delete({ where: { id: createRes2.body.id } })
+        .delete({ where: { id: createRes2.body.deviceArtifact.id } })
         .catch(() => {
           /* already deleted */
         });

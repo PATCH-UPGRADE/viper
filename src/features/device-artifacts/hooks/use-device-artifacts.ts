@@ -57,7 +57,7 @@ export const useCreateDeviceArtifact = () => {
   return useMutation(
     trpc.deviceArtifacts.create.mutationOptions({
       onSuccess: (data) => {
-        toast.success(`DeviceArtifact "${data.role}" created`);
+        toast.success(`DeviceArtifact "${data.deviceArtifact.role}" created`);
         invalidateDeviceArtifactQueries(queryClient, trpc);
       },
       onError: (error) => {

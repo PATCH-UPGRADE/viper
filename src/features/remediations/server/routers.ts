@@ -140,7 +140,7 @@ export const remediationsRouter = createTRPCRouter({
       const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
       const userId = ctx.auth.user.id;
 
-      // Handle S3 URL -- if the user included a hash/size but no downloadUrl, they want us to host it
+      // Handle S3 upload URL -- if the user included a hash/size but no downloadUrl, they want us to host it
       const { processedArtifacts, uploadInstructions } =
         await processArtifactHosting(artifacts);
 

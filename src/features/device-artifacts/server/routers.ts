@@ -10,6 +10,7 @@ import {
   processIntegrationToken,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
+import { processArtifactHosting } from "@/lib/s3";
 import { integrationResponseSchema } from "@/lib/schemas";
 import {
   baseProcedure,
@@ -22,6 +23,7 @@ import {
   deviceArtifactInputSchema,
   deviceArtifactResponseSchema,
   deviceArtifactUpdateSchema,
+  deviceArtifactUploadResponseSchema,
   integrationDeviceArtifactInputSchema,
   paginatedDeviceArtifactResponseSchema,
 } from "../types";
@@ -169,14 +171,22 @@ export const deviceArtifactsRouter = createTRPCRouter({
         path: "/deviceArtifacts",
         tags: ["DeviceArtifacts"],
         summary: "Create DeviceArtifact",
-        description:
-          "Create a new DeviceArtifact. The authenticated user will be recorded as the creator.",
+        description: `
+          Create a new DeviceArtifact. The authenticated user will be recorded as the creator.
+          
+          **Artifact hosting**
+          See docs/upload_artifact.md
+          `.trim(),
       },
     })
-    .output(deviceArtifactResponseSchema)
+    .output(deviceArtifactUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
       const deviceGroup = await cpeToDeviceGroup(input.cpe);
       const userId = ctx.auth.user.id;
+
+      // Handle S3 upload URL -- if the user included a hash/size but no downloadUrl, they want us to host it
+      const { processedArtifacts, uploadInstructions } =
+        await processArtifactHosting(input.artifacts);
 
       // Create device artifact with wrappers and initial artifacts in a transaction
       const result = await prisma.$transaction(async (tx) => {
@@ -193,7 +203,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
 
         await createArtifactWrappers(
           tx,
-          input.artifacts,
+          processedArtifacts,
           deviceArtifact.id,
           "deviceArtifactId",
           userId,
@@ -206,9 +216,13 @@ export const deviceArtifactsRouter = createTRPCRouter({
         });
       });
 
-      return transformArtifactWrapper(result);
+      return {
+        deviceArtifact: transformArtifactWrapper(result),
+        uploadInstructions: uploadInstructions,
+      };
     }),
 
+  // POST - Device artifact integrations
   processIntegrationCreate: baseProcedure
     .input(integrationDeviceArtifactInputSchema)
     .meta({

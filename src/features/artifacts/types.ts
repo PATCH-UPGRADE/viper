@@ -68,11 +68,24 @@ export const artifactUpdateSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
   artifactType: z.enum(ArtifactType).optional(),
+  downloadUrl: safeUrlSchema.nullish(),
+  hash: z.string().nullish(),
   size: z.number().optional(),
 });
 
 export const createArtifactVersionSchema = artifactInputSchema.extend({
   wrapperId: z.string(),
+});
+
+const uploadInstructionsSchema = z.object({
+  artifactName: z.string(),
+  uploadUrl: z.string().url(),
+  requiredHeader: z.string(),
+});
+
+export const artifactUploadResponseSchema = z.object({
+  artifact: artifactWithUrlsSchema,
+  uploadInstructions: z.array(uploadInstructionsSchema),
 });
 
 export const paginatedArtifactResponseSchema = createPaginatedResponseSchema(

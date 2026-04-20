@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { type AlohaStatus, Priority, ResourceType } from "@/generated/prisma";
+import {
+  type AlohaStatus,
+  type DeviceGroup,
+  Priority,
+  ResourceType,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
@@ -26,6 +31,7 @@ import {
   vulnerabilityInclude,
   vulnerabilityInputSchema,
   vulnerabilityResponseSchema,
+  vulnerabilityUpdateInputSchema,
 } from "../types";
 
 const createSearchFilter = (search: string) => {
@@ -331,7 +337,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        data: vulnerabilityInputSchema,
+        data: vulnerabilityUpdateInputSchema,
       }),
     )
     .meta({
@@ -348,16 +354,24 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "vulnerability");
-      const { cpes, ...dataInput } = input.data;
-      const deviceGroups = await cpesToDeviceGroups(cpes);
+      const { cpes = undefined, ...dataInput } = input.data;
+
+      let deviceGroups: DeviceGroup[] = [];
+      if (cpes) {
+        deviceGroups = await cpesToDeviceGroups(cpes);
+      }
 
       return prisma.vulnerability.update({
         where: { id: input.id },
         data: {
           ...dataInput,
-          affectedDeviceGroups: {
-            set: deviceGroups.map((dg) => ({ id: dg.id })),
-          },
+          ...(deviceGroups.length > 0
+            ? {
+                affectedDeviceGroups: {
+                  set: deviceGroups.map((dg) => ({ id: dg.id })),
+                },
+              }
+            : {}),
         },
         include: vulnerabilityInclude,
       });

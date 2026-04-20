@@ -43,6 +43,12 @@ export const vulnerabilityArrayInputSchema = z.object({
   vulnerabilities: z.array(vulnerabilityInputSchema).nonempty(),
 });
 
+// make these two fields optional so users can update any field independently
+export const vulnerabilityUpdateInputSchema = vulnerabilityInputSchema.extend({
+  cpes: z.array(cpeSchema).min(1).optional(),
+  sarif: z.any().optional(), // JSON data - Prisma JsonValue type
+});
+
 export const vulnerabilityResponseSchema = z.object({
   id: z.string(),
   sarif: z.any(), // JSON data - Prisma JsonValue type

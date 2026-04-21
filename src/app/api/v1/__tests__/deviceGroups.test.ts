@@ -122,30 +122,31 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     expect(Array.isArray(listRes.body.items)).toBe(true);
 
     // If there are any device groups, test getting a single one
-    if (listRes.body.items.length > 0) {
-      const deviceGroup = listRes.body.items[0];
-      expect(deviceGroup).toHaveProperty("id");
-      expect(deviceGroup).toHaveProperty("cpe");
-      expect(deviceGroup).toHaveProperty("url");
-      expect(deviceGroup).toHaveProperty("sbomUrl");
-      expect(deviceGroup).toHaveProperty("vulnerabilitiesUrl");
-      expect(deviceGroup).toHaveProperty("assetsUrl");
-      expect(deviceGroup).toHaveProperty("deviceArtifactsUrl");
-      const deviceGroupId = deviceGroup.id;
+    expect(listRes.body.items.length).not.toBe(0);
+    // grab the last / oldest deviceGroup as it is much less likely to be cleared by another test
+    const deviceGroup = listRes.body.items.at(-1);
+    expect(deviceGroup).toHaveProperty("id");
+    expect(deviceGroup).toHaveProperty("cpe");
+    expect(deviceGroup).toHaveProperty("url");
+    expect(deviceGroup).toHaveProperty("sbomUrl");
+    expect(deviceGroup).toHaveProperty("vulnerabilitiesUrl");
+    expect(deviceGroup).toHaveProperty("assetsUrl");
+    expect(deviceGroup).toHaveProperty("deviceArtifactsUrl");
+    const deviceGroupId = deviceGroup.id;
 
-      // Get the specific device group
-      const detailRes = await request(BASE_URL)
-        .get(`/deviceGroups/${deviceGroupId}`)
-        .set(authHeader);
-      expect(detailRes.status).toBe(200);
-      expect(detailRes.body.id).toBe(deviceGroupId);
-      expect(detailRes.body.cpe).toBe(deviceGroup.cpe);
-      expect(detailRes.body).toHaveProperty("url");
-      expect(detailRes.body).toHaveProperty("sbomUrl");
-      expect(detailRes.body).toHaveProperty("vulnerabilitiesUrl");
-      expect(detailRes.body).toHaveProperty("assetsUrl");
-      expect(detailRes.body).toHaveProperty("deviceArtifactsUrl");
-    }
+    // Get the specific device group
+    const firstDetailRes = await request(BASE_URL)
+      .get(`/deviceGroups/${deviceGroupId}`)
+      .set(authHeader);
+
+    expect(firstDetailRes.status).toBe(200);
+    expect(firstDetailRes.body.id).toBe(deviceGroupId);
+    expect(firstDetailRes.body.cpe).toBe(deviceGroup.cpe);
+    expect(firstDetailRes.body).toHaveProperty("url");
+    expect(firstDetailRes.body).toHaveProperty("sbomUrl");
+    expect(firstDetailRes.body).toHaveProperty("vulnerabilitiesUrl");
+    expect(firstDetailRes.body).toHaveProperty("assetsUrl");
+    expect(firstDetailRes.body).toHaveProperty("deviceArtifactsUrl");
 
     // check the asset device group
     const detailRes = await request(BASE_URL)

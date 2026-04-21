@@ -566,20 +566,19 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       createdIntegration.integrationUserId,
       ResourceType.DeviceArtifact,
     );
+
+    await prisma.deviceGroup.deleteMany({
+      where: {
+        cpe: {
+          contains: "dev_art_integration_",
+        },
+      },
+    });
+
     const integrationRes = await request(BASE_URL)
       .post(`/deviceArtifacts/integrationUpload/${createToken}`)
       .set(jsonHeader)
       .send(deviceArtifactsIntegrationPayload);
-
-    onTestFinished(async () => {
-      await prisma.deviceGroup.deleteMany({
-        where: {
-          cpe: {
-            contains: "dev_art_integration_",
-          },
-        },
-      });
-    });
 
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);

@@ -12,8 +12,8 @@ import {
   SettingsIcon,
   ShieldAlertIcon,
   ShieldCheckIcon,
-  WorkflowIcon,
   Sparkles,
+  WorkflowIcon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -43,10 +43,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useSuspenseConnectors } from "@/features/api-key-connectors/hooks/use-connectors";
+import { useChat } from "@/features/chat/components/context";
 import { ResourceType } from "@/generated/prisma";
 import { NavUser } from "./nav-user";
 import { Separator } from "./ui/separator";
-import { useChat } from "@/features/chat/components/chat";
 
 const mainItems = [
   {

@@ -7,12 +7,12 @@ import {
   type DefaultHttpTransportConfig,
 } from "@inngest/use-agent";
 import { AlertCircle, Bot, Loader2, SendHorizontal, X } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -25,7 +25,6 @@ import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { useChatAgent } from "../hooks/use-chat";
 import { USER_ROLES, type UserRole } from "../utils";
-import { TooltipProvider } from "@radix-ui/react-tooltip";
 
 const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
   api: {
@@ -40,151 +39,6 @@ const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
     approveToolCall: "/api/v1/approve-tool",
     cancelMessage: "/api/v1/chat/cancel",
   },
-};
-
-type ChatContextProps = {
-  state: "expanded" | "collapsed";
-  open: boolean;
-  setOpen: (open: boolean) => void;
-  toggleChatPanel: () => void;
-};
-
-const ChatContext = React.createContext<ChatContextProps | null>(null);
-
-export function useChat() {
-  const context = React.useContext(ChatContext);
-  if (!context) {
-    throw new Error("useChat must be used within a ChatProvider.");
-  }
-
-  return context;
-}
-
-export function ChatProvider({
-  defaultOpen = false,
-  open: openProp,
-  onOpenChange: setOpenProp,
-  className,
-  style,
-  children,
-  ...props
-}: React.ComponentProps<"div"> & {
-  defaultOpen?: boolean;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}) {
-  // This is the internal state of the chat panel.
-  // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(defaultOpen);
-  const open = openProp ?? _open;
-  const setOpen = React.useCallback(
-    (value: boolean | ((value: boolean) => boolean)) => {
-      const openState = typeof value === "function" ? value(open) : value;
-      if (setOpenProp) {
-        setOpenProp(openState);
-      } else {
-        _setOpen(openState);
-      }
-    },
-    [setOpenProp, open],
-  );
-
-  // Helper to toggle the sidebar.
-  const toggleChatPanel = React.useCallback(() => {
-    return setOpen((open) => !open);
-  }, [setOpen]);
-
-  // We add a state so that we can do data-state="expanded" or "collapsed".
-  // This makes it easier to style the sidebar with Tailwind classes.
-  const state = open ? "expanded" : "collapsed";
-
-  const contextValue = React.useMemo<ChatContextProps>(
-    () => ({
-      state,
-      open,
-      setOpen,
-      toggleChatPanel,
-    }),
-    [state, open, setOpen, toggleChatPanel],
-  );
-
-  return (
-    <ChatContext.Provider value={contextValue}>
-      <div
-        data-slot="sidebar-wrapper"
-        style={
-          {
-            "--sidebar-width": 100,
-            "--sidebar-width-icon": 10,
-            ...style,
-          } as React.CSSProperties
-        }
-        className={cn(
-          "group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </div>
-    </ChatContext.Provider>
-  );
-}
-
-export const ChatPanel = ({
-  side = "left",
-  variant = "sidebar",
-  collapsible = "offcanvas",
-  className,
-  children,
-  ...props
-}) => {
-  const { state } = useChat();
-  return (
-    <div
-      className="group peer text-sidebar-foreground hidden md:block"
-      data-state={state}
-      data-collapsible={state === "collapsed" ? collapsible : ""}
-      data-variant={variant}
-      data-side={side}
-      data-slot="sidebar"
-    >
-      <div
-        data-slot="sidebar-gap"
-        className={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
-          "group-data-[collapsible=offcanvas]:w-0",
-          "group-data-[side=right]:rotate-180",
-          variant === "floating" || variant === "inset"
-            ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
-            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)",
-        )}
-      />
-      <div
-        data-slot="sidebar-container"
-        className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
-          side === "left"
-            ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
-            : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-          // Adjust the padding for floating and inset variants.
-          variant === "floating" || variant === "inset"
-            ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
-            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
-          className,
-        )}
-        {...props}
-      >
-        <div
-          data-sidebar="sidebar"
-          data-slot="sidebar-inner"
-          className="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
-        >
-          {children}
-        </div>
-      </div>
-    </div>
-  );
 };
 
 interface AIChatProps {
@@ -397,42 +251,51 @@ function ChatInputForm({
   onUserRoleChange: (role: UserRole) => void;
 }) {
   return (
-    <form onSubmit={onSubmit} className="border-t p-4 flex items-center gap-2">
-      <Input
-        value={input}
-        onChange={(e) => onInputChange(e.target.value)}
-        placeholder={
-          status === "error"
-            ? "An error has occurred..."
-            : isDisabled
-              ? "AI is working..."
-              : "Ask a question..."
-        }
-        disabled={isDisabled}
-        className="flex-1"
-      />
-      <Button type="submit" size="icon" disabled={isDisabled || !input.trim()}>
-        <SendHorizontal className="size-4" />
-      </Button>
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
-        <span>Ask as</span>
-        <Select
-          value={userRole}
-          onValueChange={(v) => onUserRoleChange(v as UserRole)}
-        >
-          <SelectTrigger size="sm" className="h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {USER_ROLES.map((r) => (
-              <SelectItem key={r} value={r}>
-                {r}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    </form>
+    <div className="border-t p-4">
+      <form
+        onSubmit={onSubmit}
+        className="flex flex-col border-2 rounded-xl bg-background drop-shadow-accent drop-shadow-sm focus-within:drop-shadow-md focus-within:border-primary transition-colors"
+      >
+        <input
+          value={input}
+          onChange={(e) => onInputChange(e.target.value)}
+          placeholder={
+            status === "error"
+              ? "An error has occurred..."
+              : isDisabled
+                ? "AI is working..."
+                : "Ask a question..."
+          }
+          disabled={isDisabled}
+          className="flex-1 border-0 drop-shadow-none text-sm outline-0 selection:outline-0 focus:outline-0 p-2"
+        />
+        <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground whitespace-nowrap p-1">
+          <span>Ask as</span>
+          <Select
+            value={userRole}
+            onValueChange={(v) => onUserRoleChange(v as UserRole)}
+          >
+            <SelectTrigger size="sm" className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {USER_ROLES.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="submit"
+            size="icon"
+            disabled={isDisabled || !input.trim()}
+          >
+            <SendHorizontal className="size-4" />
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -460,7 +323,8 @@ function ChatInner({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: want new messages to trigger scrolling
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length)
+      scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
@@ -496,7 +360,7 @@ function ChatInner({
           <ChatStatusIndicator status={status} />
         )}
 
-        <div ref={scrollRef} />
+        {/*<div ref={scrollRef} className="hidden" />*/}
       </div>
 
       {status === "error" && error && (

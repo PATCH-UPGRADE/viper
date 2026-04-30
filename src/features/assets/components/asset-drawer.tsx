@@ -9,7 +9,7 @@ import {
   ServerIcon,
   Wrench,
 } from "lucide-react";
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 import {
   DashboardDrawerShell,
   InfoColumn,
@@ -19,6 +19,11 @@ import { Badge } from "@/components/ui/badge";
 import { CopyCode } from "@/components/ui/code";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AIChat } from "@/features/chat/components/chat";
+import { useChat } from "@/features/chat/context/chat-panel-context";
+import {
+  SuggestedQuestionsProvider,
+  type SuggestedQuestion,
+} from "@/features/chat/context/suggested-questions-context";
 import { buildAssetSystemPrompt, type UserRole } from "@/features/chat/utils";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { RemediationCard } from "@/features/remediations/components/remediations";
@@ -357,7 +362,7 @@ export function AssetDashboardDrawer({
   setOpen,
   children,
 }: AssetDashboardDrawerProps) {
-  const [userRole, setUserRole] = useState<UserRole>("CISO");
+  const { userRole } = useChat();
 
   const uniqueRemediationCount = new Set(
     asset.issues.flatMap((i) => i.vulnerability.remediations.map((r) => r.id)),
@@ -365,33 +370,34 @@ export function AssetDashboardDrawer({
 
   const chatSystemPrompt = buildAssetSystemPrompt(asset, userRole);
 
-  const suggestedQuestions: Partial<Record<UserRole, string[]>> = {
+  const suggestedQuestions: Partial<Record<UserRole, SuggestedQuestion[]>> = {
     CISO: [
-      "What is the overall risk posture of this asset?",
-      "Are there any compliance implications?",
-      "What is the potential business impact if this asset is compromised?",
+      { label: "What is the overall risk posture of this asset?" },
+      { label: "Are there any compliance implications?" },
+      { label: "What is the potential business impact if this asset is compromised?" },
     ],
     "Clinical Staff": [
-      "How does this asset affect patient care workflows?",
-      "What happens to patient monitoring if this device goes offline?",
-      "Are there any safety risks for patients?",
+      { label: "How does this asset affect patient care workflows?" },
+      { label: "What happens to patient monitoring if this device goes offline?" },
+      { label: "Are there any safety risks for patients?" },
     ],
     "IT staff": [
-      "What patches are available for this asset?",
-      "What is the expected downtime for remediation?",
-      "Are there dependencies on other systems?",
+      { label: "What patches are available for this asset?" },
+      { label: "What is the expected downtime for remediation?" },
+      { label: "Are there dependencies on other systems?" },
     ],
     "hospital administration": [
-      "What is the cost impact of remediating this asset?",
-      "How does this affect our regulatory compliance?",
-      "What is the risk of delaying remediation?",
+      { label: "What is the cost impact of remediating this asset?" },
+      { label: "How does this affect our regulatory compliance?" },
+      { label: "What is the risk of delaying remediation?" },
     ],
     "biomedical engineer": [
-      "What firmware versions are affected?",
-      "Are there manufacturer advisories for this device?",
-      "What is the clinical impact of applying this patch?",
+      { label: "What firmware versions are affected?" },
+      { label: "Are there manufacturer advisories for this device?" },
+      { label: "What is the clinical impact of applying this patch?" },
     ],
   };
+  const visibleQuestions = suggestedQuestions[userRole] ?? [];
 
   const tabs = [
     {
@@ -405,12 +411,9 @@ export function AssetDashboardDrawer({
       label: "AI Chat",
       icon: MessageSquare,
       content: (
-        <AIChat
-          systemPrompt={chatSystemPrompt}
-          suggestedQuestions={suggestedQuestions}
-          userRole={userRole}
-          onUserRoleChange={setUserRole}
-        />
+        <SuggestedQuestionsProvider questions={visibleQuestions}>
+          <AIChat systemPrompt={chatSystemPrompt} />
+        </SuggestedQuestionsProvider>
       ),
       rawContent: true,
     },

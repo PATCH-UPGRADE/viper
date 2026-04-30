@@ -1,12 +1,15 @@
 "use client";
 
 import React from "react";
+import { USER_ROLES, type UserRole } from "../utils";
 
 type ChatContextProps = {
   state: "expanded" | "collapsed";
   open: boolean;
   setOpen: (open: boolean) => void;
   toggleChatPanel: () => void;
+  userRole: UserRole;
+  setUserRole: (role: UserRole) => void;
 };
 
 const ChatContext = React.createContext<ChatContextProps | null>(null);
@@ -19,7 +22,7 @@ export function useChat() {
   return context;
 }
 
-const CHAT_PANEL_WIDTH = "350px";
+const CHAT_PANEL_WIDTH = "400px";
 
 export function ChatProvider({
   defaultOpen = false,
@@ -33,6 +36,7 @@ export function ChatProvider({
 }>) {
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
+  const [userRole, setUserRole] = React.useState<UserRole>(USER_ROLES[0]);
 
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
@@ -53,8 +57,8 @@ export function ChatProvider({
   const state = open ? "expanded" : "collapsed";
 
   const contextValue = React.useMemo<ChatContextProps>(
-    () => ({ state, open, setOpen, toggleChatPanel }),
-    [state, open, setOpen, toggleChatPanel],
+    () => ({ state, open, setOpen, toggleChatPanel, userRole, setUserRole }),
+    [state, open, setOpen, toggleChatPanel, userRole],
   );
 
   return (

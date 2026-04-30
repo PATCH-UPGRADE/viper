@@ -1,17 +1,14 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SidebarHeader } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { USER_ROLES, type UserRole } from "../utils";
 import { AIChat } from "./chat";
-import { useChat } from "./context";
+import { useChat } from "../context/chat-panel-context";
 
 export function ChatPanel() {
   const { state, toggleChatPanel } = useChat();
-  const [userRole, setUserRole] = useState<UserRole>(USER_ROLES[0]);
 
   return (
     <div
@@ -36,7 +33,7 @@ export function ChatPanel() {
           </Button>
         </SidebarHeader>
         <div className="flex flex-1 flex-col overflow-hidden">
-          <AIChat userRole={userRole} onUserRoleChange={setUserRole} />
+          <AIChat />
         </div>
       </div>
     </div>

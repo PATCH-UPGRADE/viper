@@ -24,9 +24,11 @@ import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { useChatAgent } from "../hooks/use-chat";
+import { useChat } from "../context/chat-panel-context";
+import { useSuggestedQuestions } from "../context/suggested-questions-context";
 import { USER_ROLES, type UserRole } from "../utils";
 
-const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
+export const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
   api: {
     sendMessage: "/api/v1/chat",
     getRealtimeToken: "/api/v1/realtime/token",
@@ -43,17 +45,9 @@ const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
 
 interface AIChatProps {
   systemPrompt?: string;
-  suggestedQuestions?: Partial<Record<UserRole, string[]>>;
-  userRole: UserRole;
-  onUserRoleChange: (role: UserRole) => void;
 }
 
-export function AIChat({
-  systemPrompt,
-  suggestedQuestions,
-  userRole,
-  onUserRoleChange,
-}: AIChatProps) {
+export function AIChat({ systemPrompt }: AIChatProps) {
   const { data: session } = authClient.useSession();
   const userId = session?.user?.id;
   const user = session?.user ?? null;
@@ -69,13 +63,7 @@ export function AIChat({
 
   return (
     <AgentProvider userId={userId} transport={TRANSPORT_CONFIG}>
-      <ChatInner
-        systemPrompt={systemPrompt}
-        suggestedQuestions={suggestedQuestions}
-        userRole={userRole}
-        onUserRoleChange={onUserRoleChange}
-        user={user}
-      />
+      <ChatInner systemPrompt={systemPrompt} user={user} />
     </AgentProvider>
   );
 }
@@ -86,14 +74,13 @@ interface ChatUser {
 }
 
 function EmptyState({
-  questions,
   isDisabled,
   onSend,
 }: {
-  questions: string[];
   isDisabled: boolean;
   onSend: (message: string) => void;
 }) {
+  const questions = useSuggestedQuestions();
   return (
     <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
       <Bot className="size-8" />
@@ -102,13 +89,13 @@ function EmptyState({
         <div className="flex flex-wrap justify-center gap-2 mt-3 max-w-md">
           {questions.map((q) => (
             <button
-              key={q}
+              key={q.label}
               type="button"
               disabled={isDisabled}
-              onClick={() => onSend(q)}
+              onClick={() => (q.onClick ? q.onClick(q.label) : onSend(q.label))}
               className="rounded-full border bg-background px-3 py-1.5 text-xs text-foreground shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
             >
-              {q}
+              {q.label}
             </button>
           ))}
         </div>
@@ -239,17 +226,14 @@ function ChatInputForm({
   onSubmit,
   isDisabled,
   status,
-  userRole,
-  onUserRoleChange,
 }: {
   input: string;
   onInputChange: (value: string) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isDisabled: boolean;
   status: AgentStatus;
-  userRole: UserRole;
-  onUserRoleChange: (role: UserRole) => void;
 }) {
+  const { userRole, setUserRole } = useChat();
   return (
     <div className="border-t p-4">
       <form
@@ -273,7 +257,7 @@ function ChatInputForm({
           <span>Ask as</span>
           <Select
             value={userRole}
-            onValueChange={(v) => onUserRoleChange(v as UserRole)}
+            onValueChange={(v) => setUserRole(v as UserRole)}
           >
             <SelectTrigger size="sm" className="h-8 text-xs">
               <SelectValue />
@@ -301,15 +285,9 @@ function ChatInputForm({
 
 function ChatInner({
   systemPrompt,
-  suggestedQuestions,
-  userRole,
-  onUserRoleChange,
   user,
 }: {
   systemPrompt?: string;
-  suggestedQuestions?: Partial<Record<UserRole, string[]>>;
-  userRole: UserRole;
-  onUserRoleChange: (role: UserRole) => void;
   user: ChatUser | null;
 }) {
   const { messages, sendMessage, status, error, clearError } = useChatAgent({
@@ -319,7 +297,6 @@ function ChatInner({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isDisabled = status !== "ready";
-  const visibleQuestions = suggestedQuestions?.[userRole] ?? [];
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: want new messages to trigger scrolling
   useEffect(() => {
@@ -345,11 +322,7 @@ function ChatInner({
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
-          <EmptyState
-            questions={visibleQuestions}
-            isDisabled={isDisabled}
-            onSend={sendMessage}
-          />
+          <EmptyState isDisabled={isDisabled} onSend={sendMessage} />
         )}
 
         {messages.map((message) => (
@@ -373,8 +346,6 @@ function ChatInner({
         onSubmit={onSubmit}
         isDisabled={isDisabled}
         status={status}
-        userRole={userRole}
-        onUserRoleChange={onUserRoleChange}
       />
     </div>
   );

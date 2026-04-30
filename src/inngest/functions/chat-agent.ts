@@ -8,6 +8,7 @@ import {
 } from "@inngest/agent-kit";
 import { createChannel } from "@/app/api/inngest/realtime";
 import { inngest } from "../client";
+import { conversationHistoryAdapter } from "@/features/chat/viper-agent/history-adapter";
 
 const DEFAULT_SYSTEM_PROMPT = [
   "You are a helpful AI assistant for a hospital vulnerability management platform (Viper).",
@@ -16,7 +17,8 @@ const DEFAULT_SYSTEM_PROMPT = [
   "Be concise, accurate, and prioritize patient safety in your recommendations.",
 ].join(" ");
 
-const MODEL_NAME = "claude-sonnet-4-20250514";
+// TODO: changeme back const MODEL_NAME = "claude-sonnet-4-20250514";
+const MODEL_NAME = "claude-haiku-4-5-20251001";
 const MAX_TOKENS = 4096;
 
 export const chatAgent = inngest.createFunction(
@@ -50,7 +52,11 @@ export const chatAgent = inngest.createFunction(
     const agent = createAgent({
       name: "Viper Chat Assistant",
       description: "A helpful assistant for hospital vulnerability management.",
-      system: systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+      //system: systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+      system: async ({ network }) => {
+        console.log("HEY", JSON.stringify(network))
+        return DEFAULT_SYSTEM_PROMPT
+      },
       model,
     });
 
@@ -60,8 +66,11 @@ export const chatAgent = inngest.createFunction(
       defaultModel: model,
       maxIter: 1,
       router: async () => agent,
+      history: conversationHistoryAdapter,
     });
 
+    // the state is just the user id, message history, and threadid
+    // TODO: store data from tool calls in network state? https://agentkit.inngest.com/concepts/state#using-state-in-tools
     const networkState = createState<StateData>(
       { userId },
       { messages: history ?? [], threadId },

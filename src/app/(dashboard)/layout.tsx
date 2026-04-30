@@ -1,7 +1,7 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ChatPanel } from "@/features/chat/components/chat-panel";
-import { ChatProvider } from "@/features/chat/components/context";
+import { ChatProvider } from "@/features/chat/context/chat-panel-context";
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   return (

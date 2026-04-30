@@ -43,7 +43,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useSuspenseConnectors } from "@/features/api-key-connectors/hooks/use-connectors";
-import { useChat } from "@/features/chat/components/context";
+import { useChat } from "@/features/chat/context/chat-panel-context";
 import { ResourceType } from "@/generated/prisma";
 import { NavUser } from "./nav-user";
 import { Separator } from "./ui/separator";

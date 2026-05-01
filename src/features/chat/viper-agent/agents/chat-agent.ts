@@ -37,7 +37,7 @@ export function createChatAgent({
     updateTargets: "Updating targets...",
   };*/
 
-  /*return createAgent<AdvisorState>({
+/*return createAgent<AdvisorState>({
     name: "chat",
     description:
       "Answers questions and provides answers from the description",
@@ -67,8 +67,8 @@ export function createChatAgent({
           }
         }*/
 
-        // Set status label for notable non-terminal tools about to run
-        /*const toolCall = result.output.find((m) => m.type === "tool_call");
+// Set status label for notable non-terminal tools about to run
+/*const toolCall = result.output.find((m) => m.type === "tool_call");
         if (toolCall?.type === "tool_call") {
           for (const tool of toolCall.tools) {
             if (tool.name in NOTABLE_TOOLS) {
@@ -78,7 +78,7 @@ export function createChatAgent({
           }
         }*/
 
-        /*return result;
+/*return result;
       },
     },*/
 /*    tools: [

@@ -1,8 +1,5 @@
 import prisma from "@/lib/db";
-import {
-    AgentResult,
-  HistoryConfig,
-} from "@inngest/agent-kit";
+import { AgentResult, HistoryConfig } from "@inngest/agent-kit";
 
 export const conversationHistoryAdapter: HistoryConfig<any> = {
   // 1. Create new conversation threads (or ensure they exist)
@@ -58,7 +55,7 @@ export const conversationHistoryAdapter: HistoryConfig<any> = {
             },
           ],
           [],
-          new Date(msg.createdAt)
+          new Date(msg.createdAt),
         );
       } else {
         // Return agent results
@@ -72,7 +69,7 @@ export const conversationHistoryAdapter: HistoryConfig<any> = {
             },
           ],
           [],
-          new Date(msg.createdAt)
+          new Date(msg.createdAt),
         );
       }
     });
@@ -84,7 +81,10 @@ export const conversationHistoryAdapter: HistoryConfig<any> = {
 
     await prisma.chatMessage.upsert({
       where: { id: userMessage.id },
-      update: { content: userMessage.content, updatedAt: userMessage.timestamp },
+      update: {
+        content: userMessage.content,
+        updatedAt: userMessage.timestamp,
+      },
       create: {
         id: userMessage.id, // Use canonical client-generated ID
         threadId,

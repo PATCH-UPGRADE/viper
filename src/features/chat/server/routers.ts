@@ -5,10 +5,18 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
   chatRequestSchema,
   chatResponseSchema,
+  chatThreadInclude,
+  fetchHistoryResponseSchema,
+  fetchThreadsResponseSchema,
+  fetchThreadsSchema,
   realtimeRequestSchema,
   tokenResponseSchema,
 } from "../types";
+import prisma from "@/lib/db";
+import z from "zod";
+import { conversationHistoryAdapter } from "../viper-agent/history-adapter";
 
+// https://agentkit.inngest.com/streaming/transport#sendmessageparams-options
 export const chatRouter = createTRPCRouter({
   chat: protectedProcedure
     .input(chatRequestSchema)
@@ -66,5 +74,76 @@ export const chatRouter = createTRPCRouter({
       });
 
       return result;
+    }),
+
+  getManyThreads: protectedProcedure
+    .input(fetchThreadsSchema)
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/chat/threads",
+        tags: ["Chat"],
+        summary: "Fetch Threads",
+        description: "fetch threads from backend",
+      },
+    })
+    .output(fetchThreadsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const threads = await prisma.chatThread.findMany({
+        skip: input.offset,
+        take: input.limit,
+        include: chatThreadInclude,
+      });
+
+      return {
+        threads,
+        hasMore: false,
+        total: 0,
+      };
+    }),
+
+  getHistory: protectedProcedure
+    .input(z.object({ threadId: z.string() }))
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/chat/threads/{threadId}",
+        tags: ["Chat"],
+        summary: "Get conversation from thread",
+        description: "get conversation from thread",
+      },
+    })
+    .output(fetchHistoryResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      /*return await prisma.chatMessage.findMany({
+      where: { threadId: input.threadId }
+    });*/
+
+      const prismaThread = await prisma.chatThread.findUniqueOrThrow({
+        where: { id: input.threadId },
+        include: chatThreadInclude,
+      });
+
+      const thread = {
+        id: input.threadId,
+        title: prismaThread.title,
+        messageCount: prismaThread._count,
+        createdAt: prismaThread.createdAt,
+        updatedAt: prismaThread.updatedAt,
+      };
+
+      const messages = await conversationHistoryAdapter.get!({
+        threadId: input.threadId,
+        state: {} as any,
+        network: {} as any,
+        input: "",
+      });
+
+      return {
+        thread,
+        messages,
+      };
+      // TODO: use conversation history adapter, copy the use-agent example from inngest source code...
+      //return conversationHistoryAdapter
     }),
 });

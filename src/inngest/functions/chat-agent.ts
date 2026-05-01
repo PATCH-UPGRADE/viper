@@ -54,8 +54,8 @@ export const chatAgent = inngest.createFunction(
       description: "A helpful assistant for hospital vulnerability management.",
       //system: systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
       system: async ({ network }) => {
-        console.log("HEY", JSON.stringify(network))
-        return DEFAULT_SYSTEM_PROMPT
+        console.log("HEY", JSON.stringify(network));
+        return DEFAULT_SYSTEM_PROMPT;
       },
       model,
     });

@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { CopyCode } from "@/components/ui/code";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AIChat } from "@/features/chat/components/chat";
-import { useChat } from "@/features/chat/context/chat-panel-context";
+import { useChatUI } from "@/features/chat/context/chat-panel-context";
 import {
   SuggestedQuestionsProvider,
   type SuggestedQuestion,
@@ -362,7 +362,7 @@ export function AssetDashboardDrawer({
   setOpen,
   children,
 }: AssetDashboardDrawerProps) {
-  const { userRole } = useChat();
+  const { userRole } = useChatUI();
 
   const uniqueRemediationCount = new Set(
     asset.issues.flatMap((i) => i.vulnerability.remediations.map((r) => r.id)),
@@ -374,11 +374,17 @@ export function AssetDashboardDrawer({
     CISO: [
       { label: "What is the overall risk posture of this asset?" },
       { label: "Are there any compliance implications?" },
-      { label: "What is the potential business impact if this asset is compromised?" },
+      {
+        label:
+          "What is the potential business impact if this asset is compromised?",
+      },
     ],
     "Clinical Staff": [
       { label: "How does this asset affect patient care workflows?" },
-      { label: "What happens to patient monitoring if this device goes offline?" },
+      {
+        label:
+          "What happens to patient monitoring if this device goes offline?",
+      },
       { label: "Are there any safety risks for patients?" },
     ],
     "IT staff": [

@@ -1,3 +1,4 @@
+import { Prisma } from "@/generated/prisma";
 import { z } from "zod";
 
 export const chatRequestSchema = z.object({
@@ -29,3 +30,30 @@ export const tokenResponseSchema = z.object({
   channel: z.any(),
   topics: z.array(z.string()),
 });
+
+export const fetchThreadsSchema = z.object({
+  userId: z.string().optional(),
+  channelKey: z.string().optional(),
+  limit: z.number(),
+  cursorTimestamp: z.string().optional(),
+  cursorId: z.string().optional(),
+  offset: z.number().optional(),
+});
+
+export const chatThreadInclude = {
+  _count: {
+    select: { messages: true },
+  },
+} as const;
+
+export type ChatThreadWithRelations = Prisma.ChatThreadGetPayload<{
+  include: typeof chatThreadInclude;
+}>;
+
+export const fetchThreadsResponseSchema = z.object({
+  threads: z.any().array(), // TODO
+  hasMore: z.boolean(),
+  total: z.number(),
+});
+
+export const fetchHistoryResponseSchema = z.any();

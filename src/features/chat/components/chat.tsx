@@ -24,22 +24,24 @@ import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { useChatAgent } from "../hooks/use-chat";
-import { useChat } from "../context/chat-panel-context";
+import { useChatUI } from "../context/chat-panel-context";
 import { useSuggestedQuestions } from "../context/suggested-questions-context";
 import { USER_ROLES, type UserRole } from "../utils";
+import { ChatThread } from "@/generated/prisma";
+import { ChatThreadWithRelations } from "../types";
 
+// https://agentkit.inngest.com/streaming/transport#sendmessageparams-options
 export const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
   api: {
     sendMessage: "/api/v1/chat",
     getRealtimeToken: "/api/v1/realtime/token",
     // TODO: these endpoints do not exist yet, there's no concept of persistent messages
     // (threads/conversations, history, database adapters)
-    fetchThreads: "/api/v1/threads",
-    fetchHistory: "/api/v1/threads/{threadId}",
-    createThread: "/api/v1/threads",
-    deleteThread: "/api/v1/threads/{threadId}",
-    approveToolCall: "/api/v1/approve-tool",
-    cancelMessage: "/api/v1/chat/cancel",
+    fetchThreads: "/api/v1/chat/threads",
+    fetchHistory: "/api/v1/chat/threads/{threadId}",
+    createThread: "/api/v1/chat/threads",
+    deleteThread: "/api/v1/chat/threads/{threadId}",
+    approveToolCall: "/api/v1/chat/approve-tool",
   },
 };
 
@@ -233,7 +235,7 @@ function ChatInputForm({
   isDisabled: boolean;
   status: AgentStatus;
 }) {
-  const { userRole, setUserRole } = useChat();
+  const { userRole, setUserRole } = useChatUI();
   return (
     <div className="border-t p-4">
       <form
@@ -283,6 +285,37 @@ function ChatInputForm({
   );
 }
 
+function ThreadSelector({
+  currentThreadId,
+  threads,
+  threadsLoading,
+  selectThread,
+}: {
+  currentThreadId: string | null;
+  threads: ChatThread[];
+  threadsLoading: boolean;
+  selectThread: (threadId: string) => void;
+}) {
+  return (
+    <Select
+      value={currentThreadId ?? ""}
+      onValueChange={(val) => val && selectThread(val)}
+      disabled={threadsLoading}
+    >
+      <SelectTrigger className="w-[240px]">
+        <SelectValue placeholder="New Conversation" />
+      </SelectTrigger>
+      <SelectContent>
+        {threads.map((thread) => (
+          <SelectItem key={thread.id} value={thread.id}>
+            <span className="truncate max-w-[200px] block">{thread.title}</span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function ChatInner({
   systemPrompt,
   user,
@@ -290,9 +323,18 @@ function ChatInner({
   systemPrompt?: string;
   user: ChatUser | null;
 }) {
-  const { messages, sendMessage, status, error, clearError } = useChatAgent({
+  const agent = useChatAgent({
     systemPrompt,
   });
+  const {
+    messages,
+    sendMessage,
+    threads,
+    currentThreadId,
+    status,
+    error,
+    clearError,
+  } = agent;
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -320,6 +362,12 @@ function ChatInner({
 
   return (
     <div className="flex flex-col h-full">
+      <ThreadSelector
+        currentThreadId={currentThreadId}
+        selectThread={agent.switchToThread}
+        threads={threads}
+        threadsLoading={agent.threadsLoading}
+      />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <EmptyState isDisabled={isDisabled} onSend={sendMessage} />

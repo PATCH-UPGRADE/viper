@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { SidebarHeader } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { AIChat } from "./chat";
-import { useChat } from "../context/chat-panel-context";
+import { useChatUI } from "../context/chat-panel-context";
 
 export function ChatPanel() {
-  const { state, toggleChatPanel } = useChat();
+  const { state, toggleChatPanel } = useChatUI();
 
   return (
     <div

@@ -24,7 +24,7 @@ import {
   type SuggestedQuestion,
   SuggestedQuestionsProvider,
 } from "@/features/chat/context/suggested-questions-context";
-import { buildAssetSystemPrompt, type UserRole } from "@/features/chat/utils";
+import type { UserRole } from "@/features/chat/utils";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { RemediationCard } from "@/features/remediations/components/remediations";
 import { type AssetWithIssueRelations, locationSchema } from "../types";
@@ -368,8 +368,6 @@ export function AssetDashboardDrawer({
     asset.issues.flatMap((i) => i.vulnerability.remediations.map((r) => r.id)),
   ).size;
 
-  const chatSystemPrompt = buildAssetSystemPrompt(asset, userRole);
-
   const suggestedQuestions: Partial<Record<UserRole, SuggestedQuestion[]>> = {
     CISO: [
       { label: "What is the overall risk posture of this asset?" },
@@ -418,7 +416,7 @@ export function AssetDashboardDrawer({
       icon: MessageSquare,
       content: (
         <SuggestedQuestionsProvider questions={visibleQuestions}>
-          <AIChat systemPrompt={chatSystemPrompt} />
+          <AIChat config={{ agent: "explainAsset", assetData: asset }} />
         </SuggestedQuestionsProvider>
       ),
       rawContent: true,

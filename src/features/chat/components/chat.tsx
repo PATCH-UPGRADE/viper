@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { useChatUI } from "../context/chat-panel-context";
 import { useSuggestedQuestions } from "../context/suggested-questions-context";
 import { useChatAgent } from "../hooks/use-chat";
+import type { UseChatAgentConfig } from "../types";
 import { USER_ROLES, type UserRole } from "../utils";
 
 // https://agentkit.inngest.com/streaming/transport#sendmessageparams-options
@@ -57,10 +58,10 @@ export const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
 };
 
 interface AIChatProps {
-  systemPrompt?: string;
+  config?: UseChatAgentConfig;
 }
 
-export function AIChat({ systemPrompt }: AIChatProps) {
+export function AIChat({ config }: AIChatProps) {
   const { data: session } = authClient.useSession();
   const userId = session?.user?.id;
   const user = session?.user ?? null;
@@ -76,7 +77,7 @@ export function AIChat({ systemPrompt }: AIChatProps) {
 
   return (
     <AgentProvider userId={userId} transport={TRANSPORT_CONFIG}>
-      <ChatInner systemPrompt={systemPrompt} user={user} />
+      <ChatInner config={config} user={user} />
     </AgentProvider>
   );
 }
@@ -407,15 +408,13 @@ function ThreadSelector({
 }
 
 function ChatInner({
-  systemPrompt,
+  config,
   user,
 }: {
-  systemPrompt?: string;
+  config?: UseChatAgentConfig;
   user: ChatUser | null;
 }) {
-  const agent = useChatAgent({
-    systemPrompt,
-  });
+  const agent = useChatAgent(config);
   const {
     messages,
     sendMessage,
@@ -473,30 +472,33 @@ function ChatInner({
           loadMoreThreads={loadMoreThreads}
         />
         <div>
-        {currentThreadId && (
-          <>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" onClick={() => agent.switchToThread("")}>
-                  <MessageSquarePlus />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>New Chat</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => deleteThread(currentThreadId)}
-                >
-                  <Trash2 />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Delete Thread</TooltipContent>
-            </Tooltip>
-          </>
-        )}
+          {currentThreadId && (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    onClick={() => agent.switchToThread("")}
+                  >
+                    <MessageSquarePlus />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>New Chat</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => deleteThread(currentThreadId)}
+                  >
+                    <Trash2 />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete Thread</TooltipContent>
+              </Tooltip>
+            </>
+          )}
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

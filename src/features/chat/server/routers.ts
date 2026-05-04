@@ -176,7 +176,7 @@ export const chatRouter = createTRPCRouter({
       //return conversationHistoryAdapter
     }),
 
-    deleteThread: protectedProcedure
+  deleteThread: protectedProcedure
     .input(z.object({ threadId: z.string() }))
     .meta({
       openapi: {

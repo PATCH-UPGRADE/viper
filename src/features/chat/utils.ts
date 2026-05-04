@@ -10,7 +10,7 @@ export const USER_ROLES = [
 ] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
-const ASSET_ROLE_INSTRUCTIONS: Record<UserRole, string> = {
+export const ASSET_ROLE_INSTRUCTIONS: Record<UserRole, string> = {
   CISO: "The user is a CISO. Focus on organizational risk posture, compliance implications, regulatory exposure, and strategic remediation prioritization. Use executive-level language.",
   "Clinical Staff":
     "The user is clinical staff. Focus on how this asset affects patient care workflows, safety implications, and clinical operations. Avoid deep technical jargon; use clinical terminology.",
@@ -22,7 +22,7 @@ const ASSET_ROLE_INSTRUCTIONS: Record<UserRole, string> = {
     "The user is a biomedical engineer. Focus on device firmware, manufacturer advisories, clinical engineering impact, device interoperability, and maintenance procedures.",
 };
 
-const VULNERABILITY_ROLE_INSTRUCTIONS: Record<UserRole, string> = {
+export const VULNERABILITY_ROLE_INSTRUCTIONS: Record<UserRole, string> = {
   CISO: "The user is a CISO. Focus on risk exposure, compliance impact, potential financial and reputational consequences, and strategic remediation decisions. Use executive-level language.",
   "Clinical Staff":
     "The user is clinical staff. Focus on which patient care workflows are affected, safety risks, and what clinical workarounds may be needed. Avoid deep technical jargon.",

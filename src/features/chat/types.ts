@@ -1,5 +1,19 @@
 import { z } from "zod";
+import type { AssetWithIssueRelations } from "@/features/assets/types";
+import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
 import type { Prisma } from "@/generated/prisma";
+import type { UserRole } from "./utils";
+
+export interface UseChatAgentConfig {
+  agent?: "explainAsset" | "explainVulnerability" | "chat";
+  assetData?: AssetWithIssueRelations;
+  vulnerabilityData?: VulnerabilityWithRelations;
+}
+
+export interface NetworkState extends UseChatAgentConfig {
+  userId?: string;
+  userRole?: UserRole;
+}
 
 export const chatRequestSchema = z.object({
   userMessage: z.object({

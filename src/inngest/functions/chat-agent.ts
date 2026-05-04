@@ -1,25 +1,17 @@
 import {
+  type Agent,
   type AgentMessageChunk,
-  anthropic,
-  createAgent,
   createNetwork,
   createState,
   type StateData,
 } from "@inngest/agent-kit";
 import { createChannel } from "@/app/api/inngest/realtime";
+import type { NetworkState } from "@/features/chat/types";
+import { createChatAgent } from "@/features/chat/viper-agent/agents/chat-agent";
+import { createExplainAssetAgent } from "@/features/chat/viper-agent/agents/explain-asset";
+import { createExplainVulnerabilityAgent } from "@/features/chat/viper-agent/agents/explain-vulnerability";
 import { conversationHistoryAdapter } from "@/features/chat/viper-agent/history-adapter";
 import { inngest } from "../client";
-
-const DEFAULT_SYSTEM_PROMPT = [
-  "You are a helpful AI assistant for a hospital vulnerability management platform (Viper).",
-  "You help hospital administrators understand the operational impact of vulnerabilities",
-  "and remediations across systems, safety, and clinical workflows.",
-  "Be concise, accurate, and prioritize patient safety in your recommendations.",
-].join(" ");
-
-// TODO: changeme back const MODEL_NAME = "claude-sonnet-4-20250514";
-const MODEL_NAME = "claude-haiku-4-5-20251001";
-const MAX_TOKENS = 4096;
 
 export const chatAgent = inngest.createFunction(
   {
@@ -31,48 +23,44 @@ export const chatAgent = inngest.createFunction(
   async ({ event, publish }) => {
     const { userMessage, threadId, userId, history } = event.data;
 
-    // TODO: useAgent currentlly places system prompt in userMessage state, move that
-    // to event.data
-    const _systemPrompt =
-      event.data.systemPrompt ??
-      userMessage?.state?.systemPrompt ??
-      DEFAULT_SYSTEM_PROMPT;
-
     if (!userId) {
       throw new Error("userId is required for chat agent execution");
     }
 
-    const targetChannel = userId;
+    const clientState: NetworkState = userMessage?.state ?? {};
 
-    const model = anthropic({
-      model: MODEL_NAME,
-      defaultParameters: { max_tokens: MAX_TOKENS },
-    });
-
-    const agent = createAgent({
-      name: "Viper Chat Assistant",
-      description: "A helpful assistant for hospital vulnerability management.",
-      //system: systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
-      system: async ({ network }) => {
-        console.log("HEY", JSON.stringify(network));
-        return DEFAULT_SYSTEM_PROMPT;
-      },
-      model,
-    });
+    let agent: Agent<StateData>;
+    switch (clientState.agent) {
+      case "explainAsset":
+        agent = createExplainAssetAgent();
+        break;
+      case "explainVulnerability":
+        agent = createExplainVulnerabilityAgent();
+        break;
+      default:
+        agent = createChatAgent();
+    }
 
     const network = createNetwork({
       name: "Chat Network",
       agents: [agent],
-      defaultModel: model,
-      maxIter: 1,
-      router: async () => agent,
+      maxIter: 5,
+      router: async ({ network: net }) => {
+        const results = net.state.results;
+        if (results.length === 0) return agent;
+        const lastOutput = results[results.length - 1].output;
+        const lastMsg = lastOutput[lastOutput.length - 1];
+        // Stop routing once the agent has produced a final text response.
+        // Keep routing while the last message was a tool call/result so the
+        // agent gets a chance to process the tool output and reply.
+        if (lastMsg?.stop_reason === "stop") return undefined;
+        return agent;
+      },
       history: conversationHistoryAdapter,
     });
 
-    // the state is just the user id, message history, and threadid
-    // TODO: store data from tool calls in network state? https://agentkit.inngest.com/concepts/state#using-state-in-tools
     const networkState = createState<StateData>(
-      { userId },
+      { userId, ...clientState },
       { messages: history ?? [], threadId },
     );
 
@@ -80,7 +68,7 @@ export const chatAgent = inngest.createFunction(
       state: networkState,
       streaming: {
         publish: async (chunk: AgentMessageChunk) => {
-          await publish(createChannel(targetChannel).agent_stream(chunk));
+          await publish(createChannel(userId).agent_stream(chunk));
         },
       },
     });

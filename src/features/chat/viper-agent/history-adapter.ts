@@ -1,5 +1,5 @@
+import { AgentResult, type HistoryConfig } from "@inngest/agent-kit";
 import prisma from "@/lib/db";
-import { AgentResult, HistoryConfig } from "@inngest/agent-kit";
 
 export const conversationHistoryAdapter: HistoryConfig<any> = {
   // 1. Create new conversation threads (or ensure they exist)

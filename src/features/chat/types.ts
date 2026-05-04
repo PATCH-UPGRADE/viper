@@ -1,5 +1,5 @@
-import { Prisma } from "@/generated/prisma";
 import { z } from "zod";
+import type { Prisma } from "@/generated/prisma";
 
 export const chatRequestSchema = z.object({
   userMessage: z.object({

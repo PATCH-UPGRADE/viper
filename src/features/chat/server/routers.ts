@@ -1,6 +1,8 @@
 import { getSubscriptionToken } from "@inngest/realtime";
+import z from "zod";
 import { createChannel } from "@/app/api/inngest/realtime";
 import { inngest } from "@/inngest/client";
+import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
   chatRequestSchema,
@@ -12,9 +14,6 @@ import {
   realtimeRequestSchema,
   tokenResponseSchema,
 } from "../types";
-import prisma from "@/lib/db";
-import z from "zod";
-import { conversationHistoryAdapter } from "../viper-agent/history-adapter";
 
 // https://agentkit.inngest.com/streaming/transport#sendmessageparams-options
 export const chatRouter = createTRPCRouter({
@@ -93,6 +92,7 @@ export const chatRouter = createTRPCRouter({
         skip: input.offset,
         take: input.limit,
         include: chatThreadInclude,
+        orderBy: { createdAt: "desc" },
       });
 
       return {
@@ -115,7 +115,6 @@ export const chatRouter = createTRPCRouter({
     })
     .output(fetchHistoryResponseSchema)
     .mutation(async ({ input, ctx }) => {
-
       const prismaThread = await prisma.chatThread.findUniqueOrThrow({
         where: { id: input.threadId },
         include: chatThreadInclude,
@@ -139,32 +138,34 @@ export const chatRouter = createTRPCRouter({
         input: "",
       });*/
 
-     const prismaMessages = await prisma.chatMessage.findMany({
-       where: {threadId: input.threadId}
-     });
+      const prismaMessages = await prisma.chatMessage.findMany({
+        where: { threadId: input.threadId },
+      });
 
-     // Instead, I had to do this. How did I find this? I went into Inngest's
-     // source code and traced the `fetchHistory` call until I found the code
-     // reponsible for formatting messages. No idea why it looks like that.
-     // Anyways, if you use Inngest's actual exported types for messages it
-     // won't work. You have to dig around and find their undocumented, untyped
-     // json syntax.
-     // TODO: VW-XXX switch away from Inngest's AgentKit framework
-     // https://github.com/inngest/agent-kit/blob/6c9802fd79471bd77c0072a2978f45720dc1ca99/packages/use-agent/src/core/services/thread-manager.ts#L126
-     const messages = prismaMessages.map((m) => ({
-       message_id: m.id,
-       createdAt: m.createdAt,
-       content: m.content,
-       role: m.role.toLowerCase(),
-       type: m.role.toLowerCase(),
-       data: {
-         output: [{
-           type: 'text',
-           content: m.content,
-         }]
-       },
-       status: 'sent',
-     }))
+      // Instead, I had to do this. How did I find this? I went into Inngest's
+      // source code and traced the `fetchHistory` call until I found the code
+      // reponsible for formatting messages. No idea why it looks like that.
+      // Anyways, if you use Inngest's actual exported types for messages it
+      // won't work. You have to dig around and find their undocumented, untyped
+      // json syntax.
+      // TODO: VW-XXX switch away from Inngest's AgentKit framework
+      // https://github.com/inngest/agent-kit/blob/6c9802fd79471bd77c0072a2978f45720dc1ca99/packages/use-agent/src/core/services/thread-manager.ts#L126
+      const messages = prismaMessages.map((m) => ({
+        message_id: m.id,
+        createdAt: m.createdAt,
+        content: m.content,
+        role: m.role.toLowerCase(),
+        type: m.role.toLowerCase(),
+        data: {
+          output: [
+            {
+              type: "text",
+              content: m.content,
+            },
+          ],
+        },
+        status: "sent",
+      }));
 
       return {
         thread,

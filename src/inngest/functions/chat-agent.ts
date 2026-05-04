@@ -7,8 +7,8 @@ import {
   type StateData,
 } from "@inngest/agent-kit";
 import { createChannel } from "@/app/api/inngest/realtime";
-import { inngest } from "../client";
 import { conversationHistoryAdapter } from "@/features/chat/viper-agent/history-adapter";
+import { inngest } from "../client";
 
 const DEFAULT_SYSTEM_PROMPT = [
   "You are a helpful AI assistant for a hospital vulnerability management platform (Viper).",
@@ -33,7 +33,7 @@ export const chatAgent = inngest.createFunction(
 
     // TODO: useAgent currentlly places system prompt in userMessage state, move that
     // to event.data
-    const systemPrompt =
+    const _systemPrompt =
       event.data.systemPrompt ??
       userMessage?.state?.systemPrompt ??
       DEFAULT_SYSTEM_PROMPT;

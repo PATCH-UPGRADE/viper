@@ -4,8 +4,8 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarHeader } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { AIChat } from "./chat";
 import { useChatUI } from "../context/chat-panel-context";
+import { AIChat } from "./chat";
 
 export function ChatPanel() {
   const { state, toggleChatPanel } = useChatUI();

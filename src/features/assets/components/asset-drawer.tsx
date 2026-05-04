@@ -21,8 +21,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AIChat } from "@/features/chat/components/chat";
 import { useChatUI } from "@/features/chat/context/chat-panel-context";
 import {
-  SuggestedQuestionsProvider,
   type SuggestedQuestion,
+  SuggestedQuestionsProvider,
 } from "@/features/chat/context/suggested-questions-context";
 import { buildAssetSystemPrompt, type UserRole } from "@/features/chat/utils";
 import { IssuesSidebarList } from "@/features/issues/components/issue";

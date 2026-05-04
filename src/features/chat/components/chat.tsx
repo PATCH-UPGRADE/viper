@@ -6,14 +6,20 @@ import {
   type AgentStatus,
   type DefaultHttpTransportConfig,
 } from "@inngest/use-agent";
-import { AlertCircle, Bot, Loader2, SendHorizontal, X } from "lucide-react";
+import {
+  AlertCircle,
+  Bot,
+  Loader2,
+  MessageSquarePlus,
+  SendHorizontal,
+  X,
+} from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -21,15 +27,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
+import type { ChatThread } from "@/generated/prisma";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
-import { useChatAgent } from "../hooks/use-chat";
 import { useChatUI } from "../context/chat-panel-context";
 import { useSuggestedQuestions } from "../context/suggested-questions-context";
+import { useChatAgent } from "../hooks/use-chat";
 import { USER_ROLES, type UserRole } from "../utils";
-import { ChatThread } from "@/generated/prisma";
-import { ChatThreadWithRelations } from "../types";
 
 // https://agentkit.inngest.com/streaming/transport#sendmessageparams-options
 export const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
@@ -115,14 +126,18 @@ function ChatMessageSkeleton({ align }: { align: "left" | "right" }) {
         align === "right" ? "justify-end" : "justify-start",
       )}
     >
-      {align === "left" && <Skeleton className="size-7 shrink-0 rounded-full" />}
+      {align === "left" && (
+        <Skeleton className="size-7 shrink-0 rounded-full" />
+      )}
       <Skeleton
         className={cn(
           "h-10 rounded-2xl",
           align === "right" ? "w-48 rounded-br-sm" : "w-56 rounded-bl-sm",
         )}
       />
-      {align === "right" && <Skeleton className="size-7 shrink-0 rounded-full" />}
+      {align === "right" && (
+        <Skeleton className="size-7 shrink-0 rounded-full" />
+      )}
     </div>
   );
 }
@@ -276,9 +291,9 @@ function ChatInputForm({
       <form
         onSubmit={onSubmit}
         className={cn(
-          "flex flex-col border-2 rounded-xl bg-background drop-shadow-accent drop-shadow-sm focus-within:drop-shadow-md focus-within:border-primary transition-colors", 
-          isDisabled ? 'cursor-not-allowed' : '')
-        }
+          "flex flex-col border-2 rounded-xl bg-background drop-shadow-accent drop-shadow-sm focus-within:drop-shadow-md focus-within:border-primary transition-colors",
+          isDisabled ? "cursor-not-allowed" : "",
+        )}
       >
         <input
           value={input}
@@ -333,15 +348,19 @@ function ThreadSelector({
   threads,
   threadsLoading,
   threadsHasMore,
+  threadsError,
   loadMoreThreads,
   selectThread,
+  refreshThreads,
 }: {
   currentThreadId: string | null;
   threads: ChatThread[];
+  threadsError: string;
   threadsLoading: boolean;
   threadsHasMore: boolean;
   loadMoreThreads: () => void;
   selectThread: (threadId: string) => void;
+  refreshThreads: () => void;
 }) {
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -357,11 +376,14 @@ function ThreadSelector({
   return (
     <Select
       value={currentThreadId ?? ""}
-      onValueChange={(val) => val && selectThread(val)}
+      onValueChange={(val) => {
+        refreshThreads();
+        val && selectThread(val);
+      }}
       disabled={threadsLoading && threads.length === 0}
     >
       <SelectTrigger className="w-[240px]">
-        <SelectValue placeholder="New Conversation" />
+        <SelectValue placeholder="New Chat" />
       </SelectTrigger>
       <SelectContent onScroll={handleScroll}>
         {threads.map((thread) => (
@@ -379,6 +401,7 @@ function ThreadSelector({
             </div>
           </>
         )}
+        {threadsError && <span className="text-red-500">{threadsError}</span>}
       </SelectContent>
     </Select>
   );
@@ -436,18 +459,32 @@ function ChatInner({
     sendMessage(value);
   };
 
-  console.log("HEY", messages)
+  console.log("HEY", messages);
 
   return (
     <div className="flex flex-col h-full">
-      <ThreadSelector
-        currentThreadId={currentThreadId}
-        selectThread={agent.switchToThread}
-        threads={threads}
-        threadsLoading={threadsLoading}
-        threadsHasMore={threadsHasMore}
-        loadMoreThreads={loadMoreThreads}
-      />
+      <div className="bg-muted p-2 flex gap-2 justify-between">
+        <ThreadSelector
+          currentThreadId={currentThreadId}
+          selectThread={agent.switchToThread}
+          threads={threads}
+          threadsError={threadsError}
+          threadsLoading={threadsLoading}
+          threadsHasMore={threadsHasMore}
+          refreshThreads={agent.refreshThreads}
+          loadMoreThreads={loadMoreThreads}
+        />
+        {currentThreadId && (
+          <Tooltip>
+            <TooltipTrigger>
+              <Button variant="ghost" onClick={() => agent.switchToThread("")}>
+                <MessageSquarePlus />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>New Chat</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {isLoadingInitialThread ? (
           <ChatMessagesSkeletonList />

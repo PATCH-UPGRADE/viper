@@ -1,4 +1,5 @@
 import { getSubscriptionToken } from "@inngest/realtime";
+import { TRPCError } from "@trpc/server";
 import z from "zod";
 import { createChannel } from "@/app/api/inngest/realtime";
 import { inngest } from "@/inngest/client";
@@ -173,5 +174,27 @@ export const chatRouter = createTRPCRouter({
       };
       // TODO: use conversation history adapter, copy the use-agent example from inngest source code...
       //return conversationHistoryAdapter
+    }),
+
+    deleteThread: protectedProcedure
+    .input(z.object({ threadId: z.string() }))
+    .meta({
+      openapi: {
+        method: "DELETE",
+        path: "/chat/threads/{threadId}",
+        tags: ["Chat"],
+        summary: "delete a conversation thread",
+      },
+    })
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ input, ctx }) => {
+      const thread = await prisma.chatThread.findFirst({
+        where: { id: input.threadId, userId: ctx.auth.user.id },
+      });
+      if (!thread) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      await prisma.chatThread.delete({ where: { id: input.threadId } });
+      return { success: true };
     }),
 });

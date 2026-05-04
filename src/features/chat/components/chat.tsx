@@ -12,6 +12,7 @@ import {
   Loader2,
   MessageSquarePlus,
   SendHorizontal,
+  Trash2,
   X,
 } from "lucide-react";
 import type React from "react";
@@ -47,8 +48,6 @@ export const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
   api: {
     sendMessage: "/api/v1/chat",
     getRealtimeToken: "/api/v1/realtime/token",
-    // TODO: these endpoints do not exist yet, there's no concept of persistent messages
-    // (threads/conversations, history, database adapters)
     fetchThreads: "/api/v1/chat/threads",
     fetchHistory: "/api/v1/chat/threads/{threadId}",
     createThread: "/api/v1/chat/threads",
@@ -433,6 +432,7 @@ function ChatInner({
     threadsHasMore,
     threadsError,
     loadMoreThreads,
+    deleteThread,
   } = agent;
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -459,8 +459,6 @@ function ChatInner({
     sendMessage(value);
   };
 
-  console.log("HEY", messages);
-
   return (
     <div className="flex flex-col h-full">
       <div className="bg-muted p-2 flex gap-2 justify-between">
@@ -474,16 +472,32 @@ function ChatInner({
           refreshThreads={agent.refreshThreads}
           loadMoreThreads={loadMoreThreads}
         />
+        <div>
         {currentThreadId && (
-          <Tooltip>
-            <TooltipTrigger>
-              <Button variant="ghost" onClick={() => agent.switchToThread("")}>
-                <MessageSquarePlus />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>New Chat</TooltipContent>
-          </Tooltip>
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" onClick={() => agent.switchToThread("")}>
+                  <MessageSquarePlus />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>New Chat</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => deleteThread(currentThreadId)}
+                >
+                  <Trash2 />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete Thread</TooltipContent>
+            </Tooltip>
+          </>
         )}
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {isLoadingInitialThread ? (

@@ -115,9 +115,6 @@ export const chatRouter = createTRPCRouter({
     })
     .output(fetchHistoryResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      /*return await prisma.chatMessage.findMany({
-      where: { threadId: input.threadId }
-    });*/
 
       const prismaThread = await prisma.chatThread.findUniqueOrThrow({
         where: { id: input.threadId },
@@ -132,12 +129,42 @@ export const chatRouter = createTRPCRouter({
         updatedAt: prismaThread.updatedAt,
       };
 
-      const messages = await conversationHistoryAdapter.get!({
+      // This SHOULD work, but Inngest's docs are wrong (i.e, hallucinated)
+      // TODO VW-XXX: switch away from Inngest's AgentKit framework
+
+      /*const messages = await conversationHistoryAdapter.get!({
         threadId: input.threadId,
         state: {} as any,
         network: {} as any,
         input: "",
-      });
+      });*/
+
+     const prismaMessages = await prisma.chatMessage.findMany({
+       where: {threadId: input.threadId}
+     });
+
+     // Instead, I had to do this. How did I find this? I went into Inngest's
+     // source code and traced the `fetchHistory` call until I found the code
+     // reponsible for formatting messages. No idea why it looks like that.
+     // Anyways, if you use Inngest's actual exported types for messages it
+     // won't work. You have to dig around and find their undocumented, untyped
+     // json syntax.
+     // TODO: VW-XXX switch away from Inngest's AgentKit framework
+     // https://github.com/inngest/agent-kit/blob/6c9802fd79471bd77c0072a2978f45720dc1ca99/packages/use-agent/src/core/services/thread-manager.ts#L126
+     const messages = prismaMessages.map((m) => ({
+       message_id: m.id,
+       createdAt: m.createdAt,
+       content: m.content,
+       role: m.role.toLowerCase(),
+       type: m.role.toLowerCase(),
+       data: {
+         output: [{
+           type: 'text',
+           content: m.content,
+         }]
+       },
+       status: 'sent',
+     }))
 
       return {
         thread,

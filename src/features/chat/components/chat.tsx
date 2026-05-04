@@ -13,6 +13,7 @@ import Markdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -102,6 +103,38 @@ function EmptyState({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ChatMessageSkeleton({ align }: { align: "left" | "right" }) {
+  return (
+    <div
+      className={cn(
+        "flex items-end gap-2",
+        align === "right" ? "justify-end" : "justify-start",
+      )}
+    >
+      {align === "left" && <Skeleton className="size-7 shrink-0 rounded-full" />}
+      <Skeleton
+        className={cn(
+          "h-10 rounded-2xl",
+          align === "right" ? "w-48 rounded-br-sm" : "w-56 rounded-bl-sm",
+        )}
+      />
+      {align === "right" && <Skeleton className="size-7 shrink-0 rounded-full" />}
+    </div>
+  );
+}
+
+function ChatMessagesSkeletonList() {
+  const pattern: Array<"left" | "right"> = ["left", "right", "left", "right"];
+  return (
+    <div className="space-y-4">
+      {pattern.map((align, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton list
+        <ChatMessageSkeleton key={i} align={align} />
+      ))}
     </div>
   );
 }
@@ -227,12 +260,14 @@ function ChatInputForm({
   onInputChange,
   onSubmit,
   isDisabled,
+  isConnected,
   status,
 }: {
   input: string;
   onInputChange: (value: string) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isDisabled: boolean;
+  isConnected: boolean;
   status: AgentStatus;
 }) {
   const { userRole, setUserRole } = useChatUI();
@@ -240,7 +275,10 @@ function ChatInputForm({
     <div className="border-t p-4">
       <form
         onSubmit={onSubmit}
-        className="flex flex-col border-2 rounded-xl bg-background drop-shadow-accent drop-shadow-sm focus-within:drop-shadow-md focus-within:border-primary transition-colors"
+        className={cn(
+          "flex flex-col border-2 rounded-xl bg-background drop-shadow-accent drop-shadow-sm focus-within:drop-shadow-md focus-within:border-primary transition-colors", 
+          isDisabled ? 'cursor-not-allowed' : '')
+        }
       >
         <input
           value={input}
@@ -281,6 +319,11 @@ function ChatInputForm({
           </Button>
         </div>
       </form>
+      {!isConnected && (
+        <p className="text-xs text-muted-foreground text-right mt-1">
+          Status: Disconnected
+        </p>
+      )}
     </div>
   );
 }
@@ -289,28 +332,53 @@ function ThreadSelector({
   currentThreadId,
   threads,
   threadsLoading,
+  threadsHasMore,
+  loadMoreThreads,
   selectThread,
 }: {
   currentThreadId: string | null;
   threads: ChatThread[];
   threadsLoading: boolean;
+  threadsHasMore: boolean;
+  loadMoreThreads: () => void;
   selectThread: (threadId: string) => void;
 }) {
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (
+      threadsHasMore &&
+      !threadsLoading &&
+      el.scrollTop + el.clientHeight >= el.scrollHeight - 50
+    ) {
+      loadMoreThreads();
+    }
+  };
+
   return (
     <Select
       value={currentThreadId ?? ""}
       onValueChange={(val) => val && selectThread(val)}
-      disabled={threadsLoading}
+      disabled={threadsLoading && threads.length === 0}
     >
       <SelectTrigger className="w-[240px]">
         <SelectValue placeholder="New Conversation" />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent onScroll={handleScroll}>
         {threads.map((thread) => (
           <SelectItem key={thread.id} value={thread.id}>
             <span className="truncate max-w-[200px] block">{thread.title}</span>
           </SelectItem>
         ))}
+        {threadsLoading && (
+          <>
+            <div className="px-2 py-1">
+              <Skeleton className="h-8 rounded-md" />
+            </div>
+            <div className="px-2 py-1">
+              <Skeleton className="h-8 rounded-md" />
+            </div>
+          </>
+        )}
       </SelectContent>
     </Select>
   );
@@ -334,11 +402,19 @@ function ChatInner({
     status,
     error,
     clearError,
+
+    isConnected,
+    isLoadingInitialThread,
+
+    threadsLoading,
+    threadsHasMore,
+    threadsError,
+    loadMoreThreads,
   } = agent;
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const isDisabled = status !== "ready";
+  const isDisabled = status !== "ready" || !isConnected;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: want new messages to trigger scrolling
   useEffect(() => {
@@ -360,25 +436,35 @@ function ChatInner({
     sendMessage(value);
   };
 
+  console.log("HEY", messages)
+
   return (
     <div className="flex flex-col h-full">
       <ThreadSelector
         currentThreadId={currentThreadId}
         selectThread={agent.switchToThread}
         threads={threads}
-        threadsLoading={agent.threadsLoading}
+        threadsLoading={threadsLoading}
+        threadsHasMore={threadsHasMore}
+        loadMoreThreads={loadMoreThreads}
       />
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
-          <EmptyState isDisabled={isDisabled} onSend={sendMessage} />
-        )}
+        {isLoadingInitialThread ? (
+          <ChatMessagesSkeletonList />
+        ) : (
+          <>
+            {messages.length === 0 && (
+              <EmptyState isDisabled={isDisabled} onSend={sendMessage} />
+            )}
 
-        {messages.map((message) => (
-          <ChatMessage key={message.id} message={message} user={user} />
-        ))}
+            {messages.map((message) => (
+              <ChatMessage key={message.id} message={message} user={user} />
+            ))}
 
-        {(status === "submitted" || status === "streaming") && (
-          <ChatStatusIndicator status={status} />
+            {(status === "submitted" || status === "streaming") && (
+              <ChatStatusIndicator status={status} />
+            )}
+          </>
         )}
 
         {/*<div ref={scrollRef} className="hidden" />*/}
@@ -393,6 +479,7 @@ function ChatInner({
         onInputChange={setInput}
         onSubmit={onSubmit}
         isDisabled={isDisabled}
+        isConnected={isConnected}
         status={status}
       />
     </div>

@@ -88,7 +88,7 @@ export const chatRouter = createTRPCRouter({
       },
     })
     .output(fetchThreadsResponseSchema)
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const threads = await prisma.chatThread.findMany({
         skip: input.offset,
         take: input.limit,
@@ -96,10 +96,11 @@ export const chatRouter = createTRPCRouter({
         orderBy: { createdAt: "desc" },
       });
 
+      // TODO: paginate threads
       return {
         threads,
         hasMore: false,
-        total: 0,
+        total: threads.length,
       };
     }),
 

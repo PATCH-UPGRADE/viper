@@ -1,3 +1,5 @@
+// lots of code copied from docs: https://agentkit.inngest.com/concepts/history#usage
+
 import { AgentResult, type HistoryConfig } from "@inngest/agent-kit";
 import prisma from "@/lib/db";
 

@@ -520,7 +520,7 @@ function ChatInner({
           </>
         )}
 
-        {/*<div ref={scrollRef} className="hidden" />*/}
+        <div ref={scrollRef} />
       </div>
 
       {status === "error" && error && (

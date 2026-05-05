@@ -33,7 +33,5 @@ export function useChatAgent(config?: UseChatAgentConfig) {
       deleteThreadMutation({ threadId }).then(() => {}),
   });
 
-  console.log("messages", agent.messages)
-
   return agent;
 }

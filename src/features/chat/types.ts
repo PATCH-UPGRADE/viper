@@ -65,9 +65,32 @@ export type ChatThreadWithRelations = Prisma.ChatThreadGetPayload<{
 }>;
 
 export const fetchThreadsResponseSchema = z.object({
-  threads: z.any().array(), // TODO
+  threads: z.custom<ChatThreadWithRelations>().array(),
   hasMore: z.boolean(),
   total: z.number(),
 });
 
-export const fetchHistoryResponseSchema = z.any();
+const chatHistoryMessageSchema = z.object({
+  message_id: z.string(),
+  createdAt: z.coerce.date(),
+  content: z.string().nullable(),
+  role: z.string(),
+  type: z.string(),
+  data: z.object({
+    output: z.array(z.object({ type: z.string(), content: z.string().nullable() })),
+  }),
+  status: z.string(),
+});
+
+export const fetchedThreadSchema = z.object({
+  id: z.string(),
+  title: z.string().nullable(),
+  messageCount: z.object({ messages: z.number() }),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+});
+
+export const fetchHistoryResponseSchema = z.object({
+  thread: fetchedThreadSchema,
+  messages: z.array(chatHistoryMessageSchema),
+});

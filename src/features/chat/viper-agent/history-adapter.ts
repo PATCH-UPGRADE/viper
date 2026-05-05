@@ -3,6 +3,7 @@
 import { AgentResult, type HistoryConfig } from "@inngest/agent-kit";
 import prisma from "@/lib/db";
 
+// biome-ignore lint/suspicious/noExplicitAny: Inngest doesn't have an exported type for this
 export const conversationHistoryAdapter: HistoryConfig<any> = {
   // 1. Create new conversation threads (or ensure they exist)
   createThread: async ({ state, input }) => {

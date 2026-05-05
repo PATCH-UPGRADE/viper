@@ -3,7 +3,11 @@ import {
   type NetworkRun,
   type StateData,
 } from "@inngest/agent-kit";
-import { ASSET_ROLE_INSTRUCTIONS, DEFAULT_CHAT_MODEL, type UserRole } from "../../utils";
+import {
+  ASSET_ROLE_INSTRUCTIONS,
+  DEFAULT_CHAT_MODEL,
+  type UserRole,
+} from "../../utils";
 import { getAssetData } from "../tools/get-asset-data";
 
 const MODEL = DEFAULT_CHAT_MODEL;

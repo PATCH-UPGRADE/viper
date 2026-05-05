@@ -116,7 +116,7 @@ export const chatRouter = createTRPCRouter({
       },
     })
     .output(fetchHistoryResponseSchema)
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const prismaThread = await prisma.chatThread.findUniqueOrThrow({
         where: { id: input.threadId },
         include: chatThreadInclude,

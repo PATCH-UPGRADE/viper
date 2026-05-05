@@ -147,7 +147,6 @@ function ChatMessagesSkeletonList() {
   return (
     <div className="space-y-4">
       {pattern.map((align, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton list
         <ChatMessageSkeleton key={i} align={align} />
       ))}
     </div>
@@ -438,7 +437,6 @@ function ChatInner({
 
   const isDisabled = status !== "ready" || !isConnected;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: want new messages to trigger scrolling
   useEffect(() => {
     if (messages.length)
       scrollRef.current?.scrollIntoView({ behavior: "smooth" });

@@ -39,7 +39,8 @@ model User {
   integrationUser          Integration?     @relation("integration_user")
   webhooks                  Webhook[]
   userTokens UserToken[]
-  threads ChatThread[]
+  threads    ChatThread[]
+  memories   Memory[]
 
   @@unique([email])
   @@map("user")
@@ -783,14 +784,25 @@ enum ChatMessageRole {
 }
 
 model ChatMessage {
-  id            String      @id @default(cuid())
-  threadId String
-  thread         ChatThread    @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  status ChatMessageStatus?
-  role ChatMessageRole
-  content                   String?         @db.Text
+  id        String             @id @default(cuid())
+  threadId  String
+  thread    ChatThread         @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  status    ChatMessageStatus?
+  role      ChatMessageRole
+  content   String?            @db.Text
   toolStatus String?
-  createdAt                 DateTime         @default(now())
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  checksum  String?
+}
+
+model Memory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String?  @db.Text
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  checksum String?
+
+  @@index([userId])
 }

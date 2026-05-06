@@ -48,10 +48,10 @@ export const tokenResponseSchema = z.object({
 export const fetchThreadsSchema = z.object({
   userId: z.string().optional(),
   channelKey: z.string().optional(),
-  limit: z.number(),
+  limit: z.number().int().min(1).max(100),
   cursorTimestamp: z.string().optional(),
   cursorId: z.string().optional(),
-  offset: z.number().optional(),
+  offset: z.number().int().min(0).optional(),
 });
 
 export const chatThreadInclude = {

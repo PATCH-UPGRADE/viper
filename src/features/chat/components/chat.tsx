@@ -33,6 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
@@ -350,7 +351,6 @@ function ThreadSelector({
   threadsError,
   loadMoreThreads,
   selectThread,
-  refreshThreads,
 }: {
   currentThreadId: string | null;
   threads: Thread[];
@@ -359,7 +359,6 @@ function ThreadSelector({
   threadsHasMore: boolean;
   loadMoreThreads: () => void;
   selectThread: (threadId: string) => void;
-  refreshThreads: () => void;
 }) {
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -376,8 +375,7 @@ function ThreadSelector({
     <Select
       value={currentThreadId ?? ""}
       onValueChange={(val) => {
-        refreshThreads();
-        val && selectThread(val);
+        if (val) selectThread(val);
       }}
       disabled={threadsLoading && threads.length === 0}
     >
@@ -466,12 +464,11 @@ function ChatInner({
           threadsError={threadsError}
           threadsLoading={threadsLoading}
           threadsHasMore={threadsHasMore}
-          refreshThreads={agent.refreshThreads}
           loadMoreThreads={loadMoreThreads}
         />
         <div>
           {currentThreadId && (
-            <>
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -488,14 +485,17 @@ function ChatInner({
                   <Button
                     variant="ghost"
                     className="text-destructive hover:text-destructive"
-                    onClick={() => deleteThread(currentThreadId)}
+                    onClick={() => {
+                      deleteThread(currentThreadId);
+                      agent.refreshThreads();
+                    }}
                   >
                     <Trash2 />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Delete Thread</TooltipContent>
               </Tooltip>
-            </>
+            </TooltipProvider>
           )}
         </div>
       </div>

@@ -53,7 +53,7 @@ export const conversationHistoryAdapter: HistoryConfig<any> = {
             {
               type: "text" as const,
               role: "user" as const,
-              content: msg.content as string,
+              content: msg.content ?? "",
               stop_reason: "stop",
             },
           ],

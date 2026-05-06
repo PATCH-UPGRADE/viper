@@ -28,16 +28,29 @@ export const getAssetData = createTool({
       }
     }
 
+    const formattedLocation =
+      asset.location && typeof asset.location === "object"
+        ? [
+            asset.location.facility,
+            asset.location.building,
+            asset.location.floor,
+            asset.location.room,
+          ]
+            .filter(Boolean)
+            .join(" / ")
+        : "N/A";
+
+    // TODO: eventually reuse assetToMarkdown function in get-recommendations-context.ts
     return [
       `## Asset: ${asset.hostname ?? asset.ip} (ID: ${asset.id})`,
       "",
       `- **Role**: ${asset.role ?? "Unknown"}`,
       `- **IP**: ${asset.ip ?? "N/A"}`,
       `- **Hostname**: ${asset.hostname ?? "N/A"}`,
-      `- **Location**: ${asset.location ?? "N/A"}`,
+      `- **Location**: ${formattedLocation}`,
       `- **Network Segment**: ${asset.networkSegment ?? "N/A"}`,
       `- **MAC Address**: ${asset.macAddress ?? "N/A"}`,
-      `- **CPE**: ${asset.cpe ?? "N/A"}`,
+      `- **CPE**: ${asset.deviceGroup?.cpe ?? "N/A"}`,
       `- **Patch Status**: ${asset.patchStatus ?? "N/A"}`,
       "",
       "## Associated Vulnerabilities",

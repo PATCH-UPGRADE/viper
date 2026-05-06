@@ -258,13 +258,12 @@ export const AppSidebar = () => {
             <SidebarMenuButton
               className="gap-x-4 h-10 px-4 cursor-pointer"
               onClick={toggleChatPanel}
-              onKeyDown={toggleChatPanel}
-              asChild
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") toggleChatPanel();
+              }}
             >
-              <span>
-                <Sparkles className="size-4" aria-hidden="true" />
-                <span>Ask VIPER</span>
-              </span>
+              <Sparkles className="size-4" aria-hidden="true" />
+              <span>Ask VIPER</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

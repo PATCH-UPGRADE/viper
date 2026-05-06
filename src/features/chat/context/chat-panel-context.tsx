@@ -17,7 +17,7 @@ const ChatContext = React.createContext<ChatContextProps | null>(null);
 export function useChatUI() {
   const context = React.useContext(ChatContext);
   if (!context) {
-    throw new Error("useChat must be used within a ChatProvider.");
+    throw new Error("useChatUI must be used within a ChatProvider.");
   }
   return context;
 }

@@ -25,7 +25,7 @@ export const chatRouter = createTRPCRouter({
         method: "POST",
         path: "/chat",
         tags: ["Chat"],
-        summary: "Send Chat Message",
+        summary: "[Internal] Send Chat Message",
         description:
           "Send a user message to the AI chat agent via Inngest realtime.",
       },
@@ -59,7 +59,7 @@ export const chatRouter = createTRPCRouter({
         method: "POST",
         path: "/realtime/token",
         tags: ["Chat"],
-        summary: "Get Realtime Token",
+        summary: "[Internal] Get Realtime Token",
         description:
           "Generate a subscription token for the Inngest realtime channel.",
       },
@@ -83,13 +83,14 @@ export const chatRouter = createTRPCRouter({
         method: "GET",
         path: "/chat/threads",
         tags: ["Chat"],
-        summary: "Fetch Threads",
-        description: "fetch threads from backend",
+        summary: "[Internal] Fetch Threads",
       },
     })
     .output(fetchThreadsResponseSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // get only a user's threads
       const threads = await prisma.chatThread.findMany({
+        where: { userId: ctx.auth.user.id },
         skip: input.offset,
         take: input.limit,
         include: chatThreadInclude,
@@ -111,14 +112,13 @@ export const chatRouter = createTRPCRouter({
         method: "GET",
         path: "/chat/threads/{threadId}",
         tags: ["Chat"],
-        summary: "Get conversation from thread",
-        description: "get conversation from thread",
+        summary: "[Internal] Get conversation from thread",
       },
     })
     .output(fetchHistoryResponseSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const prismaThread = await prisma.chatThread.findUniqueOrThrow({
-        where: { id: input.threadId },
+        where: { id: input.threadId, userId: ctx.auth.user.id },
         include: chatThreadInclude,
       });
 
@@ -142,6 +142,7 @@ export const chatRouter = createTRPCRouter({
 
       const prismaMessages = await prisma.chatMessage.findMany({
         where: { threadId: input.threadId },
+        orderBy: { createdAt: "asc" },
       });
 
       // Instead, I had to do this. How did I find this? I went into Inngest's
@@ -184,7 +185,7 @@ export const chatRouter = createTRPCRouter({
         method: "DELETE",
         path: "/chat/threads/{threadId}",
         tags: ["Chat"],
-        summary: "delete a conversation thread",
+        summary: "[Internal] Delete a conversation thread",
       },
     })
     .output(z.object({ success: z.boolean() }))

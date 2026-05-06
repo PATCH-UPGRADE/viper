@@ -11,7 +11,7 @@ type AssetWithDeviceGroup = Prisma.AssetGetPayload<{
 function assetToMarkdown(a: AssetWithDeviceGroup): string {
   const lines = [
     `### ${a.hostname ?? a.ip ?? a.id}`,
-    `- **IP**: ${a.ip}`,
+    `- **IP**: ${a.ip ?? "N/A"}`,
     `- **MAC Address**: ${a.macAddress ?? "N/A"}`,
     `- **Role**: ${a.role ?? "Unknown"}`,
     `- **Status**: ${a.status ?? "Unknown"}`,

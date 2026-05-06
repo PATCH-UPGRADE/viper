@@ -64,8 +64,19 @@ export type ChatThreadWithRelations = Prisma.ChatThreadGetPayload<{
   include: typeof chatThreadInclude;
 }>;
 
+export const chatThreadSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  title: z.string().nullable(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+  _count: z.object({
+    messages: z.number(),
+  }),
+});
+
 export const fetchThreadsResponseSchema = z.object({
-  threads: z.custom<ChatThreadWithRelations>().array(),
+  threads: z.array(chatThreadSchema),
   hasMore: z.boolean(),
   total: z.number(),
 });

@@ -20,11 +20,12 @@ export const manageMemoriesFn = inngest.createFunction(
     for (const [i, op] of operations.entries()) {
       if (op.delete && op.id) {
         await step.run(`delete-${i}-${op.id}`, () =>
-          prisma.memory.delete({ where: { id: op.id, userId } }),
+          // use deleteMany in case id doesn't exist
+          prisma.memory.deleteMany({ where: { id: op.id, userId } }),
         );
       } else if (op.id && op.content) {
         await step.run(`update-${i}-${op.id}`, () =>
-          prisma.memory.update({
+          prisma.memory.updateMany({
             where: { id: op.id, userId },
             data: { content: op.content },
           }),

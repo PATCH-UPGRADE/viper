@@ -1,5 +1,5 @@
 import { createAgent } from "@inngest/agent-kit";
-import { DEFAULT_CHAT_MODEL } from "../../utils";
+import { DEFAULT_CHAT_MODEL } from "../constants";
 import { manageMemoriesTool } from "../tools/manage-memories";
 import { readMemories } from "../tools/read-memories";
 

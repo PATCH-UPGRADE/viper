@@ -42,6 +42,12 @@ CREATE TABLE "Memory" (
 );
 
 -- CreateIndex
+CREATE INDEX "ChatThread_userId_idx" ON "ChatThread"("userId");
+
+-- CreateIndex
+CREATE INDEX "ChatMessage_threadId_createdAt_idx" ON "ChatMessage"("threadId", "createdAt");
+
+-- CreateIndex
 CREATE INDEX "Memory_userId_idx" ON "Memory"("userId");
 
 -- AddForeignKey

@@ -1,3 +1,4 @@
+import "server-only";
 import { createTool } from "@inngest/agent-kit";
 import { z } from "zod";
 
@@ -11,16 +12,16 @@ export const getAssetData = createTool({
     const asset = network?.state.data.assetData;
     if (!asset) return "No asset data available.";
 
-    const vulnerabilities = asset.issues.map(
-      (i: { vulnerability: unknown }) => i.vulnerability,
-    );
+    const vulnerabilities = (
+      Array.isArray(asset.issues) ? asset.issues : []
+    ).map((i: { vulnerability: unknown }) => i.vulnerability);
 
     const seen = new Set<string>();
     const remediations: unknown[] = [];
     for (const vuln of vulnerabilities as Array<{
-      remediations: Array<{ id: string }>;
+      remediations?: Array<{ id: string }>;
     }>) {
-      for (const rem of vuln.remediations) {
+      for (const rem of vuln.remediations ?? []) {
         if (!seen.has(rem.id)) {
           seen.add(rem.id);
           remediations.push(rem);
@@ -37,7 +38,7 @@ export const getAssetData = createTool({
             asset.location.room,
           ]
             .filter(Boolean)
-            .join(" / ")
+            .join(" / ") || "N/A"
         : "N/A";
 
     // TODO: eventually reuse assetToMarkdown function in get-recommendations-context.ts

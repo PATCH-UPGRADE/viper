@@ -101,6 +101,9 @@
     "vaul": "^1.1.2",
     "zod": "^4.1.11"
   },
+  "overrides": {
+    "import-in-the-middle": "3.0.1"
+  },
   "devDependencies": {
     "@biomejs/biome": "2.2.0",
     "@tailwindcss/postcss": "^4",

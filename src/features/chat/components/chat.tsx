@@ -37,13 +37,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
+import { useChatUI } from "@/features/chat/context/chat-panel-context";
+import { useSuggestedQuestions } from "@/features/chat/context/suggested-questions-context";
+import { useChatAgent } from "@/features/chat/hooks/use-chat";
+import type { UseChatAgentConfig } from "@/features/chat/types";
+import { USER_ROLES, type UserRole } from "@/features/chat/utils";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
-import { useChatUI } from "../context/chat-panel-context";
-import { useSuggestedQuestions } from "../context/suggested-questions-context";
-import { useChatAgent } from "../hooks/use-chat";
-import type { UseChatAgentConfig } from "../types";
-import { USER_ROLES, type UserRole } from "../utils";
 
 // https://agentkit.inngest.com/streaming/transport#sendmessageparams-options
 export const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
@@ -485,8 +485,8 @@ function ChatInner({
                   <Button
                     variant="ghost"
                     className="text-destructive hover:text-destructive"
-                    onClick={() => {
-                      deleteThread(currentThreadId);
+                    onClick={async () => {
+                      await deleteThread(currentThreadId);
                       agent.refreshThreads();
                     }}
                   >

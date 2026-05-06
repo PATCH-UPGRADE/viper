@@ -257,6 +257,7 @@ export const AppSidebar = () => {
           <SidebarMenuItem>
             <SidebarMenuButton
               className="gap-x-4 h-10 px-4 cursor-pointer"
+              tooltip="Ask VIPER"
               onClick={toggleChatPanel}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") toggleChatPanel();

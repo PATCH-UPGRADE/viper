@@ -1,10 +1,6 @@
-import { anthropic } from "@inngest/agent-kit";
+// Client-safe constants and utilities belong in this file.
+// Server-only agent config (e.g. DEFAULT_CHAT_MODEL) lives in viper-agent/constants.ts.
 import type { Memory } from "@/generated/prisma";
-
-export const DEFAULT_CHAT_MODEL = anthropic({
-  model: "claude-haiku-4-5-20251001",
-  defaultParameters: { max_tokens: 4096 },
-});
 
 export function generateMemoryMarkdown(memories: Memory[]): string {
   if (memories.length === 0) return "## Memories\n\nNo memories saved yet.";

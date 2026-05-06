@@ -87,7 +87,7 @@ export const chatRouter = createTRPCRouter({
       },
     })
     .output(fetchThreadsResponseSchema)
-    .mutation(async ({ input, ctx }) => {
+    .query(async ({ input, ctx }) => {
       // get only a user's threads
       const threads = await prisma.chatThread.findMany({
         where: { userId: ctx.auth.user.id },
@@ -116,7 +116,7 @@ export const chatRouter = createTRPCRouter({
       },
     })
     .output(fetchHistoryResponseSchema)
-    .mutation(async ({ input, ctx }) => {
+    .query(async ({ input, ctx }) => {
       const prismaThread = await prisma.chatThread.findUniqueOrThrow({
         where: { id: input.threadId, userId: ctx.auth.user.id },
         include: chatThreadInclude,

@@ -131,7 +131,7 @@ export const chatRouter = createTRPCRouter({
       };
 
       // This SHOULD work, but Inngest's docs are wrong (i.e, hallucinated)
-      // TODO VW-XXX: switch away from Inngest's AgentKit framework
+      // TODO VW-252: switch away from Inngest's AgentKit framework
 
       /*const messages = await conversationHistoryAdapter.get!({
         threadId: input.threadId,
@@ -150,7 +150,7 @@ export const chatRouter = createTRPCRouter({
       // Anyways, if you use Inngest's actual exported types for messages it
       // won't work. You have to dig around and find their undocumented, untyped
       // json syntax.
-      // TODO: VW-XXX switch away from Inngest's AgentKit framework
+      // TODO: VW-252 switch away from Inngest's AgentKit framework
       // https://github.com/inngest/agent-kit/blob/6c9802fd79471bd77c0072a2978f45720dc1ca99/packages/use-agent/src/core/services/thread-manager.ts#L126
       const messages = prismaMessages.map((m) => ({
         message_id: m.id,

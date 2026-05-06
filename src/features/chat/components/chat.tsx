@@ -5,6 +5,7 @@ import {
   AgentProvider,
   type AgentStatus,
   type DefaultHttpTransportConfig,
+  type Thread,
 } from "@inngest/use-agent";
 import {
   AlertCircle,
@@ -35,7 +36,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
-import type { ChatThread } from "@/generated/prisma";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { useChatUI } from "../context/chat-panel-context";
@@ -353,8 +353,8 @@ function ThreadSelector({
   refreshThreads,
 }: {
   currentThreadId: string | null;
-  threads: ChatThread[];
-  threadsError: string;
+  threads: Thread[];
+  threadsError: string | null;
   threadsLoading: boolean;
   threadsHasMore: boolean;
   loadMoreThreads: () => void;

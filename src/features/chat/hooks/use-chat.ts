@@ -23,11 +23,11 @@ export function useChatAgent(config?: UseChatAgentConfig) {
   );
 
   const agent = useAgent({
+    // Priority chain: config > userRole base.
+    // Server (chat-agent.ts) defaults the agent when none is set.
     state: () => ({
-      agent: config?.agent ?? "chat",
-      assetData: config?.assetData,
-      vulnerabilityData: config?.vulnerabilityData,
       userRole,
+      ...config,
     }),
     deleteThread: (threadId: string) =>
       deleteThreadMutation({ threadId }).then(() => {}),

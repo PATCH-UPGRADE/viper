@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -93,7 +93,10 @@ function EmptyState({
   onSend,
 }: {
   isDisabled: boolean;
-  onSend: (message: string) => void;
+  onSend: (
+    message: string,
+    configOverride?: Partial<UseChatAgentConfig>,
+  ) => void;
 }) {
   const questions = useSuggestedQuestions();
   return (
@@ -107,7 +110,7 @@ function EmptyState({
               key={q.label}
               type="button"
               disabled={isDisabled}
-              onClick={() => (q.onClick ? q.onClick(q.label) : onSend(q.label))}
+              onClick={() => onSend(q.label, q.config)}
               className="rounded-full border bg-background px-3 py-1.5 text-xs text-foreground shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
             >
               {q.label}
@@ -415,6 +418,7 @@ function ChatInner({
   const {
     messages,
     sendMessage,
+    sendMessageToThread,
     threads,
     currentThreadId,
     status,
@@ -430,10 +434,46 @@ function ChatInner({
     loadMoreThreads,
     deleteThread,
   } = agent;
+  const { userRole } = useChatUI();
   const [input, setInput] = useState("");
+  const [configOverride, setConfigOverride] =
+    useState<Partial<UseChatAgentConfig>>();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isDisabled = status !== "ready" || !isConnected;
+
+  const sendWithOverride = useCallback(
+    (message: string, override?: Partial<UseChatAgentConfig>) => {
+      // Explicit override (e.g. suggested-question click) is sticky: persist it
+      // so subsequent free-form messages also use it. Without this, React's
+      // batched setState wouldn't reflect the change in time for this send.
+      if (override && Object.keys(override).length > 0) {
+        setConfigOverride(override);
+      }
+      const effective = override ?? configOverride;
+      if (!effective || Object.keys(effective).length === 0) {
+        return sendMessage(message);
+      }
+      // Priority chain: effective override > page-level config > userRole base.
+      // Server (chat-agent.ts) defaults the agent when none is set.
+      const stateOverride = {
+        userRole,
+        ...config,
+        ...effective,
+      };
+      return sendMessageToThread(currentThreadId ?? "", message, {
+        state: stateOverride,
+      });
+    },
+    [
+      sendMessage,
+      sendMessageToThread,
+      currentThreadId,
+      config,
+      configOverride,
+      userRole,
+    ],
+  );
 
   useEffect(() => {
     if (messages.length)
@@ -451,7 +491,7 @@ function ChatInner({
     const value = input.trim();
     if (!value || isDisabled) return;
     setInput("");
-    sendMessage(value);
+    sendWithOverride(value);
   };
 
   return (
@@ -505,7 +545,7 @@ function ChatInner({
         ) : (
           <>
             {messages.length === 0 && (
-              <EmptyState isDisabled={isDisabled} onSend={sendMessage} />
+              <EmptyState isDisabled={isDisabled} onSend={sendWithOverride} />
             )}
 
             {messages.map((message) => (

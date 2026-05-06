@@ -12,6 +12,7 @@ import {
   SettingsIcon,
   ShieldAlertIcon,
   ShieldCheckIcon,
+  Sparkles,
   WorkflowIcon,
 } from "lucide-react";
 import Image from "next/image";
@@ -42,6 +43,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useSuspenseConnectors } from "@/features/api-key-connectors/hooks/use-connectors";
+import { useChatUI } from "@/features/chat/context/chat-panel-context";
 import { ResourceType } from "@/generated/prisma";
 import { NavUser } from "./nav-user";
 import { Separator } from "./ui/separator";
@@ -141,6 +143,8 @@ export const AppSidebar = () => {
     connectorItems[type].activeCount = activeCount;
     totalActiveConnectors += activeCount;
   }
+
+  const { toggleChatPanel } = useChatUI();
 
   return (
     <Sidebar collapsible="icon">
@@ -249,6 +253,19 @@ export const AppSidebar = () => {
                 </SidebarMenu>
               </CollapsibleContent>
             </Collapsible>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              className="gap-x-4 h-10 px-4 cursor-pointer"
+              tooltip="Ask VIPER"
+              onClick={toggleChatPanel}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") toggleChatPanel();
+              }}
+            >
+              <Sparkles className="size-4" aria-hidden="true" />
+              <span>Ask VIPER</span>
+            </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
         <Separator className="my-2" />

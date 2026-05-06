@@ -39,6 +39,8 @@ model User {
   integrationUser          Integration?     @relation("integration_user")
   webhooks                  Webhook[]
   userTokens UserToken[]
+  threads    ChatThread[]
+  memories   Memory[]
 
   @@unique([email])
   @@map("user")
@@ -758,4 +760,53 @@ model ExternalAdvisoryMapping {
   @@unique([integrationId, externalId], name: "external_advisory_mappings_integrationId_externalId_key")
   @@index([itemId])
   @@map("external_advisory_mappings")
+}
+
+model ChatThread {
+  id            String      @id @default(cuid())
+  userId String
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title String?
+  createdAt                 DateTime         @default(now())
+  updatedAt DateTime @updatedAt
+  messages ChatMessage[]
+
+  @@index([userId])
+}
+
+enum ChatMessageStatus {
+  PROCESSING
+  COMPLETED
+  CANCELED // america
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+}
+
+model ChatMessage {
+  id        String             @id @default(cuid())
+  threadId  String
+  thread    ChatThread         @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  status    ChatMessageStatus?
+  role      ChatMessageRole
+  content   String?            @db.Text
+  toolStatus String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  checksum  String?
+
+  @@index([threadId, createdAt])
+}
+
+model Memory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }

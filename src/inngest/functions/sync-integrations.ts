@@ -44,13 +44,15 @@ export const syncAllIntegrations = inngest.createFunction(
     });
 
     // Trigger sync for each integration
-    await step.sendEvent(
-      "trigger-syncs",
-      integrationsToSync.map((integration) => ({
-        name: "integration/sync.requested",
-        data: { integrationId: integration.id },
-      })),
-    );
+    if (integrationsToSync.length > 0) {
+      await step.sendEvent(
+        "trigger-syncs",
+        integrationsToSync.map((integration) => ({
+          name: "integration/sync.requested",
+          data: { integrationId: integration.id },
+        })),
+      );
+    }
 
     return { syncedCount: integrationsToSync.length };
   },

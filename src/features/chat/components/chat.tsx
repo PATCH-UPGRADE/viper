@@ -5,14 +5,23 @@ import {
   AgentProvider,
   type AgentStatus,
   type DefaultHttpTransportConfig,
+  type Thread,
 } from "@inngest/use-agent";
-import { AlertCircle, Bot, Loader2, SendHorizontal, X } from "lucide-react";
+import {
+  AlertCircle,
+  Bot,
+  Loader2,
+  MessageSquarePlus,
+  SendHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
+import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -20,40 +29,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
+import { useChatUI } from "@/features/chat/context/chat-panel-context";
+import { useSuggestedQuestions } from "@/features/chat/context/suggested-questions-context";
+import { useChatAgent } from "@/features/chat/hooks/use-chat";
+import type { UseChatAgentConfig } from "@/features/chat/types";
+import { USER_ROLES, type UserRole } from "@/features/chat/utils";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
-import { useChatAgent } from "../hooks/use-chat";
-import { USER_ROLES, type UserRole } from "../utils";
 
-const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
+// https://agentkit.inngest.com/streaming/transport#sendmessageparams-options
+export const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
   api: {
     sendMessage: "/api/v1/chat",
     getRealtimeToken: "/api/v1/realtime/token",
-    // TODO: these endpoints do not exist yet, there's no concept of persistent messages
-    // (threads/conversations, history, database adapters)
-    fetchThreads: "/api/v1/threads",
-    fetchHistory: "/api/v1/threads/{threadId}",
-    createThread: "/api/v1/threads",
-    deleteThread: "/api/v1/threads/{threadId}",
-    approveToolCall: "/api/v1/approve-tool",
-    cancelMessage: "/api/v1/chat/cancel",
+    fetchThreads: "/api/v1/chat/threads",
+    fetchHistory: "/api/v1/chat/threads/{threadId}",
+    createThread: "/api/v1/chat/threads",
+    deleteThread: "/api/v1/chat/threads/{threadId}",
+    approveToolCall: "/api/v1/chat/approve-tool",
   },
 };
 
 interface AIChatProps {
-  systemPrompt?: string;
-  suggestedQuestions?: Partial<Record<UserRole, string[]>>;
-  userRole: UserRole;
-  onUserRoleChange: (role: UserRole) => void;
+  config?: UseChatAgentConfig;
 }
 
-export function AIChat({
-  systemPrompt,
-  suggestedQuestions,
-  userRole,
-  onUserRoleChange,
-}: AIChatProps) {
+export function AIChat({ config }: AIChatProps) {
   const { data: session } = authClient.useSession();
   const userId = session?.user?.id;
   const user = session?.user ?? null;
@@ -69,13 +78,7 @@ export function AIChat({
 
   return (
     <AgentProvider userId={userId} transport={TRANSPORT_CONFIG}>
-      <ChatInner
-        systemPrompt={systemPrompt}
-        suggestedQuestions={suggestedQuestions}
-        userRole={userRole}
-        onUserRoleChange={onUserRoleChange}
-        user={user}
-      />
+      <ChatInner config={config} user={user} />
     </AgentProvider>
   );
 }
@@ -86,14 +89,13 @@ interface ChatUser {
 }
 
 function EmptyState({
-  questions,
   isDisabled,
   onSend,
 }: {
-  questions: string[];
   isDisabled: boolean;
   onSend: (message: string) => void;
 }) {
+  const questions = useSuggestedQuestions();
   return (
     <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
       <Bot className="size-8" />
@@ -102,17 +104,52 @@ function EmptyState({
         <div className="flex flex-wrap justify-center gap-2 mt-3 max-w-md">
           {questions.map((q) => (
             <button
-              key={q}
+              key={q.label}
               type="button"
               disabled={isDisabled}
-              onClick={() => onSend(q)}
+              onClick={() => (q.onClick ? q.onClick(q.label) : onSend(q.label))}
               className="rounded-full border bg-background px-3 py-1.5 text-xs text-foreground shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
             >
-              {q}
+              {q.label}
             </button>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ChatMessageSkeleton({ align }: { align: "left" | "right" }) {
+  return (
+    <div
+      className={cn(
+        "flex items-end gap-2",
+        align === "right" ? "justify-end" : "justify-start",
+      )}
+    >
+      {align === "left" && (
+        <Skeleton className="size-7 shrink-0 rounded-full" />
+      )}
+      <Skeleton
+        className={cn(
+          "h-10 rounded-2xl",
+          align === "right" ? "w-48 rounded-br-sm" : "w-56 rounded-bl-sm",
+        )}
+      />
+      {align === "right" && (
+        <Skeleton className="size-7 shrink-0 rounded-full" />
+      )}
+    </div>
+  );
+}
+
+function ChatMessagesSkeletonList() {
+  const pattern: Array<"left" | "right"> = ["left", "right", "left", "right"];
+  return (
+    <div className="space-y-4">
+      {pattern.map((align, i) => (
+        <ChatMessageSkeleton key={i} align={align} />
+      ))}
     </div>
   );
 }
@@ -238,83 +275,169 @@ function ChatInputForm({
   onInputChange,
   onSubmit,
   isDisabled,
+  isConnected,
   status,
-  userRole,
-  onUserRoleChange,
 }: {
   input: string;
   onInputChange: (value: string) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isDisabled: boolean;
+  isConnected: boolean;
   status: AgentStatus;
-  userRole: UserRole;
-  onUserRoleChange: (role: UserRole) => void;
 }) {
+  const { userRole, setUserRole } = useChatUI();
   return (
-    <form onSubmit={onSubmit} className="border-t p-4 flex items-center gap-2">
-      <Input
-        value={input}
-        onChange={(e) => onInputChange(e.target.value)}
-        placeholder={
-          status === "error"
-            ? "An error has occurred..."
-            : isDisabled
-              ? "AI is working..."
-              : "Ask a question..."
-        }
-        disabled={isDisabled}
-        className="flex-1"
-      />
-      <Button type="submit" size="icon" disabled={isDisabled || !input.trim()}>
-        <SendHorizontal className="size-4" />
-      </Button>
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
-        <span>Ask as</span>
-        <Select
-          value={userRole}
-          onValueChange={(v) => onUserRoleChange(v as UserRole)}
-        >
-          <SelectTrigger size="sm" className="h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {USER_ROLES.map((r) => (
-              <SelectItem key={r} value={r}>
-                {r}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    </form>
+    <div className="border-t p-4">
+      <form
+        onSubmit={onSubmit}
+        className={cn(
+          "flex flex-col border-2 rounded-xl bg-background drop-shadow-accent drop-shadow-sm focus-within:drop-shadow-md focus-within:border-primary transition-colors",
+          isDisabled ? "cursor-not-allowed" : "",
+        )}
+      >
+        <input
+          value={input}
+          onChange={(e) => onInputChange(e.target.value)}
+          placeholder={
+            status === "error"
+              ? "An error has occurred..."
+              : isDisabled
+                ? "AI is working..."
+                : "Ask a question..."
+          }
+          disabled={isDisabled}
+          className="flex-1 border-0 drop-shadow-none text-sm outline-0 selection:outline-0 focus:outline-0 p-2"
+        />
+        <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground whitespace-nowrap p-1">
+          <span>Ask as</span>
+          <Select
+            value={userRole}
+            onValueChange={(v) => setUserRole(v as UserRole)}
+          >
+            <SelectTrigger size="sm" className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {USER_ROLES.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="submit"
+            size="icon"
+            disabled={isDisabled || !input.trim()}
+          >
+            <SendHorizontal className="size-4" />
+          </Button>
+        </div>
+      </form>
+      {!isConnected && (
+        <p className="text-xs text-muted-foreground text-right mt-1">
+          Status: Disconnected
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ThreadSelector({
+  currentThreadId,
+  threads,
+  threadsLoading,
+  threadsHasMore,
+  threadsError,
+  loadMoreThreads,
+  selectThread,
+}: {
+  currentThreadId: string | null;
+  threads: Thread[];
+  threadsError: string | null;
+  threadsLoading: boolean;
+  threadsHasMore: boolean;
+  loadMoreThreads: () => void;
+  selectThread: (threadId: string) => void;
+}) {
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (
+      threadsHasMore &&
+      !threadsLoading &&
+      el.scrollTop + el.clientHeight >= el.scrollHeight - 50
+    ) {
+      loadMoreThreads();
+    }
+  };
+
+  return (
+    <Select
+      value={currentThreadId ?? ""}
+      onValueChange={(val) => {
+        if (val) selectThread(val);
+      }}
+      disabled={threadsLoading && threads.length === 0}
+    >
+      <SelectTrigger className="w-[240px]">
+        <SelectValue placeholder="New Chat" />
+      </SelectTrigger>
+      <SelectContent onScroll={handleScroll}>
+        {threads.map((thread) => (
+          <SelectItem key={thread.id} value={thread.id}>
+            <span className="truncate max-w-[200px] block">{thread.title}</span>
+          </SelectItem>
+        ))}
+        {threadsLoading && (
+          <>
+            <div className="px-2 py-1">
+              <Skeleton className="h-8 rounded-md" />
+            </div>
+            <div className="px-2 py-1">
+              <Skeleton className="h-8 rounded-md" />
+            </div>
+          </>
+        )}
+        {threadsError && <span className="text-red-500">{threadsError}</span>}
+      </SelectContent>
+    </Select>
   );
 }
 
 function ChatInner({
-  systemPrompt,
-  suggestedQuestions,
-  userRole,
-  onUserRoleChange,
+  config,
   user,
 }: {
-  systemPrompt?: string;
-  suggestedQuestions?: Partial<Record<UserRole, string[]>>;
-  userRole: UserRole;
-  onUserRoleChange: (role: UserRole) => void;
+  config?: UseChatAgentConfig;
   user: ChatUser | null;
 }) {
-  const { messages, sendMessage, status, error, clearError } = useChatAgent({
-    systemPrompt,
-  });
+  const agent = useChatAgent(config);
+  const {
+    messages,
+    sendMessage,
+    threads,
+    currentThreadId,
+    status,
+    error,
+    clearError,
+
+    isConnected,
+    isLoadingInitialThread,
+
+    threadsLoading,
+    threadsHasMore,
+    threadsError,
+    loadMoreThreads,
+    deleteThread,
+  } = agent;
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const isDisabled = status !== "ready";
-  const visibleQuestions = suggestedQuestions?.[userRole] ?? [];
+  const isDisabled = status !== "ready" || !isConnected;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: want new messages to trigger scrolling
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length)
+      scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
@@ -333,21 +456,66 @@ function ChatInner({
 
   return (
     <div className="flex flex-col h-full">
+      <div className="bg-muted p-2 flex gap-2 justify-between">
+        <ThreadSelector
+          currentThreadId={currentThreadId}
+          selectThread={agent.switchToThread}
+          threads={threads}
+          threadsError={threadsError}
+          threadsLoading={threadsLoading}
+          threadsHasMore={threadsHasMore}
+          loadMoreThreads={loadMoreThreads}
+        />
+        <div>
+          {currentThreadId && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    onClick={() => agent.switchToThread("")}
+                  >
+                    <MessageSquarePlus />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>New Chat</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    onClick={async () => {
+                      await deleteThread(currentThreadId);
+                      agent.refreshThreads();
+                    }}
+                  >
+                    <Trash2 />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete Thread</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
-          <EmptyState
-            questions={visibleQuestions}
-            isDisabled={isDisabled}
-            onSend={sendMessage}
-          />
-        )}
+        {isLoadingInitialThread ? (
+          <ChatMessagesSkeletonList />
+        ) : (
+          <>
+            {messages.length === 0 && (
+              <EmptyState isDisabled={isDisabled} onSend={sendMessage} />
+            )}
 
-        {messages.map((message) => (
-          <ChatMessage key={message.id} message={message} user={user} />
-        ))}
+            {messages.map((message) => (
+              <ChatMessage key={message.id} message={message} user={user} />
+            ))}
 
-        {(status === "submitted" || status === "streaming") && (
-          <ChatStatusIndicator status={status} />
+            {(status === "submitted" || status === "streaming") && (
+              <ChatStatusIndicator status={status} />
+            )}
+          </>
         )}
 
         <div ref={scrollRef} />
@@ -362,9 +530,8 @@ function ChatInner({
         onInputChange={setInput}
         onSubmit={onSubmit}
         isDisabled={isDisabled}
+        isConnected={isConnected}
         status={status}
-        userRole={userRole}
-        onUserRoleChange={onUserRoleChange}
       />
     </div>
   );

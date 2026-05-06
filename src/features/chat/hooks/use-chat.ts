@@ -1,21 +1,36 @@
 "use client";
 
 import { useAgent } from "@inngest/use-agent";
-
-interface UseChatAgentConfig {
-  systemPrompt?: string;
-}
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { useTRPC } from "@/trpc/client";
+import { useChatUI } from "../context/chat-panel-context";
+import type { UseChatAgentConfig } from "../types";
 
 export function useChatAgent(config?: UseChatAgentConfig) {
-  // I love useAgent, this is great. Anyways `agent` this gives you the following
-  // const { messages, sendMessage, status, currentThreadId, switchToThread } = useAgent();
-  // https://agentkit.inngest.com/reference/use-agent#useagent
+  const trpc = useTRPC();
+  const { userRole } = useChatUI();
+
+  const { mutateAsync: deleteThreadMutation } = useMutation(
+    trpc.chat.deleteThread.mutationOptions({
+      onSuccess: () => {
+        toast.success("Thread deleted");
+      },
+      onError: (error) => {
+        toast.error(`Failed to delete thread: ${error.message}`);
+      },
+    }),
+  );
+
   const agent = useAgent({
     state: () => ({
-      systemPrompt: config?.systemPrompt,
+      agent: config?.agent ?? "chat",
+      assetData: config?.assetData,
+      vulnerabilityData: config?.vulnerabilityData,
+      userRole,
     }),
-    fetchThreads: async () => ({ threads: [], hasMore: false, total: 0 }),
-    fetchHistory: async () => [],
+    deleteThread: (threadId: string) =>
+      deleteThreadMutation({ threadId }).then(() => {}),
   });
 
   return agent;

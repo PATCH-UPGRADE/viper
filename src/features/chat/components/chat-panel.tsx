@@ -17,7 +17,7 @@ export function ChatPanel() {
   const suggestedQuestions: SuggestedQuestion[] = [
     {
       label: "Give me a recommendation",
-      config: { agent: "explainAsset" },
+      config: { agent: "giveRecommendations" },
     },
   ];
 

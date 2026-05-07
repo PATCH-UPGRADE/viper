@@ -10,6 +10,7 @@ import type { NetworkState } from "@/features/chat/types";
 import { createChatAgent } from "@/features/chat/viper-agent/agents/chat-agent";
 import { createExplainAssetAgent } from "@/features/chat/viper-agent/agents/explain-asset";
 import { createExplainVulnerabilityAgent } from "@/features/chat/viper-agent/agents/explain-vulnerability";
+import { createGiveRecommendationsAgent } from "@/features/chat/viper-agent/agents/give-recommendations";
 import { conversationHistoryAdapter } from "@/features/chat/viper-agent/history-adapter";
 import { inngest } from "../client";
 
@@ -36,6 +37,9 @@ export const chatAgent = inngest.createFunction(
         break;
       case "explainVulnerability":
         agent = createExplainVulnerabilityAgent();
+        break;
+      case "giveRecommendations":
+        agent = createGiveRecommendationsAgent();
         break;
       default:
         agent = createChatAgent();

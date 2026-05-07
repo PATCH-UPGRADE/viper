@@ -1,3 +1,4 @@
+import "server-only";
 import { createAgent } from "@inngest/agent-kit";
 import { DEFAULT_CHAT_MODEL } from "../constants";
 import { getRecommendationsContext } from "../tools/get-recommendations-context";
@@ -26,4 +27,7 @@ export const createGiveRecommendationsAgent = () =>
     system: SYSTEM_PROMPT,
     tools: [getRecommendationsContext],
     model: MODEL,
+    // TODO: explore using tool choice to force the tool call here
+    // however, don't want to call on subsequent messages, should only call once per conversation
+    //tool_choice: getRecommendationsContext
   });

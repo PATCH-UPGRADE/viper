@@ -475,6 +475,11 @@ function ChatInner({
     ],
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: set config override to none if thread changes
+  useEffect(() => {
+    setConfigOverride(undefined);
+  }, [currentThreadId]);
+
   useEffect(() => {
     if (messages.length)
       scrollRef.current?.scrollIntoView({ behavior: "smooth" });

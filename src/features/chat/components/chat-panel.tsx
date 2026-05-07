@@ -5,10 +5,21 @@ import { Button } from "@/components/ui/button";
 import { SidebarHeader } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { useChatUI } from "../context/chat-panel-context";
+import {
+  type SuggestedQuestion,
+  SuggestedQuestionsProvider,
+} from "../context/suggested-questions-context";
 import { AIChat } from "./chat";
 
 export function ChatPanel() {
   const { state, toggleChatPanel } = useChatUI();
+
+  const suggestedQuestions: SuggestedQuestion[] = [
+    {
+      label: "Give me a recommendation",
+      config: { agent: "giveRecommendations" },
+    },
+  ];
 
   return (
     <div
@@ -33,7 +44,9 @@ export function ChatPanel() {
           </Button>
         </SidebarHeader>
         <div className="flex flex-1 flex-col overflow-hidden">
-          <AIChat />
+          <SuggestedQuestionsProvider questions={suggestedQuestions}>
+            <AIChat />
+          </SuggestedQuestionsProvider>
         </div>
       </div>
     </div>

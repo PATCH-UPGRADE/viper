@@ -76,11 +76,6 @@ const mainItems = [
     url: "/advisories",
   },
   {
-    title: "Recommendations",
-    icon: ShieldCheckIcon,
-    url: "/recommendations",
-  },
-  {
     title: "Settings",
     icon: SettingsIcon,
     url: "/settings",

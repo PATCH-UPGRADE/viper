@@ -5,11 +5,7 @@ import type { Prisma } from "@/generated/prisma";
 import type { UserRole } from "./utils";
 
 export interface UseChatAgentConfig {
-  agent?:
-    | "explainAsset"
-    | "explainVulnerability"
-    | "chat"
-    | "giveRecommendations";
+  agent?: "chat" | "giveRecommendations";
   assetData?: AssetWithIssueRelations;
   vulnerabilityData?: VulnerabilityWithRelations;
 }

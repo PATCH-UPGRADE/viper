@@ -1,6 +1,112 @@
 // Client-safe constants and utilities belong in this file.
 // Server-only agent config (e.g. DEFAULT_CHAT_MODEL) lives in viper-agent/constants.ts.
-import type { Memory } from "@/generated/prisma";
+import type { Memory, Prisma } from "@/generated/prisma";
+
+export type AssetWithDeviceGroup = Prisma.AssetGetPayload<{
+  include: { deviceGroup: true };
+}>;
+
+export type VulnerabilityFlat = Prisma.VulnerabilityGetPayload<
+  Record<string, never>
+>;
+
+export type RemediationFlat = Prisma.RemediationGetPayload<
+  Record<string, never>
+>;
+
+interface AssetForMarkdown {
+  id: string;
+  hostname?: string | null;
+  ip?: string | null;
+  macAddress?: string | null;
+  role?: string | null;
+  status?: string | null;
+  networkSegment?: string | null;
+  serialNumber?: string | null;
+  deviceGroup: {
+    manufacturer?: string | null;
+    modelName?: string | null;
+    cpe: string;
+    version?: string | null;
+  };
+}
+
+export function assetToMarkdown(a: AssetForMarkdown): string {
+  const lines = [
+    `### ${a.hostname ?? a.ip ?? a.id}`,
+    `- **IP**: ${a.ip ?? "N/A"}`,
+    `- **MAC Address**: ${a.macAddress ?? "N/A"}`,
+    `- **Role**: ${a.role ?? "Unknown"}`,
+    `- **Status**: ${a.status ?? "Unknown"}`,
+    `- **Network Segment**: ${a.networkSegment ?? "N/A"}`,
+    `- **Serial Number**: ${a.serialNumber ?? "N/A"}`,
+    `- **Device Group**: ${a.deviceGroup.manufacturer ?? ""} ${a.deviceGroup.modelName ?? ""} (CPE: ${a.deviceGroup.cpe})`.trim(),
+    `- **Device Group Version**: ${a.deviceGroup.version ?? "N/A"}`,
+  ];
+  return lines.join("\n");
+}
+
+export function vulnerabilityToMarkdown(v: VulnerabilityFlat): string {
+  const lines = [
+    `### ${v.cveId ?? v.id}`,
+    `- **Severity**: ${v.severity}`,
+    `- **Priority**: ${v.priority}`,
+    `- **CVSS Score**: ${v.cvssScore ?? "N/A"}`,
+    `- **CVSS Vector**: ${v.cvssVector ?? "N/A"}`,
+    `- **EPSS Score**: ${v.epss != null ? `${(v.epss * 100).toFixed(2)}%` : "N/A"}`,
+    `- **In CISA KEV**: ${v.inKEV ? "Yes" : "No"}`,
+  ];
+  if (v.exploitUri) lines.push(`- **Exploit URI**: ${v.exploitUri}`);
+  if (v.affectedComponents.length > 0)
+    lines.push(`- **Affected Components**: ${v.affectedComponents.join(", ")}`);
+  if (v.description) lines.push(`- **Description**: ${v.description}`);
+  if (v.narrative) lines.push(`- **Exploit Narrative**: ${v.narrative}`);
+  if (v.impact) lines.push(`- **Clinical Impact**: ${v.impact}`);
+  return lines.join("\n");
+}
+
+export function remediationToMarkdown(r: RemediationFlat): string {
+  const lines = [
+    `### [${r.id}]`,
+    `- **Linked Vulnerability**: ${r.vulnerabilityId ?? "N/A"}`,
+  ];
+  if (r.description) lines.push(`- **Description**: ${r.description}`);
+  if (r.narrative) lines.push(`- **How to Apply**: ${r.narrative}`);
+  return lines.join("\n");
+}
+
+export function generateContextMarkdown(
+  assets: AssetWithDeviceGroup[],
+  vulnerabilities: VulnerabilityFlat[],
+  remediations: RemediationFlat[],
+): string {
+  const assetSection =
+    assets.length === 0
+      ? "No assets found."
+      : assets.map(assetToMarkdown).join("\n\n");
+
+  const vulnSection =
+    vulnerabilities.length === 0
+      ? "No vulnerabilities found."
+      : vulnerabilities.map(vulnerabilityToMarkdown).join("\n\n");
+
+  const remSection =
+    remediations.length === 0
+      ? "No remediations found."
+      : remediations.map(remediationToMarkdown).join("\n\n");
+
+  return `## Assets
+
+${assetSection}
+
+## Vulnerabilities
+
+${vulnSection}
+
+## Remediations
+
+${remSection}`;
+}
 
 export function generateMemoryMarkdown(memories: Memory[]): string {
   if (memories.length === 0) return "## Memories\n\nNo memories saved yet.";

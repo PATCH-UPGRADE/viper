@@ -15,6 +15,7 @@ export const getRecommendationsContext = createTool({
     "Retrieve full context about the current user and environment before responding. Returns saved memories plus all assets, vulnerabilities, and remediations with their cross-entity relationships. Call once at the start of a thread.",
   parameters: z.object({}),
   handler: async (_, { network }) => {
+    return "TODO: just ignore this for now";
     const userId = network?.state.data.userId as string | undefined;
     if (!userId) return "No user context available.";
 

@@ -1,5 +1,6 @@
 "use client";
 
+import type { AnyToolCallPart } from "@inngest/use-agent";
 import {
   type AgentError,
   AgentProvider,
@@ -10,18 +11,26 @@ import {
 import {
   AlertCircle,
   Bot,
+  ChevronDown,
   Loader2,
   MessageSquarePlus,
   SendHorizontal,
   Trash2,
+  Wrench,
   X,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -159,14 +168,154 @@ function ChatMessagesSkeletonList() {
 
 type ChatAgentMessage = ReturnType<typeof useChatAgent>["messages"][number];
 
+interface AskUserQuestion {
+  question: string;
+  reason: string;
+  suggested_answers: string[];
+}
+
+function ToolCallAccordion({ part }: { part: AnyToolCallPart }) {
+  const [open, setOpen] = useState(false);
+  const label = part.toolName.replace(/_/g, " ");
+  const output =
+    part.state === "output-available"
+      ? ((part.output as { data?: string })?.data ?? "")
+      : null;
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="my-1">
+      <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
+        <Wrench className="size-3 shrink-0" />
+        <span>{label}</span>
+        <ChevronDown
+          className={cn("size-3 transition-transform", open && "rotate-180")}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-1 rounded-md bg-muted/50 p-2 text-xs font-mono whitespace-pre-wrap max-h-48 overflow-y-auto">
+          {output ?? "Running..."}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function AskUserQuestionsMessage({
+  part,
+  isAnswered,
+  onAnswer,
+}: {
+  part: AnyToolCallPart;
+  isAnswered: boolean;
+  onAnswer: (payload: string) => void;
+}) {
+  const questions =
+    (part.input as { questions?: AskUserQuestion[] })?.questions ?? [];
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+
+  const allAnswered =
+    questions.length > 0 &&
+    questions.every((_, i) => (answers[i] ?? "").trim().length > 0);
+
+  const handleSubmit = () => {
+    const payload = JSON.stringify({
+      answers: questions.map((q, i) => ({
+        question: q.question,
+        answer: answers[i] ?? "",
+      })),
+    });
+    onAnswer(payload);
+  };
+
+  if (questions.length === 0) return null;
+
+  return (
+    <div className="space-y-4 mt-2">
+      {questions.map((q, i) => (
+        <div key={i} className="space-y-2">
+          <p className="text-sm font-medium">{q.question}</p>
+          <p className="text-xs text-muted-foreground italic">{q.reason}</p>
+          {isAnswered ? (
+            <p className="text-sm text-muted-foreground">{answers[i] ?? "—"}</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-1.5">
+                {(q.suggested_answers ?? []).map((ans) => (
+                  <button
+                    key={ans}
+                    type="button"
+                    onClick={() =>
+                      setAnswers((prev) => ({ ...prev, [i]: ans }))
+                    }
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs transition-colors",
+                      answers[i] === ans
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background hover:bg-muted border-border",
+                    )}
+                  >
+                    {ans}
+                  </button>
+                ))}
+              </div>
+              <Input
+                placeholder="Write in response..."
+                value={answers[i] ?? ""}
+                onChange={(e) =>
+                  setAnswers((prev) => ({ ...prev, [i]: e.target.value }))
+                }
+                className="text-xs h-8"
+              />
+            </>
+          )}
+        </div>
+      ))}
+      {!isAnswered && (
+        <Button
+          size="sm"
+          disabled={!allAnswered}
+          onClick={handleSubmit}
+          className="mt-1"
+        >
+          Send Answers
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function AnswerSummary({
+  answers,
+}: {
+  answers: { question: string; answer: string }[];
+}) {
+  return (
+    <div className="space-y-1.5">
+      {answers.map((a, i) => (
+        <div key={i} className="text-sm">
+          <span className="font-medium opacity-80">{a.question}</span>
+          <br />
+          <span>{a.answer}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ChatMessage({
   message,
   user,
+  isLast,
+  onAnswer,
 }: {
   message: ChatAgentMessage;
   user: ChatUser | null;
+  isLast: boolean;
+  onAnswer: (payload: string) => void;
 }) {
   const { role, parts } = message;
+
+  const hasText = parts.some((p) => p.type === "text");
 
   return (
     <div
@@ -176,7 +325,7 @@ function ChatMessage({
       )}
     >
       {role === "assistant" && (
-        <Avatar className="size-7 shrink-0">
+        <Avatar className="size-7 shrink-0 self-start mt-1">
           <AvatarFallback className="bg-muted">
             <Bot className="size-4" />
           </AvatarFallback>
@@ -185,17 +334,52 @@ function ChatMessage({
 
       <div
         className={cn(
-          "markdown max-w-[80%] px-3 py-2 text-sm",
+          "max-w-[80%] text-sm",
           role === "user"
-            ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm"
-            : "bg-muted rounded-2xl rounded-bl-sm",
+            ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-3 py-2"
+            : hasText
+              ? "bg-muted rounded-2xl rounded-bl-sm px-3 py-2"
+              : "space-y-1",
         )}
       >
-        {parts.map((part) =>
-          part.type === "text" ? (
-            <Markdown key={part.id}>{part.content}</Markdown>
-          ) : null,
-        )}
+        {parts.map((part, idx) => {
+          if (part.type === "text") {
+            if (role === "user") {
+              try {
+                const parsed = JSON.parse(part.content);
+                if (Array.isArray(parsed.answers)) {
+                  return (
+                    <AnswerSummary
+                      key={`${part.id}-${idx}`}
+                      answers={parsed.answers}
+                    />
+                  );
+                }
+              } catch {
+                // not JSON — fall through to markdown
+              }
+            }
+            return (
+              <div key={`${part.id}-${idx}`} className="markdown">
+                <Markdown>{part.content}</Markdown>
+              </div>
+            );
+          }
+          if (part.type === "tool-call") {
+            if (part.toolName === "ask_user_questions") {
+              return (
+                <AskUserQuestionsMessage
+                  key={part.toolCallId}
+                  part={part}
+                  isAnswered={!isLast}
+                  onAnswer={onAnswer}
+                />
+              );
+            }
+            return <ToolCallAccordion key={part.toolCallId} part={part} />;
+          }
+          return null;
+        })}
       </div>
 
       {role === "user" && (
@@ -280,6 +464,7 @@ function ChatInputForm({
   isDisabled,
   isConnected,
   status,
+  hasActiveQuestions,
 }: {
   input: string;
   onInputChange: (value: string) => void;
@@ -287,6 +472,7 @@ function ChatInputForm({
   isDisabled: boolean;
   isConnected: boolean;
   status: AgentStatus;
+  hasActiveQuestions: boolean;
 }) {
   const { userRole, setUserRole } = useChatUI();
   return (
@@ -304,15 +490,17 @@ function ChatInputForm({
           placeholder={
             status === "error"
               ? "An error has occurred..."
-              : isDisabled
-                ? "AI is working..."
-                : "Ask a question..."
+              : hasActiveQuestions
+                ? "Please answer the questions above..."
+                : isDisabled
+                  ? "AI is working..."
+                  : "Ask a question..."
           }
           disabled={isDisabled}
           className="flex-1 border-0 drop-shadow-none text-sm outline-0 selection:outline-0 focus:outline-0 p-2"
         />
         <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground whitespace-nowrap p-1">
-          <span>Ask as foo</span>
+          <span>Ask as</span>
           <Select
             value={userRole}
             onValueChange={(v) => setUserRole(v as UserRole)}
@@ -434,15 +622,25 @@ function ChatInner({
     loadMoreThreads,
     deleteThread,
   } = agent;
-  console.log('here', agent);
-  console.log('messages', agent.messages)
+  console.log("HEY", agent.messages);
   const { userRole } = useChatUI();
   const [input, setInput] = useState("");
   const [configOverride, setConfigOverride] =
     useState<Partial<UseChatAgentConfig>>();
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const isDisabled = status !== "ready" || !isConnected;
+  const isAgentBusy = status !== "ready" || !isConnected;
+
+  const hasActiveQuestions = useMemo(() => {
+    if (status !== "ready") return false;
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastMsg.role !== "assistant") return false;
+    return lastMsg.parts.some(
+      (p) => p.type === "tool-call" && p.toolName === "ask_user_questions",
+    );
+  }, [messages, status]);
+
+  const isDisabled = isAgentBusy || hasActiveQuestions;
 
   const sendWithOverride = useCallback(
     (message: string, override?: Partial<UseChatAgentConfig>) => {
@@ -555,8 +753,14 @@ function ChatInner({
               <EmptyState isDisabled={isDisabled} onSend={sendWithOverride} />
             )}
 
-            {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} user={user} />
+            {messages.map((message, i) => (
+              <ChatMessage
+                key={message.id}
+                message={message}
+                user={user}
+                isLast={i === messages.length - 1}
+                onAnswer={(payload) => sendWithOverride(payload)}
+              />
             ))}
 
             {(status === "submitted" || status === "streaming") && (
@@ -579,6 +783,7 @@ function ChatInner({
         isDisabled={isDisabled}
         isConnected={isConnected}
         status={status}
+        hasActiveQuestions={hasActiveQuestions}
       />
     </div>
   );

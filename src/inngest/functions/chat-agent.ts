@@ -47,14 +47,15 @@ export const chatAgent = inngest.createFunction(
         if (results.length === 0) return agent;
         const lastOutput = results[results.length - 1].output;
         const lastMsg = lastOutput[lastOutput.length - 1];
-        // Stop routing once the agent produces a final text response, or after
-        // ask_user_questions fires — the turn ends so the user can respond.
+        // If ask_user_questions was called anywhere in this turn, stop immediately
+        // so the user can respond.
+        const askedUser = lastOutput.some(
+          (msg) =>
+            msg.type === "tool_call" &&
+            msg.tools.some((msg) => msg.name === "ask_user_questions"),
+        );
+        if (askedUser) return undefined;
         if (lastMsg?.stop_reason === "stop") return undefined;
-        if (
-          lastMsg?.type === "tool_result" &&
-          lastMsg.tool.name === "ask_user_questions"
-        )
-          return undefined;
         return agent;
       },
       history: conversationHistoryAdapter,

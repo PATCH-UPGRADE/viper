@@ -1,6 +1,10 @@
 // lots of code copied from docs: https://agentkit.inngest.com/concepts/history#usage
 
-import { AgentResult, type HistoryConfig } from "@inngest/agent-kit";
+import {
+  AgentResult,
+  type HistoryConfig,
+  type Message,
+} from "@inngest/agent-kit";
 import prisma from "@/lib/db";
 
 // biome-ignore lint/suspicious/noExplicitAny: Inngest doesn't have an exported type for this
@@ -61,16 +65,17 @@ export const conversationHistoryAdapter: HistoryConfig<any> = {
           new Date(msg.createdAt),
         );
       } else {
-        // Return agent results
+        const textMessage: Message = {
+          type: "text" as const,
+          role: "assistant" as const,
+          content: msg.content ?? "",
+        };
+        const toolCallMessages: Message[] = Array.isArray(msg.toolCalls)
+          ? (msg.toolCalls as unknown as Message[])
+          : [];
         return new AgentResult(
-          "assistant", // TODO: could be something like msg.agentName
-          [
-            {
-              type: "text" as const,
-              role: "assistant" as const,
-              content: msg.content as string,
-            },
-          ],
+          "assistant",
+          [textMessage, ...toolCallMessages],
           [],
           new Date(msg.createdAt),
         );
@@ -109,16 +114,20 @@ export const conversationHistoryAdapter: HistoryConfig<any> = {
         .map((msg) => msg.content)
         .join("\n");
 
+      const toolCalls = result.output.filter(
+        (msg) => msg.type === "tool_call" || msg.type === "tool_result",
+      );
+
       await prisma.chatMessage.upsert({
         where: { id: result.id },
-        update: { content, updatedAt: result.createdAt },
+        update: { content, toolCalls, updatedAt: result.createdAt },
         create: {
-          id: result.id || crypto.randomUUID(), // Use result.id if available
+          id: result.id || crypto.randomUUID(),
           threadId,
           role: "ASSISTANT",
-          //agentName: result.agentName,
           content,
-          checksum: result.checksum, // For idempotency
+          toolCalls,
+          checksum: result.checksum,
           createdAt: result.createdAt,
         },
       });

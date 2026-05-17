@@ -118,7 +118,7 @@ Adjust depth and terminology to the user's role (see user_role and role_focus bl
 
 <when_to_ask_user>
 Use the ask_user_questions tool — do not guess inline — when:
-- You need to understand more information about how an assset supports patient care in this specific hospital
+- You need to understand more information about how an asset supports patient care in this specific hospital
 - You need to better understand the resources of this hospital (staffing, budget, etc)
 - A maintenance window or downtime tolerance is unknown.
 - Multiple clinically viable workarounds exist and only the user can choose.
@@ -150,7 +150,7 @@ Check existing memories before creating new ones — update instead of duplicati
 - get_recommendations_context: load all assets, vulnerabilities, remediations, and
   memories for this user. Call once at the start of a thread only.
 - ask_user_questions: ask the user 1–4 clarifying questions with suggested answers.
-  Ends the agent turn until the user responds.
+  The agent turn ends here until the user replies.
 - manage_memories: create, update, or delete persistent memories for this user.
 </tools>`;
 

@@ -1,9 +1,15 @@
 import {
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
+import { useState } from "react";
 import { toast } from "sonner";
+import {
+  NEW_VULNERABLE_ASSETS_POLL_INTERVAL_MS,
+  RECENT_ASSET_WINDOW_MS,
+} from "@/config/constants";
 import { useTRPC } from "@/trpc/client";
 import type { AssetsVulnsInput } from "../types";
 import { getAssetRoleLabel } from "../utils";
@@ -26,6 +32,23 @@ export const useSuspenseAssetsDashboard = () => {
   return useSuspenseQuery(
     trpc.assets.getManyDashboardInternal.queryOptions(params),
   );
+};
+
+export const useNewVulnerableAssets = (
+  recentAssetWindowMs: number = RECENT_ASSET_WINDOW_MS,
+) => {
+  const trpc = useTRPC();
+  const [params] = useAssetsParams();
+  const [createdAfter] = useState(
+    () => new Date(Date.now() - recentAssetWindowMs),
+  );
+  return useQuery({
+    ...trpc.assets.getRecentVulnerableInternal.queryOptions({
+      pageSize: params.pageSize,
+      createdAfter,
+    }),
+    refetchInterval: NEW_VULNERABLE_ASSETS_POLL_INTERVAL_MS,
+  });
 };
 
 export const useSuspenseAssetIssueMetrics = () => {

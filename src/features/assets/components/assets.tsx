@@ -8,7 +8,9 @@ import {
   CircleMinus,
   ExternalLinkIcon,
   ServerIcon,
+  ShieldAlert,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import { type PropsWithChildren, Suspense, useState } from "react";
 import {
@@ -21,6 +23,7 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +51,7 @@ import type { AssetWithDeviceGroup, AssetWithIssues } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { useAssetsParams } from "../hooks/use-asset-params";
 import {
+  useNewVulnerableAssets,
   useRemoveAsset,
   useSuspenseAssetIssueMetrics,
   useSuspenseAssets,
@@ -249,18 +253,90 @@ export const AssetsListWithDrawer = () => {
   );
 };
 
+export const NewVulnerableAssetsAlert = ({
+  items,
+  totalCount,
+  onAssetClick,
+}: {
+  items: AssetWithIssueRelations[];
+  totalCount: number;
+  onAssetClick: (asset: AssetWithIssueRelations) => void;
+}) => {
+  // Intentionally not persisted - dismissing is a session-only UX convenience
+  // In the future I think alerts will take a different form, so it's not worth
+  // the effort here to use localstorage/cookie
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed || items.length === 0) return null;
+
+  const overflow = totalCount - items.length;
+
+  return (
+    <Alert className="relative border-orange-200 bg-orange-50">
+      <ShieldAlert className="text-orange-600" />
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute right-2 top-2 h-6 w-6 text-muted-foreground hover:text-foreground"
+        onClick={() => setDismissed(true)}
+        aria-label="Dismiss alert"
+      >
+        <X className="h-4 w-4" />
+      </Button>
+      <AlertTitle className="text-orange-800">
+        Newly Vulnerable Assets
+      </AlertTitle>
+      <AlertDescription>
+        <p className="mb-1 text-orange-700">
+          The following assets were recently discovered and have active
+          vulnerabilities:
+        </p>
+        <ul className="list-disc list-inside space-y-0.5">
+          {items.map((asset) => (
+            <li key={asset.id}>
+              <button
+                type="button"
+                className="text-orange-800 underline underline-offset-2 hover:text-orange-900"
+                onClick={() => onAssetClick(asset)}
+              >
+                {getAssetRoleLabel(asset)}
+              </button>
+            </li>
+          ))}
+        </ul>
+        {overflow > 0 && (
+          <p className="mt-1 text-orange-700">
+            and {overflow} other {overflow === 1 ? "asset" : "assets"}
+          </p>
+        )}
+      </AlertDescription>
+    </Alert>
+  );
+};
+
 export const AssetDashboardList = () => {
   const { data, isFetching } = useSuspenseAssetsDashboard();
   const { data: metrics } = useSuspenseAssetIssueMetrics();
+  const { data: recentVulnData } = useNewVulnerableAssets();
 
   const [asset, setAsset] = useState<AssetWithIssueRelations | undefined>(
     undefined,
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  const openDrawer = (a: AssetWithIssueRelations) => {
+    setAsset(a);
+    setDrawerOpen(true);
+  };
+
   return (
     <>
       <AssetIssueMetrics data={metrics} />
+      <NewVulnerableAssetsAlert
+        items={(recentVulnData?.items ?? []) as AssetWithIssueRelations[]}
+        totalCount={recentVulnData?.totalCount ?? 0}
+        onAssetClick={openDrawer}
+      />
       {asset && (
         <AssetDashboardDrawer
           asset={asset}
@@ -275,10 +351,7 @@ export const AssetDashboardList = () => {
         nestedDataKey="issues"
         isLoading={isFetching}
         search={<AssetsSearch />}
-        rowOnclick={(row) => {
-          setDrawerOpen(true);
-          setAsset(row.original);
-        }}
+        rowOnclick={(row) => openDrawer(row.original)}
       />
     </>
   );

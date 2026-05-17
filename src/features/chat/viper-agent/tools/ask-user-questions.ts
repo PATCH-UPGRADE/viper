@@ -30,8 +30,8 @@ export const askUserQuestions = createTool({
       ),
   }),
   handler: async ({ questions }) => {
-    // Returns a sentinel block the chat UI can parse to render quick-reply chips.
-    // Falls back gracefully as readable plain text if the UI does not handle it.
+    // this should be unnecessary -- the questions get loaded from the tool input in the UI
+    // return question json as tool output though for debugging purposes
     const payload = JSON.stringify({ questions }, null, 2);
     return `\`\`\`viper-ask-user\n${payload}\n\`\`\``;
   },

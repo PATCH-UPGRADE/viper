@@ -209,6 +209,34 @@ function ToolCallAccordion({ part }: { part: AnyToolCallPart }) {
   );
 }
 
+function SuggestedAnswers({
+  answers,
+  currentIndex,
+  selected,
+  onSelect,
+}: {
+  answers: string[];
+  currentIndex: number;
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  if (answers.length === 0) return null;
+  return (
+    <RadioGroup value={selected} onValueChange={onSelect} className="gap-2">
+      {answers.map((ans) => (
+        <FieldLabel key={ans} htmlFor={`q${currentIndex}-${ans}`}>
+          <Field orientation="horizontal">
+            <FieldContent>
+              <FieldTitle>{ans}</FieldTitle>
+            </FieldContent>
+            <RadioGroupItem value={ans} id={`q${currentIndex}-${ans}`} />
+          </Field>
+        </FieldLabel>
+      ))}
+    </RadioGroup>
+  );
+}
+
 function AskUserQuestionsMessage({
   part,
   isAnswered,
@@ -228,6 +256,7 @@ function AskUserQuestionsMessage({
     questions.every((_, i) => (answers[i] ?? "").trim().length > 0);
 
   const handleSubmit = () => {
+    // the actual message that gets sent to the chat
     const payload = JSON.stringify({
       answers: questions.map((q, i) => ({
         question: q.question,
@@ -241,33 +270,37 @@ function AskUserQuestionsMessage({
 
   const q = questions[currentIndex];
 
+  const navChevrons = (
+    <div className="flex items-center gap-1 shrink-0">
+      <button
+        type="button"
+        onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
+        disabled={currentIndex === 0}
+        className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <span className="text-xs text-muted-foreground tabular-nums">
+        {currentIndex + 1} / {questions.length}
+      </span>
+      <button
+        type="button"
+        onClick={() =>
+          setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))
+        }
+        disabled={currentIndex === questions.length - 1}
+        className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
   return (
     <div className="space-y-3 mt-2">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium">{q.question}</p>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
-            disabled={currentIndex === 0}
-            className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {currentIndex + 1} / {questions.length}
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))
-            }
-            disabled={currentIndex === questions.length - 1}
-            className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
+        {navChevrons}
       </div>
       <p className="text-xs text-muted-foreground italic">{q.reason}</p>
       {isAnswered ? (
@@ -276,29 +309,14 @@ function AskUserQuestionsMessage({
         </p>
       ) : (
         <>
-          {(q.suggested_answers ?? []).length > 0 && (
-            <RadioGroup
-              value={answers[currentIndex] ?? ""}
-              onValueChange={(value) =>
-                setAnswers((prev) => ({ ...prev, [currentIndex]: value }))
-              }
-              className="gap-2"
-            >
-              {(q.suggested_answers ?? []).map((ans) => (
-                <FieldLabel key={ans} htmlFor={`q${currentIndex}-${ans}`}>
-                  <Field orientation="horizontal">
-                    <FieldContent>
-                      <FieldTitle>{ans}</FieldTitle>
-                    </FieldContent>
-                    <RadioGroupItem
-                      value={ans}
-                      id={`q${currentIndex}-${ans}`}
-                    />
-                  </Field>
-                </FieldLabel>
-              ))}
-            </RadioGroup>
-          )}
+          <SuggestedAnswers
+            answers={q.suggested_answers ?? []}
+            currentIndex={currentIndex}
+            selected={answers[currentIndex] ?? ""}
+            onSelect={(value) =>
+              setAnswers((prev) => ({ ...prev, [currentIndex]: value }))
+            }
+          />
           <Input
             placeholder="Write in response..."
             value={answers[currentIndex] ?? ""}
@@ -517,6 +535,20 @@ function ChatInputForm({
   hasActiveQuestions: boolean;
 }) {
   const { userRole, setUserRole } = useChatUI();
+
+  const inputPlaceholder = (() => {
+    switch (true) {
+      case status === "error":
+        return "An error has occurred...";
+      case hasActiveQuestions:
+        return "Please answer the questions above...";
+      case isDisabled:
+        return "AI is working...";
+      default:
+        return "Ask a question...";
+    }
+  })();
+
   return (
     <div className="border-t p-4">
       <form
@@ -529,15 +561,7 @@ function ChatInputForm({
         <input
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
-          placeholder={
-            status === "error"
-              ? "An error has occurred..."
-              : hasActiveQuestions
-                ? "Please answer the questions above..."
-                : isDisabled
-                  ? "AI is working..."
-                  : "Ask a question..."
-          }
+          placeholder={inputPlaceholder}
           disabled={isDisabled}
           className="flex-1 border-0 drop-shadow-none text-sm outline-0 selection:outline-0 focus:outline-0 p-2"
         />

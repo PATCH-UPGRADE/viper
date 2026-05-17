@@ -12,6 +12,8 @@ import {
   AlertCircle,
   Bot,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   MessageSquarePlus,
   SendHorizontal,
@@ -30,7 +32,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Field,
+  FieldContent,
+  FieldLabel,
+  FieldTitle,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -212,6 +221,7 @@ function AskUserQuestionsMessage({
   const questions =
     (part.input as { questions?: AskUserQuestion[] })?.questions ?? [];
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   const allAnswered =
     questions.length > 0 &&
@@ -229,47 +239,79 @@ function AskUserQuestionsMessage({
 
   if (questions.length === 0) return null;
 
+  const q = questions[currentIndex];
+
   return (
-    <div className="space-y-4 mt-2">
-      {questions.map((q, i) => (
-        <div key={i} className="space-y-2">
-          <p className="text-sm font-medium">{q.question}</p>
-          <p className="text-xs text-muted-foreground italic">{q.reason}</p>
-          {isAnswered ? (
-            <p className="text-sm text-muted-foreground">{answers[i] ?? "—"}</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-1.5">
-                {(q.suggested_answers ?? []).map((ans) => (
-                  <button
-                    key={ans}
-                    type="button"
-                    onClick={() =>
-                      setAnswers((prev) => ({ ...prev, [i]: ans }))
-                    }
-                    className={cn(
-                      "rounded-full border px-3 py-1 text-xs transition-colors",
-                      answers[i] === ans
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background hover:bg-muted border-border",
-                    )}
-                  >
-                    {ans}
-                  </button>
-                ))}
-              </div>
-              <Input
-                placeholder="Write in response..."
-                value={answers[i] ?? ""}
-                onChange={(e) =>
-                  setAnswers((prev) => ({ ...prev, [i]: e.target.value }))
-                }
-                className="text-xs h-8"
-              />
-            </>
-          )}
+    <div className="space-y-3 mt-2">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium">{q.question}</p>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
+            disabled={currentIndex === 0}
+            className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {currentIndex + 1} / {questions.length}
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))
+            }
+            disabled={currentIndex === questions.length - 1}
+            className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
-      ))}
+      </div>
+      <p className="text-xs text-muted-foreground italic">{q.reason}</p>
+      {isAnswered ? (
+        <p className="text-sm text-muted-foreground">
+          {answers[currentIndex] ?? "—"}
+        </p>
+      ) : (
+        <>
+          {(q.suggested_answers ?? []).length > 0 && (
+            <RadioGroup
+              value={answers[currentIndex] ?? ""}
+              onValueChange={(value) =>
+                setAnswers((prev) => ({ ...prev, [currentIndex]: value }))
+              }
+              className="gap-2"
+            >
+              {(q.suggested_answers ?? []).map((ans) => (
+                <FieldLabel key={ans} htmlFor={`q${currentIndex}-${ans}`}>
+                  <Field orientation="horizontal">
+                    <FieldContent>
+                      <FieldTitle>{ans}</FieldTitle>
+                    </FieldContent>
+                    <RadioGroupItem
+                      value={ans}
+                      id={`q${currentIndex}-${ans}`}
+                    />
+                  </Field>
+                </FieldLabel>
+              ))}
+            </RadioGroup>
+          )}
+          <Input
+            placeholder="Write in response..."
+            value={answers[currentIndex] ?? ""}
+            onChange={(e) =>
+              setAnswers((prev) => ({
+                ...prev,
+                [currentIndex]: e.target.value,
+              }))
+            }
+            className="text-xs h-8"
+          />
+        </>
+      )}
       {!isAnswered && (
         <Button
           size="sm"

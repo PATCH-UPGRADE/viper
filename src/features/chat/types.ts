@@ -88,9 +88,7 @@ const chatHistoryMessageSchema = z.object({
   role: z.string(),
   type: z.string(),
   data: z.object({
-    output: z.array(
-      z.object({ type: z.string(), content: z.string().nullable() }),
-    ),
+    output: z.array(z.object({ type: z.string() }).passthrough()),
   }),
   status: z.string(),
 });

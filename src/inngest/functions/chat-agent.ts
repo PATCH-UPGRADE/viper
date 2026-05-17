@@ -41,7 +41,7 @@ export const chatAgent = inngest.createFunction(
     const network = createNetwork({
       name: "Chat Network",
       agents: [agent],
-      maxIter: 5,
+      maxIter: 8,
       router: async ({ network: net }) => {
         const results = net.state.results;
         if (results.length === 0) return agent;

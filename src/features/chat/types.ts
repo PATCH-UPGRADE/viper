@@ -81,17 +81,15 @@ export const fetchThreadsResponseSchema = z.object({
   total: z.number(),
 });
 
-const chatHistoryMessageSchema = z.object({
-  message_id: z.string(),
+export const historyMessageSchema = z.object({
+  id: z.string(),
+  agentName: z.string(),
   createdAt: z.coerce.date(),
-  content: z.string().nullable(),
-  role: z.string(),
-  type: z.string(),
-  data: z.object({
-    output: z.array(z.object({ type: z.string() }).passthrough()),
-  }),
-  status: z.string(),
+  // AgentKit Message[] — opaque on the wire; buildConversationMessages parses at runtime
+  output: z.array(z.unknown()),
 });
+
+export type HistoryMessage = z.infer<typeof historyMessageSchema>;
 
 export const fetchedThreadSchema = z.object({
   id: z.string(),
@@ -103,5 +101,5 @@ export const fetchedThreadSchema = z.object({
 
 export const fetchHistoryResponseSchema = z.object({
   thread: fetchedThreadSchema,
-  messages: z.array(chatHistoryMessageSchema),
+  messages: z.array(historyMessageSchema),
 });

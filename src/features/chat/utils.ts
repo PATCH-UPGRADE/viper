@@ -1,3 +1,5 @@
+import type { HistoryMessage } from "./types";
+
 // ─── Structural interfaces for markdown rendering ─────────────────────────────
 // Any Prisma payload that includes these fields is compatible (structural typing).
 
@@ -298,3 +300,109 @@ export const RECOMMENDATION_ROLE_INSTRUCTIONS: Record<UserRole, string> = {
   "biomedical engineer":
     "Focus on the device layer: firmware version, manufacturer patch advisory, device certification impact, required post-patch biomedical validation steps, and any interoperability risks with connected systems. Reference device model and CPE.",
 };
+
+// ─── History → ConversationMessage conversion ─────────────────────────────────
+
+interface AgentKitToolMessage {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+interface AgentKitToolCallMsg {
+  type: "tool_call";
+  tools: AgentKitToolMessage[];
+}
+
+interface AgentKitToolResultMsg {
+  type: "tool_result";
+  tool: AgentKitToolMessage;
+  content: unknown;
+}
+
+interface AgentKitTextMsg {
+  type: "text";
+  content: string;
+}
+
+type AgentKitMsg =
+  | AgentKitTextMsg
+  | AgentKitToolCallMsg
+  | AgentKitToolResultMsg;
+
+function isToolCallMsg(m: unknown): m is AgentKitToolCallMsg {
+  return (
+    typeof m === "object" &&
+    m !== null &&
+    (m as { type?: string }).type === "tool_call" &&
+    Array.isArray((m as AgentKitToolCallMsg).tools)
+  );
+}
+
+function isToolResultMsg(m: unknown): m is AgentKitToolResultMsg {
+  return (
+    typeof m === "object" &&
+    m !== null &&
+    (m as { type?: string }).type === "tool_result" &&
+    typeof (m as AgentKitToolResultMsg).tool === "object"
+  );
+}
+
+function isTextMsg(m: unknown): m is AgentKitTextMsg {
+  return (
+    typeof m === "object" &&
+    m !== null &&
+    (m as { type?: string }).type === "text" &&
+    typeof (m as AgentKitTextMsg).content === "string"
+  );
+}
+
+/**
+ * Converts raw history messages from getHistory into ConversationMessage objects
+ * suitable for injection via replaceThreadMessages. Produces TextUIPart and
+ * ToolCallUIPart parts from the AgentKit Message[] stored in each message's output.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: ConversationMessage generics not exported from use-agent
+export function buildConversationMessages(messages: HistoryMessage[]): any[] {
+  return messages.map((msg) => {
+    const id = msg.id;
+    const timestamp = new Date(msg.createdAt);
+    const role = msg.agentName === "user" ? "user" : "assistant";
+
+    // Index tool results by tool id for O(1) lookup when building tool-call parts
+    const toolResults = new Map<string, unknown>();
+    for (const m of msg.output as unknown as AgentKitMsg[]) {
+      if (isToolResultMsg(m)) {
+        toolResults.set(m.tool.id, m.content);
+      }
+    }
+
+    const parts: Record<string, unknown>[] = [];
+
+    for (const m of msg.output as unknown as AgentKitMsg[]) {
+      if (isTextMsg(m) && m.content) {
+        parts.push({
+          type: "text",
+          id: `text-${id}-${parts.length}`,
+          content: m.content,
+          status: "complete",
+        });
+      } else if (isToolCallMsg(m)) {
+        for (const tool of m.tools) {
+          const hasOutput = toolResults.has(tool.id);
+          parts.push({
+            type: "tool-call",
+            toolCallId: tool.id,
+            toolName: tool.name,
+            input: tool.input,
+            state: hasOutput ? "output-available" : "input-available",
+            ...(hasOutput ? { output: toolResults.get(tool.id) } : {}),
+          });
+        }
+      }
+      // tool_result: skip — already consumed above when pairing with tool_call
+    }
+
+    return { id, role, parts, timestamp, status: "sent" };
+  });
+}

@@ -681,6 +681,7 @@ function ChatInner({
 
     isConnected,
     isLoadingInitialThread,
+    isLoadingHistory,
 
     threadsLoading,
     threadsHasMore,
@@ -811,7 +812,7 @@ function ChatInner({
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {isLoadingInitialThread ? (
+        {isLoadingInitialThread || isLoadingHistory ? (
           <ChatMessagesSkeletonList />
         ) : (
           <>

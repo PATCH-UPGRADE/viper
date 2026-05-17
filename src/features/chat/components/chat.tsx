@@ -312,7 +312,7 @@ function ChatInputForm({
           className="flex-1 border-0 drop-shadow-none text-sm outline-0 selection:outline-0 focus:outline-0 p-2"
         />
         <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground whitespace-nowrap p-1">
-          <span>Ask as</span>
+          <span>Ask as foo</span>
           <Select
             value={userRole}
             onValueChange={(v) => setUserRole(v as UserRole)}
@@ -434,6 +434,8 @@ function ChatInner({
     loadMoreThreads,
     deleteThread,
   } = agent;
+  console.log('here', agent);
+  console.log('messages', agent.messages)
   const { userRole } = useChatUI();
   const [input, setInput] = useState("");
   const [configOverride, setConfigOverride] =

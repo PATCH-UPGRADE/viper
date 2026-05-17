@@ -370,8 +370,8 @@ export function AssetDashboardDrawer({
 
   const suggestedQuestions: Partial<Record<UserRole, SuggestedQuestion[]>> = {
     CISO: [
+      { label: "Advise me on creating a remediation plan for this asset." },
       { label: "What is the overall risk posture of this asset?" },
-      { label: "Are there any compliance implications?" },
       {
         label:
           "What is the potential business impact if this asset is compromised?",
@@ -386,17 +386,17 @@ export function AssetDashboardDrawer({
       { label: "Are there any safety risks for patients?" },
     ],
     "IT staff": [
-      { label: "What patches are available for this asset?" },
+      { label: "Advise me on creating a remediation plan for this asset." },
       { label: "What is the expected downtime for remediation?" },
       { label: "Are there dependencies on other systems?" },
     ],
     "hospital administration": [
-      { label: "What is the cost impact of remediating this asset?" },
+      { label: "Advise me on creating a remediation plan for this asset." },
       { label: "How does this affect our regulatory compliance?" },
       { label: "What is the risk of delaying remediation?" },
     ],
     "biomedical engineer": [
-      { label: "What firmware versions are affected?" },
+      { label: "Advise me on creating a remediation plan for this asset." },
       { label: "Are there manufacturer advisories for this device?" },
       { label: "What is the clinical impact of applying this patch?" },
     ],

@@ -25,6 +25,10 @@ export const locationSchema = z.object({
   room: z.string().optional(),
 });
 
+export const assetUtilizationSchema = z.array(
+  z.record(z.string(), z.number().int()),
+);
+
 export const assetInputSchema = z.object({
   ip: z.string().min(1),
   networkSegment: z.string().nullish(),
@@ -36,6 +40,7 @@ export const assetInputSchema = z.object({
   serialNumber: z.string().nullish(),
   location: locationSchema.optional(),
   status: assetStatusSchema.nullish(),
+  utilization: assetUtilizationSchema.nullish(),
 });
 
 export const updateAssetSchema = assetInputSchema.partial().extend({
@@ -61,6 +66,7 @@ export const assetResponseSchema = z.object({
   serialNumber: z.string().nullable(),
   location: z.unknown().nullable(),
   status: assetStatusSchema.nullable(),
+  utilization: z.unknown().nullable(),
   userId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),

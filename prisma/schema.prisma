@@ -232,6 +232,7 @@ model Asset {
   serialNumber String?
   location     Json? // { facility, building, floor, room }
   status       AssetStatus?
+  utilization  Json? // [{ [key: string]: number }]
 
   deviceGroupId String
   // TODO: is Cascade the correct behavior for this?

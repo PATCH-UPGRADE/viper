@@ -523,6 +523,31 @@ export const assetsRouter = createTRPCRouter({
       );
     }),
 
+  // not exposed on OpenAPI
+  getRecentVulnerableInternal: protectedProcedure
+    .input(
+      z.object({
+        pageSize: z.number().int().min(1).max(100).default(10),
+        createdAfter: z.date(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const where = {
+        createdAt: { gte: input.createdAfter },
+        issues: { some: { status: IssueStatus.ACTIVE } },
+      };
+      const [totalCount, items] = await Promise.all([
+        prisma.asset.count({ where }),
+        prisma.asset.findMany({
+          where,
+          include: assetDashboardInclude,
+          orderBy: { createdAt: "desc" },
+          take: input.pageSize,
+        }),
+      ]);
+      return { items, totalCount };
+    }),
+
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))

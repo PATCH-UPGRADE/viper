@@ -13,3 +13,7 @@ export const UNKNOWN_CPE_STRING = "cpe:2.3:-:-:-";
 export const MIN_PASSWORD_LENGTH = 8;
 
 export const INTEGRATION_SYNC_EVERY_MIN = 5; //minutes
+
+export const NEW_VULNERABLE_ASSETS_POLL_INTERVAL_MS = 20_000;
+
+export const RECENT_ASSET_WINDOW_MS = 10 * 60 * 1000;

@@ -133,7 +133,6 @@ export const useUpdateWorkflowDescription = () => {
   );
 };
 
-
 /**
  * Hook to update a workflow
  */

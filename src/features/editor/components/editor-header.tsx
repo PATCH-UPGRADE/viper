@@ -130,7 +130,11 @@ export const EditorNameInput = ({ workflowId }: { workflowId: string }) => {
   );
 };
 
-export const EditorDescriptionInput = ({ workflowId }: { workflowId: string }) => {
+export const EditorDescriptionInput = ({
+  workflowId,
+}: {
+  workflowId: string;
+}) => {
   const { data: workflow } = useSuspenseWorkflow(workflowId);
   const updateDescription = useUpdateWorkflowDescription();
 

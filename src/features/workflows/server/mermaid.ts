@@ -1,4 +1,4 @@
-import type { Node, Edge } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 
 interface NodeWithName extends Node {
   data: Record<string, unknown> & { name?: string; label?: string };
@@ -10,10 +10,10 @@ interface NodeWithName extends Node {
  * @param edges Array of workflow edges
  * @returns Mermaid flowchart JSON string
  */
-export function workflowToMermaidJSON(nodes: NodeWithName[], edges: Edge[]): string {
-    console.log("Converting workflow to Mermaid JSON");
-    console.log("Nodes:", nodes);
-    console.log("Edges:", edges);
+export function workflowToMermaidJSON(
+  nodes: NodeWithName[],
+  edges: Edge[],
+): string {
   // Mermaid flowchart: flowchart TD; A --> B;
   const nodeLabels: Record<string, string> = {};
   nodes.forEach((node) => {

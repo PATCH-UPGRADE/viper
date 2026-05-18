@@ -19,8 +19,8 @@ import { useEntitySearch } from "@/hooks/use-entity-search";
 import {
   useCreateWorkflow,
   useExportWorkflowMermaidDownload,
-  useRemoveWorkflow,
   useExportWorkflowSerializedDownload,
+  useRemoveWorkflow,
   useSuspenseWorkflows,
 } from "../hooks/use-workflows";
 import { useWorkflowsParams } from "../hooks/use-workflows-params";
@@ -144,7 +144,8 @@ export const WorkflowsEmpty = () => {
 
 export const WorkflowItem = ({ data }: { data: Workflow }) => {
   const removeWorkflow = useRemoveWorkflow();
-  const exportWorkflowSerializedDownload = useExportWorkflowSerializedDownload();
+  const exportWorkflowSerializedDownload =
+    useExportWorkflowSerializedDownload();
   const exportWorkflowMermaidDownload = useExportWorkflowMermaidDownload();
 
   const handleRemove = () => {

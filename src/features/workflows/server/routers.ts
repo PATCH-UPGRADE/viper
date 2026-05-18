@@ -13,6 +13,8 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 import { workflowToMermaidJSON } from "./mermaid";
 
+type SerializedNode = Omit<Node, "position">;
+
 export const workflowsRouter = createTRPCRouter({
   // TODO: we probably don't need this code here
   execute: protectedProcedure
@@ -240,7 +242,7 @@ export const workflowsRouter = createTRPCRouter({
       });
       const workflow = requireExistence(workflowOrNull, "Workflow");
 
-      const nodes: Node[] = workflow.nodes.map((node) => ({
+      const nodes: SerializedNode[] = workflow.nodes.map((node) => ({
         id: node.id,
         type: node.type,
         data: { ...(node.data as Record<string, unknown>), name: node.name },

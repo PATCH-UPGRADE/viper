@@ -1,7 +1,9 @@
 import "server-only";
 import type { Edge, Node } from "@xyflow/react";
 
-interface NodeWithName extends Node {
+type SerializedNode = Omit<Node, "position">;
+
+interface NodeWithName extends SerializedNode {
   data: Record<string, unknown> & { name?: string; label?: string };
 }
 

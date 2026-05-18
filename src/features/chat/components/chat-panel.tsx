@@ -26,11 +26,11 @@ export function ChatPanel() {
       className={cn(
         "relative shrink-0 sticky top-0 h-svh overflow-hidden",
         "border-l bg-sidebar text-sidebar-foreground",
-        state === "collapsed" ? "w-0 border-l-0" : "w-(--chat-panel-width)",
+        state === "collapsed" ? "w-0 border-l-0" : "w-full",
         "transition-[width] duration-200 ease-linear",
       )}
     >
-      <div className="flex flex-col h-full w-(--chat-panel-width)">
+      <div className="flex flex-col h-full w-full">
         <SidebarHeader className="flex-row items-center justify-between py-3">
           <span className="font-semibold text-sm">Ask VIPER</span>
           <Button

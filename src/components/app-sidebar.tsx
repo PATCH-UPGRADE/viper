@@ -11,7 +11,6 @@ import {
   PlugIcon,
   SettingsIcon,
   ShieldAlertIcon,
-  ShieldCheckIcon,
   Sparkles,
   WorkflowIcon,
 } from "lucide-react";

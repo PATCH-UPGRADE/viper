@@ -1,3 +1,4 @@
+import "server-only";
 import type { Edge, Node } from "@xyflow/react";
 
 interface NodeWithName extends Node {

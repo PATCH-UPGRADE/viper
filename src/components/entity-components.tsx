@@ -300,6 +300,24 @@ export const EntityItem = ({
     }
   };
 
+  const handleExportMermaid = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (onExportMermaid) {
+      await onExportMermaid();
+    }
+  };
+
+  const handleExportJSON = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (onExportJSON) {
+      await onExportJSON();
+    }
+  };
+
   const content = (
     <Card
       className={cn(
@@ -335,12 +353,12 @@ export const EntityItem = ({
                   onExportMermaid && {
                     label: "Export as Mermaid",
                     icon: <DownloadIcon className="mr-2 size-4" />,
-                    onClick: onExportMermaid,
+                    onClick: handleExportMermaid,
                   },
                   onExportJSON && {
                     label: "Export as JSON",
                     icon: <DownloadIcon className="mr-2 size-4" />,
-                    onClick: onExportJSON,
+                    onClick: handleExportJSON,
                   },
                 ]}
               />

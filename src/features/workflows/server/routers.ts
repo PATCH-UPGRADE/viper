@@ -33,7 +33,7 @@ export const workflowsRouter = createTRPCRouter({
     return prisma.workflow.create({
       data: {
         name: generateSlug(3),
-        description: "Description of the workflow",
+        description: null,
         userId: ctx.auth.user.id,
         nodes: {
           create: {
@@ -133,11 +133,13 @@ export const workflowsRouter = createTRPCRouter({
       });
     }),
   updateDescription: protectedProcedure
-    .input(z.object({ id: z.string(), description: z.string().min(1) }))
+    .input(z.object({ id: z.string(), description: z.string().trim() }))
     .mutation(({ ctx, input }) => {
       return prisma.workflow.update({
         where: { id: input.id, userId: ctx.auth.user.id },
-        data: { description: input.description },
+        data: {
+          description: input.description.length ? input.description : null,
+        },
       });
     }),
   getOne: protectedProcedure
@@ -231,9 +233,9 @@ export const workflowsRouter = createTRPCRouter({
 
   serialize: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       const workflowOrNull = await prisma.workflow.findUnique({
-        where: { id: input.id, userId: ctx.auth.user.id },
+        where: { id: input.id },
         include: { nodes: true, connections: true },
       });
       const workflow = requireExistence(workflowOrNull, "Workflow");
@@ -241,7 +243,6 @@ export const workflowsRouter = createTRPCRouter({
       const nodes: Node[] = workflow.nodes.map((node) => ({
         id: node.id,
         type: node.type,
-        position: node.position as { x: number; y: number },
         data: { ...(node.data as Record<string, unknown>), name: node.name },
       }));
       const edges: Edge[] = workflow.connections.map((connection) => ({

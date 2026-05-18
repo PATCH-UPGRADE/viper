@@ -163,12 +163,6 @@ export const EditorDescriptionInput = ({
       return;
     }
 
-    if (!trimmed) {
-      setDescription(current);
-      setIsEditing(false);
-      return;
-    }
-
     try {
       await updateDescription.mutateAsync({
         id: workflowId,

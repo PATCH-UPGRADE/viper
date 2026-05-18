@@ -73,6 +73,19 @@ function getUtilizationColor(value: number): string {
   return `hsl(120, ${s}%, ${l}%)`;
 }
 
+/*
+ Example utilization data:
+    [
+      {"9": 1, "10": 12, "11": 8, "14": 3, "15": 5},  # 0 = Monday
+      {"9": 1, "10": 8, "11": 15},                    # 1 = Tuesday
+      {"9": 2, "14": 5},                              # 2 = Wednesday
+      {"10": 6, "11": 9, "13": 4},                    # 3 = Thursday
+      {"9": 1, "13": 2},                              # 4 = Friday
+      {},                                             # 5 = Saturday
+      {},                                             # 6 = Sunday
+    ]
+ Tuesday 9am to 10am, the device had 1% utilization throughout the hour, 10am-11am it was 8%, and 11am to 12pm it was 15%, and all other hours of the day it was offline (0% utilization)
+ */
 function AssetUtilizationGrid({
   utilization,
 }: {
@@ -117,7 +130,9 @@ function AssetUtilizationGrid({
                   <td key={dayIndex} className="p-0">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div
+                        <button
+                          type="button"
+                          aria-label={`${DAY_NAMES[dayIndex]} ${hour}:00 to ${hour + 1}:00, ${value}% utilization`}
                           className="w-16 h-3.5 rounded-sm cursor-default"
                           style={{
                             backgroundColor: getUtilizationColor(value),

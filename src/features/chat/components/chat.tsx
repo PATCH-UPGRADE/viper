@@ -276,6 +276,7 @@ function AskUserQuestionsMessage({
   const navChevrons = (
     <div className="flex items-center gap-1 shrink-0">
       <button
+        aria-label="Previous question"
         type="button"
         onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
         disabled={currentIndex === 0}
@@ -287,6 +288,7 @@ function AskUserQuestionsMessage({
         {currentIndex + 1} / {questions.length}
       </span>
       <button
+        aria-label="Next question"
         type="button"
         onClick={() =>
           setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))

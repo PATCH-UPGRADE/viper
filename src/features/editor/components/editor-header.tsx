@@ -17,6 +17,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   useSuspenseWorkflow,
   useUpdateWorkflow,
+  useUpdateWorkflowDescription,
   useUpdateWorkflowName,
 } from "@/features/workflows/hooks/use-workflows";
 import { editorAtom } from "../store/atoms";
@@ -41,7 +42,7 @@ export const EditorSaveButton = ({ workflowId }: { workflowId: string }) => {
   };
 
   return (
-    <div className="ml-auto">
+    <div>
       <Button size="sm" onClick={handleSave} disabled={saveWorkflow.isPending}>
         <SaveIcon className="size-4" />
         Save
@@ -129,6 +130,91 @@ export const EditorNameInput = ({ workflowId }: { workflowId: string }) => {
   );
 };
 
+export const EditorDescriptionInput = ({
+  workflowId,
+}: {
+  workflowId: string;
+}) => {
+  const { data: workflow } = useSuspenseWorkflow(workflowId);
+  const updateDescription = useUpdateWorkflowDescription();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [description, setDescription] = useState(workflow.description ?? "");
+
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setDescription(workflow.description ?? "");
+  }, [workflow.description]);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleSave = async () => {
+    const trimmed = description.trim();
+    const current = workflow.description ?? "";
+
+    if (trimmed === current) {
+      setIsEditing(false);
+      return;
+    }
+
+    try {
+      await updateDescription.mutateAsync({
+        id: workflowId,
+        description: trimmed,
+      });
+    } catch {
+      setDescription(current);
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSave();
+    } else if (e.key === "Escape") {
+      setDescription(workflow.description ?? "");
+      setIsEditing(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <Input
+        disabled={updateDescription.isPending}
+        ref={inputRef}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={handleKeyDown}
+        className="h-7 w-full max-w-md px-2"
+        placeholder="Add workflow description"
+      />
+    );
+  }
+
+  return (
+    <BreadcrumbItem
+      onClick={() => setIsEditing(true)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setIsEditing(true);
+        }
+      }}
+      className="text-sm text-muted-foreground italic cursor-pointer hover:text-foreground transition-colors"
+    >
+      {workflow.description || "Add workflow description"}
+    </BreadcrumbItem>
+  );
+};
+
 export const EditorBreadcrumbs = ({ workflowId }: { workflowId: string }) => {
   return (
     <Breadcrumb>
@@ -153,7 +239,10 @@ export const EditorHeader = ({ workflowId }: { workflowId: string }) => {
       <SidebarTrigger />
       <div className="flex flex-row items-center justify-between gap-x-4 w-full">
         <EditorBreadcrumbs workflowId={workflowId} />
-        <EditorSaveButton workflowId={workflowId} />
+        <div className="ml-auto flex items-center gap-2">
+          <EditorDescriptionInput workflowId={workflowId} />
+          <EditorSaveButton workflowId={workflowId} />
+        </div>
       </div>
     </header>
   );

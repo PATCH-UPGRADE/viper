@@ -11,6 +11,9 @@ import {
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
+import { workflowToMermaidJSON } from "./mermaid";
+
+type SerializedNode = Omit<Node, "position">;
 
 export const workflowsRouter = createTRPCRouter({
   // TODO: we probably don't need this code here
@@ -32,6 +35,7 @@ export const workflowsRouter = createTRPCRouter({
     return prisma.workflow.create({
       data: {
         name: generateSlug(3),
+        description: null,
         userId: ctx.auth.user.id,
         nodes: {
           create: {
@@ -130,6 +134,16 @@ export const workflowsRouter = createTRPCRouter({
         data: { name: input.name },
       });
     }),
+  updateDescription: protectedProcedure
+    .input(z.object({ id: z.string(), description: z.string().trim() }))
+    .mutation(({ ctx, input }) => {
+      return prisma.workflow.update({
+        where: { id: input.id, userId: ctx.auth.user.id },
+        data: {
+          description: input.description.length ? input.description : null,
+        },
+      });
+    }),
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
@@ -160,6 +174,7 @@ export const workflowsRouter = createTRPCRouter({
       return {
         id: workflow.id,
         name: workflow.name,
+        description: workflow.description,
         nodes,
         edges,
       };
@@ -189,5 +204,70 @@ export const workflowsRouter = createTRPCRouter({
       });
 
       return createPaginatedResponse(items, meta);
+    }),
+
+  exportMermaid: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const workflowOrNull = await prisma.workflow.findUnique({
+        where: { id: input.id },
+        include: { nodes: true, connections: true },
+      });
+      const workflow = requireExistence(workflowOrNull, "Workflow");
+      // Transform to react-flow compatible nodes/edges
+      const nodes: Node[] = workflow.nodes.map((node) => ({
+        id: node.id,
+        type: node.type,
+        position: node.position as { x: number; y: number },
+        data: { ...(node.data as Record<string, unknown>), name: node.name },
+      }));
+      const edges: Edge[] = workflow.connections.map((connection) => ({
+        id: connection.id,
+        source: connection.fromNodeId,
+        target: connection.toNodeId,
+        sourceHandle: connection.fromOutput,
+        targetHandle: connection.toInput,
+      }));
+
+      const mermaid = workflowToMermaidJSON(nodes, edges);
+      return { mermaid };
+    }),
+
+  serialize: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const workflowOrNull = await prisma.workflow.findUnique({
+        where: { id: input.id },
+        include: { nodes: true, connections: true },
+      });
+      const workflow = requireExistence(workflowOrNull, "Workflow");
+
+      const nodes: SerializedNode[] = workflow.nodes.map((node) => ({
+        id: node.id,
+        type: node.type,
+        data: { ...(node.data as Record<string, unknown>), name: node.name },
+      }));
+      const edges: Edge[] = workflow.connections.map((connection) => ({
+        id: connection.id,
+        source: connection.fromNodeId,
+        target: connection.toNodeId,
+        sourceHandle: connection.fromOutput,
+        targetHandle: connection.toInput,
+      }));
+
+      const mermaid = workflowToMermaidJSON(nodes, edges);
+
+      return {
+        workflow: {
+          id: workflow.id,
+          name: workflow.name,
+          description: workflow.description,
+          createdAt: workflow.createdAt,
+          updatedAt: workflow.updatedAt,
+          nodes,
+          edges,
+        },
+        mermaid,
+      };
     }),
 });

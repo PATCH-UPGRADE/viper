@@ -792,6 +792,7 @@ model ChatMessage {
   status    ChatMessageStatus?
   role      ChatMessageRole
   content   String?            @db.Text
+  toolCalls Json?
   toolStatus String?
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt

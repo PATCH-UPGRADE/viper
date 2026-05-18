@@ -2,101 +2,197 @@ import { createTool } from "@inngest/agent-kit";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { generateMemoryMarkdown } from "../../utils";
+import {
+  assetToMarkdown,
+  generateMemoryMarkdown,
+  remediationToMarkdown,
+  vulnerabilityToMarkdown,
+} from "../../utils";
 
-type AssetWithDeviceGroup = Prisma.AssetGetPayload<{
-  include: { deviceGroup: true };
+function shortId(id: string): string {
+  return id.slice(0, 8);
+}
+
+function generateInventorySummaryTable(assets: AssetForContext[]): string {
+  if (assets.length === 0) return "_No assets in inventory._";
+
+  const header = "| Asset | Device | Role | Status | Active Issues |";
+  const divider = "|---|---|---|---|---|";
+  const rows = assets.map((a) => {
+    const label = a.hostname ?? a.ip ?? shortId(a.id);
+    const device =
+      [a.deviceGroup.manufacturer, a.deviceGroup.modelName]
+        .filter(Boolean)
+        .join(" ") || a.deviceGroup.cpe;
+    const active = (a.issues ?? []).filter((i) => i.status === "ACTIVE").length;
+    return `| ${label} (${shortId(a.id)}) | ${device} | ${a.role ?? "—"} | ${a.status ?? "—"} | ${active} |`;
+  });
+
+  return [header, divider, ...rows].join("\n");
+}
+
+function generateVulnAssetRemMap(
+  vulnerabilities: VulnerabilityForContext[],
+): string {
+  if (vulnerabilities.length === 0) return "_No vulnerabilities found._";
+
+  const header =
+    "| Vulnerability | CVSS | EPSS | KEV | Affected Assets | Available Remediations |";
+  const divider = "|---|---|---|---|---|---|";
+  const rows = vulnerabilities.map((v) => {
+    const vid = v.cveId ?? shortId(v.id);
+    const cvss = v.cvssScore?.toFixed(1) ?? "—";
+    const epss = v.epss != null ? `${(v.epss * 100).toFixed(1)}%` : "—";
+    const kev = v.inKEV ? "Yes" : "No";
+    const assetLabels =
+      v.issues && v.issues.length > 0
+        ? v.issues
+            .map((i) => i.asset.hostname ?? i.asset.ip ?? shortId(i.asset.id))
+            .join(", ")
+        : "—";
+    const remLabels =
+      v.remediations && v.remediations.length > 0
+        ? v.remediations.map((r) => `rem-${shortId(r.id)}`).join(", ")
+        : "—";
+    return `| ${vid} | ${cvss} | ${epss} | ${kev} | ${assetLabels} | ${remLabels} |`;
+  });
+
+  return [header, divider, ...rows].join("\n");
+}
+
+// ─── Prisma includes ──────────────────────────────────────────────────────────
+
+export const assetContextInclude = {
+  deviceGroup: true,
+  issues: {
+    include: {
+      vulnerability: {
+        select: { id: true, cveId: true, severity: true, priority: true },
+      },
+    },
+  },
+} satisfies Prisma.AssetInclude;
+
+export type AssetForContext = Prisma.AssetGetPayload<{
+  include: typeof assetContextInclude;
 }>;
 
-function assetToMarkdown(a: AssetWithDeviceGroup): string {
-  const lines = [
-    `### ${a.hostname ?? a.ip ?? a.id}`,
-    `- **IP**: ${a.ip ?? "N/A"}`,
-    `- **MAC Address**: ${a.macAddress ?? "N/A"}`,
-    `- **Role**: ${a.role ?? "Unknown"}`,
-    `- **Status**: ${a.status ?? "Unknown"}`,
-    `- **Network Segment**: ${a.networkSegment ?? "N/A"}`,
-    `- **Serial Number**: ${a.serialNumber ?? "N/A"}`,
-    `- **Device Group**: ${a.deviceGroup.manufacturer ?? ""} ${a.deviceGroup.modelName ?? ""} (CPE: ${a.deviceGroup.cpe})`.trim(),
-    `- **Device Group Version**: ${a.deviceGroup.version ?? "N/A"}`,
-  ];
-  return lines.join("\n");
-}
+export const vulnerabilityContextInclude = {
+  affectedDeviceGroups: {
+    select: { cpe: true, modelName: true, manufacturer: true },
+  },
+  remediations: { select: { id: true, description: true } },
+  issues: {
+    include: {
+      asset: {
+        select: {
+          id: true,
+          hostname: true,
+          ip: true,
+          role: true,
+          status: true,
+          location: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.VulnerabilityInclude;
 
-type VulnerabilityFlat = Prisma.VulnerabilityGetPayload<Record<string, never>>;
+export type VulnerabilityForContext = Prisma.VulnerabilityGetPayload<{
+  include: typeof vulnerabilityContextInclude;
+}>;
 
-function vulnerabilityToMarkdown(v: VulnerabilityFlat): string {
-  const lines = [
-    `### ${v.cveId ?? v.id}`,
-    `- **Severity**: ${v.severity}`,
-    `- **Priority**: ${v.priority}`,
-    `- **CVSS Score**: ${v.cvssScore ?? "N/A"}`,
-    `- **CVSS Vector**: ${v.cvssVector ?? "N/A"}`,
-    `- **EPSS Score**: ${v.epss != null ? `${(v.epss * 100).toFixed(2)}%` : "N/A"}`,
-    `- **In CISA KEV**: ${v.inKEV ? "Yes" : "No"}`,
-  ];
-  if (v.exploitUri) lines.push(`- **Exploit URI**: ${v.exploitUri}`);
-  if (v.affectedComponents.length > 0)
-    lines.push(`- **Affected Components**: ${v.affectedComponents.join(", ")}`);
-  if (v.description) lines.push(`- **Description**: ${v.description}`);
-  if (v.narrative) lines.push(`- **Exploit Narrative**: ${v.narrative}`);
-  if (v.impact) lines.push(`- **Clinical Impact**: ${v.impact}`);
-  return lines.join("\n");
-}
+export const remediationContextInclude = {
+  vulnerability: { select: { id: true, cveId: true } },
+  affectedDeviceGroups: {
+    select: { cpe: true, modelName: true, manufacturer: true },
+  },
+  issueRemediations: {
+    include: {
+      issue: {
+        include: {
+          asset: { select: { id: true, hostname: true, ip: true } },
+        },
+      },
+    },
+  },
+  artifacts: {
+    include: {
+      latestArtifact: { select: { artifactType: true } },
+    },
+  },
+} satisfies Prisma.RemediationInclude;
 
-type RemediationFlat = Prisma.RemediationGetPayload<Record<string, never>>;
+export type RemediationForContext = Prisma.RemediationGetPayload<{
+  include: typeof remediationContextInclude;
+}>;
 
-function remediationToMarkdown(r: RemediationFlat): string {
-  const lines = [
-    `### [${r.id}]`,
-    `- **Linked Vulnerability**: ${r.vulnerabilityId ?? "N/A"}`,
-  ];
-  if (r.description) lines.push(`- **Description**: ${r.description}`);
-  if (r.narrative) lines.push(`- **How to Apply**: ${r.narrative}`);
-  return lines.join("\n");
-}
+// ─── Context generator ────────────────────────────────────────────────────────
 
 function generateContextMarkdown(
-  assets: AssetWithDeviceGroup[],
-  vulnerabilities: VulnerabilityFlat[],
-  remediations: RemediationFlat[],
+  assets: AssetForContext[],
+  vulnerabilities: VulnerabilityForContext[],
+  remediations: RemediationForContext[],
+  role?: string,
 ): string {
+  const sections: string[] = [];
+
+  if (role) {
+    sections.push(`## User Role\n\n${role}`);
+  }
+
+  sections.push(
+    `## Inventory Summary\n\n${generateInventorySummaryTable(assets)}`,
+  );
+
+  sections.push(
+    `## Vulnerability × Asset × Remediation Map\n\n${generateVulnAssetRemMap(vulnerabilities)}`,
+  );
+
   const assetSection =
     assets.length === 0
-      ? "No assets found."
-      : assets.map(assetToMarkdown).join("\n\n");
+      ? "_No assets found._"
+      : assets
+          .map((a) => assetToMarkdown(a, { includeIssues: true }))
+          .join("\n\n");
+  sections.push(`## Assets (full)\n\n${assetSection}`);
 
   const vulnSection =
     vulnerabilities.length === 0
-      ? "No vulnerabilities found."
-      : vulnerabilities.map(vulnerabilityToMarkdown).join("\n\n");
+      ? "_No vulnerabilities found._"
+      : vulnerabilities
+          .map((v) =>
+            vulnerabilityToMarkdown(v, {
+              includeAssets: true,
+              includeRemediations: true,
+            }),
+          )
+          .join("\n\n");
+  sections.push(`## Vulnerabilities (full)\n\n${vulnSection}`);
 
   const remSection =
     remediations.length === 0
-      ? "No remediations found."
+      ? "_No remediations found._"
       : remediations.map(remediationToMarkdown).join("\n\n");
+  sections.push(`## Remediations (full)\n\n${remSection}`);
 
-  return `## Assets
+  // TODO(network-flow): add "## Network Flow" section here.
+  // TODO(workflows): add "## Clinical Workflows" section here.
+  // TODO(utilization): add "## Device Utilization Windows" section here.
 
-${assetSection}
-
-## Vulnerabilities
-
-${vulnSection}
-
-## Remediations
-
-${remSection}`;
+  return sections.join("\n\n---\n\n");
 }
 
 export const getRecommendationsContext = createTool({
   name: "get_recommendations_context",
   description:
-    "Retrieve full context about the current user and environment before responding. Returns saved memories plus all assets, vulnerabilities, and remediations in the system.",
+    "Retrieve full context about the current user and environment before responding. Returns saved memories plus all assets, vulnerabilities, and remediations with their cross-entity relationships. Call once at the start of a thread.",
   parameters: z.object({}),
   handler: async (_, { network }) => {
     const userId = network?.state.data.userId as string | undefined;
     if (!userId) return "No user context available.";
+
+    const userRole = network?.state.data.userRole as string | undefined;
 
     const [memories, assets, vulnerabilities, remediations] = await Promise.all(
       [
@@ -104,12 +200,16 @@ export const getRecommendationsContext = createTool({
           where: { userId },
           orderBy: { createdAt: "asc" },
         }),
-        prisma.asset.findMany({ include: { deviceGroup: true } }),
-        prisma.vulnerability.findMany(),
-        prisma.remediation.findMany(),
+        prisma.asset.findMany({ include: assetContextInclude }),
+        prisma.vulnerability.findMany({ include: vulnerabilityContextInclude }),
+        prisma.remediation.findMany({ include: remediationContextInclude }),
       ],
     );
 
-    return `${generateMemoryMarkdown(memories)}\n\n${generateContextMarkdown(assets, vulnerabilities, remediations)}`;
+    // TODO(network-flow): fetch + render network communication graph here.
+    // TODO(workflows): fetch + render clinical workflow definitions (text + mermaid).
+    // TODO(utilization): fetch + render device utilization windows.
+
+    return `${generateMemoryMarkdown(memories)}\n\n---\n\n${generateContextMarkdown(assets, vulnerabilities, remediations, userRole)}`;
   },
 });

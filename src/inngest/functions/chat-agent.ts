@@ -9,8 +9,6 @@ import {
 import { createChannel } from "@/app/api/inngest/realtime";
 import type { NetworkState } from "@/features/chat/types";
 import { createChatAgent } from "@/features/chat/viper-agent/agents/chat-agent";
-import { createExplainAssetAgent } from "@/features/chat/viper-agent/agents/explain-asset";
-import { createExplainVulnerabilityAgent } from "@/features/chat/viper-agent/agents/explain-vulnerability";
 import { createGiveRecommendationsAgent } from "@/features/chat/viper-agent/agents/give-recommendations";
 import { conversationHistoryAdapter } from "@/features/chat/viper-agent/history-adapter";
 import { inngest } from "../client";
@@ -33,12 +31,6 @@ export const chatAgent = inngest.createFunction(
 
     let agent: Agent<StateData>;
     switch (clientState.agent) {
-      case "explainAsset":
-        agent = createExplainAssetAgent();
-        break;
-      case "explainVulnerability":
-        agent = createExplainVulnerabilityAgent();
-        break;
       case "giveRecommendations":
         agent = createGiveRecommendationsAgent();
         break;
@@ -49,15 +41,20 @@ export const chatAgent = inngest.createFunction(
     const network = createNetwork({
       name: "Chat Network",
       agents: [agent],
-      maxIter: 5,
+      maxIter: 8,
       router: async ({ network: net }) => {
         const results = net.state.results;
         if (results.length === 0) return agent;
         const lastOutput = results[results.length - 1].output;
         const lastMsg = lastOutput[lastOutput.length - 1];
-        // Stop routing once the agent has produced a final text response.
-        // Keep routing while the last message was a tool call/result so the
-        // agent gets a chance to process the tool output and reply.
+        // If ask_user_questions was called anywhere in this turn, stop immediately
+        // so the user can respond.
+        const askedUser = lastOutput.some(
+          (msg) =>
+            msg.type === "tool_call" &&
+            msg.tools.some((msg) => msg.name === "ask_user_questions"),
+        );
+        if (askedUser) return undefined;
         if (lastMsg?.stop_reason === "stop") return undefined;
         return agent;
       },

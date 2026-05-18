@@ -150,9 +150,8 @@ const buildSystemPrompt = (
   const role: UserRole = data?.userRole ?? "hospital administration";
   const parts: string[] = [BASE_PROMPT];
 
-  parts.push(`<user_role>${role}</user_role>`);
   parts.push(
-    `<role_focus_recommendation>${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</role_focus_recommendation>`,
+    `<role_focus_recommendation>The user has the role ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</role_focus_recommendation>`,
   );
 
   if (data?.assetData) {

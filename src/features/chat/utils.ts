@@ -251,7 +251,7 @@ export function generateMemoryMarkdown(
   memories: { id: string; content: string | null }[],
 ): string {
   if (memories.length === 0) return "## Memories\n\n_No memories saved yet._";
-  return `## Memories\n\n${memories.map((m) => `- [${m.id}] ${m.content}`).join("\n")}`;
+  return `## Memories\n\n${memories.map((m) => `- [${m.id}] ${m.content ?? ""}`).join("\n")}`;
 }
 
 // ─── User roles and per-role instructions ─────────────────────────────────────
@@ -371,15 +371,16 @@ export function buildConversationMessages(messages: HistoryMessage[]): any[] {
 
     // Index tool results by tool id for O(1) lookup when building tool-call parts
     const toolResults = new Map<string, unknown>();
-    for (const m of msg.output as unknown as AgentKitMsg[]) {
+    const output = Array.isArray(msg.output)
+      ? (msg.output as AgentKitMsg[])
+      : [];
+    for (const m of output) {
       if (isToolResultMsg(m)) {
         toolResults.set(m.tool.id, m.content);
       }
     }
-
     const parts: Record<string, unknown>[] = [];
-
-    for (const m of msg.output as unknown as AgentKitMsg[]) {
+    for (const m of output) {
       if (isTextMsg(m) && m.content) {
         parts.push({
           type: "text",

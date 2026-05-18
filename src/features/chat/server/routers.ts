@@ -137,8 +137,10 @@ export const chatRouter = createTRPCRouter({
       const historyCtx = { threadId: input.threadId } as any;
       const agentResults = await conversationHistoryAdapter.get!(historyCtx);
 
-      const messages = agentResults.map((result) => ({
-        id: result.id ?? crypto.randomUUID(),
+      const messages = agentResults.map((result, index) => ({
+        id:
+          result.id ??
+          `${result.agentName}:${result.createdAt.toISOString()}:${index}`,
         agentName: result.agentName,
         createdAt: result.createdAt,
         output: result.output,

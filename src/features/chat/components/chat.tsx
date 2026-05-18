@@ -223,16 +223,19 @@ function SuggestedAnswers({
   if (answers.length === 0) return null;
   return (
     <RadioGroup value={selected} onValueChange={onSelect} className="gap-2">
-      {answers.map((ans) => (
-        <FieldLabel key={ans} htmlFor={`q${currentIndex}-${ans}`}>
-          <Field orientation="horizontal">
-            <FieldContent>
-              <FieldTitle>{ans}</FieldTitle>
-            </FieldContent>
-            <RadioGroupItem value={ans} id={`q${currentIndex}-${ans}`} />
-          </Field>
-        </FieldLabel>
-      ))}
+      {answers.map((ans) => {
+        const ansSlug = ans.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9_-]/g, "");
+        return (
+          <FieldLabel key={ans} htmlFor={`q${currentIndex}-${ansSlug}`}>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldTitle>{ans}</FieldTitle>
+              </FieldContent>
+              <RadioGroupItem value={ans} id={`q${currentIndex}-${ansSlug}`} />
+            </Field>
+          </FieldLabel>
+        );
+      })}
     </RadioGroup>
   );
 }
@@ -689,7 +692,6 @@ function ChatInner({
     loadMoreThreads,
     deleteThread,
   } = agent;
-  console.log("HEY", agent.messages);
   const { userRole } = useChatUI();
   const [input, setInput] = useState("");
   const [configOverride, setConfigOverride] =

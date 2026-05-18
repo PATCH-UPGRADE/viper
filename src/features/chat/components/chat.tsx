@@ -10,8 +10,10 @@ import {
 import {
   AlertCircle,
   Bot,
+  Fullscreen,
   Loader2,
   MessageSquarePlus,
+  Minimize2,
   SendHorizontal,
   Trash2,
   X,
@@ -22,6 +24,7 @@ import Markdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -435,9 +438,11 @@ function ChatInner({
     deleteThread,
   } = agent;
   const { userRole } = useChatUI();
+
   const [input, setInput] = useState("");
   const [configOverride, setConfigOverride] =
     useState<Partial<UseChatAgentConfig>>();
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isDisabled = status !== "ready" || !isConnected;
@@ -499,7 +504,7 @@ function ChatInner({
     sendWithOverride(value);
   };
 
-  return (
+  const chatContent = (
     <div className="flex flex-col h-full">
       <div className="bg-muted p-2 flex gap-2 justify-between">
         <ThreadSelector
@@ -512,36 +517,61 @@ function ChatInner({
           loadMoreThreads={loadMoreThreads}
         />
         <div>
-          {currentThreadId && (
-            <TooltipProvider>
+          <TooltipProvider>
+            {isFullscreen ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
-                    onClick={() => agent.switchToThread("")}
+                    onClick={() => setIsFullscreen(false)}
                   >
-                    <MessageSquarePlus />
+                    <Minimize2 />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>New Chat</TooltipContent>
+                <TooltipContent>Exit fullscreen</TooltipContent>
               </Tooltip>
+            ) : (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive"
-                    onClick={async () => {
-                      await deleteThread(currentThreadId);
-                      agent.refreshThreads();
-                    }}
-                  >
-                    <Trash2 />
+                  <Button variant="ghost" onClick={() => setIsFullscreen(true)}>
+                    <Fullscreen />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Delete Thread</TooltipContent>
+                <TooltipContent>Fullscreen</TooltipContent>
               </Tooltip>
-            </TooltipProvider>
-          )}
+            )}
+
+            {currentThreadId && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      onClick={() => agent.switchToThread("")}
+                    >
+                      <MessageSquarePlus />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>New Chat</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      onClick={async () => {
+                        await deleteThread(currentThreadId);
+                        agent.refreshThreads();
+                      }}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete Thread</TooltipContent>
+                </Tooltip>
+              </>
+            )}
+          </TooltipProvider>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -579,5 +609,30 @@ function ChatInner({
         status={status}
       />
     </div>
+  );
+
+  return (
+    <>
+      {/* handle pop-out by conditionally rendering the SAME chat box in one of two places */}
+      {isFullscreen ? (
+        <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
+          <Fullscreen className="size-8" />
+          AI Chat is currently fullscreened.
+        </div>
+      ) : (
+        chatContent
+      )}
+
+      <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
+        {/* hide DialogContent close button (keep ESC functionality) and let Minimize button do it */}
+        <DialogContent
+          aria-describedby={"Fullscreened AI Chat Window"}
+          className="min-w-1/2 w-full h-full flex flex-col p-0 gap-0 [&>button:last-child]:hidden"
+        >
+          <DialogTitle className="sr-only">AI Chat</DialogTitle>
+          {chatContent}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

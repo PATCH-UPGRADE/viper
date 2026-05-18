@@ -31,6 +31,7 @@ const LayoutInner = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
+      // recalc includes window width in case the user resized it at some point
       const newWidth = window.innerWidth - e.clientX;
       setChatWidth(Math.min(MAX_WIDTH, Math.max(DEFAULT_WIDTH, newWidth)));
     };
@@ -58,8 +59,7 @@ const LayoutInner = ({ children }: { children: React.ReactNode }) => {
           <button
             type="button"
             onMouseDown={onDragStart}
-            className="absolute left-0 top-0 h-full w-1 cursor-col-resize z-99
-                       hover:bg-primary/40 active:bg-primary/60 transition-colors"
+            className="absolute left-0 top-0 h-full w-1 cursor-col-resize z-99 hover:bg-primary/40 active:bg-primary/60 transition-colors"
           />
           <ChatPanel />
         </div>

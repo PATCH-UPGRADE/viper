@@ -633,8 +633,16 @@ function ThreadSelector({
     }
   };
 
+  // Radix SelectValue caches the trigger label from the SelectItem matched at
+  // mount time. For a brand-new chat, the matching SelectItem only appears in
+  // `threads` after refreshThreads runs (post title-generation), so we re-mount
+  // the Select when that title flips in to force a fresh resolution.
+  const currentTitle =
+    threads.find((t) => t.id === currentThreadId)?.title ?? null;
+
   return (
     <Select
+      key={`${currentThreadId ?? "none"}:${currentTitle ?? ""}`}
       value={currentThreadId ?? ""}
       onValueChange={(val) => {
         if (val) selectThread(val);
@@ -676,7 +684,6 @@ function ChatInner({
   const agent = useChatAgent(config);
   const {
     messages,
-    sendMessage,
     sendMessageToThread,
     threads,
     currentThreadId,
@@ -721,23 +728,27 @@ function ChatInner({
       if (override && Object.keys(override).length > 0) {
         setConfigOverride(override);
       }
+      // For a brand-new chat, currentThreadId is null and useAgent's internal
+      // sendMessage uses a hidden fallback UUID without ever syncing it back to
+      // currentThreadId — leaving the thread picker with no "selected" value.
+      // Materializing the thread explicitly gives us a stable id to send under
+      // and select against.
+      const threadId = currentThreadId ?? agent.createNewThread();
       const effective = override ?? configOverride;
-      if (!effective || Object.keys(effective).length === 0) {
-        return sendMessage(message);
-      }
-      // Priority chain: effective override > page-level config > userRole base.
-      // Server (chat-agent.ts) defaults the agent when none is set.
-      const stateOverride = {
-        userRole,
-        ...config,
-        ...effective,
-      };
-      return sendMessageToThread(currentThreadId ?? "", message, {
-        state: stateOverride,
-      });
+      const stateOverride =
+        effective && Object.keys(effective).length > 0
+          ? // Priority chain: effective override > page-level config > userRole base.
+            // Server (chat-agent.ts) defaults the agent when none is set.
+            { userRole, ...config, ...effective }
+          : undefined;
+      return sendMessageToThread(
+        threadId,
+        message,
+        stateOverride ? { state: stateOverride } : undefined,
+      );
     },
     [
-      sendMessage,
+      agent.createNewThread,
       sendMessageToThread,
       currentThreadId,
       config,

@@ -2,6 +2,7 @@ import { createAgent } from "@inngest/agent-kit";
 import { DEFAULT_CHAT_MODEL } from "../constants";
 import { manageMemoriesTool } from "../tools/manage-memories";
 import { readMemories } from "../tools/read-memories";
+import { askUserQuestions } from "../tools/ask-user-questions";
 
 const MODEL = DEFAULT_CHAT_MODEL;
 
@@ -9,6 +10,13 @@ const SYSTEM_PROMPT = `You are a helpful AI assistant for a hospital vulnerabili
 You help hospital administrators and security engineers understand the operational impact
 of vulnerabilities and remediations across systems, safety, and clinical workflows.
 Be concise, accurate, and prioritize patient safety in your recommendations.
+
+<tools>
+- ask_user_questions: ask the user 1–4 clarifying questions with suggested answers.
+  The agent turn ends here until the user replies.
+- read_memories: read memories from chat history
+- manage_memories: create, update, or delete persistent memories for this user.
+</tools>
 
 ## Startup
 Always call the read_memories tool before your first response in every
@@ -39,5 +47,5 @@ export const createChatAgent = () =>
     description: "General assistant for hospital vulnerability management.",
     system: SYSTEM_PROMPT,
     model: MODEL,
-    tools: [readMemories, manageMemoriesTool],
+    tools: [readMemories, manageMemoriesTool, askUserQuestions],
   });

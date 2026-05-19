@@ -50,7 +50,21 @@ export function useChatAgent(config?: UseChatAgentConfig) {
 
   const { currentThreadId, replaceThreadMessages, refreshThreads } = agent;
   const loadedThreadRef = useRef<string | null>(null);
+  const freshThreadsRef = useRef<Set<string>>(new Set());
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // Wraps useAgent.createNewThread so that, for threads we materialise
+  // client-side, we immediately flip historyLoaded=true (via an empty
+  // replaceThreadMessages) and mark the id as "fresh" so the history-load
+  // effect below skips the doomed DB fetch (the server only writes the
+  // ChatThread row once the Inngest function runs).
+  const createNewThread = useCallback((): string => {
+    const id = agent.createNewThread();
+    freshThreadsRef.current.add(id);
+    loadedThreadRef.current = id;
+    replaceThreadMessages(id, []);
+    return id;
+  }, [agent, replaceThreadMessages]);
 
   // Subscribe to thread_updated events so AI-generated titles appear without
   // requiring a manual refresh. The server publishes after the first exchange
@@ -82,6 +96,13 @@ export function useChatAgent(config?: UseChatAgentConfig) {
 
   useEffect(() => {
     if (!currentThreadId || loadedThreadRef.current === currentThreadId) return;
+    // Threads created client-side via the wrapped createNewThread above don't
+    // yet have a DB row; skip the fetch (the .catch path would otherwise wipe
+    // the user's just-sent message via replaceThreadMessages([])).
+    if (freshThreadsRef.current.has(currentThreadId)) {
+      loadedThreadRef.current = currentThreadId;
+      return;
+    }
     loadedThreadRef.current = currentThreadId;
     setIsLoadingHistory(true);
 
@@ -95,10 +116,8 @@ export function useChatAgent(config?: UseChatAgentConfig) {
         replaceThreadMessages(currentThreadId, built);
       })
       .catch(() => {
-        // Thread not yet in DB (brand-new thread created client-side via
-        // createNewThread). Mark history as loaded with no messages so the
-        // skeleton clears — without this, isLoadingInitialThread stays true.
-        replaceThreadMessages(currentThreadId, []);
+        // Unknown thread (deep-linked to one that doesn't exist or isn't
+        // owned by this user). Leave messages untouched.
       })
       .finally(() => {
         setIsLoadingHistory(false);
@@ -110,5 +129,5 @@ export function useChatAgent(config?: UseChatAgentConfig) {
     trpc.chat.getHistory,
   ]);
 
-  return { ...agent, isLoadingHistory };
+  return { ...agent, createNewThread, isLoadingHistory };
 }

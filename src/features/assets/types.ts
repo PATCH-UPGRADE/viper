@@ -25,6 +25,13 @@ export const locationSchema = z.object({
   room: z.string().optional(),
 });
 
+const utilizationHourKeySchema = z.string().regex(/^(?:[0-9]|1[0-9]|2[0-3])$/);
+
+// TODO: add more rigorous type to z.number().int() after collabing with VL
+export const assetUtilizationSchema = z.array(
+  z.record(utilizationHourKeySchema, z.number().int()),
+);
+
 export const assetInputSchema = z.object({
   ip: z.string().min(1),
   networkSegment: z.string().nullish(),
@@ -36,6 +43,7 @@ export const assetInputSchema = z.object({
   serialNumber: z.string().nullish(),
   location: locationSchema.optional(),
   status: assetStatusSchema.nullish(),
+  utilization: assetUtilizationSchema.nullish(),
 });
 
 export const updateAssetSchema = assetInputSchema.partial().extend({
@@ -61,6 +69,7 @@ export const assetResponseSchema = z.object({
   serialNumber: z.string().nullable(),
   location: z.unknown().nullable(),
   status: assetStatusSchema.nullable(),
+  utilization: z.unknown().nullable(),
   userId: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),

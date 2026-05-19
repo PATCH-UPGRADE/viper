@@ -18,6 +18,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CopyCode } from "@/components/ui/code";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { AIChat } from "@/features/chat/components/chat";
 import { useChatUI } from "@/features/chat/context/chat-panel-context";
 import {
@@ -27,7 +32,11 @@ import {
 import type { UserRole } from "@/features/chat/utils";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { RemediationCard } from "@/features/remediations/components/remediations";
-import { type AssetWithIssueRelations, locationSchema } from "../types";
+import {
+  type AssetWithIssueRelations,
+  assetUtilizationSchema,
+  locationSchema,
+} from "../types";
 import { getAssetRoleLabel } from "../utils";
 
 // ============================================================================
@@ -42,6 +51,110 @@ interface AssetDashboardDrawerProps {
 }
 
 // ============================================================================
+// Utilization Grid
+// ============================================================================
+
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const DAY_NAMES = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+
+function getUtilizationColor(value: number): string {
+  if (value === 0) return "hsl(120, 0%, 82%)";
+  const s = 30 + value * 0.6;
+  const l = 70 - value * 0.25;
+  return `hsl(120, ${s}%, ${l}%)`;
+}
+
+/*
+ Example utilization data:
+    [
+      {"9": 1, "10": 12, "11": 8, "14": 3, "15": 5},  # 0 = Monday
+      {"9": 1, "10": 8, "11": 15},                    # 1 = Tuesday
+      {"9": 2, "14": 5},                              # 2 = Wednesday
+      {"10": 6, "11": 9, "13": 4},                    # 3 = Thursday
+      {"9": 1, "13": 2},                              # 4 = Friday
+      {},                                             # 5 = Saturday
+      {},                                             # 6 = Sunday
+    ]
+ Tuesday 9am to 10am, the device had 1% utilization throughout the hour, 10am-11am it was 8%, and 11am to 12pm it was 15%, and all other hours of the day it was offline (0% utilization)
+ */
+function AssetUtilizationGrid({
+  utilization,
+}: {
+  utilization: AssetWithIssueRelations["utilization"];
+}) {
+  const parsed = assetUtilizationSchema.safeParse(utilization);
+  const data = parsed.success ? parsed.data : null;
+
+  if (!data) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No device utilization data found
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto w-full">
+      <table className="border-separate border-spacing-0.5 text-xs">
+        <thead>
+          <tr>
+            <th className="sticky left-0 bg-background w-6 min-w-6" />
+            {DAYS.map((day) => (
+              <th
+                key={day}
+                className="text-muted-foreground font-medium text-center px-1 pb-1 min-w-8"
+              >
+                {day}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {HOURS.map((hour) => (
+            <tr key={hour}>
+              <td className="sticky left-0 bg-background text-muted-foreground text-right pr-1.5 tabular-nums leading-none py-0.5">
+                {hour}
+              </td>
+              {data.map((dayData, dayIndex) => {
+                const value = dayData[String(hour)] ?? 0;
+                return (
+                  <td key={dayIndex} className="p-0">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label={`${DAY_NAMES[dayIndex]} ${hour}:00 to ${hour + 1}:00, ${value}% utilization`}
+                          className="w-16 h-3.5 rounded-sm cursor-default"
+                          style={{
+                            backgroundColor: getUtilizationColor(value),
+                          }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {DAY_NAMES[dayIndex]} {hour}:00–{hour + 1}:00 · {value}%
+                      </TooltipContent>
+                    </Tooltip>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ============================================================================
 // Details Section
 // ============================================================================
 
@@ -51,16 +164,20 @@ function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
     : null;
   const location = locationResult?.success ? locationResult.data : null;
 
-  const sections = [
+  type Section =
+    | { header: string; text: string }
+    | { header: string; content: React.ReactNode };
+
+  const sections: Section[] = [
     {
       header: "Device Overview",
-      content: `${getAssetRoleLabel(asset)} — ${asset.deviceGroup.cpe}`,
+      text: `${getAssetRoleLabel(asset)} — ${asset.deviceGroup.cpe}`,
     },
     ...(location
       ? [
           {
             header: "Location",
-            content: [
+            text: [
               location.facility,
               location.building,
               location.floor,
@@ -68,25 +185,39 @@ function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
             ]
               .filter(Boolean)
               .join(" / "),
-          },
+          } satisfies Section,
         ]
       : []),
     ...(asset.hostname
-      ? [{ header: "Hostname", content: asset.hostname }]
+      ? [{ header: "Hostname", text: asset.hostname } satisfies Section]
       : []),
+    {
+      header: "Device Utilization",
+      content: (
+        <div className="overflow-x-auto">
+          <AssetUtilizationGrid utilization={asset.utilization} />
+        </div>
+      ),
+    },
   ];
 
   return (
-    <div className="space-y-6">
-      {sections.map((section, i) => (
-        <div key={`details-${i}`}>
-          {i > 0 && <div className="border-t my-4" />}
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">
-            {section.header}
-          </h3>
-          <p className="text-sm leading-relaxed">{section.content}</p>
-        </div>
-      ))}
+    <div className="h-full overflow-y-scroll overflow-x-hidden">
+      <div className="p-6 space-y-6">
+        {sections.map((section, i) => (
+          <div key={`details-${i}`}>
+            {i > 0 && <div className="border-t my-4" />}
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">
+              {section.header}
+            </h3>
+            {"text" in section ? (
+              <p className="text-sm leading-relaxed">{section.text}</p>
+            ) : (
+              section.content
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -408,6 +539,7 @@ export function AssetDashboardDrawer({
       value: "details",
       label: "Details",
       icon: FileText,
+      rawContent: true,
       content: <DetailsSection asset={asset} />,
     },
     {

@@ -642,7 +642,7 @@ function ThreadSelector({
     }
   };
 
-  // Add key to Select to force re-mount when thread title changes
+  // add `key` to Select to force re-mount when thread title changes
   const currentTitle =
     threads.find((t) => t.id === currentThreadId)?.title ?? null;
   const currentThreadExists = threads?.some((t) => t.id === currentThreadId);
@@ -650,6 +650,7 @@ function ThreadSelector({
   const [displayedTitle, setDisplayedTitle] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
 
+  // animate the title as it comes in with type-writer effect
   useEffect(() => {
     if (!currentTitle) {
       setDisplayedTitle(null);

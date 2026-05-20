@@ -639,11 +639,12 @@ function ThreadSelector({
   // the Select when that title flips in to force a fresh resolution.
   const currentTitle =
     threads.find((t) => t.id === currentThreadId)?.title ?? null;
+  const currentThreadExists = threads?.some(t => t.id === currentThreadId);
 
   return (
     <Select
       key={`${currentThreadId ?? "none"}:${currentTitle ?? ""}`}
-      value={currentThreadId ?? ""}
+      value={currentThreadExists ? currentThreadId || "" : ""}
       onValueChange={(val) => {
         if (val) selectThread(val);
       }}
@@ -655,7 +656,7 @@ function ThreadSelector({
       <SelectContent onScroll={handleScroll}>
         {threads.map((thread) => (
           <SelectItem key={thread.id} value={thread.id}>
-            <span className="truncate max-w-[200px] block">{thread.title}</span>
+            <span className="truncate max-w-[200px] block">{thread.title || "New Chat"}</span>
           </SelectItem>
         ))}
         {threadsLoading && (

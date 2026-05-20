@@ -1,3 +1,4 @@
+import "server-only";
 import {
   createAgent,
   type NetworkRun,

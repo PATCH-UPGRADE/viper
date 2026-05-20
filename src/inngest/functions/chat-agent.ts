@@ -115,7 +115,7 @@ export const chatAgent = inngest.createFunction(
         if (!title) return { skipped: "generation-failed" as const };
 
         await prisma.chatThread.update({
-          where: { id: threadId },
+          where: { id: threadId, userId },
           data: { title },
         });
         await publish(

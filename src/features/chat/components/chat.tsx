@@ -25,7 +25,12 @@ import remarkGfm from "remark-gfm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -651,11 +656,11 @@ function ChatInner({
 
       <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
         {/* hide DialogContent close button (keep ESC functionality) and let Minimize button do it */}
-        <DialogContent
-          aria-describedby={"Fullscreened AI Chat Window"}
-          className="min-w-1/2 w-full h-full flex flex-col p-0 gap-0 [&>button:last-child]:hidden"
-        >
+        <DialogContent className="min-w-1/2 w-full h-full flex flex-col p-0 gap-0 [&>button:last-child]:hidden">
           <DialogTitle className="sr-only">AI Chat</DialogTitle>
+          <DialogDescription className="sr-only">
+            Fullscreened AI Chat window
+          </DialogDescription>
           {chatContent}
         </DialogContent>
       </Dialog>

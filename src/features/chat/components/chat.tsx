@@ -385,6 +385,7 @@ const MarkdownWithTablesWrapper = memo(({ children }: { children: string }) => {
   return (
     <div
       className="
+        markdown block
         [&_table]:w-full [&_table]:border-collapse
         [&_th]:border [&_th]:border-gray-300 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:bg-gray-50
         [&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2
@@ -422,6 +423,7 @@ function ChatMessage({
   const { role, parts } = message;
 
   const hasText = parts.some((p) => p.type === "text");
+  // const hasTable = parts.some((p) => p.type === "text" && p.content.includes("|"));
 
   return (
     <div
@@ -440,7 +442,7 @@ function ChatMessage({
 
       <div
         className={cn(
-          "max-w-[80%] text-sm",
+          "max-w-[80%] text-sm overflow-x-auto",
           role === "user"
             ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-3 py-2"
             : hasText

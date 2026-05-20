@@ -167,10 +167,10 @@ async function syncPartnerIntegration(
 
   const body = JSON.stringify({
     // TODO: blueflow should be able to handle "null". for now though, if there's no date just send one in the past
-    last_sync: integration.lastSuccessfulSync ?? new Date(0).toISOString(),
-    page: 1,
-    pageSize: 500,
-    webhook_url: `${getBaseUrl()}/api/v1${responsePath}`,
+    since: integration.lastSuccessfulSync ?? new Date(0).toISOString(),
+    max_pages: 1,
+    page_size: 500,
+    callback: `${getBaseUrl()}/api/v1${responsePath}`,
   });
 
   const response = await fetch(integration.integrationUri, {

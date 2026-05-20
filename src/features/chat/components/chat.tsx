@@ -1,5 +1,6 @@
 "use client";
 
+import type { AnyToolCallPart } from "@inngest/use-agent";
 import {
   type AgentError,
   AgentProvider,
@@ -10,27 +11,44 @@ import {
 import {
   AlertCircle,
   Bot,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Fullscreen,
   Loader2,
   MessageSquarePlus,
   Minimize2,
   SendHorizontal,
   Trash2,
+  Wrench,
   X,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Field,
+  FieldContent,
+  FieldLabel,
+  FieldTitle,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -66,6 +84,8 @@ export const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
     approveToolCall: "/api/v1/chat/approve-tool",
   },
 };
+
+const REMARK_PLUGINS = [remarkGfm];
 
 interface AIChatProps {
   config?: UseChatAgentConfig;
@@ -168,14 +188,240 @@ function ChatMessagesSkeletonList() {
 
 type ChatAgentMessage = ReturnType<typeof useChatAgent>["messages"][number];
 
+interface AskUserQuestion {
+  question: string;
+  reason: string;
+  suggested_answers: string[];
+}
+
+function ToolCallAccordion({ part }: { part: AnyToolCallPart }) {
+  const [open, setOpen] = useState(false);
+  const label = part.toolName.replace(/_/g, " ");
+  const output =
+    part.state === "output-available"
+      ? ((part.output as { data?: string })?.data ?? "")
+      : null;
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="my-1">
+      <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
+        <Wrench className="size-3 shrink-0" />
+        <span>{label}</span>
+        <ChevronDown
+          className={cn("size-3 transition-transform", open && "rotate-180")}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-1 rounded-md bg-muted/50 p-2 text-xs font-mono whitespace-pre-wrap max-h-48 overflow-y-auto">
+          {output ?? "Running..."}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function SuggestedAnswers({
+  answers,
+  currentIndex,
+  selected,
+  onSelect,
+}: {
+  answers: string[];
+  currentIndex: number;
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  if (answers.length === 0) return null;
+  return (
+    <RadioGroup value={selected} onValueChange={onSelect} className="gap-2">
+      {answers.map((ans) => {
+        const ansSlug = ans.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9_-]/g, "");
+        return (
+          <FieldLabel key={ans} htmlFor={`q${currentIndex}-${ansSlug}`}>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldTitle>{ans}</FieldTitle>
+              </FieldContent>
+              <RadioGroupItem value={ans} id={`q${currentIndex}-${ansSlug}`} />
+            </Field>
+          </FieldLabel>
+        );
+      })}
+    </RadioGroup>
+  );
+}
+
+function AskUserQuestionsMessage({
+  part,
+  isAnswered,
+  onAnswer,
+}: {
+  part: AnyToolCallPart;
+  isAnswered: boolean;
+  onAnswer: (payload: string) => void;
+}) {
+  const questions =
+    (part.input as { questions?: AskUserQuestion[] })?.questions ?? [];
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const allAnswered =
+    questions.length > 0 &&
+    questions.every((_, i) => (answers[i] ?? "").trim().length > 0);
+
+  const handleSubmit = () => {
+    // the actual message that gets sent to the chat
+    const payload = JSON.stringify({
+      answers: questions.map((q, i) => ({
+        question: q.question,
+        answer: answers[i] ?? "",
+      })),
+    });
+    onAnswer(payload);
+  };
+
+  if (questions.length === 0) return null;
+
+  const q = questions[currentIndex];
+
+  const navChevrons = (
+    <div className="flex items-center gap-1 shrink-0">
+      <button
+        aria-label="Previous question"
+        type="button"
+        onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
+        disabled={currentIndex === 0}
+        className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <span className="text-xs text-muted-foreground tabular-nums">
+        {currentIndex + 1} / {questions.length}
+      </span>
+      <button
+        aria-label="Next question"
+        type="button"
+        onClick={() =>
+          setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))
+        }
+        disabled={currentIndex === questions.length - 1}
+        className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3 mt-2">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium">{q.question}</p>
+        {navChevrons}
+      </div>
+      <p className="text-xs text-muted-foreground italic">{q.reason}</p>
+      {isAnswered ? (
+        <p className="text-sm text-muted-foreground">
+          {answers[currentIndex] ?? "—"}
+        </p>
+      ) : (
+        <>
+          <SuggestedAnswers
+            answers={q.suggested_answers ?? []}
+            currentIndex={currentIndex}
+            selected={answers[currentIndex] ?? ""}
+            onSelect={(value) =>
+              setAnswers((prev) => ({ ...prev, [currentIndex]: value }))
+            }
+          />
+          <Input
+            placeholder="Write in response..."
+            value={answers[currentIndex] ?? ""}
+            onChange={(e) =>
+              setAnswers((prev) => ({
+                ...prev,
+                [currentIndex]: e.target.value,
+              }))
+            }
+            className="text-xs h-8"
+          />
+        </>
+      )}
+      {!isAnswered && (
+        <Button
+          size="sm"
+          disabled={!allAnswered}
+          onClick={handleSubmit}
+          className="mt-1"
+        >
+          Send Answers
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function AnswerSummary({
+  answers,
+}: {
+  answers: { question: string; answer: string }[];
+}) {
+  return (
+    <div className="space-y-1.5">
+      {answers.map((a, i) => (
+        <div key={i} className="text-sm">
+          <span className="font-medium opacity-80">{a.question}</span>
+          <br />
+          <span>{a.answer}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const MarkdownWithTablesWrapper = memo(({ children }: { children: string }) => {
+  // memo-ized to prevent re-rendering as parsing markdown is really slow!!
+  // the Remark-GFM plugin will convert markdown text tables into proper <table> elements in-line
+  // they still need to be styled to look good though - CSS generated using Claude LLM
+  return (
+    <div
+      className="
+        [&_table]:w-full [&_table]:border-collapse
+        [&_th]:border [&_th]:border-gray-300 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:bg-gray-50
+        [&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2
+        [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mb-4
+        [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mb-3
+        [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mb-2
+        [&_p]:mb-3 [&_p]:leading-relaxed
+        [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3
+        [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3
+        [&_li]:mb-1
+        [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm [&_code]:font-mono
+        [&_pre]:bg-gray-100 [&_pre]:p-4 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:mb-3
+        [&_pre_code]:bg-transparent [&_pre_code]:p-0
+        [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-600
+        [&_a]:text-blue-600 [&_a]:underline [&_a]:hover:text-blue-800
+        [&_hr]:border-gray-200 [&_hr]:my-4
+      "
+    >
+      <Markdown remarkPlugins={REMARK_PLUGINS}>{children}</Markdown>
+    </div>
+  );
+});
+
 function ChatMessage({
   message,
   user,
+  isLast,
+  onAnswer,
 }: {
   message: ChatAgentMessage;
   user: ChatUser | null;
+  isLast: boolean;
+  onAnswer: (payload: string) => void;
 }) {
   const { role, parts } = message;
+
+  const hasText = parts.some((p) => p.type === "text");
 
   return (
     <div
@@ -185,7 +431,7 @@ function ChatMessage({
       )}
     >
       {role === "assistant" && (
-        <Avatar className="size-7 shrink-0">
+        <Avatar className="size-7 shrink-0 self-start mt-1">
           <AvatarFallback className="bg-muted">
             <Bot className="size-4" />
           </AvatarFallback>
@@ -194,42 +440,52 @@ function ChatMessage({
 
       <div
         className={cn(
-          "markdown max-w-[80%] px-3 py-2 text-sm",
+          "max-w-[80%] text-sm",
           role === "user"
-            ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm"
-            : "bg-muted rounded-2xl rounded-bl-sm",
+            ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-3 py-2"
+            : hasText
+              ? "bg-muted rounded-2xl rounded-bl-sm px-3 py-2"
+              : "space-y-1",
         )}
       >
-        {/* the Remark-GFM plugin converts text tables into proper <table> elements BUT they still need to be styled to look good
-        CSS generated using Claude LLM*/}
-        <div
-          className="
-          [&_table]:w-full [&_table]:border-collapse
-          [&_th]:border [&_th]:border-gray-300 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:bg-gray-50
-          [&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2
-          [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mb-4
-          [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mb-3
-          [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mb-2
-          [&_p]:mb-3 [&_p]:leading-relaxed
-          [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3
-          [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3
-          [&_li]:mb-1
-          [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm [&_code]:font-mono
-          [&_pre]:bg-gray-100 [&_pre]:p-4 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:mb-3
-          [&_pre_code]:bg-transparent [&_pre_code]:p-0
-          [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-600
-          [&_a]:text-blue-600 [&_a]:underline [&_a]:hover:text-blue-800
-          [&_hr]:border-gray-200 [&_hr]:my-4
-        "
-        >
-          {parts.map((part) =>
-            part.type === "text" ? (
-              <Markdown remarkPlugins={[remarkGfm]} key={part.id}>
+        {parts.map((part, idx) => {
+          if (part.type === "text") {
+            if (role === "user") {
+              try {
+                const parsed = JSON.parse(part.content);
+                if (Array.isArray(parsed.answers)) {
+                  return (
+                    <AnswerSummary
+                      key={`${part.id}-${idx}`}
+                      answers={parsed.answers}
+                    />
+                  );
+                }
+              } catch {
+                // not JSON — fall through to markdown
+              }
+            }
+            return (
+              <MarkdownWithTablesWrapper key={`${part.id}-${idx}`}>
                 {part.content}
-              </Markdown>
-            ) : null,
-          )}
-        </div>
+              </MarkdownWithTablesWrapper>
+            );
+          }
+          if (part.type === "tool-call") {
+            if (part.toolName === "ask_user_questions") {
+              return (
+                <AskUserQuestionsMessage
+                  key={part.toolCallId}
+                  part={part}
+                  isAnswered={!isLast}
+                  onAnswer={onAnswer}
+                />
+              );
+            }
+            return <ToolCallAccordion key={part.toolCallId} part={part} />;
+          }
+          return null;
+        })}
       </div>
 
       {role === "user" && (
@@ -314,6 +570,7 @@ function ChatInputForm({
   isDisabled,
   isConnected,
   status,
+  hasActiveQuestions,
 }: {
   input: string;
   onInputChange: (value: string) => void;
@@ -321,8 +578,23 @@ function ChatInputForm({
   isDisabled: boolean;
   isConnected: boolean;
   status: AgentStatus;
+  hasActiveQuestions: boolean;
 }) {
   const { userRole, setUserRole } = useChatUI();
+
+  const inputPlaceholder = (() => {
+    switch (true) {
+      case status === "error":
+        return "An error has occurred...";
+      case hasActiveQuestions:
+        return "Please answer the questions above...";
+      case isDisabled:
+        return "AI is working...";
+      default:
+        return "Ask a question...";
+    }
+  })();
+
   return (
     <div className="border-t p-4">
       <form
@@ -335,13 +607,7 @@ function ChatInputForm({
         <input
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
-          placeholder={
-            status === "error"
-              ? "An error has occurred..."
-              : isDisabled
-                ? "AI is working..."
-                : "Ask a question..."
-          }
+          placeholder={inputPlaceholder}
           disabled={isDisabled}
           className="flex-1 border-0 drop-shadow-none text-sm outline-0 selection:outline-0 focus:outline-0 p-2"
         />
@@ -461,6 +727,7 @@ function ChatInner({
 
     isConnected,
     isLoadingInitialThread,
+    isLoadingHistory,
 
     threadsLoading,
     threadsHasMore,
@@ -476,7 +743,18 @@ function ChatInner({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const isDisabled = status !== "ready" || !isConnected;
+  const isAgentBusy = status !== "ready" || !isConnected;
+
+  const hasActiveQuestions = useMemo(() => {
+    if (status !== "ready") return false;
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastMsg.role !== "assistant") return false;
+    return lastMsg.parts.some(
+      (p) => p.type === "tool-call" && p.toolName === "ask_user_questions",
+    );
+  }, [messages, status]);
+
+  const isDisabled = isAgentBusy || hasActiveQuestions;
 
   const sendWithOverride = useCallback(
     (message: string, override?: Partial<UseChatAgentConfig>) => {
@@ -606,7 +884,7 @@ function ChatInner({
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {isLoadingInitialThread ? (
+        {isLoadingInitialThread || isLoadingHistory ? (
           <ChatMessagesSkeletonList />
         ) : (
           <>
@@ -614,8 +892,14 @@ function ChatInner({
               <EmptyState isDisabled={isDisabled} onSend={sendWithOverride} />
             )}
 
-            {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} user={user} />
+            {messages.map((message, i) => (
+              <ChatMessage
+                key={message.id}
+                message={message}
+                user={user}
+                isLast={i === messages.length - 1}
+                onAnswer={(payload) => sendWithOverride(payload)}
+              />
             ))}
 
             {(status === "submitted" || status === "streaming") && (
@@ -638,6 +922,7 @@ function ChatInner({
         isDisabled={isDisabled}
         isConnected={isConnected}
         status={status}
+        hasActiveQuestions={hasActiveQuestions}
       />
     </div>
   );

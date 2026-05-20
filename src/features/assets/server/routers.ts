@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
-import { IssueStatus, ResourceType, Severity } from "@/generated/prisma";
+import {
+  IssueStatus,
+  type Prisma,
+  ResourceType,
+  Severity,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   buildPaginationMeta,
@@ -411,11 +416,12 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { cpe, ...dataInput } = input;
+      const { cpe, utilization, ...dataInput } = input;
       const deviceGroup = await cpeToDeviceGroup(cpe ?? UNKNOWN_CPE_STRING);
       return prisma.asset.create({
         data: {
           ...dataInput,
+          utilization: utilization as Prisma.InputJsonValue | undefined,
           deviceGroupId: deviceGroup.id,
           userId: ctx.auth.user.id,
         },
@@ -449,10 +455,11 @@ export const assetsRouter = createTRPCRouter({
       // create all assets in a transaction
       return prisma.$transaction(
         input.assets.map((asset, index) => {
-          const { cpe: _cpe, ...dataInput } = asset;
+          const { cpe: _cpe, utilization, ...dataInput } = asset;
           return prisma.asset.create({
             data: {
               ...dataInput,
+              utilization: utilization as Prisma.InputJsonValue | undefined,
               deviceGroupId: deviceGroups[index].id,
               userId: ctx.auth.user.id,
             },
@@ -487,7 +494,7 @@ export const assetsRouter = createTRPCRouter({
           model: prisma.asset,
           mappingModel: prisma.externalAssetMapping,
           transformInputItem: async (item, userId) => {
-            const { cpe, vendorId: _vendorId, ...itemData } = item;
+            const { cpe, vendorId: _vendorId, utilization, ...itemData } = item;
             const deviceGroup = await cpeToDeviceGroup(
               cpe ?? UNKNOWN_CPE_STRING,
             );
@@ -504,11 +511,13 @@ export const assetsRouter = createTRPCRouter({
             return {
               createData: {
                 ...itemData,
+                utilization: utilization as Prisma.InputJsonValue | undefined,
                 deviceGroupId: deviceGroup.id,
                 userId,
               },
               updateData: {
                 ...itemData,
+                utilization: utilization as Prisma.InputJsonValue | undefined,
                 deviceGroupId: deviceGroup.id,
               },
               uniqueFieldConditions,
@@ -589,7 +598,7 @@ export const assetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await requireOwnership(input.id, ctx.auth.user.id, "asset");
 
-      const { id, cpe, ...updateData } = input;
+      const { id, cpe, utilization, ...updateData } = input;
       const deviceGroupUpdate = cpe
         ? { deviceGroupId: (await cpeToDeviceGroup(cpe)).id }
         : {};
@@ -598,6 +607,7 @@ export const assetsRouter = createTRPCRouter({
         data: {
           ...deviceGroupUpdate,
           ...updateData,
+          utilization: utilization as Prisma.InputJsonValue | undefined,
         },
         include: assetInclude,
       });

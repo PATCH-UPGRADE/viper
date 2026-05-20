@@ -108,10 +108,11 @@ model UserToken {
 }
 
 model Workflow {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   nodes       Node[]
   connections Connection[]
@@ -231,6 +232,7 @@ model Asset {
   serialNumber String?
   location     Json? // { facility, building, floor, room }
   status       AssetStatus?
+  utilization  Json? // [{ [key: string]: number }]
 
   deviceGroupId String
   // TODO: is Cascade the correct behavior for this?
@@ -792,6 +794,7 @@ model ChatMessage {
   status    ChatMessageStatus?
   role      ChatMessageRole
   content   String?            @db.Text
+  toolCalls Json?
   toolStatus String?
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt

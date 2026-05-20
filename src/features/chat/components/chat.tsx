@@ -540,6 +540,7 @@ function ChatInputForm({
   hasActiveQuestions: boolean;
 }) {
   const { userRole, setUserRole } = useChatUI();
+  const formRef = useRef<HTMLFormElement>(null);
 
   const inputPlaceholder = (() => {
     switch (true) {
@@ -557,18 +558,26 @@ function ChatInputForm({
   return (
     <div className="border-t p-4">
       <form
+        ref={formRef}
         onSubmit={onSubmit}
         className={cn(
           "flex flex-col border-2 rounded-xl bg-background drop-shadow-accent drop-shadow-sm focus-within:drop-shadow-md focus-within:border-primary transition-colors",
           isDisabled ? "cursor-not-allowed" : "",
         )}
       >
-        <input
+        <textarea
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              formRef.current?.requestSubmit();
+            }
+          }}
+          rows={1}
           placeholder={inputPlaceholder}
           disabled={isDisabled}
-          className="flex-1 border-0 drop-shadow-none text-sm outline-0 selection:outline-0 focus:outline-0 p-2"
+          className="w-full resize-none border-0 drop-shadow-none text-sm outline-0 selection:bg-primary/25 focus:outline-0 p-2 overflow-y-auto max-h-32 field-sizing-content"
         />
         <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground whitespace-nowrap p-1">
           <span>Ask as</span>
@@ -633,13 +642,33 @@ function ThreadSelector({
     }
   };
 
-  // Radix SelectValue caches the trigger label from the SelectItem matched at
-  // mount time. For a brand-new chat, the matching SelectItem only appears in
-  // `threads` after refreshThreads runs (post title-generation), so we re-mount
-  // the Select when that title flips in to force a fresh resolution.
+  // Add key to Select to force re-mount when thread title changes
   const currentTitle =
     threads.find((t) => t.id === currentThreadId)?.title ?? null;
-  const currentThreadExists = threads?.some(t => t.id === currentThreadId);
+  const currentThreadExists = threads?.some((t) => t.id === currentThreadId);
+
+  const [displayedTitle, setDisplayedTitle] = useState<string | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    if (!currentTitle) {
+      setDisplayedTitle(null);
+      setIsAnimating(false);
+      return;
+    }
+    setDisplayedTitle("");
+    setIsAnimating(true);
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setDisplayedTitle(currentTitle.slice(0, i));
+      if (i >= currentTitle.length) {
+        clearInterval(id);
+        setIsAnimating(false);
+      }
+    }, 40);
+    return () => clearInterval(id);
+  }, [currentTitle]);
 
   return (
     <Select
@@ -651,12 +680,21 @@ function ThreadSelector({
       disabled={threadsLoading && threads.length === 0}
     >
       <SelectTrigger className="w-[240px]">
-        <SelectValue placeholder="New Chat" />
+        <SelectValue placeholder="New Chat">
+          {displayedTitle !== null ? (
+            <span className="truncate max-w-[200px] block">
+              {displayedTitle}
+              {isAnimating ? "▌" : ""}
+            </span>
+          ) : undefined}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent onScroll={handleScroll}>
         {threads.map((thread) => (
           <SelectItem key={thread.id} value={thread.id}>
-            <span className="truncate max-w-[200px] block">{thread.title || "New Chat"}</span>
+            <span className="truncate max-w-[200px] block">
+              {thread.title || "New Chat"}
+            </span>
           </SelectItem>
         ))}
         {threadsLoading && (
@@ -706,7 +744,7 @@ function ChatInner({
   const [input, setInput] = useState("");
   const [configOverride, setConfigOverride] =
     useState<Partial<UseChatAgentConfig>>();
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const isAgentBusy = status !== "ready" || !isConnected;
 
@@ -729,11 +767,8 @@ function ChatInner({
       if (override && Object.keys(override).length > 0) {
         setConfigOverride(override);
       }
-      // For a brand-new chat, currentThreadId is null and useAgent's internal
-      // sendMessage uses a hidden fallback UUID without ever syncing it back to
-      // currentThreadId — leaving the thread picker with no "selected" value.
-      // Materializing the thread explicitly gives us a stable id to send under
-      // and select against.
+      // Get threadId and use sendMessageToThread instead of sendMessage for
+      // persistent thread information
       const threadId = currentThreadId ?? agent.createNewThread();
       const effective = override ?? configOverride;
       const stateOverride =
@@ -764,8 +799,9 @@ function ChatInner({
   }, [currentThreadId]);
 
   useEffect(() => {
-    if (messages.length)
-      scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = containerRef.current;
+    if (messages.length && el)
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
@@ -827,7 +863,7 @@ function ChatInner({
           )}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={containerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {isLoadingInitialThread || isLoadingHistory ? (
           <ChatMessagesSkeletonList />
         ) : (
@@ -851,8 +887,6 @@ function ChatInner({
             )}
           </>
         )}
-
-        <div ref={scrollRef} />
       </div>
 
       {status === "error" && error && (

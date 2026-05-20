@@ -30,9 +30,9 @@ export function useChatAgent(config?: UseChatAgentConfig) {
     trpc.chat.token.mutationOptions(),
   );
 
-  // Return [] so formatRawHistoryMessages (always called by useAgent) is bypassed.
-  // Tool calls can't survive formatRawHistoryMessages — we inject full history via
-  // replaceThreadMessages below instead.
+  // Inngest's fetchHistory is broken, undocumented, and will not render tool
+  // calls. We set history to [] here and just handle getting messages for
+  // threads ourselves in a useEffect below.
   const fetchHistory = useCallback(
     async (_threadId: string): Promise<unknown[]> => [],
     [],
@@ -53,11 +53,9 @@ export function useChatAgent(config?: UseChatAgentConfig) {
   const freshThreadsRef = useRef<Set<string>>(new Set());
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-  // Wraps useAgent.createNewThread so that, for threads we materialise
-  // client-side, we immediately flip historyLoaded=true (via an empty
-  // replaceThreadMessages) and mark the id as "fresh" so the history-load
-  // effect below skips the doomed DB fetch (the server only writes the
-  // ChatThread row once the Inngest function runs).
+  // Threads created client side don't exist in the db yet until messages get
+  // saved. Set `loadedThreadRef` so we skip a call to the db to get those
+  // threads' messages -- see the useEffect hook below this.
   const createNewThread = useCallback((): string => {
     const id = agent.createNewThread();
     freshThreadsRef.current.add(id);
@@ -94,11 +92,15 @@ export function useChatAgent(config?: UseChatAgentConfig) {
     refreshThreads();
   }, [latestTitleUpdate, refreshThreads]);
 
+  /* Use the getHistory trpc endpoint to get messages from the user
+   * use `buildConversationMessages` + `replaceThreadMessages to structure
+   * these for Inngest.
+   * If we're looking at a thread that was just created, skip the db call
+   * since that thread doesn't live in the db yet. */
   useEffect(() => {
     if (!currentThreadId || loadedThreadRef.current === currentThreadId) return;
     // Threads created client-side via the wrapped createNewThread above don't
-    // yet have a DB row; skip the fetch (the .catch path would otherwise wipe
-    // the user's just-sent message via replaceThreadMessages([])).
+    // yet have a DB row; skip the fetch
     if (freshThreadsRef.current.has(currentThreadId)) {
       loadedThreadRef.current = currentThreadId;
       return;
@@ -116,8 +118,7 @@ export function useChatAgent(config?: UseChatAgentConfig) {
         replaceThreadMessages(currentThreadId, built);
       })
       .catch(() => {
-        // Unknown thread (deep-linked to one that doesn't exist or isn't
-        // owned by this user). Leave messages untouched.
+        // Unknown thread? Leave messages untouched.
       })
       .finally(() => {
         setIsLoadingHistory(false);

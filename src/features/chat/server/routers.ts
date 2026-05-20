@@ -71,7 +71,7 @@ export const chatRouter = createTRPCRouter({
 
       const result = await getSubscriptionToken(inngest, {
         channel: createChannel(channelKey),
-        topics: ["agent_stream"],
+        topics: ["agent_stream", "thread_updated"],
       });
 
       return result;

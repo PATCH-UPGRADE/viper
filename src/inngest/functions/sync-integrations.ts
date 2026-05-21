@@ -167,10 +167,10 @@ async function syncPartnerIntegration(
 
   const body = JSON.stringify({
     // TODO: blueflow should be able to handle "null". for now though, if there's no date just send one in the past
-    last_sync: integration.lastSuccessfulSync ?? new Date(0).toISOString(),
-    page: 1,
-    pageSize: 500,
-    webhook_url: `${getBaseUrl()}/api/v1${responsePath}`,
+    since: integration.lastSuccessfulSync ?? new Date(0).toISOString(),
+    max_pages: 1,
+    page_size: 500,
+    callback: `${getBaseUrl()}/api/v1${responsePath}`,
   });
 
   const response = await fetch(integration.integrationUri, {
@@ -204,6 +204,19 @@ export const syncIntegration = inngest.createFunction(
       throw new Error(`Integration ${integrationId} not found`);
     }
 
+    // Create PENDING sync status *first* -- Inngest steps are slow, so
+    // if we did this afterwards in a separate step, there's a race condition
+    // where we could get a webhook callback before Inngest created the status
+    const pendingStatus = await step.run("create-sync-status", async () => {
+      return prisma.syncStatus.create({
+        data: {
+          integrationId: integration.id,
+          status: SyncStatusEnum.Pending,
+          syncedAt: new Date(),
+        },
+      });
+    });
+
     const syncResult = await step.run("fetch-integration-data", async () => {
       try {
         if (integration.integrationType === IntegrationType.AI) {
@@ -224,19 +237,23 @@ export const syncIntegration = inngest.createFunction(
       }
     });
 
-    await step.run("create-sync-status", async () => {
-      await prisma.syncStatus.create({
-        data: {
-          integrationId: integration.id,
-          status: !syncResult.success
-            ? SyncStatusEnum.Error
-            : SyncStatusEnum.Pending,
-          errorMessage: syncResult.success ? null : syncResult.errorMessage,
-          syncedAt: new Date(),
-        },
-      });
+    await step.run("finalize-sync-status", async () => {
+      // If the sync request failed to trigger entirely, update this run's
+      // specific status record to ERROR (no webhook callback will fire).
+      if (!syncResult.success) {
+        await prisma.syncStatus.updateMany({
+          where: {
+            id: pendingStatus.id,
+            status: SyncStatusEnum.Pending,
+          },
+          data: {
+            status: SyncStatusEnum.Error,
+            errorMessage: syncResult.errorMessage,
+          },
+        });
+      }
 
-      // Delete old statuses keeping only the 5 most recent
+      // Keep only the 5 most recent statuses
       await prisma.$executeRaw`
         DELETE FROM "sync_status"
         WHERE "integrationId" = ${integration.id}

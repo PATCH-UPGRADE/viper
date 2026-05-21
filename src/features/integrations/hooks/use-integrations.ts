@@ -4,6 +4,7 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { INTEGRATIONS_POLL_INTERVAL_MS } from "@/config/constants";
 import type { ResourceType } from "@/generated/prisma";
 import { usePaginationParams } from "@/lib/pagination";
 import { useTRPC } from "@/trpc/client";
@@ -13,12 +14,14 @@ export const useSuspenseIntegrations = (resourceType: ResourceType) => {
   const [params] = usePaginationParams();
   // TODO: augment params to also include `asset`, right? for the `resourceType`
 
-  return useSuspenseQuery(
-    trpc.integrations.getMany.queryOptions({
+  return useSuspenseQuery({
+    ...trpc.integrations.getMany.queryOptions({
       ...params,
       ...{ resourceType },
     }),
-  );
+    refetchInterval: INTEGRATIONS_POLL_INTERVAL_MS,
+    refetchIntervalInBackground: true,
+  });
 };
 
 /**

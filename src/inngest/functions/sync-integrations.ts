@@ -204,6 +204,19 @@ export const syncIntegration = inngest.createFunction(
       throw new Error(`Integration ${integrationId} not found`);
     }
 
+    // Create PENDING sync status *first* -- Inngest steps are slow, so
+    // if we did this afterwards in a separate step, there's a race condition
+    // where we could get a webhook callback before Inngest created the status
+    await step.run("create-sync-status", async () => {
+      await prisma.syncStatus.create({
+        data: {
+          integrationId: integration.id,
+          status: SyncStatusEnum.Pending,
+          syncedAt: new Date(),
+        },
+      });
+    });
+
     const syncResult = await step.run("fetch-integration-data", async () => {
       try {
         if (integration.integrationType === IntegrationType.AI) {
@@ -224,19 +237,26 @@ export const syncIntegration = inngest.createFunction(
       }
     });
 
-    await step.run("create-sync-status", async () => {
-      await prisma.syncStatus.create({
-        data: {
-          integrationId: integration.id,
-          status: !syncResult.success
-            ? SyncStatusEnum.Error
-            : SyncStatusEnum.Pending,
-          errorMessage: syncResult.success ? null : syncResult.errorMessage,
-          syncedAt: new Date(),
-        },
-      });
+    await step.run("finalize-sync-status", async () => {
+      // If the sync request failed to trigger entirely, update the status
+      // from PENDING to ERROR
+      if (!syncResult.success) {
+        const latestPending = await prisma.syncStatus.findFirst({
+          where: { integrationId: integration.id, status: SyncStatusEnum.Pending },
+          orderBy: { syncedAt: "desc" },
+        });
+        if (latestPending) {
+          await prisma.syncStatus.update({
+            where: { id: latestPending.id },
+            data: {
+              status: SyncStatusEnum.Error,
+              errorMessage: syncResult.errorMessage,
+            },
+          });
+        }
+      }
 
-      // Delete old statuses keeping only the 5 most recent
+      // Keep only the 5 most recent statuses
       await prisma.$executeRaw`
         DELETE FROM "sync_status"
         WHERE "integrationId" = ${integration.id}

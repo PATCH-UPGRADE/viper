@@ -75,12 +75,7 @@ export const IntegrationsList = ({
 }: {
   resourceType: ResourceType;
 }) => {
-  const {
-    data: integrations,
-    isFetching,
-    isRefetching,
-  } = useSuspenseIntegrations(resourceType);
-  const isInitialLoad = isFetching && !isRefetching;
+  const { data: integrations } = useSuspenseIntegrations(resourceType);
 
   const columns = useMemo(() => {
     return getIntegrationColumns(resourceType);
@@ -91,7 +86,6 @@ export const IntegrationsList = ({
       search={<IntegrationsSearch />}
       paginatedData={integrations}
       columns={columns}
-      isLoading={isInitialLoad}
     />
   );
 };

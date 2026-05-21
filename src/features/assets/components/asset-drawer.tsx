@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Background, type Edge, type Node, ReactFlow, MarkerType } from "@xyflow/react";
 import { formatDistanceToNow } from "date-fns";
 import {
   BugIcon,
@@ -11,8 +10,8 @@ import {
   ServerIcon,
   Wrench,
 } from "lucide-react";
-import { Suspense } from "react";
-import "@xyflow/react/dist/style.css";
+import { Suspense, useCallback, useState } from "react";
+import { Layer, Rectangle, ResponsiveContainer, Sankey } from "recharts";
 import {
   DashboardDrawerShell,
   InfoColumn,
@@ -34,6 +33,10 @@ import {
 } from "@/features/chat/context/suggested-questions-context";
 import type { UserRole } from "@/features/chat/utils";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
+import type {
+  EnrichedNetworkAsset,
+  NetworkConnection,
+} from "@/features/network/types";
 import { RemediationCard } from "@/features/remediations/components/remediations";
 import { useTRPC } from "@/trpc/client";
 import {
@@ -162,71 +165,184 @@ function AssetUtilizationGrid({
 // Network Flow Section
 // ============================================================================
 
+const PORT_PROTOCOL_MAP: Record<number, string> = {
+  21: "FTP",
+  22: "SSH",
+  23: "Telnet",
+  25: "SMTP",
+  53: "DNS",
+  80: "HTTP",
+  104: "DICOM",
+  443: "HTTPS",
+  445: "SMB",
+  1433: "MSSQL",
+  2049: "NFS",
+  2575: "HL7",
+  3389: "RDP",
+  4840: "OPC-UA",
+  5900: "VNC",
+  8080: "HTTP",
+  8443: "HTTPS",
+  11112: "DICOM",
+};
+
+function getProtocolLabel(port: number, transport: "tcp" | "udp"): string {
+  return PORT_PROTOCOL_MAP[port] ?? transport.toUpperCase();
+}
+
+function getAssetLabel(asset: EnrichedNetworkAsset): string {
+  return (
+    asset.viper_data?.role ??
+    asset.viper_data?.hostname ??
+    asset.manufacturer ??
+    asset.id.slice(0, 8)
+  );
+}
+
+function getAssetIP(asset: EnrichedNetworkAsset): string | null {
+  return (
+    asset.interfaces[0]?.ipv4_address ??
+    asset.interfaces[0]?.ipv6_address ??
+    null
+  );
+}
+
+interface SankeyNodeData {
+  name: string;
+  tier: "focal" | "protocol" | "peer";
+  ip: string | null;
+}
+
+function buildSankeyData(
+  assets: EnrichedNetworkAsset[],
+  connections: NetworkConnection[],
+  focalId: string,
+) {
+  const focalAsset = assets.find((a) => a.id === focalId)!;
+  const peers = assets.filter((a) => a.id !== focalId);
+
+  const mapped = connections.map((c) => ({
+    peerId: c.src_asset_id === focalId ? c.dst_asset_id : c.src_asset_id,
+    proto: getProtocolLabel(c.dst_port, c.protocol),
+  }));
+
+  const protoSet = [...new Set(mapped.map((m) => m.proto))];
+
+  const nodes: SankeyNodeData[] = [
+    { name: getAssetLabel(focalAsset), tier: "focal", ip: null },
+    ...protoSet.map((p) => ({ name: p, tier: "protocol" as const, ip: null })),
+    ...peers.map((p) => ({
+      name: getAssetLabel(p),
+      tier: "peer" as const,
+      ip: getAssetIP(p),
+    })),
+  ];
+
+  const protoIdx = (p: string) => 1 + protoSet.indexOf(p);
+  const peerIdx = (id: string) =>
+    1 + protoSet.length + peers.findIndex((a) => a.id === id);
+
+  const focalToProto = new Map<string, number>();
+  const protoToPeer = new Map<string, number>();
+  for (const { peerId, proto } of mapped) {
+    focalToProto.set(proto, (focalToProto.get(proto) ?? 0) + 1);
+    const key = `${proto}|${peerId}`;
+    protoToPeer.set(key, (protoToPeer.get(key) ?? 0) + 1);
+  }
+
+  const links = [
+    ...Array.from(focalToProto.entries()).map(([proto, value]) => ({
+      source: 0,
+      target: protoIdx(proto),
+      value,
+    })),
+    ...Array.from(protoToPeer.entries()).map(([key, value]) => {
+      const [proto, peerId] = key.split("|") as [string, string];
+      return { source: protoIdx(proto), target: peerIdx(peerId), value };
+    }),
+  ];
+
+  return { nodes, links, protoCount: protoSet.length };
+}
+
+interface SankeyTooltip {
+  label: string;
+  ip: string;
+  x: number;
+  y: number;
+}
+
+interface SankeyNodeProps {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  index: number;
+  payload: SankeyNodeData;
+}
+
 function NetworkFlowSection({ assetId }: { assetId: string }) {
   const trpc = useTRPC();
   const { data } = useQuery(
     trpc.network.getFlowForAsset.queryOptions({ assetId }),
   );
+  const [tooltip, setTooltip] = useState<SankeyTooltip | null>(null);
+
+  const renderNode = useCallback(
+    ({ x, y, width, height, index, payload }: SankeyNodeProps) => {
+      const fill =
+        payload.tier === "focal"
+          ? "var(--primary)"
+          : payload.tier === "protocol"
+            ? "var(--foreground)"
+            : "var(--muted-foreground)";
+
+      return (
+        <Layer key={`node-${index}`}>
+          <Rectangle
+            x={x}
+            y={y}
+            width={width}
+            height={height}
+            fill={fill}
+            fillOpacity={payload.tier === "protocol" ? 0.6 : 0.85}
+            radius={3}
+            onMouseEnter={() => {
+              if (payload.tier === "peer" && payload.ip) {
+                setTooltip({
+                  label: payload.name,
+                  ip: payload.ip,
+                  x: x + width + 8,
+                  y,
+                });
+              }
+            }}
+            onMouseLeave={() => setTooltip(null)}
+          />
+          <text
+            x={payload.tier === "peer" ? x + width + 6 : x - 6}
+            y={y + height / 2}
+            dy="0.35em"
+            textAnchor={payload.tier === "peer" ? "start" : "end"}
+            fill="var(--muted-foreground)"
+            fontSize={11}
+          >
+            {payload.name}
+          </text>
+        </Layer>
+      );
+    },
+    [],
+  );
 
   if (!data?.in_flow) return null;
+  if (!data.connections.length) return null;
 
-  const { assets, connections, focal_asset_id } = data;
-
-  const neighbours = assets.filter((a) => a.id !== focal_asset_id);
-  const RADIUS = 160;
-
-  const rfNodes: Node[] = assets.map((networkAsset) => {
-    const isFocal = networkAsset.id === focal_asset_id;
-    let x = 0;
-    let y = 0;
-    if (!isFocal) {
-      const idx = neighbours.indexOf(networkAsset);
-      const angle = (2 * Math.PI * idx) / Math.max(neighbours.length, 1);
-      x = Math.round(RADIUS * Math.cos(angle));
-      y = Math.round(RADIUS * Math.sin(angle));
-    }
-
-    const label =
-      networkAsset.viper_data?.role ??
-      networkAsset.viper_data?.hostname ??
-      networkAsset.manufacturer ??
-      networkAsset.id.slice(0, 8);
-
-    return {
-      id: networkAsset.id,
-      position: { x, y },
-      data: { label },
-      style: isFocal
-        ? {
-            background: "var(--primary)",
-            color: "var(--primary-foreground)",
-            fontWeight: 600,
-            fontSize: 12,
-            borderColor: "var(--primary)",
-          }
-        : {
-            background: "var(--muted)",
-            color: "var(--muted-foreground)",
-            fontSize: 11,
-            borderColor: "var(--border)",
-          },
-    };
-  });
-
-  const rfEdges: Edge[] = connections.map((c, i) => ({
-    id: `edge-${i}`,
-    source: c.src_asset_id,
-    target: c.dst_asset_id,
-    label: `${c.protocol.toUpperCase()}:${c.dst_port}`,
-    labelStyle: { fontSize: 10 },
-    markerStart: c.direction === "bidirectional" ? {
-      type: MarkerType.Arrow,
-    } : undefined,
-    markerEnd: {
-      type: MarkerType.Arrow,
-    },
-    labelBgStyle: { border: "var(--border)", fillOpacity: 0.8 },
-  }));
+  const { nodes, links } = buildSankeyData(
+    data.assets,
+    data.connections,
+    data.focal_asset_id,
+  );
 
   return (
     <>
@@ -234,19 +350,23 @@ function NetworkFlowSection({ assetId }: { assetId: string }) {
       <h3 className="text-sm font-medium text-muted-foreground mb-2">
         Network Flow
       </h3>
-      <div className="h-64 w-full rounded-md border overflow-hidden">
-        <ReactFlow
-          nodes={rfNodes}
-          edges={rfEdges}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          panOnDrag={true}
-          zoomOnScroll={true}
-          fitView
-          fitViewOptions={{ padding: 0.3 }}
-        >
-          <Background />
-        </ReactFlow>
+      <div className="relative h-64 w-full rounded-md border overflow-hidden">
+        <ResponsiveContainer width="100%" height="100%">
+          <Sankey
+            data={{ nodes, links }}
+            node={renderNode as never}
+            link={{ stroke: "var(--border)", strokeOpacity: 0.4 }}
+            margin={{ top: 10, right: 140, bottom: 10, left: 140 }}
+          />
+        </ResponsiveContainer>
+        {tooltip && (
+          <div
+            className="absolute pointer-events-none z-10 bg-popover text-popover-foreground text-xs px-2 py-1 rounded-md border shadow-md"
+            style={{ left: tooltip.x, top: tooltip.y }}
+          >
+            {tooltip.ip}
+          </div>
+        )}
       </div>
     </>
   );

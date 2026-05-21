@@ -155,6 +155,7 @@ const SAMPLE_DEVICE_GROUPS = [
 const SAMPLE_ASSETS = [
   // ICU Medical Devices
   {
+    id: "seed-asset-001",
     ip: "10.20.1.101",
     cpe: "cpe:2.3:h:philips:intellivue_mp70:*:*:*:*:*:*:*:*",
     role: "ICU Patient Monitor",
@@ -172,6 +173,7 @@ const SAMPLE_ASSETS = [
     status: "Active",
   },
   {
+    id: "seed-asset-002",
     ip: "10.20.1.102",
     cpe: "cpe:2.3:h:baxter:infusion_pump:sigma_spectrum:*:*:*:*:*:*:*",
     role: "Infusion Pump",
@@ -224,6 +226,7 @@ const SAMPLE_ASSETS = [
   },
   // Laboratory Equipment
   {
+    id: "seed-asset-003",
     ip: "10.30.2.201",
     cpe: "cpe:2.3:h:roche:cobas_6000:*:*:*:*:*:*:*:*",
     role: "Laboratory Analyzer",
@@ -328,6 +331,7 @@ const SAMPLE_ASSETS = [
   },
   // IT Infrastructure
   {
+    id: "seed-asset-004",
     ip: "10.10.4.401",
     cpe: "cpe:2.3:a:epic:emr:2023:*:*:*:*:*:*:*",
     role: "EMR Server",
@@ -432,6 +436,7 @@ const SAMPLE_ASSETS = [
   },
   // Workstations
   {
+    id: "seed-asset-005",
     ip: "10.60.6.601",
     cpe: "cpe:2.3:h:dell:optiplex_7090:*:*:*:*:*:*:*:*",
     role: "Clinical Workstation",
@@ -449,6 +454,7 @@ const SAMPLE_ASSETS = [
     status: "Active",
   },
   {
+    id: "seed-asset-006",
     ip: "10.60.6.602",
     cpe: "cpe:2.3:h:hp:elitedesk_800:*:*:*:*:*:*:*:*",
     role: "Nurse Station Workstation",
@@ -484,6 +490,7 @@ const SAMPLE_ASSETS = [
   },
   // Network Infrastructure
   {
+    id: "seed-asset-007",
     ip: "10.70.7.701",
     cpe: "cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*",
     role: "Network Switch",
@@ -501,6 +508,7 @@ const SAMPLE_ASSETS = [
     status: "Active",
   },
   {
+    id: "seed-asset-008",
     ip: "10.70.7.702",
     cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
     role: "Firewall",
@@ -983,6 +991,7 @@ async function seedAssets(userId: string) {
 
       return prisma.asset.create({
         data: {
+          ...("id" in asset && asset.id ? { id: asset.id } : {}),
           ip: asset.ip,
           networkSegment: asset.networkSegment,
           role: asset.role,

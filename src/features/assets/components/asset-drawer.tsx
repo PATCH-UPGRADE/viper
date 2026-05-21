@@ -1,5 +1,7 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+import { Background, type Edge, type Node, ReactFlow, MarkerType } from "@xyflow/react";
 import { formatDistanceToNow } from "date-fns";
 import {
   BugIcon,
@@ -10,6 +12,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { Suspense } from "react";
+import "@xyflow/react/dist/style.css";
 import {
   DashboardDrawerShell,
   InfoColumn,
@@ -32,6 +35,7 @@ import {
 import type { UserRole } from "@/features/chat/utils";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { RemediationCard } from "@/features/remediations/components/remediations";
+import { useTRPC } from "@/trpc/client";
 import {
   type AssetWithIssueRelations,
   assetUtilizationSchema,
@@ -155,6 +159,100 @@ function AssetUtilizationGrid({
 }
 
 // ============================================================================
+// Network Flow Section
+// ============================================================================
+
+function NetworkFlowSection({ assetId }: { assetId: string }) {
+  const trpc = useTRPC();
+  const { data } = useQuery(
+    trpc.network.getFlowForAsset.queryOptions({ assetId }),
+  );
+
+  if (!data?.in_flow) return null;
+
+  const { assets, connections, focal_asset_id } = data;
+
+  const neighbours = assets.filter((a) => a.id !== focal_asset_id);
+  const RADIUS = 160;
+
+  const rfNodes: Node[] = assets.map((networkAsset) => {
+    const isFocal = networkAsset.id === focal_asset_id;
+    let x = 0;
+    let y = 0;
+    if (!isFocal) {
+      const idx = neighbours.indexOf(networkAsset);
+      const angle = (2 * Math.PI * idx) / Math.max(neighbours.length, 1);
+      x = Math.round(RADIUS * Math.cos(angle));
+      y = Math.round(RADIUS * Math.sin(angle));
+    }
+
+    const label =
+      networkAsset.viper_data?.role ??
+      networkAsset.viper_data?.hostname ??
+      networkAsset.manufacturer ??
+      networkAsset.id.slice(0, 8);
+
+    return {
+      id: networkAsset.id,
+      position: { x, y },
+      data: { label },
+      style: isFocal
+        ? {
+            background: "var(--primary)",
+            color: "var(--primary-foreground)",
+            fontWeight: 600,
+            fontSize: 12,
+            borderColor: "var(--primary)",
+          }
+        : {
+            background: "var(--muted)",
+            color: "var(--muted-foreground)",
+            fontSize: 11,
+            borderColor: "var(--border)",
+          },
+    };
+  });
+
+  const rfEdges: Edge[] = connections.map((c, i) => ({
+    id: `edge-${i}`,
+    source: c.src_asset_id,
+    target: c.dst_asset_id,
+    label: `${c.protocol.toUpperCase()}:${c.dst_port}`,
+    labelStyle: { fontSize: 10 },
+    markerStart: c.direction === "bidirectional" ? {
+      type: MarkerType.Arrow,
+    } : undefined,
+    markerEnd: {
+      type: MarkerType.Arrow,
+    },
+    labelBgStyle: { border: "var(--border)", fillOpacity: 0.8 },
+  }));
+
+  return (
+    <>
+      <div className="border-t my-4" />
+      <h3 className="text-sm font-medium text-muted-foreground mb-2">
+        Network Flow
+      </h3>
+      <div className="h-64 w-full rounded-md border overflow-hidden">
+        <ReactFlow
+          nodes={rfNodes}
+          edges={rfEdges}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          panOnDrag={true}
+          zoomOnScroll={true}
+          fitView
+          fitViewOptions={{ padding: 0.3 }}
+        >
+          <Background />
+        </ReactFlow>
+      </div>
+    </>
+  );
+}
+
+// ============================================================================
 // Details Section
 // ============================================================================
 
@@ -217,6 +315,7 @@ function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
             )}
           </div>
         ))}
+        <NetworkFlowSection assetId={asset.id} />
       </div>
     </div>
   );

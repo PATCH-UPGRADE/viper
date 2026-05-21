@@ -1,0 +1,186 @@
+{
+  "schema_version": "0.1.0-minimal",
+  "snapshot_id": "a1b2c3d4-e5f6-4789-a012-b34c56d7e8f9",
+  "timestamp": "2026-05-21T00:00:00Z",
+  "assets": [
+    {
+      "id": "seed-asset-001",
+      "manufacturer": "Philips",
+      "interfaces": [
+        {
+          "id": "if-001",
+          "mac_address": "00:1A:2B:3C:4D:5E",
+          "ipv4_address": "10.20.1.101",
+          "ipv6_address": null
+        }
+      ],
+      "services": []
+    },
+    {
+      "id": "seed-asset-002",
+      "manufacturer": "Baxter",
+      "interfaces": [
+        {
+          "id": "if-002",
+          "mac_address": "00:1A:2B:3C:4D:5F",
+          "ipv4_address": "10.20.1.102",
+          "ipv6_address": null
+        }
+      ],
+      "services": []
+    },
+    {
+      "id": "seed-asset-003",
+      "manufacturer": "Roche",
+      "interfaces": [
+        {
+          "id": "if-003",
+          "mac_address": "00:1A:2B:3C:4D:62",
+          "ipv4_address": "10.30.2.201",
+          "ipv6_address": null
+        }
+      ],
+      "services": [
+        { "port": 2575, "protocol": "tcp" }
+      ]
+    },
+    {
+      "id": "seed-asset-004",
+      "manufacturer": "Epic Systems",
+      "interfaces": [
+        {
+          "id": "if-004",
+          "mac_address": "00:1A:2B:3C:4D:68",
+          "ipv4_address": "10.10.4.401",
+          "ipv6_address": null
+        }
+      ],
+      "services": [
+        { "port": 443, "protocol": "tcp" },
+        { "port": 2575, "protocol": "tcp" }
+      ]
+    },
+    {
+      "id": "seed-asset-005",
+      "manufacturer": "Dell",
+      "interfaces": [
+        {
+          "id": "if-005",
+          "mac_address": "00:1A:2B:3C:4D:6E",
+          "ipv4_address": "10.60.6.601",
+          "ipv6_address": null
+        }
+      ],
+      "services": []
+    },
+    {
+      "id": "seed-asset-006",
+      "manufacturer": "HP",
+      "interfaces": [
+        {
+          "id": "if-006",
+          "mac_address": "00:1A:2B:3C:4D:6F",
+          "ipv4_address": "10.60.6.602",
+          "ipv6_address": null
+        }
+      ],
+      "services": []
+    },
+    {
+      "id": "seed-asset-007",
+      "manufacturer": "Cisco Systems",
+      "interfaces": [
+        {
+          "id": "if-007",
+          "mac_address": "00:1A:2B:3C:4D:71",
+          "ipv4_address": "10.70.7.701",
+          "ipv6_address": null
+        }
+      ],
+      "services": [
+        { "port": 22, "protocol": "tcp" }
+      ]
+    },
+    {
+      "id": "seed-asset-008",
+      "manufacturer": "Fortinet",
+      "interfaces": [
+        {
+          "id": "if-008",
+          "mac_address": "00:1A:2B:3C:4D:72",
+          "ipv4_address": "10.70.7.702",
+          "ipv6_address": null
+        }
+      ],
+      "services": [
+        { "port": 443, "protocol": "tcp" },
+        { "port": 53, "protocol": "udp" }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "src_asset_id": "seed-asset-001",
+      "dst_asset_id": "seed-asset-004",
+      "dst_port": 2575,
+      "protocol": "tcp",
+      "direction": "bidirectional"
+    },
+    {
+      "src_asset_id": "seed-asset-002",
+      "dst_asset_id": "seed-asset-004",
+      "dst_port": 2575,
+      "protocol": "tcp",
+      "direction": "unidirectional"
+    },
+    {
+      "src_asset_id": "seed-asset-003",
+      "dst_asset_id": "seed-asset-004",
+      "dst_port": 2575,
+      "protocol": "tcp",
+      "direction": "bidirectional"
+    },
+    {
+      "src_asset_id": "seed-asset-005",
+      "dst_asset_id": "seed-asset-004",
+      "dst_port": 443,
+      "protocol": "tcp",
+      "direction": "bidirectional"
+    },
+    {
+      "src_asset_id": "seed-asset-006",
+      "dst_asset_id": "seed-asset-004",
+      "dst_port": 443,
+      "protocol": "tcp",
+      "direction": "bidirectional"
+    },
+    {
+      "src_asset_id": "seed-asset-001",
+      "dst_asset_id": "seed-asset-007",
+      "dst_port": 22,
+      "protocol": "tcp",
+      "direction": "unidirectional"
+    },
+    {
+      "src_asset_id": "seed-asset-003",
+      "dst_asset_id": "seed-asset-007",
+      "dst_port": 22,
+      "protocol": "tcp",
+      "direction": "unidirectional"
+    },
+    {
+      "src_asset_id": "seed-asset-007",
+      "dst_asset_id": "seed-asset-008",
+      "dst_port": 443,
+      "protocol": "tcp",
+      "direction": "bidirectional"
+    },
+    {
+      "src_asset_id": "seed-asset-008",
+      "dst_asset_id": "seed-asset-004",
+      "dst_port": 443,
+      "protocol": "tcp",
+      "direction": "unidirectional"
+    }
+  ]
+}

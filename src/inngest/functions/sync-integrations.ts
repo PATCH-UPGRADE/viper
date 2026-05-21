@@ -242,7 +242,10 @@ export const syncIntegration = inngest.createFunction(
       // from PENDING to ERROR
       if (!syncResult.success) {
         const latestPending = await prisma.syncStatus.findFirst({
-          where: { integrationId: integration.id, status: SyncStatusEnum.Pending },
+          where: {
+            integrationId: integration.id,
+            status: SyncStatusEnum.Pending,
+          },
           orderBy: { syncedAt: "desc" },
         });
         if (latestPending) {

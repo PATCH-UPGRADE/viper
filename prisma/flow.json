@@ -40,9 +40,7 @@
           "ipv6_address": null
         }
       ],
-      "services": [
-        { "port": 2575, "protocol": "tcp" }
-      ]
+      "services": [{ "port": 2575, "protocol": "tcp" }]
     },
     {
       "id": "seed-asset-004",
@@ -97,9 +95,7 @@
           "ipv6_address": null
         }
       ],
-      "services": [
-        { "port": 22, "protocol": "tcp" }
-      ]
+      "services": [{ "port": 22, "protocol": "tcp" }]
     },
     {
       "id": "seed-asset-008",

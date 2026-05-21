@@ -2,8 +2,8 @@ import { z } from "zod";
 
 // ============================================================================
 // Network Topology Schema
-// Mirrors the upstream "Network Topology Snapshot (Minimal, Flow-Derived)" spec.
-// Asset IDs are Viper cuid strings — matching Viper's asset.id directly.
+// Mirrors what we might be providing TA's like Galois, subject to change
+// For now let's use the most recently proposed schema so we can demo it
 // ============================================================================
 
 export const networkInterfaceSchema = z.object({

@@ -482,13 +482,11 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
-      console.log("HERE", input)
       // Validate provided token or throw error
       const { userId, integrationId } = await processIntegrationToken(
         input.token,
         ResourceType.Asset,
       );
-      console.log("OK", userId, integrationId)
 
       return processIntegrationSync(
         prisma,

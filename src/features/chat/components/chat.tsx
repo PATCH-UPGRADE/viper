@@ -14,16 +14,19 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Fullscreen,
   Loader2,
   MessageSquarePlus,
+  Minimize2,
   SendHorizontal,
   Trash2,
   Wrench,
   X,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -32,6 +35,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Field,
   FieldContent,
@@ -75,6 +84,8 @@ export const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
     approveToolCall: "/api/v1/chat/approve-tool",
   },
 };
+
+const REMARK_PLUGINS = [remarkGfm];
 
 interface AIChatProps {
   config?: UseChatAgentConfig;
@@ -367,6 +378,37 @@ function AnswerSummary({
   );
 }
 
+const MarkdownWithTablesWrapper = memo(({ children }: { children: string }) => {
+  // memo-ized to prevent re-rendering as parsing markdown is really slow!!
+  // the Remark-GFM plugin will convert markdown text tables into proper <table> elements in-line
+  // they still need to be styled to look good though - CSS generated using Claude LLM
+  return (
+    <div
+      className="
+        markdown block
+        [&_table]:w-full [&_table]:border-collapse
+        [&_th]:border [&_th]:border-gray-300 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:bg-gray-50
+        [&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2
+        [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mb-4
+        [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mb-3
+        [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mb-2
+        [&_p]:mb-3 [&_p]:leading-relaxed
+        [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3
+        [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3
+        [&_li]:mb-1
+        [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm [&_code]:font-mono
+        [&_pre]:bg-gray-100 [&_pre]:p-4 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:mb-3
+        [&_pre_code]:bg-transparent [&_pre_code]:p-0
+        [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-600
+        [&_a]:text-blue-600 [&_a]:underline [&_a]:hover:text-blue-800
+        [&_hr]:border-gray-200 [&_hr]:my-4
+      "
+    >
+      <Markdown remarkPlugins={REMARK_PLUGINS}>{children}</Markdown>
+    </div>
+  );
+});
+
 function ChatMessage({
   message,
   user,
@@ -381,6 +423,7 @@ function ChatMessage({
   const { role, parts } = message;
 
   const hasText = parts.some((p) => p.type === "text");
+  // const hasTable = parts.some((p) => p.type === "text" && p.content.includes("|"));
 
   return (
     <div
@@ -399,7 +442,7 @@ function ChatMessage({
 
       <div
         className={cn(
-          "max-w-[80%] text-sm",
+          "max-w-[80%] text-sm overflow-x-auto",
           role === "user"
             ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-3 py-2"
             : hasText
@@ -425,9 +468,9 @@ function ChatMessage({
               }
             }
             return (
-              <div key={`${part.id}-${idx}`} className="markdown">
-                <Markdown>{part.content}</Markdown>
-              </div>
+              <MarkdownWithTablesWrapper key={`${part.id}-${idx}`}>
+                {part.content}
+              </MarkdownWithTablesWrapper>
             );
           }
           if (part.type === "tool-call") {
@@ -540,6 +583,7 @@ function ChatInputForm({
   hasActiveQuestions: boolean;
 }) {
   const { userRole, setUserRole } = useChatUI();
+  const formRef = useRef<HTMLFormElement>(null);
 
   const inputPlaceholder = (() => {
     switch (true) {
@@ -557,18 +601,26 @@ function ChatInputForm({
   return (
     <div className="border-t p-4">
       <form
+        ref={formRef}
         onSubmit={onSubmit}
         className={cn(
           "flex flex-col border-2 rounded-xl bg-background drop-shadow-accent drop-shadow-sm focus-within:drop-shadow-md focus-within:border-primary transition-colors",
           isDisabled ? "cursor-not-allowed" : "",
         )}
       >
-        <input
+        <textarea
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              formRef.current?.requestSubmit();
+            }
+          }}
+          rows={1}
           placeholder={inputPlaceholder}
           disabled={isDisabled}
-          className="flex-1 border-0 drop-shadow-none text-sm outline-0 selection:outline-0 focus:outline-0 p-2"
+          className="w-full resize-none border-0 drop-shadow-none text-sm outline-0 selection:bg-primary/25 focus:outline-0 p-2 overflow-y-auto max-h-32 field-sizing-content"
         />
         <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground whitespace-nowrap p-1">
           <span>Ask as</span>
@@ -633,21 +685,60 @@ function ThreadSelector({
     }
   };
 
+  // add `key` to Select to force re-mount when thread title changes
+  const currentTitle =
+    threads.find((t) => t.id === currentThreadId)?.title ?? null;
+  const currentThreadExists = threads?.some((t) => t.id === currentThreadId);
+
+  const [displayedTitle, setDisplayedTitle] = useState<string | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  // animate the title as it comes in with type-writer effect
+  useEffect(() => {
+    if (!currentTitle) {
+      setDisplayedTitle(null);
+      setIsAnimating(false);
+      return;
+    }
+    setDisplayedTitle("");
+    setIsAnimating(true);
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setDisplayedTitle(currentTitle.slice(0, i));
+      if (i >= currentTitle.length) {
+        clearInterval(id);
+        setIsAnimating(false);
+      }
+    }, 40);
+    return () => clearInterval(id);
+  }, [currentTitle]);
+
   return (
     <Select
-      value={currentThreadId ?? ""}
+      key={`${currentThreadId ?? "none"}:${currentTitle ?? ""}`}
+      value={currentThreadExists ? currentThreadId || "" : ""}
       onValueChange={(val) => {
         if (val) selectThread(val);
       }}
       disabled={threadsLoading && threads.length === 0}
     >
       <SelectTrigger className="w-[240px]">
-        <SelectValue placeholder="New Chat" />
+        <SelectValue placeholder="New Chat">
+          {displayedTitle !== null ? (
+            <span className="truncate max-w-[200px] block">
+              {displayedTitle}
+              {isAnimating ? "▌" : ""}
+            </span>
+          ) : undefined}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent onScroll={handleScroll}>
         {threads.map((thread) => (
           <SelectItem key={thread.id} value={thread.id}>
-            <span className="truncate max-w-[200px] block">{thread.title}</span>
+            <span className="truncate max-w-[200px] block">
+              {thread.title || "New Chat"}
+            </span>
           </SelectItem>
         ))}
         {threadsLoading && (
@@ -676,7 +767,6 @@ function ChatInner({
   const agent = useChatAgent(config);
   const {
     messages,
-    sendMessage,
     sendMessageToThread,
     threads,
     currentThreadId,
@@ -695,10 +785,12 @@ function ChatInner({
     deleteThread,
   } = agent;
   const { userRole } = useChatUI();
+
   const [input, setInput] = useState("");
   const [configOverride, setConfigOverride] =
     useState<Partial<UseChatAgentConfig>>();
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const isAgentBusy = status !== "ready" || !isConnected;
 
@@ -721,23 +813,24 @@ function ChatInner({
       if (override && Object.keys(override).length > 0) {
         setConfigOverride(override);
       }
+      // Get threadId and use sendMessageToThread instead of sendMessage for
+      // persistent thread information
+      const threadId = currentThreadId ?? agent.createNewThread();
       const effective = override ?? configOverride;
-      if (!effective || Object.keys(effective).length === 0) {
-        return sendMessage(message);
-      }
-      // Priority chain: effective override > page-level config > userRole base.
-      // Server (chat-agent.ts) defaults the agent when none is set.
-      const stateOverride = {
-        userRole,
-        ...config,
-        ...effective,
-      };
-      return sendMessageToThread(currentThreadId ?? "", message, {
-        state: stateOverride,
-      });
+      const stateOverride =
+        effective && Object.keys(effective).length > 0
+          ? // Priority chain: effective override > page-level config > userRole base.
+            // Server (chat-agent.ts) defaults the agent when none is set.
+            { userRole, ...config, ...effective }
+          : undefined;
+      return sendMessageToThread(
+        threadId,
+        message,
+        stateOverride ? { state: stateOverride } : undefined,
+      );
     },
     [
-      sendMessage,
+      agent.createNewThread,
       sendMessageToThread,
       currentThreadId,
       config,
@@ -752,8 +845,9 @@ function ChatInner({
   }, [currentThreadId]);
 
   useEffect(() => {
-    if (messages.length)
-      scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = containerRef.current;
+    if (messages.length && el)
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
@@ -770,7 +864,7 @@ function ChatInner({
     sendWithOverride(value);
   };
 
-  return (
+  const chatContent = (
     <div className="flex flex-col h-full">
       <div className="bg-muted p-2 flex gap-2 justify-between">
         <ThreadSelector
@@ -783,39 +877,64 @@ function ChatInner({
           loadMoreThreads={loadMoreThreads}
         />
         <div>
-          {currentThreadId && (
-            <TooltipProvider>
+          <TooltipProvider>
+            {isFullscreen ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
-                    onClick={() => agent.switchToThread("")}
+                    onClick={() => setIsFullscreen(false)}
                   >
-                    <MessageSquarePlus />
+                    <Minimize2 />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>New Chat</TooltipContent>
+                <TooltipContent>Exit fullscreen</TooltipContent>
               </Tooltip>
+            ) : (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive"
-                    onClick={async () => {
-                      await deleteThread(currentThreadId);
-                      agent.refreshThreads();
-                    }}
-                  >
-                    <Trash2 />
+                  <Button variant="ghost" onClick={() => setIsFullscreen(true)}>
+                    <Fullscreen />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Delete Thread</TooltipContent>
+                <TooltipContent>Fullscreen</TooltipContent>
               </Tooltip>
-            </TooltipProvider>
-          )}
+            )}
+
+            {currentThreadId && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      onClick={() => agent.switchToThread("")}
+                    >
+                      <MessageSquarePlus />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>New Chat</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      onClick={async () => {
+                        await deleteThread(currentThreadId);
+                        agent.refreshThreads();
+                      }}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete Thread</TooltipContent>
+                </Tooltip>
+              </>
+            )}
+          </TooltipProvider>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={containerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {isLoadingInitialThread || isLoadingHistory ? (
           <ChatMessagesSkeletonList />
         ) : (
@@ -839,8 +958,6 @@ function ChatInner({
             )}
           </>
         )}
-
-        <div ref={scrollRef} />
       </div>
 
       {status === "error" && error && (
@@ -857,5 +974,30 @@ function ChatInner({
         hasActiveQuestions={hasActiveQuestions}
       />
     </div>
+  );
+
+  return (
+    <>
+      {/* handle pop-out by conditionally rendering the SAME chat box in one of two places */}
+      {isFullscreen ? (
+        <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
+          <Fullscreen className="size-8" />
+          AI Chat is currently fullscreened.
+        </div>
+      ) : (
+        chatContent
+      )}
+
+      <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
+        {/* hide DialogContent close button (keep ESC functionality) and let Minimize button do it */}
+        <DialogContent className="min-w-1/2 w-full h-full flex flex-col p-0 gap-0 [&>button:last-child]:hidden">
+          <DialogTitle className="sr-only">AI Chat</DialogTitle>
+          <DialogDescription className="sr-only">
+            Fullscreened AI Chat window
+          </DialogDescription>
+          {chatContent}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

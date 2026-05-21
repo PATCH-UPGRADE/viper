@@ -207,8 +207,8 @@ export const syncIntegration = inngest.createFunction(
     // Create PENDING sync status *first* -- Inngest steps are slow, so
     // if we did this afterwards in a separate step, there's a race condition
     // where we could get a webhook callback before Inngest created the status
-    await step.run("create-sync-status", async () => {
-      await prisma.syncStatus.create({
+    const pendingStatus = await step.run("create-sync-status", async () => {
+      return prisma.syncStatus.create({
         data: {
           integrationId: integration.id,
           status: SyncStatusEnum.Pending,
@@ -238,22 +238,19 @@ export const syncIntegration = inngest.createFunction(
     });
 
     await step.run("finalize-sync-status", async () => {
-      // If the sync request failed to trigger entirely, update the status
-      // from PENDING to ERROR
+      // If the sync request failed to trigger entirely, update this run's
+      // specific status record to ERROR (no webhook callback will fire).
       if (!syncResult.success) {
-        const latestPending = await prisma.syncStatus.findFirst({
-          where: { integrationId: integration.id, status: SyncStatusEnum.Pending },
-          orderBy: { syncedAt: "desc" },
+        await prisma.syncStatus.updateMany({
+          where: {
+            id: pendingStatus.id,
+            status: SyncStatusEnum.Pending,
+          },
+          data: {
+            status: SyncStatusEnum.Error,
+            errorMessage: syncResult.errorMessage,
+          },
         });
-        if (latestPending) {
-          await prisma.syncStatus.update({
-            where: { id: latestPending.id },
-            data: {
-              status: SyncStatusEnum.Error,
-              errorMessage: syncResult.errorMessage,
-            },
-          });
-        }
       }
 
       // Keep only the 5 most recent statuses

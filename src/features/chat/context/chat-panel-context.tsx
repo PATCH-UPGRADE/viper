@@ -22,8 +22,6 @@ export function useChatUI() {
   return context;
 }
 
-const CHAT_PANEL_WIDTH = "400px";
-
 export function ChatProvider({
   defaultOpen = false,
   open: openProp,
@@ -65,11 +63,6 @@ export function ChatProvider({
     <ChatContext.Provider value={contextValue}>
       <div
         data-slot="sidebar-wrapper"
-        style={
-          {
-            "--chat-panel-width": CHAT_PANEL_WIDTH,
-          } as React.CSSProperties
-        }
         className="group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full"
       >
         {children}

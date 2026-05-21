@@ -1,19 +1,10 @@
-import { AppSidebar } from "@/components/app-sidebar";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { ChatPanel } from "@/features/chat/components/chat-panel";
 import { ChatProvider } from "@/features/chat/context/chat-panel-context";
+import LayoutInner from "./layout-client";
 
-const Layout = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <ChatProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset className="bg-accent/20">{children}</SidebarInset>
-        {/*TODO: make chat panel resizable*/}
-        <ChatPanel />
-      </SidebarProvider>
-    </ChatProvider>
-  );
-};
+const Layout = ({ children }: { children: React.ReactNode }) => (
+  <ChatProvider>
+    <LayoutInner>{children}</LayoutInner>
+  </ChatProvider>
+);
 
 export default Layout;

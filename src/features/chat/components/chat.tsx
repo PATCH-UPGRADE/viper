@@ -14,16 +14,19 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Fullscreen,
   Loader2,
   MessageSquarePlus,
+  Minimize2,
   SendHorizontal,
   Trash2,
   Wrench,
   X,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -32,6 +35,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Field,
   FieldContent,
@@ -75,6 +84,8 @@ export const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
     approveToolCall: "/api/v1/chat/approve-tool",
   },
 };
+
+const REMARK_PLUGINS = [remarkGfm];
 
 interface AIChatProps {
   config?: UseChatAgentConfig;
@@ -367,6 +378,37 @@ function AnswerSummary({
   );
 }
 
+const MarkdownWithTablesWrapper = memo(({ children }: { children: string }) => {
+  // memo-ized to prevent re-rendering as parsing markdown is really slow!!
+  // the Remark-GFM plugin will convert markdown text tables into proper <table> elements in-line
+  // they still need to be styled to look good though - CSS generated using Claude LLM
+  return (
+    <div
+      className="
+        markdown block
+        [&_table]:w-full [&_table]:border-collapse
+        [&_th]:border [&_th]:border-gray-300 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:bg-gray-50
+        [&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2
+        [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mb-4
+        [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mb-3
+        [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mb-2
+        [&_p]:mb-3 [&_p]:leading-relaxed
+        [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3
+        [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3
+        [&_li]:mb-1
+        [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm [&_code]:font-mono
+        [&_pre]:bg-gray-100 [&_pre]:p-4 [&_pre]:rounded [&_pre]:overflow-x-auto [&_pre]:mb-3
+        [&_pre_code]:bg-transparent [&_pre_code]:p-0
+        [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-gray-600
+        [&_a]:text-blue-600 [&_a]:underline [&_a]:hover:text-blue-800
+        [&_hr]:border-gray-200 [&_hr]:my-4
+      "
+    >
+      <Markdown remarkPlugins={REMARK_PLUGINS}>{children}</Markdown>
+    </div>
+  );
+});
+
 function ChatMessage({
   message,
   user,
@@ -381,6 +423,7 @@ function ChatMessage({
   const { role, parts } = message;
 
   const hasText = parts.some((p) => p.type === "text");
+  // const hasTable = parts.some((p) => p.type === "text" && p.content.includes("|"));
 
   return (
     <div
@@ -399,7 +442,7 @@ function ChatMessage({
 
       <div
         className={cn(
-          "max-w-[80%] text-sm",
+          "max-w-[80%] text-sm overflow-x-auto",
           role === "user"
             ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-3 py-2"
             : hasText
@@ -425,9 +468,9 @@ function ChatMessage({
               }
             }
             return (
-              <div key={`${part.id}-${idx}`} className="markdown">
-                <Markdown>{part.content}</Markdown>
-              </div>
+              <MarkdownWithTablesWrapper key={`${part.id}-${idx}`}>
+                {part.content}
+              </MarkdownWithTablesWrapper>
             );
           }
           if (part.type === "tool-call") {
@@ -742,9 +785,11 @@ function ChatInner({
     deleteThread,
   } = agent;
   const { userRole } = useChatUI();
+
   const [input, setInput] = useState("");
   const [configOverride, setConfigOverride] =
     useState<Partial<UseChatAgentConfig>>();
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const isAgentBusy = status !== "ready" || !isConnected;
@@ -819,7 +864,7 @@ function ChatInner({
     sendWithOverride(value);
   };
 
-  return (
+  const chatContent = (
     <div className="flex flex-col h-full">
       <div className="bg-muted p-2 flex gap-2 justify-between">
         <ThreadSelector
@@ -832,36 +877,61 @@ function ChatInner({
           loadMoreThreads={loadMoreThreads}
         />
         <div>
-          {currentThreadId && (
-            <TooltipProvider>
+          <TooltipProvider>
+            {isFullscreen ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
-                    onClick={() => agent.switchToThread("")}
+                    onClick={() => setIsFullscreen(false)}
                   >
-                    <MessageSquarePlus />
+                    <Minimize2 />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>New Chat</TooltipContent>
+                <TooltipContent>Exit fullscreen</TooltipContent>
               </Tooltip>
+            ) : (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive"
-                    onClick={async () => {
-                      await deleteThread(currentThreadId);
-                      agent.refreshThreads();
-                    }}
-                  >
-                    <Trash2 />
+                  <Button variant="ghost" onClick={() => setIsFullscreen(true)}>
+                    <Fullscreen />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Delete Thread</TooltipContent>
+                <TooltipContent>Fullscreen</TooltipContent>
               </Tooltip>
-            </TooltipProvider>
-          )}
+            )}
+
+            {currentThreadId && (
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      onClick={() => agent.switchToThread("")}
+                    >
+                      <MessageSquarePlus />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>New Chat</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      onClick={async () => {
+                        await deleteThread(currentThreadId);
+                        agent.refreshThreads();
+                      }}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete Thread</TooltipContent>
+                </Tooltip>
+              </>
+            )}
+          </TooltipProvider>
         </div>
       </div>
       <div ref={containerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -904,5 +974,30 @@ function ChatInner({
         hasActiveQuestions={hasActiveQuestions}
       />
     </div>
+  );
+
+  return (
+    <>
+      {/* handle pop-out by conditionally rendering the SAME chat box in one of two places */}
+      {isFullscreen ? (
+        <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
+          <Fullscreen className="size-8" />
+          AI Chat is currently fullscreened.
+        </div>
+      ) : (
+        chatContent
+      )}
+
+      <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
+        {/* hide DialogContent close button (keep ESC functionality) and let Minimize button do it */}
+        <DialogContent className="min-w-1/2 w-full h-full flex flex-col p-0 gap-0 [&>button:last-child]:hidden">
+          <DialogTitle className="sr-only">AI Chat</DialogTitle>
+          <DialogDescription className="sr-only">
+            Fullscreened AI Chat window
+          </DialogDescription>
+          {chatContent}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

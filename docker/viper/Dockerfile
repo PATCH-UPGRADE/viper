@@ -4,6 +4,8 @@ RUN apt-get update && apt-get install -y openssl
 COPY . .
 RUN npm ci
 RUN npx prisma generate
+ARG NEXT_PUBLIC_INNGEST_BASE_URL=http://localhost:8288
+ENV NEXT_PUBLIC_INNGEST_BASE_URL=$NEXT_PUBLIC_INNGEST_BASE_URL
 RUN npm run build
 
 

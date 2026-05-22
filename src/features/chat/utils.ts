@@ -1,3 +1,4 @@
+import { assetUtilizationSchema } from "@/features/assets/types";
 import type { HistoryMessage } from "./types";
 
 // ─── Structural interfaces for markdown rendering ─────────────────────────────
@@ -13,6 +14,7 @@ interface AssetForMarkdown {
   networkSegment?: string | null;
   serialNumber?: string | null;
   location?: unknown;
+  utilization?: unknown;
   updatedAt?: Date;
   deviceGroup: {
     manufacturer?: string | null;
@@ -77,6 +79,56 @@ interface RemediationForMarkdown {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const UTILIZATION_DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function utilizationBucket(
+  value: number,
+): "Offline" | "Low" | "Medium" | "High" {
+  if (value === 0) return "Offline";
+  if (value <= 30) return "Low";
+  if (value <= 50) return "Medium";
+  return "High";
+}
+
+function renderUtilizationLine(raw: unknown): string {
+  const parsed = assetUtilizationSchema.safeParse(raw);
+  if (!parsed.success) return "No data";
+  const data = parsed.data;
+
+  const parts: string[] = [];
+  for (let dayIdx = 0; dayIdx < data.length; dayIdx++) {
+    const dayData = data[dayIdx];
+    const dayName = UTILIZATION_DAY_NAMES[dayIdx] ?? `Day${dayIdx}`;
+    const hours = Object.keys(dayData)
+      .map(Number)
+      .sort((a, b) => a - b);
+
+    if (hours.length === 0) {
+      parts.push(`${dayName}: Offline`);
+      continue;
+    }
+
+    const segments: { bucket: string; start: number; end: number }[] = [];
+    for (const hour of hours) {
+      const bucket = utilizationBucket(dayData[String(hour)] ?? 0);
+      const last = segments[segments.length - 1];
+      if (last && last.bucket === bucket && last.end === hour - 1) {
+        last.end = hour;
+      } else {
+        segments.push({ bucket, start: hour, end: hour });
+      }
+    }
+
+    const segStrs = segments.map(({ bucket, start, end }) => {
+      const range = start === end ? `${start}:00` : `${start}:00–${end + 1}:00`;
+      return `${range} [${bucket}]`;
+    });
+    parts.push(`${dayName}: ${segStrs.join(", ")}`);
+  }
+
+  return parts.join(" | ");
+}
+
 function truncate(text: string | null | undefined, max = 400): string {
   if (!text) return "";
   return text.length > max ? `${text.slice(0, max)}…` : text;
@@ -125,6 +177,10 @@ export function assetToMarkdown(
     `- **Device Group**: ${[a.deviceGroup.manufacturer, a.deviceGroup.modelName].filter(Boolean).join(" ")} (CPE: ${a.deviceGroup.cpe})`.trim(),
     `- **Device Group Version**: ${a.deviceGroup.version ?? "N/A"}`,
   ];
+
+  lines.push(
+    `- **Utilization Schedule**: ${renderUtilizationLine(a.utilization)}`,
+  );
 
   if (a.updatedAt) {
     lines.push(`- **Last Updated**: ${new Date(a.updatedAt).toISOString()}`);

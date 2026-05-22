@@ -15,6 +15,7 @@ import {
   Panel,
   ReactFlow,
 } from "@xyflow/react";
+import { useTheme } from "next-themes";
 import { useCallback, useState } from "react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { useSuspenseWorkflow } from "@/features/workflows/hooks/use-workflows";
@@ -35,8 +36,16 @@ export const EditorError = () => {
 
 export const Editor = ({ workflowId }: { workflowId: string }) => {
   const { data: workflow } = useSuspenseWorkflow(workflowId);
+  const { resolvedTheme } = useTheme();
 
   const setEditor = useSetAtom(editorAtom);
+  const colorMode = resolvedTheme === "dark" ? "dark" : "light";
+  const miniMapMaskColor =
+    colorMode === "dark" ? "rgb(2 6 23 / 0.55)" : "rgb(255 255 255 / 0.65)";
+  // Workaround to make the background dots more visible in light mode, since the default color is too light
+  const backgroundDotColor =
+    colorMode === "dark" ? "var(--border)" : "rgb(100 116 139 / 0.55)";
+  const backgroundDotSize = colorMode === "dark" ? 1 : 1.25;
 
   const [nodes, setNodes] = useState<Node[]>(workflow.nodes);
   const [edges, setEdges] = useState<Edge[]>(workflow.edges);
@@ -73,10 +82,34 @@ export const Editor = ({ workflowId }: { workflowId: string }) => {
         panOnScroll
         panOnDrag={false}
         selectionOnDrag
+        colorMode={colorMode}
       >
-        <Background />
-        <Controls />
-        <MiniMap />
+        <Background
+          color={backgroundDotColor}
+          gap={16}
+          size={backgroundDotSize}
+        />
+        <Controls
+          style={{
+            backgroundColor: "var(--card)",
+            color: "var(--card-foreground)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            boxShadow: "var(--shadow-sm)",
+          }}
+        />
+        <MiniMap
+          pannable
+          zoomable
+          nodeColor="var(--primary)"
+          maskColor={miniMapMaskColor}
+          style={{
+            backgroundColor: "var(--card)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            boxShadow: "var(--shadow-sm)",
+          }}
+        />
         <Panel position="top-right">
           <AddNodeButton />
         </Panel>

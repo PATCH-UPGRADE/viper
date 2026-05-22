@@ -127,8 +127,10 @@ const PrioritiesExplained = {
   Critical: {
     help: "Immediate remediation required. Confirmed exploitation of high-impact vulnerabilities.",
     icon: ShieldAlert,
-    color: "text-red-600",
-    colorBg: "bg-red-50",
+    color: "text-red-600 dark:text-red-400",
+    colorBg: "bg-red-50 dark:bg-red-950/25",
+    alertClass:
+      "border-red-200/80 bg-red-50/80 dark:border-red-900/70 dark:bg-red-950/40",
     alertHeader: "Critical - Immediate Remediation",
     alertBody:
       "These vulnerabilities have confirmed exploitation of high-impact systems and require immediate action. They pose the highest risk to patient safety and data security.",
@@ -136,8 +138,10 @@ const PrioritiesExplained = {
   High: {
     help: "Scheduled remediation required. Predicted exploitation of high-impact vulnerabilities.",
     icon: ShieldClose,
-    color: "text-orange-600",
-    colorBg: "bg-orange-50",
+    color: "text-orange-600 dark:text-orange-400",
+    colorBg: "bg-orange-50 dark:bg-orange-950/25",
+    alertClass:
+      "border-orange-200/80 bg-orange-50/80 dark:border-orange-900/70 dark:bg-orange-950/40",
     alertHeader: "High - Scheduled Remediation",
     alertBody:
       "These vulnerabilities indicate predicted exploitation of high-impact systems. Plan and schedule remediation activities within your next maintenance window.",
@@ -145,8 +149,10 @@ const PrioritiesExplained = {
   Monitor: {
     help: "Track for changes in threat landscape or impact assessment.",
     icon: Eye,
-    color: "text-yellow-600",
-    colorBg: "bg-yellow-50",
+    color: "text-yellow-700 dark:text-yellow-300",
+    colorBg: "bg-yellow-50 dark:bg-yellow-950/25",
+    alertClass:
+      "border-yellow-200/80 bg-yellow-50/80 dark:border-yellow-900/70 dark:bg-yellow-950/40",
     alertHeader: "Monitor - Track Changes",
     alertBody:
       "These vulnerabilities should be monitored for changes in threat landscape or impact assessment. No immediate action required.",
@@ -154,8 +160,10 @@ const PrioritiesExplained = {
   Defer: {
     help: "Standard patching. No exploitation evidence, can be addressed through standard patching cycles.",
     icon: Clock,
-    color: "text-blue-600",
-    colorBg: "bg-blue-50",
+    color: "text-blue-600 dark:text-blue-400",
+    colorBg: "bg-blue-50 dark:bg-blue-950/25",
+    alertClass:
+      "border-blue-200/80 bg-blue-50/80 dark:border-blue-900/70 dark:bg-blue-950/40",
     alertHeader: "Defer - Standard Patching",
     alertBody:
       "These vulnerabilities have no exploitation evidence and can be addressed through standard patching cycles.",
@@ -163,8 +171,9 @@ const PrioritiesExplained = {
   Unsorted: {
     help: "Not yet prioritized. Awaiting enrichment data or manual triage.",
     icon: BugIcon,
-    color: "text-gray-500",
-    colorBg: "bg-gray-50",
+    color: "text-gray-500 dark:text-gray-400",
+    colorBg: "bg-gray-50 dark:bg-gray-900/40",
+    alertClass: "",
     alertHeader: "",
     alertBody: "",
   },
@@ -256,7 +265,7 @@ export const PrioritizedVulnerabilitiesList = () => {
         />
       )}
       {explained.alertBody && explained.alertHeader && (
-        <Alert className={explained.colorBg}>
+        <Alert className={explained.alertClass}>
           {<explained.icon className={explained.color} />}
           <AlertDescription className="text-foreground">
             <strong>{explained.alertHeader}</strong> {explained.alertBody}

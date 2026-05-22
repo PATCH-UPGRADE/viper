@@ -1,182 +1,242 @@
 {
   "schema_version": "0.1.0-minimal",
-  "snapshot_id": "a1b2c3d4-e5f6-4789-a012-b34c56d7e8f9",
+  "snapshot_id": "b2c3d4e5-f6a7-4891-b234-c56d78e9f012",
   "timestamp": "2026-05-21T00:00:00Z",
   "assets": [
     {
-      "id": "seed-asset-001",
-      "manufacturer": "Philips",
+      "id": "rad-ct-001",
+      "manufacturer": "GE Healthcare",
       "interfaces": [
         {
-          "id": "if-001",
-          "mac_address": "00:1A:2B:3C:4D:5E",
-          "ipv4_address": "10.20.1.101",
+          "id": "if-ct-001",
+          "mac_address": "00:1A:2B:3C:50:10",
+          "ipv4_address": "10.40.1.10",
           "ipv6_address": null
         }
       ],
-      "services": []
+      "services": [{ "port": 104, "protocol": "tcp" }]
     },
     {
-      "id": "seed-asset-002",
-      "manufacturer": "Baxter",
+      "id": "rad-ws-001",
+      "manufacturer": "GE Healthcare",
       "interfaces": [
         {
-          "id": "if-002",
-          "mac_address": "00:1A:2B:3C:4D:5F",
-          "ipv4_address": "10.20.1.102",
+          "id": "if-ws-001",
+          "mac_address": "00:1A:2B:3C:50:20",
+          "ipv4_address": "10.40.1.20",
           "ipv6_address": null
         }
       ],
-      "services": []
+      "services": [{ "port": 104, "protocol": "tcp" }]
     },
     {
-      "id": "seed-asset-003",
-      "manufacturer": "Roche",
+      "id": "rad-us-001",
+      "manufacturer": "GE Healthcare",
       "interfaces": [
         {
-          "id": "if-003",
-          "mac_address": "00:1A:2B:3C:4D:62",
-          "ipv4_address": "10.30.2.201",
+          "id": "if-us-001",
+          "mac_address": "00:1A:2B:3C:50:30",
+          "ipv4_address": "10.40.1.30",
           "ipv6_address": null
         }
       ],
-      "services": [{ "port": 2575, "protocol": "tcp" }]
+      "services": [{ "port": 104, "protocol": "tcp" }]
     },
     {
-      "id": "seed-asset-004",
-      "manufacturer": "Epic Systems",
+      "id": "rad-us-002",
+      "manufacturer": "GE Healthcare",
       "interfaces": [
         {
-          "id": "if-004",
-          "mac_address": "00:1A:2B:3C:4D:68",
-          "ipv4_address": "10.10.4.401",
+          "id": "if-us-002",
+          "mac_address": "00:1A:2B:3C:50:31",
+          "ipv4_address": "10.40.1.31",
+          "ipv6_address": null
+        }
+      ],
+      "services": [{ "port": 104, "protocol": "tcp" }]
+    },
+    {
+      "id": "rad-xr-001",
+      "manufacturer": "GE Healthcare",
+      "interfaces": [
+        {
+          "id": "if-xr-001",
+          "mac_address": "00:1A:2B:3C:50:40",
+          "ipv4_address": "10.40.1.40",
+          "ipv6_address": null
+        }
+      ],
+      "services": [{ "port": 104, "protocol": "tcp" }]
+    },
+    {
+      "id": "rad-pacs-001",
+      "manufacturer": "GE Healthcare",
+      "interfaces": [
+        {
+          "id": "if-pacs-001",
+          "mac_address": "00:1A:2B:3C:51:10",
+          "ipv4_address": "10.40.2.10",
+          "ipv6_address": null
+        }
+      ],
+      "services": [
+        { "port": 104, "protocol": "tcp" },
+        { "port": 443, "protocol": "tcp" }
+      ]
+    },
+    {
+      "id": "rad-rws-001",
+      "manufacturer": "GE Healthcare",
+      "interfaces": [
+        {
+          "id": "if-rws-001",
+          "mac_address": "00:1A:2B:3C:51:20",
+          "ipv4_address": "10.40.2.20",
+          "ipv6_address": null
+        }
+      ],
+      "services": [{ "port": 104, "protocol": "tcp" }]
+    },
+    {
+      "id": "rad-rws-002",
+      "manufacturer": "GE Healthcare",
+      "interfaces": [
+        {
+          "id": "if-rws-002",
+          "mac_address": "00:1A:2B:3C:51:21",
+          "ipv4_address": "10.40.2.21",
+          "ipv6_address": null
+        }
+      ],
+      "services": [{ "port": 104, "protocol": "tcp" }]
+    },
+    {
+      "id": "rad-ed-001",
+      "manufacturer": "Dell",
+      "interfaces": [
+        {
+          "id": "if-ed-001",
+          "mac_address": "00:1A:2B:3C:52:10",
+          "ipv4_address": "10.50.1.10",
+          "ipv6_address": null
+        }
+      ],
+      "services": [{ "port": 443, "protocol": "tcp" }]
+    },
+    {
+      "id": "rad-vpn-001",
+      "manufacturer": "Cisco",
+      "interfaces": [
+        {
+          "id": "if-vpn-001",
+          "mac_address": "00:1A:2B:3C:53:10",
+          "ipv4_address": "10.70.1.10",
           "ipv6_address": null
         }
       ],
       "services": [
         { "port": 443, "protocol": "tcp" },
-        { "port": 2575, "protocol": "tcp" }
+        { "port": 500, "protocol": "udp" },
+        { "port": 4500, "protocol": "udp" }
       ]
     },
     {
-      "id": "seed-asset-005",
-      "manufacturer": "Dell",
+      "id": "rad-sw-001",
+      "manufacturer": "Cisco",
       "interfaces": [
         {
-          "id": "if-005",
-          "mac_address": "00:1A:2B:3C:4D:6E",
-          "ipv4_address": "10.60.6.601",
-          "ipv6_address": null
-        }
-      ],
-      "services": []
-    },
-    {
-      "id": "seed-asset-006",
-      "manufacturer": "HP",
-      "interfaces": [
-        {
-          "id": "if-006",
-          "mac_address": "00:1A:2B:3C:4D:6F",
-          "ipv4_address": "10.60.6.602",
-          "ipv6_address": null
-        }
-      ],
-      "services": []
-    },
-    {
-      "id": "seed-asset-007",
-      "manufacturer": "Cisco Systems",
-      "interfaces": [
-        {
-          "id": "if-007",
-          "mac_address": "00:1A:2B:3C:4D:71",
-          "ipv4_address": "10.70.7.701",
+          "id": "if-sw-001",
+          "mac_address": "00:1A:2B:3C:53:20",
+          "ipv4_address": "10.70.1.20",
           "ipv6_address": null
         }
       ],
       "services": [{ "port": 22, "protocol": "tcp" }]
     },
     {
-      "id": "seed-asset-008",
-      "manufacturer": "Fortinet",
+      "id": "rad-fw-001",
+      "manufacturer": "Cisco",
       "interfaces": [
         {
-          "id": "if-008",
-          "mac_address": "00:1A:2B:3C:4D:72",
-          "ipv4_address": "10.70.7.702",
+          "id": "if-fw-001",
+          "mac_address": "00:1A:2B:3C:53:01",
+          "ipv4_address": "10.70.1.1",
           "ipv6_address": null
         }
       ],
-      "services": [
-        { "port": 443, "protocol": "tcp" },
-        { "port": 53, "protocol": "udp" }
-      ]
+      "services": [{ "port": 443, "protocol": "tcp" }]
     }
   ],
   "connections": [
     {
-      "src_asset_id": "seed-asset-001",
-      "dst_asset_id": "seed-asset-004",
-      "dst_port": 2575,
+      "src_asset_id": "rad-ct-001",
+      "dst_asset_id": "rad-ws-001",
+      "dst_port": 104,
       "protocol": "tcp",
       "direction": "bidirectional"
     },
     {
-      "src_asset_id": "seed-asset-002",
-      "dst_asset_id": "seed-asset-004",
-      "dst_port": 2575,
+      "src_asset_id": "rad-ws-001",
+      "dst_asset_id": "rad-pacs-001",
+      "dst_port": 104,
       "protocol": "tcp",
       "direction": "unidirectional"
     },
     {
-      "src_asset_id": "seed-asset-003",
-      "dst_asset_id": "seed-asset-004",
-      "dst_port": 2575,
+      "src_asset_id": "rad-us-001",
+      "dst_asset_id": "rad-pacs-001",
+      "dst_port": 104,
+      "protocol": "tcp",
+      "direction": "unidirectional"
+    },
+    {
+      "src_asset_id": "rad-us-002",
+      "dst_asset_id": "rad-pacs-001",
+      "dst_port": 104,
+      "protocol": "tcp",
+      "direction": "unidirectional"
+    },
+    {
+      "src_asset_id": "rad-xr-001",
+      "dst_asset_id": "rad-pacs-001",
+      "dst_port": 104,
+      "protocol": "tcp",
+      "direction": "unidirectional"
+    },
+    {
+      "src_asset_id": "rad-pacs-001",
+      "dst_asset_id": "rad-rws-001",
+      "dst_port": 104,
       "protocol": "tcp",
       "direction": "bidirectional"
     },
     {
-      "src_asset_id": "seed-asset-005",
-      "dst_asset_id": "seed-asset-004",
+      "src_asset_id": "rad-pacs-001",
+      "dst_asset_id": "rad-rws-002",
+      "dst_port": 104,
+      "protocol": "tcp",
+      "direction": "bidirectional"
+    },
+    {
+      "src_asset_id": "rad-pacs-001",
+      "dst_asset_id": "rad-ed-001",
       "dst_port": 443,
       "protocol": "tcp",
       "direction": "bidirectional"
     },
     {
-      "src_asset_id": "seed-asset-006",
-      "dst_asset_id": "seed-asset-004",
+      "src_asset_id": "rad-pacs-001",
+      "dst_asset_id": "rad-vpn-001",
       "dst_port": 443,
       "protocol": "tcp",
       "direction": "bidirectional"
     },
     {
-      "src_asset_id": "seed-asset-001",
-      "dst_asset_id": "seed-asset-007",
-      "dst_port": 22,
-      "protocol": "tcp",
-      "direction": "unidirectional"
-    },
-    {
-      "src_asset_id": "seed-asset-003",
-      "dst_asset_id": "seed-asset-007",
-      "dst_port": 22,
-      "protocol": "tcp",
-      "direction": "unidirectional"
-    },
-    {
-      "src_asset_id": "seed-asset-007",
-      "dst_asset_id": "seed-asset-008",
+      "src_asset_id": "rad-sw-001",
+      "dst_asset_id": "rad-fw-001",
       "dst_port": 443,
       "protocol": "tcp",
       "direction": "bidirectional"
-    },
-    {
-      "src_asset_id": "seed-asset-008",
-      "dst_asset_id": "seed-asset-004",
-      "dst_port": 443,
-      "protocol": "tcp",
-      "direction": "unidirectional"
     }
   ]
 }

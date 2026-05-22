@@ -14,491 +14,291 @@ const SEED_USER = {
   name: "Seed User",
 };
 
-// Sample device groups (manufacturers and models)
+// Device groups — one entry per unique CPE
 const SAMPLE_DEVICE_GROUPS = [
-  // ICU Medical Devices
+  // ── CT Scanner ──────────────────────────────────────────────────────────────
   {
-    cpe: "cpe:2.3:h:philips:intellivue_mp70:*:*:*:*:*:*:*:*",
-    manufacturer: "Philips",
-    modelName: "IntelliVue MP70",
-    version: "Rev B",
-  },
-  {
-    cpe: "cpe:2.3:h:baxter:infusion_pump:sigma_spectrum:*:*:*:*:*:*:*",
-    manufacturer: "Baxter",
-    modelName: "Sigma Spectrum Infusion Pump",
-    version: "8.0",
-  },
-  {
-    cpe: "cpe:2.3:h:ge_healthcare:dash_4000:*:*:*:*:*:*:*:*",
+    cpe: "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
     manufacturer: "GE Healthcare",
-    modelName: "DASH 4000",
-    version: "3.0",
+    modelName: "BrightSpeed Elite Select",
+    version: "unknown",
   },
+  // ── CT Acquisition Workstation Software ─────────────────────────────────────
   {
-    cpe: "cpe:2.3:h:draeger:evita_v500:*:*:*:*:*:*:*:*",
-    manufacturer: "Dräger",
-    modelName: "Evita V500",
-    version: "2.5",
+    cpe: "cpe:2.3:a:gehealthcare:advantage_workstation:4.6:*:*:*:*:*:*:*",
+    manufacturer: "GE Healthcare",
+    modelName: "Advantage Workstation",
+    version: "4.6",
   },
-  // Laboratory Equipment
+  // ── PACS Server Software (versioned) ────────────────────────────────────────
   {
-    cpe: "cpe:2.3:h:roche:cobas_6000:*:*:*:*:*:*:*:*",
-    manufacturer: "Roche",
-    modelName: "Cobas 6000",
-    version: "c501",
-  },
-  {
-    cpe: "cpe:2.3:h:abbott:architect_i2000sr:*:*:*:*:*:*:*:*",
-    manufacturer: "Abbott",
-    modelName: "Architect i2000SR",
+    cpe: "cpe:2.3:a:gehealthcare:centricity_pacs_iw:5.0:*:*:*:*:*:*:*",
+    manufacturer: "GE Healthcare",
+    modelName: "Centricity PACS-IW",
     version: "5.0",
   },
+  // ── Radiology Diagnostic Workstation Software (viewer, unversioned) ──────────
   {
-    cpe: "cpe:2.3:h:sysmex:xs-1000i:*:*:*:*:*:*:*:*",
-    manufacturer: "Sysmex",
-    modelName: "XS-1000i",
-    version: "1.2",
-  },
-  // Imaging Equipment
-  {
-    cpe: "cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*",
-    manufacturer: "Siemens Healthineers",
-    modelName: "Magnetom Aera",
-    version: "VE11C",
-  },
-  {
-    cpe: "cpe:2.3:h:ge_healthcare:optima_ct660:*:*:*:*:*:*:*:*",
+    cpe: "cpe:2.3:a:gehealthcare:centricity_pacs_iw:-:*:*:*:*:*:*:*",
     manufacturer: "GE Healthcare",
-    modelName: "Optima CT660",
-    version: "15.0",
+    modelName: "Centricity PACS-IW",
+    version: "unknown",
+  },
+  // ── EOL OS platforms (exist for vulnerability targeting; no assets use these
+  //    as primary CPE, but EternalBlue affectedDeviceGroups connects here too
+  //    so seedIssues creates Issue records for all Windows hosts) ──────────────
+  {
+    cpe: "cpe:2.3:o:microsoft:windows_7:-:*:*:*:*:*:*:*",
+    manufacturer: "Microsoft",
+    modelName: "Windows 7",
+    version: "EOL",
   },
   {
-    cpe: "cpe:2.3:h:fujifilm:fcr_xg-1:*:*:*:*:*:*:*:*",
-    manufacturer: "Fujifilm",
-    modelName: "FCR XG-1",
-    version: "2.0",
+    cpe: "cpe:2.3:o:microsoft:windows_server_2008:r2:sp1:*:*:*:*:x64:*",
+    manufacturer: "Microsoft",
+    modelName: "Windows Server 2008 R2",
+    version: "SP1 (EOL)",
   },
-  // IT Infrastructure
+  // ── ED Image Viewer Hardware ─────────────────────────────────────────────────
   {
-    cpe: "cpe:2.3:a:epic:emr:2023:*:*:*:*:*:*:*",
-    manufacturer: "Epic Systems",
-    modelName: "EMR",
-    version: "2023",
-  },
-  {
-    cpe: "cpe:2.3:a:cerner:millennium:*:*:*:*:*:*:*:*",
-    manufacturer: "Cerner",
-    modelName: "Millennium",
-    version: "2023.1",
-  },
-  {
-    cpe: "cpe:2.3:a:meditech:expanse:*:*:*:*:*:*:*:*",
-    manufacturer: "Meditech",
-    modelName: "Expanse",
-    version: "7.0",
-  },
-  {
-    cpe: "cpe:2.3:h:cisco:unified_communications:*:*:*:*:*:*:*:*",
-    manufacturer: "Cisco",
-    modelName: "Unified Communications",
-    version: "12.5",
-  },
-  // Surgical Equipment
-  {
-    cpe: "cpe:2.3:h:stryker:surgical_navigation:*:*:*:*:*:*:*:*",
-    manufacturer: "Stryker",
-    modelName: "Surgical Navigation System",
-    version: "8.0",
-  },
-  {
-    cpe: "cpe:2.3:h:intuitive:da_vinci_xi:*:*:*:*:*:*:*:*",
-    manufacturer: "Intuitive Surgical",
-    modelName: "da Vinci Xi",
-    version: "5.0",
-  },
-  // Workstations
-  {
-    cpe: "cpe:2.3:h:dell:optiplex_7090:*:*:*:*:*:*:*:*",
+    cpe: "cpe:2.3:h:dell:optiplex_790:-:*:*:*:*:*:*:*",
     manufacturer: "Dell",
-    modelName: "OptiPlex 7090",
+    modelName: "OptiPlex 790",
+    version: "N/A",
+  },
+  // ── Network / VPN Appliance ──────────────────────────────────────────────────
+  {
+    cpe: "cpe:2.3:h:cisco:asa_5505:-:*:*:*:*:*:*:*",
+    manufacturer: "Cisco",
+    modelName: "ASA 5505",
     version: "N/A",
   },
   {
-    cpe: "cpe:2.3:h:hp:elitedesk_800:*:*:*:*:*:*:*:*",
-    manufacturer: "HP",
-    modelName: "EliteDesk 800",
-    version: "G8",
-  },
-  {
-    cpe: "cpe:2.3:h:lenovo:thinkcentre_m90a:*:*:*:*:*:*:*:*",
-    manufacturer: "Lenovo",
-    modelName: "ThinkCentre M90a",
-    version: "Gen 3",
-  },
-  // Network Infrastructure
-  {
-    cpe: "cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*",
+    cpe: "cpe:2.3:a:cisco:adaptive_security_appliance_software:8.2:*:*:*:*:*:*:*",
     manufacturer: "Cisco",
-    modelName: "Catalyst 9300",
-    version: "IOS-XE 17.6",
+    modelName: "Adaptive Security Appliance Software",
+    version: "8.2",
   },
+  // ── Portable Ultrasound ──────────────────────────────────────────────────────
   {
-    cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
-    manufacturer: "Fortinet",
-    modelName: "FortiGate 600E",
-    version: "7.0",
+    cpe: "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
+    manufacturer: "GE Healthcare",
+    modelName: "LOGIQ e R7",
+    version: "R7",
+  },
+  // ── X-Ray / DR Node ─────────────────────────────────────────────────────────
+  {
+    cpe: "cpe:2.3:h:gehealthcare:optima_xr200amx:-:*:*:*:*:*:*:*",
+    manufacturer: "GE Healthcare",
+    modelName: "Optima XR200amx",
+    version: "N/A",
+  },
+  // ── Network Switch ───────────────────────────────────────────────────────────
+  {
+    cpe: "cpe:2.3:h:cisco:catalyst_2960s-24ts-l:-:*:*:*:*:*:*:*",
+    manufacturer: "Cisco",
+    modelName: "Catalyst 2960S-24TS-L",
+    version: "N/A",
+  },
+  // ── Patient Monitor ──────────────────────────────────────────────────────────
+  {
+    cpe: "cpe:2.3:h:philips:intellivue_mp5:-:*:*:*:*:*:*:*",
+    manufacturer: "Philips",
+    modelName: "IntelliVue MP5",
+    version: "N/A",
+  },
+  // ── Infusion Pump ────────────────────────────────────────────────────────────
+  {
+    cpe: "cpe:2.3:h:baxter:sigma_spectrum:-:*:*:*:*:*:*:*",
+    manufacturer: "Baxter",
+    modelName: "Sigma Spectrum",
+    version: "N/A",
   },
 ];
 
-// Sample hospital asset data (individual devices)
+// Individual hospital assets
 const SAMPLE_ASSETS = [
-  // ICU Medical Devices
+  // ── Imaging Devices (IMAGING-VLAN-40) ───────────────────────────────────────
   {
-    id: "seed-asset-001",
-    ip: "10.20.1.101",
-    cpe: "cpe:2.3:h:philips:intellivue_mp70:*:*:*:*:*:*:*:*",
-    role: "ICU Patient Monitor",
-    upstreamApi: "https://api.philips.com/devices/monitor",
-    networkSegment: "ICU-VLAN-20",
-    hostname: "ICU-MON-101",
-    macAddress: "00:1A:2B:3C:4D:5E",
-    serialNumber: "PH-MP70-2023-001",
-    location: {
-      facility: "Main Hospital",
-      building: "Tower A",
-      floor: "3",
-      room: "ICU-301",
-    },
-    status: "Active",
-  },
-  {
-    id: "seed-asset-002",
-    ip: "10.20.1.102",
-    cpe: "cpe:2.3:h:baxter:infusion_pump:sigma_spectrum:*:*:*:*:*:*:*",
-    role: "Infusion Pump",
-    upstreamApi: "https://api.baxter.com/devices/pump",
-    networkSegment: "ICU-VLAN-20",
-    hostname: "ICU-PUMP-102",
-    macAddress: "00:1A:2B:3C:4D:5F",
-    serialNumber: "BX-SS-2023-042",
-    location: {
-      facility: "Main Hospital",
-      building: "Tower A",
-      floor: "3",
-      room: "ICU-302",
-    },
-    status: "Active",
-  },
-  {
-    ip: "10.20.1.103",
-    cpe: "cpe:2.3:h:ge_healthcare:dash_4000:*:*:*:*:*:*:*:*",
-    role: "Vital Signs Monitor",
-    upstreamApi: "https://api.gehealthcare.com/devices/vitals",
-    networkSegment: "ICU-VLAN-20",
-    hostname: "ICU-VITAL-103",
-    macAddress: "00:1A:2B:3C:4D:60",
-    serialNumber: "GE-D4K-2023-078",
-    location: {
-      facility: "Main Hospital",
-      building: "Tower A",
-      floor: "3",
-      room: "ICU-303",
-    },
-    status: "Active",
-  },
-  {
-    ip: "10.20.1.104",
-    cpe: "cpe:2.3:h:draeger:evita_v500:*:*:*:*:*:*:*:*",
-    role: "Ventilator",
-    upstreamApi: "https://api.draeger.com/devices/ventilator",
-    networkSegment: "ICU-VLAN-20",
-    hostname: "ICU-VENT-104",
-    macAddress: "00:1A:2B:3C:4D:61",
-    serialNumber: "DR-EV5-2023-015",
-    location: {
-      facility: "Main Hospital",
-      building: "Tower A",
-      floor: "3",
-      room: "ICU-304",
-    },
-    status: "Active",
-  },
-  // Laboratory Equipment
-  {
-    id: "seed-asset-003",
-    ip: "10.30.2.201",
-    cpe: "cpe:2.3:h:roche:cobas_6000:*:*:*:*:*:*:*:*",
-    role: "Laboratory Analyzer",
-    upstreamApi: "https://api.roche.com/lab/analyzer",
-    networkSegment: "LAB-VLAN-30",
-    hostname: "LAB-COBAS-201",
-    macAddress: "00:1A:2B:3C:4D:62",
-    serialNumber: "RC-C6K-2023-009",
-    location: {
-      facility: "Main Hospital",
-      building: "Tower B",
-      floor: "1",
-      room: "Lab-Core",
-    },
-    status: "Active",
-  },
-  {
-    ip: "10.30.2.202",
-    cpe: "cpe:2.3:h:abbott:architect_i2000sr:*:*:*:*:*:*:*:*",
-    role: "Immunoassay Analyzer",
-    upstreamApi: "https://api.abbott.com/lab/immunoassay",
-    networkSegment: "LAB-VLAN-30",
-    hostname: "LAB-ABBOTT-202",
-    macAddress: "00:1A:2B:3C:4D:63",
-    serialNumber: "AB-I2K-2023-024",
-    location: {
-      facility: "Main Hospital",
-      building: "Tower B",
-      floor: "1",
-      room: "Lab-Immuno",
-    },
-    status: "Active",
-  },
-  {
-    ip: "10.30.2.203",
-    cpe: "cpe:2.3:h:sysmex:xs-1000i:*:*:*:*:*:*:*:*",
-    role: "Hematology Analyzer",
-    upstreamApi: "https://api.sysmex.com/lab/hematology",
-    networkSegment: "LAB-VLAN-30",
-    hostname: "LAB-SYSMEX-203",
-    macAddress: "00:1A:2B:3C:4D:64",
-    serialNumber: "SY-XS1-2023-051",
-    location: {
-      facility: "Main Hospital",
-      building: "Tower B",
-      floor: "1",
-      room: "Lab-Heme",
-    },
-    status: "Active",
-  },
-  // Imaging Equipment
-  {
-    ip: "10.40.3.301",
-    cpe: "cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*",
-    role: "MRI Scanner",
-    upstreamApi: "https://api.siemens-healthineers.com/imaging/mri",
-    networkSegment: "IMAGING-VLAN-40",
-    hostname: "RAD-MRI-301",
-    macAddress: "00:1A:2B:3C:4D:65",
-    serialNumber: "SI-MAG-2023-003",
-    location: {
-      facility: "Main Hospital",
-      building: "Tower C",
-      floor: "1",
-      room: "MRI-Suite-1",
-    },
-    status: "Active",
-  },
-  {
-    ip: "10.40.3.302",
-    cpe: "cpe:2.3:h:ge_healthcare:optima_ct660:*:*:*:*:*:*:*:*",
+    id: "rad-ct-001",
+    ip: "10.40.1.10",
+    cpe: "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
     role: "CT Scanner",
-    upstreamApi: "https://api.gehealthcare.com/imaging/ct",
+    upstreamApi: "https://www.gehealthcare.com/support",
     networkSegment: "IMAGING-VLAN-40",
-    hostname: "RAD-CT-302",
-    macAddress: "00:1A:2B:3C:4D:66",
-    serialNumber: "GE-CT6-2023-012",
+    hostname: "CT-BRIGHT-001",
+    macAddress: "00:1A:2B:3C:50:10",
+    serialNumber: "GE-BS-2018-001",
     location: {
       facility: "Main Hospital",
       building: "Tower C",
       floor: "1",
-      room: "CT-Suite-2",
+      room: "CT-Suite-1",
     },
     status: "Active",
   },
   {
-    ip: "10.40.3.303",
-    cpe: "cpe:2.3:h:fujifilm:fcr_xg-1:*:*:*:*:*:*:*:*",
-    role: "X-Ray System",
-    upstreamApi: "https://api.fujifilm.com/imaging/xray",
+    id: "rad-us-001",
+    ip: "10.40.1.30",
+    cpe: "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
+    role: "Portable Ultrasound",
+    upstreamApi: "https://www.gehealthcare.com/support",
     networkSegment: "IMAGING-VLAN-40",
-    hostname: "RAD-XRAY-303",
-    macAddress: "00:1A:2B:3C:4D:67",
-    serialNumber: "FJ-XG1-2023-087",
+    hostname: "US-LOGIQ-001",
+    macAddress: "00:1A:2B:3C:50:30",
+    serialNumber: "GE-LQ-2019-001",
     location: {
       facility: "Main Hospital",
       building: "Tower C",
       floor: "1",
-      room: "XRay-Room-3",
+      room: "Ultrasound-Bay-1",
     },
     status: "Active",
   },
-  // IT Infrastructure
   {
-    id: "seed-asset-004",
-    ip: "10.10.4.401",
-    cpe: "cpe:2.3:a:epic:emr:2023:*:*:*:*:*:*:*",
-    role: "EMR Server",
-    upstreamApi: "https://api.epic.com/emr/server",
-    networkSegment: "IT-SERVER-VLAN-10",
-    hostname: "EMR-PROD-401",
-    macAddress: "00:1A:2B:3C:4D:68",
-    serialNumber: "EP-EMR-2023-001",
+    id: "rad-us-002",
+    ip: "10.40.1.31",
+    cpe: "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
+    role: "Portable Ultrasound",
+    upstreamApi: "https://www.gehealthcare.com/support",
+    networkSegment: "IMAGING-VLAN-40",
+    hostname: "US-LOGIQ-002",
+    macAddress: "00:1A:2B:3C:50:31",
+    serialNumber: "GE-LQ-2019-002",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower C",
+      floor: "1",
+      room: "Ultrasound-Bay-2",
+    },
+    status: "Active",
+  },
+  {
+    id: "rad-xr-001",
+    ip: "10.40.1.40",
+    cpe: "cpe:2.3:h:gehealthcare:optima_xr200amx:-:*:*:*:*:*:*:*",
+    role: "X-Ray / DR Node",
+    upstreamApi: "https://www.gehealthcare.com/support",
+    networkSegment: "IMAGING-VLAN-40",
+    hostname: "XR-OPTIMA-001",
+    macAddress: "00:1A:2B:3C:50:40",
+    serialNumber: "GE-XR-2017-001",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower C",
+      floor: "1",
+      room: "XRay-Room-1",
+    },
+    status: "Active",
+  },
+  // CT Acquisition Workstation — HP Z800, Windows 7, Advantage Workstation 4.6
+  {
+    id: "rad-ws-001",
+    ip: "10.40.1.20",
+    cpe: "cpe:2.3:a:gehealthcare:advantage_workstation:4.6:*:*:*:*:*:*:*",
+    role: "CT Acquisition Workstation",
+    upstreamApi: "https://www.gehealthcare.com/support",
+    networkSegment: "IMAGING-VLAN-40",
+    hostname: "WS-ADVANTAGE-001",
+    macAddress: "00:1A:2B:3C:50:20",
+    serialNumber: "HP-Z800-2015-001",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower C",
+      floor: "1",
+      room: "CT-Control-Room",
+    },
+    status: "Active",
+  },
+  // ── PACS & Radiology Workstations (PACS-VLAN-41) ────────────────────────────
+  // PACS Server — Dell PowerEdge R710, Windows Server 2008 R2, Centricity PACS-IW v5.0
+  {
+    id: "rad-pacs-001",
+    ip: "10.40.2.10",
+    cpe: "cpe:2.3:a:gehealthcare:centricity_pacs_iw:5.0:*:*:*:*:*:*:*",
+    role: "PACS Server",
+    upstreamApi: "https://www.gehealthcare.com/support",
+    networkSegment: "PACS-VLAN-41",
+    hostname: "PACS-CENTRICITY-001",
+    macAddress: "00:1A:2B:3C:51:10",
+    serialNumber: "DL-R710-2014-001",
     location: {
       facility: "Main Hospital",
       building: "Data Center",
       floor: "B1",
-      room: "DC-Rack-12",
+      room: "DC-Rack-08",
     },
     status: "Active",
   },
+  // Radiology Diagnostic Workstations — HP Z400, Windows 7, Centricity PACS-IW (viewer)
   {
-    ip: "10.10.4.402",
-    cpe: "cpe:2.3:a:cerner:millennium:*:*:*:*:*:*:*:*",
-    role: "Clinical Information System",
-    upstreamApi: "https://api.cerner.com/cis/server",
-    networkSegment: "IT-SERVER-VLAN-10",
-    hostname: "CIS-PROD-402",
-    macAddress: "00:1A:2B:3C:4D:69",
-    serialNumber: "CR-MIL-2023-005",
+    id: "rad-rws-001",
+    ip: "10.40.2.20",
+    cpe: "cpe:2.3:a:gehealthcare:centricity_pacs_iw:-:*:*:*:*:*:*:*",
+    role: "Radiology Diagnostic Workstation",
+    upstreamApi: "https://www.gehealthcare.com/support",
+    networkSegment: "PACS-VLAN-41",
+    hostname: "WS-RADIOLOGY-001",
+    macAddress: "00:1A:2B:3C:51:20",
+    serialNumber: "HP-Z400-2016-001",
     location: {
       facility: "Main Hospital",
-      building: "Data Center",
-      floor: "B1",
-      room: "DC-Rack-13",
-    },
-    status: "Active",
-  },
-  {
-    ip: "10.10.4.403",
-    cpe: "cpe:2.3:a:meditech:expanse:*:*:*:*:*:*:*:*",
-    role: "Pharmacy System",
-    upstreamApi: "https://api.meditech.com/pharmacy/server",
-    networkSegment: "IT-SERVER-VLAN-10",
-    hostname: "PHARM-PROD-403",
-    macAddress: "00:1A:2B:3C:4D:6A",
-    serialNumber: "MT-EXP-2023-008",
-    location: {
-      facility: "Main Hospital",
-      building: "Data Center",
-      floor: "B1",
-      room: "DC-Rack-14",
-    },
-    status: "Active",
-  },
-  {
-    ip: "10.10.4.404",
-    cpe: "cpe:2.3:h:cisco:unified_communications:*:*:*:*:*:*:*:*",
-    role: "Nurse Call System",
-    upstreamApi: "https://api.cisco.com/communications/nurse",
-    networkSegment: "IT-SERVER-VLAN-10",
-    hostname: "NURSE-CALL-404",
-    macAddress: "00:1A:2B:3C:4D:6B",
-    serialNumber: "CS-UC-2023-019",
-    location: {
-      facility: "Main Hospital",
-      building: "Data Center",
-      floor: "B1",
-      room: "DC-Rack-15",
-    },
-    status: "Active",
-  },
-  // Surgical Equipment
-  {
-    ip: "10.50.5.501",
-    cpe: "cpe:2.3:h:stryker:surgical_navigation:*:*:*:*:*:*:*:*",
-    role: "Surgical Navigation System",
-    upstreamApi: "https://api.stryker.com/surgical/navigation",
-    networkSegment: "OR-VLAN-50",
-    hostname: "OR-NAV-501",
-    macAddress: "00:1A:2B:3C:4D:6C",
-    serialNumber: "ST-NAV-2023-007",
-    location: {
-      facility: "Main Hospital",
-      building: "Tower A",
-      floor: "4",
-      room: "OR-5",
-    },
-    status: "Active",
-  },
-  {
-    ip: "10.50.5.502",
-    cpe: "cpe:2.3:h:intuitive:da_vinci_xi:*:*:*:*:*:*:*:*",
-    role: "Robotic Surgical System",
-    upstreamApi: "https://api.intuitive.com/surgical/robot",
-    networkSegment: "OR-VLAN-50",
-    hostname: "OR-ROBOT-502",
-    macAddress: "00:1A:2B:3C:4D:6D",
-    serialNumber: "IN-DV-2023-002",
-    location: {
-      facility: "Main Hospital",
-      building: "Tower A",
-      floor: "4",
-      room: "OR-6",
-    },
-    status: "Active",
-  },
-  // Workstations
-  {
-    id: "seed-asset-005",
-    ip: "10.60.6.601",
-    cpe: "cpe:2.3:h:dell:optiplex_7090:*:*:*:*:*:*:*:*",
-    role: "Clinical Workstation",
-    upstreamApi: "https://api.dell.com/workstation/clinical",
-    networkSegment: "WORKSTATION-VLAN-60",
-    hostname: "WKS-CLINIC-601",
-    macAddress: "00:1A:2B:3C:4D:6E",
-    serialNumber: "DL-OP7-2023-156",
-    location: {
-      facility: "Main Hospital",
-      building: "Tower A",
+      building: "Tower C",
       floor: "2",
-      room: "Nurse-Station-2A",
+      room: "Radiology-Reading-Room",
     },
     status: "Active",
   },
   {
-    id: "seed-asset-006",
-    ip: "10.60.6.602",
-    cpe: "cpe:2.3:h:hp:elitedesk_800:*:*:*:*:*:*:*:*",
-    role: "Nurse Station Workstation",
-    upstreamApi: "https://api.hp.com/workstation/nurse",
-    networkSegment: "WORKSTATION-VLAN-60",
-    hostname: "WKS-NURSE-602",
-    macAddress: "00:1A:2B:3C:4D:6F",
-    serialNumber: "HP-ED8-2023-234",
+    id: "rad-rws-002",
+    ip: "10.40.2.21",
+    cpe: "cpe:2.3:a:gehealthcare:centricity_pacs_iw:-:*:*:*:*:*:*:*",
+    role: "Radiology Diagnostic Workstation",
+    upstreamApi: "https://www.gehealthcare.com/support",
+    networkSegment: "PACS-VLAN-41",
+    hostname: "WS-RADIOLOGY-002",
+    macAddress: "00:1A:2B:3C:51:21",
+    serialNumber: "HP-Z400-2016-002",
+    location: {
+      facility: "Main Hospital",
+      building: "Tower C",
+      floor: "2",
+      room: "Radiology-Reading-Room",
+    },
+    status: "Active",
+  },
+  // ── ED Image Viewer (ED-VLAN-50) ─────────────────────────────────────────────
+  // Dell OptiPlex 790, Windows 7
+  {
+    id: "rad-ed-001",
+    ip: "10.50.1.10",
+    cpe: "cpe:2.3:h:dell:optiplex_790:-:*:*:*:*:*:*:*",
+    role: "ED Image Viewer / Workstation",
+    upstreamApi: "https://www.dell.com/support",
+    networkSegment: "ED-VLAN-50",
+    hostname: "WS-ED-VIEWER-001",
+    macAddress: "00:1A:2B:3C:52:10",
+    serialNumber: "DL-OP790-2013-001",
     location: {
       facility: "Main Hospital",
       building: "Tower A",
-      floor: "3",
-      room: "Nurse-Station-3A",
+      floor: "1",
+      room: "ED-Bay-5",
     },
     status: "Active",
   },
+  // ── Network Infrastructure (INFRA-VLAN-70) ───────────────────────────────────
+  // Remote Radiology VPN Gateway — Cisco ASA 5505, ASA OS 8.2
   {
-    ip: "10.60.6.603",
-    cpe: "cpe:2.3:h:lenovo:thinkcentre_m90a:*:*:*:*:*:*:*:*",
-    role: "Administrative Workstation",
-    upstreamApi: "https://api.lenovo.com/workstation/admin",
-    networkSegment: "ADMIN-VLAN-65",
-    hostname: "WKS-ADMIN-603",
-    macAddress: "00:1A:2B:3C:4D:70",
-    serialNumber: "LN-M90-2023-089",
-    location: {
-      facility: "Main Hospital",
-      building: "Tower B",
-      floor: "2",
-      room: "Admin-Office-201",
-    },
-    status: "Active",
-  },
-  // Network Infrastructure
-  {
-    id: "seed-asset-007",
-    ip: "10.70.7.701",
-    cpe: "cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*",
-    role: "Network Switch",
-    upstreamApi: "https://api.cisco.com/network/switch",
-    networkSegment: "INFRASTRUCTURE-VLAN-70",
-    hostname: "SW-CORE-701",
-    macAddress: "00:1A:2B:3C:4D:71",
-    serialNumber: "CS-C93-2023-045",
+    id: "rad-vpn-001",
+    ip: "10.70.1.10",
+    cpe: "cpe:2.3:h:cisco:asa_5505:-:*:*:*:*:*:*:*",
+    role: "Remote Radiology VPN Gateway",
+    upstreamApi: "https://www.cisco.com/c/en/us/support",
+    networkSegment: "INFRA-VLAN-70",
+    hostname: "VPN-ASA-001",
+    macAddress: "00:1A:2B:3C:53:10",
+    serialNumber: "CS-ASA5505-2013-001",
     location: {
       facility: "Main Hospital",
       building: "Data Center",
@@ -507,16 +307,36 @@ const SAMPLE_ASSETS = [
     },
     status: "Active",
   },
+  // Network Switch — Cisco Catalyst 2960S-24TS-L
   {
-    id: "seed-asset-008",
-    ip: "10.70.7.702",
-    cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
-    role: "Firewall",
-    upstreamApi: "https://api.fortinet.com/network/firewall",
-    networkSegment: "INFRASTRUCTURE-VLAN-70",
-    hostname: "FW-EDGE-702",
-    macAddress: "00:1A:2B:3C:4D:72",
-    serialNumber: "FT-FG6-2023-011",
+    id: "rad-sw-001",
+    ip: "10.70.1.20",
+    cpe: "cpe:2.3:h:cisco:catalyst_2960s-24ts-l:-:*:*:*:*:*:*:*",
+    role: "Imaging Network Switch",
+    upstreamApi: "https://www.cisco.com/c/en/us/support",
+    networkSegment: "INFRA-VLAN-70",
+    hostname: "SW-IMAGING-001",
+    macAddress: "00:1A:2B:3C:53:20",
+    serialNumber: "CS-C2960S-2015-001",
+    location: {
+      facility: "Main Hospital",
+      building: "Data Center",
+      floor: "B1",
+      room: "DC-Network",
+    },
+    status: "Active",
+  },
+  // Perimeter Firewall — Cisco ASA 5505, ASA OS 8.4
+  {
+    id: "rad-fw-001",
+    ip: "10.70.1.1",
+    cpe: "cpe:2.3:h:cisco:asa_5505:-:*:*:*:*:*:*:*",
+    role: "Perimeter Firewall",
+    upstreamApi: "https://www.cisco.com/c/en/us/support",
+    networkSegment: "INFRA-VLAN-70",
+    hostname: "FW-ASA-001",
+    macAddress: "00:1A:2B:3C:53:01",
+    serialNumber: "CS-ASA5505-2014-001",
     location: {
       facility: "Main Hospital",
       building: "Data Center",
@@ -525,86 +345,95 @@ const SAMPLE_ASSETS = [
     },
     status: "Active",
   },
+  // ── Patient Monitors — Philips IntelliVue MP5 ×13 (WARD-VLAN-20) ─────────────
+  ...Array.from({ length: 13 }, (_, i) => ({
+    id: `rad-mon-${String(i + 1).padStart(3, "0")}`,
+    ip: `10.20.3.${101 + i}`,
+    cpe: "cpe:2.3:h:philips:intellivue_mp5:-:*:*:*:*:*:*:*",
+    role: "Patient Monitor",
+    upstreamApi: "https://www.philips.com/a-w/about/support.html",
+    networkSegment: "WARD-VLAN-20",
+    hostname: `MON-MP5-${String(i + 1).padStart(3, "0")}`,
+    macAddress: `00:1A:2B:3C:60:${(0x10 + i).toString(16).padStart(2, "0").toUpperCase()}`,
+    serialNumber: `PH-MP5-2020-${String(i + 1).padStart(3, "0")}`,
+    location: {
+      facility: "Main Hospital",
+      building: "Tower A",
+      floor: "3",
+      room: `Ward-3A-Bed-${i + 1}`,
+    },
+    status: "Active",
+  })),
+  // ── Infusion Pumps — Baxter Sigma Spectrum ×23 (WARD-VLAN-20) ───────────────
+  ...Array.from({ length: 23 }, (_, i) => ({
+    id: `rad-pump-${String(i + 1).padStart(3, "0")}`,
+    ip: `10.20.4.${101 + i}`,
+    cpe: "cpe:2.3:h:baxter:sigma_spectrum:-:*:*:*:*:*:*:*",
+    role: "Infusion Pump",
+    upstreamApi:
+      "https://www.baxter.com/healthcare-professionals/service-and-support",
+    networkSegment: "WARD-VLAN-20",
+    hostname: `PUMP-SIGMA-${String(i + 1).padStart(3, "0")}`,
+    macAddress: `00:1A:2B:3C:61:${(0x10 + i).toString(16).padStart(2, "0").toUpperCase()}`,
+    serialNumber: `BX-SS-2021-${String(i + 1).padStart(3, "0")}`,
+    location: {
+      facility: "Main Hospital",
+      building: "Tower A",
+      floor: "3",
+      room: `Ward-3A-Bed-${i + 1}`,
+    },
+    status: "Active",
+  })),
 ];
 
-// Sample hospital vulnerability data
-
+// Vulnerabilities — cpes is an array to support multi-device-group linking
 const SAMPLE_VULNERABILITIES = [
-  // --- Critical priority: confirmed exploitation, high CVSS, high EPSS, in KEV ---
+  // ── CVE-2020-25175: GE Healthcare Credential Exposure (Critical) ─────────────
   {
-    cveId: "CVE-2024-21762",
+    cveId: "CVE-2020-25175",
     severity: Severity.Critical,
     cvssScore: 9.8,
-    epss: 0.91,
-    inKEV: true,
+    epss: 0.35,
+    inKEV: false,
     priority: Priority.Critical,
     sarif: {
       version: "2.1.0",
       runs: [
         {
-          tool: { driver: { name: "Network Scanner" } },
+          tool: { driver: { name: "ICS Security Scanner" } },
           results: [
             {
-              ruleId: "CVE-2024-21762",
+              ruleId: "CVE-2020-25175",
               level: "error",
               message: {
-                text: "Out-of-bounds write in Fortinet FortiOS SSL VPN allows unauthenticated remote code execution",
+                text: "GE Healthcare imaging device transmits credentials with insufficient protection across the network (CWE-522/CWE-523)",
               },
             },
           ],
         },
       ],
     },
-    cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
-    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2024-21762",
-    upstreamApi: "https://www.fortiguard.com/psirt/FG-IR-24-015",
-    description:
-      "Out-of-bounds write vulnerability in Fortinet FortiOS SSL VPN daemon allows unauthenticated remote code execution via specially crafted HTTP requests",
-    narrative:
-      "An unauthenticated attacker can send crafted HTTP requests to the SSL VPN service on the hospital perimeter firewall, triggering an out-of-bounds write that leads to arbitrary code execution. This vulnerability is actively exploited in the wild by multiple threat actors and requires no user interaction.",
-    impact:
-      "Complete hospital network perimeter compromise. Attackers gain root-level access to the edge firewall, enabling interception of all network traffic, disabling of security policies, and lateral movement into clinical VLANs containing medical devices, EMR systems, and patient data stores.",
-  },
-  {
-    cveId: "CVE-2023-20198",
-    severity: Severity.Critical,
-    cvssScore: 10.0,
-    epss: 0.87,
-    inKEV: true,
-    priority: Priority.Critical,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Network Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2023-20198",
-              level: "error",
-              message: {
-                text: "Cisco IOS XE Web UI privilege escalation allows unauthenticated admin account creation",
-              },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*",
-    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2023-20198",
+    cpes: [
+      "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
+      "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
+      "cpe:2.3:h:gehealthcare:optima_xr200amx:-:*:*:*:*:*:*:*",
+    ],
+    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2020-25175",
     upstreamApi:
-      "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-iosxe-webui-privesc-j22SaA4z",
+      "https://www.cisa.gov/news-events/ics-medical-advisories/icsma-20-343-01",
     description:
-      "Privilege escalation vulnerability in Cisco IOS XE Web UI allows unauthenticated remote attackers to create administrative accounts",
+      "GE Healthcare imaging and ultrasound products may allow specific credentials to be exposed during transport over the network due to insufficiently protected credential transmission (CWE-522/CWE-523). Affects the BrightSpeed Elite Select CT scanner, LOGIQ e R7 portable ultrasound units, and Optima XR200amx X-ray system.",
     narrative:
-      "An unauthenticated remote attacker can exploit the web UI feature of Cisco IOS XE to create a local administrator account with privilege level 15. This is the first stage of a two-stage attack chain (combined with CVE-2023-20273) that ultimately grants root access to the network switch operating system. Over 1,800 devices were compromised in mass exploitation campaigns.",
+      "The GE BrightSpeed Elite Select CT scanner, LOGIQ e R7 ultrasound units, and Optima XR200amx transmit service credentials with insufficient protection during normal network operations. An attacker with access to the DICOM VLAN can passively intercept these credentials and use them to gain unauthorized access to scanner configuration interfaces — potentially altering imaging protocols, disabling devices, or pivoting to connected workstations. GE Healthcare issued Security Bulletin GE-2020-004 recommending network isolation and firmware updates.",
     impact:
-      "Hospital network segmentation failure. Compromised core switches allow attackers to reconfigure VLANs, bypass network access controls, and gain access to isolated medical device networks. Lateral movement enables interception of patient data, disruption of PACS/EMR traffic, and potential manipulation of clinical systems.",
+      "Credential compromise on imaging devices could allow attackers to alter scanner calibration or protocols, disabling devices during active patient care. In a radiology emergency workflow (stroke, trauma), device unavailability can directly delay time-critical diagnoses. The DICOM VLAN provides network adjacency to PACS and clinical workstations for further lateral movement.",
   },
+  // ── CVE-2017-0144: EternalBlue / MS17-010 (SMBv1 RCE, Critical, KEV) ────────
   {
-    cveId: "CVE-2024-1709",
+    cveId: "CVE-2017-0144",
     severity: Severity.Critical,
-    cvssScore: 10.0,
-    epss: 0.944,
+    cvssScore: 9.8,
+    epss: 0.97,
     inKEV: true,
     priority: Priority.Critical,
     sarif: {
@@ -614,297 +443,129 @@ const SAMPLE_VULNERABILITIES = [
           tool: { driver: { name: "Endpoint Scanner" } },
           results: [
             {
-              ruleId: "CVE-2024-1709",
+              ruleId: "CVE-2017-0144",
               level: "error",
               message: {
-                text: "ConnectWise ScreenConnect authentication bypass on clinical workstations",
+                text: "EternalBlue SMBv1 remote code execution on end-of-life Windows host — WannaCry/NotPetya exploit vector",
               },
             },
           ],
         },
       ],
     },
-    cpe: "cpe:2.3:h:dell:optiplex_7090:*:*:*:*:*:*:*:*",
-    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2024-1709",
+    // Connects to both the EOL OS device groups AND the application-level device
+    // groups so seedIssues() creates Issue records for every affected asset
+    cpes: [
+      "cpe:2.3:o:microsoft:windows_7:-:*:*:*:*:*:*:*",
+      "cpe:2.3:o:microsoft:windows_server_2008:r2:sp1:*:*:*:*:x64:*",
+      "cpe:2.3:a:gehealthcare:advantage_workstation:4.6:*:*:*:*:*:*:*",
+      "cpe:2.3:a:gehealthcare:centricity_pacs_iw:5.0:*:*:*:*:*:*:*",
+      "cpe:2.3:a:gehealthcare:centricity_pacs_iw:-:*:*:*:*:*:*:*",
+      "cpe:2.3:h:dell:optiplex_790:-:*:*:*:*:*:*:*",
+    ],
+    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2017-0144",
     upstreamApi:
-      "https://www.connectwise.com/company/trust/security-bulletins/connectwise-screenconnect-23.9.8",
+      "https://support.microsoft.com/en-us/topic/ms17-010-security-update-for-windows-smb-server-814d78c1-a11d-e4c8-d52a-f41a41b5d238",
     description:
-      "Authentication bypass in ConnectWise ScreenConnect allows unauthenticated attackers to create administrator accounts on clinical workstations used for remote EMR support",
+      "Windows SMBv1 remote code execution vulnerability (MS17-010) allows unauthenticated remote attackers to execute arbitrary code via crafted SMB packets. Exploited by WannaCry and NotPetya ransomware. Five hosts in the imaging network run end-of-life Windows 7 or Windows Server 2008 R2 and cannot receive the MS17-010 patch through standard Windows Update.",
     narrative:
-      "ConnectWise ScreenConnect, deployed on clinical workstations for remote IT support of EMR systems, contains an authentication bypass vulnerability. Unauthenticated attackers can create admin-level accounts, gaining full control of any connected workstation. Public exploits and Metasploit modules are available. Used in ransomware campaigns targeting healthcare.",
+      "Five systems in the radiology imaging network run Windows 7 or Windows Server 2008 R2 — both end-of-life operating systems no longer receiving security updates. The EternalBlue exploit (developed by the NSA, leaked by the Shadow Brokers) is available in Metasploit and requires no authentication. WannaCry and NotPetya ransomware campaigns brought hospital imaging departments offline globally in 2017 using this exact vector. The CT acquisition workstation, PACS server, both radiology reading workstations, and the ED image viewer are all susceptible.",
     impact:
-      "Clinical workstation compromise across the hospital. Attackers gain remote desktop access to nurse stations and clinical PCs with active EMR sessions, exposing patient records, enabling ransomware deployment, and potentially disrupting clinical workflows during patient care.",
+      "Ransomware infection or complete compromise of the entire imaging workflow chain: CT acquisition, PACS storage and routing, radiology reading, and ED viewing. A WannaCry-style attack would encrypt DICOM archives, disabling radiologist access to historical studies and blocking active imaging workflows. In a hospital without fallback procedures, this creates a patient safety emergency for active stroke, trauma, and critical care cases.",
   },
+  // ── CVE-2016-6366: EXTRABACON — Cisco ASA SNMP Buffer Overflow (High, KEV) ──
   {
-    cveId: "CVE-2024-47575",
-    severity: Severity.Critical,
-    cvssScore: 9.8,
-    epss: 0.5,
-    inKEV: true,
-    priority: Priority.Critical,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Network Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2024-47575",
-              level: "error",
-              message: {
-                text: "Missing authentication in FortiManager allows remote code execution via crafted requests",
-              },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
-    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2024-47575",
-    upstreamApi: "https://www.fortiguard.com/psirt/FG-IR-24-423",
-    description:
-      "Missing authentication vulnerability in FortiManager (FortiJump) allows unauthenticated remote code execution and exfiltration of managed firewall configurations",
-    narrative:
-      "The hospital's FortiManager instance, which centrally manages all FortiGate firewalls, has a missing authentication flaw. Threat actor UNC5820 exploited this vulnerability to register rogue FortiManager devices and exfiltrate configuration data including hashed passwords and firewall rules from over 50 managed devices in similar environments.",
-    impact:
-      "Compromise of the firewall management platform exposes all managed FortiGate configurations, security policies, VPN credentials, and network topology. Attackers can modify firewall rules to open backdoor access or disable security controls across the entire hospital network perimeter.",
-  },
-  {
-    cveId: "CVE-2024-38014",
+    cveId: "CVE-2016-6366",
     severity: Severity.High,
-    cvssScore: 7.8,
-    epss: 0.15,
+    cvssScore: 8.8,
+    epss: 0.21,
     inKEV: true,
-    priority: Priority.Critical,
+    priority: Priority.High,
     sarif: {
       version: "2.1.0",
       runs: [
         {
-          tool: { driver: { name: "Endpoint Scanner" } },
+          tool: { driver: { name: "Network Scanner" } },
           results: [
             {
-              ruleId: "CVE-2024-38014",
+              ruleId: "CVE-2016-6366",
               level: "warning",
               message: {
-                text: "Windows Installer privilege escalation on nurse station workstations",
+                text: "Cisco ASA SNMP buffer overflow (EXTRABACON) allows unauthenticated remote code execution on ASA OS 8.x",
               },
             },
           ],
         },
       ],
     },
-    cpe: "cpe:2.3:h:hp:elitedesk_800:*:*:*:*:*:*:*:*",
-    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2024-38014",
+    cpes: [
+      "cpe:2.3:h:cisco:asa_5505:-:*:*:*:*:*:*:*",
+      "cpe:2.3:a:cisco:adaptive_security_appliance_software:8.2:*:*:*:*:*:*:*",
+    ],
+    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2016-6366",
     upstreamApi:
-      "https://msrc.microsoft.com/update-guide/vulnerability/CVE-2024-38014",
+      "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-20160817-asa-snmp",
     description:
-      "Windows Installer privilege escalation vulnerability allows local attackers to gain SYSTEM privileges on nurse station workstations",
+      "Buffer overflow in the SNMP code of Cisco ASA Software versions 8.4 and earlier allows unauthenticated remote attackers to execute arbitrary code or reload the device via crafted SNMPv2c packets. Disclosed by the Shadow Brokers as the EXTRABACON exploit. Both ASA 5505 devices in this network (remote radiology VPN gateway and perimeter firewall) run ASA OS 8.2.",
     narrative:
-      "A local attacker (or malware running under a standard user account) can exploit the Windows Installer service to escalate privileges to SYSTEM level. While requiring local access, this vulnerability is actively exploited and could be chained with remote access vulnerabilities to achieve full workstation compromise.",
+      "Both Cisco ASA 5505 appliances — the remote radiology VPN gateway and the perimeter firewall — run ASA OS 8.2, falling within the EXTRABACON exploit range (ASA 8.4 and earlier). The exploit is publicly available and was part of the NSA Equation Group toolkit leaked by the Shadow Brokers in 2016. An attacker on the same network segment as the SNMP management interface can send crafted SNMPv2c packets to gain unauthenticated remote code execution. Compromise of the VPN gateway directly cuts off remote radiologist access; compromise of the firewall exposes the full hospital network.",
     impact:
-      "Local privilege escalation on nurse station PCs. An attacker with limited user access can gain full system control, install persistent backdoors, access cached credentials, and pivot to other systems on the clinical network. Risk is moderated by requiring initial local access.",
-  },
-  // --- Defer priority: low EPSS, no active exploitation ---
-  {
-    cveId: "CVE-2024-48974",
-    severity: Severity.Critical,
-    cvssScore: 9.3,
-    epss: 0.04,
-    inKEV: false,
-    priority: Priority.Defer,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "FDA Cybersecurity Scanner" } },
-          results: [
-            {
-              ruleId: "CVE-2024-48974",
-              level: "warning",
-              message: {
-                text: "Ventilator firmware update integrity verification bypass",
-              },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:draeger:evita_v500:*:*:*:*:*:*:*:*",
-    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2024-48974",
-    upstreamApi:
-      "https://www.cisa.gov/news-events/ics-medical-advisories/icsma-24-319-01",
-    description:
-      "Ventilator does not perform proper file integrity checks when adopting firmware updates, allowing unauthorized configuration changes via compromised firmware",
-    narrative:
-      "The ventilator's firmware update mechanism lacks proper integrity verification, meaning a malicious firmware image could be loaded if an attacker gains physical or network access to the update interface. While the CVSS score is critical due to potential patient safety impact, no exploitation has been observed in the wild and the attack requires specialized access to the device.",
-    impact:
-      "Potential patient safety risk if exploited — unauthorized firmware could alter ventilator behavior. However, exploitation requires physical access or highly specialized network position. Risk is mitigated by network segmentation of ICU devices and physical access controls.",
-  },
-  // --- Unsorted priority: not yet enriched ---
-  {
-    cveId: null,
-    severity: Severity.Medium,
-    cvssScore: null,
-    epss: null,
-    inKEV: false,
-    priority: Priority.Unsorted,
-    sarif: {
-      version: "2.1.0",
-      runs: [
-        {
-          tool: { driver: { name: "Internal Audit" } },
-          results: [
-            {
-              ruleId: "INTERNAL-2024-001",
-              level: "note",
-              message: {
-                text: "Unencrypted DICOM traffic observed from MRI scanner",
-              },
-            },
-          ],
-        },
-      ],
-    },
-    cpe: "cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*",
-    exploitUri: null,
-    upstreamApi: null,
-    description:
-      "Unencrypted DICOM traffic from Siemens MRI scanner exposes patient imaging data on the radiology network",
-    narrative:
-      "Internal security audit detected that the Siemens Magnetom Aera transmits DICOM images and patient metadata in cleartext across the radiology VLAN. An attacker with network access could passively capture patient imaging studies, demographics, and referring physician information.",
-    impact:
-      "HIPAA compliance risk. Patient imaging data including names, dates of birth, and medical images could be intercepted. No CVE has been assigned yet; awaiting vendor response and formal vulnerability assessment.",
+      "Compromise of the VPN gateway severs remote radiologist connectivity, disabling after-hours imaging coverage and potentially delaying critical results. Compromise of the perimeter firewall allows the attacker to modify security policy, intercept all DICOM/HL7 traffic, and pivot freely into clinical VLANs containing imaging devices, PACS, and patient monitoring infrastructure.",
   },
 ];
 
-// Sample device artifact data (formerly emulators)
-const SAMPLE_DEVICE_ARTIFACTS = [
-  {
-    role: "Philips IntelliVue MP70 Monitor Emulator",
-    cpe: "cpe:2.3:h:philips:intellivue_mp70:*:*:*:*:*:*:*:*",
-    dockerUrl: "https://hub.docker.com/r/icsemu/philips-mp70-emulator:v1.2",
-    description:
-      "Docker-based emulator for Philips IntelliVue MP70 patient monitor. Simulates vital sign data streams, alarm conditions, and network protocols (HL7, proprietary Philips protocol). Useful for security testing, integration testing, and staff training without requiring physical hardware.",
-  },
-  {
-    role: "Baxter Sigma Spectrum Infusion Pump Emulator",
-    cpe: "cpe:2.3:h:baxter:infusion_pump:sigma_spectrum:*:*:*:*:*:*:*",
-    downloadUrl:
-      "https://github.com/medical-device-emulators/baxter-pump-vm/releases/download/v2.1/baxter-sigma-spectrum-vm.ova",
-    description:
-      "VirtualBox/VMware OVA containing a software emulation of the Baxter Sigma Spectrum infusion pump. Includes drug library interface, dosing calculations, and alarm mechanisms. Supports security research and clinical workflow testing in safe sandbox environment.",
-  },
-  {
-    role: "GE DASH 4000 Vital Signs Monitor Emulator",
-    cpe: "cpe:2.3:h:ge_healthcare:dash_4000:*:*:*:*:*:*:*:*",
-    dockerUrl: "https://hub.docker.com/r/healthemu/ge-dash-4000:latest",
-    description:
-      "Containerized emulator of GE DASH 4000 patient monitor. Generates realistic ECG waveforms, SpO2 trends, and NIBP readings. Exposes network services for remote monitoring and alarm integration. Ideal for vulnerability assessment and penetration testing of patient monitoring networks.",
-  },
-  {
-    role: "Dräger Evita V500 Ventilator Simulator",
-    cpe: "cpe:2.3:h:draeger:evita_v500:*:*:*:*:*:*:*:*",
-    downloadUrl:
-      "https://github.com/critical-care-sims/draeger-ventilator/releases/download/v1.0/draeger-evita-v500.qcow2",
-    description:
-      "QEMU disk image running Dräger Evita V500 ventilator firmware emulation. Simulates respiratory mechanics, pressure/volume ventilation modes, and alarm systems. Used for clinical engineering training and security analysis of critical respiratory support systems.",
-  },
-  {
-    role: "Roche Cobas 6000 Laboratory Analyzer Emulator",
-    cpe: "cpe:2.3:h:roche:cobas_6000:*:*:*:*:*:*:*:*",
-    dockerUrl: "https://hub.docker.com/r/labemu/roche-cobas-6000:v3.0",
-    description:
-      "Docker container emulating Roche Cobas 6000 chemistry and immunoassay analyzer. Simulates LIS (Laboratory Information System) interface, result transmission protocols, and QC workflows. Enables security testing of lab analyzers without disrupting actual patient testing.",
-  },
-  {
-    role: "Siemens Magnetom Aera MRI Scanner Emulator",
-    cpe: "cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*",
-    downloadUrl:
-      "https://github.com/radiology-emulators/siemens-mri/releases/download/v2.3/magnetom-aera-sim.vmdk",
-    description:
-      "VMware disk image containing Siemens Syngo MR software emulator. Simulates DICOM services, imaging protocols, and scanner control interfaces. Supports penetration testing of radiology PACS networks and MRI security assessments without access to multi-million dollar scanners.",
-  },
-  {
-    role: "Epic EMR Test Environment",
-    cpe: "cpe:2.3:a:epic:emr:2023:*:*:*:*:*:*:*",
-    downloadUrl:
-      "https://github.com/ehr-test-envs/epic-sandbox/releases/download/2023.1/epic-emr-sandbox.ova",
-    description:
-      "Complete Epic EMR sandbox environment in OVA format. Includes patient records, HL7 interfaces, and FHIR APIs. Used for integration testing, security assessments, and clinical workflow validation. Pre-populated with synthetic patient data (HIPAA-compliant test data).",
-  },
-  {
-    role: "GE Optima CT660 Scanner Emulator",
-    cpe: "cpe:2.3:h:ge_healthcare:optima_ct660:*:*:*:*:*:*:*:*",
-    dockerUrl: "https://hub.docker.com/r/imagingemu/ge-ct-scanner:v1.5",
-    description:
-      "Containerized CT scanner emulator with DICOM worklist (MWL) support, image acquisition simulation, and PACS connectivity. Generates synthetic CT image series for testing. Useful for assessing DICOM security vulnerabilities and radiation dose reporting integrations.",
-  },
-  {
-    role: "Cisco Catalyst 9300 Network Switch Emulator",
-    cpe: "cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*",
-    dockerUrl:
-      "https://hub.docker.com/r/networkemu/cisco-catalyst-9300:ios-xe-17",
-    description:
-      "GNS3/EVE-NG compatible Cisco IOS-XE emulator for Catalyst 9300 switches. Simulates VLAN configuration, port security, and hospital network segmentation. Allows penetration testers to practice network attacks against medical device networks in isolated lab environment.",
-  },
-  {
-    role: "Abbott Architect i2000SR Immunoassay Analyzer Emulator",
-    cpe: "cpe:2.3:h:abbott:architect_i2000sr:*:*:*:*:*:*:*:*",
-    downloadUrl:
-      "https://github.com/lab-device-emus/abbott-architect/releases/download/v1.1/abbott-i2000sr.ova",
-    description:
-      "VirtualBox VM running Abbott Architect immunoassay analyzer software stack. Simulates sample processing, result calculations, and LIS bi-directional interface. Enables security researchers to test lab analyzer vulnerabilities without impacting patient testing workflows.",
-  },
-];
+// Add device artifacts here as needed in the future
+const SAMPLE_DEVICE_ARTIFACTS: {
+  role: string;
+  cpe: string;
+  dockerUrl?: string;
+  downloadUrl?: string;
+  description: string;
+}[] = [];
 
-// Sample remediation data (matched to seed vulnerability CPEs)
+// Remediations matched to seed vulnerability CPEs
 const SAMPLE_REMEDIATIONS = [
+  // CVE-2020-25175 remediation for GE BrightSpeed Elite Select
   {
-    cpe: "cpe:2.3:h:fortinet:fortigate_600e:*:*:*:*:*:*:*:*",
-    fixUri: "https://www.fortiguard.com/psirt/FG-IR-24-015",
-    description:
-      "FortiOS firmware upgrade to 7.4.3+ patches the out-of-bounds write vulnerability (CVE-2024-21762) in the SSL VPN daemon.",
-    narrative:
-      "Schedule maintenance window during low-traffic period (Sunday 2-6 AM). Backup FortiGate configuration via FortiManager. Upgrade firmware to FortiOS 7.4.3 or later. If immediate upgrade is not possible, disable SSL VPN as an interim mitigation — disabling webmode alone is not sufficient. Post-upgrade: verify VPN connectivity, firewall rules, and VLAN routing. Monitor logs for 48 hours.",
-    upstreamApi: "https://www.fortinet.com/products/next-generation-firewall",
-  },
-  {
-    cpe: "cpe:2.3:h:cisco:catalyst_9300:*:*:*:*:*:*:*:*",
+    cpe: "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
     fixUri:
-      "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-iosxe-webui-privesc-j22SaA4z",
+      "https://www.cisa.gov/news-events/ics-medical-advisories/icsma-20-343-01",
     description:
-      "IOS-XE software update patches the Web UI privilege escalation vulnerability (CVE-2023-20198) by hardening authentication on the HTTP server.",
+      "Apply GE Healthcare ICS security controls per CISA advisory ICSMA-20-343-01 and GE Security Bulletin GE-2020-004 to mitigate credential exposure on imaging devices (CVE-2020-25175).",
     narrative:
-      "Immediately disable the HTTP/HTTPS server on all Catalyst 9300 switches as an interim mitigation (no ip http server / no ip http secure-server). Schedule staged firmware rollout via Cisco DNA Center: test VLAN first, then non-clinical, then clinical switches. Each switch requires a 10-minute reboot. Update during change control window (Tuesday/Thursday 10 PM-2 AM). Post-upgrade: re-enable web UI only if required, verify VLAN connectivity and medical device network access.",
-    upstreamApi:
-      "https://www.cisco.com/c/en/us/products/switches/catalyst-9300-series-switches/index.html",
+      "Work with GE Healthcare Biomedical/Clinical Engineering to apply mitigations from GE Security Bulletin GE-2020-004. Immediately isolate all affected GE imaging devices (CT scanner, ultrasound units, X-ray node) to a dedicated DICOM VLAN with strict ACLs permitting only DICOM traffic (port 104/TCP) to and from the PACS server. Disable unnecessary network services on each device via GE service mode. Request firmware update availability from your GE account representative. Deploy IDS/IPS monitoring on the DICOM VLAN to detect anomalous credential-bearing traffic. Post-remediation: verify DICOM connectivity to PACS and confirm the imaging workflow is unaffected.",
+    upstreamApi: "https://www.gehealthcare.com/security",
   },
+  // CVE-2017-0144 remediation for CT Acquisition Workstation (Windows 7 / EOL host)
   {
-    cpe: "cpe:2.3:h:dell:optiplex_7090:*:*:*:*:*:*:*:*",
+    cpe: "cpe:2.3:a:gehealthcare:advantage_workstation:4.6:*:*:*:*:*:*:*",
     fixUri:
-      "https://www.connectwise.com/company/trust/security-bulletins/connectwise-screenconnect-23.9.8",
+      "https://support.microsoft.com/en-us/topic/ms17-010-security-update-for-windows-smb-server-814d78c1-a11d-e4c8-d52a-f41a41b5d238",
     description:
-      "ConnectWise ScreenConnect upgrade to version 23.9.8 patches the authentication bypass vulnerability (CVE-2024-1709) on clinical workstations.",
+      "Windows 7 and Server 2008 R2 are end-of-life and do not receive patches via standard Windows Update. Apply MS17-010 via Microsoft extended support if contracted, then implement network-level compensating controls to mitigate EternalBlue (CVE-2017-0144) across all five imaging network Windows hosts.",
     narrative:
-      "Push ScreenConnect 23.9.8 update to all clinical workstations via SCCM/Intune. On-premise ScreenConnect server must be updated first. Verify all connected agents auto-update within 24 hours. For workstations that cannot be updated immediately, disable the ScreenConnect service. Post-update: verify remote support connectivity, audit for any unauthorized admin accounts created before patch.",
-    upstreamApi:
-      "https://www.connectwise.com/platform/unified-management/control",
+      "Immediate actions: (1) Disable SMBv1 on all five affected hosts via PowerShell (Set-SmbServerConfiguration -EnableSMB1Protocol $false) and registry (HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters, SMB1=0). (2) Block TCP port 445 inbound at the Cisco Catalyst 2960S switch using ACLs on all imaging and PACS VLANs. (3) Deploy host-based firewall rules to block SMB from non-management hosts. (4) Micro-segment each workstation subnet to minimize lateral movement. Long-term: coordinate with GE Healthcare to plan migration of CT acquisition workstation and PACS server to a supported OS — Advantage Workstation 4.6 and Centricity PACS-IW 5.0 compatibility with newer Windows versions must be confirmed with the vendor before upgrading.",
+    upstreamApi: "https://www.microsoft.com/en-us/windows/end-of-support",
   },
+  // CVE-2016-6366 remediation for Cisco ASA 5505 (both VPN gateway and firewall)
   {
-    cpe: "cpe:2.3:h:siemens:magnetom_aera:*:*:*:*:*:*:*:*",
-    fixUri: "https://www.siemens-healthineers.com/services/cybersecurity",
+    cpe: "cpe:2.3:h:cisco:asa_5505:-:*:*:*:*:*:*:*",
+    fixUri:
+      "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-20160817-asa-snmp",
     description:
-      "Network segmentation and DICOM TLS configuration to encrypt MRI scanner traffic and prevent passive interception of patient imaging data.",
+      "Upgrade Cisco ASA 5505 software from 8.2.x to a patched release (9.1(7.21) or later) per Cisco Security Advisory cisco-sa-20160817-asa-snmp to remediate the EXTRABACON SNMP buffer overflow (CVE-2016-6366). Applies to both the remote radiology VPN gateway and the perimeter firewall.",
     narrative:
-      "Work with Siemens field service to enable DICOM TLS on the Magnetom Aera (requires Syngo software update). Configure dedicated radiology VLAN with ACLs restricting traffic to PACS servers only. Deploy network monitoring to detect any remaining unencrypted DICOM traffic. Verify image transfer performance is not degraded after TLS enablement. Radiologist validates image quality post-change.",
+      "Both ASA 5505 appliances must be upgraded. Cisco ASA 5505 supports ASA software up to 9.2(x); upgrade to 9.1(7.21)+ or the latest available 9.2.x release. Before upgrading: back up ASA configuration (copy running-config tftp://...), test rollback procedure in a change window. Schedule separate maintenance windows for each device — perimeter firewall first (~30 min downtime), then VPN gateway (coordinate with remote radiology team to minimize after-hours coverage gap). If an immediate upgrade cannot be scheduled: switch from SNMPv2c to SNMPv3 with authentication and encryption, or restrict SNMP community access via ACL to the management VLAN only. Post-upgrade: verify VPN tunnels for remote radiologist access, confirm firewall policy enforcement, and validate DICOM routing.",
     upstreamApi:
-      "https://www.siemens-healthineers.com/magnetic-resonance-imaging/1-5t-mri-scanner/magnetom-aera",
+      "https://www.cisco.com/c/en/us/support/security/asa-5500-series-next-generation-firewalls/series.html",
   },
 ];
 
 async function clearDatabase() {
   console.log("🗑️  Clearing database...");
 
+  // Workflows cascade to Node and Connection
+  await prisma.workflow.deleteMany();
   // Delete in order of dependencies (child tables first)
   await prisma.issue.deleteMany();
   await prisma.syncStatus.deleteMany();
@@ -1018,13 +679,16 @@ async function seedVulnerabilities(userId: string) {
 
   const vulnerabilities = await Promise.all(
     SAMPLE_VULNERABILITIES.map(async (vulnerability) => {
-      const { cpe, ...data } = vulnerability;
-      const deviceGroup = await prisma.deviceGroup.findFirst({
-        where: { cpe },
-      });
+      const { cpes, ...data } = vulnerability;
 
-      if (!deviceGroup) {
-        console.warn(`⚠️  No device group found for CPE: ${vulnerability.cpe}`);
+      const deviceGroups = (
+        await Promise.all(
+          cpes.map((cpe) => prisma.deviceGroup.findFirst({ where: { cpe } })),
+        )
+      ).filter((dg): dg is NonNullable<typeof dg> => dg !== null);
+
+      if (deviceGroups.length === 0) {
+        console.warn(`⚠️  No device groups found for CPEs: ${cpes.join(", ")}`);
         return null;
       }
 
@@ -1033,7 +697,7 @@ async function seedVulnerabilities(userId: string) {
           ...data,
           userId,
           affectedDeviceGroups: {
-            connect: { id: deviceGroup.id },
+            connect: deviceGroups.map((dg) => ({ id: dg.id })),
           },
         },
       });
@@ -1059,7 +723,6 @@ async function seedDeviceArtifacts(userId: string) {
         return null;
       }
 
-      // Create the DeviceArtifact
       const createdDeviceArtifact = await prisma.deviceArtifact.create({
         data: {
           role: deviceArtifact.role,
@@ -1069,7 +732,6 @@ async function seedDeviceArtifacts(userId: string) {
         },
       });
 
-      // Create ArtifactWrapper for this device artifact
       const wrapper = await prisma.artifactWrapper.create({
         data: {
           deviceArtifactId: createdDeviceArtifact.id,
@@ -1077,7 +739,6 @@ async function seedDeviceArtifacts(userId: string) {
         },
       });
 
-      // Create artifacts for dockerUrl and downloadUrl if they exist
       const artifacts = [];
 
       if (deviceArtifact.dockerUrl) {
@@ -1108,7 +769,6 @@ async function seedDeviceArtifacts(userId: string) {
         artifacts.push(downloadArtifact);
       }
 
-      // Set the latest artifact if we created any
       if (artifacts.length > 0) {
         await prisma.artifactWrapper.update({
           where: { id: wrapper.id },
@@ -1154,7 +814,6 @@ async function seedRemediations(userId: string) {
         return null;
       }
 
-      // Create the Remediation with affectedDeviceGroups and vulnerability
       const createdRemediation = await prisma.remediation.create({
         data: {
           description: remediation.description,
@@ -1168,7 +827,6 @@ async function seedRemediations(userId: string) {
         },
       });
 
-      // Create ArtifactWrapper for this remediation
       const wrapper = await prisma.artifactWrapper.create({
         data: {
           remediationId: createdRemediation.id,
@@ -1176,7 +834,6 @@ async function seedRemediations(userId: string) {
         },
       });
 
-      // Create artifact for the fixUri
       const fixArtifact = await prisma.artifact.create({
         data: {
           wrapperId: wrapper.id,
@@ -1188,7 +845,6 @@ async function seedRemediations(userId: string) {
         },
       });
 
-      // Set as latest artifact
       await prisma.artifactWrapper.update({
         where: { id: wrapper.id },
         data: {
@@ -1247,6 +903,270 @@ async function seedIssues() {
   return issues;
 }
 
+async function seedWorkflows(userId: string) {
+  console.log("\n🌱 Seeding workflows...");
+
+  const STEP_POS = 100;
+
+  // ── Workflow 1: Emergency CT — Acute Stroke / Trauma Protocol ───────────────
+  const workflow1 = await prisma.workflow.create({
+    data: {
+      name: "Emergency CT: Acute Stroke / Trauma Protocol",
+      description:
+        "End-to-end clinical pathway for a time-sensitive ED imaging order — from patient arrival through CT acquisition, PACS routing, radiology interpretation, and ED treatment decision.",
+      userId,
+    },
+  });
+
+  const w1nodes = await Promise.all([
+    prisma.node.create({
+      data: {
+        workflowId: workflow1.id,
+        name: "Patient Arrives at ED",
+        type: "STEP",
+        position: { x: 0 * STEP_POS, y: 0 },
+        data: {
+          label: "Patient Arrives at ED",
+          description:
+            "Patient presents with suspected stroke, trauma, or altered mental status — time-sensitive imaging required.",
+        },
+      },
+    }),
+    prisma.node.create({
+      data: {
+        workflowId: workflow1.id,
+        name: "ED Physician Orders CT",
+        type: "STEP",
+        position: { x: 1 * STEP_POS, y: 0 },
+        data: {
+          label: "ED Physician Orders CT",
+          description:
+            "Clinical order placed for emergent CT scan with contrast.",
+        },
+      },
+    }),
+    prisma.node.create({
+      data: {
+        workflowId: workflow1.id,
+        name: "CT Scanner",
+        type: "ASSET",
+        position: { x: 2 * STEP_POS, y: 0 },
+        data: {
+          icon: "Workstation on Wheels",
+          label: "GE BrightSpeed Elite Select",
+          description:
+            "GE BrightSpeed Elite Select acquires axial and helical CT studies. Completed images are sent to the CT acquisition workstation via DICOM.",
+          cpes: [
+            "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
+          ],
+        },
+      },
+    }),
+    prisma.node.create({
+      data: {
+        workflowId: workflow1.id,
+        name: "CT Acquisition Workstation",
+        type: "ASSET",
+        position: { x: 3 * STEP_POS, y: 0 },
+        data: {
+          icon: "Workstation on Wheels",
+          label: "CT Acquisition Workstation",
+          description:
+            "GE Advantage Workstation 4.6 processes raw CT data, reconstructs images, and pushes the completed study to PACS.",
+          assetIds: ["rad-ws-001"],
+        },
+      },
+    }),
+    prisma.node.create({
+      data: {
+        workflowId: workflow1.id,
+        name: "PACS Server",
+        type: "ASSET",
+        position: { x: 4 * STEP_POS, y: 0 },
+        data: {
+          icon: "Workstation on Wheels",
+          label: "PACS Server",
+          description:
+            "Centricity PACS-IW v5.0 stores and routes DICOM studies to radiology workstations and the ED image viewer.",
+          assetIds: ["rad-pacs-001"],
+        },
+      },
+    }),
+    prisma.node.create({
+      data: {
+        workflowId: workflow1.id,
+        name: "Radiology Diagnostic Workstations",
+        type: "ASSET",
+        position: { x: 5 * STEP_POS, y: 0 },
+        data: {
+          icon: "Workstation on Wheels",
+          label: "Radiology Diagnostic Workstations",
+          description:
+            "Radiologist interprets the CT study on a diagnostic-grade display, dictates findings, and signs the final report.",
+          assetIds: ["rad-rws-001", "rad-rws-002"],
+        },
+      },
+    }),
+    prisma.node.create({
+      data: {
+        workflowId: workflow1.id,
+        name: "ED Image Viewer",
+        type: "ASSET",
+        position: { x: 6 * STEP_POS, y: 0 },
+        data: {
+          icon: "Workstation on Wheels",
+          label: "ED Image Viewer",
+          description:
+            "ED team reviews the imaging study and the signed radiology report to guide treatment and disposition decisions.",
+          assetIds: ["rad-ed-001"],
+        },
+      },
+    }),
+    prisma.node.create({
+      data: {
+        workflowId: workflow1.id,
+        name: "Treatment / Disposition Decision",
+        type: "STEP",
+        position: { x: 7 * STEP_POS, y: 0 },
+        data: {
+          label: "Treatment / Disposition Decision",
+          description:
+            "ED team uses imaging result for treatment, transfer, or patient disposition.",
+        },
+      },
+    }),
+  ]);
+
+  for (let i = 0; i < w1nodes.length - 1; i++) {
+    await prisma.connection.create({
+      data: {
+        workflowId: workflow1.id,
+        fromNodeId: w1nodes[i].id,
+        toNodeId: w1nodes[i + 1].id,
+        fromOutput: "main",
+        toInput: "main",
+      },
+    });
+  }
+
+  console.log(`  ✅ "${workflow1.name}" (${w1nodes.length} nodes)`);
+
+  // ── Workflow 2: Remote Radiology — After-Hours Imaging Coverage ─────────────
+  const workflow2 = await prisma.workflow.create({
+    data: {
+      name: "Remote Radiology — After-Hours Imaging Coverage",
+      description:
+        "Workflow for inpatient studies acquired after hours and routed to a remote radiologist via VPN, enabling continuous imaging coverage and timely clinical decisions around the clock.",
+      userId,
+    },
+  });
+
+  const w2nodes = await Promise.all([
+    prisma.node.create({
+      data: {
+        workflowId: workflow2.id,
+        name: "Inpatient Imaging Order Placed",
+        type: "STEP",
+        position: { x: 0 * STEP_POS, y: 0 },
+        data: {
+          label: "Inpatient Imaging Order Placed",
+          description:
+            "Clinical team orders after-hours imaging for an inpatient.",
+        },
+      },
+    }),
+    prisma.node.create({
+      data: {
+        workflowId: workflow2.id,
+        name: "Imaging Device",
+        type: "ASSET",
+        position: { x: 1 * STEP_POS, y: 0 },
+        data: {
+          icon: "Workstation on Wheels",
+          label: "Portable Ultrasound / X-Ray",
+          description:
+            "GE LOGIQ e R7 portable ultrasound or Optima XR200amx DR system acquires bedside or mobile studies for inpatients.",
+          cpes: [
+            "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
+            "cpe:2.3:h:gehealthcare:optima_xr200amx:-:*:*:*:*:*:*:*",
+          ],
+        },
+      },
+    }),
+    prisma.node.create({
+      data: {
+        workflowId: workflow2.id,
+        name: "PACS Server",
+        type: "ASSET",
+        position: { x: 2 * STEP_POS, y: 0 },
+        data: {
+          icon: "Workstation on Wheels",
+          label: "PACS Server",
+          description:
+            "Centricity PACS-IW v5.0 stores the study and routes it to the remote radiologist via the VPN gateway.",
+          assetIds: ["rad-pacs-001"],
+        },
+      },
+    }),
+    prisma.node.create({
+      data: {
+        workflowId: workflow2.id,
+        name: "Remote Radiology VPN Gateway",
+        type: "ASSET",
+        position: { x: 3 * STEP_POS, y: 0 },
+        data: {
+          icon: "Workstation on Wheels",
+          label: "Remote Radiology VPN Gateway",
+          description:
+            "Cisco ASA 5505 VPN gateway provides secure encrypted connectivity for remote radiologist access to the hospital PACS.",
+          assetIds: ["rad-vpn-001"],
+        },
+      },
+    }),
+    prisma.node.create({
+      data: {
+        workflowId: workflow2.id,
+        name: "Remote Radiologist Reviews Study",
+        type: "STEP",
+        position: { x: 4 * STEP_POS, y: 0 },
+        data: {
+          label: "Remote Radiologist Reviews Study",
+          description:
+            "Off-site radiologist reads the study via VPN and prepares a signed report.",
+        },
+      },
+    }),
+    prisma.node.create({
+      data: {
+        workflowId: workflow2.id,
+        name: "Signed Report Returned to Care Team",
+        type: "STEP",
+        position: { x: 5 * STEP_POS, y: 0 },
+        data: {
+          label: "Signed Report Returned to Care Team",
+          description:
+            "Final radiology report transmitted back to the ordering care team.",
+        },
+      },
+    }),
+  ]);
+
+  for (let i = 0; i < w2nodes.length - 1; i++) {
+    await prisma.connection.create({
+      data: {
+        workflowId: workflow2.id,
+        fromNodeId: w2nodes[i].id,
+        toNodeId: w2nodes[i + 1].id,
+        fromOutput: "main",
+        toInput: "main",
+      },
+    });
+  }
+
+  console.log(`  ✅ "${workflow2.name}" (${w2nodes.length} nodes)`);
+  console.log("✅ Workflow seeding complete");
+}
+
 async function main() {
   console.log("🌱 Starting database seed...\n");
 
@@ -1264,6 +1184,7 @@ async function main() {
     await seedDeviceArtifacts(user.id);
     await seedRemediations(user.id);
     await seedIssues();
+    await seedWorkflows(user.id);
 
     console.log("\n✅ Database seeding completed successfully!");
     console.log(`\n📧 Login with: ${SEED_USER.email} / ${SEED_USER.password}`);

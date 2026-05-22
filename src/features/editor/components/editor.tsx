@@ -15,10 +15,10 @@ import {
   Panel,
   ReactFlow,
 } from "@xyflow/react";
+import { useTheme } from "next-themes";
 import { useCallback, useState } from "react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { useSuspenseWorkflow } from "@/features/workflows/hooks/use-workflows";
-import { useTheme } from "next-themes";
 
 import "@xyflow/react/dist/style.css";
 import { useSetAtom } from "jotai";
@@ -84,7 +84,11 @@ export const Editor = ({ workflowId }: { workflowId: string }) => {
         selectionOnDrag
         colorMode={colorMode}
       >
-        <Background color={backgroundDotColor} gap={16} size={backgroundDotSize} />
+        <Background
+          color={backgroundDotColor}
+          gap={16}
+          size={backgroundDotSize}
+        />
         <Controls
           style={{
             backgroundColor: "var(--card)",

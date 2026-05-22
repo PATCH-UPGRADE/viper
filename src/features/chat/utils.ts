@@ -90,6 +90,10 @@ function utilizationBucket(
   return "High";
 }
 
+// Convert asset utilization data into more AI-friendly format
+// Aggregate usage percentages into buckets, then group consecutive hours
+// of the same bucket into one line.
+// E.g, "9:00-13:00 [High], 13:00-14:00 [Low]", etc
 function renderUtilizationLine(raw: unknown): string {
   const parsed = assetUtilizationSchema.safeParse(raw);
   if (!parsed.success) return "No data";

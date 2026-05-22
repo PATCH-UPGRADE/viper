@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  anthropic,
   createAgent,
   type NetworkRun,
   type StateData,
@@ -13,7 +14,6 @@ import {
   VULNERABILITY_ROLE_INSTRUCTIONS,
   vulnerabilityToMarkdown,
 } from "@/features/chat/utils";
-import { DEFAULT_CHAT_MODEL } from "../constants";
 import { askUserQuestions } from "../tools/ask-user-questions";
 import { getRecommendationsContext } from "../tools/get-recommendations-context";
 import { manageMemoriesTool } from "../tools/manage-memories";
@@ -26,7 +26,10 @@ import { manageMemoriesTool } from "../tools/manage-memories";
 //   used by <failure_mode_framework> so the agent has few-shot patterns to
 //   imitate rather than improvising from a blank slate.
 
-const MODEL = DEFAULT_CHAT_MODEL;
+const MODEL = anthropic({
+  model: "claude-opus-4-6",
+  defaultParameters: { max_tokens: 1_000_000 },
+});
 
 const BASE_PROMPT = `\
 <role>
@@ -85,7 +88,7 @@ about typical usage patterns for that device before committing to a window — f
 questions around shift patterns, care hours, and maintenance windows rather than
 guessing.
 
-Always note: post-patch validation is required, batch related assets where possible,
+Always note: post-patch validation may be required, batch related assets where possible,
 stagger to avoid shift changes.
 </scheduling_guidance>
 
@@ -157,11 +160,11 @@ and explicitly describe which communication paths will be severed and what clini
 operational function each path supports.
 
 **## Device Utilization Windows** — hourly utilization per asset in four buckets:
-Offline (0%), Low (1–30%), Medium (31–50%), High (51–100%). To find a minimally
-disruptive patch window: identify hours where the asset (and any co-scheduled assets)
-are simultaneously Offline or Low. Prefer windows spanning multiple consecutive offline
-hours. If utilization data is absent for a device, ask the user via ask_user_questions —
-frame questions around typical shift patterns, care hours, and maintenance windows.
+Offline (0%), Low (1–30%), Medium (31–50%), High (51–100%). Percentages represent the
+probability that a device will need to be used at that time. If utilization data is
+absent for a device and is necessary to know for your remediation assistance, ask the
+user via ask_user_questions — frame questions around typical shift patterns, care
+hours, and maintenance windows.
 </context_data_guidance>`;
 
 const buildSystemPrompt = (

@@ -171,19 +171,16 @@ export function assetToMarkdown(
     `- **MAC Address**: ${a.macAddress ?? "N/A"}`,
     `- **Role**: ${a.role ?? "Unknown"}`,
     `- **Status**: ${a.status ?? "Unknown"}`,
-    `- **Network Segment**: ${a.networkSegment ?? "N/A"}`,
     `- **Serial Number**: ${a.serialNumber ?? "N/A"}`,
     `- **Location**: ${parseLocation(a.location)}`,
     `- **Device Group**: ${[a.deviceGroup.manufacturer, a.deviceGroup.modelName].filter(Boolean).join(" ")} (CPE: ${a.deviceGroup.cpe})`.trim(),
     `- **Device Group Version**: ${a.deviceGroup.version ?? "N/A"}`,
   ];
 
-  lines.push(
-    `- **Utilization Schedule**: ${renderUtilizationLine(a.utilization)}`,
-  );
-
-  if (a.updatedAt) {
-    lines.push(`- **Last Updated**: ${new Date(a.updatedAt).toISOString()}`);
+  if (a.utilization) {
+    lines.push(
+      `- **Utilization Schedule**: ${renderUtilizationLine(a.utilization)}`,
+    );
   }
 
   if (opts.includeIssues && a.issues && a.issues.length > 0) {
@@ -219,7 +216,6 @@ export function vulnerabilityToMarkdown(
     `- **In CISA KEV**: ${v.inKEV ? "Yes" : "No"}`,
   ];
 
-  if (v.exploitUri) lines.push(`- **Exploit URI**: ${v.exploitUri}`);
   if (v.affectedComponents && v.affectedComponents.length > 0) {
     lines.push(`- **Affected Components**: ${v.affectedComponents.join(", ")}`);
   }
@@ -234,11 +230,9 @@ export function vulnerabilityToMarkdown(
     lines.push(`- **Affected Device Groups**: ${dgList}`);
   }
 
-  if (v.description)
-    lines.push(`- **Description**: ${truncate(v.description)}`);
-  if (v.narrative)
-    lines.push(`- **Exploit Narrative**: ${truncate(v.narrative)}`);
-  if (v.impact) lines.push(`- **Clinical Impact**: ${truncate(v.impact)}`);
+  if (v.description) lines.push(`- **Description**: ${v.description}`);
+  if (v.narrative) lines.push(`- **Exploit Narrative**: ${v.narrative}`);
+  if (v.impact) lines.push(`- **Clinical Impact**: ${v.impact}`);
 
   if (opts.includeAssets && v.issues && v.issues.length > 0) {
     lines.push(`- **Affected Assets** (${v.issues.length}):`);
@@ -284,19 +278,8 @@ export function remediationToMarkdown(r: RemediationForMarkdown): string {
     }
   }
 
-  if (r.artifacts && r.artifacts.length > 0) {
-    const types = r.artifacts
-      .map((a) => a.latestArtifact?.artifactType)
-      .filter(Boolean)
-      .join(", ");
-    lines.push(
-      `- **Artifacts**: ${r.artifacts.length}${types ? ` (${types})` : ""}`,
-    );
-  }
-
-  if (r.description)
-    lines.push(`- **Description**: ${truncate(r.description)}`);
-  if (r.narrative) lines.push(`- **How to Apply**: ${truncate(r.narrative)}`);
+  if (r.description) lines.push(`- **Description**: ${r.description}`);
+  if (r.narrative) lines.push(`- **How to Apply**: ${r.narrative}`);
 
   return lines.join("\n");
 }

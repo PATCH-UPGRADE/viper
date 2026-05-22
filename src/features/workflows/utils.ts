@@ -1,4 +1,4 @@
-import type { Edge, Node } from "@xyflow/react";
+import type { Node } from "@xyflow/react";
 import type { Prisma } from "@/generated/prisma";
 
 type SerializedNode = Omit<Node, "position">;
@@ -15,20 +15,10 @@ export function serializeWorkflow(workflow: WorkflowWithRelations) {
     type: node.type,
     data: { ...(node.data as Record<string, unknown>), name: node.name },
   }));
-  const edges: Edge[] = workflow.connections.map((connection) => ({
-    id: connection.id,
-    source: connection.fromNodeId,
-    target: connection.toNodeId,
-    sourceHandle: connection.fromOutput,
-    targetHandle: connection.toInput,
-  }));
   return {
     id: workflow.id,
     name: workflow.name,
     description: workflow.description,
-    createdAt: workflow.createdAt,
-    updatedAt: workflow.updatedAt,
     nodes,
-    edges,
   };
 }

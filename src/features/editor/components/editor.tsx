@@ -42,6 +42,10 @@ export const Editor = ({ workflowId }: { workflowId: string }) => {
   const colorMode = resolvedTheme === "dark" ? "dark" : "light";
   const miniMapMaskColor =
     colorMode === "dark" ? "rgb(2 6 23 / 0.55)" : "rgb(255 255 255 / 0.65)";
+  // Workaround to make the background dots more visible in light mode, since the default color is too light
+  const backgroundDotColor =
+    colorMode === "dark" ? "var(--border)" : "rgb(100 116 139 / 0.55)";
+  const backgroundDotSize = colorMode === "dark" ? 1 : 1.25;
 
   const [nodes, setNodes] = useState<Node[]>(workflow.nodes);
   const [edges, setEdges] = useState<Edge[]>(workflow.edges);
@@ -80,7 +84,7 @@ export const Editor = ({ workflowId }: { workflowId: string }) => {
         selectionOnDrag
         colorMode={colorMode}
       >
-        <Background color="var(--border)" gap={16} />
+        <Background color={backgroundDotColor} gap={16} size={backgroundDotSize} />
         <Controls
           style={{
             backgroundColor: "var(--card)",

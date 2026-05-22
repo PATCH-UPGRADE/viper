@@ -65,8 +65,7 @@ export const networkRouter = createTRPCRouter({
         path: "/network/flow",
         tags: ["Network"],
         summary: "Get Network Flow Topology",
-        description:
-          "Proxies the upstream network flow service and returns a minimal topology snapshot (assets and observed traffic connections).",
+        description: "Returns network flow topology data according to schema",
       },
     })
     .input(z.void())
@@ -76,6 +75,10 @@ export const networkRouter = createTRPCRouter({
     }),
 
   // Internal — returns the 1-hop subgraph for a specific Viper asset, enriched with Prisma data
+  // 1. Get the topology data from upstream
+  // 2. Figure out if the asset user provides endpoints is in that data
+  // 3. Gather connected assets, it's immediate neighborhood
+  // 4. Enrich those assets with VIPER data
   getFlowForAsset: protectedProcedure
     .input(z.object({ assetId: z.string() }))
     .output(assetFlowResponseSchema)

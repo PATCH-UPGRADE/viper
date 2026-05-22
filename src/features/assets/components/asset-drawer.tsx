@@ -239,8 +239,10 @@ function buildSankeyData(
   ];
 
   const protoIdx = (p: string) => 1 + protoSet.indexOf(p);
-  const peerIdx = (id: string) =>
-    1 + protoSet.length + peers.findIndex((a) => a.id === id);
+  const peerIndexById = new Map(
+    peers.map((a, idx) => [a.id, 1 + protoSet.length + idx] as const),
+  );
+  const peerIdx = (id: string) => peerIndexById.get(id);
 
   const focalToProto = new Map<string, number>();
   const protoToPeer = new Map<string, number>();
@@ -256,9 +258,11 @@ function buildSankeyData(
       target: protoIdx(proto),
       value,
     })),
-    ...Array.from(protoToPeer.entries()).map(([key, value]) => {
+    ...Array.from(protoToPeer.entries()).flatMap(([key, value]) => {
       const [proto, peerId] = key.split("|") as [string, string];
-      return { source: protoIdx(proto), target: peerIdx(peerId), value };
+      const target = peerIdx(peerId);
+      if (target === undefined) return [];
+      return [{ source: protoIdx(proto), target, value }];
     }),
   ];
 

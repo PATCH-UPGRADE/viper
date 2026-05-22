@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  anthropic,
   createAgent,
   type NetworkRun,
   type StateData,
@@ -13,22 +14,9 @@ import {
   VULNERABILITY_ROLE_INSTRUCTIONS,
   vulnerabilityToMarkdown,
 } from "@/features/chat/utils";
-import { DEFAULT_CHAT_MODEL } from "../constants";
 import { askUserQuestions } from "../tools/ask-user-questions";
 import { getRecommendationsContext } from "../tools/get-recommendations-context";
 import { manageMemoriesTool } from "../tools/manage-memories";
-
-// TODO(network-flow): when network communication graph is available, inject a
-//   <network_flow> block into BASE_PROMPT and add a clause requiring the agent
-//   to trace downstream comms impact before recommending device isolation.
-
-// TODO(workflows): when clinical workflow definitions (text + mermaid) are
-//   available, inject a <clinical_workflows> block and require the agent to
-//   name affected workflow IDs before recommending.
-
-// TODO(utilization): when device utilization data is available, replace the
-//   "conservative default windows" fallback in <scheduling_guidance> with
-//   specific windows derived from the utilization table.
 
 // TODO(few-shot-harms): when patient harm examples are ready, inject a
 //   <patient_harm_examples> block with golden examples of cyber-outage ->
@@ -38,7 +26,10 @@ import { manageMemoriesTool } from "../tools/manage-memories";
 //   used by <failure_mode_framework> so the agent has few-shot patterns to
 //   imitate rather than improvising from a blank slate.
 
-const MODEL = DEFAULT_CHAT_MODEL;
+const MODEL = anthropic({
+  model: "claude-opus-4-6",
+  defaultParameters: { max_tokens: 4096 },
+});
 
 const BASE_PROMPT = `\
 <role>
@@ -86,11 +77,19 @@ output where useful.
 </failure_mode_framework>
 
 <scheduling_guidance>
-Propose patch windows that minimize disruption to patient care. When specific device
-utilization data is not available in the retrieved context, recommend conservative
-default windows (overnight, weekend low-acuity periods) and flag the assumption so
-the user can confirm or override. Always note: post-patch validation is required,
-batch related assets where possible, stagger to avoid shift changes.
+Propose patch windows that minimize disruption to patient care.
+
+When "## Device Utilization Windows" is present in the retrieved context, use per-asset
+utilization data (Offline / Low / Medium / High buckets) to identify hours where all
+affected assets are Offline or Low, and propose those as patch windows.
+
+When utilization data is absent for a device, use ask_user_questions to ask the user
+about typical usage patterns for that device before committing to a window — frame
+questions around shift patterns, care hours, and maintenance windows rather than
+guessing.
+
+Always note: post-patch validation may be required, batch related assets where possible,
+stagger to avoid shift changes.
 </scheduling_guidance>
 
 <output_contract>
@@ -136,12 +135,37 @@ Check existing memories before creating new ones — update instead of duplicati
 </memory_guidance>
 
 <tools>
-- get_recommendations_context: load all assets, vulnerabilities, remediations, and
-  memories for this user. Call once at the start of a thread only.
+- get_recommendations_context: load all assets, vulnerabilities, remediations,
+  memories, clinical workflows, network flow topology, and device utilization windows
+  for this user. Call once at the start of a thread only.
 - ask_user_questions: ask the user 1–4 clarifying questions with suggested answers.
   The agent turn ends here until the user replies.
 - manage_memories: create, update, or delete persistent memories for this user.
-</tools>`;
+</tools>
+
+<context_data_guidance>
+The retrieved context includes three additional data sources. Use them as follows:
+
+**## Clinical Workflows** — serialized JSON graphs of hospital clinical/operational
+workflows. Each workflow node represents a clinical function (device, system, or step);
+edges represent dependencies. When recommending remediation for an asset, search
+workflow nodes for matching role or hostname. Name affected workflows and describe the
+downstream clinical impact in step 3 (clinical dependency) and step 4 (failure pathway)
+of the failure_mode_framework.
+
+**## Network Flow** — observed network topology snapshot. Each asset entry lists IPs
+and services; each connection entry shows directional traffic between assets. Before
+recommending network isolation of a device, identify all 1-hop peers in the flow data
+and explicitly describe which communication paths will be severed and what clinical or
+operational function each path supports.
+
+**## Device Utilization Windows** — hourly utilization per asset in four buckets:
+Offline (0%), Low (1–30%), Medium (31–50%), High (51–100%). Percentages represent the
+probability that a device will need to be used at that time. If utilization data is
+absent for a device and is necessary to know for your remediation assistance, ask the
+user via ask_user_questions — frame questions around typical shift patterns, care
+hours, and maintenance windows.
+</context_data_guidance>`;
 
 const buildSystemPrompt = (
   network: NetworkRun<StateData> | undefined,

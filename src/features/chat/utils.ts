@@ -1,3 +1,4 @@
+import { assetUtilizationSchema } from "@/features/assets/types";
 import type { HistoryMessage } from "./types";
 
 // ─── Structural interfaces for markdown rendering ─────────────────────────────
@@ -13,6 +14,7 @@ interface AssetForMarkdown {
   networkSegment?: string | null;
   serialNumber?: string | null;
   location?: unknown;
+  utilization?: unknown;
   updatedAt?: Date;
   deviceGroup: {
     manufacturer?: string | null;
@@ -77,6 +79,53 @@ interface RemediationForMarkdown {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const UTILIZATION_DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function utilizationBucket(
+  value: number,
+): "Offline" | "Low" | "Medium" | "High" {
+  if (value === 0) return "Offline";
+  if (value <= 30) return "Low";
+  if (value <= 50) return "Medium";
+  return "High";
+}
+
+// Convert asset utilization data into more AI-friendly format
+// Aggregate usage percentages into buckets, then group consecutive hours
+// of the same bucket into one line.
+// E.g, "9:00-13:00 [High], 13:00-14:00 [Low]", etc
+function renderUtilizationLine(raw: unknown): string {
+  const parsed = assetUtilizationSchema.safeParse(raw);
+  if (!parsed.success) return "No data";
+  const data = parsed.data;
+
+  const parts: string[] = [];
+  for (let dayIdx = 0; dayIdx < data.length; dayIdx++) {
+    const dayData = data[dayIdx];
+    const dayName = UTILIZATION_DAY_NAMES[dayIdx] ?? `Day${dayIdx}`;
+    const hours = Array.from({ length: 24 }, (_, h) => h);
+
+    const segments: { bucket: string; start: number; end: number }[] = [];
+    for (const hour of hours) {
+      const bucket = utilizationBucket(dayData[String(hour)] ?? 0);
+      const last = segments[segments.length - 1];
+      if (last && last.bucket === bucket && last.end === hour - 1) {
+        last.end = hour;
+      } else {
+        segments.push({ bucket, start: hour, end: hour });
+      }
+    }
+
+    const segStrs = segments.map(({ bucket, start, end }) => {
+      const range = start === end ? `${start}:00` : `${start}:00–${end + 1}:00`;
+      return `${range} [${bucket}]`;
+    });
+    parts.push(`${dayName}: ${segStrs.join(", ")}`);
+  }
+
+  return parts.join(" | ");
+}
+
 function truncate(text: string | null | undefined, max = 400): string {
   if (!text) return "";
   return text.length > max ? `${text.slice(0, max)}…` : text;
@@ -119,15 +168,16 @@ export function assetToMarkdown(
     `- **MAC Address**: ${a.macAddress ?? "N/A"}`,
     `- **Role**: ${a.role ?? "Unknown"}`,
     `- **Status**: ${a.status ?? "Unknown"}`,
-    `- **Network Segment**: ${a.networkSegment ?? "N/A"}`,
     `- **Serial Number**: ${a.serialNumber ?? "N/A"}`,
     `- **Location**: ${parseLocation(a.location)}`,
     `- **Device Group**: ${[a.deviceGroup.manufacturer, a.deviceGroup.modelName].filter(Boolean).join(" ")} (CPE: ${a.deviceGroup.cpe})`.trim(),
     `- **Device Group Version**: ${a.deviceGroup.version ?? "N/A"}`,
   ];
 
-  if (a.updatedAt) {
-    lines.push(`- **Last Updated**: ${new Date(a.updatedAt).toISOString()}`);
+  if (a.utilization) {
+    lines.push(
+      `- **Utilization Schedule**: ${renderUtilizationLine(a.utilization)}`,
+    );
   }
 
   if (opts.includeIssues && a.issues && a.issues.length > 0) {
@@ -163,7 +213,6 @@ export function vulnerabilityToMarkdown(
     `- **In CISA KEV**: ${v.inKEV ? "Yes" : "No"}`,
   ];
 
-  if (v.exploitUri) lines.push(`- **Exploit URI**: ${v.exploitUri}`);
   if (v.affectedComponents && v.affectedComponents.length > 0) {
     lines.push(`- **Affected Components**: ${v.affectedComponents.join(", ")}`);
   }
@@ -178,11 +227,9 @@ export function vulnerabilityToMarkdown(
     lines.push(`- **Affected Device Groups**: ${dgList}`);
   }
 
-  if (v.description)
-    lines.push(`- **Description**: ${truncate(v.description)}`);
-  if (v.narrative)
-    lines.push(`- **Exploit Narrative**: ${truncate(v.narrative)}`);
-  if (v.impact) lines.push(`- **Clinical Impact**: ${truncate(v.impact)}`);
+  if (v.description) lines.push(`- **Description**: ${v.description}`);
+  if (v.narrative) lines.push(`- **Exploit Narrative**: ${v.narrative}`);
+  if (v.impact) lines.push(`- **Clinical Impact**: ${v.impact}`);
 
   if (opts.includeAssets && v.issues && v.issues.length > 0) {
     lines.push(`- **Affected Assets** (${v.issues.length}):`);
@@ -228,19 +275,8 @@ export function remediationToMarkdown(r: RemediationForMarkdown): string {
     }
   }
 
-  if (r.artifacts && r.artifacts.length > 0) {
-    const types = r.artifacts
-      .map((a) => a.latestArtifact?.artifactType)
-      .filter(Boolean)
-      .join(", ");
-    lines.push(
-      `- **Artifacts**: ${r.artifacts.length}${types ? ` (${types})` : ""}`,
-    );
-  }
-
-  if (r.description)
-    lines.push(`- **Description**: ${truncate(r.description)}`);
-  if (r.narrative) lines.push(`- **How to Apply**: ${truncate(r.narrative)}`);
+  if (r.description) lines.push(`- **Description**: ${r.description}`);
+  if (r.narrative) lines.push(`- **How to Apply**: ${r.narrative}`);
 
   return lines.join("\n");
 }

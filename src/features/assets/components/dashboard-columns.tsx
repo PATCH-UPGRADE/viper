@@ -149,6 +149,15 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
     },
   },
   {
+    id: "updatedAt",
+    accessorKey: "updatedAt",
+    header: ({ column }) => (
+      <SortableHeader header="Last Updated" column={column} />
+    ),
+    cell: ({ row }) =>
+      formatDistanceToNow(row.original.updatedAt, { addSuffix: true }),
+  },
+  {
     id: "actions",
     enableHiding: false,
     header: "",

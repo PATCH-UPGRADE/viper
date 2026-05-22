@@ -28,7 +28,7 @@ import { manageMemoriesTool } from "../tools/manage-memories";
 
 const MODEL = anthropic({
   model: "claude-opus-4-6",
-  defaultParameters: { max_tokens: 1_000_000 },
+  defaultParameters: { max_tokens: 4096 },
 });
 
 const BASE_PROMPT = `\

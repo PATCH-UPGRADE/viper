@@ -135,12 +135,13 @@ function generateWorkflowsMarkdown(workflows: WorkflowWithRelations[]): string {
   return workflows
     .map((wf) => {
       const serialized = serializeWorkflow(wf);
+      const { edges: _edges, ...withoutEdges } = serialized;
       const lines = [`### ${serialized.name} (${shortId(serialized.id)})`];
       if (serialized.description) {
         lines.push(`\n${serialized.description}`);
       }
       lines.push(
-        `\n\`\`\`json\n${JSON.stringify(serialized, null, 2)}\n\`\`\``,
+        `\n\`\`\`json\n${JSON.stringify(withoutEdges, null, 2)}\n\`\`\``,
       );
       return lines.join("\n");
     })

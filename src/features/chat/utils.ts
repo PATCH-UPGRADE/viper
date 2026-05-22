@@ -99,14 +99,7 @@ function renderUtilizationLine(raw: unknown): string {
   for (let dayIdx = 0; dayIdx < data.length; dayIdx++) {
     const dayData = data[dayIdx];
     const dayName = UTILIZATION_DAY_NAMES[dayIdx] ?? `Day${dayIdx}`;
-    const hours = Object.keys(dayData)
-      .map(Number)
-      .sort((a, b) => a - b);
-
-    if (hours.length === 0) {
-      parts.push(`${dayName}: Offline`);
-      continue;
-    }
+    const hours = Array.from({ length: 24 }, (_, h) => h);
 
     const segments: { bucket: string; start: number; end: number }[] = [];
     for (const hour of hours) {

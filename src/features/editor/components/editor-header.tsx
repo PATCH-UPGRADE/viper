@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { truncate } from "@/features/chat/utils";
 import {
   useSuspenseWorkflow,
   useUpdateWorkflow,
@@ -210,7 +211,7 @@ export const EditorDescriptionInput = ({
       }}
       className="text-sm text-muted-foreground italic cursor-pointer hover:text-foreground transition-colors"
     >
-      {workflow.description || "Add workflow description"}
+      {truncate(workflow.description, 80) || "Add workflow description"}
     </BreadcrumbItem>
   );
 };

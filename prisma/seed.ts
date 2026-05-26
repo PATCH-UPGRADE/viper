@@ -535,9 +535,9 @@ const SAMPLE_VULNERABILITIES = [
     description:
       "GE Healthcare imaging and ultrasound products may allow specific credentials to be exposed during transport over the network due to insufficiently protected credential transmission (CWE-522/CWE-523). Affects the BrightSpeed Elite Select CT scanner, LOGIQ e R7 portable ultrasound units, and Optima XR200amx X-ray system.",
     narrative:
-      "The GE BrightSpeed Elite Select CT scanner, LOGIQ e R7 ultrasound units, and Optima XR200amx transmit service credentials with insufficient protection during normal network operations. An attacker with access to the DICOM VLAN can passively intercept these credentials and use them to gain unauthorized access to scanner configuration interfaces — potentially altering imaging protocols, disabling devices, or pivoting to connected workstations. GE Healthcare issued Security Bulletin GE-2020-004 recommending network isolation and firmware updates.",
+      "The GE BrightSpeed Elite Select CT scanner, LOGIQ e R7 ultrasound units, and Optima XR200amx transmit service credentials with insufficient protection during normal network operations. An attacker with access to the DICOM VLAN can passively intercept these credentials and use them to gain unauthorized access to scanner configuration interfaces — potentially altering imaging protocols, disabling devices, or pivoting to connected workstations. If exploited, these vulnerabilities could allow an attacker to gain access to affected devices in a way that is comparable with GE (remote) service user privileges. A successful exploitation could expose sensitive data such as a limited set of patient health information (PHI) or could allow the attacker to run arbitrary code, which might impact the availability of the system and allow manipulation of PHI.",
     impact:
-      "Credential compromise on imaging devices could allow attackers to alter scanner calibration or protocols, disabling devices during active patient care. In a radiology emergency workflow (stroke, trauma), device unavailability can directly delay time-critical diagnoses. The DICOM VLAN provides network adjacency to PACS and clinical workstations for further lateral movement.",
+      "Credential compromise on imaging devices could allow attackers to alter scanner calibration or protocols, disabling devices during active patient care. In a radiology emergency workflow (stroke, trauma), device unavailability can directly delay time-critical diagnoses.",
   },
   // ── CVE-2017-0144: EternalBlue / MS17-010 (SMBv1 RCE, Critical, KEV) ────────
   {
@@ -653,10 +653,18 @@ const SAMPLE_REMEDIATIONS = [
     fixUri:
       "https://www.cisa.gov/news-events/ics-medical-advisories/icsma-20-343-01",
     description:
-      "Apply GE Healthcare ICS security controls per CISA advisory ICSMA-20-343-01 and GE Security Bulletin GE-2020-004 to mitigate credential exposure on imaging devices (CVE-2020-25175).",
+      "Firmware update. Apply GE Healthcare ICS security controls per CISA advisory ICSMA-20-343-01 and GE Security Bulletin GE-2020-004 to mitigate credential exposure on imaging devices (CVE-2020-25175).",
     narrative:
-      "Work with GE Healthcare Biomedical/Clinical Engineering to apply mitigations from GE Security Bulletin GE-2020-004. Immediately isolate all affected GE imaging devices (CT scanner, ultrasound units, X-ray node) to a dedicated DICOM VLAN with strict ACLs permitting only DICOM traffic (port 104/TCP) to and from the PACS server. Disable unnecessary network services on each device via GE service mode. Request firmware update availability from your GE account representative. Deploy IDS/IPS monitoring on the DICOM VLAN to detect anomalous credential-bearing traffic. Post-remediation: verify DICOM connectivity to PACS and confirm the imaging workflow is unaffected.",
+      "Work with GE Healthcare Biomedical/Clinical Engineering to apply mitigations from GE Security Bulletin GE-2020-004. Request firmware update from your GE account representative. Post-remediation: verify DICOM connectivity to PACS and confirm the imaging workflow is unaffected.",
     upstreamApi: "https://www.gehealthcare.com/security",
+  },
+  // BITW remediation for GE BrightSpeed Elite Select
+  {
+    cpe: "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
+    description:
+      "Network-based remediation. Insert a bump-in-the-wire device between the CT scanner and hospital LAN, to permit only DICOM traffic to and from the PACS server. This functions as an IDS/IPS to detect and prevent anomalous credential-bearing traffic.",
+    narrative:
+      "This is intended as a temporary stopgap as routine network traffic could potentially be disrupted. Devices should be isolated on VLANs first, if possible. Post-remediation: verify DICOM connectivity to PACS and confirm the imaging workflow is unaffected.",
   },
   // CVE-2017-0144 remediation for CT Acquisition Workstation (Windows 7 / EOL host)
   {

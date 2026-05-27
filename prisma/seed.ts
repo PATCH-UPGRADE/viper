@@ -4,6 +4,9 @@ import {
   type AssetStatus,
   Priority,
   Severity,
+  TicketCategory,
+  TicketSource,
+  TicketStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
@@ -623,6 +626,44 @@ const SAMPLE_VULNERABILITIES = [
     impact:
       "Compromise of the VPN gateway severs remote radiologist connectivity, disabling after-hours imaging coverage and potentially delaying critical results. Compromise of the perimeter firewall allows the attacker to modify security policy, intercept all DICOM/HL7 traffic, and pivot freely into clinical VLANs containing imaging devices, PACS, and patient monitoring infrastructure.",
   },
+  // ── CVE-2021-12345: Baxter Sigma Spectrum Buffer Overflow (High) ────────────
+  // Hypothetical CVE used for seed data — drives the "Update Baxter Infusion
+  // Pumps Firmware" change ticket and creates Issue records for all 23 pumps.
+  {
+    cveId: "CVE-2021-12345",
+    severity: Severity.High,
+    cvssScore: 8.1,
+    epss: 0.04,
+    inKEV: false,
+    priority: Priority.High,
+    sarif: {
+      version: "2.1.0",
+      runs: [
+        {
+          tool: { driver: { name: "Medical Device Scanner" } },
+          results: [
+            {
+              ruleId: "CVE-2021-12345",
+              level: "warning",
+              message: {
+                text: "Baxter Sigma Spectrum infusion pump firmware contains a buffer overflow in the wireless management interface allowing remote code execution from the same wireless segment",
+              },
+            },
+          ],
+        },
+      ],
+    },
+    cpes: ["cpe:2.3:h:baxter:sigma_spectrum:-:*:*:*:*:*:*:*"],
+    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2021-12345",
+    upstreamApi:
+      "https://www.baxter.com/healthcare-professionals/service-and-support",
+    description:
+      "Buffer overflow in the wireless management interface of Baxter Sigma Spectrum infusion pumps running firmware versions prior to 8.x allows an attacker on the same wireless segment to execute arbitrary code or crash the device via crafted management packets. All 23 Sigma Spectrum pumps on WARD-VLAN-20 are running the vulnerable firmware (v1.2.3).",
+    narrative:
+      "The Baxter Sigma Spectrum pump fleet on the medical-surgical floor is running firmware v1.2.3, which contains a buffer overflow in the wireless management interface. An attacker with access to WARD-VLAN-20 can send crafted management packets to crash a pump or execute code in the pump's control context. Baxter has issued an updated firmware release that addresses the vulnerability, but each pump must be taken out of service, updated, and clinically validated before being returned to patient use.",
+    impact:
+      "A successful exploit could cause a pump to crash mid-infusion, interrupting medication delivery to a patient. In the worst case, code execution could allow an attacker to alter infusion parameters (rate, volume, dose) — a direct patient-safety risk for any patient on continuous IV medication. With all 23 pumps running the vulnerable firmware, a worm-style attack could disable the entire medical-surgical infusion fleet simultaneously.",
+  },
 ];
 
 const SAMPLE_MEMORIES = [
@@ -683,9 +724,366 @@ const SAMPLE_REMEDIATIONS = [
   },
 ];
 
+const SAMPLE_DEPARTMENTS = [
+  {
+    name: "Radiology",
+    description:
+      "Imaging department — CT, PACS, ultrasound, X-ray, reading rooms.",
+    color: "purple",
+  },
+  {
+    name: "Emergency Department",
+    description:
+      "ED clinical operations, including the bedside image viewer.",
+    color: "red",
+  },
+  {
+    name: "Biomed",
+    description:
+      "Medical device lifecycle — patient monitors, infusion pumps, validation.",
+    color: "orange",
+  },
+  {
+    name: "Biotech",
+    description: "Biotechnology research and lab operations.",
+    color: "yellow",
+  },
+  {
+    name: "Nursing",
+    description: "Ward operations on the medical-surgical floor.",
+    color: "pink",
+  },
+  {
+    name: "IT",
+    description:
+      "Network, firewall, VPN, identity, and security operations.",
+    color: "blue",
+  },
+  {
+    name: "Procurement",
+    description: "Capital equipment sourcing and vendor management.",
+    color: "blue",
+  },
+  {
+    name: "Administration",
+    description: "Hospital leadership and compliance oversight.",
+    color: "slate",
+  },
+];
+
+const SAMPLE_CATEGORY_COLORS: { category: TicketCategory; color: string }[] = [
+  { category: TicketCategory.PATCH, color: "blue" },
+  { category: TicketCategory.CONFIG_CHANGE, color: "purple" },
+  { category: TicketCategory.VULN_REMEDIATION, color: "red" },
+  { category: TicketCategory.ADVISORY_RESPONSE, color: "amber" },
+  { category: TicketCategory.CLINICAL_REVIEW, color: "pink" },
+  { category: TicketCategory.FIRMWARE_UPDATE, color: "orange" },
+  { category: TicketCategory.NETWORK_REMEDIATION, color: "blue" },
+  { category: TicketCategory.NEW_ASSET_PROCUREMENT, color: "purple" },
+  { category: TicketCategory.OTHER, color: "slate" },
+];
+
+const SEED_USER_DEPARTMENT = "IT";
+
+type SampleTicket = {
+  summary: string;
+  description?: string;
+  status: TicketStatus;
+  category: TicketCategory;
+  department: string;
+  lifeSafety?: boolean;
+  source: TicketSource;
+  sourceWorkflowName?: string;
+  scheduledAt?: Date;
+  linkedCveIds?: string[];
+  linkedAssetIds?: string[];
+  comments?: string[];
+};
+
+type SampleParentTicket = SampleTicket & { children?: SampleTicket[] };
+
+// Tickets generated against the seed vulnerabilities/assets/workflows above.
+// Scheduled dates are relative to seed run; relative offsets are computed below.
+const dayMs = 24 * 60 * 60 * 1000;
+const now = Date.now();
+const inDays = (n: number) => new Date(now + n * dayMs);
+
+const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
+  {
+    summary:
+      "Update Baxter Infusion Pumps Firmware",
+    description:
+      "Baxter Sigma Spectrum infusion pumps are running firmware version 1.2.3, which is vulnerable to CVE-2021-12345 (hypothetical buffer overflow). Coordinate with Biomed to schedule firmware updates for all 23 pumps, ensuring validation of clinical functionality post-update.",
+    status: TicketStatus.IN_PROGRESS,
+    category: TicketCategory.FIRMWARE_UPDATE,
+    department: "Biomed",
+    source: TicketSource.MANUAL,
+    linkedCveIds: ["CVE-2021-12345"],
+    linkedAssetIds: Array.from({ length: 23 }, (_, i) => `rad-pump-${String(i + 1).padStart(3, "0")}`),
+    comments: [
+      "Firmware update available from Baxter support portal.",
+    ],
+    children: [
+      {
+        summary: "Update firmware on ICU pumps (4 devices)",
+        description:
+          "Schedule update for pumps in ICU first, coordinate with nursing to minimize disruption.",
+        status: TicketStatus.DONE,
+        category: TicketCategory.FIRMWARE_UPDATE,
+        department: "Biomed",
+        source: TicketSource.MANUAL,
+        linkedCveIds: ["CVE-2021-12345"],
+        linkedAssetIds: ["rad-pump-001", "rad-pump-002", "rad-pump-003", "rad-pump-004"],
+        comments: [
+          "Completed on 2026-05-15; validated pump functionality post-update.",
+        ],
+      },
+      {
+        summary: "Update firmware on ER pumps (3 devices)",
+        description:
+          "Schedule update for pumps in ER next, coordinate with nursing to minimize disruption.",
+        status: TicketStatus.IN_PROGRESS,
+        category: TicketCategory.FIRMWARE_UPDATE,
+        department: "Biomed",
+        source: TicketSource.MANUAL,
+        linkedCveIds: ["CVE-2021-12345"],
+        linkedAssetIds: ["rad-pump-005", "rad-pump-006", "rad-pump-007"],
+        comments: [
+          "Pending Biomed review and scheduling.",
+        ],
+      },
+      {
+        summary: "Update firmware on Surgery pumps (3 devices)",
+        description:
+          "Schedule update for pumps in Surgery next, coordinate with nursing to minimize disruption.",
+        status: TicketStatus.TO_DO,
+        category: TicketCategory.FIRMWARE_UPDATE,
+        department: "Biomed",
+        source: TicketSource.MANUAL,
+        linkedCveIds: ["CVE-2021-12345"],
+        linkedAssetIds: ["rad-pump-008", "rad-pump-009", "rad-pump-010"],
+      }
+    ]
+  },
+  {
+    summary:
+      "Remediate EternalBlue (CVE-2017-0144) across EOL Windows imaging hosts",
+    description:
+      "Umbrella ticket covering SMBv1/MS17-010 mitigation on every Windows 7 / Server 2008 R2 host in the imaging chain. Tracks per-host workstreams and the network-level compensating controls.",
+    status: TicketStatus.IN_PROGRESS,
+    category: TicketCategory.VULN_REMEDIATION,
+    department: "Radiology",
+    lifeSafety: true,
+    source: TicketSource.WORKFLOW,
+    sourceWorkflowName: "Emergency CT: Acute Stroke / Trauma Protocol",
+    linkedCveIds: ["CVE-2017-0144"],
+    linkedAssetIds: [
+      "rad-ws-001",
+      "rad-pacs-001",
+      "rad-rws-001",
+      "rad-rws-002",
+      "rad-ed-001",
+    ],
+    comments: [
+      "Tracking five hosts + two compensating controls. Final verify lands once PACS patch is approved.",
+    ],
+    children: [
+      {
+        summary: "Disable SMBv1 on CT Acquisition Workstation (rad-ws-001)",
+        description:
+          "Mitigates EternalBlue on the EOL Windows 7 host. Coordinate with Radiology — workstation is on the Emergency CT path.",
+        status: TicketStatus.TO_DO,
+        category: TicketCategory.CONFIG_CHANGE,
+        department: "Radiology",
+        lifeSafety: true,
+        source: TicketSource.WORKFLOW,
+        sourceWorkflowName: "Emergency CT: Acute Stroke / Trauma Protocol",
+        linkedCveIds: ["CVE-2017-0144"],
+        linkedAssetIds: ["rad-ws-001"],
+        comments: [
+          "Life-safety path: confirm fallback procedure before rollout.",
+          "Vendor compat check pending with GE for Advantage Workstation 4.6.",
+        ],
+      },
+      {
+        summary: "Patch PACS Server EternalBlue (rad-pacs-001)",
+        description:
+          "PACS server is on EOL Windows Server 2008 R2. Apply MS17-010 via extended support or disable SMBv1 + block 445 at the switch. Affects the entire imaging workflow.",
+        status: TicketStatus.REQUIRES_APPROVAL,
+        category: TicketCategory.VULN_REMEDIATION,
+        department: "Radiology",
+        lifeSafety: true,
+        source: TicketSource.WORKFLOW,
+        sourceWorkflowName: "Remote Radiology — After-Hours Imaging Coverage",
+        scheduledAt: inDays(10),
+        linkedCveIds: ["CVE-2017-0144"],
+        linkedAssetIds: ["rad-pacs-001"],
+        comments: [
+          "Awaiting CMO sign-off — full imaging chain outage if this goes sideways.",
+        ],
+      },
+      {
+        summary: "Disable SMBv1 on Radiology Diagnostic Workstations",
+        description:
+          "Apply SMBv1 disablement to rad-rws-001 and rad-rws-002 in tandem so radiologist coverage isn't interrupted.",
+        status: TicketStatus.IN_PROGRESS,
+        category: TicketCategory.CONFIG_CHANGE,
+        department: "Radiology",
+        source: TicketSource.MANUAL,
+        scheduledAt: inDays(1),
+        linkedCveIds: ["CVE-2017-0144"],
+        linkedAssetIds: ["rad-rws-001", "rad-rws-002"],
+        comments: ["rws-001 done; rws-002 scheduled for tonight."],
+      },
+      {
+        summary: "Block TCP/445 at imaging switch (rad-sw-001)",
+        description:
+          "Network-level compensating control for EternalBlue on EOL Windows hosts. ACL deployed on imaging and PACS VLANs.",
+        status: TicketStatus.DONE,
+        category: TicketCategory.CONFIG_CHANGE,
+        department: "IT",
+        source: TicketSource.MANUAL,
+        scheduledAt: inDays(-9),
+        linkedCveIds: ["CVE-2017-0144"],
+        linkedAssetIds: ["rad-sw-001"],
+        comments: ["Work order ticket CHG-2207 closed; pending verification."],
+      },
+      {
+        summary: "Verify DICOM VLAN ACL enforcement",
+        description:
+          "Validate post-deployment that only DICOM (104/TCP) is permitted between imaging devices and PACS.",
+        status: TicketStatus.DONE,
+        category: TicketCategory.CONFIG_CHANGE,
+        department: "IT",
+        source: TicketSource.MANUAL,
+        scheduledAt: inDays(-6),
+        linkedCveIds: ["CVE-2020-25175"],
+        linkedAssetIds: ["rad-pacs-001", "rad-sw-001"],
+        comments: ["Validated via packet capture on 2026-05-21."],
+      },
+    ],
+  },
+  {
+    summary: "GE Imaging Device Hardening (CVE-2020-25175)",
+    description:
+      "Umbrella ticket for credential-exposure mitigations across GE BrightSpeed CT, LOGIQ e ultrasounds, and Optima XR200amx per CISA ICSMA-20-343-01.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.VULN_REMEDIATION,
+    department: "Radiology",
+    source: TicketSource.WORKFLOW,
+    sourceWorkflowName: "Emergency CT: Acute Stroke / Trauma Protocol",
+    linkedCveIds: ["CVE-2020-25175"],
+    linkedAssetIds: ["rad-ct-001", "rad-us-001", "rad-us-002", "rad-xr-001"],
+    comments: [
+      "Proposed by workflow after AI.PatchRead flagged credential exposure on the DICOM VLAN.",
+    ],
+    children: [
+      {
+        summary: "Isolate GE imaging devices to a dedicated DICOM VLAN",
+        description:
+          "Per CISA ICSMA-20-343-01, isolate the BrightSpeed CT, both LOGIQ e ultrasounds, and the Optima XR200amx onto a DICOM-only VLAN with strict ACLs. Coordinate with Biomed for post-change DICOM validation.",
+        status: TicketStatus.TO_DO,
+        category: TicketCategory.CONFIG_CHANGE,
+        department: "Radiology",
+        source: TicketSource.WORKFLOW,
+        sourceWorkflowName: "Emergency CT: Acute Stroke / Trauma Protocol",
+        linkedCveIds: ["CVE-2020-25175"],
+        linkedAssetIds: [
+          "rad-ct-001",
+          "rad-us-001",
+          "rad-us-002",
+          "rad-xr-001",
+        ],
+      },
+    ],
+  },
+  {
+    summary: "Cisco ASA EXTRABACON Upgrades (CVE-2016-6366)",
+    description:
+      "Upgrade both ASA 5505 appliances (perimeter firewall + remote radiology VPN gateway) from 8.2 to a patched 9.1.x release.",
+    status: TicketStatus.REQUIRES_APPROVAL,
+    category: TicketCategory.PATCH,
+    department: "IT",
+    source: TicketSource.MANUAL,
+    linkedCveIds: ["CVE-2016-6366"],
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+    children: [
+      {
+        summary: "Upgrade Perimeter Firewall ASA 8.2 → 9.1(7.21)",
+        description:
+          "SNMP RCE on ASA 8.x. Upgrade rad-fw-001 to a patched 9.1.x release in a maintenance window.",
+        status: TicketStatus.REQUIRES_APPROVAL,
+        category: TicketCategory.PATCH,
+        department: "IT",
+        source: TicketSource.MANUAL,
+        scheduledAt: inDays(7),
+        linkedCveIds: ["CVE-2016-6366"],
+        linkedAssetIds: ["rad-fw-001"],
+        comments: ["~30 min downtime expected; backup config staged."],
+      },
+      {
+        summary: "Upgrade Cisco ASA VPN gateway (rad-vpn-001)",
+        description:
+          "Coordinate with remote radiology coverage. Upgrade ASA 8.2 → 9.1.x to remediate EXTRABACON.",
+        status: TicketStatus.IN_PROGRESS,
+        category: TicketCategory.PATCH,
+        department: "IT",
+        source: TicketSource.WORKFLOW,
+        sourceWorkflowName: "Remote Radiology — After-Hours Imaging Coverage",
+        scheduledAt: inDays(3),
+        linkedCveIds: ["CVE-2016-6366"],
+        linkedAssetIds: ["rad-vpn-001"],
+      },
+    ],
+  },
+  {
+    summary: "Patient Device Roadmap",
+    description:
+      "Tracks longer-horizon decisions for patient monitor and infusion pump fleets — vendor engagement, fleet refresh planning.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.OTHER,
+    department: "Biomed",
+    source: TicketSource.MANUAL,
+    children: [
+      {
+        summary: "Investigate IntelliVue MP5 firmware update availability",
+        description:
+          "Open ticket with Philips on patient monitor firmware roadmap and known vulns.",
+        status: TicketStatus.TO_DO,
+        category: TicketCategory.OTHER,
+        department: "Biomed",
+        source: TicketSource.MANUAL,
+        linkedAssetIds: Array.from(
+          { length: 13 },
+          (_, i) => `rad-mon-${String(i + 1).padStart(3, "0")}`,
+        ),
+      },
+      {
+        summary: "Replace Baxter Sigma Spectrum infusion pumps",
+        description:
+          "Proposed full fleet replacement deferred — out-of-budget this FY. Revisit in next capital cycle.",
+        status: TicketStatus.DONE,
+        category: TicketCategory.OTHER,
+        department: "Biomed",
+        lifeSafety: true,
+        source: TicketSource.MANUAL,
+        linkedAssetIds: Array.from(
+          { length: 23 },
+          (_, i) => `rad-pump-${String(i + 1).padStart(3, "0")}`,
+        ),
+        comments: ["Deferred per Admin — revisit FY27 capital plan."],
+      },
+    ],
+  },
+];
+
 async function clearDatabase() {
   console.log("🗑️  Clearing database...");
 
+  // Tickets first — they reference assets/vulns/remediations/advisories/workflows/users.
+  // Comments cascade with their parent ticket; the implicit m2m join rows cascade too.
+  await prisma.ticketComment.deleteMany();
+  await prisma.workOrderTicket.deleteMany();
   // Workflows cascade to Node and Connection
   await prisma.workflow.deleteMany();
   // Delete in order of dependencies (child tables first)
@@ -703,6 +1101,8 @@ async function clearDatabase() {
   await prisma.deviceGroup.deleteMany();
   await prisma.integration.deleteMany();
   await prisma.memory.deleteMany();
+  await prisma.categoryColor.deleteMany();
+  await prisma.department.deleteMany();
 
   console.log("✅ Database cleared");
 }
@@ -1309,6 +1709,146 @@ async function seedWorkflows(userId: string) {
   console.log("✅ Workflow seeding complete");
 }
 
+async function seedCategoryColors() {
+  console.log("\n🌱 Seeding category colors...");
+  await Promise.all(
+    SAMPLE_CATEGORY_COLORS.map((c) =>
+      prisma.categoryColor.upsert({
+        where: { category: c.category },
+        update: { color: c.color },
+        create: c,
+      }),
+    ),
+  );
+  console.log(`✅ Seeded ${SAMPLE_CATEGORY_COLORS.length} category colors`);
+}
+
+async function seedDepartments(userId: string) {
+  console.log("\n🌱 Seeding departments...");
+
+  const departments = await Promise.all(
+    SAMPLE_DEPARTMENTS.map((dept) =>
+      prisma.department.upsert({
+        where: { name: dept.name },
+        update: dept,
+        create: dept,
+      }),
+    ),
+  );
+
+  const seedUserDept = departments.find(
+    (d) => d.name === SEED_USER_DEPARTMENT,
+  );
+  if (seedUserDept) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { departmentId: seedUserDept.id },
+    });
+  }
+
+  console.log(`✅ Seeded ${departments.length} departments`);
+  return departments;
+}
+
+async function createWorkOrderTicket(
+  ticket: SampleTicket,
+  userId: string,
+  parentId: string | null,
+) {
+  const department = await prisma.department.findUnique({
+    where: { name: ticket.department },
+  });
+
+  const sourceWorkflow = ticket.sourceWorkflowName
+    ? await prisma.workflow.findFirst({
+        where: { name: ticket.sourceWorkflowName },
+      })
+    : null;
+
+  const linkedVulns = ticket.linkedCveIds?.length
+    ? await prisma.vulnerability.findMany({
+        where: { cveId: { in: ticket.linkedCveIds } },
+        select: { id: true },
+      })
+    : [];
+
+  const linkedAssets = ticket.linkedAssetIds?.length
+    ? await prisma.asset.findMany({
+        where: { id: { in: ticket.linkedAssetIds } },
+        select: { id: true },
+      })
+    : [];
+
+  const linkedRemediations = ticket.linkedCveIds?.length
+    ? await prisma.remediation.findMany({
+        where: { vulnerability: { cveId: { in: ticket.linkedCveIds } } },
+        select: { id: true },
+      })
+    : [];
+
+  const linkedIssues =
+    ticket.linkedAssetIds?.length && ticket.linkedCveIds?.length
+      ? await prisma.issue.findMany({
+          where: {
+            assetId: { in: ticket.linkedAssetIds },
+            vulnerability: { cveId: { in: ticket.linkedCveIds } },
+          },
+          select: { id: true },
+        })
+      : [];
+
+  return prisma.workOrderTicket.create({
+    data: {
+      summary: ticket.summary,
+      description: ticket.description,
+      status: ticket.status,
+      category: ticket.category,
+      lifeSafety: ticket.lifeSafety ?? false,
+      source: ticket.source,
+      sourceWorkflowId: sourceWorkflow?.id,
+      departmentId: department?.id,
+      parentId,
+      creatorId: userId,
+      assigneeId: userId,
+      scheduledAt: ticket.scheduledAt,
+      vulnerabilities: { connect: linkedVulns.map((v) => ({ id: v.id })) },
+      assets: { connect: linkedAssets.map((a) => ({ id: a.id })) },
+      remediations: {
+        connect: linkedRemediations.map((r) => ({ id: r.id })),
+      },
+      issues: { connect: linkedIssues.map((i) => ({ id: i.id })) },
+      comments: ticket.comments?.length
+        ? {
+            create: ticket.comments.map((body) => ({
+              body,
+              authorId: userId,
+            })),
+          }
+        : undefined,
+    },
+  });
+}
+
+async function seedWorkOrderTickets(userId: string) {
+  console.log("\n🌱 Seeding work order tickets...");
+
+  let parentCount = 0;
+  let childCount = 0;
+
+  for (const parent of SAMPLE_CHANGE_TICKETS) {
+    const created = await createWorkOrderTicket(parent, userId, null);
+    parentCount++;
+    for (const child of parent.children ?? []) {
+      await createWorkOrderTicket(child, userId, created.id);
+      childCount++;
+    }
+  }
+
+  console.log(
+    `✅ Seeded ${parentCount} parent tickets and ${childCount} child tickets`,
+  );
+}
+
 async function main() {
   console.log("🌱 Starting database seed...\n");
 
@@ -1320,6 +1860,8 @@ async function main() {
 
     const user = await createOrGetSeedUser();
 
+    await seedDepartments(user.id);
+    await seedCategoryColors();
     await seedDeviceGroups();
     await seedAssets(user.id);
     await seedVulnerabilities(user.id);
@@ -1328,6 +1870,7 @@ async function main() {
     await seedIssues();
     await seedWorkflows(user.id);
     await seedMemories(user.id);
+    await seedWorkOrderTickets(user.id);
 
     console.log("\n✅ Database seeding completed successfully!");
     console.log(`\n📧 Login with: ${SEED_USER.email} / ${SEED_USER.password}`);

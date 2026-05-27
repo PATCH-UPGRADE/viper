@@ -3,6 +3,7 @@
 import {
   BugIcon,
   ChevronDownIcon,
+  ListChecksIcon,
   ComputerIcon,
   CpuIcon,
   ExternalLink,
@@ -73,6 +74,11 @@ const mainItems = [
     title: "Advisories",
     icon: ShieldAlertIcon,
     url: "/advisories",
+  },
+  {
+    title: "Tracking",
+    icon: ListChecksIcon,
+    url: "/tracking",
   },
   {
     title: "Settings",

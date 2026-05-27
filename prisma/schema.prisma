@@ -42,7 +42,14 @@ model User {
   threads    ChatThread[]
   memories   Memory[]
 
+  departmentId           String?
+  department             Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  workOrderTicketsCreated   WorkOrderTicket[]  @relation("WorkOrderTicketCreator")
+  workOrderTicketsAssigned  WorkOrderTicket[]  @relation("WorkOrderTicketAssignee")
+  ticketComments         TicketComment[]
+
   @@unique([email])
+  @@index([departmentId])
   @@map("user")
 }
 
@@ -119,6 +126,8 @@ model Workflow {
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sourceWorkOrderTickets WorkOrderTicket[] @relation("WorkOrderTicketSourceWorkflow")
 }
 
 enum NodeType {
@@ -244,6 +253,7 @@ model Asset {
   issues               Issue[]
   deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
+  workOrderTickets        WorkOrderTicket[]       @relation("WorkOrderTicketAssets")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -470,6 +480,7 @@ model Vulnerability {
 
   remediations         Remediation[]
   issues               Issue[]
+  workOrderTickets        WorkOrderTicket[]  @relation("WorkOrderTicketVulns")
 
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
@@ -501,6 +512,7 @@ model Issue {
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
   issueRemediations  IssueRemediation[]
+  workOrderTickets      WorkOrderTicket[]     @relation("WorkOrderTicketIssues")
 
   status IssueStatus @default(ACTIVE)
 
@@ -524,6 +536,7 @@ model Remediation {
   vulnerability   Vulnerability? @relation(fields: [vulnerabilityId], references: [id], onDelete: SetNull)
 
   issueRemediations    IssueRemediation[]
+  workOrderTickets        WorkOrderTicket[]     @relation("WorkOrderTicketRemediations")
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -742,6 +755,7 @@ model Advisory {
   createdAt                 DateTime        @default(now())
   updatedAt                 DateTime        @updatedAt
   externalMappings          ExternalAdvisoryMapping[]
+  workOrderTickets             WorkOrderTicket[]  @relation("WorkOrderTicketAdvisories")
 
   @@index([userId])
   @@map("advisory")
@@ -812,4 +826,117 @@ model Memory {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+enum TicketStatus {
+  TO_DO
+  IN_PROGRESS
+  REQUIRES_APPROVAL
+  DONE
+}
+
+enum TicketCategory {
+  PATCH
+  CONFIG_CHANGE
+  VULN_REMEDIATION
+  ADVISORY_RESPONSE
+  CLINICAL_REVIEW
+  FIRMWARE_UPDATE
+  NETWORK_REMEDIATION
+  NEW_ASSET_PROCUREMENT
+  OTHER
+}
+
+enum TicketSource {
+  WORKFLOW
+  MANUAL
+  WEBHOOK
+  API
+}
+
+model Department {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  description String?        @db.Text
+  color       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  users       User[]
+  tickets     WorkOrderTicket[]
+
+  @@map("department")
+}
+
+model CategoryColor {
+  id        String         @id @default(cuid())
+  category  TicketCategory @unique
+  color     String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@map("category_color")
+}
+
+model WorkOrderTicket {
+  id          String         @id @default(cuid())
+  summary     String
+  description String?        @db.Text
+
+  status      TicketStatus   @default(TO_DO)
+  category    TicketCategory @default(OTHER)
+
+  lifeSafety  Boolean        @default(false)
+
+  source             TicketSource @default(MANUAL)
+  sourceWorkflowId   String?
+  sourceWorkflow     Workflow?    @relation("WorkOrderTicketSourceWorkflow", fields: [sourceWorkflowId], references: [id], onDelete: SetNull)
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  parentId  String?
+  parent    WorkOrderTicket?  @relation("WorkOrderTicketChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children  WorkOrderTicket[] @relation("WorkOrderTicketChildren")
+
+  creatorId   String
+  creator     User           @relation("WorkOrderTicketCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  assigneeId  String?
+  assignee    User?          @relation("WorkOrderTicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  scheduledAt DateTime?
+
+  issues          Issue[]         @relation("WorkOrderTicketIssues")
+  vulnerabilities Vulnerability[] @relation("WorkOrderTicketVulns")
+  remediations    Remediation[]   @relation("WorkOrderTicketRemediations")
+  advisories      Advisory[]      @relation("WorkOrderTicketAdvisories")
+  assets          Asset[]         @relation("WorkOrderTicketAssets")
+
+  comments    TicketComment[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([departmentId])
+  @@index([assigneeId])
+  @@index([creatorId])
+  @@index([sourceWorkflowId])
+  @@index([parentId])
+  @@map("work_order_ticket")
+}
+
+model TicketComment {
+  id        String       @id @default(cuid())
+  ticketId  String
+  ticket    WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body      String       @db.Text
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([ticketId, createdAt])
+  @@index([authorId])
+  @@map("ticket_comment")
 }

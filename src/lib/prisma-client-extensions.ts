@@ -70,6 +70,43 @@ export const artifactExtension = Prisma.defineExtension({
   },
 });
 
+// create issues on asset create for any vulnerabilities already linked to the same device group
+export const assetExtension = Prisma.defineExtension((client) =>
+  client.$extends({
+    name: "assetIssueCreation",
+    query: {
+      asset: {
+        async create({ query, args }) {
+          const asset = await query(args);
+          const assetId = asset.id as string;
+          const deviceGroupId = asset.deviceGroupId as string | null;
+
+          if (!deviceGroupId) return asset;
+
+          const vulnerabilities = await client.vulnerability.findMany({
+            where: {
+              affectedDeviceGroups: { some: { id: deviceGroupId } },
+            },
+            select: { id: true },
+          });
+
+          if (vulnerabilities.length > 0) {
+            await client.issue.createMany({
+              data: vulnerabilities.map((v) => ({
+                assetId,
+                vulnerabilityId: v.id,
+              })),
+              skipDuplicates: true,
+            });
+          }
+
+          return asset;
+        },
+      },
+    },
+  }),
+);
+
 // create issues on vulnerability create
 export const vulnerabilityExtension = Prisma.defineExtension((client) =>
   client.$extends({

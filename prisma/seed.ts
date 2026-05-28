@@ -119,7 +119,7 @@ const SAMPLE_DEVICE_GROUPS = [
 // Individual hospital assets
 const SAMPLE_ASSETS = [
   // ── Imaging Devices (IMAGING-VLAN-40) ───────────────────────────────────────
-  {
+  /*{
     id: "rad-ct-001",
     ip: "10.40.1.10",
     cpe: "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
@@ -134,7 +134,7 @@ const SAMPLE_ASSETS = [
       room: "CT Suite",
     },
     status: "Active",
-  },
+  },*/
   {
     id: "rad-us-001",
     ip: "10.40.1.30",

@@ -494,7 +494,12 @@ export const assetsRouter = createTRPCRouter({
           model: prisma.asset,
           mappingModel: prisma.externalAssetMapping,
           transformInputItem: async (item, userId) => {
-            const { cpe, vendorId: _vendorId, utilization, ...itemData } = item;
+            const {
+              cpe,
+              vendorId: _vendorId,
+              utilization: _utilization,
+              ...itemData
+            } = item;
             const deviceGroup = await cpeToDeviceGroup(
               cpe ?? UNKNOWN_CPE_STRING,
             );
@@ -511,13 +516,11 @@ export const assetsRouter = createTRPCRouter({
             return {
               createData: {
                 ...itemData,
-                utilization: utilization as Prisma.InputJsonValue | undefined,
                 deviceGroupId: deviceGroup.id,
                 userId,
               },
               updateData: {
                 ...itemData,
-                utilization: utilization as Prisma.InputJsonValue | undefined,
                 deviceGroupId: deviceGroup.id,
               },
               uniqueFieldConditions,

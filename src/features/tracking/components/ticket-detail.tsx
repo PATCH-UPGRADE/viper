@@ -3,11 +3,15 @@
 import { format } from "date-fns";
 import {
   CalendarIcon,
+  CheckIcon,
+  ChevronsUpDownIcon,
   ClockIcon,
   HeartPulseIcon,
   MessageSquareIcon,
+  PencilIcon,
   SlashIcon,
   UserIcon,
+  XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -16,13 +20,32 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/user-avatar";
 import { authClient } from "@/lib/auth-client";
@@ -42,14 +65,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SeverityBadge } from "@/components/severity-badge";
-import {
+import type {
   TicketCategory,
   TicketSource,
   TicketStatus,
@@ -59,9 +77,13 @@ import {
   useCategoryColor,
 } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
+import { cn } from "@/lib/utils";
 import {
   useAddTicketComment,
+  useAssignableUsers,
+  useDepartments,
   useSuspenseTrackingTicket,
+  useUpdateTicket,
 } from "../hooks/use-tracking";
 import type { TicketDetail } from "../types";
 
@@ -156,23 +178,22 @@ const Section = ({
   </section>
 );
 
-type DetailAsset =
-  TicketDetail["assets"][number];
-type DetailRemediation =
-  TicketDetail["remediations"][number];
+type DetailAsset = TicketDetail["assets"][number];
+type DetailRemediation = TicketDetail["remediations"][number];
 
 const formatLocation = (location: unknown): string => {
   if (!location || typeof location !== "object") return "—";
   const loc = location as Record<string, unknown>;
-  const parts = [loc.building, loc.floor, loc.room]
-    .filter((v): v is string => typeof v === "string" && v.length > 0);
+  const parts = [loc.building, loc.floor, loc.room].filter(
+    (v): v is string => typeof v === "string" && v.length > 0,
+  );
   return parts.length > 0 ? parts.join(" · ") : "—";
 };
 
 const truncate = (s: string, n = 80) =>
   s.length > n ? `${s.slice(0, n - 1)}…` : s;
 
-const LinkedAssetsTable = ({
+export const LinkedAssetsTable = ({
   assets,
   remediations,
 }: {
@@ -201,53 +222,54 @@ const LinkedAssetsTable = ({
           <TableHead>Remediation</TableHead>
         </TableRow>
       </TableHeader>
-        <TableBody>
-          {assets.map((a) => {
-            const remediation = remediationByDeviceGroup.get(a.deviceGroupId);
-            const model = a.deviceGroup
-              ? [a.deviceGroup.manufacturer, a.deviceGroup.modelName]
-                  .filter(Boolean)
-                  .join(" ")
-              : "—";
-            return (
-              <TableRow key={a.id} className="hover:bg-muted/40">
-                <TableCell>
-                  <Link
-                    href={`/assets/${a.id}`}
-                    className="text-sm hover:underline"
-                  >
-                    {a.role ?? "—"}
-                  </Link>
-                </TableCell>
-                <TableCell className="text-sm">{model || "—"}</TableCell>
-                <TableCell className="font-mono text-xs">{a.ip}</TableCell>
-                <TableCell className="font-mono text-xs">
-                  {a.macAddress ?? "—"}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {formatLocation(a.location)}
-                </TableCell>
-                <TableCell className="text-sm">
-                  {remediation ? (
-                    <span title={remediation.description ?? undefined}>
-                      {truncate(
-                        remediation.description ?? `Remediation ${remediation.id}`,
-                        60,
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+      <TableBody>
+        {assets.map((a) => {
+          const remediation = remediationByDeviceGroup.get(a.deviceGroupId);
+          const model = a.deviceGroup
+            ? [a.deviceGroup.manufacturer, a.deviceGroup.modelName]
+                .filter(Boolean)
+                .join(" ")
+            : "—";
+          return (
+            <TableRow key={a.id} className="hover:bg-muted/40">
+              <TableCell>
+                <Link
+                  href={`/assets/${a.id}`}
+                  className="text-sm hover:underline"
+                >
+                  {a.role ?? "—"}
+                </Link>
+              </TableCell>
+              <TableCell className="text-sm">{model || "—"}</TableCell>
+              <TableCell className="font-mono text-xs">{a.ip}</TableCell>
+              <TableCell className="font-mono text-xs">
+                {a.macAddress ?? "—"}
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {formatLocation(a.location)}
+              </TableCell>
+              <TableCell className="text-sm">
+                {remediation ? (
+                  <span title={remediation.description ?? undefined}>
+                    {truncate(
+                      remediation.description ??
+                        `Remediation ${remediation.id}`,
+                      60,
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 };
 
-const AddCommentForm = ({ ticketId }: { ticketId: string }) => {
+export const AddCommentForm = ({ ticketId }: { ticketId: string }) => {
   const [body, setBody] = useState("");
   const addComment = useAddTicketComment(ticketId);
   const { data: session } = authClient.useSession();
@@ -295,8 +317,322 @@ const AddCommentForm = ({ ticketId }: { ticketId: string }) => {
   );
 };
 
-const TicketDetailContent = ({ id }: { id: string }) => {
+const UNASSIGNED = "__unassigned__";
+
+const toDateTimeLocal = (date: Date | string | null | undefined) => {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
+  const offsetMs = d.getTimezoneOffset() * 60_000;
+  return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16);
+};
+
+type EditState = {
+  summary: string;
+  description: string;
+  status: TicketStatus;
+  category: TicketCategory;
+  lifeSafety: boolean;
+  departmentIds: string[];
+  assigneeId: string;
+  scheduledAt: string;
+};
+
+const buildEditState = (data: TicketDetail): EditState => ({
+  summary: data.summary,
+  description: data.description ?? "",
+  status: data.status,
+  category: data.category,
+  lifeSafety: data.lifeSafety,
+  departmentIds: data.departments.map((d) => d.id),
+  assigneeId: data.assignee?.id ?? UNASSIGNED,
+  scheduledAt: toDateTimeLocal(data.scheduledAt),
+});
+
+type DepartmentOption = { id: string; name: string; color: string | null };
+
+export const DepartmentMultiSelect = ({
+  options,
+  selectedIds,
+  onChange,
+}: {
+  options: DepartmentOption[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const selected = options.filter((o) => selectedIds.includes(o.id));
+
+  const toggle = (id: string) => {
+    onChange(
+      selectedIds.includes(id)
+        ? selectedIds.filter((s) => s !== id)
+        : [...selectedIds, id],
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {selected.map((d) => (
+            <Badge
+              key={d.id}
+              variant="outline"
+              className={cn(getChipClass(d.color), "gap-1 pr-1")}
+            >
+              {d.name}
+              <button
+                type="button"
+                onClick={() => toggle(d.id)}
+                className="rounded-full hover:bg-muted/70 p-0.5"
+                aria-label={`Remove ${d.name}`}
+              >
+                <XIcon className="size-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="justify-between font-normal"
+          >
+            <span className="text-muted-foreground">
+              {selected.length === 0
+                ? "Select departments..."
+                : `${selected.length} selected`}
+            </span>
+            <ChevronsUpDownIcon className="size-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="p-0 w-[var(--radix-popover-trigger-width)]">
+          <Command>
+            <CommandInput placeholder="Search departments..." />
+            <CommandList>
+              <CommandEmpty>No departments found.</CommandEmpty>
+              <CommandGroup>
+                {options.map((d) => {
+                  const isSelected = selectedIds.includes(d.id);
+                  return (
+                    <CommandItem
+                      key={d.id}
+                      value={d.name}
+                      onSelect={() => toggle(d.id)}
+                    >
+                      <CheckIcon
+                        className={cn(
+                          "size-4",
+                          isSelected ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                      {d.name}
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+};
+
+export const TicketEditForm = ({
+  data,
+  onCancel,
+}: {
+  data: TicketDetail;
+  onCancel: () => void;
+}) => {
+  const [form, setForm] = useState<EditState>(() => buildEditState(data));
+  const update = useUpdateTicket(data.id);
+  const { data: users } = useAssignableUsers();
+  const { data: departments } = useDepartments();
+
+  const handleSubmit = () => {
+    const trimmedSummary = form.summary.trim();
+    if (!trimmedSummary) return;
+    const trimmedDescription = form.description.trim();
+    update.mutate(
+      {
+        id: data.id,
+        summary: trimmedSummary,
+        description: trimmedDescription.length > 0 ? trimmedDescription : null,
+        status: form.status,
+        category: form.category,
+        lifeSafety: form.lifeSafety,
+        departmentIds: form.departmentIds,
+        assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
+        scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
+      },
+      { onSuccess: () => onCancel() },
+    );
+  };
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSubmit();
+      }}
+      className="flex flex-col gap-4"
+    >
+      <div className="rounded-lg border bg-background p-4 flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="ticket-summary">Summary</Label>
+          <Input
+            id="ticket-summary"
+            value={form.summary}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, summary: e.target.value }))
+            }
+            required
+            maxLength={255}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ticket-assignee">Assignee</Label>
+            <Select
+              value={form.assigneeId}
+              onValueChange={(v) => setForm((f) => ({ ...f, assigneeId: v }))}
+            >
+              <SelectTrigger id="ticket-assignee">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                {users?.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name ?? u.email ?? u.id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label>Departments</Label>
+            <DepartmentMultiSelect
+              options={departments ?? []}
+              selectedIds={form.departmentIds}
+              onChange={(ids) => setForm((f) => ({ ...f, departmentIds: ids }))}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ticket-scheduled">Scheduled for</Label>
+            <Input
+              id="ticket-scheduled"
+              type="datetime-local"
+              value={form.scheduledAt}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, scheduledAt: e.target.value }))
+              }
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ticket-category">Category</Label>
+            <Select
+              value={form.category}
+              onValueChange={(v) =>
+                setForm((f) => ({ ...f, category: v as TicketCategory }))
+              }
+            >
+              <SelectTrigger id="ticket-category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(categoryLabels) as TicketCategory[]).map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {categoryLabels[c]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ticket-status">Status</Label>
+            <Select
+              value={form.status}
+              onValueChange={(v) =>
+                setForm((f) => ({ ...f, status: v as TicketStatus }))
+              }
+            >
+              <SelectTrigger id="ticket-status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(statusLabels) as TicketStatus[]).map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {statusLabels[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ticket-life-safety">Life Safety</Label>
+            <div className="flex items-center h-9 gap-2">
+              <Switch
+                id="ticket-life-safety"
+                checked={form.lifeSafety}
+                onCheckedChange={(checked) =>
+                  setForm((f) => ({ ...f, lifeSafety: checked }))
+                }
+              />
+              <span className="text-sm text-muted-foreground">
+                {form.lifeSafety ? "Yes" : "No"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border bg-background p-4 flex flex-col gap-2">
+        <Label htmlFor="ticket-description">Description</Label>
+        <Textarea
+          id="ticket-description"
+          value={form.description}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, description: e.target.value }))
+          }
+          rows={6}
+          maxLength={10_000}
+          placeholder="Describe the ticket..."
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={update.isPending}>
+          {update.isPending ? "Saving..." : "Save"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={update.isPending}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+};
+
+export const TicketDetailContent = ({ id }: { id: string }) => {
   const { data } = useSuspenseTrackingTicket(id);
+  const [isEditing, setIsEditing] = useState(false);
 
   return (
     <EntityContainer
@@ -340,60 +676,83 @@ const TicketDetailContent = ({ id }: { id: string }) => {
             <h1 className="text-xl md:text-2xl font-semibold flex-1 min-w-0">
               {data.summary}
             </h1>
+            {!isEditing && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsEditing(true)}
+              >
+                <PencilIcon className="size-3.5" />
+                Edit
+              </Button>
+            )}
           </div>
         </div>
       }
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 rounded-lg border bg-background p-4">
-        <MetadataRow label="Assignee">
-          <div className="flex items-center gap-1.5 text-sm">
-            <UserIcon className="size-3.5 text-muted-foreground" />
-            {data.assignee?.name ?? "Unassigned"}
+      {isEditing ? (
+        <TicketEditForm data={data} onCancel={() => setIsEditing(false)} />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 rounded-lg border bg-background p-4">
+            <MetadataRow label="Assignee">
+              <div className="flex items-center gap-1.5 text-sm">
+                <UserIcon className="size-3.5 text-muted-foreground" />
+                {data.assignee?.name ?? "Unassigned"}
+              </div>
+            </MetadataRow>
+            <MetadataRow label="Departments">
+              {data.departments.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {data.departments.map((d) => (
+                    <Badge
+                      key={d.id}
+                      variant="outline"
+                      className={getChipClass(d.color)}
+                    >
+                      {d.name}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
+            </MetadataRow>
+            <MetadataRow label="Scheduled for">
+              <div className="flex items-center gap-1.5 text-sm">
+                <CalendarIcon className="size-3.5 text-muted-foreground" />
+                {formatScheduled(data.scheduledAt) ?? "—"}
+              </div>
+            </MetadataRow>
+            <MetadataRow label="Created">
+              <div className="flex items-center gap-1.5 text-sm">
+                <ClockIcon className="size-3.5 text-muted-foreground" />
+                {formatDate(data.createdAt)}
+              </div>
+            </MetadataRow>
+            <MetadataRow label="Category">
+              <CategoryChip category={data.category} />
+            </MetadataRow>
+            <MetadataRow label="Status">
+              <Badge
+                variant="outline"
+                className={getChipClass(statusHue[data.status])}
+              >
+                {statusLabels[data.status]}
+              </Badge>
+            </MetadataRow>
           </div>
-        </MetadataRow>
-        <MetadataRow label="Department">
-          {data.department ? (
-            <Badge
-              variant="outline"
-              className={getChipClass(data.department.color)}
-            >
-              {data.department.name}
-            </Badge>
-          ) : (
-            <span className="text-sm text-muted-foreground">—</span>
-          )}
-        </MetadataRow>
-        <MetadataRow label="Scheduled for">
-          <div className="flex items-center gap-1.5 text-sm">
-            <CalendarIcon className="size-3.5 text-muted-foreground" />
-            {formatScheduled(data.scheduledAt) ?? "—"}
-          </div>
-        </MetadataRow>
-        <MetadataRow label="Created">
-          <div className="flex items-center gap-1.5 text-sm">
-            <ClockIcon className="size-3.5 text-muted-foreground" />
-            {formatDate(data.createdAt)}
-          </div>
-        </MetadataRow>
-        <MetadataRow label="Category">
-          <CategoryChip category={data.category} />
-        </MetadataRow>
-        <MetadataRow label="Status">
-          <Badge
-            variant="outline"
-            className={getChipClass(statusHue[data.status])}
-          >
-            {statusLabels[data.status]}
-          </Badge>
-        </MetadataRow>
-      </div>
 
-      {data.description && (
-        <div className="rounded-lg border bg-background p-4">
-          <Section title="Description">
-            <p className="text-sm whitespace-pre-wrap">{data.description}</p>
-          </Section>
-        </div>
+          {data.description && (
+            <div className="rounded-lg border bg-background p-4">
+              <Section title="Description">
+                <p className="text-sm whitespace-pre-wrap">
+                  {data.description}
+                </p>
+              </Section>
+            </div>
+          )}
+        </>
       )}
 
       {data.children.length > 0 && (
@@ -409,14 +768,15 @@ const TicketDetailContent = ({ id }: { id: string }) => {
                     {child.summary}
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
-                    {child.department && (
+                    {child.departments.map((d) => (
                       <Badge
+                        key={d.id}
                         variant="outline"
-                        className={getChipClass(child.department.color)}
+                        className={getChipClass(d.color)}
                       >
-                        {child.department.name}
+                        {d.name}
                       </Badge>
-                    )}
+                    ))}
                     <Badge
                       variant="outline"
                       className={getChipClass(statusHue[child.status])}
@@ -532,9 +892,7 @@ const TicketDetailContent = ({ id }: { id: string }) => {
               })}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              No comments yet.
-            </p>
+            <p className="text-sm text-muted-foreground">No comments yet.</p>
           )}
           <AddCommentForm ticketId={data.id} />
         </Section>

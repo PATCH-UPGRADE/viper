@@ -12,11 +12,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useCategoryColor } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
-import {
-  TicketCategory,
-  TicketSource,
-  TicketStatus,
-} from "@/generated/prisma";
+import { TicketCategory, TicketSource, TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import type { TrackingTicketChildRow } from "../types";
 
@@ -108,15 +104,13 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
                 <TooltipContent>Life-safety impacted</TooltipContent>
               </Tooltip>
             )}
-            <span className="font-medium truncate">
-              {row.original.summary}
-            </span>
+            <span className="font-medium truncate">{row.original.summary}</span>
           </div>
           {total > 0 && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>
-                  {completed}/{total}
-                </span>
+              <span>
+                {completed}/{total}
+              </span>
               <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted-foreground/25">
                 <div
                   className={cn(
@@ -155,12 +149,21 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
     id: "dept",
     header: "Dept",
     cell: ({ row }) => {
-      const dept = row.original.department;
-      if (!dept) return <span className="text-muted-foreground">—</span>;
+      const depts = row.original.departments;
+      if (!depts || depts.length === 0)
+        return <span className="text-muted-foreground">—</span>;
       return (
-        <Badge variant="outline" className={getChipClass(dept.color)}>
-          {dept.name}
-        </Badge>
+        <div className="flex flex-wrap gap-1">
+          {depts.map((d) => (
+            <Badge
+              key={d.id}
+              variant="outline"
+              className={getChipClass(d.color)}
+            >
+              {d.name}
+            </Badge>
+          ))}
+        </div>
       );
     },
   },
@@ -200,10 +203,7 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
             </Badge>
           ))}
           {more > 0 && (
-            <Badge
-              variant="secondary"
-              className="text-[10px] border-border/60"
-            >
+            <Badge variant="secondary" className="text-[10px] border-border/60">
               +{more}
             </Badge>
           )}

@@ -863,7 +863,7 @@ model Department {
   updatedAt   DateTime       @updatedAt
 
   users       User[]
-  tickets     WorkOrderTicket[]
+  tickets     WorkOrderTicket[] @relation("WorkOrderTicketDepartments")
 
   @@map("department")
 }
@@ -892,8 +892,7 @@ model WorkOrderTicket {
   sourceWorkflowId   String?
   sourceWorkflow     Workflow?    @relation("WorkOrderTicketSourceWorkflow", fields: [sourceWorkflowId], references: [id], onDelete: SetNull)
 
-  departmentId String?
-  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  departments Department[] @relation("WorkOrderTicketDepartments")
 
   parentId  String?
   parent    WorkOrderTicket?  @relation("WorkOrderTicketChildren", fields: [parentId], references: [id], onDelete: Cascade)
@@ -918,7 +917,6 @@ model WorkOrderTicket {
   updatedAt   DateTime @updatedAt
 
   @@index([status])
-  @@index([departmentId])
   @@index([assigneeId])
   @@index([creatorId])
   @@index([sourceWorkflowId])

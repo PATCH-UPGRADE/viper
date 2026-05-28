@@ -733,8 +733,7 @@ const SAMPLE_DEPARTMENTS = [
   },
   {
     name: "Emergency Department",
-    description:
-      "ED clinical operations, including the bedside image viewer.",
+    description: "ED clinical operations, including the bedside image viewer.",
     color: "red",
   },
   {
@@ -755,8 +754,7 @@ const SAMPLE_DEPARTMENTS = [
   },
   {
     name: "IT",
-    description:
-      "Network, firewall, VPN, identity, and security operations.",
+    description: "Network, firewall, VPN, identity, and security operations.",
     color: "blue",
   },
   {
@@ -810,8 +808,7 @@ const inDays = (n: number) => new Date(now + n * dayMs);
 
 const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
   {
-    summary:
-      "Update Baxter Infusion Pumps Firmware",
+    summary: "Update Baxter Infusion Pumps Firmware",
     description:
       "Baxter Sigma Spectrum infusion pumps are running firmware version 1.2.3, which is vulnerable to CVE-2021-12345 (hypothetical buffer overflow). Coordinate with Biomed to schedule firmware updates for all 23 pumps, ensuring validation of clinical functionality post-update.",
     status: TicketStatus.IN_PROGRESS,
@@ -819,10 +816,11 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
     department: "Biomed",
     source: TicketSource.MANUAL,
     linkedCveIds: ["CVE-2021-12345"],
-    linkedAssetIds: Array.from({ length: 23 }, (_, i) => `rad-pump-${String(i + 1).padStart(3, "0")}`),
-    comments: [
-      "Firmware update available from Baxter support portal.",
-    ],
+    linkedAssetIds: Array.from(
+      { length: 23 },
+      (_, i) => `rad-pump-${String(i + 1).padStart(3, "0")}`,
+    ),
+    comments: ["Firmware update available from Baxter support portal."],
     children: [
       {
         summary: "Update firmware on ICU pumps (4 devices)",
@@ -833,7 +831,12 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         department: "Biomed",
         source: TicketSource.MANUAL,
         linkedCveIds: ["CVE-2021-12345"],
-        linkedAssetIds: ["rad-pump-001", "rad-pump-002", "rad-pump-003", "rad-pump-004"],
+        linkedAssetIds: [
+          "rad-pump-001",
+          "rad-pump-002",
+          "rad-pump-003",
+          "rad-pump-004",
+        ],
         comments: [
           "Completed on 2026-05-15; validated pump functionality post-update.",
         ],
@@ -848,9 +851,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         source: TicketSource.MANUAL,
         linkedCveIds: ["CVE-2021-12345"],
         linkedAssetIds: ["rad-pump-005", "rad-pump-006", "rad-pump-007"],
-        comments: [
-          "Pending Biomed review and scheduling.",
-        ],
+        comments: ["Pending Biomed review and scheduling."],
       },
       {
         summary: "Update firmware on Surgery pumps (3 devices)",
@@ -862,8 +863,8 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         source: TicketSource.MANUAL,
         linkedCveIds: ["CVE-2021-12345"],
         linkedAssetIds: ["rad-pump-008", "rad-pump-009", "rad-pump-010"],
-      }
-    ]
+      },
+    ],
   },
   {
     summary:
@@ -1736,9 +1737,7 @@ async function seedDepartments(userId: string) {
     ),
   );
 
-  const seedUserDept = departments.find(
-    (d) => d.name === SEED_USER_DEPARTMENT,
-  );
+  const seedUserDept = departments.find((d) => d.name === SEED_USER_DEPARTMENT);
   if (seedUserDept) {
     await prisma.user.update({
       where: { id: userId },
@@ -1806,7 +1805,7 @@ async function createWorkOrderTicket(
       lifeSafety: ticket.lifeSafety ?? false,
       source: ticket.source,
       sourceWorkflowId: sourceWorkflow?.id,
-      departmentId: department?.id,
+      departments: department ? { connect: { id: department.id } } : undefined,
       parentId,
       creatorId: userId,
       assigneeId: userId,

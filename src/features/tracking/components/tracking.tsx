@@ -8,11 +8,7 @@ import {
   LoadingView,
 } from "@/components/entity-components";
 import { DataTable } from "@/components/ui/data-table";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useRouter } from "next/navigation";
@@ -30,7 +26,7 @@ const tabLabels: Record<TrackingTab, string> = {
   all: "All",
 };
 
-const TrackingSearch = () => {
+export const TrackingSearch = () => {
   const [params, setParams] = useTrackingParams();
   const { searchValue, onSearchChange } = useEntitySearch({
     params,
@@ -46,7 +42,7 @@ const TrackingSearch = () => {
   );
 };
 
-const TrackingTabsNav = () => {
+export const TrackingTabsNav = () => {
   const [{ tab }, setParams] = useTrackingParams();
 
   return (
@@ -75,12 +71,7 @@ export const TrackingList = () => {
     <CategoryColorProvider>
       <div className="flex flex-col gap-4">
         <TrackingTabsNav />
-        <DataTable<
-          TrackingTicketRow,
-          unknown,
-          TrackingTicketChildRow,
-          unknown
-        >
+        <DataTable<TrackingTicketRow, unknown, TrackingTicketChildRow, unknown>
           paginatedData={data}
           columns={trackingColumns as ColumnDef<TrackingTicketRow>[]}
           nestedColumns={trackingColumns}

@@ -1,5 +1,7 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
+import { useRouter } from "next/navigation";
 import {
   EntityContainer,
   EntityHeader,
@@ -9,13 +11,11 @@ import {
 } from "@/components/entity-components";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEntitySearch } from "@/hooks/use-entity-search";
-import type { ColumnDef } from "@tanstack/react-table";
-import { useRouter } from "next/navigation";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
+import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useSuspenseTrackingTickets } from "../hooks/use-tracking";
 import { useTrackingParams } from "../hooks/use-tracking-params";
-import { type TrackingTab, TRACKING_TABS } from "../params";
+import { TRACKING_TABS, type TrackingTab } from "../params";
 import type { TrackingTicketChildRow, TrackingTicketRow } from "../types";
 import { trackingColumns } from "./columns";
 
@@ -80,6 +80,12 @@ export const TrackingList = () => {
           isLoading={isFetching}
           search={<TrackingSearch />}
           rowOnclick={(row) => {
+            // Parents with sub-tickets expand on first click; a second click
+            // (or any click on a leaf parent / child row) opens the detail.
+            if (row.depth === 0 && row.getCanExpand() && !row.getIsExpanded()) {
+              row.toggleExpanded();
+              return;
+            }
             router.push(`/tracking/${row.original.id}`);
           }}
         />

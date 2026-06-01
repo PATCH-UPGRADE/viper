@@ -1,4 +1,5 @@
 import "server-only";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   type Prisma,
@@ -12,17 +13,25 @@ import {
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { fetchPaginated } from "@/lib/router-utils";
+import { createSortParser, fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 import { TRACKING_TABS } from "../params";
 import {
   paginatedWorkOrderListResponseSchema,
   ticketBaseInclude,
+  ticketCommentResponseSchema,
   ticketDetailInclude,
+  workOrderDetailResponseSchema,
   workOrderListFilterSchema,
   workOrderListInclude,
 } from "../types";
+import {
+  recordAssetActivity,
+  recordChildActivity,
+  recordUpdateActivities,
+  snapshotBeforeUpdate,
+} from "./activities";
 
 const trackingInputSchema = paginationInputSchema.extend({
   tab: z.enum(TRACKING_TABS).default("suggested"),
@@ -35,10 +44,29 @@ const createSearchFilter = (
     ? {
         OR: [
           { summary: { contains: search, mode: "insensitive" } },
-          { description: { contains: search, mode: "insensitive" } },
+          {
+            descriptions: {
+              some: { body: { contains: search, mode: "insensitive" } },
+            },
+          },
         ],
       }
     : {};
+
+// Whitelist of fields the tracking table can sort on. Anything else in the
+// `?sort=` param is ignored so we don't blindly forward arbitrary user input
+// to Prisma's orderBy.
+const parseSort = createSortParser(
+  new Set([
+    "summary",
+    "status",
+    "category",
+    "scheduledAt",
+    "createdAt",
+    "updatedAt",
+  ] as const),
+  [{ updatedAt: "desc" }],
+);
 
 const ticketLinkedCount = (count: {
   issues: number;
@@ -108,19 +136,26 @@ export const trackingRouter = createTRPCRouter({
       const totalCount = await prisma.workOrderTicket.count({ where });
       const meta = buildPaginationMeta(input, totalCount);
 
+      const seenByMe = {
+        seenBy: {
+          where: { userId: ctx.auth.user.id },
+          select: { seenAt: true },
+        },
+      } as const;
       const tickets = await prisma.workOrderTicket.findMany({
         skip: meta.skip,
         take: meta.take,
         where,
         include: {
           ...ticketBaseInclude,
+          ...seenByMe,
           children: {
-            include: ticketBaseInclude,
+            include: { ...ticketBaseInclude, ...seenByMe },
             where: childTabWhere,
             orderBy: { createdAt: "asc" },
           },
         },
-        orderBy: { updatedAt: "desc" },
+        orderBy: parseSort(input.sort),
       });
 
       const items = tickets.map((t) => {
@@ -150,12 +185,24 @@ export const trackingRouter = createTRPCRouter({
           return true;
         });
 
+        // Roll up the latest comment timestamp across this parent and its
+        // children so the parent row reflects unread comments anywhere in the
+        // tree.
+        const commentTimes = [
+          t.lastCommentAt,
+          ...children.map((c) => c.lastCommentAt),
+        ].filter((d): d is Date => d !== null);
+        const rolledLastCommentAt = commentTimes.length
+          ? new Date(Math.max(...commentTimes.map((d) => d.getTime())))
+          : null;
+
         return {
           ...t,
           children,
           linkedCount: rolledLinked,
           commentCount: rolledComments,
           linkedPreview: rolledPreview,
+          lastCommentAt: rolledLastCommentAt,
         };
       });
 
@@ -164,10 +211,27 @@ export const trackingRouter = createTRPCRouter({
 
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/work-orders/{id}",
+        tags: ["Work Orders"],
+        summary: "Get a work-order ticket",
+        description:
+          "Fetch a single work-order ticket with linked entities, sub-tickets, and comments.",
+      },
+    })
+    .output(workOrderDetailResponseSchema)
+    .query(async ({ input, ctx }) => {
       const ticket = await prisma.workOrderTicket.findUnique({
         where: { id: input.id },
-        include: ticketDetailInclude,
+        include: {
+          ...ticketDetailInclude,
+          seenBy: {
+            where: { userId: ctx.auth.user.id },
+            select: { seenAt: true },
+          },
+        },
       });
       return requireExistence(ticket, "Ticket");
     }),
@@ -185,8 +249,8 @@ export const trackingRouter = createTRPCRouter({
       },
     })
     .output(paginatedWorkOrderListResponseSchema)
-    .query(async ({ input }) => {
-      const { search, departmentIds, assigneeIds, lifeSafety } = input;
+    .query(async ({ input, ctx }) => {
+      const { search, departmentIds, assigneeIds } = input;
       const filters: Prisma.WorkOrderTicketWhereInput[] = [
         createSearchFilter(search),
       ];
@@ -199,15 +263,26 @@ export const trackingRouter = createTRPCRouter({
       if (assigneeIds && assigneeIds.length > 0) {
         filters.push({ assigneeId: { in: assigneeIds } });
       }
-      if (lifeSafety !== undefined) {
-        filters.push({ lifeSafety });
-      }
 
-      return fetchPaginated(prisma.workOrderTicket, input, {
+      const result = await fetchPaginated(prisma.workOrderTicket, input, {
         where: { AND: filters },
-        include: workOrderListInclude,
-        orderBy: { updatedAt: "desc" },
+        include: {
+          ...workOrderListInclude,
+          seenBy: {
+            where: { userId: ctx.auth.user.id },
+            select: { seenAt: true },
+          },
+        },
+        orderBy: parseSort(input.sort),
       });
+
+      return {
+        ...result,
+        items: result.items.map(({ seenBy, ...item }) => ({
+          ...item,
+          lastSeenAt: seenBy[0]?.seenAt ?? null,
+        })),
+      };
     }),
 
   update: protectedProcedure
@@ -215,28 +290,356 @@ export const trackingRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         summary: z.string().trim().min(1).max(255).optional(),
-        description: z.string().max(10_000).nullish(),
         status: z.nativeEnum(TicketStatus).optional(),
         category: z.nativeEnum(TicketCategory).optional(),
-        lifeSafety: z.boolean().optional(),
         departmentIds: z.array(z.string()).optional(),
+        descriptions: z
+          .array(
+            z.object({
+              departmentId: z.string(),
+              body: z.string().max(10_000),
+            }),
+          )
+          .optional(),
         assigneeId: z.string().nullish(),
         scheduledAt: z.coerce.date().nullish(),
       }),
     )
-    .mutation(async ({ input }) => {
-      const { id, departmentIds, ...rest } = input;
-      const ticket = await prisma.workOrderTicket.update({
-        where: { id },
-        data: {
-          ...rest,
-          ...(departmentIds !== undefined && {
-            departments: { set: departmentIds.map((dId) => ({ id: dId })) },
-          }),
-        },
-        include: ticketDetailInclude,
+    .meta({
+      openapi: {
+        method: "PATCH",
+        path: "/work-orders/{id}",
+        tags: ["Work Orders"],
+        summary: "Update a work-order ticket",
+        description:
+          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt) to clear them. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
+      },
+    })
+    .output(workOrderDetailResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { id, departmentIds, descriptions, ...rest } = input;
+      return prisma.$transaction(async (tx) => {
+        const before = await snapshotBeforeUpdate(tx, id);
+        if (!before) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Ticket not found",
+          });
+        }
+
+        // Compute the post-update department set so we can scope description
+        // writes (and orphan cleanups) to currently-linked departments only.
+        const nextDepartmentIds = new Set(
+          departmentIds ?? before.departments.map((d) => d.id),
+        );
+
+        // Normalize `descriptions`: keep only non-empty bodies for departments
+        // that will still be on the ticket after this update.
+        const nextDescriptions = (descriptions ?? []).filter(
+          (d) =>
+            d.body.trim().length > 0 && nextDepartmentIds.has(d.departmentId),
+        );
+
+        await tx.workOrderTicket.update({
+          where: { id },
+          data: {
+            ...rest,
+            ...(departmentIds !== undefined && {
+              departments: { set: departmentIds.map((dId) => ({ id: dId })) },
+            }),
+          },
+        });
+
+        // Reconcile per-department descriptions when the caller sent the
+        // field, or when the department set shrank and may have orphaned
+        // descriptions. Either way, the desired state is `nextDescriptions`
+        // plus pre-existing rows for departments not touched in this update.
+        if (descriptions !== undefined || departmentIds !== undefined) {
+          const beforeByDept = new Map(
+            before.descriptions.map((d) => [d.departmentId, d.body]),
+          );
+          const desiredByDept = new Map<string, string>();
+          if (descriptions !== undefined) {
+            for (const d of nextDescriptions) {
+              desiredByDept.set(d.departmentId, d.body);
+            }
+          } else {
+            // departmentIds changed but descriptions wasn't passed: preserve
+            // existing descriptions for departments still on the ticket.
+            for (const [deptId, body] of beforeByDept) {
+              if (nextDepartmentIds.has(deptId)) {
+                desiredByDept.set(deptId, body);
+              }
+            }
+          }
+
+          const toDelete: string[] = [];
+          for (const [deptId] of beforeByDept) {
+            if (!desiredByDept.has(deptId)) toDelete.push(deptId);
+          }
+          if (toDelete.length > 0) {
+            await tx.ticketDescription.deleteMany({
+              where: { ticketId: id, departmentId: { in: toDelete } },
+            });
+          }
+          for (const [deptId, body] of desiredByDept) {
+            if (beforeByDept.get(deptId) === body) continue;
+            await tx.ticketDescription.upsert({
+              where: {
+                ticketId_departmentId: { ticketId: id, departmentId: deptId },
+              },
+              create: { ticketId: id, departmentId: deptId, body },
+              update: { body },
+            });
+          }
+        }
+
+        // Build the canonical descriptions list the activity helper should
+        // diff against (so removed-department descriptions show up as
+        // cleared, even if the caller didn't pass `descriptions`).
+        const descriptionsForActivity =
+          descriptions !== undefined
+            ? nextDescriptions
+            : before.descriptions.filter((d) =>
+                nextDepartmentIds.has(d.departmentId),
+              );
+        await recordUpdateActivities(tx, id, ctx.auth.user.id, before, {
+          ...input,
+          descriptions:
+            descriptions !== undefined || departmentIds !== undefined
+              ? descriptionsForActivity
+              : undefined,
+        });
+        // Re-fetch so the response includes the freshly-written activity rows.
+        return tx.workOrderTicket.findUniqueOrThrow({
+          where: { id },
+          include: {
+            ...ticketDetailInclude,
+            seenBy: {
+              where: { userId: ctx.auth.user.id },
+              select: { seenAt: true },
+            },
+          },
+        });
       });
-      return ticket;
+    }),
+
+  attachChild: protectedProcedure
+    .input(z.object({ parentId: z.string(), childId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      if (input.parentId === input.childId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A ticket cannot be its own sub-ticket",
+        });
+      }
+      const child = await prisma.workOrderTicket.findUnique({
+        where: { id: input.childId },
+        select: { _count: { select: { children: true } } },
+      });
+      if (!child) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Ticket not found",
+        });
+      }
+      if (child._count.children > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot attach a ticket that already has sub-tickets",
+        });
+      }
+      return prisma.$transaction(async (tx) => {
+        const updated = await tx.workOrderTicket.update({
+          where: { id: input.childId },
+          data: { parentId: input.parentId },
+        });
+        await recordChildActivity(
+          tx,
+          input.parentId,
+          ctx.auth.user.id,
+          input.childId,
+          "attached",
+        );
+        return updated;
+      });
+    }),
+
+  detachChild: protectedProcedure
+    .input(z.object({ ticketId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      return prisma.$transaction(async (tx) => {
+        // Snapshot the parent id BEFORE we null it out, since the activity
+        // belongs on the parent's timeline.
+        const child = await tx.workOrderTicket.findUnique({
+          where: { id: input.ticketId },
+          select: { parentId: true },
+        });
+        const updated = await tx.workOrderTicket.update({
+          where: { id: input.ticketId },
+          data: { parentId: null },
+        });
+        if (child?.parentId) {
+          await recordChildActivity(
+            tx,
+            child.parentId,
+            ctx.auth.user.id,
+            input.ticketId,
+            "detached",
+          );
+        }
+        return updated;
+      });
+    }),
+
+  listAttachableChildren: protectedProcedure
+    .input(z.object({ parentId: z.string() }))
+    .query(async ({ input }) => {
+      // Eligible candidates: any ticket other than the current parent that
+      // doesn't already have sub-tickets of its own (we keep the tree flat
+      // since the UI only renders one level of children).
+      const tickets = await prisma.workOrderTicket.findMany({
+        where: {
+          id: { not: input.parentId },
+          children: { none: {} },
+        },
+        select: {
+          id: true,
+          summary: true,
+          status: true,
+          parent: { select: { id: true, summary: true } },
+        },
+        take: 100,
+      });
+
+      // No-parent tickets first (alphabetically by summary), then parented
+      // ones (also alphabetically by summary).
+      return tickets.sort((a, b) => {
+        if (!a.parent && b.parent) return -1;
+        if (a.parent && !b.parent) return 1;
+        return a.summary.localeCompare(b.summary);
+      });
+    }),
+
+  attachAsset: protectedProcedure
+    .input(z.object({ ticketId: z.string(), assetId: z.string() }))
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/work-orders/{ticketId}/assets/{assetId}",
+        tags: ["Work Orders"],
+        summary: "Attach an asset to a work-order ticket",
+        description:
+          "Link an existing asset to the given work-order ticket via the many-to-many relation. Returns the updated ticket detail.",
+      },
+    })
+    .output(workOrderDetailResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      return prisma.$transaction(async (tx) => {
+        const updated = await tx.workOrderTicket.update({
+          where: { id: input.ticketId },
+          data: { assets: { connect: { id: input.assetId } } },
+        });
+        await recordAssetActivity(
+          tx,
+          input.ticketId,
+          ctx.auth.user.id,
+          input.assetId,
+          "attached",
+        );
+        // Re-fetch so activities and the just-attached asset are in the
+        // response.
+        return tx.workOrderTicket.findUniqueOrThrow({
+          where: { id: updated.id },
+          include: {
+            ...ticketDetailInclude,
+            seenBy: {
+              where: { userId: ctx.auth.user.id },
+              select: { seenAt: true },
+            },
+          },
+        });
+      });
+    }),
+
+  detachAsset: protectedProcedure
+    .input(z.object({ ticketId: z.string(), assetId: z.string() }))
+    .meta({
+      openapi: {
+        method: "DELETE",
+        path: "/work-orders/{ticketId}/assets/{assetId}",
+        tags: ["Work Orders"],
+        summary: "Detach an asset from a work-order ticket",
+        description:
+          "Unlink an asset from the given work-order ticket. The asset itself is not deleted. Returns the updated ticket detail.",
+      },
+    })
+    .output(workOrderDetailResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      return prisma.$transaction(async (tx) => {
+        const updated = await tx.workOrderTicket.update({
+          where: { id: input.ticketId },
+          data: { assets: { disconnect: { id: input.assetId } } },
+        });
+        await recordAssetActivity(
+          tx,
+          input.ticketId,
+          ctx.auth.user.id,
+          input.assetId,
+          "detached",
+        );
+        return tx.workOrderTicket.findUniqueOrThrow({
+          where: { id: updated.id },
+          include: {
+            ...ticketDetailInclude,
+            seenBy: {
+              where: { userId: ctx.auth.user.id },
+              select: { seenAt: true },
+            },
+          },
+        });
+      });
+    }),
+
+  listAttachableAssets: protectedProcedure
+    .input(z.object({ ticketId: z.string() }))
+    .query(async ({ input }) => {
+      // Only return assets not already attached to this ticket so the picker
+      // doesn't show duplicates of what's already in the table.
+      return prisma.asset.findMany({
+        where: {
+          workOrderTickets: { none: { id: input.ticketId } },
+        },
+        select: {
+          id: true,
+          hostname: true,
+          ip: true,
+          role: true,
+          deviceGroup: { select: { manufacturer: true, modelName: true } },
+        },
+        orderBy: [{ hostname: "asc" }, { ip: "asc" }],
+        take: 100,
+      });
+    }),
+
+  markSeen: protectedProcedure
+    .input(z.object({ ticketId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const now = new Date();
+      return prisma.ticketSeen.upsert({
+        where: {
+          userId_ticketId: {
+            userId: ctx.auth.user.id,
+            ticketId: input.ticketId,
+          },
+        },
+        create: {
+          userId: ctx.auth.user.id,
+          ticketId: input.ticketId,
+          seenAt: now,
+        },
+        update: { seenAt: now },
+      });
     }),
 
   addComment: protectedProcedure
@@ -246,13 +649,43 @@ export const trackingRouter = createTRPCRouter({
         body: z.string().trim().min(1).max(10_000),
       }),
     )
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/work-orders/{ticketId}/comments",
+        tags: ["Work Orders"],
+        summary: "Add a comment to a work-order ticket",
+        description:
+          "Post a comment authored by the authenticated user. Bumps the ticket's lastCommentAt in the same transaction.",
+      },
+    })
+    .output(ticketCommentResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      return prisma.ticketComment.create({
-        data: {
-          ticketId: input.ticketId,
-          authorId: ctx.auth.user.id,
-          body: input.body,
-        },
+      const now = new Date();
+      return prisma.$transaction(async (tx) => {
+        const comment = await tx.ticketComment.create({
+          data: {
+            ticketId: input.ticketId,
+            authorId: ctx.auth.user.id,
+            body: input.body,
+          },
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+                department: { select: { id: true, name: true, color: true } },
+              },
+            },
+          },
+        });
+        await tx.workOrderTicket.update({
+          where: { id: input.ticketId },
+          data: { lastCommentAt: now },
+        });
+        return comment;
       });
     }),
 });

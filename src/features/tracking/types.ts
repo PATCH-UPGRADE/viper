@@ -1,7 +1,9 @@
 import { z } from "zod";
 import {
+  IssueStatus,
   type Prisma,
   Severity,
+  TicketActivityType,
   TicketCategory,
   TicketSource,
   TicketStatus,
@@ -17,6 +19,9 @@ export const ticketBaseInclude = {
   sourceWorkflow: { select: { id: true, name: true } },
   vulnerabilities: { select: { id: true, cveId: true } },
   assets: { select: { id: true, hostname: true } },
+  // `seenBy` is replaced at the procedure level with a where: { userId } filter.
+  // Including it here keeps the derived TS type consistent across call sites.
+  seenBy: { select: { seenAt: true } },
   _count: {
     select: {
       comments: true,
@@ -65,6 +70,12 @@ export const ticketDetailInclude = {
     select: { id: true, name: true, color: true },
     orderBy: { name: "asc" as const },
   },
+  descriptions: {
+    include: {
+      department: { select: { id: true, name: true, color: true } },
+    },
+    orderBy: { department: { name: "asc" as const } },
+  },
   assignee: { select: { id: true, name: true, email: true } },
   creator: { select: { id: true, name: true, email: true } },
   sourceWorkflow: { select: { id: true, name: true } },
@@ -112,7 +123,23 @@ export const ticketDetailInclude = {
   advisories: { select: { id: true, title: true, severity: true } },
   comments: {
     include: {
-      author: { select: { id: true, name: true, email: true, image: true } },
+      author: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          department: { select: { id: true, name: true, color: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" as const },
+  },
+  // Replaced at the procedure level with a where: { userId } filter.
+  seenBy: { select: { seenAt: true } },
+  activities: {
+    include: {
+      user: { select: { id: true, name: true, image: true } },
     },
     orderBy: { createdAt: "asc" as const },
   },
@@ -139,6 +166,8 @@ export const workOrderListInclude = {
   },
   advisories: { select: { id: true, title: true, severity: true } },
   remediations: { select: { id: true, description: true } },
+  // Replaced at the procedure level with a where: { userId } filter.
+  seenBy: { select: { seenAt: true } },
 } satisfies Prisma.WorkOrderTicketInclude;
 
 export type WorkOrderListItem = Prisma.WorkOrderTicketGetPayload<{
@@ -150,7 +179,6 @@ export type WorkOrderListItem = Prisma.WorkOrderTicketGetPayload<{
 export const workOrderListFilterSchema = z.object({
   departmentIds: z.array(z.string()).optional(),
   assigneeIds: z.array(z.string()).optional(),
-  lifeSafety: z.boolean().optional(),
 });
 
 // --- Output ---------------------------------------------------------------
@@ -200,11 +228,9 @@ const linkedRemediationSchema = z.object({
 export const workOrderListItemSchema = z.object({
   id: z.string(),
   summary: z.string(),
-  description: z.string().nullable(),
   status: z.enum(TicketStatus),
   category: z.enum(TicketCategory),
   source: z.enum(TicketSource),
-  lifeSafety: z.boolean(),
   scheduledAt: z.date().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -219,7 +245,134 @@ export const workOrderListItemSchema = z.object({
   vulnerabilities: z.array(linkedVulnerabilitySchema),
   advisories: z.array(linkedAdvisorySchema),
   remediations: z.array(linkedRemediationSchema),
+  lastSeenAt: z.date().nullable(),
 });
 
 export const paginatedWorkOrderListResponseSchema =
   createPaginatedResponseSchema(workOrderListItemSchema);
+
+// --- Detail-view schemas (getOne, update, attach/detach asset) ----------------
+
+const ticketCreatorSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().nullable(),
+});
+
+const ticketParentRefSchema = z
+  .object({ id: z.string(), summary: z.string() })
+  .nullable();
+
+const ticketChildRefSchema = z.object({
+  id: z.string(),
+  summary: z.string(),
+  status: z.enum(TicketStatus),
+  departments: z.array(departmentItemSchema),
+  _count: z.object({ comments: z.number() }),
+});
+
+const ticketCommentAuthorSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().nullable(),
+  image: z.string().nullable(),
+  department: departmentItemSchema.nullable(),
+});
+
+export const ticketCommentResponseSchema = z.object({
+  id: z.string(),
+  ticketId: z.string(),
+  authorId: z.string(),
+  body: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  author: ticketCommentAuthorSchema,
+});
+
+const detailLinkedAssetSchema = linkedAssetSchema.extend({
+  macAddress: z.string().nullable(),
+  // Prisma's Json column. Using z.any() so the inferred TS type is `any`,
+  // which stays assignable to Prisma.JsonValue on the UI side.
+  location: z.any(),
+  deviceGroupId: z.string(),
+  deviceGroup: z.object({
+    id: z.string(),
+    modelName: z.string().nullable(),
+    manufacturer: z.string().nullable(),
+  }),
+});
+
+const detailLinkedRemediationSchema = z.object({
+  id: z.string(),
+  description: z.string().nullable(),
+  affectedDeviceGroups: z.array(z.object({ id: z.string() })),
+});
+
+const ticketIssueSchema = z.object({
+  id: z.string(),
+  status: z.enum(IssueStatus),
+  assetId: z.string(),
+  vulnerabilityId: z.string(),
+});
+
+const ticketSeenBySchema = z.array(z.object({ seenAt: z.date() }));
+
+const ticketActivityUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  image: z.string().nullable(),
+});
+
+export const ticketActivitySchema = z.object({
+  id: z.string(),
+  ticketId: z.string(),
+  userId: z.string(),
+  type: z.enum(TicketActivityType),
+  // Shape varies by `type`; documented in the API description rather than
+  // enumerated in the schema (too noisy for OpenAPI).
+  // biome-ignore lint/suspicious/noExplicitAny: Json blob with type-specific shape
+  data: z.any() as z.ZodType<any>,
+  createdAt: z.date(),
+  user: ticketActivityUserSchema,
+});
+
+const ticketDescriptionSchema = z.object({
+  id: z.string(),
+  ticketId: z.string(),
+  departmentId: z.string(),
+  body: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  department: departmentItemSchema,
+});
+
+export const workOrderDetailResponseSchema = z.object({
+  id: z.string(),
+  summary: z.string(),
+  status: z.enum(TicketStatus),
+  category: z.enum(TicketCategory),
+  source: z.enum(TicketSource),
+  scheduledAt: z.date().nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  lastCommentAt: z.date().nullable(),
+  parentId: z.string().nullable(),
+  creatorId: z.string(),
+  assigneeId: z.string().nullable(),
+  sourceWorkflowId: z.string().nullable(),
+  departments: z.array(departmentItemSchema),
+  descriptions: z.array(ticketDescriptionSchema),
+  assignee: assigneeItemSchema.nullable(),
+  sourceWorkflow: sourceWorkflowItemSchema.nullable(),
+  creator: ticketCreatorSchema,
+  parent: ticketParentRefSchema,
+  children: z.array(ticketChildRefSchema),
+  assets: z.array(detailLinkedAssetSchema),
+  vulnerabilities: z.array(linkedVulnerabilitySchema),
+  advisories: z.array(linkedAdvisorySchema),
+  remediations: z.array(detailLinkedRemediationSchema),
+  issues: z.array(ticketIssueSchema),
+  comments: z.array(ticketCommentResponseSchema),
+  seenBy: ticketSeenBySchema,
+  activities: z.array(ticketActivitySchema),
+});

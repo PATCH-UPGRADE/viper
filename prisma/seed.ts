@@ -785,11 +785,18 @@ const SEED_USER_DEPARTMENT = "IT";
 
 type SampleTicket = {
   summary: string;
+  // Default body, applied to the primary department when no per-department
+  // override exists in `descriptionsByDepartment`.
   description?: string;
+  // Per-department description bodies, keyed by department name. Overrides
+  // `description` for any matching department; departments that appear here
+  // but not in `department`/`departments` are ignored.
+  descriptionsByDepartment?: Record<string, string>;
   status: TicketStatus;
   category: TicketCategory;
-  department: string;
-  lifeSafety?: boolean;
+  // Single primary department or an ordered list — first entry is "primary"
+  // for the purpose of the default `description` fallback.
+  department: string | string[];
   source: TicketSource;
   sourceWorkflowName?: string;
   scheduledAt?: Date;
@@ -809,11 +816,15 @@ const inDays = (n: number) => new Date(now + n * dayMs);
 const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
   {
     summary: "Update Baxter Infusion Pumps Firmware",
-    description:
-      "Baxter Sigma Spectrum infusion pumps are running firmware version 1.2.3, which is vulnerable to CVE-2021-12345 (hypothetical buffer overflow). Coordinate with Biomed to schedule firmware updates for all 23 pumps, ensuring validation of clinical functionality post-update.",
     status: TicketStatus.IN_PROGRESS,
     category: TicketCategory.FIRMWARE_UPDATE,
-    department: "Biomed",
+    department: ["Biomed", "Nursing"],
+    descriptionsByDepartment: {
+      Biomed:
+        "Baxter Sigma Spectrum infusion pumps are running firmware version 1.2.3, which is vulnerable to CVE-2021-12345 (hypothetical buffer overflow). Update all 23 pumps to firmware 1.4.0 from the Baxter support portal. Validate dose-error reduction software (DERS) library integrity and channel-to-channel concentration calculations on each pump post-update before returning to clinical use.",
+      Nursing:
+        "Infusion pumps in your unit will be pulled for firmware updates in rolling batches of ~4 pumps at a time, by floor. Biomed will deliver swap pumps before pulling each batch — no expected interruption to active infusions, but please verify any in-progress drips are re-programmed on the swap pump and document the channel hand-off in the MAR. Escalate to charge nurse if Biomed can't supply a swap before pulling a pump.",
+    },
     source: TicketSource.MANUAL,
     linkedCveIds: ["CVE-2021-12345"],
     linkedAssetIds: Array.from(
@@ -869,12 +880,16 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
   {
     summary:
       "Remediate EternalBlue (CVE-2017-0144) across EOL Windows imaging hosts",
-    description:
-      "Umbrella ticket covering SMBv1/MS17-010 mitigation on every Windows 7 / Server 2008 R2 host in the imaging chain. Tracks per-host workstreams and the network-level compensating controls.",
     status: TicketStatus.IN_PROGRESS,
     category: TicketCategory.VULN_REMEDIATION,
-    department: "Radiology",
-    lifeSafety: true,
+    department: ["Radiology", "IT", "Administration"],
+    descriptionsByDepartment: {
+      Radiology:
+        "Five hosts in the imaging chain — the CT acquisition workstation, the PACS server, two diagnostic reading workstations, and the ED bedside viewer — are EOL Windows 7 / Server 2008 R2 and vulnerable to MS17-010. Each will be touched on its own schedule to keep at least one diagnostic workstation online at all times. Expect a brief read interruption (under 5 minutes) per workstation; PACS work will run in a dedicated overnight maintenance window with CMO sign-off.",
+      IT: "SMBv1 disablement on each host (registry + reboot), plus network-level compensating controls: ACL blocking TCP/445 across the imaging and PACS VLANs, and a DICOM-only VLAN ACL to limit blast radius. ASA configs were backed up before any change. Track per-host workstreams in the child tickets; the network-level controls are already deployed and verified by packet capture.",
+      Administration:
+        "Imaging-chain EternalBlue remediation. Compliance-relevant: EOL OS exposure on patient-facing systems. PACS server change requires CMO sign-off (separate child ticket) due to imaging chain blast radius. Expected aggregate downtime across all hosts: under 30 minutes during business hours, plus a single overnight maintenance window for PACS.",
+    },
     source: TicketSource.WORKFLOW,
     sourceWorkflowName: "Emergency CT: Acute Stroke / Trauma Protocol",
     linkedCveIds: ["CVE-2017-0144"],
@@ -896,7 +911,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.TO_DO,
         category: TicketCategory.CONFIG_CHANGE,
         department: "Radiology",
-        lifeSafety: true,
         source: TicketSource.WORKFLOW,
         sourceWorkflowName: "Emergency CT: Acute Stroke / Trauma Protocol",
         linkedCveIds: ["CVE-2017-0144"],
@@ -913,7 +927,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.REQUIRES_APPROVAL,
         category: TicketCategory.VULN_REMEDIATION,
         department: "Radiology",
-        lifeSafety: true,
         source: TicketSource.WORKFLOW,
         sourceWorkflowName: "Remote Radiology — After-Hours Imaging Coverage",
         scheduledAt: inDays(10),
@@ -938,11 +951,14 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
       },
       {
         summary: "Block TCP/445 at imaging switch (rad-sw-001)",
-        description:
-          "Network-level compensating control for EternalBlue on EOL Windows hosts. ACL deployed on imaging and PACS VLANs.",
         status: TicketStatus.DONE,
         category: TicketCategory.CONFIG_CHANGE,
-        department: "IT",
+        department: ["IT", "Radiology"],
+        descriptionsByDepartment: {
+          IT: "Network-level compensating control for EternalBlue on EOL Windows hosts. ACL deployed on imaging and PACS VLANs blocking inbound TCP/445 except from the management VLAN. Verified by packet capture post-deployment.",
+          Radiology:
+            "Networking change on the imaging switch shouldn't be visible from any reading workstation — DICOM traffic (104/TCP) is unaffected. If you see new failures sending studies to PACS or pulling priors, flag IT immediately; we ran post-deploy validation but want eyes on it for the first 48 hours.",
+        },
         source: TicketSource.MANUAL,
         scheduledAt: inDays(-9),
         linkedCveIds: ["CVE-2017-0144"],
@@ -1000,11 +1016,14 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
   },
   {
     summary: "Cisco ASA EXTRABACON Upgrades (CVE-2016-6366)",
-    description:
-      "Upgrade both ASA 5505 appliances (perimeter firewall + remote radiology VPN gateway) from 8.2 to a patched 9.1.x release.",
     status: TicketStatus.REQUIRES_APPROVAL,
     category: TicketCategory.PATCH,
-    department: "IT",
+    department: ["IT", "Administration"],
+    descriptionsByDepartment: {
+      IT: "Upgrade both ASA 5505 appliances (perimeter firewall + remote radiology VPN gateway) from 8.2 to a patched 9.1(7.21) release. Separate maintenance windows: perimeter firewall first (~30 min downtime, business-impact: external traffic suspended), then VPN gateway (coordinate with remote radiology — after-hours read coverage gap). Pre-stage backup configs; test rollback procedure in a change window before production. If immediate upgrade can't be scheduled, switch SNMPv2c → SNMPv3 with auth+encryption or restrict community access via ACL to the management VLAN.",
+      Administration:
+        "EXTRABACON remote-code-execution exposure on perimeter firewall. Patient impact: minimal during business hours (~30 min internet outage); after-hours remote radiology read coverage may be briefly interrupted during VPN upgrade. Recommend approving the staggered upgrade plan from IT. Risk if deferred: known SNMP RCE exploit chain against an internet-facing device.",
+    },
     source: TicketSource.MANUAL,
     linkedCveIds: ["CVE-2016-6366"],
     linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
@@ -1066,7 +1085,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.DONE,
         category: TicketCategory.OTHER,
         department: "Biomed",
-        lifeSafety: true,
         source: TicketSource.MANUAL,
         linkedAssetIds: Array.from(
           { length: 23 },
@@ -1082,8 +1100,10 @@ async function clearDatabase() {
   console.log("🗑️  Clearing database...");
 
   // Tickets first — they reference assets/vulns/remediations/advisories/workflows/users.
-  // Comments cascade with their parent ticket; the implicit m2m join rows cascade too.
+  // Comments and descriptions cascade with their parent ticket; the implicit
+  // m2m join rows cascade too.
   await prisma.ticketComment.deleteMany();
+  await prisma.ticketDescription.deleteMany();
   await prisma.workOrderTicket.deleteMany();
   // Workflows cascade to Node and Connection
   await prisma.workflow.deleteMany();
@@ -1754,9 +1774,20 @@ async function createWorkOrderTicket(
   userId: string,
   parentId: string | null,
 ) {
-  const department = await prisma.department.findUnique({
-    where: { name: ticket.department },
+  // Normalize single-dept and multi-dept shapes to one ordered list. The
+  // first entry is the "primary" department, used as the fallback target
+  // for the default `description` field.
+  const departmentNames = Array.isArray(ticket.department)
+    ? ticket.department
+    : [ticket.department];
+  const departments = await prisma.department.findMany({
+    where: { name: { in: departmentNames } },
   });
+  // Preserve the seed-declared order.
+  const departmentsByName = new Map(departments.map((d) => [d.name, d]));
+  const orderedDepartments = departmentNames
+    .map((n) => departmentsByName.get(n))
+    .filter((d): d is (typeof departments)[number] => Boolean(d));
 
   const sourceWorkflow = ticket.sourceWorkflowName
     ? await prisma.workflow.findFirst({
@@ -1796,16 +1827,32 @@ async function createWorkOrderTicket(
         })
       : [];
 
+  // Build one description row per linked department. Each department gets
+  // its per-department override from `descriptionsByDepartment` if present;
+  // the primary department additionally falls back to the default
+  // `description` field. Departments without any body produce no row.
+  const seededDescriptions = orderedDepartments
+    .map((d, idx) => {
+      const override = ticket.descriptionsByDepartment?.[d.name];
+      const body = override ?? (idx === 0 ? ticket.description : undefined);
+      if (!body) return null;
+      return { body, departmentId: d.id };
+    })
+    .filter((d): d is { body: string; departmentId: string } => d !== null);
+
   return prisma.workOrderTicket.create({
     data: {
       summary: ticket.summary,
-      description: ticket.description,
       status: ticket.status,
       category: ticket.category,
-      lifeSafety: ticket.lifeSafety ?? false,
       source: ticket.source,
       sourceWorkflowId: sourceWorkflow?.id,
-      departments: department ? { connect: { id: department.id } } : undefined,
+      departments: {
+        connect: orderedDepartments.map((d) => ({ id: d.id })),
+      },
+      descriptions: seededDescriptions.length
+        ? { create: seededDescriptions }
+        : undefined,
       parentId,
       creatorId: userId,
       assigneeId: userId,

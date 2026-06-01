@@ -2,7 +2,7 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
-import { HeartPulseIcon, MessageSquareIcon } from "lucide-react";
+import { MessageSquareIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SortableHeader } from "@/components/ui/data-table";
 import {
@@ -12,7 +12,11 @@ import {
 } from "@/components/ui/tooltip";
 import { useCategoryColor } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
-import { TicketCategory, TicketSource, TicketStatus } from "@/generated/prisma";
+import {
+  type TicketCategory,
+  TicketSource,
+  TicketStatus,
+} from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import type { TrackingTicketChildRow } from "../types";
 
@@ -72,10 +76,27 @@ const formatShortDate = (date: Date | string | null | undefined) => {
 
 const COMPLETED_STATUSES: TicketStatus[] = [TicketStatus.DONE];
 
+const isUnread = (row: { seenBy: { seenAt: Date }[]; updatedAt: Date }) => {
+  const lastSeenAt = row.seenBy[0]?.seenAt;
+  if (!lastSeenAt) return true;
+  return new Date(lastSeenAt) < new Date(row.updatedAt);
+};
+
+const hasUnreadComments = (row: {
+  seenBy: { seenAt: Date }[];
+  lastCommentAt: Date | null;
+}) => {
+  if (!row.lastCommentAt) return false;
+  const lastSeenAt = row.seenBy[0]?.seenAt;
+  if (!lastSeenAt) return true;
+  return new Date(row.lastCommentAt) > new Date(lastSeenAt);
+};
+
 export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
   {
     id: "summary",
     accessorKey: "summary",
+    sortDescFirst: false,
     header: ({ column }) => <SortableHeader header="Summary" column={column} />,
     cell: ({ row }) => {
       const children = (
@@ -90,21 +111,79 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
       const pct = total > 0 ? (completed / total) * 100 : 0;
       const isComplete = total > 0 && completed === total;
 
+      const selfUnread = isUnread(row.original);
+      const unreadChildCount = children?.filter((c) => isUnread(c)).length ?? 0;
+      const anyUnread = selfUnread || unreadChildCount > 0;
+      const unreadTooltip = (() => {
+        const childPart =
+          unreadChildCount > 0
+            ? `${unreadChildCount} child ticket${unreadChildCount === 1 ? "" : "s"} unread`
+            : null;
+        if (selfUnread && childPart) {
+          return `Updated since you last viewed · ${childPart}`;
+        }
+        if (selfUnread) {
+          return "Updated since you last viewed";
+        }
+        return childPart ?? "";
+      })();
+
       return (
         <div className="flex flex-col gap-1 min-w-0 max-w-96">
           <div className="flex items-center gap-2">
-            {row.original.lifeSafety && (
+            {row.depth > 0 &&
+              (() => {
+                const parentRow = row.getParentRow();
+                const isLastChild = parentRow
+                  ? parentRow.subRows[parentRow.subRows.length - 1]?.id ===
+                    row.id
+                  : false;
+                return (
+                  <span
+                    aria-label={
+                      isLastChild ? "Last child ticket" : "Child ticket"
+                    }
+                    role="img"
+                    className="pointer-events-none absolute inset-y-0 -left-4 w-8"
+                  >
+                    <span
+                      className={cn(
+                        "absolute left-0 border-l border-muted-foreground/40",
+                        isLastChild ? "top-0 bottom-1/2" : "inset-y-0",
+                      )}
+                    />
+                    <span className="absolute top-1/2 left-0 right-0 border-t border-muted-foreground/40" />
+                  </span>
+                );
+              })()}
+            {anyUnread ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <HeartPulseIcon
-                    className="size-4 text-destructive shrink-0"
-                    aria-label="Life safety"
+                  <span
+                    aria-label="Unread"
+                    className="size-2 rounded-full bg-blue-500 shrink-0"
                   />
                 </TooltipTrigger>
-                <TooltipContent>Life-safety impacted</TooltipContent>
+                <TooltipContent>{unreadTooltip}</TooltipContent>
               </Tooltip>
+            ) : (
+              <span className="size-2 shrink-0" aria-hidden="true" />
             )}
-            <span className="font-medium truncate">{row.original.summary}</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className={cn(
+                    "truncate",
+                    anyUnread ? "font-semibold" : "font-medium",
+                  )}
+                >
+                  {row.original.summary}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-md">
+                {row.original.summary}
+              </TooltipContent>
+            </Tooltip>
           </div>
           {total > 0 && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -175,6 +254,7 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
   {
     id: "scheduled",
     accessorKey: "scheduledAt",
+    sortDescFirst: false,
     header: ({ column }) => (
       <SortableHeader header="Scheduled" column={column} />
     ),
@@ -213,13 +293,40 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
   },
   {
     id: "comments",
-    header: "Comments",
-    cell: ({ row }) => (
-      <div className="flex items-center gap-1 text-muted-foreground">
-        <MessageSquareIcon className="size-3.5" />
-        <span>{row.original.commentCount}</span>
-      </div>
+    header: () => (
+      <>
+        <MessageSquareIcon
+          className="size-3.5 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <span className="sr-only">Comments</span>
+      </>
     ),
+    cell: ({ row }) => {
+      const unread = hasUnreadComments(row.original);
+      const totalCount = row.original.commentCount;
+      const ownCount = row.original._count.comments;
+      const showBreakdown = row.depth === 0 && totalCount !== ownCount;
+      return (
+        <div
+          className={cn(
+            "flex items-center gap-1",
+            unread ? "text-blue-500" : "text-muted-foreground",
+          )}
+          aria-label={unread ? "Unread comments" : "Comments"}
+        >
+          <MessageSquareIcon
+            className={cn("size-3.5", unread && "fill-current")}
+          />
+          <span>
+            {totalCount}
+            {showBreakdown && (
+              <span className="text-muted-foreground/60"> ({ownCount})</span>
+            )}
+          </span>
+        </div>
+      );
+    },
   },
   {
     id: "source",
@@ -245,12 +352,14 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
   {
     id: "created",
     accessorKey: "createdAt",
+    sortDescFirst: false,
     header: ({ column }) => <SortableHeader header="Created" column={column} />,
     cell: ({ row }) => formatShortDate(row.original.createdAt),
   },
   {
     id: "updated",
     accessorKey: "updatedAt",
+    sortDescFirst: false,
     header: ({ column }) => <SortableHeader header="Updated" column={column} />,
     cell: ({ row }) => formatShortDate(row.original.updatedAt),
   },

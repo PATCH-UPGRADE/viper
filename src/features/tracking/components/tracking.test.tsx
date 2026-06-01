@@ -208,9 +208,7 @@ describe("TrackingTabsNav", () => {
 describe("TrackingSearch", () => {
   it("renders an input with the placeholder", () => {
     render(<TrackingSearch />);
-    expect(
-      screen.getByPlaceholderText(/search tickets/i),
-    ).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search tickets/i)).toBeInTheDocument();
   });
 
   it("calls onSearchChange when the user types", async () => {
@@ -246,7 +244,6 @@ const sampleTicket = (overrides: Record<string, unknown> = {}) => ({
   source: "MANUAL",
   sourceWorkflow: null,
   scheduledAt: new Date("2026-06-10T15:00:00Z"),
-  lifeSafety: false,
   departments: [{ id: "d-it", name: "IT", color: "purple" }],
   assignee: { id: "u1", name: "Alice", email: "alice@example.com" },
   vulnerabilities: [],
@@ -265,6 +262,8 @@ const sampleTicket = (overrides: Record<string, unknown> = {}) => ({
     advisories: 0,
     assets: 0,
   },
+  seenBy: [],
+  lastCommentAt: null,
   ...overrides,
 });
 
@@ -297,7 +296,7 @@ describe("TrackingList", () => {
     expect(screen.getByText(/update pacs server/i)).toBeInTheDocument();
   });
 
-  it("navigates to the ticket detail page when a row is clicked", async () => {
+  it("navigates to the ticket detail page when a leaf parent (no children) is clicked", async () => {
     const user = userEvent.setup();
     mockUseSuspenseTrackingTickets.mockReturnValueOnce({
       data: {
@@ -317,5 +316,352 @@ describe("TrackingList", () => {
     await user.click(row);
 
     expect(mockRouterPush).toHaveBeenCalledWith("/tracking/ticket-1");
+  });
+
+  it("expands a parent with sub-tickets on first click and navigates on the second", async () => {
+    const user = userEvent.setup();
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [
+          sampleTicket({
+            id: "parent-1",
+            summary: "Parent ticket",
+            children: [
+              sampleTicket({ id: "child-1", summary: "Child ticket" }),
+            ],
+          }),
+        ],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+
+    // Child is hidden initially
+    expect(screen.queryByText("Child ticket")).not.toBeInTheDocument();
+
+    const parentRow = screen.getByText("Parent ticket").closest("tr");
+    if (!parentRow) throw new Error("parent row not found");
+
+    // First click → expand, no navigation
+    await user.click(parentRow);
+    expect(mockRouterPush).not.toHaveBeenCalled();
+    expect(screen.getByText("Child ticket")).toBeInTheDocument();
+
+    // Second click on the (now-expanded) parent → navigate
+    await user.click(parentRow);
+    expect(mockRouterPush).toHaveBeenCalledWith("/tracking/parent-1");
+  });
+
+  it("renders an unread dot when the user has never seen the ticket", () => {
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [sampleTicket({ seenBy: [] })],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+    expect(screen.getByLabelText("Unread")).toBeInTheDocument();
+  });
+
+  it("renders an unread dot when the ticket was updated after the user's last view", () => {
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [
+          sampleTicket({
+            seenBy: [{ seenAt: new Date("2026-05-01T00:00:00Z") }],
+            updatedAt: new Date("2026-05-15T00:00:00Z"),
+          }),
+        ],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+    expect(screen.getByLabelText("Unread")).toBeInTheDocument();
+  });
+
+  it("does not render an unread dot when the user's last view is after the ticket's updatedAt", () => {
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [
+          sampleTicket({
+            seenBy: [{ seenAt: new Date("2026-05-20T00:00:00Z") }],
+            updatedAt: new Date("2026-05-15T00:00:00Z"),
+          }),
+        ],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+    expect(screen.queryByLabelText("Unread")).not.toBeInTheDocument();
+  });
+
+  it("shows an outlined Comments icon when the ticket has no comments", () => {
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [sampleTicket({ lastCommentAt: null })],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+    expect(screen.getByLabelText("Comments")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Unread comments")).not.toBeInTheDocument();
+  });
+
+  it("shows a filled Comments icon when a comment is newer than the user's last view", () => {
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [
+          sampleTicket({
+            seenBy: [{ seenAt: new Date("2026-05-10T00:00:00Z") }],
+            lastCommentAt: new Date("2026-05-12T00:00:00Z"),
+            updatedAt: new Date("2026-05-08T00:00:00Z"),
+          }),
+        ],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+    expect(screen.getByLabelText("Unread comments")).toBeInTheDocument();
+  });
+
+  it("shows a filled Comments icon when the user has never seen the ticket but it has comments", () => {
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [
+          sampleTicket({
+            seenBy: [],
+            lastCommentAt: new Date("2026-05-12T00:00:00Z"),
+          }),
+        ],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+    expect(screen.getByLabelText("Unread comments")).toBeInTheDocument();
+  });
+
+  it("shows an outlined Comments icon when all comments predate the user's last view", () => {
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [
+          sampleTicket({
+            seenBy: [{ seenAt: new Date("2026-05-20T00:00:00Z") }],
+            lastCommentAt: new Date("2026-05-10T00:00:00Z"),
+            updatedAt: new Date("2026-05-10T00:00:00Z"),
+          }),
+        ],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+    expect(screen.getByLabelText("Comments")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Unread comments")).not.toBeInTheDocument();
+  });
+
+  it("shows a tree-connector on every child row, with an elbow (└) on the last and a T-junction (├) on the others", async () => {
+    const user = userEvent.setup();
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [
+          sampleTicket({
+            id: "parent-1",
+            summary: "Parent ticket",
+            children: [
+              sampleTicket({ id: "child-1", summary: "First child" }),
+              sampleTicket({ id: "child-2", summary: "Middle child" }),
+              sampleTicket({ id: "child-3", summary: "Last child" }),
+            ],
+          }),
+        ],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+
+    // Collapsed: no child rows, no connectors yet
+    expect(screen.queryAllByLabelText(/^(Last )?Child ticket$/i)).toHaveLength(
+      0,
+    );
+
+    await user.click(screen.getByLabelText(/expand nested data/i));
+
+    // Non-last children get the T-shape ("Child ticket")
+    expect(screen.getAllByLabelText("Child ticket")).toHaveLength(2);
+    // The last child gets the elbow ("Last child ticket")
+    expect(screen.getAllByLabelText("Last child ticket")).toHaveLength(1);
+
+    // And the rows themselves are visible
+    expect(screen.getByText("First child")).toBeInTheDocument();
+    expect(screen.getByText("Middle child")).toBeInTheDocument();
+    expect(screen.getByText("Last child")).toBeInTheDocument();
+  });
+
+  it("fires the unified 'Unread' dot on the parent when any child is unread, even if the parent itself is read", () => {
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [
+          sampleTicket({
+            id: "parent-1",
+            // Parent itself is read (seenAt > updatedAt) so the signal can
+            // only come from the unread child.
+            seenBy: [{ seenAt: new Date("2026-06-01T00:00:00Z") }],
+            updatedAt: new Date("2026-05-01T00:00:00Z"),
+            children: [
+              sampleTicket({
+                id: "child-read",
+                seenBy: [{ seenAt: new Date("2026-06-01T00:00:00Z") }],
+                updatedAt: new Date("2026-05-01T00:00:00Z"),
+              }),
+              sampleTicket({
+                id: "child-unread",
+                seenBy: [],
+                updatedAt: new Date("2026-05-15T00:00:00Z"),
+              }),
+            ],
+          }),
+        ],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+    expect(screen.getByLabelText("Unread")).toBeInTheDocument();
+  });
+
+  it("does not fire the dot when neither the parent nor any child is unread", () => {
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [
+          sampleTicket({
+            id: "parent-1",
+            seenBy: [{ seenAt: new Date("2026-06-01T00:00:00Z") }],
+            updatedAt: new Date("2026-05-01T00:00:00Z"),
+            children: [
+              sampleTicket({
+                id: "child-1",
+                seenBy: [{ seenAt: new Date("2026-06-01T00:00:00Z") }],
+                updatedAt: new Date("2026-05-01T00:00:00Z"),
+              }),
+            ],
+          }),
+        ],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+    expect(screen.queryByLabelText("Unread")).not.toBeInTheDocument();
+  });
+
+  it("renders the parent comments cell as 'X (Y)' when child comments add to the total", () => {
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [
+          sampleTicket({
+            commentCount: 5, // rolled total
+            _count: {
+              comments: 2, // own count
+              issues: 0,
+              vulnerabilities: 0,
+              remediations: 0,
+              advisories: 0,
+              assets: 0,
+            },
+          }),
+        ],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+    const cell = screen.getByLabelText("Comments");
+    expect(cell).toHaveTextContent("5 (2)");
+  });
+
+  it("omits the breakdown when own and total counts match", () => {
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [
+          sampleTicket({
+            commentCount: 3,
+            _count: {
+              comments: 3,
+              issues: 0,
+              vulnerabilities: 0,
+              remediations: 0,
+              advisories: 0,
+              assets: 0,
+            },
+          }),
+        ],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+
+    renderTrackingList();
+    const cell = screen.getByLabelText("Comments");
+    expect(cell).toHaveTextContent("3");
+    expect(cell.textContent).not.toContain("(");
   });
 });

@@ -236,8 +236,9 @@ export function DataTable<
   const [expandedRows, setExpandedRows] = React.useState<Set<string>>(
     new Set(),
   );
-  const [expandedTanstack, setExpandedTanstack] =
-    React.useState<ExpandedState>({});
+  const [expandedTanstack, setExpandedTanstack] = React.useState<ExpandedState>(
+    {},
+  );
 
   // Reset expanded rows when the page data changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: do use paginated data as dependency here to trigger on page change
@@ -375,9 +376,7 @@ export function DataTable<
                 const inlineCanExpand = isInlineNested && row.getCanExpand();
                 const inlineIsExpanded = isInlineNested && row.getIsExpanded();
                 const showChevron = hasNestedTable || isInlineNested;
-                const chevronVisible = isInlineNested
-                  ? inlineCanExpand
-                  : true;
+                const chevronVisible = isInlineNested ? inlineCanExpand : true;
                 const chevronExpanded = isInlineNested
                   ? inlineIsExpanded
                   : !!legacyExpanded;
@@ -458,10 +457,13 @@ export function DataTable<
                               className={cn(
                                 "py-4 first-of-type:pl-4 last-of-type:pr-4",
                                 cell.column.columnDef.meta?.cellClassName,
+                                isChildRow && i === 0 && "relative",
                               )}
                               style={
                                 isChildRow && i === 0
-                                  ? { paddingLeft: `${row.depth * 1.5 + 1}rem` }
+                                  ? {
+                                      paddingLeft: `${(row.depth - 1) * 1.5 + 1}rem`,
+                                    }
                                   : undefined
                               }
                             >

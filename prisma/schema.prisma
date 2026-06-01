@@ -47,6 +47,8 @@ model User {
   workOrderTicketsCreated   WorkOrderTicket[]  @relation("WorkOrderTicketCreator")
   workOrderTicketsAssigned  WorkOrderTicket[]  @relation("WorkOrderTicketAssignee")
   ticketComments         TicketComment[]
+  ticketSeen             TicketSeen[]
+  ticketActivities       TicketActivity[]
 
   @@unique([email])
   @@index([departmentId])
@@ -862,8 +864,9 @@ model Department {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  users       User[]
-  tickets     WorkOrderTicket[] @relation("WorkOrderTicketDepartments")
+  users              User[]
+  tickets            WorkOrderTicket[]   @relation("WorkOrderTicketDepartments")
+  ticketDescriptions TicketDescription[]
 
   @@map("department")
 }
@@ -881,12 +884,9 @@ model CategoryColor {
 model WorkOrderTicket {
   id          String         @id @default(cuid())
   summary     String
-  description String?        @db.Text
 
   status      TicketStatus   @default(TO_DO)
   category    TicketCategory @default(OTHER)
-
-  lifeSafety  Boolean        @default(false)
 
   source             TicketSource @default(MANUAL)
   sourceWorkflowId   String?
@@ -911,7 +911,11 @@ model WorkOrderTicket {
   advisories      Advisory[]      @relation("WorkOrderTicketAdvisories")
   assets          Asset[]         @relation("WorkOrderTicketAssets")
 
-  comments    TicketComment[]
+  comments       TicketComment[]
+  descriptions   TicketDescription[]
+  seenBy         TicketSeen[]
+  activities     TicketActivity[]
+  lastCommentAt  DateTime?
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -922,6 +926,49 @@ model WorkOrderTicket {
   @@index([sourceWorkflowId])
   @@index([parentId])
   @@map("work_order_ticket")
+}
+
+model TicketSeen {
+  userId   String
+  ticketId String
+  seenAt   DateTime @default(now())
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@id([userId, ticketId])
+  @@index([userId])
+  @@index([ticketId])
+  @@map("ticket_seen")
+}
+
+enum TicketActivityType {
+  STATUS_CHANGED
+  CATEGORY_CHANGED
+  ASSIGNEE_CHANGED
+  DEPARTMENTS_CHANGED
+  SCHEDULED_AT_CHANGED
+  SUMMARY_CHANGED
+  DESCRIPTION_CHANGED
+  CHILD_ATTACHED
+  CHILD_DETACHED
+  ASSET_ATTACHED
+  ASSET_DETACHED
+}
+
+model TicketActivity {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      TicketActivityType
+  data      Json     // shape varies by `type`; structured server-side
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([userId])
+  @@map("ticket_activity")
 }
 
 model TicketComment {
@@ -937,4 +984,19 @@ model TicketComment {
   @@index([ticketId, createdAt])
   @@index([authorId])
   @@map("ticket_comment")
+}
+
+model TicketDescription {
+  id           String          @id @default(cuid())
+  ticketId     String
+  ticket       WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  departmentId String
+  department   Department      @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  body         String          @db.Text
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@unique([ticketId, departmentId])
+  @@index([departmentId])
+  @@map("ticket_description")
 }

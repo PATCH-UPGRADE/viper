@@ -50,6 +50,321 @@ export const useDepartments = () => {
   return useQuery(trpc.departments.getMany.queryOptions());
 };
 
+export const useMarkTicketSeen = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.tracking.markSeen.mutationOptions({
+      // Optimistically clear the unread dot on every cached tracking list that
+      // contains this ticket (top-level or nested). The server response will
+      // overwrite once it lands, and on error we'd just refetch on `onSettled`.
+      onMutate: async ({ ticketId }) => {
+        const filter = trpc.tracking.getMany.queryFilter();
+        await queryClient.cancelQueries(filter);
+        const now = new Date();
+        // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape varies
+        queryClient.setQueriesData<any>(filter, (old: any) => {
+          if (!old?.items) return old;
+          const stamp = (row: { id: string; seenBy: { seenAt: Date }[] }) =>
+            row.id === ticketId ? { ...row, seenBy: [{ seenAt: now }] } : row;
+          return {
+            ...old,
+            items: old.items.map(
+              // biome-ignore lint/suspicious/noExplicitAny: nested row shape
+              (item: any) => {
+                const stamped = stamp(item);
+                if (!item.children) return stamped;
+                return {
+                  ...stamped,
+                  children: item.children.map(stamp),
+                };
+              },
+            ),
+          };
+        });
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+      },
+    }),
+  );
+};
+
+export const useAttachableChildren = (parentId: string) => {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.tracking.listAttachableChildren.queryOptions({ parentId }),
+  );
+};
+
+export const useAttachChild = (parentId: string) => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.tracking.attachChild.mutationOptions({
+      onMutate: async ({ childId }) => {
+        const detailFilter = trpc.tracking.getOne.queryFilter({
+          id: parentId,
+        });
+        const pickerFilter = trpc.tracking.listAttachableChildren.queryFilter({
+          parentId,
+        });
+        await queryClient.cancelQueries(detailFilter);
+        await queryClient.cancelQueries(pickerFilter);
+        const previousDetail = queryClient.getQueriesData(detailFilter);
+        const previousPicker = queryClient.getQueriesData(pickerFilter);
+
+        // Look up the candidate in the picker cache so we can render a
+        // best-effort row immediately. Missing fields (departments,
+        // comment count) fill in on the post-mutation refetch.
+        const candidate = previousPicker
+          .flatMap(([, data]) => (Array.isArray(data) ? data : []))
+          .find((c: { id: string }) => c.id === childId) as
+          | { id: string; summary: string; status: string }
+          | undefined;
+
+        if (candidate) {
+          // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape
+          queryClient.setQueriesData<any>(detailFilter, (old: any) => {
+            if (!old?.children) return old;
+            return {
+              ...old,
+              children: [
+                ...old.children,
+                {
+                  id: candidate.id,
+                  summary: candidate.summary,
+                  status: candidate.status,
+                  departments: [],
+                  _count: { comments: 0 },
+                },
+              ],
+            };
+          });
+        }
+        // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape
+        queryClient.setQueriesData<any>(pickerFilter, (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.filter((c: { id: string }) => c.id !== childId);
+        });
+
+        return { previousDetail, previousPicker };
+      },
+      onError: (error, _vars, context) => {
+        for (const [key, data] of context?.previousDetail ?? []) {
+          queryClient.setQueryData(key, data);
+        }
+        for (const [key, data] of context?.previousPicker ?? []) {
+          queryClient.setQueryData(key, data);
+        }
+        toast.error(`Failed to attach sub-ticket: ${error.message}`);
+      },
+      onSuccess: () => {
+        toast.success("Sub-ticket attached");
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries(
+          trpc.tracking.getOne.queryFilter({ id: parentId }),
+        );
+        queryClient.invalidateQueries(
+          trpc.tracking.listAttachableChildren.queryFilter({ parentId }),
+        );
+        queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+      },
+    }),
+  );
+};
+
+export const useDetachChild = (parentId: string) => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.tracking.detachChild.mutationOptions({
+      onMutate: async ({ ticketId }) => {
+        const detailFilter = trpc.tracking.getOne.queryFilter({
+          id: parentId,
+        });
+        await queryClient.cancelQueries(detailFilter);
+        const previousDetail = queryClient.getQueriesData(detailFilter);
+        // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape
+        queryClient.setQueriesData<any>(detailFilter, (old: any) => {
+          if (!old?.children) return old;
+          return {
+            ...old,
+            children: old.children.filter(
+              (c: { id: string }) => c.id !== ticketId,
+            ),
+          };
+        });
+        return { previousDetail };
+      },
+      onError: (error, _vars, context) => {
+        if (context?.previousDetail) {
+          for (const [key, data] of context.previousDetail) {
+            queryClient.setQueryData(key, data);
+          }
+        }
+        toast.error(`Failed to detach sub-ticket: ${error.message}`);
+      },
+      onSuccess: () => {
+        toast.success("Sub-ticket detached");
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries(
+          trpc.tracking.getOne.queryFilter({ id: parentId }),
+        );
+        queryClient.invalidateQueries(
+          trpc.tracking.listAttachableChildren.queryFilter({ parentId }),
+        );
+        queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+      },
+    }),
+  );
+};
+
+export const useAttachableAssets = (ticketId: string) => {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.tracking.listAttachableAssets.queryOptions({ ticketId }),
+  );
+};
+
+export const useAttachAsset = (ticketId: string) => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.tracking.attachAsset.mutationOptions({
+      onMutate: async ({ assetId }) => {
+        const detailFilter = trpc.tracking.getOne.queryFilter({
+          id: ticketId,
+        });
+        const pickerFilter = trpc.tracking.listAttachableAssets.queryFilter({
+          ticketId,
+        });
+        await queryClient.cancelQueries(detailFilter);
+        await queryClient.cancelQueries(pickerFilter);
+        const previousDetail = queryClient.getQueriesData(detailFilter);
+        const previousPicker = queryClient.getQueriesData(pickerFilter);
+
+        const candidate = previousPicker
+          .flatMap(([, data]) => (Array.isArray(data) ? data : []))
+          .find((c: { id: string }) => c.id === assetId) as
+          | {
+              id: string;
+              hostname: string | null;
+              ip: string;
+              role: string | null;
+              deviceGroup: {
+                manufacturer: string | null;
+                modelName: string | null;
+              } | null;
+            }
+          | undefined;
+
+        if (candidate) {
+          // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape
+          queryClient.setQueriesData<any>(detailFilter, (old: any) => {
+            if (!old?.assets) return old;
+            return {
+              ...old,
+              assets: [
+                ...old.assets,
+                {
+                  id: candidate.id,
+                  hostname: candidate.hostname,
+                  ip: candidate.ip,
+                  role: candidate.role,
+                  macAddress: null,
+                  location: null,
+                  deviceGroupId: "",
+                  deviceGroup: candidate.deviceGroup
+                    ? {
+                        id: "",
+                        manufacturer: candidate.deviceGroup.manufacturer,
+                        modelName: candidate.deviceGroup.modelName,
+                      }
+                    : null,
+                },
+              ],
+            };
+          });
+        }
+        // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape
+        queryClient.setQueriesData<any>(pickerFilter, (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.filter((c: { id: string }) => c.id !== assetId);
+        });
+
+        return { previousDetail, previousPicker };
+      },
+      onError: (error, _vars, context) => {
+        for (const [key, data] of context?.previousDetail ?? []) {
+          queryClient.setQueryData(key, data);
+        }
+        for (const [key, data] of context?.previousPicker ?? []) {
+          queryClient.setQueryData(key, data);
+        }
+        toast.error(`Failed to attach asset: ${error.message}`);
+      },
+      onSuccess: () => {
+        toast.success("Asset attached");
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries(
+          trpc.tracking.getOne.queryFilter({ id: ticketId }),
+        );
+        queryClient.invalidateQueries(
+          trpc.tracking.listAttachableAssets.queryFilter({ ticketId }),
+        );
+      },
+    }),
+  );
+};
+
+export const useDetachAsset = (ticketId: string) => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.tracking.detachAsset.mutationOptions({
+      onMutate: async ({ assetId }) => {
+        const detailFilter = trpc.tracking.getOne.queryFilter({
+          id: ticketId,
+        });
+        await queryClient.cancelQueries(detailFilter);
+        const previousDetail = queryClient.getQueriesData(detailFilter);
+        // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape
+        queryClient.setQueriesData<any>(detailFilter, (old: any) => {
+          if (!old?.assets) return old;
+          return {
+            ...old,
+            assets: old.assets.filter((a: { id: string }) => a.id !== assetId),
+          };
+        });
+        return { previousDetail };
+      },
+      onError: (error, _vars, context) => {
+        if (context?.previousDetail) {
+          for (const [key, data] of context.previousDetail) {
+            queryClient.setQueryData(key, data);
+          }
+        }
+        toast.error(`Failed to detach asset: ${error.message}`);
+      },
+      onSuccess: () => {
+        toast.success("Asset detached");
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries(
+          trpc.tracking.getOne.queryFilter({ id: ticketId }),
+        );
+        queryClient.invalidateQueries(
+          trpc.tracking.listAttachableAssets.queryFilter({ ticketId }),
+        );
+      },
+    }),
+  );
+};
+
 export const useAddTicketComment = (ticketId: string) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

@@ -38,6 +38,7 @@ export const createCallerFactory = t.createCallerFactory;
 export const baseProcedure = t.procedure;
 
 export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
+  console.log("HEY", ctx.req)
   const session = await getSession();
   if (session) {
     return next({ ctx: { ...ctx, auth: { ...session, key: undefined } } });

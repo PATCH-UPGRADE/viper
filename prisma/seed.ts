@@ -737,10 +737,17 @@ const SAMPLE_DEPARTMENTS = [
     color: "red",
   },
   {
+    id: "dept-biomed-fixed-0000001",
     name: "Biomed",
     description:
       "Medical device lifecycle — patient monitors, infusion pumps, validation.",
     color: "orange",
+  },
+  {
+    id: "dept-clinicians-fixed-001",
+    name: "Clinicians",
+    description: "Clinical staff — physicians, nurses, and care coordinators.",
+    color: "green",
   },
   {
     name: "Biotech",
@@ -1748,11 +1755,11 @@ async function seedDepartments(userId: string) {
   console.log("\n🌱 Seeding departments...");
 
   const departments = await Promise.all(
-    SAMPLE_DEPARTMENTS.map((dept) =>
+    SAMPLE_DEPARTMENTS.map(({ id, ...rest }) =>
       prisma.department.upsert({
-        where: { name: dept.name },
-        update: dept,
-        create: dept,
+        where: { name: rest.name },
+        update: rest,
+        create: id ? { id, ...rest } : rest,
       }),
     ),
   );

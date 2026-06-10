@@ -133,6 +133,7 @@ export const trackingRouter = createTRPCRouter({
         AND: [{ parentId: null }, parentTabWhere, createSearchFilter(search)],
       };
 
+
       const totalCount = await prisma.workOrderTicket.count({ where });
       const meta = buildPaginationMeta(input, totalCount);
 
@@ -283,6 +284,99 @@ export const trackingRouter = createTRPCRouter({
           lastSeenAt: seenBy[0]?.seenAt ?? null,
         })),
       };
+    }),
+
+  create: protectedProcedure
+    .input(
+      z.object({
+        summary: z.string().trim().min(1).max(255),
+        status: z.nativeEnum(TicketStatus).optional(),
+        category: z.nativeEnum(TicketCategory).optional(),
+        source: z.nativeEnum(TicketSource).optional(),
+        assetIds: z.array(z.string()).optional(),
+        vulnerabilityIds: z.array(z.string()).optional(),
+        issueIds: z.array(z.string()).optional(),
+        remediationIds: z.array(z.string()).optional(),
+        departmentIds: z.array(z.string()).optional(),
+        descriptions: z
+          .array(
+            z.object({
+              departmentId: z.string(),
+              body: z.string().max(10_000),
+            }),
+          )
+          .optional(),
+        assigneeId: z.string().optional(),
+        scheduledAt: z.coerce.date().nullish(),
+      }),
+    )
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/work-orders",
+        tags: ["Work Orders"],
+        summary: "Create a work-order ticket",
+        description:
+          "Create a new work-order ticket. The authenticated user is recorded as the creator. Pass source: WORKFLOW to surface the ticket in the Suggested tab. Departments referenced in descriptions are automatically connected.",
+      },
+    })
+    .output(workOrderDetailResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const {
+        assetIds,
+        vulnerabilityIds,
+        issueIds,
+        remediationIds,
+        departmentIds,
+        descriptions,
+        ...rest
+      } = input;
+
+      // Non-empty description entries only; auto-collect their department IDs.
+      const validDescriptions = (descriptions ?? []).filter(
+        (d) => d.body.trim().length > 0,
+      );
+      const descriptionDeptIds = validDescriptions.map((d) => d.departmentId);
+
+      // Union of explicitly-passed department IDs and those implied by descriptions.
+      const allDeptIds = [
+        ...new Set([...(departmentIds ?? []), ...descriptionDeptIds]),
+      ];
+
+      const ticket = await prisma.workOrderTicket.create({
+        data: {
+          ...rest,
+          creatorId: ctx.auth.user.id,
+          ...(assetIds?.length && {
+            assets: { connect: assetIds.map((id) => ({ id })) },
+          }),
+          ...(vulnerabilityIds?.length && {
+            vulnerabilities: { connect: vulnerabilityIds.map((id) => ({ id })) },
+          }),
+          ...(issueIds?.length && {
+            issues: { connect: issueIds.map((id) => ({ id })) },
+          }),
+          ...(remediationIds?.length && {
+            remediations: { connect: remediationIds.map((id) => ({ id })) },
+          }),
+          ...(allDeptIds.length && {
+            departments: { connect: allDeptIds.map((id) => ({ id })) },
+          }),
+          ...(validDescriptions.length && {
+            descriptions: { create: validDescriptions },
+          }),
+        },
+      });
+      return prisma.workOrderTicket.findUniqueOrThrow({
+        where: { id: ticket.id },
+        include: {
+          ...ticketDetailInclude,
+          seenBy: {
+            where: { userId: ctx.auth.user.id },
+            select: { seenAt: true },
+          },
+        },
+      });
     }),
 
   update: protectedProcedure

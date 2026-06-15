@@ -129,6 +129,11 @@ export async function POST(req: Request) {
 
   return createUIMessageStreamResponse({
     stream,
-    headers: { "x-thread-id": threadId },
+    headers: {
+      "x-thread-id": threadId,
+      // `no-transform` stops edge proxies/CDNs from buffering or transforming
+      // the SSE stream (belt-and-suspenders alongside the SDK's x-accel-buffering).
+      "cache-control": "no-cache, no-transform",
+    },
   });
 }

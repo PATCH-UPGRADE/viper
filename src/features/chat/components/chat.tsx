@@ -1,16 +1,9 @@
 "use client";
 
-import type { AnyToolCallPart } from "@inngest/use-agent";
-import {
-  type AgentError,
-  AgentProvider,
-  type AgentStatus,
-  type DefaultHttpTransportConfig,
-  type Thread,
-} from "@inngest/use-agent";
 import {
   AlertCircle,
   Bot,
+  Brain,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -66,24 +59,11 @@ import {
 import { UserAvatar } from "@/components/user-avatar";
 import { useChatUI } from "@/features/chat/context/chat-panel-context";
 import { useSuggestedQuestions } from "@/features/chat/context/suggested-questions-context";
-import { useChatAgent } from "@/features/chat/hooks/use-chat";
+import { useViperChat, type ViperChat } from "@/features/chat/hooks/use-viper-chat";
 import type { UseChatAgentConfig } from "@/features/chat/types";
 import { USER_ROLES, type UserRole } from "@/features/chat/utils";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
-
-// https://agentkit.inngest.com/streaming/transport#sendmessageparams-options
-export const TRANSPORT_CONFIG: Partial<DefaultHttpTransportConfig> = {
-  api: {
-    sendMessage: "/api/v1/chat",
-    getRealtimeToken: "/api/v1/realtime/token",
-    fetchThreads: "/api/v1/chat/threads",
-    fetchHistory: "/api/v1/chat/threads/{threadId}",
-    createThread: "/api/v1/chat/threads",
-    deleteThread: "/api/v1/chat/threads/{threadId}",
-    approveToolCall: "/api/v1/chat/approve-tool",
-  },
-};
 
 const REMARK_PLUGINS = [remarkGfm];
 
@@ -93,11 +73,10 @@ interface AIChatProps {
 
 export function AIChat({ config }: AIChatProps) {
   const { data: session } = authClient.useSession();
-  const userId = session?.user?.id;
   const user = session?.user ?? null;
 
   // technically "dead code" because this should only be used on protected routes
-  if (!userId) {
+  if (!session?.user?.id) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
         Please sign in to use AI Chat.
@@ -105,17 +84,43 @@ export function AIChat({ config }: AIChatProps) {
     );
   }
 
-  return (
-    <AgentProvider userId={userId} transport={TRANSPORT_CONFIG}>
-      <ChatInner config={config} user={user} />
-    </AgentProvider>
-  );
+  return <ChatInner config={config} user={user} />;
+}
+
+// ─── Message part helpers (AI SDK UIMessage parts) ────────────────────────────
+
+type ChatAgentMessage = ViperChat["messages"][number];
+type MessagePart = ChatAgentMessage["parts"][number];
+
+interface ToolPart {
+  type: string;
+  toolName?: string;
+  toolCallId: string;
+  state?: string;
+  input?: unknown;
+  output?: unknown;
+}
+
+function isToolPart(part: MessagePart): part is MessagePart & ToolPart {
+  return part.type === "dynamic-tool" || part.type.startsWith("tool-");
+}
+
+function toolName(part: ToolPart): string {
+  return part.toolName ?? part.type.replace(/^tool-/, "");
 }
 
 interface ChatUser {
   name?: string | null;
   image?: string | null;
 }
+
+interface AskUserQuestion {
+  question: string;
+  reason: string;
+  suggested_answers: string[];
+}
+
+// ─── Presentational pieces (unchanged structurally) ───────────────────────────
 
 function EmptyState({
   isDisabled,
@@ -186,21 +191,41 @@ function ChatMessagesSkeletonList() {
   );
 }
 
-type ChatAgentMessage = ReturnType<typeof useChatAgent>["messages"][number];
+function ReasoningBlock({ text, streaming }: { text: string; streaming: boolean }) {
+  const [open, setOpen] = useState(false);
+  // Auto-expand while the model is actively thinking; let the user collapse after.
+  useEffect(() => {
+    if (streaming) setOpen(true);
+  }, [streaming]);
 
-interface AskUserQuestion {
-  question: string;
-  reason: string;
-  suggested_answers: string[];
+  if (!text) return null;
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="my-1">
+      <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
+        <Brain className="size-3 shrink-0" />
+        <span>{streaming ? "Thinking…" : "Thought process"}</span>
+        <ChevronDown
+          className={cn("size-3 transition-transform", open && "rotate-180")}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-1 rounded-md border-l-2 border-muted bg-muted/30 p-2 text-xs text-muted-foreground whitespace-pre-wrap max-h-60 overflow-y-auto">
+          {text}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
 }
 
-function ToolCallAccordion({ part }: { part: AnyToolCallPart }) {
+function ToolCallAccordion({ part }: { part: ToolPart }) {
   const [open, setOpen] = useState(false);
-  const label = part.toolName.replace(/_/g, " ");
-  const output =
-    part.state === "output-available"
-      ? ((part.output as { data?: string })?.data ?? "")
-      : null;
+  const label = toolName(part).replace(/_/g, " ");
+  const hasOutput = part.state === "output-available";
+  const output = hasOutput
+    ? typeof part.output === "string"
+      ? part.output
+      : JSON.stringify(part.output, null, 2)
+    : null;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="my-1">
@@ -256,7 +281,7 @@ function AskUserQuestionsMessage({
   isAnswered,
   onAnswer,
 }: {
-  part: AnyToolCallPart;
+  part: ToolPart;
   isAnswered: boolean;
   onAnswer: (payload: string) => void;
 }) {
@@ -270,7 +295,6 @@ function AskUserQuestionsMessage({
     questions.every((_, i) => (answers[i] ?? "").trim().length > 0);
 
   const handleSubmit = () => {
-    // the actual message that gets sent to the chat
     const payload = JSON.stringify({
       answers: questions.map((q, i) => ({
         question: q.question,
@@ -413,17 +437,17 @@ function ChatMessage({
   message,
   user,
   isLast,
+  streaming,
   onAnswer,
 }: {
   message: ChatAgentMessage;
   user: ChatUser | null;
   isLast: boolean;
+  streaming: boolean;
   onAnswer: (payload: string) => void;
 }) {
   const { role, parts } = message;
-
   const hasText = parts.some((p) => p.type === "text");
-  // const hasTable = parts.some((p) => p.type === "text" && p.content.includes("|"));
 
   return (
     <div
@@ -451,30 +475,38 @@ function ChatMessage({
         )}
       >
         {parts.map((part, idx) => {
+          const key = `${message.id}-${idx}`;
+
+          if (part.type === "reasoning") {
+            return (
+              <ReasoningBlock
+                key={key}
+                text={part.text}
+                streaming={streaming && isLast}
+              />
+            );
+          }
+
           if (part.type === "text") {
             if (role === "user") {
               try {
-                const parsed = JSON.parse(part.content);
+                const parsed = JSON.parse(part.text);
                 if (Array.isArray(parsed.answers)) {
-                  return (
-                    <AnswerSummary
-                      key={`${part.id}-${idx}`}
-                      answers={parsed.answers}
-                    />
-                  );
+                  return <AnswerSummary key={key} answers={parsed.answers} />;
                 }
               } catch {
                 // not JSON — fall through to markdown
               }
             }
             return (
-              <MarkdownWithTablesWrapper key={`${part.id}-${idx}`}>
-                {part.content}
+              <MarkdownWithTablesWrapper key={key}>
+                {part.text}
               </MarkdownWithTablesWrapper>
             );
           }
-          if (part.type === "tool-call") {
-            if (part.toolName === "ask_user_questions") {
+
+          if (isToolPart(part)) {
+            if (toolName(part) === "ask_user_questions") {
               return (
                 <AskUserQuestionsMessage
                   key={part.toolCallId}
@@ -534,7 +566,7 @@ function ChatError({
   error,
   onClear,
 }: {
-  error: AgentError;
+  error: Error;
   onClear: () => void;
 }) {
   return (
@@ -542,15 +574,7 @@ function ChatError({
       <Alert variant="destructive">
         <AlertCircle className="size-4" />
         <AlertDescription className="flex items-center justify-between gap-2">
-          <span>
-            {error.message}
-            {error.suggestion && (
-              <span className="text-muted-foreground">
-                {" "}
-                — {error.suggestion}
-              </span>
-            )}
-          </span>
+          <span>{error.message}</span>
           <Button
             variant="ghost"
             size="icon"
@@ -570,7 +594,6 @@ function ChatInputForm({
   onInputChange,
   onSubmit,
   isDisabled,
-  isConnected,
   status,
   hasActiveQuestions,
 }: {
@@ -578,8 +601,7 @@ function ChatInputForm({
   onInputChange: (value: string) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isDisabled: boolean;
-  isConnected: boolean;
-  status: AgentStatus;
+  status: "submitted" | "streaming" | "ready" | "error";
   hasActiveQuestions: boolean;
 }) {
   const { userRole, setUserRole } = useChatUI();
@@ -648,44 +670,28 @@ function ChatInputForm({
           </Button>
         </div>
       </form>
-      {!isConnected && (
-        <p className="text-xs text-muted-foreground text-right mt-1">
-          Status: Disconnected
-        </p>
-      )}
     </div>
   );
+}
+
+interface ThreadListItem {
+  id: string;
+  title: string | null;
 }
 
 function ThreadSelector({
   currentThreadId,
   threads,
   threadsLoading,
-  threadsHasMore,
   threadsError,
-  loadMoreThreads,
   selectThread,
 }: {
   currentThreadId: string | null;
-  threads: Thread[];
+  threads: ThreadListItem[];
   threadsError: string | null;
   threadsLoading: boolean;
-  threadsHasMore: boolean;
-  loadMoreThreads: () => void;
   selectThread: (threadId: string) => void;
 }) {
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    if (
-      threadsHasMore &&
-      !threadsLoading &&
-      el.scrollTop + el.clientHeight >= el.scrollHeight - 50
-    ) {
-      loadMoreThreads();
-    }
-  };
-
-  // add `key` to Select to force re-mount when thread title changes
   const currentTitle =
     threads.find((t) => t.id === currentThreadId)?.title ?? null;
   const currentThreadExists = threads?.some((t) => t.id === currentThreadId);
@@ -733,7 +739,7 @@ function ThreadSelector({
           ) : undefined}
         </SelectValue>
       </SelectTrigger>
-      <SelectContent onScroll={handleScroll}>
+      <SelectContent>
         {threads.map((thread) => (
           <SelectItem key={thread.id} value={thread.id}>
             <span className="truncate max-w-[200px] block">
@@ -764,26 +770,22 @@ function ChatInner({
   config?: UseChatAgentConfig;
   user: ChatUser | null;
 }) {
-  const agent = useChatAgent(config);
   const {
     messages,
-    sendMessageToThread,
-    threads,
-    currentThreadId,
     status,
     error,
     clearError,
-
-    isConnected,
-    isLoadingInitialThread,
-    isLoadingHistory,
-
+    send,
+    threads,
     threadsLoading,
-    threadsHasMore,
     threadsError,
-    loadMoreThreads,
+    currentThreadId,
+    switchThread,
+    newThread,
     deleteThread,
-  } = agent;
+    refreshThreads,
+    isLoadingHistory,
+  } = useViperChat(config);
   const { userRole } = useChatUI();
 
   const [input, setInput] = useState("");
@@ -792,14 +794,17 @@ function ChatInner({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const isAgentBusy = status !== "ready" || !isConnected;
+  const isAgentBusy = status === "submitted" || status === "streaming";
 
   const hasActiveQuestions = useMemo(() => {
     if (status !== "ready") return false;
     const lastMsg = messages[messages.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") return false;
     return lastMsg.parts.some(
-      (p) => p.type === "tool-call" && p.toolName === "ask_user_questions",
+      (p) =>
+        (p.type === "dynamic-tool" || p.type.startsWith("tool-")) &&
+        ((p as ToolPart).toolName ?? p.type.replace(/^tool-/, "")) ===
+          "ask_user_questions",
     );
   }, [messages, status]);
 
@@ -807,39 +812,16 @@ function ChatInner({
 
   const sendWithOverride = useCallback(
     (message: string, override?: Partial<UseChatAgentConfig>) => {
-      // Explicit override (e.g. suggested-question click) is sticky: persist it
-      // so subsequent free-form messages also use it. Without this, React's
-      // batched setState wouldn't reflect the change in time for this send.
+      // Explicit override (e.g. suggested-question click) is sticky.
       if (override && Object.keys(override).length > 0) {
         setConfigOverride(override);
       }
-      // Get threadId and use sendMessageToThread instead of sendMessage for
-      // persistent thread information
-      const threadId = currentThreadId ?? agent.createNewThread();
-      const effective = override ?? configOverride;
-      const stateOverride =
-        effective && Object.keys(effective).length > 0
-          ? // Priority chain: effective override > page-level config > userRole base.
-            // Server (chat-agent.ts) defaults the agent when none is set.
-            { userRole, ...config, ...effective }
-          : undefined;
-      return sendMessageToThread(
-        threadId,
-        message,
-        stateOverride ? { state: stateOverride } : undefined,
-      );
+      send(message, override ?? configOverride);
     },
-    [
-      agent.createNewThread,
-      sendMessageToThread,
-      currentThreadId,
-      config,
-      configOverride,
-      userRole,
-    ],
+    [send, configOverride],
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: set config override to none if thread changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset config override when thread changes
   useEffect(() => {
     setConfigOverride(undefined);
   }, [currentThreadId]);
@@ -869,12 +851,10 @@ function ChatInner({
       <div className="bg-muted p-2 flex gap-2 justify-between">
         <ThreadSelector
           currentThreadId={currentThreadId}
-          selectThread={agent.switchToThread}
+          selectThread={switchThread}
           threads={threads}
           threadsError={threadsError}
           threadsLoading={threadsLoading}
-          threadsHasMore={threadsHasMore}
-          loadMoreThreads={loadMoreThreads}
         />
         <div>
           <TooltipProvider>
@@ -905,10 +885,7 @@ function ChatInner({
               <>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      onClick={() => agent.switchToThread("")}
-                    >
+                    <Button variant="ghost" onClick={() => newThread()}>
                       <MessageSquarePlus />
                     </Button>
                   </TooltipTrigger>
@@ -921,7 +898,7 @@ function ChatInner({
                       className="text-destructive hover:text-destructive"
                       onClick={async () => {
                         await deleteThread(currentThreadId);
-                        agent.refreshThreads();
+                        refreshThreads();
                       }}
                     >
                       <Trash2 />
@@ -935,7 +912,7 @@ function ChatInner({
         </div>
       </div>
       <div ref={containerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-        {isLoadingInitialThread || isLoadingHistory ? (
+        {isLoadingHistory ? (
           <ChatMessagesSkeletonList />
         ) : (
           <>
@@ -949,6 +926,7 @@ function ChatInner({
                 message={message}
                 user={user}
                 isLast={i === messages.length - 1}
+                streaming={status === "streaming"}
                 onAnswer={(payload) => sendWithOverride(payload)}
               />
             ))}
@@ -969,7 +947,6 @@ function ChatInner({
         onInputChange={setInput}
         onSubmit={onSubmit}
         isDisabled={isDisabled}
-        isConnected={isConnected}
         status={status}
         hasActiveQuestions={hasActiveQuestions}
       />

@@ -1,6 +1,5 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/inngest/client";
-import { chatAgent } from "@/inngest/functions/chat-agent";
 import {
   enrichAllVulnerabilities,
   enrichVulnerability,
@@ -19,7 +18,6 @@ export const { GET, POST, PUT } = serve({
     syncIntegration,
     enrichVulnerability,
     enrichAllVulnerabilities,
-    chatAgent,
     manageMemoriesFn,
     purgeExpiredTokensFn,
   ],

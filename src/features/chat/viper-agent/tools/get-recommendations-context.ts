@@ -1,5 +1,3 @@
-import { createTool } from "@inngest/agent-kit";
-import { z } from "zod";
 import { assetUtilizationSchema } from "@/features/assets/types";
 import {
   type NetworkTopology,
@@ -371,36 +369,34 @@ function generateContextMarkdown(
   return sections.join("\n\n---\n\n");
 }
 
-export const getRecommendationsContext = createTool({
-  name: "get_recommendations_context",
-  description:
-    "Retrieve full context about the current user and environment before responding. Returns saved memories plus all assets, vulnerabilities, remediations, clinical workflows, network flow topology, device utilization windows, and their cross-entity relationships. Call once at the start of a thread.",
-  parameters: z.object({}),
-  handler: async (_, { network }) => {
-    const userId = network?.state.data.userId as string | undefined;
-    if (!userId) return "No user context available.";
+/**
+ * Loads the full recommendations context (memories + assets + vulns +
+ * remediations + workflows + network flow + utilization) as markdown.
+ * Shared by the AgentKit tool below and the LangGraph recommendations graph
+ * (which preloads it deterministically rather than as a model tool call).
+ */
+export async function loadRecommendationsContextMarkdown(
+  userId: string,
+  userRole?: string,
+): Promise<string> {
+  const [
+    memories,
+    assets,
+    vulnerabilities,
+    remediations,
+    workflows,
+    networkTopology,
+  ] = await Promise.all([
+    prisma.memory.findMany({
+      where: { userId },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.asset.findMany({ include: assetContextInclude }),
+    prisma.vulnerability.findMany({ include: vulnerabilityContextInclude }),
+    prisma.remediation.findMany({ include: remediationContextInclude }),
+    prisma.workflow.findMany({ include: { nodes: true, connections: true } }),
+    fetchNetworkTopologyForContext(),
+  ]);
 
-    const userRole = network?.state.data.userRole as string | undefined;
-
-    const [
-      memories,
-      assets,
-      vulnerabilities,
-      remediations,
-      workflows,
-      networkTopology,
-    ] = await Promise.all([
-      prisma.memory.findMany({
-        where: { userId },
-        orderBy: { createdAt: "asc" },
-      }),
-      prisma.asset.findMany({ include: assetContextInclude }),
-      prisma.vulnerability.findMany({ include: vulnerabilityContextInclude }),
-      prisma.remediation.findMany({ include: remediationContextInclude }),
-      prisma.workflow.findMany({ include: { nodes: true, connections: true } }),
-      fetchNetworkTopologyForContext(),
-    ]);
-
-    return `${generateMemoryMarkdown(memories)}\n\n---\n\n${generateContextMarkdown(assets, vulnerabilities, remediations, workflows, networkTopology, userRole)}`;
-  },
-});
+  return `${generateMemoryMarkdown(memories)}\n\n---\n\n${generateContextMarkdown(assets, vulnerabilities, remediations, workflows, networkTopology, userRole)}`;
+}

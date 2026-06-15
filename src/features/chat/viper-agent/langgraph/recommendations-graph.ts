@@ -1,35 +1,30 @@
+/**
+ * Viper Recommendations Advisor (Opus + extended thinking) as a LangGraph
+ * graph — replaces the AgentKit createGiveRecommendationsAgent.
+ *
+ * The full environment context (assets, vulns, remediations, workflows, network
+ * flow, utilization, memories) is preloaded DETERMINISTICALLY (replaces the
+ * get_recommendations_context tool + "call it once at the start" rule). This
+ * also keeps extended thinking alive across the run (see SPIKE FINDING).
+ */
 import "server-only";
-import {
-  anthropic,
-  createAgent,
-  type NetworkRun,
-  type StateData,
-} from "@inngest/agent-kit";
-import type { NetworkState } from "@/features/chat/types";
+import { ChatAnthropic } from "@langchain/anthropic";
+import { SystemMessage } from "@langchain/core/messages";
+import type { AssetWithIssueRelations } from "@/features/assets/types";
 import {
   ASSET_ROLE_INSTRUCTIONS,
-  assetToMarkdown,
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
   VULNERABILITY_ROLE_INSTRUCTIONS,
+  assetToMarkdown,
   vulnerabilityToMarkdown,
 } from "@/features/chat/utils";
-import { askUserQuestions } from "../tools/ask-user-questions";
-import { getRecommendationsContext } from "../tools/get-recommendations-context";
-import { manageMemoriesTool } from "../tools/manage-memories";
+import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
+import { loadRecommendationsContextMarkdown } from "../tools/get-recommendations-context";
+import { buildAgentGraph } from "./build-graph";
+import { buildChatTools } from "./tools";
 
-// TODO(few-shot-harms): when patient harm examples are ready, inject a
-//   <patient_harm_examples> block with golden examples of cyber-outage ->
-//   patient harm chains (e.g., 2016 MedStar ransomware delaying care; CT
-//   scanner outage delaying stroke imaging; infusion pump misconfiguration
-//   causing dosing error). Each example should match the failure pathway shape
-//   used by <failure_mode_framework> so the agent has few-shot patterns to
-//   imitate rather than improvising from a blank slate.
-
-const MODEL = anthropic({
-  model: "claude-opus-4-6",
-  defaultParameters: { max_tokens: 4096 },
-});
+const RECOMMENDATIONS_MODEL = "claude-opus-4-6";
 
 const BASE_PROMPT = `\
 <role>
@@ -42,10 +37,11 @@ Your recommendations should be at a high level overview. You should not suggest 
 </role>
 
 <grounding_rules>
-- Always call get_recommendations_context once at the start of a thread before responding.
-  Do not call it again on follow-up turns in the same thread.
+- The full environment context (assets, vulnerabilities, remediations, memories, clinical
+  workflows, network flow, device utilization) has already been loaded for you below.
+  You do not need to fetch it.
 - Never invent CVSS scores, EPSS values, KEV status, asset IDs, hostnames, scheduling
-  windows, or commands to run on devices. If a fact is not in the retrieved context or memories, say so explicitly.
+  windows, or commands to run on devices. If a fact is not in the provided context or memories, say so explicitly.
 - When data is missing and would meaningfully change your recommendation, use
   ask_user_questions rather than guessing.
 </grounding_rules>
@@ -79,7 +75,7 @@ output where useful.
 <scheduling_guidance>
 Propose patch windows that minimize disruption to patient care.
 
-When "## Device Utilization Windows" is present in the retrieved context, use per-asset
+When "## Device Utilization Windows" is present in the provided context, use per-asset
 utilization data (Offline / Low / Medium / High buckets) to identify hours where all
 affected assets are Offline or Low, and propose those as patch windows.
 
@@ -135,16 +131,13 @@ Check existing memories before creating new ones — update instead of duplicati
 </memory_guidance>
 
 <tools>
-- get_recommendations_context: load all assets, vulnerabilities, remediations,
-  memories, clinical workflows, network flow topology, and device utilization windows
-  for this user. Call once at the start of a thread only.
 - ask_user_questions: ask the user 1–4 clarifying questions with suggested answers.
   The agent turn ends here until the user replies.
 - manage_memories: create, update, or delete persistent memories for this user.
 </tools>
 
 <context_data_guidance>
-The retrieved context includes three additional data sources. Use them as follows:
+The provided context includes three additional data sources. Use them as follows:
 
 **## Clinical Workflows** — serialized JSON graphs of hospital clinical/operational
 workflows. Each workflow node represents a clinical function (device, system, or step);
@@ -167,26 +160,25 @@ user via ask_user_questions — frame questions around typical shift patterns, c
 hours, and maintenance windows.
 </context_data_guidance>`;
 
-const buildSystemPrompt = (
-  network: NetworkRun<StateData> | undefined,
-): string => {
-  const data = network?.state.data as NetworkState | undefined;
-  const role: UserRole = data?.userRole ?? "hospital administration";
-  const parts: string[] = [BASE_PROMPT];
-
-  parts.push(
+function buildSystemPrompt(
+  role: UserRole,
+  assetData?: AssetWithIssueRelations,
+  vulnerabilityData?: VulnerabilityWithRelations,
+): string {
+  const parts: string[] = [
+    BASE_PROMPT,
     `<role_focus_recommendation>The user has the role ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</role_focus_recommendation>`,
-  );
+  ];
 
-  if (data?.assetData) {
-    const assetMd = assetToMarkdown(data.assetData, { includeIssues: false });
+  if (assetData) {
+    const assetMd = assetToMarkdown(assetData, { includeIssues: false });
     parts.push(
       `<role_focus_asset>${ASSET_ROLE_INSTRUCTIONS[role]}</role_focus_asset>\n\n<asset_focus>Unless otherwise specified, the user is asking about this asset:\n\n${assetMd}</asset_focus>`,
     );
   }
 
-  if (data?.vulnerabilityData) {
-    const vulnMd = vulnerabilityToMarkdown(data.vulnerabilityData, {
+  if (vulnerabilityData) {
+    const vulnMd = vulnerabilityToMarkdown(vulnerabilityData, {
       includeAssets: false,
       includeRemediations: false,
     });
@@ -196,14 +188,36 @@ const buildSystemPrompt = (
   }
 
   return parts.join("\n\n");
-};
+}
 
-export const createGiveRecommendationsAgent = () =>
-  createAgent({
-    name: "Viper Recommendations Advisor",
-    description:
-      "Prioritizes remediations using failure-mode analysis, proposes patch windows to minimize clinical disruption, persists hospital-specific learnings, and asks the user for clarification when needed.",
-    system: ({ network }) => buildSystemPrompt(network),
-    tools: [getRecommendationsContext, askUserQuestions, manageMemoriesTool],
-    model: MODEL,
+export function buildRecommendationsGraph({
+  userId,
+  userRole = "hospital administration",
+  assetData,
+  vulnerabilityData,
+  loadContext = () => loadRecommendationsContextMarkdown(userId, userRole),
+}: {
+  userId: string;
+  userRole?: UserRole;
+  assetData?: AssetWithIssueRelations;
+  vulnerabilityData?: VulnerabilityWithRelations;
+  /** Overridable for tests / DB-less verification. */
+  loadContext?: () => Promise<string>;
+}) {
+  const tools = buildChatTools(userId);
+  const model = new ChatAnthropic({
+    model: RECOMMENDATIONS_MODEL,
+    maxTokens: 8000,
+    streaming: true,
+    thinking: { type: "enabled", budget_tokens: 3000 },
+  }).bindTools(tools);
+
+  return buildAgentGraph({
+    model,
+    tools,
+    systemMessage: new SystemMessage(
+      buildSystemPrompt(userRole, assetData, vulnerabilityData),
+    ),
+    preload: loadContext,
   });
+}

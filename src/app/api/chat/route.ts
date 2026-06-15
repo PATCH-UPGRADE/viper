@@ -75,31 +75,33 @@ export async function POST(req: Request) {
   }
   const userText = textOf(newUserMessage);
   const threadId = body.threadId ?? crypto.randomUUID();
-
-  // Persist the user's turn, then hydrate the full conversation from the DB
-  // (authoritative — we don't trust client-side message state).
-  await ensureThread(threadId, userId, userText);
-  await saveUserMessage(threadId, newUserMessage.id, userText);
-  const history = await loadHistoryMessages(threadId);
-
-  const graph =
-    body.agent === "giveRecommendations"
-      ? buildRecommendationsGraph({
-          userId,
-          userRole,
-          assetData: body.assetData,
-          vulnerabilityData: body.vulnerabilityData,
-        })
-      : buildChatGraph({ userId, userRole });
+  const { agent, assetData, vulnerabilityData } = body;
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
+      // Open the stream and flush the first chunk BEFORE the network-bound work.
+      // On Vercel, any awaits before returning the Response delay the entire
+      // body (perceived as "no streaming, just a spinner"), so all the DB
+      // round-trips + graph run happen here, after the connection is live.
       writer.write({ type: "start" });
-      await streamGraphToUI({
-        graph,
-        input: { messages: history },
-        writer,
-      });
+
+      // Persist the user's turn, then hydrate the full conversation from the DB
+      // (authoritative — we don't trust client-side message state).
+      await ensureThread(threadId, userId, userText);
+      await saveUserMessage(threadId, newUserMessage.id, userText);
+      const history = await loadHistoryMessages(threadId);
+
+      const graph =
+        agent === "giveRecommendations"
+          ? buildRecommendationsGraph({
+              userId,
+              userRole,
+              assetData,
+              vulnerabilityData,
+            })
+          : buildChatGraph({ userId, userRole });
+
+      await streamGraphToUI({ graph, input: { messages: history }, writer });
       writer.write({ type: "finish" });
     },
     onError: (error) =>

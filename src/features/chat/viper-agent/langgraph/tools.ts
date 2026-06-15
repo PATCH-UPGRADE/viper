@@ -100,7 +100,11 @@ Do not save one-time queries or transient requests.`,
           .optional()
           .describe("Memories to update."),
         deletions: z
-          .array(z.object({ id: z.string().describe("ID of the memory to delete.") }))
+          .array(
+            z.object({
+              id: z.string().describe("ID of the memory to delete."),
+            }),
+          )
           .optional()
           .describe("Memories to delete."),
       }),

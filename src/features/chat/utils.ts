@@ -335,4 +335,3 @@ export const RECOMMENDATION_ROLE_INSTRUCTIONS: Record<UserRole, string> = {
   "biomedical engineer":
     "Focus on the device layer: firmware version, manufacturer patch advisory, device certification impact, required post-patch biomedical validation steps, and any interoperability risks with connected systems. Reference device model and CPE.",
 };
-

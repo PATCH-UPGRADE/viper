@@ -8,12 +8,10 @@ import {
   createUIMessageStreamResponse,
   type UIMessage,
 } from "ai";
-import { getSession } from "@/lib/auth-utils";
 import type { AssetWithIssueRelations } from "@/features/assets/types";
-import { type UserRole, USER_ROLES } from "@/features/chat/utils";
+import { USER_ROLES, type UserRole } from "@/features/chat/utils";
+import { generateThreadTitle } from "@/features/chat/viper-agent/generate-thread-title";
 import { buildChatGraph } from "@/features/chat/viper-agent/langgraph/chat-graph";
-import { buildRecommendationsGraph } from "@/features/chat/viper-agent/langgraph/recommendations-graph";
-import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
 import {
   ensureThread,
   loadHistoryMessages,
@@ -21,8 +19,10 @@ import {
   saveUserMessage,
   userMessageCount,
 } from "@/features/chat/viper-agent/langgraph/history";
+import { buildRecommendationsGraph } from "@/features/chat/viper-agent/langgraph/recommendations-graph";
 import { streamGraphToUI } from "@/features/chat/viper-agent/langgraph/stream-bridge";
-import { generateThreadTitle } from "@/features/chat/viper-agent/generate-thread-title";
+import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
+import { getSession } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -102,7 +102,8 @@ export async function POST(req: Request) {
       });
       writer.write({ type: "finish" });
     },
-    onError: (error) => (error instanceof Error ? error.message : String(error)),
+    onError: (error) =>
+      error instanceof Error ? error.message : String(error),
     onFinish: async ({ responseMessage }) => {
       const { content, toolCalls } = splitAssistant(responseMessage);
       if (content.trim() || toolCalls.length) {

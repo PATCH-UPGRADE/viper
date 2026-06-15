@@ -150,7 +150,8 @@ export async function streamGraphToUI({
         closeText();
         const out = ev.data?.output as AIMessage | undefined;
         if (out?.tool_calls?.length) {
-          for (const chunk of aiMessageToToolInputChunks(out)) writer.write(chunk);
+          for (const chunk of aiMessageToToolInputChunks(out))
+            writer.write(chunk);
         }
         break;
       }

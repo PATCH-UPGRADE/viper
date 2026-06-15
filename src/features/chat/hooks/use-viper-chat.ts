@@ -23,8 +23,15 @@ export function useViperChat(config?: UseChatAgentConfig) {
     () => new DefaultChatTransport({ api: "/api/chat" }),
     [],
   );
-  const { messages, sendMessage, status, error, stop, setMessages, clearError } =
-    useChat({ transport });
+  const {
+    messages,
+    sendMessage,
+    status,
+    error,
+    stop,
+    setMessages,
+    clearError,
+  } = useChat({ transport });
 
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);

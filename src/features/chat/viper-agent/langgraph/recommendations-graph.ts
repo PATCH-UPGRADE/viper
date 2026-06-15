@@ -13,10 +13,10 @@ import { SystemMessage } from "@langchain/core/messages";
 import type { AssetWithIssueRelations } from "@/features/assets/types";
 import {
   ASSET_ROLE_INSTRUCTIONS,
+  assetToMarkdown,
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
   VULNERABILITY_ROLE_INSTRUCTIONS,
-  assetToMarkdown,
   vulnerabilityToMarkdown,
 } from "@/features/chat/utils";
 import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";

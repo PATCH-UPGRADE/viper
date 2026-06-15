@@ -59,7 +59,10 @@ import {
 import { UserAvatar } from "@/components/user-avatar";
 import { useChatUI } from "@/features/chat/context/chat-panel-context";
 import { useSuggestedQuestions } from "@/features/chat/context/suggested-questions-context";
-import { useViperChat, type ViperChat } from "@/features/chat/hooks/use-viper-chat";
+import {
+  useViperChat,
+  type ViperChat,
+} from "@/features/chat/hooks/use-viper-chat";
 import type { UseChatAgentConfig } from "@/features/chat/types";
 import { USER_ROLES, type UserRole } from "@/features/chat/utils";
 import { authClient } from "@/lib/auth-client";
@@ -191,7 +194,13 @@ function ChatMessagesSkeletonList() {
   );
 }
 
-function ReasoningBlock({ text, streaming }: { text: string; streaming: boolean }) {
+function ReasoningBlock({
+  text,
+  streaming,
+}: {
+  text: string;
+  streaming: boolean;
+}) {
   const [open, setOpen] = useState(false);
   // Auto-expand while the model is actively thinking; let the user collapse after.
   useEffect(() => {
@@ -562,13 +571,7 @@ function ChatStatusIndicator({
   );
 }
 
-function ChatError({
-  error,
-  onClear,
-}: {
-  error: Error;
-  onClear: () => void;
-}) {
+function ChatError({ error, onClear }: { error: Error; onClear: () => void }) {
   return (
     <div className="px-4 pb-2">
       <Alert variant="destructive">
@@ -786,7 +789,6 @@ function ChatInner({
     refreshThreads,
     isLoadingHistory,
   } = useViperChat(config);
-  const { userRole } = useChatUI();
 
   const [input, setInput] = useState("");
   const [configOverride, setConfigOverride] =

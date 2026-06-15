@@ -6,12 +6,12 @@
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { SystemMessage } from "@langchain/core/messages";
-import prisma from "@/lib/db";
 import {
+  generateMemoryMarkdown,
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
-  generateMemoryMarkdown,
 } from "@/features/chat/utils";
+import prisma from "@/lib/db";
 import { buildAgentGraph } from "./build-graph";
 import { buildChatTools } from "./tools";
 

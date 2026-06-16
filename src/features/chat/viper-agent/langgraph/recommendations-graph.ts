@@ -1,11 +1,10 @@
 /**
  * Viper Recommendations Advisor (Opus + extended thinking) as a LangGraph
- * graph — replaces the AgentKit createGiveRecommendationsAgent.
+ * graph
  *
  * The full environment context (assets, vulns, remediations, workflows, network
- * flow, utilization, memories) is preloaded DETERMINISTICALLY (replaces the
- * get_recommendations_context tool + "call it once at the start" rule). This
- * also keeps extended thinking alive across the run (see SPIKE FINDING).
+ * flow, utilization, memories) is preloaded DETERMINISTICALLY (not via a model
+ * tool call), which keeps extended thinking alive across the run.
  */
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";

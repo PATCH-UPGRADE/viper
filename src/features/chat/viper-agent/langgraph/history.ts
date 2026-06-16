@@ -1,14 +1,18 @@
 /**
- * Prisma-backed conversation history for the LangGraph chat path. Replaces the
- * @inngest/agent-kit HistoryConfig adapter (history-adapter.ts).
+ * Prisma-backed conversation history for the LangGraph chat path.
  *
  * Hydration is TEXT-ONLY by design: we feed prior USER/ASSISTANT text back to
  * the model but NOT reconstructed tool_call/ToolMessage pairs. Anthropic rejects
  * an assistant tool_use turn that isn't immediately followed by matching
- * tool_result blocks, so reconstructing partial/cross-format (old AgentKit) tool
+ * tool_result blocks, so reconstructing partial/cross-format tool
  * history is fragile. The assistant's text already summarizes tool outcomes, so
  * text-only hydration is both safe and sufficient. `toolCalls` is still
  * persisted for the UI to render.
+ *
+ * Access model (INTENTIONAL — do not "harden"): these functions key off the
+ * client-supplied `threadId` and are NOT scoped to `userId` — `ensureThread`
+ * upserts by id alone, and `loadHistoryMessages`/`saveUserMessage` trust the
+ * threadId as given.
  */
 import "server-only";
 import {
@@ -24,6 +28,8 @@ export async function ensureThread(
   userId: string,
   firstUserContent: string,
 ): Promise<void> {
+  // Keyed by threadId only, no userId scope — intentional (see access-model
+  // note in the file header).
   await prisma.chatThread.upsert({
     where: { id: threadId },
     update: { updatedAt: new Date() },

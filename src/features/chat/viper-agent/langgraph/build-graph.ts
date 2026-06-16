@@ -5,11 +5,11 @@
  *
  * - preload: loads mandatory context (memories, or full recommendations
  *   context) and injects it as a user-role message. Deterministic — NOT a
- *   forced model tool call — so extended thinking survives (see SPIKE FINDING
- *   in the migration notes) and the context is guaranteed loaded once per run.
+ *   forced model tool call — so extended thinking survives
+ *   and the context is guaranteed loaded once per run.
  * - agent: the model (with tools bound), prepended with the system message.
  * - tools: ToolNode; if ask_user_questions was called, END so the user can
- *   reply (human-in-the-loop), replacing the old hand-rolled network router.
+ *   reply (human-in-the-loop).
  */
 import "server-only";
 import {

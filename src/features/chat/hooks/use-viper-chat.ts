@@ -1,10 +1,5 @@
 "use client";
 
-/**
- * Thread-aware chat hook for the LangGraph chat route (/api/chat), built on
- * `@ai-sdk/react` useChat (single conversation) + tRPC for the thread list and
- * history. Replaces the @inngest/use-agent multi-thread hook (use-chat.ts).
- */
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport } from "ai";

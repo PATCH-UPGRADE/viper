@@ -123,7 +123,7 @@ interface AskUserQuestion {
   suggested_answers: string[];
 }
 
-// ─── Presentational pieces (unchanged structurally) ───────────────────────────
+// ─── Presentational pieces ───────────────────────────
 
 function EmptyState({
   isDisabled,

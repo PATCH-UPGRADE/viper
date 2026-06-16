@@ -1,8 +1,3 @@
-/**
- * Production streaming chat route (LangGraph + AI SDK UI), replacing the
- * Inngest fire-and-forget chat path. Holds the connection for the agent run and
- * streams token + reasoning + tool deltas back to `useChat`.
- */
 import {
   createUIMessageStream,
   createUIMessageStreamResponse,

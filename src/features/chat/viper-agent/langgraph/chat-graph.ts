@@ -1,8 +1,3 @@
-/**
- * Viper Chat agent (Haiku) as a LangGraph graph — replaces the AgentKit
- * createAgent + createNetwork. Memories are preloaded deterministically
- * (replaces the read_memories tool + "always call it first" prompt rule).
- */
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { SystemMessage } from "@langchain/core/messages";

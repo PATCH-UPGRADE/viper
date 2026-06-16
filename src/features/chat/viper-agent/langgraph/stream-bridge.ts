@@ -11,8 +11,6 @@
  * nested on_tool_end event (~33% observed), but the ToolMessage always lands in
  * a node's chain output. We dedupe by tool_call_id since the same ToolMessage
  * appears in both the tools-node and root-graph chain_end.
- *
- * Validated end-to-end in the Phase 0 spike (token + thinking + tool streaming).
  */
 import "server-only";
 import type { AIMessage, ToolMessage } from "@langchain/core/messages";

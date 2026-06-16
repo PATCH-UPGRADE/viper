@@ -1,10 +1,6 @@
 /**
- * LangChain ports of the Viper chat tools (was @inngest/agent-kit createTool).
- *
  * `read_memories` is NOT a model tool here — memories are preloaded
- * deterministically by the graph's loadMemories node (see chat-graph.ts and the
- * Phase 0 SPIKE FINDING: deterministic context is more reliable than a forced/
- * prompt-begged first tool call, and avoids killing extended thinking).
+ * deterministically by the graph's loadMemories node
  *
  * Tools are built per-request via a factory so they close over the userId
  * instead of threading it through LangGraph config.
@@ -53,7 +49,7 @@ const askUserQuestions = tool(
   },
 );
 
-/** Schedule memory create/update/delete via the existing Inngest function. */
+/** Schedule memory create/update/delete via the manageMemoriesFn Inngest function. */
 function makeManageMemoriesTool(userId: string) {
   return tool(
     async ({ creations, updates, deletions }) => {
@@ -68,8 +64,8 @@ function makeManageMemoriesTool(userId: string) {
 
       if (operations.length === 0) return "No operations to perform.";
 
-      // Outside AgentKit's step context we publish the event directly; the
-      // existing manageMemoriesFn Inngest function processes it unchanged.
+      // Publish the event; the manageMemoriesFn Inngest function persists the
+      // memory operations.
       await inngest.send({
         name: "app/memories.manage",
         data: { userId, operations },

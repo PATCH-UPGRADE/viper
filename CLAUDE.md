@@ -67,6 +67,7 @@ npm run format
 - **State Management**: Jotai (global), TanStack Query (server), nuqs (URL)
 - **Visual Editor**: XYFlow React 12.8.6
 - **UI**: Radix UI + Tailwind CSS 4 + shadcn/ui (New York style)
+- **AI / Chat**: LangGraph + LangChain (`ChatAnthropic`) for the chat & recommendations agents, streamed to the client via Vercel AI SDK UI (`useChat`)
 - **AI Providers**: Vercel AI SDK with Anthropic, OpenAI, Google
 - **Code Quality**: Biome 2.2.0 (replaces ESLint/Prettier)
 - **Observability**: Sentry
@@ -267,10 +268,13 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
 
 ### Background Jobs (Inngest)
 
-**Setup** (`src/inngest/functions.ts`):
+Inngest runs the durable/background work: integration syncs (cron + event-driven),
+nightly vulnerability enrichment (EPSS / KEV), chat memory persistence, and
+expired-token cleanup. The AI chat does **not** run in Inngest — see "AI Chat" below.
+
+**Setup** (`src/inngest/functions/`):
 
 - Functions defined with `inngest.createFunction()`
-- Use `step.ai.wrap()` for AI SDK telemetry
 - Use `step.sleep()` for delays
 - Automatic retry and observability built-in
 
@@ -279,11 +283,28 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
 ```typescript
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [execute],
+  functions: [
+    syncAllIntegrations,
+    syncIntegration,
+    enrichVulnerability,
+    enrichAllVulnerabilities,
+    manageMemoriesFn,
+    purgeExpiredTokensFn,
+  ],
 });
 ```
 
 **Development**: Run `npm run inngest:dev` (or `npm run dev:all`) to start the Inngest dev server
+
+### AI Chat (LangGraph + AI SDK UI)
+
+The chat and recommendations agents run as a **streaming Next.js route**
+(`src/app/api/chat/route.ts`) — not as Inngest jobs:
+
+- **LangGraph** orchestrates each agent graph in `src/features/chat/viper-agent/langgraph/` (`buildAgentGraph`: deterministic context preload → model ↔ tools, with an `ask_user_questions` human-in-the-loop stop).
+- Models are **LangChain `ChatAnthropic`** — Haiku for the chat agent, Opus + extended thinking for the recommendations agent.
+- The route streams token + reasoning + tool deltas to the client via **Vercel AI SDK UI** (`useChat` in `src/features/chat/hooks/use-viper-chat.ts`); `langgraph/stream-bridge.ts` maps LangGraph `streamEvents` onto the AI SDK UI message stream.
+- Conversation history is persisted to Prisma (`ChatThread` / `ChatMessage`); the `manage_memories` tool dispatches to the `manageMemoriesFn` Inngest function.
 
 ## Database
 

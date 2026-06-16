@@ -372,8 +372,8 @@ function generateContextMarkdown(
 /**
  * Loads the full recommendations context (memories + assets + vulns +
  * remediations + workflows + network flow + utilization) as markdown.
- * Shared by the AgentKit tool below and the LangGraph recommendations graph
- * (which preloads it deterministically rather than as a model tool call).
+ * The recommendations graph preloads this deterministically (not as a model
+ * tool call).
  */
 export async function loadRecommendationsContextMarkdown(
   userId: string,

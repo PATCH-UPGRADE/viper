@@ -38,9 +38,9 @@ export const chatRouter = createTRPCRouter({
       };
     }),
 
-  // UIMessage-shaped history for the LangGraph chat (AI SDK `useChat`).
-  // Rebuilds messages from ChatMessage rows: text content + persisted tool
-  // UI parts. Old AgentKit-format toolCalls are skipped (render text-only).
+  // UIMessage-shaped history for the chat (AI SDK `useChat`). Rebuilds messages
+  // from ChatMessage rows: text content + persisted tool UI parts. Tool entries
+  // that aren't AI SDK-shaped are skipped (those rows render text-only).
   getUIMessages: protectedProcedure
     .input(z.object({ threadId: z.string() }))
     .query(async ({ input, ctx }) => {

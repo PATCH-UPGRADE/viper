@@ -773,8 +773,12 @@ async function seedAssets(userId: string) {
         return null;
       }
 
-      return prisma.asset.create({
-        data: {
+      return prisma.asset.upsert({
+        where: {
+          id: "id" in asset && asset.id ? asset.id : "-1",
+        },
+        update: {},
+        create: {
           ...("id" in asset && asset.id ? { id: asset.id } : {}),
           ip: asset.ip,
           networkSegment: asset.networkSegment,

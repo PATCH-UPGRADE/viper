@@ -95,3 +95,24 @@ export async function generateUploadUrl(
 export function buildDownloadUrl(key: string): string {
   return `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 }
+
+/**
+ * Server-side buffer upload to S3. Returns the public download URL.
+ * Use this for server-originated uploads (e.g. Inngest functions).
+ * For client-side uploads use generateUploadUrl() instead.
+ */
+export async function uploadBufferToS3(
+  buffer: Buffer,
+  key: string,
+  contentType: string,
+): Promise<string> {
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    }),
+  );
+  return buildDownloadUrl(key);
+}

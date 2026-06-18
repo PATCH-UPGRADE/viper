@@ -11,14 +11,6 @@ import {
 export const chatRouter = createTRPCRouter({
   getManyThreads: protectedProcedure
     .input(fetchThreadsSchema)
-    .meta({
-      openapi: {
-        method: "GET",
-        path: "/chat/threads",
-        tags: ["Chat"],
-        summary: "[Internal] Fetch Threads",
-      },
-    })
     .output(fetchThreadsResponseSchema)
     .query(async ({ input, ctx }) => {
       // get only a user's threads
@@ -77,14 +69,6 @@ export const chatRouter = createTRPCRouter({
 
   deleteThread: protectedProcedure
     .input(z.object({ threadId: z.string() }))
-    .meta({
-      openapi: {
-        method: "DELETE",
-        path: "/chat/threads/{threadId}",
-        tags: ["Chat"],
-        summary: "[Internal] Delete a conversation thread",
-      },
-    })
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ input, ctx }) => {
       const thread = await prisma.chatThread.findFirst({

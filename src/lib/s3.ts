@@ -25,7 +25,7 @@ export const s3Client = new S3Client({
  * Handler for hex MD5
  * S3 requires Base64 MD5 in Content-MD5 header
  */
-function normalizeMd5(hash: string): string {
+export function normalizeMd5(hash: string): string {
   const isHex = /^[0-9a-fA-F]{32}$/.test(hash);
   if (isHex) {
     return Buffer.from(hash, "hex").toString("base64");
@@ -112,6 +112,7 @@ export async function uploadBufferToS3(
   buffer: Buffer,
   key: string,
   contentType: string,
+  contentMd5?: string,
 ): Promise<string> {
   await s3Client.send(
     new PutObjectCommand({
@@ -119,6 +120,7 @@ export async function uploadBufferToS3(
       Key: key,
       Body: buffer,
       ContentType: contentType,
+      ...(contentMd5 && { ContentMD5: contentMd5 }),
     }),
   );
   return buildDownloadUrl(key);

@@ -905,6 +905,7 @@ model NotificationAttachment {
   createdAt DateTime @default(now())
 
   @@index([sourceId])
+  @@index([hash])
   @@map("notification_attachment")
 }
 

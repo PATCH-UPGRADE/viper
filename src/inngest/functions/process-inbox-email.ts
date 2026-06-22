@@ -10,7 +10,7 @@ import {
 } from "@/features/inbox/agent/relevance";
 import { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { uploadBufferToS3 } from "@/lib/s3";
+import { normalizeMd5, uploadBufferToS3 } from "@/lib/s3";
 import { inngest } from "../client";
 
 const turndown = new TurndownService();
@@ -55,7 +55,6 @@ export const processInboxEmail = inngest.createFunction(
     const uploadedAttachments = await step.run(
       "upload-attachments",
       async () => {
-        // TODO: Should probably search a sha hash to make sure we're not hosting a duplicate attachment
         if (!email.attachments?.length) return [];
 
         const { Resend } = await import("resend");
@@ -81,11 +80,30 @@ export const processInboxEmail = inngest.createFunction(
             }
 
             const buffer = Buffer.from(await res.arrayBuffer());
+            const { createHash } = await import("node:crypto");
+            const hashHex = createHash("md5").update(buffer).digest("hex");
+
+            const existing = await prisma.notificationAttachment.findFirst({
+              where: { hash: hashHex },
+              select: { downloadUrl: true },
+            });
+
+            if (existing?.downloadUrl) {
+              return {
+                filename: att.filename,
+                contentType: att.content_type,
+                downloadUrl: existing.downloadUrl,
+                size: buffer.length,
+                hash: hashHex,
+              };
+            }
+
             const key = `inbox/${emailId}/${crypto.randomUUID()}-${att.filename ?? att.id}`;
             const downloadUrl = await uploadBufferToS3(
               buffer,
               key,
               att.content_type ?? "application/octet-stream",
+              normalizeMd5(hashHex),
             );
 
             return {
@@ -93,6 +111,7 @@ export const processInboxEmail = inngest.createFunction(
               contentType: att.content_type,
               downloadUrl,
               size: buffer.length,
+              hash: hashHex,
             };
           }),
         ).then((results) => results.filter(Boolean));
@@ -129,6 +148,7 @@ export const processInboxEmail = inngest.createFunction(
                 contentType: a.contentType ?? null,
                 downloadUrl: a.downloadUrl,
                 size: a.size,
+                hash: a.hash ?? null,
               })),
             },
           },

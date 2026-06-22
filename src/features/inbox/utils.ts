@@ -17,7 +17,10 @@ export async function fetchPdfAttachments(
   const results = await Promise.all(
     attachments
       .filter(
-        (a) => a.contentType === "application/pdf" && a.downloadUrl !== null,
+        (a) =>
+          (a.contentType?.startsWith("application/pdf") ||
+            a.filename?.toLowerCase().endsWith(".pdf")) &&
+          a.downloadUrl !== null,
       )
       .map(async (a) => {
         try {

@@ -1,4 +1,5 @@
 import "server-only";
+import { Prisma } from "@/generated/prisma";
 import TurndownService from "turndown";
 import {
   checkEmailRelevance,
@@ -101,28 +102,46 @@ export const processInboxEmail = inngest.createFunction(
 
     // 5. Persist NotificationSource + NotificationAttachment
     const sourceId = await step.run("save-source", async () => {
-      const source = await prisma.notificationSource.create({
-        data: {
-          channel: "Email",
-          externalId: emailId,
-          raw,
-          markdown,
-          attachments: {
-            create: (
-              uploadedAttachments as NonNullable<
-                (typeof uploadedAttachments)[number]
-              >[]
-            ).map((a) => ({
-              filename: a.filename ?? null,
-              contentType: a.contentType ?? null,
-              downloadUrl: a.downloadUrl,
-              size: a.size,
-            })),
+      // DEV: uncomment to reset duplicate so you can replay the same email webhook
+      await prisma.notificationSource.deleteMany({ where: { externalId: emailId } });
+
+      try {
+        const source = await prisma.notificationSource.create({
+          data: {
+            channel: "Email",
+            externalId: emailId,
+            raw,
+            markdown,
+            attachments: {
+              create: (
+                uploadedAttachments as NonNullable<
+                  (typeof uploadedAttachments)[number]
+                >[]
+              ).map((a) => ({
+                filename: a.filename ?? null,
+                contentType: a.contentType ?? null,
+                downloadUrl: a.downloadUrl,
+                size: a.size,
+              })),
+            },
           },
-        },
-      });
-      return source.id;
+        });
+        return source.id;
+      } catch (e) {
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === "P2002"
+        ) {
+          console.log(
+            `NotificationSource already exists for emailId=${emailId}, skipping`,
+          );
+          return null;
+        }
+        throw e;
+      }
     });
+
+    if (!sourceId) return { skipped: true, reason: "duplicate", emailId };
 
     return { sourceId, emailId };
   },

@@ -1,5 +1,5 @@
 import "server-only";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { z } from "zod";
 import type { artifactInputSchema } from "@/features/artifacts/types";
@@ -101,6 +101,27 @@ export function buildDownloadUrl(key: string): string {
     return `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET_NAME}/${key}`;
   }
   return `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+}
+
+/** Reverse of buildDownloadUrl — extracts the S3 object key from a stored download URL. */
+export function keyFromDownloadUrl(url: string): string {
+  const endpoint = process.env.S3_ENDPOINT;
+  const bucket = process.env.S3_BUCKET_NAME!;
+  if (endpoint) {
+    const prefix = `${endpoint}/${bucket}/`;
+    return url.startsWith(prefix) ? url.slice(prefix.length) : url;
+  }
+  const prefix = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/`;
+  return url.startsWith(prefix) ? url.slice(prefix.length) : url;
+}
+
+/** Authenticated S3 download — works with private buckets (MinIO and AWS). */
+export async function downloadBufferFromS3(key: string): Promise<Buffer> {
+  const { Body } = await s3Client.send(
+    new GetObjectCommand({ Bucket: process.env.S3_BUCKET_NAME!, Key: key }),
+  );
+  if (!Body) throw new Error(`Empty S3 response for key: ${key}`);
+  return Buffer.from(await Body.transformToByteArray());
 }
 
 /**

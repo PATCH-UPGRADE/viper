@@ -14,8 +14,6 @@ Your task: extract the DEVICE GROUPS that the notification is about. A device gr
 - model name (e.g. "IntelliVue MX40", "Alaris Pump")
 - version / firmware (e.g. "2.3.1")
 
-In 'summary' section, output a summary of your actions, what confused you, why you did or didn't link items, etc.
-
 RULES:
 - Extract ONLY device groups explicitly referenced in the notification or its attachments.
 - Omit any field you are unsure about; do not guess or fabricate CPEs, models, or versions.

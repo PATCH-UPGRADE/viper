@@ -1,5 +1,6 @@
 import "server-only";
 import prisma from "@/lib/db";
+import { downloadBufferFromS3, keyFromDownloadUrl } from "@/lib/s3";
 
 /**
  * Fetch all PDF attachments for a NotificationSource and return them as
@@ -24,11 +25,11 @@ export async function fetchPdfAttachments(
       )
       .map(async (a) => {
         try {
-          const res = await fetch(a.downloadUrl!);
-          if (!res.ok) return null;
-          const buffer = Buffer.from(await res.arrayBuffer());
+          const key = keyFromDownloadUrl(a.downloadUrl!);
+          const buffer = await downloadBufferFromS3(key);
           return { filename: a.filename, base64: buffer.toString("base64") };
-        } catch {
+        } catch (err) {
+          console.warn(`Failed to download attachment for source ${sourceId}:`, err);
           return null;
         }
       }),

@@ -18,6 +18,8 @@ export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 // with no usable identifier.
 // TODO: add new fields like UDI after VW-283 gets merged in
 // TODO: add new fields like versionRange after VW-283 gets merged in (used to link individual assets?)
+// vers schema, if we provide that + maybe a skill to use it if necessary, has a way to provide multiple OR versions
+//  https://www.packageurl.org/docs/vers/schemas
 // TODO: if we can find more data, add something like serialRange
 // TODO: What about more unique ID's for specific vendors? e.g, Siemens has material number as a unique device group code
 export const extractedDeviceGroupSchema = z.object({
@@ -31,7 +33,6 @@ export const extractedDeviceGroupSchema = z.object({
 // and remediations
 export const extractSchema = z.object({
   deviceGroups: z.array(extractedDeviceGroupSchema),
-  summary: z.string(),
 });
 
 export type ExtractedDeviceGroup = z.infer<typeof extractedDeviceGroupSchema>;

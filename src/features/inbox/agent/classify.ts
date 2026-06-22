@@ -4,6 +4,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import { z } from "zod";
 import prisma from "@/lib/db";
 import { notificationPayloadSchema } from "../types";
+import { fetchPdfAttachments } from "../utils";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -14,11 +15,15 @@ const classifySchema = notificationPayloadSchema.extend({
   notificationId: z
     .string()
     .optional()
-    .describe("Required when action is 'update': id of the existing notification to link to"),
+    .describe(
+      "Required when action is 'update': id of the existing notification to link to",
+    ),
   reasonWhy: z
     .string()
     .optional()
-    .describe("Required when action is 'update': why this email was matched to the existing notification"),
+    .describe(
+      "Required when action is 'update': why this email was matched to the existing notification",
+    ),
 });
 
 type ClassifyResult = z.infer<typeof classifySchema>;
@@ -77,34 +82,6 @@ ${input.markdown}
 
 --- EXISTING NOTIFICATIONS ---
 ${existing}`;
-}
-
-async function fetchPdfAttachments(
-  sourceId: string,
-): Promise<Array<{ filename: string | null; base64: string }>> {
-  const attachments = await prisma.notificationAttachment.findMany({
-    where: { sourceId },
-    select: { downloadUrl: true, contentType: true, filename: true },
-  });
-
-  const results = await Promise.all(
-    attachments
-      .filter(
-        (a) => a.contentType === "application/pdf" && a.downloadUrl !== null,
-      )
-      .map(async (a) => {
-        try {
-          const res = await fetch(a.downloadUrl!);
-          if (!res.ok) return null;
-          const buffer = Buffer.from(await res.arrayBuffer());
-          return { filename: a.filename, base64: buffer.toString("base64") };
-        } catch {
-          return null;
-        }
-      }),
-  );
-
-  return results.filter((a) => a !== null);
 }
 
 export async function classifyNotification(

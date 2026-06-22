@@ -1,6 +1,9 @@
 import "server-only";
 import TurndownService from "turndown";
+import { searchCandidates } from "@/features/inbox/agent/candidate-search";
 import { classifyNotification } from "@/features/inbox/agent/classify";
+import { extractEntities } from "@/features/inbox/agent/extract";
+import { matchAndLinkEntities } from "@/features/inbox/agent/match";
 import {
   checkEmailRelevance,
   stripHtml,
@@ -188,6 +191,24 @@ export const processInboxEmail = inngest.createFunction(
       return notification.id;
     });
 
-    return { sourceId, notificationId, emailId };
+    // 7. Extract entities (device groups) referenced in the notification
+    const extracted = await step.run("extract-entities", () =>
+      extractEntities(sourceId, {
+        from: email.from,
+        subject: email.subject,
+        markdown: markdown ?? "",
+      }),
+    );
+
+    // 8. Fuzzy-search the DB for matches and link/update/create them
+    const linkSummary = await step.run("match-and-link-entities", async () => {
+      if (!notificationId || extracted.deviceGroups.length === 0) {
+        return { linked: 0, updated: 0, created: 0, skipped: 0 };
+      }
+      const candidates = await searchCandidates(extracted);
+      return matchAndLinkEntities(notificationId, extracted, candidates);
+    });
+
+    return { sourceId, notificationId, emailId, linkSummary };
   },
 );

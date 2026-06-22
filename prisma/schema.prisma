@@ -835,8 +835,9 @@ enum NotificationChannel {
 }
 
 enum ConfidenceLevel {
-  Confirmed
-  Guess
+  NeedsReview // An LLM matched this but with low confidence
+  Matched // An LLM matched this with high confidence
+  Confirmed // A human confirmed this match was correct
 }
 
 enum NotificationSourceType {
@@ -877,7 +878,7 @@ model NotificationSource {
   reasonWhy String? @db.Text // why was this email linked to this notification?
 
   channel      NotificationChannel
-  externalId   String?
+  externalId   String? // for an email, this is the resend email id
   referenceUrl String?
   raw          Json
   markdown     String?              @db.Text

@@ -3,8 +3,8 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
 import type { ConfidenceLevel } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import type { ExtractResult } from "./extract";
 import type { Candidates } from "./candidate-search";
+import type { ExtractResult } from "./extract";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -18,8 +18,7 @@ const deviceGroupFieldsSchema = z.object({
 });
 
 const decisionSchema = z.object({
-  // Single-value enum now; widens as more entity kinds are added.
-  kind: z.enum(["deviceGroup"]),
+  kind: z.enum(["deviceGroup"]), // TODO: add vulnerability, remediation, maybe asset...
   op: z.enum(["link", "update", "create"]),
   // The id of an existing candidate to link/update. Omitted for create.
   targetId: z.string().nullish(),

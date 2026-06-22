@@ -5,7 +5,10 @@ CREATE TYPE "NotificationType" AS ENUM ('Advisory', 'Recall', 'UpdateAvailable',
 CREATE TYPE "NotificationChannel" AS ENUM ('Email', 'PolledApi', 'Crawl');
 
 -- CreateEnum
-CREATE TYPE "ConfidenceLevel" AS ENUM ('High', 'Medium', 'Low');
+CREATE TYPE "ConfidenceLevel" AS ENUM ('NeedsReview', 'Matched', 'Confirmed');
+
+-- CreateEnum
+CREATE TYPE "NotificationSourceType" AS ENUM ('Source', 'Link');
 
 -- CreateTable
 CREATE TABLE "notification" (
@@ -25,6 +28,8 @@ CREATE TABLE "notification" (
 CREATE TABLE "notification_source" (
     "id" TEXT NOT NULL,
     "notificationId" TEXT,
+    "sourceType" "NotificationSourceType" NOT NULL DEFAULT 'Source',
+    "reasonWhy" TEXT,
     "channel" "NotificationChannel" NOT NULL,
     "externalId" TEXT,
     "referenceUrl" TEXT,
@@ -65,6 +70,7 @@ CREATE TABLE "notification_asset_mapping" (
     "notificationId" TEXT NOT NULL,
     "assetId" TEXT NOT NULL,
     "confidence" "ConfidenceLevel",
+    "reasonWhy" TEXT,
 
     CONSTRAINT "notification_asset_mapping_pkey" PRIMARY KEY ("id")
 );
@@ -75,6 +81,7 @@ CREATE TABLE "notification_device_group_mapping" (
     "notificationId" TEXT NOT NULL,
     "deviceGroupId" TEXT NOT NULL,
     "confidence" "ConfidenceLevel",
+    "reasonWhy" TEXT,
 
     CONSTRAINT "notification_device_group_mapping_pkey" PRIMARY KEY ("id")
 );
@@ -85,6 +92,7 @@ CREATE TABLE "notification_vulnerability_mapping" (
     "notificationId" TEXT NOT NULL,
     "vulnerabilityId" TEXT NOT NULL,
     "confidence" "ConfidenceLevel",
+    "reasonWhy" TEXT,
 
     CONSTRAINT "notification_vulnerability_mapping_pkey" PRIMARY KEY ("id")
 );
@@ -95,6 +103,7 @@ CREATE TABLE "notification_remediation_mapping" (
     "notificationId" TEXT NOT NULL,
     "remediationId" TEXT NOT NULL,
     "confidence" "ConfidenceLevel",
+    "reasonWhy" TEXT,
 
     CONSTRAINT "notification_remediation_mapping_pkey" PRIMARY KEY ("id")
 );
@@ -110,6 +119,9 @@ CREATE UNIQUE INDEX "notification_source_channel_externalId_key" ON "notificatio
 
 -- CreateIndex
 CREATE INDEX "notification_attachment_sourceId_idx" ON "notification_attachment"("sourceId");
+
+-- CreateIndex
+CREATE INDEX "notification_attachment_hash_idx" ON "notification_attachment"("hash");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "notification_read_notificationId_userId_key" ON "notification_read"("notificationId", "userId");

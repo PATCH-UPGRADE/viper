@@ -21,8 +21,7 @@ export type Candidates = {
   }>;
 };
 
-// Identifier-keyed fuzzy search: reuses the same `contains`/insensitive pattern
-// as the device-groups router. Returns top-K candidates per extracted entity.
+// Returns top-K candidates per extracted entity.
 async function searchDeviceGroup(
   extracted: ExtractedDeviceGroup,
 ): Promise<DeviceGroupCandidate[]> {

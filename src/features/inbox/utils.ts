@@ -29,7 +29,10 @@ export async function fetchPdfAttachments(
           const buffer = await downloadBufferFromS3(key);
           return { filename: a.filename, base64: buffer.toString("base64") };
         } catch (err) {
-          console.warn(`Failed to download attachment for source ${sourceId}:`, err);
+          console.warn(
+            `Failed to download attachment for source ${sourceId}:`,
+            err,
+          );
           return null;
         }
       }),

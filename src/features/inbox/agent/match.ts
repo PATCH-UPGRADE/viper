@@ -3,8 +3,8 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
 import type { ConfidenceLevel } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import type { ExtractResult } from "./extract";
 import type { Candidates } from "./candidate-search";
-import { ExtractResult } from "../types";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -30,7 +30,7 @@ const decisionSchema = z.object({
 });
 
 const matchSchema = z.object({
-  decisions: z.array(decisionSchema),
+  decisions: z.array(decisionSchema).default([]),
 });
 
 export type Decision = z.infer<typeof decisionSchema>;
@@ -100,7 +100,7 @@ export async function matchAndLinkEntities(
   extracted: ExtractResult,
   candidates: Candidates,
 ): Promise<MatchSummary> {
-  if (extracted.deviceGroups.length === 0) {
+  if (Object.values(extracted).every((v) => v.length === 0)) {
     return { linked: 0, updated: 0, created: 0, skipped: 0 };
   }
 
@@ -109,7 +109,7 @@ export async function matchAndLinkEntities(
     maxTokens: 2048,
   }).withStructuredOutput(matchSchema);
 
-  const { decisions } = await model.invoke([
+  const { decisions = [] } = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: renderCandidates(candidates) },
   ]);
@@ -168,6 +168,7 @@ export async function applyDecisions(
           update: { confidence, reasonWhy: decision.reasonWhy },
         });
 
+      // link the device group to the notification
       if (decision.op === "link") {
         if (!decision.targetId || !validIds.has(decision.targetId)) {
           summary.skipped++;
@@ -175,7 +176,10 @@ export async function applyDecisions(
         }
         await upsertMapping(decision.targetId);
         summary.linked++;
-      } else if (decision.op === "update") {
+      }
+      // update the device group and link it to the notification
+      // TODO: consider, we may want to separate this into 'update' and 'update_and_link' actions
+      else if (decision.op === "update") {
         if (!decision.targetId || !validIds.has(decision.targetId)) {
           summary.skipped++;
           continue;

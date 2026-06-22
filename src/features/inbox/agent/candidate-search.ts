@@ -1,7 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { ExtractedDeviceGroup, ExtractResult } from "../types";
+import type { ExtractedDeviceGroup, ExtractResult } from "./extract";
 
 const TOP_K = 5;
 

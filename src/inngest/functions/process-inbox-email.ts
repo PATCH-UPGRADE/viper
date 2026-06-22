@@ -127,9 +127,9 @@ export const processInboxEmail = inngest.createFunction(
     // 5. Persist NotificationSource + NotificationAttachment
     const sourceId = await step.run("save-source", async () => {
       // DEV: uncomment to reset duplicate so you can replay the same email webhook
-      await prisma.notificationSource.deleteMany({
-        where: { externalId: emailId },
-      });
+      //await prisma.notificationSource.deleteMany({
+      //  where: { externalId: emailId },
+      //});
 
       try {
         const source = await prisma.notificationSource.create({
@@ -222,7 +222,10 @@ export const processInboxEmail = inngest.createFunction(
 
     // 8. Fuzzy-search the DB for matches and link/update/create them
     const linkSummary = await step.run("match-and-link-entities", async () => {
-      if (!notificationId || extracted.deviceGroups.length === 0) {
+      if (
+        !notificationId ||
+        Object.values(extracted).every((v) => v.length === 0)
+      ) {
         return { linked: 0, updated: 0, created: 0, skipped: 0 };
       }
       const candidates = await searchCandidates(extracted);

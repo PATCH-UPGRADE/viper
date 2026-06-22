@@ -836,9 +836,8 @@ enum NotificationChannel {
 }
 
 enum ConfidenceLevel {
-  High
-  Medium
-  Low
+  Confirmed
+  Guess
 }
 
 model Notification {
@@ -918,6 +917,7 @@ model NotificationAssetMapping {
   assetId        String
   asset          Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
   confidence     ConfidenceLevel?
+  reasonWhy String?
 
   @@unique([notificationId, assetId])
   @@map("notification_asset_mapping")
@@ -930,6 +930,7 @@ model NotificationDeviceGroupMapping {
   deviceGroupId  String
   deviceGroup    DeviceGroup     @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
   confidence     ConfidenceLevel?
+  reasonWhy String?
 
   @@unique([notificationId, deviceGroupId])
   @@map("notification_device_group_mapping")
@@ -942,6 +943,7 @@ model NotificationVulnerabilityMapping {
   vulnerabilityId String
   vulnerability   Vulnerability   @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
   confidence      ConfidenceLevel?
+  reasonWhy String?
 
   @@unique([notificationId, vulnerabilityId])
   @@map("notification_vulnerability_mapping")
@@ -954,6 +956,7 @@ model NotificationRemediationMapping {
   remediationId  String
   remediation    Remediation     @relation(fields: [remediationId], references: [id], onDelete: Cascade)
   confidence     ConfidenceLevel?
+  reasonWhy String?
 
   @@unique([notificationId, remediationId])
   @@map("notification_remediation_mapping")

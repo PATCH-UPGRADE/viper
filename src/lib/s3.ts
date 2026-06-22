@@ -10,11 +10,15 @@ type ArtifactInput = z.infer<typeof artifactInputSchema>;
  * Central S3 client used across Viper
  */
 export const s3Client = new S3Client({
-  region: process.env.AWS_REGION,
+  region: process.env.AWS_REGION ?? "us-east-1",
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
+  ...(process.env.S3_ENDPOINT && {
+    endpoint: process.env.S3_ENDPOINT,
+    forcePathStyle: true,
+  }),
 });
 
 /**
@@ -93,6 +97,9 @@ export async function generateUploadUrl(
  * Builds an S3 download URL for a given artifact
  */
 export function buildDownloadUrl(key: string): string {
+  if (process.env.S3_ENDPOINT) {
+    return `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET_NAME}/${key}`;
+  }
   return `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 }
 

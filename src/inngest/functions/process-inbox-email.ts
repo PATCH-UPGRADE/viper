@@ -1,10 +1,11 @@
 import "server-only";
-import { Prisma } from "@/generated/prisma";
 import TurndownService from "turndown";
+import { classifyNotification } from "@/features/inbox/agent/classify";
 import {
   checkEmailRelevance,
   stripHtml,
 } from "@/features/inbox/agent/relevance";
+import { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { uploadBufferToS3 } from "@/lib/s3";
 import { inngest } from "../client";
@@ -51,6 +52,7 @@ export const processInboxEmail = inngest.createFunction(
     const uploadedAttachments = await step.run(
       "upload-attachments",
       async () => {
+        // TODO: Should probably search a sha hash to make sure we're not hosting a duplicate attachment
         if (!email.attachments?.length) return [];
 
         const { Resend } = await import("resend");
@@ -103,7 +105,9 @@ export const processInboxEmail = inngest.createFunction(
     // 5. Persist NotificationSource + NotificationAttachment
     const sourceId = await step.run("save-source", async () => {
       // DEV: uncomment to reset duplicate so you can replay the same email webhook
-      await prisma.notificationSource.deleteMany({ where: { externalId: emailId } });
+      await prisma.notificationSource.deleteMany({
+        where: { externalId: emailId },
+      });
 
       try {
         const source = await prisma.notificationSource.create({
@@ -143,6 +147,47 @@ export const processInboxEmail = inngest.createFunction(
 
     if (!sourceId) return { skipped: true, reason: "duplicate", emailId };
 
-    return { sourceId, emailId };
+    // 6. Classify email and upsert Notification
+    const notificationId = await step.run("classify-notification", async () => {
+      const result = await classifyNotification(sourceId, {
+        from: email.from,
+        subject: email.subject,
+        markdown: markdown ?? "",
+      });
+
+      if (result.action === "update") {
+        await prisma.$transaction(async (tx) => {
+          await tx.notification.update({
+            where: { id: result.notificationId },
+            data: {
+              type: result.type,
+              title: result.title,
+              summary: result.summary,
+              ...(result.tlp !== null ? { tlp: result.tlp } : {}),
+              sources: { connect: { id: sourceId } },
+            },
+          });
+
+          await tx.notificationSource.update({
+            where: { id: sourceId },
+            data: { sourceType: "Link", reasonWhy: result.reasonWhy },
+          });
+        });
+        return result.notificationId;
+      }
+
+      const notification = await prisma.notification.create({
+        data: {
+          type: result.type,
+          title: result.title,
+          summary: result.summary,
+          ...(result.tlp !== null ? { tlp: result.tlp } : {}),
+          sources: { connect: { id: sourceId } },
+        },
+      });
+      return notification.id;
+    });
+
+    return { sourceId, notificationId, emailId };
   },
 );

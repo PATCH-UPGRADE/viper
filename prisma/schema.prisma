@@ -12,7 +12,6 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DATABASE_DIRECT_URL")
 }
 
 model User {
@@ -840,6 +839,13 @@ enum ConfidenceLevel {
   Guess
 }
 
+enum NotificationSourceType {
+  // Source: the notification was created as a result of this email
+  Source
+  // Link: the notification already existed, and was linked to this email
+  Link
+}
+
 model Notification {
   id      String           @id @default(cuid())
   type    NotificationType
@@ -866,6 +872,9 @@ model NotificationSource {
   id             String               @id @default(cuid())
   notificationId String?
   notification   Notification?        @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  sourceType NotificationSourceType @default(Source)
+  reasonWhy String? @db.Text // why was this email linked to this notification?
 
   channel      NotificationChannel
   externalId   String?

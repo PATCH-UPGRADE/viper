@@ -15,6 +15,7 @@ import {
 import {
   cpeToDeviceGroup,
   fetchPaginated,
+  findVulnerabilitiesMatchingDeviceGroups,
   processIntegrationSync,
   processIntegrationToken,
 } from "@/lib/router-utils";
@@ -46,9 +47,20 @@ const createSearchFilter = (search: string) => {
           { role: { contains: search, mode: "insensitive" as const } },
           {
             deviceGroup: {
-              cpe: {
-                contains: search,
-                mode: "insensitive" as const,
+              vendor: { contains: search, mode: "insensitive" as const },
+            },
+          },
+          {
+            deviceGroup: {
+              product: { contains: search, mode: "insensitive" as const },
+            },
+          },
+          {
+            deviceGroup: {
+              cpes: {
+                some: {
+                  cpe: { contains: search, mode: "insensitive" as const },
+                },
               },
             },
           },
@@ -344,8 +356,9 @@ export const assetsRouter = createTRPCRouter({
       const where = {
         OR: [
           ...(assetIds?.length ? [{ id: { in: assetIds } }] : []),
-          ...(cpes?.length ? [{ deviceGroup: { cpe: { in: cpes } } }] : []),
-          // TODO:: ^this needs to be a pattern match, not just "in"
+          ...(cpes?.length
+            ? [{ deviceGroup: { cpes: { some: { cpe: { in: cpes } } } } }]
+            : []),
         ],
       };
       const assetsCount = await prisma.asset.count({ where: where });
@@ -356,26 +369,21 @@ export const assetsRouter = createTRPCRouter({
         orderBy: { updatedAt: "desc" },
       });
 
-      const assetCpes = assetItems
-        .map((asset) => asset.deviceGroup.cpe)
-        .filter(Boolean);
-      const allCpes = [...new Set([...(cpes ?? []), ...assetCpes])];
-
-      const vulnsWhere = {
-        affectedDeviceGroups: { some: { cpe: { in: allCpes } } },
-      };
-      const vulnsCount = await prisma.vulnerability.count({
-        where: vulnsWhere,
-      });
-      const vulnerabilities = await prisma.vulnerability.findMany({
-        where: vulnsWhere,
-      });
+      // Collect the distinct device-group identities backing these assets and
+      // find every vulnerability whose match objects apply to them.
+      const deviceGroups = [
+        ...new Map(
+          assetItems.map((asset) => [asset.deviceGroup.id, asset.deviceGroup]),
+        ).values(),
+      ];
+      const vulnerabilities =
+        await findVulnerabilitiesMatchingDeviceGroups(deviceGroups);
 
       return {
         assets: assetItems,
         assetsCount,
         vulnerabilities,
-        vulnerabilitiesCount: vulnsCount,
+        vulnerabilitiesCount: vulnerabilities.length,
       };
     }),
 

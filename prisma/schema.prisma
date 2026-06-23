@@ -182,23 +182,64 @@ model Connection {
 }
 
 model DeviceGroup {
-  id                   String               @id @default(cuid())
-  cpe                  String               @unique
-  manufacturer         String?
-  modelName            String?
-  version              String?
-  helmSbomId           String?
+  id      String  @id @default(cuid())
+  vendor  String
+  product String
+  version String?
+  gudid   String?
+
+  cpes       DeviceGroupCpe[]
+  helmSbomId String?
+
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   deviceGroupHistories DeviceGroupHistory[]
   assets               Asset[]
-  vulnerabilities      Vulnerability[]      @relation("VulnerabilityDeviceGroups")
-  remediations         Remediation[]        @relation("RemediationDeviceGroups")
   deviceArtifacts      DeviceArtifact[]
-  advisories           Advisory[]           @relation("AdvisoryDeviceGroups")
 
-  @@index([cpe])
+  // NOTE: Postgres treats NULLs as distinct, so this composite unique will NOT
+  // prevent two "unknown version" (version = null) rows for the same
+  // vendor/product. Identity resolution is therefore done in the app via
+  // resolveDeviceGroup() (findFirst + create in a transaction), not upsert.
+  @@unique([vendor, product, version], name: "device_group_identity")
+  @@index([vendor, product])
   @@map("device_group")
+}
+
+model DeviceGroupCpe {
+  id            String      @id @default(cuid())
+  cpe           String
+  deviceGroupId String
+  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+
+  @@unique([deviceGroupId, cpe])
+  @@index([cpe])
+  @@map("device_group_cpe")
+}
+
+model DGMatchObject {
+  id           String  @id @default(cuid())
+  vendor       String
+  product      String?
+  version      String?
+  versionRange String? // VERS spec string; e.g. "vers:all/*", "vers:semver/>=2.1.2|<=2.1.4"
+
+  vulnerabilityId String?
+  vulnerability   Vulnerability? @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
+  remediationId   String?
+  remediation     Remediation?   @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+  advisoryId      String?
+  advisory        Advisory?      @relation(fields: [advisoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vendor, product])
+  @@index([vulnerabilityId])
+  @@index([remediationId])
+  @@index([advisoryId])
+  @@map("dg_match_object")
 }
 
 model DeviceGroupHistory {
@@ -444,7 +485,7 @@ model Vulnerability {
   cvssVector           String?
   sarif                Json
   affectedComponents   String[]        @default([])
-  affectedDeviceGroups DeviceGroup[]   @relation("VulnerabilityDeviceGroups")
+  matchObjects         DGMatchObject[]
   advisories           Advisory[]      @relation("AdvisoryVulnerabilities")
   exploitUri           String?         @map("exploit-uri")
   upstreamApi          String?         @map("upstream-api")
@@ -515,7 +556,7 @@ model Remediation {
   id            String      @id @default(cuid())
   artifacts ArtifactWrapper[]
 
-  affectedDeviceGroups DeviceGroup[] @relation("RemediationDeviceGroups")
+  matchObjects  DGMatchObject[]
   description   String?      @db.Text // description of remediation
   narrative     String?      @db.Text // how a remediation can be applied 
   upstreamApi   String?      @map("upstream-api")
@@ -728,10 +769,7 @@ model Advisory {
   title                     String?
   user                      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   referencedVulnerabilities Vulnerability[] @relation("AdvisoryVulnerabilities")
-  // TODO: In the future, don't reference vulnerabilities directly, but consider using "match objects" that
-  // can reference ranges of vulnerabilities. `affectedDeviceGroups` is also currently unused, but left
-  // here in case we want to use it to cache searches to increase performance later.
-  affectedDeviceGroups      DeviceGroup[]   @relation("AdvisoryDeviceGroups")
+  matchObjects              DGMatchObject[]
   csaf                      Json            @default("{}")
   upstreamUrl               String?         @unique
   severity                  Severity

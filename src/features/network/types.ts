@@ -63,7 +63,10 @@ export const viperAssetDataSchema = z.object({
   hostname: z.string().nullable(),
   status: z.enum(["Active", "Decommissioned", "Maintenance"]).nullable(),
   deviceGroup: z.object({
-    cpe: z.string(),
+    vendor: z.string(),
+    product: z.string(),
+    version: z.string().nullable(),
+    cpes: z.array(z.object({ cpe: z.string() })),
   }),
 });
 export type ViperAssetData = z.infer<typeof viperAssetDataSchema>;

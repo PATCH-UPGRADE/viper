@@ -3,8 +3,9 @@ import type { Prisma } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   alohaResponseSchema,
-  cpeSchema,
   createIntegrationInputSchema,
+  dgMatchObjectInputSchema,
+  dgMatchObjectResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -14,11 +15,10 @@ import {
   artifactWrapperSelect,
   artifactWrapperWithUrlsSchema,
 } from "../artifacts/types";
-import { deviceGroupSchema, deviceGroupSelect } from "../device-groups/types";
 
 // Validation schemas
 export const remediationInputSchema = z.object({
-  cpes: z.array(cpeSchema).min(1),
+  matchObjects: z.array(dgMatchObjectInputSchema).min(1),
   vulnerabilityId: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
@@ -34,7 +34,7 @@ export const integrationRemediationInputSchema = createIntegrationInputSchema(
 
 export const remediationUpdateSchema = z.object({
   id: z.string(),
-  cpes: z.array(cpeSchema).optional(),
+  matchObjects: z.array(dgMatchObjectInputSchema).optional(),
   vulnerabilityId: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
@@ -49,7 +49,7 @@ export const vulnerabilitySchema = z.object({
 
 export const remediationResponseSchema = z.object({
   id: z.string(),
-  affectedDeviceGroups: z.array(deviceGroupSchema),
+  matchObjects: z.array(dgMatchObjectResponseSchema),
   upstreamApi: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
@@ -86,7 +86,7 @@ const remediationVulnerabilitySelect = {
 export const remediationInclude = {
   user: userIncludeSelect,
   vulnerability: remediationVulnerabilitySelect,
-  affectedDeviceGroups: deviceGroupSelect,
+  matchObjects: true,
   artifacts: artifactWrapperSelect,
 };
 

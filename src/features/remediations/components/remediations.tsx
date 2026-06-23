@@ -30,6 +30,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { matchObjectsSummary } from "@/lib/string-utils";
 import { formatFileSize } from "@/lib/utils";
 import {
   useRemoveRemediation,
@@ -174,13 +175,13 @@ function RemediationDrawer({
           variant="link"
           className="text-foreground h-auto p-0 text-left font-medium"
         >
-          {remediation.affectedDeviceGroups[0]?.cpe ?? "Unknown CPE"}
+          {matchObjectsSummary(remediation.matchObjects) || "Unknown"}
         </Button>
       </DrawerTrigger>
       <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
         <DrawerHeader className="gap-1">
           <DrawerTitle>
-            {remediation.affectedDeviceGroups[0]?.cpe ?? "Unknown CPE"}
+            {matchObjectsSummary(remediation.matchObjects) || "Unknown"}
           </DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
             <Badge variant="outline" className="text-primary">
@@ -244,10 +245,10 @@ function RemediationDrawer({
             <div className="grid grid-cols-1 gap-3">
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1">
-                  CPE Identifier
+                  Affected Products
                 </div>
                 <code className="text-xs bg-muted px-2 py-1 rounded">
-                  {remediation.affectedDeviceGroups[0]?.cpe ?? "N/A"}
+                  {matchObjectsSummary(remediation.matchObjects) || "N/A"}
                 </code>
               </div>
 

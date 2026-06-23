@@ -48,6 +48,7 @@ import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { Severity } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type { AssetWithDeviceGroup, AssetWithIssues } from "@/lib/db";
+import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/string-utils";
 import { cn } from "@/lib/utils";
 import { useAssetsParams } from "../hooks/use-asset-params";
 import {
@@ -418,8 +419,7 @@ export const AssetItem = ({
       <div className="flex-1 min-w-0">
         <AssetDrawer asset={data}>{getAssetRoleLabel(data)}</AssetDrawer>
         <div className="text-xs text-muted-foreground mt-1">
-          {data.ip} &bull;{" "}
-          {data.deviceGroup.cpe.split(":").slice(3, 5).join(" ")} &bull; Updated{" "}
+          {data.ip} &bull; {deviceGroupLabel(data.deviceGroup)} &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
           {hasIssues && data.issues.length >= 1 && (
             <>
@@ -492,9 +492,9 @@ export function AssetDrawer({
 
             <div>
               <div className="text-xs font-medium text-muted-foreground mb-1">
-                Group ID
+                CPE
               </div>
-              <CopyCode>{asset.deviceGroup.cpe}</CopyCode>
+              <CopyCode>{deviceGroupCpeList(asset.deviceGroup)}</CopyCode>
             </div>
           </div>
         </div>

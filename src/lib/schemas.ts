@@ -43,6 +43,51 @@ export const cpeSchema = z
   .string()
   .regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format");
 
+/**
+ * Device-group match confidence, returned (computed) alongside a matched
+ * vulnerability / remediation / advisory. Not stored in the database.
+ */
+export const dgMatchStatusSchema = z.enum([
+  "VENDOR", // matches vendor only; unsure about product/version
+  "PRODUCT", // matches vendor + product; unsure about version
+  "VERSION_RANGE", // matches vendor + product, version falls in a VERS range
+  "VERSION", // matches vendor + product + exact version
+]);
+export type DGMatchStatus = z.infer<typeof dgMatchStatusSchema>;
+
+/**
+ * Describes a (possibly fuzzy) device-group identity that a vulnerability /
+ * remediation / advisory affects. `version` and `versionRange` are mutually
+ * exclusive ("nand" — at most one may be set). `versionRange` uses the VERS
+ * version-range spec (e.g. "vers:all/*", "vers:semver/>=2.1.2|<=2.1.4").
+ */
+export const dgMatchObjectInputSchema = z
+  .object({
+    vendor: z.string().min(1),
+    product: z.string().min(1).nullish(),
+    version: z.string().min(1).nullish(),
+    versionRange: z.string().min(1).nullish(),
+  })
+  .refine((data) => !(data.version && data.versionRange), {
+    message: "Only one of version or versionRange may be specified.",
+    path: ["versionRange"],
+  })
+  .refine((data) => !(data.version && !data.product), {
+    message: "version requires product to be specified.",
+    path: ["version"],
+  });
+export type DGMatchObjectInput = z.infer<typeof dgMatchObjectInputSchema>;
+
+/** A stored match object as returned by the API. */
+export const dgMatchObjectResponseSchema = z.object({
+  id: z.string(),
+  vendor: z.string(),
+  product: z.string().nullable(),
+  version: z.string().nullable(),
+  versionRange: z.string().nullable(),
+});
+export type DGMatchObjectResponse = z.infer<typeof dgMatchObjectResponseSchema>;
+
 export const basicAuthSchema = z.object({
   username: z.string(),
   password: z.string(),

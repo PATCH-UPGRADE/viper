@@ -5,6 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 
 import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
+import { matchObjectsSummary } from "@/lib/string-utils";
 import type { VulnerabilityResponse } from "../types";
 
 export const columns: ColumnDef<VulnerabilityResponse>[] = [
@@ -17,16 +18,12 @@ export const columns: ColumnDef<VulnerabilityResponse>[] = [
     ),
   },
   {
-    id: "cpe",
-    meta: { title: "CPE" },
-    header: "CPE",
+    id: "affected",
+    meta: { title: "Affected" },
+    header: "Affected",
     cell: ({ row }) => {
       return (
-        <CopyCode>
-          {row.original.affectedDeviceGroups
-            .map((group) => group.cpe)
-            .join(", ")}
-        </CopyCode>
+        <CopyCode>{matchObjectsSummary(row.original.matchObjects)}</CopyCode>
       );
     },
   },

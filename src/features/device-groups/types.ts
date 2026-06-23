@@ -6,7 +6,11 @@ import {
 
 export const deviceGroupSchema = z.object({
   id: z.string(),
-  cpe: z.string(),
+  vendor: z.string(),
+  product: z.string(),
+  version: z.string().nullable(),
+  gudid: z.string().nullable(),
+  cpes: z.array(z.object({ cpe: z.string() })),
 });
 
 export const paginationInputWithUpdatedAtFilterFields =
@@ -18,15 +22,17 @@ export const paginationInputWithUpdatedAtFilterFields =
 export const deviceGroupInputSchema = z
   .object({
     id: z.string(),
-    manufacturer: z.string().nullish(),
-    modelName: z.string().nullish(),
+    vendor: z.string().optional(),
+    product: z.string().optional(),
     version: z.string().nullish(),
+    gudid: z.string().nullish(),
   })
   .refine(
     (data) =>
-      data.manufacturer !== undefined ||
-      data.modelName !== undefined ||
-      data.version !== undefined,
+      data.vendor !== undefined ||
+      data.product !== undefined ||
+      data.version !== undefined ||
+      data.gudid !== undefined,
     { message: "At least one field must be provided." },
   );
 
@@ -66,9 +72,6 @@ export const deviceGroupWithUrlsSchema = deviceGroupSchema.extend({
 export type DeviceGroupWithUrls = z.infer<typeof deviceGroupWithUrlsSchema>;
 
 export const deviceGroupWithDetailsSchema = deviceGroupWithUrlsSchema.extend({
-  manufacturer: z.string().nullable(),
-  modelName: z.string().nullable(),
-  version: z.string().nullable(),
   helmSbomId: z.string().nullable(),
 });
 
@@ -83,7 +86,11 @@ export const paginatedDeviceGroupResponseSchema = createPaginatedResponseSchema(
 export const deviceGroupSelect = {
   select: {
     id: true,
-    cpe: true,
+    vendor: true,
+    product: true,
+    version: true,
+    gudid: true,
+    cpes: { select: { cpe: true } },
     url: true,
     sbomUrl: true,
     vulnerabilitiesUrl: true,

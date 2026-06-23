@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/string-utils";
 import {
   useRemoveDeviceArtifact,
   useSuspenseDeviceArtifacts,
@@ -154,7 +155,7 @@ export const DeviceArtifactItem = ({
       <div className="flex-1 min-w-0">
         <DeviceArtifactDrawer deviceArtifact={data} />
         <div className="text-xs text-muted-foreground mt-1">
-          {data.deviceGroup.cpe} &bull; Updated{" "}
+          {deviceGroupLabel(data.deviceGroup)} &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
         </div>
       </div>
@@ -227,7 +228,7 @@ function DeviceArtifactDrawer({
                   CPE Identifier
                 </div>
                 <code className="text-xs bg-muted px-2 py-1 rounded break-all">
-                  {deviceArtifact.deviceGroup.cpe}
+                  {deviceGroupCpeList(deviceArtifact.deviceGroup)}
                 </code>
               </div>
 

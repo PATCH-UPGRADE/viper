@@ -231,9 +231,11 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
     // Verify the response structure
     expect(createdDeviceArtifact).toHaveProperty("deviceGroup");
-    expect(createdDeviceArtifact.deviceGroup).toEqual(
-      expect.objectContaining({ cpe: payload.cpe }),
-    );
+    expect(
+      createdDeviceArtifact.deviceGroup.cpes.some(
+        (c: { cpe: string }) => c.cpe === payload.cpe,
+      ),
+    ).toBe(true);
 
     expect(createdDeviceArtifact).toHaveProperty("artifacts");
     expect(Array.isArray(createdDeviceArtifact.artifacts)).toBe(true);
@@ -300,7 +302,11 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       });
 
     expect(updateCpeRes.status).toBe(200);
-    expect(updateCpeRes.body.deviceGroup.cpe).toBe(newCpe);
+    expect(
+      updateCpeRes.body.deviceGroup.cpes.some(
+        (c: { cpe: string }) => c.cpe === newCpe,
+      ),
+    ).toBe(true);
 
     // Delete the device artifact
     const deleteRes = await request(BASE_URL)
@@ -400,8 +406,12 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       );
       await prisma.deviceGroup.deleteMany({
         where: {
-          cpe: {
-            contains: cpeName,
+          cpes: {
+            some: {
+              cpe: {
+                contains: cpeName,
+              },
+            },
           },
         },
       });
@@ -569,8 +579,12 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
     await prisma.deviceGroup.deleteMany({
       where: {
-        cpe: {
-          contains: "dev_art_integration_",
+        cpes: {
+          some: {
+            cpe: {
+              contains: "dev_art_integration_",
+            },
+          },
         },
       },
     });
@@ -599,7 +613,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         id: mapping1.itemId,
       },
       include: {
-        deviceGroup: true,
+        deviceGroup: { include: { cpes: true } },
         artifacts: true,
       },
     });
@@ -609,7 +623,11 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
     expect(foundDeviceArtifact1.description).toBe(daPayload1.description);
     expect(foundDeviceArtifact1.upstreamApi).toBe(daPayload1.upstreamApi);
-    expect(foundDeviceArtifact1.deviceGroup.cpe).toBe(daPayload1.cpe);
+    expect(
+      foundDeviceArtifact1.deviceGroup.cpes.some(
+        (c) => c.cpe === daPayload1.cpe,
+      ),
+    ).toBe(true);
     expect(foundDeviceArtifact1.artifacts.length).toBe(1);
 
     const daPayload2 = deviceArtifactsIntegrationPayload.items[1];
@@ -625,7 +643,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         id: mapping2.itemId,
       },
       include: {
-        deviceGroup: true,
+        deviceGroup: { include: { cpes: true } },
         artifacts: true,
       },
     });
@@ -635,7 +653,11 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
     expect(foundDeviceArtifact2.description).toBe(daPayload2.description);
     expect(foundDeviceArtifact2.upstreamApi).toBe(daPayload2.upstreamApi);
-    expect(foundDeviceArtifact2.deviceGroup.cpe).toBe(daPayload2.cpe);
+    expect(
+      foundDeviceArtifact2.deviceGroup.cpes.some(
+        (c) => c.cpe === daPayload2.cpe,
+      ),
+    ).toBe(true);
     expect(foundDeviceArtifact2.artifacts.length).toBe(1);
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {

@@ -1,4 +1,9 @@
 import { assetUtilizationSchema } from "@/features/assets/types";
+import {
+  deviceGroupCpeList,
+  deviceGroupLabel,
+  matchObjectsSummary,
+} from "@/lib/string-utils";
 
 // ─── Structural interfaces for markdown rendering ─────────────────────────────
 // Any Prisma payload that includes these fields is compatible (structural typing).
@@ -16,10 +21,10 @@ interface AssetForMarkdown {
   utilization?: unknown;
   updatedAt?: Date;
   deviceGroup: {
-    manufacturer?: string | null;
-    modelName?: string | null;
-    cpe: string;
+    vendor: string;
+    product: string;
     version?: string | null;
+    cpes?: Array<{ cpe: string }>;
   };
   issues?: Array<{
     status: string;
@@ -46,10 +51,11 @@ interface VulnerabilityForMarkdown {
   description?: string | null;
   narrative?: string | null;
   impact?: string | null;
-  affectedDeviceGroups?: Array<{
-    cpe: string;
-    modelName?: string | null;
-    manufacturer?: string | null;
+  matchObjects?: Array<{
+    vendor: string;
+    product?: string | null;
+    version?: string | null;
+    versionRange?: string | null;
   }>;
   remediations?: Array<{ id: string; description?: string | null }>;
   issues?: Array<{
@@ -64,7 +70,12 @@ interface RemediationForMarkdown {
   narrative?: string | null;
   vulnerabilityId?: string | null;
   vulnerability?: { id: string; cveId?: string | null } | null;
-  affectedDeviceGroups?: Array<{ cpe: string; modelName?: string | null }>;
+  matchObjects?: Array<{
+    vendor: string;
+    product?: string | null;
+    version?: string | null;
+    versionRange?: string | null;
+  }>;
   issueRemediations?: Array<{
     issue: {
       status: string;
@@ -169,7 +180,7 @@ export function assetToMarkdown(
     `- **Status**: ${a.status ?? "Unknown"}`,
     `- **Serial Number**: ${a.serialNumber ?? "N/A"}`,
     `- **Location**: ${parseLocation(a.location)}`,
-    `- **Device Group**: ${[a.deviceGroup.manufacturer, a.deviceGroup.modelName].filter(Boolean).join(" ")} (CPE: ${a.deviceGroup.cpe})`.trim(),
+    `- **Device Group**: ${deviceGroupLabel(a.deviceGroup)}${a.deviceGroup.cpes?.length ? ` (CPE: ${deviceGroupCpeList(a.deviceGroup)})` : ""}`.trim(),
     `- **Device Group Version**: ${a.deviceGroup.version ?? "N/A"}`,
   ];
 
@@ -216,14 +227,10 @@ export function vulnerabilityToMarkdown(
     lines.push(`- **Affected Components**: ${v.affectedComponents.join(", ")}`);
   }
 
-  if (v.affectedDeviceGroups && v.affectedDeviceGroups.length > 0) {
-    const dgList = v.affectedDeviceGroups
-      .map(
-        (dg) =>
-          [dg.manufacturer, dg.modelName].filter(Boolean).join(" ") || dg.cpe,
-      )
-      .join(", ");
-    lines.push(`- **Affected Device Groups**: ${dgList}`);
+  if (v.matchObjects && v.matchObjects.length > 0) {
+    lines.push(
+      `- **Affected Products**: ${matchObjectsSummary(v.matchObjects)}`,
+    );
   }
 
   if (v.description) lines.push(`- **Description**: ${v.description}`);
@@ -256,11 +263,10 @@ export function remediationToMarkdown(r: RemediationForMarkdown): string {
     r.vulnerability?.cveId ?? r.vulnerabilityId ?? "no linked vuln";
   const lines = [`### Remediation rem-${shortId(r.id)} → ${cveRef}`];
 
-  if (r.affectedDeviceGroups && r.affectedDeviceGroups.length > 0) {
-    const dgList = r.affectedDeviceGroups
-      .map((dg) => dg.modelName ?? dg.cpe)
-      .join(", ");
-    lines.push(`- **Affected Device Groups**: ${dgList}`);
+  if (r.matchObjects && r.matchObjects.length > 0) {
+    lines.push(
+      `- **Affected Products**: ${matchObjectsSummary(r.matchObjects)}`,
+    );
   }
 
   if (r.issueRemediations && r.issueRemediations.length > 0) {

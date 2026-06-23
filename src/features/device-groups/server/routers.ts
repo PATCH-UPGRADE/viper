@@ -19,17 +19,23 @@ const deviceGroupDetailsResponseSchema = deviceGroupWithDetailsSchema;
 const deviceGroupInputSchema = z
   .object({
     id: z.string(),
-    manufacturer: z.string().nullable().optional(),
-    modelName: z.string().nullable().optional(),
+    vendor: z.string().optional(),
+    product: z.string().optional(),
     version: z.string().nullable().optional(),
+    gudid: z.string().nullable().optional(),
   })
   .refine(
     (data) =>
-      data.manufacturer !== undefined ||
-      data.modelName !== undefined ||
-      data.version !== undefined,
+      data.vendor !== undefined ||
+      data.product !== undefined ||
+      data.version !== undefined ||
+      data.gudid !== undefined,
     { message: "At least one field must be provided." },
   );
+
+const deviceGroupCpeInclude = {
+  cpes: { select: { cpe: true } },
+} as const;
 
 const deviceGroupInputHelmIdSchema = z.object({
   id: z.string(),
@@ -67,14 +73,16 @@ export const deviceGroupsRouter = createTRPCRouter({
       const where = search
         ? {
             OR: [
-              { cpe: { contains: search, mode: "insensitive" as const } },
+              { vendor: { contains: search, mode: "insensitive" as const } },
+              { product: { contains: search, mode: "insensitive" as const } },
+              { gudid: { contains: search, mode: "insensitive" as const } },
               {
-                manufacturer: {
-                  contains: search,
-                  mode: "insensitive" as const,
+                cpes: {
+                  some: {
+                    cpe: { contains: search, mode: "insensitive" as const },
+                  },
                 },
               },
-              { modelName: { contains: search, mode: "insensitive" as const } },
             ],
             updatedAt,
           }
@@ -82,6 +90,7 @@ export const deviceGroupsRouter = createTRPCRouter({
 
       return fetchPaginated(prisma.deviceGroup, input, {
         where: where,
+        include: deviceGroupCpeInclude,
       });
     }),
 
@@ -102,6 +111,7 @@ export const deviceGroupsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const deviceGroup = await prisma.deviceGroup.findUnique({
         where: { id: input.id },
+        include: deviceGroupCpeInclude,
       });
       return requireExistence(deviceGroup, "DeviceGroup");
     }),
@@ -148,6 +158,7 @@ export const deviceGroupsRouter = createTRPCRouter({
       return prisma.deviceGroup.update({
         where: { id },
         data: updateData,
+        include: deviceGroupCpeInclude,
       });
     }),
 
@@ -172,6 +183,7 @@ export const deviceGroupsRouter = createTRPCRouter({
         data: {
           helmSbomId: helmSbomId,
         },
+        include: deviceGroupCpeInclude,
       });
     }),
 });

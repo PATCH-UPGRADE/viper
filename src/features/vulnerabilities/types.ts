@@ -7,24 +7,23 @@ import {
 } from "@/lib/pagination";
 import {
   alohaResponseSchema,
-  cpeSchema,
   createIntegrationInputSchema,
+  dgMatchObjectInputSchema,
+  dgMatchObjectResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
 } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
-import {
-  deviceGroupSelect,
-  deviceGroupWithUrlsSchema,
-} from "../device-groups/types";
 import { remediationCardInclude } from "../remediations/types";
 
 // Validation schemas
 const severitySchema = z.enum(Object.values(Severity));
 
 export const vulnerabilityInputSchema = z.object({
-  cpes: z.array(cpeSchema).min(1, "At least one CPE is required"),
+  matchObjects: z
+    .array(dgMatchObjectInputSchema)
+    .min(1, "At least one match object is required"),
   sarif: z.any(), // JSON data - Prisma JsonValue type
   cveId: z.string().min(1).nullish(),
   description: z.string().min(1).nullish(),
@@ -45,14 +44,14 @@ export const vulnerabilityArrayInputSchema = z.object({
 
 // make these two fields optional so users can update any field independently
 export const vulnerabilityUpdateInputSchema = vulnerabilityInputSchema.extend({
-  cpes: z.array(cpeSchema).min(1).optional(),
+  matchObjects: z.array(dgMatchObjectInputSchema).min(1).optional(),
   sarif: z.any().optional(), // JSON data - Prisma JsonValue type
 });
 
 export const vulnerabilityResponseSchema = z.object({
   id: z.string(),
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  affectedDeviceGroups: z.array(deviceGroupWithUrlsSchema),
+  matchObjects: z.array(dgMatchObjectResponseSchema),
   exploitUri: z.string().nullable(),
   upstreamApi: z.string().nullable(),
   description: z.string().nullable(),
@@ -96,12 +95,12 @@ export const vulnerabilitiesByPriorityInputSchema =
 
 export const vulnerabilityInclude = {
   user: userIncludeSelect,
-  affectedDeviceGroups: deviceGroupSelect,
+  matchObjects: true,
 };
 
 export const vulnerabilityByPriorityInclude = {
   user: userIncludeSelect,
-  affectedDeviceGroups: deviceGroupSelect,
+  matchObjects: true,
   issues: {
     include: {
       asset: {

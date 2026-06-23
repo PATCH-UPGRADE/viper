@@ -3,11 +3,13 @@ import { type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
-  cpeToDeviceGroup,
   createArtifactWrappers,
   fetchPaginated,
+  findMatchingIdsForDeviceGroup,
   processIntegrationSync,
   processIntegrationToken,
+  resolveMatchingConnect,
+  resolveMatchingIdFromCpe,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
 import { processArtifactHosting } from "@/lib/s3";
@@ -112,22 +114,25 @@ export const deviceArtifactsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { search, deviceGroupId } = input;
       const searchFilter = createSearchFilter(search);
-      const whereFilter = search
-        ? {
-            AND: [
-              searchFilter,
-              {
-                deviceGroup: {
-                  id: deviceGroupId,
-                },
-              },
-            ],
-          }
-        : {
-            deviceGroup: {
-              id: deviceGroupId,
-            },
-          };
+
+      // Artifacts "for" a device group are those whose identity matching applies.
+      const group = await prisma.deviceGroup.findUnique({
+        where: { id: deviceGroupId },
+        select: {
+          id: true,
+          vendorId: true,
+          productId: true,
+          versionId: true,
+          version: { select: { canonicalName: true } },
+        },
+      });
+      const matchingIds = group
+        ? await findMatchingIdsForDeviceGroup(group)
+        : [];
+      const idFilter = {
+        deviceGroupMatchings: { some: { id: { in: matchingIds } } },
+      };
+      const whereFilter = search ? { AND: [searchFilter, idFilter] } : idFilter;
 
       const result = await fetchPaginated(prisma.deviceArtifact, input, {
         where: whereFilter,
@@ -181,7 +186,13 @@ export const deviceArtifactsRouter = createTRPCRouter({
     })
     .output(deviceArtifactUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const deviceGroup = await cpeToDeviceGroup(input.cpe);
+      // The CPE resolves to the device's identity matching; component matchings
+      // (if any) join the same set.
+      const identityMatchingId = await resolveMatchingIdFromCpe(input.cpe);
+      const componentConnect = input.componentMatchings
+        ? await resolveMatchingConnect(input.componentMatchings)
+        : [];
+      const matchingConnect = [{ id: identityMatchingId }, ...componentConnect];
       const userId = ctx.auth.user.id;
 
       // Handle S3 upload URL -- if the user included a hash/size but no downloadUrl, they want us to host it
@@ -196,7 +207,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
             role: input.role,
             description: input.description,
             upstreamApi: input.upstreamApi || null,
-            deviceGroupId: deviceGroup.id,
+            deviceGroupMatchings: { connect: matchingConnect },
             userId,
           },
         });
@@ -249,8 +260,21 @@ export const deviceArtifactsRouter = createTRPCRouter({
           model: prisma.deviceArtifact,
           mappingModel: prisma.externalDeviceArtifactMapping,
           transformInputItem: async (item, userId) => {
-            const { cpe, vendorId: _vendorId, artifacts, ...itemData } = item;
-            const newDeviceGroup = await cpeToDeviceGroup(cpe);
+            const {
+              cpe,
+              componentMatchings,
+              vendorId: _vendorId,
+              artifacts,
+              ...itemData
+            } = item;
+            const identityMatchingId = await resolveMatchingIdFromCpe(cpe);
+            const componentConnect = componentMatchings
+              ? await resolveMatchingConnect(componentMatchings)
+              : [];
+            const matchingConnect = [
+              { id: identityMatchingId },
+              ...componentConnect,
+            ];
 
             return {
               createData: {
@@ -258,15 +282,11 @@ export const deviceArtifactsRouter = createTRPCRouter({
                 user: {
                   connect: { id: userId },
                 },
-                deviceGroup: {
-                  connect: { id: newDeviceGroup.id },
-                },
+                deviceGroupMatchings: { connect: matchingConnect },
               },
               updateData: {
                 ...itemData,
-                deviceGroup: {
-                  connect: { id: newDeviceGroup.id },
-                },
+                deviceGroupMatchings: { set: matchingConnect },
               },
               uniqueFieldConditions: [],
               artifactsData: {
@@ -326,7 +346,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "deviceArtifact");
 
-      const { id, cpe, ...updateData } = input;
+      const { id, cpe, componentMatchings, ...updateData } = input;
 
       // Prepare update data
       const data: Prisma.DeviceArtifactUpdateInput = {
@@ -339,10 +359,16 @@ export const deviceArtifactsRouter = createTRPCRouter({
         }),
       };
 
-      // Handle CPE/device group update if provided
-      if (cpe) {
-        const deviceGroup = await cpeToDeviceGroup(cpe);
-        data.deviceGroup = { connect: { id: deviceGroup.id } };
+      // Add the device's identity matching (from CPE) and/or component matchings
+      // to the artifact's matching set when provided.
+      const matchingConnect = [
+        ...(cpe ? [{ id: await resolveMatchingIdFromCpe(cpe) }] : []),
+        ...(componentMatchings
+          ? await resolveMatchingConnect(componentMatchings)
+          : []),
+      ];
+      if (matchingConnect.length > 0) {
+        data.deviceGroupMatchings = { connect: matchingConnect };
       }
 
       const deviceArtifact = await prisma.deviceArtifact.update({

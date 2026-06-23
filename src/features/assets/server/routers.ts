@@ -40,30 +40,23 @@ import {
 } from "../types";
 
 const createSearchFilter = (search: string) => {
+  const insensitive = { contains: search, mode: "insensitive" as const };
   return search
     ? {
         OR: [
-          { ip: { contains: search, mode: "insensitive" as const } },
-          { role: { contains: search, mode: "insensitive" as const } },
+          { ip: insensitive },
+          { role: insensitive },
           {
             deviceGroup: {
-              vendor: { contains: search, mode: "insensitive" as const },
+              is: { vendor: { is: { canonicalName: insensitive } } },
             },
           },
           {
             deviceGroup: {
-              product: { contains: search, mode: "insensitive" as const },
+              is: { product: { is: { canonicalName: insensitive } } },
             },
           },
-          {
-            deviceGroup: {
-              cpes: {
-                some: {
-                  cpe: { contains: search, mode: "insensitive" as const },
-                },
-              },
-            },
-          },
+          { deviceGroup: { is: { cpe: { has: search } } } },
         ],
       }
     : {};
@@ -357,7 +350,7 @@ export const assetsRouter = createTRPCRouter({
         OR: [
           ...(assetIds?.length ? [{ id: { in: assetIds } }] : []),
           ...(cpes?.length
-            ? [{ deviceGroup: { cpes: { some: { cpe: { in: cpes } } } } }]
+            ? [{ deviceGroup: { is: { cpe: { hasSome: cpes } } } }]
             : []),
         ],
       };
@@ -370,12 +363,20 @@ export const assetsRouter = createTRPCRouter({
       });
 
       // Collect the distinct device-group identities backing these assets and
-      // find every vulnerability whose match objects apply to them.
-      const deviceGroups = [
-        ...new Map(
-          assetItems.map((asset) => [asset.deviceGroup.id, asset.deviceGroup]),
-        ).values(),
+      // find every vulnerability whose matchings apply to them.
+      const deviceGroupIds = [
+        ...new Set(assetItems.map((asset) => asset.deviceGroupId)),
       ];
+      const deviceGroups = await prisma.deviceGroup.findMany({
+        where: { id: { in: deviceGroupIds } },
+        select: {
+          id: true,
+          vendorId: true,
+          productId: true,
+          versionId: true,
+          version: { select: { canonicalName: true } },
+        },
+      });
       const vulnerabilities =
         await findVulnerabilitiesMatchingDeviceGroups(deviceGroups);
 

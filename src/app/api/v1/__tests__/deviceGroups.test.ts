@@ -140,7 +140,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     expect(deviceGroup).toHaveProperty("id");
     expect(deviceGroup).toHaveProperty("vendor");
     expect(deviceGroup).toHaveProperty("product");
-    expect(deviceGroup).toHaveProperty("cpes");
+    expect(deviceGroup).toHaveProperty("cpe");
     expect(deviceGroup).toHaveProperty("url");
     expect(deviceGroup).toHaveProperty("sbomUrl");
     expect(deviceGroup).toHaveProperty("vulnerabilitiesUrl");
@@ -155,7 +155,9 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
 
     expect(firstDetailRes.status).toBe(200);
     expect(firstDetailRes.body.id).toBe(deviceGroupId);
-    expect(firstDetailRes.body.vendor).toBe(deviceGroup.vendor);
+    expect(firstDetailRes.body.vendor?.canonicalName).toBe(
+      deviceGroup.vendor?.canonicalName,
+    );
     expect(firstDetailRes.body).toHaveProperty("url");
     expect(firstDetailRes.body).toHaveProperty("sbomUrl");
     expect(firstDetailRes.body).toHaveProperty("vulnerabilitiesUrl");
@@ -168,11 +170,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .set(authHeader);
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.id).toBe(assetDeviceGroupId);
-    expect(
-      detailRes.body.cpes.some(
-        (c: { cpe: string }) => c.cpe === assetPayload.cpe,
-      ),
-    ).toBe(true);
+    expect(detailRes.body.cpe.includes(assetPayload.cpe)).toBe(true);
 
     // Update device group
     const updateDeviceGroup = await request(BASE_URL)
@@ -181,11 +179,13 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .send(updateDeviceGroupPayload);
     expect(updateDeviceGroup.status).toBe(200);
     expect(updateDeviceGroup.body.id).toBe(assetDeviceGroupId);
-    expect(updateDeviceGroup.body.vendor).toBe(updateDeviceGroupPayload.vendor);
-    expect(updateDeviceGroup.body.product).toBe(
+    expect(updateDeviceGroup.body.vendor?.canonicalDisplayName).toBe(
+      updateDeviceGroupPayload.vendor,
+    );
+    expect(updateDeviceGroup.body.product?.canonicalDisplayName).toBe(
       updateDeviceGroupPayload.product,
     );
-    expect(updateDeviceGroup.body.version).toBe(
+    expect(updateDeviceGroup.body.version?.canonicalDisplayName).toBe(
       updateDeviceGroupPayload.version,
     );
 

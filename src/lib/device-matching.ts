@@ -1,5 +1,5 @@
 import semver from "semver";
-import type { DeviceGroup, Prisma } from "@/generated/prisma";
+import type { Prisma } from "@/generated/prisma";
 import type { DGMatchStatus } from "./schemas";
 
 // ============================================================================
@@ -11,8 +11,8 @@ import type { DGMatchStatus } from "./schemas";
 // joined by "|", e.g. "vers:semver/>=2.1.2|<=2.1.4" or the wildcard "vers:all/*".
 //
 // We fully support the `semver` scheme via the `semver` npm package. For other
-// schemes (component versions that are not semver) we fall back to exact string
-// equality of the constraint. Broader scheme support can be added later.
+// schemes we fall back to exact string equality of the constraint. Broader
+// scheme support can be added later.
 
 type VersConstraint = {
   operator: ">=" | "<=" | ">" | "<" | "=";
@@ -111,69 +111,86 @@ export function versSatisfies(version: string | null, range: string): boolean {
 }
 
 // ============================================================================
-// Match status + device-group resolution
+// Match status + device-group resolution (canonical-id based)
 // ============================================================================
 
-type MatchObjectLike = {
-  vendor: string;
-  product?: string | null;
-  version?: string | null;
-  versionRange?: string | null;
+export type MatchingLike = {
+  vendorId: string;
+  productId: string | null;
+  versionId: string | null;
+  versionRange: string | null;
 };
 
-type DeviceGroupIdentity = Pick<DeviceGroup, "vendor" | "product" | "version">;
-
-const eqInsensitive = (a: string | null, b: string | null) =>
-  (a ?? "").toLowerCase() === (b ?? "").toLowerCase();
+export type DeviceGroupIdentity = {
+  id: string;
+  vendorId: string | null;
+  productId: string | null;
+  versionId: string | null;
+  // canonical version string, needed for VERS-range checks
+  version?: { canonicalName: string } | null;
+};
 
 /**
- * Compute how confidently a match object matches a concrete device group.
- * Returns null when the match object does not apply to the group at all.
+ * Compute how confidently a matching applies to a concrete device group.
+ * Returns null when it does not apply. Vendor/product/exact-version comparisons
+ * use canonical FK ids; version-range checks use the version's canonical string.
  */
 export function computeMatchStatus(
-  matchObject: MatchObjectLike,
+  matching: MatchingLike,
   deviceGroup: DeviceGroupIdentity,
 ): DGMatchStatus | null {
-  if (!eqInsensitive(matchObject.vendor, deviceGroup.vendor)) return null;
-
-  // Vendor-only match object: matches every product/version of this vendor.
-  if (!matchObject.product) return "VENDOR";
-  if (!eqInsensitive(matchObject.product, deviceGroup.product)) return null;
-
-  // Vendor + product match object, no version constraint.
-  if (!matchObject.version && !matchObject.versionRange) return "PRODUCT";
-
-  if (matchObject.version) {
-    return eqInsensitive(matchObject.version, deviceGroup.version)
-      ? "VERSION"
-      : null;
+  if (!deviceGroup.vendorId || matching.vendorId !== deviceGroup.vendorId) {
+    return null;
   }
 
-  // versionRange
-  if (matchObject.versionRange) {
-    return versSatisfies(deviceGroup.version, matchObject.versionRange)
+  // Wildcard product (null) matches every product of the vendor.
+  if (matching.productId === null) return "VENDOR";
+  if (matching.productId !== deviceGroup.productId) return null;
+
+  // Vendor + product match. Now resolve the version constraint.
+  if (matching.versionId !== null) {
+    return matching.versionId === deviceGroup.versionId ? "VERSION" : null;
+  }
+
+  if (matching.versionRange !== null) {
+    return versSatisfies(
+      deviceGroup.version?.canonicalName ?? null,
+      matching.versionRange,
+    )
       ? "VERSION_RANGE"
       : null;
   }
 
+  // No version constraint => product-level (not applicable).
   return "PRODUCT";
 }
 
 /**
- * Build a Prisma `where` filter selecting the device groups that a single match
- * object could apply to (vendor + optional product). Version filtering is done
- * in memory via computeMatchStatus because VERS ranges can't be expressed in SQL.
+ * Prisma `where` selecting device groups a matching could apply to (vendor +
+ * optional product). Version filtering is done in memory via computeMatchStatus.
  */
-export function matchObjectWhere(
-  matchObject: MatchObjectLike,
+export function deviceGroupWhereForMatching(
+  matching: MatchingLike,
 ): Prisma.DeviceGroupWhereInput {
-  const where: Prisma.DeviceGroupWhereInput = {
-    vendor: { equals: matchObject.vendor, mode: "insensitive" },
+  return {
+    vendorId: matching.vendorId,
+    ...(matching.productId !== null ? { productId: matching.productId } : {}),
   };
-  if (matchObject.product) {
-    where.product = { equals: matchObject.product, mode: "insensitive" };
-  }
-  return where;
+}
+
+/**
+ * Prisma `where` selecting matchings that could apply to a device group: same
+ * vendor, and either a wildcard product or the same product (the naive
+ * same-vendor/product scan). Caller must pass a group that has a vendorId.
+ */
+export function matchingWhereForDeviceGroup(deviceGroup: {
+  vendorId: string;
+  productId: string | null;
+}): Prisma.DeviceGroupMatchingWhereInput {
+  return {
+    vendorId: deviceGroup.vendorId,
+    OR: [{ productId: null }, { productId: deviceGroup.productId }],
+  };
 }
 
 export type MatchedDeviceGroup<T extends DeviceGroupIdentity> = {
@@ -181,29 +198,32 @@ export type MatchedDeviceGroup<T extends DeviceGroupIdentity> = {
   matchStatus: DGMatchStatus;
 };
 
+const STATUS_STRENGTH: Record<DGMatchStatus, number> = {
+  VENDOR: 0,
+  PRODUCT: 1,
+  VERSION_RANGE: 2,
+  VERSION: 3,
+};
+
 /**
- * Given a set of match objects and a candidate list of device groups, return the
- * groups each match object resolves to alongside the computed match status.
- * Deduplicates by device-group id, keeping the strongest match status.
+ * Resolve a set of matchings against candidate device groups, returning each
+ * group that matches with the strongest computed status (deduped by group id).
  */
-export function resolveMatches<T extends DeviceGroupIdentity & { id: string }>(
-  matchObjects: MatchObjectLike[],
+export function resolveMatches<T extends DeviceGroupIdentity>(
+  matchings: MatchingLike[],
   deviceGroups: T[],
 ): MatchedDeviceGroup<T>[] {
-  const strength: Record<DGMatchStatus, number> = {
-    VENDOR: 0,
-    PRODUCT: 1,
-    VERSION_RANGE: 2,
-    VERSION: 3,
-  };
   const best = new Map<string, MatchedDeviceGroup<T>>();
 
-  for (const matchObject of matchObjects) {
+  for (const matching of matchings) {
     for (const deviceGroup of deviceGroups) {
-      const matchStatus = computeMatchStatus(matchObject, deviceGroup);
+      const matchStatus = computeMatchStatus(matching, deviceGroup);
       if (!matchStatus) continue;
       const existing = best.get(deviceGroup.id);
-      if (!existing || strength[matchStatus] > strength[existing.matchStatus]) {
+      if (
+        !existing ||
+        STATUS_STRENGTH[matchStatus] > STATUS_STRENGTH[existing.matchStatus]
+      ) {
         best.set(deviceGroup.id, { deviceGroup, matchStatus });
       }
     }

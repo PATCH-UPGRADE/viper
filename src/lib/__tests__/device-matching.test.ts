@@ -52,35 +52,80 @@ describe("versSatisfies", () => {
 });
 
 describe("computeMatchStatus", () => {
-  const dg = { vendor: "Acme", product: "Radiator", version: "2.1.3" };
+  // device group identity uses canonical FK ids; version carries its string.
+  const dg = {
+    id: "dg1",
+    vendorId: "v-acme",
+    productId: "p-radiator",
+    versionId: "ver-213",
+    version: { canonicalName: "2.1.3" },
+  };
 
   it("returns null when the vendor differs", () => {
-    expect(computeMatchStatus({ vendor: "Other" }, dg)).toBeNull();
+    expect(
+      computeMatchStatus(
+        {
+          vendorId: "v-other",
+          productId: null,
+          versionId: null,
+          versionRange: null,
+        },
+        dg,
+      ),
+    ).toBeNull();
   });
 
-  it("returns VENDOR for a vendor-only match object", () => {
-    expect(computeMatchStatus({ vendor: "acme" }, dg)).toBe("VENDOR");
+  it("returns VENDOR for a wildcard-product matching", () => {
+    expect(
+      computeMatchStatus(
+        {
+          vendorId: "v-acme",
+          productId: null,
+          versionId: null,
+          versionRange: null,
+        },
+        dg,
+      ),
+    ).toBe("VENDOR");
   });
 
   it("returns PRODUCT when vendor+product match and no version constraint", () => {
     expect(
-      computeMatchStatus({ vendor: "Acme", product: "radiator" }, dg),
+      computeMatchStatus(
+        {
+          vendorId: "v-acme",
+          productId: "p-radiator",
+          versionId: null,
+          versionRange: null,
+        },
+        dg,
+      ),
     ).toBe("PRODUCT");
   });
 
-  it("returns VERSION for an exact version match", () => {
+  it("returns VERSION for an exact versionId match", () => {
     expect(
       computeMatchStatus(
-        { vendor: "Acme", product: "Radiator", version: "2.1.3" },
+        {
+          vendorId: "v-acme",
+          productId: "p-radiator",
+          versionId: "ver-213",
+          versionRange: null,
+        },
         dg,
       ),
     ).toBe("VERSION");
   });
 
-  it("returns null for an exact version mismatch", () => {
+  it("returns null for a versionId mismatch", () => {
     expect(
       computeMatchStatus(
-        { vendor: "Acme", product: "Radiator", version: "2.1.4" },
+        {
+          vendorId: "v-acme",
+          productId: "p-radiator",
+          versionId: "ver-999",
+          versionRange: null,
+        },
         dg,
       ),
     ).toBeNull();
@@ -90,8 +135,9 @@ describe("computeMatchStatus", () => {
     expect(
       computeMatchStatus(
         {
-          vendor: "Acme",
-          product: "Radiator",
+          vendorId: "v-acme",
+          productId: "p-radiator",
+          versionId: null,
           versionRange: "vers:semver/>=2.0.0|<3.0.0",
         },
         dg,
@@ -103,8 +149,9 @@ describe("computeMatchStatus", () => {
     expect(
       computeMatchStatus(
         {
-          vendor: "Acme",
-          product: "Radiator",
+          vendorId: "v-acme",
+          productId: "p-radiator",
+          versionId: null,
           versionRange: "vers:semver/>=3.0.0",
         },
         dg,
@@ -115,22 +162,60 @@ describe("computeMatchStatus", () => {
 
 describe("resolveMatches", () => {
   const groups = [
-    { id: "a", vendor: "Acme", product: "Radiator", version: "2.1.3" },
-    { id: "b", vendor: "Acme", product: "Radiator", version: "9.9.9" },
-    { id: "c", vendor: "Other", product: "Widget", version: "1.0.0" },
+    {
+      id: "a",
+      vendorId: "v-acme",
+      productId: "p-radiator",
+      versionId: "ver-213",
+      version: { canonicalName: "2.1.3" },
+    },
+    {
+      id: "b",
+      vendorId: "v-acme",
+      productId: "p-radiator",
+      versionId: "ver-999",
+      version: { canonicalName: "9.9.9" },
+    },
+    {
+      id: "c",
+      vendorId: "v-other",
+      productId: "p-widget",
+      versionId: "ver-100",
+      version: { canonicalName: "1.0.0" },
+    },
   ];
 
-  it("resolves a vendor-only match object to all of that vendor's groups", () => {
-    const matches = resolveMatches([{ vendor: "Acme" }], groups);
+  it("resolves a wildcard-product matching to all of that vendor's groups", () => {
+    const matches = resolveMatches(
+      [
+        {
+          vendorId: "v-acme",
+          productId: null,
+          versionId: null,
+          versionRange: null,
+        },
+      ],
+      groups,
+    );
     expect(matches.map((m) => m.deviceGroup.id).sort()).toEqual(["a", "b"]);
     expect(matches.every((m) => m.matchStatus === "VENDOR")).toBe(true);
   });
 
-  it("keeps the strongest match status when multiple match objects overlap", () => {
+  it("keeps the strongest match status when multiple matchings overlap", () => {
     const matches = resolveMatches(
       [
-        { vendor: "Acme" }, // VENDOR for group a
-        { vendor: "Acme", product: "Radiator", version: "2.1.3" }, // VERSION for group a
+        {
+          vendorId: "v-acme",
+          productId: null,
+          versionId: null,
+          versionRange: null,
+        }, // VENDOR for group a
+        {
+          vendorId: "v-acme",
+          productId: "p-radiator",
+          versionId: "ver-213",
+          versionRange: null,
+        }, // VERSION for group a
       ],
       groups,
     );
@@ -139,6 +224,18 @@ describe("resolveMatches", () => {
   });
 
   it("returns nothing when no group matches", () => {
-    expect(resolveMatches([{ vendor: "Nobody" }], groups)).toEqual([]);
+    expect(
+      resolveMatches(
+        [
+          {
+            vendorId: "v-nobody",
+            productId: null,
+            versionId: null,
+            versionRange: null,
+          },
+        ],
+        groups,
+      ),
+    ).toEqual([]);
   });
 });

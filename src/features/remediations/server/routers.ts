@@ -11,7 +11,6 @@ import {
   fetchPaginated,
   processIntegrationSync,
   processIntegrationToken,
-  toMatchObjectCreateData,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
 import { processArtifactHosting } from "@/lib/s3";
@@ -135,7 +134,7 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { matchObjects, artifacts, ...dataInput } = input;
+      const { artifacts, ...dataInput } = input;
       const userId = ctx.auth.user.id;
 
       // Handle S3 upload URL -- if the user included a hash/size but no downloadUrl, they want us to host it
@@ -156,9 +155,6 @@ export const remediationsRouter = createTRPCRouter({
         const remediation = await tx.remediation.create({
           data: {
             ...dataInput,
-            matchObjects: {
-              create: toMatchObjectCreateData(matchObjects),
-            },
             userId,
           },
         });
@@ -211,28 +207,15 @@ export const remediationsRouter = createTRPCRouter({
           model: prisma.remediation,
           mappingModel: prisma.externalRemediationMapping,
           transformInputItem: async (item, userId) => {
-            const {
-              matchObjects,
-              vendorId: _vendorId,
-              artifacts,
-              ...itemData
-            } = item;
-            const matchObjectData = toMatchObjectCreateData(matchObjects);
+            const { vendorId: _vendorId, artifacts, ...itemData } = item;
 
             return {
               createData: {
                 ...itemData,
                 userId,
-                matchObjects: {
-                  create: matchObjectData,
-                },
               },
               updateData: {
                 ...itemData,
-                matchObjects: {
-                  deleteMany: {},
-                  create: matchObjectData,
-                },
               },
               uniqueFieldConditions: [],
               artifactsData: {
@@ -356,7 +339,7 @@ export const remediationsRouter = createTRPCRouter({
       // Verify ownership and get current data
       await requireOwnership(input.id, ctx.auth.user.id, "remediation");
 
-      const { id, matchObjects, artifacts = [], ...updateData } = input;
+      const { id, artifacts = [], ...updateData } = input;
 
       // Prepare update data
       const { processedArtifacts, uploadInstructions } =
@@ -377,14 +360,6 @@ export const remediationsRouter = createTRPCRouter({
             vulnerabilityId: updateData.vulnerabilityId,
           }),
         };
-
-        // Replace match objects if provided
-        if (matchObjects) {
-          data.matchObjects = {
-            deleteMany: {},
-            create: toMatchObjectCreateData(matchObjects),
-          };
-        }
 
         await tx.remediation.update({
           where: { id },

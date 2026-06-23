@@ -2,7 +2,7 @@ import { Prisma, TriggerEnum } from "@/generated/prisma";
 import type { PayloadToResult } from "@/generated/prisma/runtime/library";
 import { inngest } from "@/inngest/client";
 import prisma from "./db";
-import { matchObjectWhere, resolveMatches } from "./device-matching";
+import { deviceGroupWhereForMatching, resolveMatches } from "./device-matching";
 import { getBaseUrl } from "./url-utils";
 import { sendWebhook } from "./utils";
 
@@ -82,25 +82,31 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
           // cast id to string. we know a string exists since create succeeded
           const vulnerabilityId = vulnerability.id as string;
 
-          // Resolve this vuln's match objects to concrete device groups, then
-          // find every asset in those groups and open issues for them.
-          const matchObjects = await client.dGMatchObject.findMany({
-            where: { vulnerabilityId },
+          // Resolve this vuln's matchings to concrete device groups, then find
+          // every asset in those groups and open issues for them.
+          const matchings = await client.deviceGroupMatching.findMany({
+            where: { vulnerabilities: { some: { id: vulnerabilityId } } },
             select: {
-              vendor: true,
-              product: true,
-              version: true,
+              vendorId: true,
+              productId: true,
+              versionId: true,
               versionRange: true,
             },
           });
 
-          if (matchObjects.length > 0) {
+          if (matchings.length > 0) {
             const candidateGroups = await client.deviceGroup.findMany({
-              where: { OR: matchObjects.map(matchObjectWhere) },
-              select: { id: true, vendor: true, product: true, version: true },
+              where: { OR: matchings.map(deviceGroupWhereForMatching) },
+              select: {
+                id: true,
+                vendorId: true,
+                productId: true,
+                versionId: true,
+                version: { select: { canonicalName: true } },
+              },
             });
             const matchedGroupIds = resolveMatches(
-              matchObjects,
+              matchings,
               candidateGroups,
             ).map((match) => match.deviceGroup.id);
 

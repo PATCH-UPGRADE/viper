@@ -16,7 +16,7 @@ import {
 describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
   const payload = {
     sarif: { tool: { driver: { name: "TestScanner" } } },
-    matchObjects: [generateMatchObject("vuln_v1")],
+    deviceGroupMatchings: [generateMatchObject("vuln_v1")],
     exploitUri: "https://exploit-db.com/1234",
     upstreamApi: "https://nvd.nist.gov/api",
     description: "Mock -- Buffer overflow in device X",
@@ -47,7 +47,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     items: [
       {
         sarif: { tool: { driver: { name: "MockScanner" } } },
-        matchObjects: [generateMatchObject("vuln_integration_v10")],
+        deviceGroupMatchings: [generateMatchObject("vuln_integration_v10")],
         exploitUri: "https://mock-exploit-db.com/vuln-001",
         upstreamApi: "https://mock-vuln-upstream-api.com/",
         description: `${descDeleteKeyWord} -- Critical buffer overflow in imaging device`,
@@ -57,7 +57,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       },
       {
         sarif: { tool: { driver: { name: "MockScanner" } } },
-        matchObjects: [generateMatchObject("vuln_integration_v11")],
+        deviceGroupMatchings: [generateMatchObject("vuln_integration_v11")],
         exploitUri: "https://mock-exploit-db.com/vuln-002",
         upstreamApi: "https://mock-vuln-upstream-api.com/",
         description: `${descDeleteKeyWord} -- Authentication bypass vulnerability`,
@@ -145,18 +145,21 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(foundIssue[0].assetId).toBe(postAssetRes.body.id);
     expect(foundIssue[0].vulnerabilityId).toBe(res.body.id);
 
-    expect(Array.isArray(detailRes.body.matchObjects)).toBe(true);
+    expect(Array.isArray(detailRes.body.deviceGroupMatchings)).toBe(true);
 
     // Check that the array has one element
-    expect(detailRes.body.matchObjects.length).toBe(1);
+    expect(detailRes.body.deviceGroupMatchings.length).toBe(1);
 
     // Check that the single object in the array has the correct match values
-    expect(detailRes.body.matchObjects[0]).toEqual(
-      expect.objectContaining({
-        vendor: payload.matchObjects[0].vendor,
-        product: payload.matchObjects[0].product,
-        version: payload.matchObjects[0].version,
-      }),
+    const matching = detailRes.body.deviceGroupMatchings[0];
+    expect(matching.vendor.canonicalName).toBe(
+      payload.deviceGroupMatchings[0].vendor,
+    );
+    expect(matching.product?.canonicalName).toBe(
+      payload.deviceGroupMatchings[0].product,
+    );
+    expect(matching.version?.canonicalName).toBe(
+      payload.deviceGroupMatchings[0].version,
     );
 
     const deleteRes = await request(BASE_URL)
@@ -211,12 +214,11 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       });
       await prisma.deviceGroup.deleteMany({
         where: {
-          cpes: {
-            some: {
-              cpe: {
-                contains: "vuln_integration_",
-              },
-            },
+          cpe: {
+            hasSome: [
+              generateCPE("vuln_integration_v10"),
+              generateCPE("vuln_integration_v11"),
+            ],
           },
         },
       });
@@ -242,7 +244,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
         id: mapping1.itemId,
       },
       include: {
-        matchObjects: true,
+        deviceGroupMatchings: { include: { version: true } },
       },
     });
 
@@ -255,11 +257,11 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(foundVuln1.upstreamApi).toBe(vulnPayload1.upstreamApi);
     expect(foundVuln1.exploitUri).toBe(vulnPayload1.exploitUri);
     expect(foundVuln1.sarif).toStrictEqual(vulnPayload1.sarif);
-    expect(foundVuln1.matchObjects.length).toBe(
-      vulnPayload1.matchObjects.length,
+    expect(foundVuln1.deviceGroupMatchings.length).toBe(
+      vulnPayload1.deviceGroupMatchings.length,
     );
-    expect(foundVuln1.matchObjects[0].version).toBe(
-      vulnPayload1.matchObjects[0].version,
+    expect(foundVuln1.deviceGroupMatchings[0].version?.canonicalName).toBe(
+      vulnPayload1.deviceGroupMatchings[0].version,
     );
 
     const vulnPayload2 = vulnerabilityIntegrationPayload.items[1];
@@ -276,7 +278,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
         id: mapping2.itemId,
       },
       include: {
-        matchObjects: true,
+        deviceGroupMatchings: { include: { version: true } },
       },
     });
 
@@ -289,11 +291,11 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(foundVuln2.upstreamApi).toBe(vulnPayload2.upstreamApi);
     expect(foundVuln2.exploitUri).toBe(vulnPayload2.exploitUri);
     expect(foundVuln2.sarif).toStrictEqual(vulnPayload2.sarif);
-    expect(foundVuln2.matchObjects.length).toBe(
-      vulnPayload2.matchObjects.length,
+    expect(foundVuln2.deviceGroupMatchings.length).toBe(
+      vulnPayload2.deviceGroupMatchings.length,
     );
-    expect(foundVuln2.matchObjects[0].version).toBe(
-      vulnPayload2.matchObjects[0].version,
+    expect(foundVuln2.deviceGroupMatchings[0].version?.canonicalName).toBe(
+      vulnPayload2.deviceGroupMatchings[0].version,
     );
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {

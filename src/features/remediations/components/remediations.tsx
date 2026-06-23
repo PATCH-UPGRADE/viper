@@ -30,7 +30,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { matchObjectsSummary } from "@/lib/string-utils";
+import { deviceGroupMatchingsSummary } from "@/lib/string-utils";
 import { formatFileSize } from "@/lib/utils";
 import {
   useRemoveRemediation,
@@ -175,13 +175,17 @@ function RemediationDrawer({
           variant="link"
           className="text-foreground h-auto p-0 text-left font-medium"
         >
-          {matchObjectsSummary(remediation.matchObjects) || "Unknown"}
+          {deviceGroupMatchingsSummary(
+            remediation.vulnerability?.deviceGroupMatchings ?? [],
+          ) || "Unknown"}
         </Button>
       </DrawerTrigger>
       <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
         <DrawerHeader className="gap-1">
           <DrawerTitle>
-            {matchObjectsSummary(remediation.matchObjects) || "Unknown"}
+            {deviceGroupMatchingsSummary(
+              remediation.vulnerability?.deviceGroupMatchings ?? [],
+            ) || "Unknown"}
           </DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
             <Badge variant="outline" className="text-primary">
@@ -248,7 +252,9 @@ function RemediationDrawer({
                   Affected Products
                 </div>
                 <code className="text-xs bg-muted px-2 py-1 rounded">
-                  {matchObjectsSummary(remediation.matchObjects) || "N/A"}
+                  {deviceGroupMatchingsSummary(
+                    remediation.vulnerability?.deviceGroupMatchings ?? [],
+                  ) || "N/A"}
                 </code>
               </div>
 

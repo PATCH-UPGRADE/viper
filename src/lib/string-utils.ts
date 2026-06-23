@@ -28,48 +28,61 @@ export function formatResourceName(modelName: string | symbol): string {
   return capitalize(String(modelName));
 }
 
+type CanonicalRef = { canonicalDisplayName: string } | null | undefined;
+
+const displayName = (ref: CanonicalRef): string | undefined =>
+  ref && ref.canonicalDisplayName !== "-"
+    ? ref.canonicalDisplayName
+    : undefined;
+
 type DeviceGroupDisplay = {
-  vendor: string;
-  product: string;
-  version?: string | null;
-  cpes?: { cpe: string }[];
+  vendor?: CanonicalRef;
+  product?: CanonicalRef;
+  version?: CanonicalRef;
+  cpe?: string[];
 };
 
 /**
  * Human-readable label for a device group, e.g. "Acme InfusionPump".
- * Falls back to "Unknown device" when vendor/product are unknown ("-").
+ * Falls back to "Unknown device" when vendor/product are unknown.
  */
 export function deviceGroupLabel(dg: DeviceGroupDisplay): string {
-  const parts = [dg.vendor, dg.product].filter((p) => p && p !== "-");
+  const parts = [displayName(dg.vendor), displayName(dg.product)].filter(
+    Boolean,
+  );
   return parts.length > 0 ? parts.join(" ") : "Unknown device";
 }
 
 /** Comma-joined list of a device group's CPE strings. */
 export function deviceGroupCpeList(dg: DeviceGroupDisplay): string {
-  return dg.cpes?.map((c) => c.cpe).join(", ") ?? "";
+  return (dg.cpe ?? []).join(", ");
 }
 
-type MatchObjectDisplay = {
-  vendor: string;
-  product?: string | null;
-  version?: string | null;
+type DeviceGroupMatchingDisplay = {
+  vendor?: CanonicalRef;
+  product?: CanonicalRef;
+  version?: CanonicalRef;
   versionRange?: string | null;
 };
 
 /**
- * Human-readable label for a match object, e.g. "Acme Radiator 2.1.3" or
- * "Acme Radiator vers:semver/>=2.0|<3.0".
+ * Human-readable label for a device-group matching, e.g. "Acme Radiator 2.1.3"
+ * or "Acme Radiator vers:semver/>=2.0|<3.0".
  */
-export function matchObjectLabel(mo: MatchObjectDisplay): string {
-  const parts = [mo.vendor, mo.product, mo.version ?? mo.versionRange].filter(
-    Boolean,
-  );
+export function deviceGroupMatchingLabel(
+  m: DeviceGroupMatchingDisplay,
+): string {
+  const parts = [
+    displayName(m.vendor),
+    displayName(m.product),
+    displayName(m.version) ?? m.versionRange ?? undefined,
+  ].filter(Boolean);
   return parts.join(" ");
 }
 
-/** Comma-joined summary of a set of match objects. */
-export function matchObjectsSummary(
-  matchObjects: MatchObjectDisplay[],
+/** Comma-joined summary of a set of device-group matchings. */
+export function deviceGroupMatchingsSummary(
+  matchings: DeviceGroupMatchingDisplay[],
 ): string {
-  return matchObjects.map(matchObjectLabel).join(", ");
+  return matchings.map(deviceGroupMatchingLabel).join(", ");
 }

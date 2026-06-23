@@ -59,17 +59,51 @@ const DEVICE_GROUP = {
 const DEVICE_GROUP_CPE =
   "cpe:2.3:h:baxter:life2000_ventilation_system:06.08.00.00:*:*:*:*:*:*:*";
 
-type DeviceGroupIdentity = {
-  vendor: string;
-  product: string;
-  version: string | null;
+type GroupIdentity = {
+  vendorId: string | null;
+  productId: string | null;
+  versionId: string | null;
 };
 
-const matchObjectFor = (dg: DeviceGroupIdentity) => ({
-  vendor: dg.vendor,
-  product: dg.product,
-  version: dg.version,
-});
+// Canonical resolvers (canonicalName is @unique → upsert is race-safe).
+function upsertVendor(name: string) {
+  const canonicalName = name.trim().toLowerCase();
+  return prisma.vendor.upsert({
+    where: { canonicalName },
+    update: {},
+    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+  });
+}
+function upsertProduct(name: string) {
+  const canonicalName = name.trim().toLowerCase();
+  return prisma.product.upsert({
+    where: { canonicalName },
+    update: {},
+    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+  });
+}
+function upsertVersion(name: string) {
+  const canonicalName = name.trim().toLowerCase();
+  return prisma.version.upsert({
+    where: { canonicalName },
+    update: {},
+    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+  });
+}
+
+// Find-or-create a shared DeviceGroupMatching for a device-group identity.
+async function matchingIdFor(dg: GroupIdentity): Promise<string> {
+  const where = {
+    vendorId: dg.vendorId ?? "",
+    productId: dg.productId,
+    versionId: dg.versionId,
+    versionRange: null,
+  };
+  const existing = await prisma.deviceGroupMatching.findFirst({ where });
+  const matching =
+    existing ?? (await prisma.deviceGroupMatching.create({ data: where }));
+  return matching.id;
+}
 
 const ASSETS = [
   {
@@ -622,24 +656,32 @@ async function createOrGetSeedUser() {
 async function seedDeviceGroup() {
   console.log("\n🌱 Upserting Baxter Life2000 device group...");
 
-  const existing = await prisma.deviceGroup.findFirst({
-    where: DEVICE_GROUP,
-  });
+  const vendor = await upsertVendor(DEVICE_GROUP.vendor);
+  const product = await upsertProduct(DEVICE_GROUP.product);
+  const version = await upsertVersion(DEVICE_GROUP.version);
+
+  const identity = {
+    vendorId: vendor.id,
+    productId: product.id,
+    versionId: version.id,
+    versionStatus: "KNOWN" as const,
+  };
+
+  const existing = await prisma.deviceGroup.findFirst({ where: identity });
   const deviceGroup =
-    existing ?? (await prisma.deviceGroup.create({ data: DEVICE_GROUP }));
+    existing ??
+    (await prisma.deviceGroup.create({
+      data: { ...identity, cpe: [DEVICE_GROUP_CPE] },
+    }));
 
-  await prisma.deviceGroupCpe.upsert({
-    where: {
-      deviceGroupId_cpe: {
-        deviceGroupId: deviceGroup.id,
-        cpe: DEVICE_GROUP_CPE,
-      },
-    },
-    update: {},
-    create: { deviceGroupId: deviceGroup.id, cpe: DEVICE_GROUP_CPE },
-  });
+  if (existing && !existing.cpe.includes(DEVICE_GROUP_CPE)) {
+    await prisma.deviceGroup.update({
+      where: { id: deviceGroup.id },
+      data: { cpe: [...existing.cpe, DEVICE_GROUP_CPE] },
+    });
+  }
 
-  console.log(`✅ Device group: ${deviceGroup.product} (${deviceGroup.id})`);
+  console.log(`✅ Device group: ${DEVICE_GROUP.product} (${deviceGroup.id})`);
   return deviceGroup;
 }
 
@@ -660,11 +702,10 @@ async function seedAssets(userId: string, deviceGroupId: string) {
   return assets;
 }
 
-async function seedVulnerabilities(
-  userId: string,
-  deviceGroup: DeviceGroupIdentity,
-) {
+async function seedVulnerabilities(userId: string, deviceGroup: GroupIdentity) {
   console.log("\n🌱 Seeding vulnerabilities...");
+
+  const matchingId = await matchingIdFor(deviceGroup);
 
   const vulns = await Promise.all(
     VULNERABILITIES.map(async ({ ...data }) => {
@@ -676,7 +717,7 @@ async function seedVulnerabilities(
         data: {
           ...data,
           userId,
-          matchObjects: { create: [matchObjectFor(deviceGroup)] },
+          deviceGroupMatchings: { connect: { id: matchingId } },
         },
       });
     }),
@@ -686,11 +727,7 @@ async function seedVulnerabilities(
   return vulns;
 }
 
-async function seedAdvisory(
-  userId: string,
-  deviceGroup: DeviceGroupIdentity,
-  vulnIds: string[],
-) {
+async function seedAdvisory(userId: string, vulnIds: string[]) {
   console.log("\n🌱 Upserting advisory...");
 
   const UPSTREAM_URL =
@@ -710,10 +747,6 @@ async function seedAdvisory(
       referencedVulnerabilities: {
         set: vulnIds.map((id) => ({ id })),
       },
-      matchObjects: {
-        deleteMany: {},
-        create: [matchObjectFor(deviceGroup)],
-      },
     },
     create: {
       userId,
@@ -728,9 +761,6 @@ async function seedAdvisory(
       csaf: CSAF_JSON,
       referencedVulnerabilities: {
         connect: vulnIds.map((id) => ({ id })),
-      },
-      matchObjects: {
-        create: [matchObjectFor(deviceGroup)],
       },
     },
   });
@@ -751,7 +781,6 @@ async function main() {
   const vulns = await seedVulnerabilities(integrationUser.id, deviceGroup);
   await seedAdvisory(
     integrationUser.id,
-    deviceGroup,
     vulns.map((v) => v.id),
   );
 

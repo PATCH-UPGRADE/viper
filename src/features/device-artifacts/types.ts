@@ -3,6 +3,8 @@ import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   cpeSchema,
   createIntegrationInputSchema,
+  deviceGroupMatchingInputSchema,
+  deviceGroupMatchingResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -12,13 +14,24 @@ import {
   artifactWrapperSelect,
   artifactWrapperWithUrlsSchema,
 } from "../artifacts/types";
-import {
-  deviceGroupSelect,
-  deviceGroupWithUrlsSchema,
-} from "../device-groups/types";
+
+const canonicalRefInclude = {
+  select: { canonicalName: true, canonicalDisplayName: true },
+} as const;
+
+const matchingInclude = {
+  include: {
+    vendor: canonicalRefInclude,
+    product: canonicalRefInclude,
+    version: canonicalRefInclude,
+  },
+} as const;
 
 export const deviceArtifactInputSchema = z.object({
+  // The device this artifact is for (resolved to an identity matching).
   cpe: cpeSchema,
+  // Optional SBOM components this artifact contains (auto-parsing deferred).
+  componentMatchings: z.array(deviceGroupMatchingInputSchema).optional(),
   role: z.string().min(1, "Role is required"),
   description: z.string().min(1, "Description is required"),
   upstreamApi: safeUrlSchema.nullish(),
@@ -36,6 +49,7 @@ export const deviceArtifactUpdateSchema = z.object({
   description: z.string().optional(),
   upstreamApi: safeUrlSchema.optional(),
   cpe: cpeSchema.optional(),
+  componentMatchings: z.array(deviceGroupMatchingInputSchema).optional(),
 });
 
 export const deviceArtifactResponseSchema = z.object({
@@ -46,7 +60,7 @@ export const deviceArtifactResponseSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
   user: userSchema,
-  deviceGroup: deviceGroupWithUrlsSchema,
+  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
   artifacts: z.array(artifactWrapperWithUrlsSchema),
 });
 export type DeviceArtifactResponse = z.infer<
@@ -69,6 +83,6 @@ export const paginatedDeviceArtifactResponseSchema =
 
 export const deviceArtifactInclude = {
   user: userIncludeSelect,
-  deviceGroup: deviceGroupSelect,
+  deviceGroupMatchings: matchingInclude,
   artifacts: artifactWrapperSelect,
 };

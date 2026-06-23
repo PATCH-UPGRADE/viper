@@ -217,8 +217,28 @@ function generateNetworkFlowMarkdown(topology: NetworkTopology | null): string {
 
 // ─── Prisma includes ──────────────────────────────────────────────────────────
 
+const canonicalNameSelect = {
+  select: { canonicalDisplayName: true },
+} as const;
+
+const matchingContextSelect = {
+  select: {
+    vendor: canonicalNameSelect,
+    product: canonicalNameSelect,
+    version: canonicalNameSelect,
+    versionRange: true,
+  },
+} as const;
+
 export const assetContextInclude = {
-  deviceGroup: true,
+  deviceGroup: {
+    select: {
+      vendor: canonicalNameSelect,
+      product: canonicalNameSelect,
+      version: canonicalNameSelect,
+      cpe: true,
+    },
+  },
   issues: {
     include: {
       vulnerability: {
@@ -233,14 +253,7 @@ export type AssetForContext = Prisma.AssetGetPayload<{
 }>;
 
 export const vulnerabilityContextInclude = {
-  matchObjects: {
-    select: {
-      vendor: true,
-      product: true,
-      version: true,
-      versionRange: true,
-    },
-  },
+  deviceGroupMatchings: matchingContextSelect,
   remediations: { select: { id: true, description: true } },
   issues: {
     include: {
@@ -263,13 +276,11 @@ export type VulnerabilityForContext = Prisma.VulnerabilityGetPayload<{
 }>;
 
 export const remediationContextInclude = {
-  vulnerability: { select: { id: true, cveId: true } },
-  matchObjects: {
+  vulnerability: {
     select: {
-      vendor: true,
-      product: true,
-      version: true,
-      versionRange: true,
+      id: true,
+      cveId: true,
+      deviceGroupMatchings: matchingContextSelect,
     },
   },
   issueRemediations: {

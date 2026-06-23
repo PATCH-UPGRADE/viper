@@ -229,11 +229,13 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         });
     });
 
-    // Verify the response structure
-    expect(createdDeviceArtifact).toHaveProperty("deviceGroup");
+    // Verify the response structure: a device-group matching reflects the CPE's
+    // vendor/product/version.
+    expect(createdDeviceArtifact).toHaveProperty("deviceGroupMatchings");
     expect(
-      createdDeviceArtifact.deviceGroup.cpes.some(
-        (c: { cpe: string }) => c.cpe === payload.cpe,
+      createdDeviceArtifact.deviceGroupMatchings.some(
+        (m: { version: { canonicalName: string } | null }) =>
+          m.version?.canonicalName === payload.cpe.split(":")[5].toLowerCase(),
       ),
     ).toBe(true);
 
@@ -303,8 +305,9 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
     expect(updateCpeRes.status).toBe(200);
     expect(
-      updateCpeRes.body.deviceGroup.cpes.some(
-        (c: { cpe: string }) => c.cpe === newCpe,
+      updateCpeRes.body.deviceGroupMatchings.some(
+        (m: { version: { canonicalName: string } | null }) =>
+          m.version?.canonicalName === newCpe.split(":")[5].toLowerCase(),
       ),
     ).toBe(true);
 
@@ -406,12 +409,10 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       );
       await prisma.deviceGroup.deleteMany({
         where: {
-          cpes: {
-            some: {
-              cpe: {
-                contains: cpeName,
-              },
-            },
+          cpe: {
+            hasSome: Array.from({ length: 5 }, (_, i) =>
+              generateCPE(`${cpeName}${i}`),
+            ),
           },
         },
       });
@@ -469,7 +470,21 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     const cpe1 = generateCPE("dev_art_group1");
     const cpe2 = generateCPE("dev_art_group2");
 
-    // Create device artifacts with different CPEs
+    // Device artifacts no longer create device groups; create assets to
+    // materialize the groups, then artifacts whose identity matches them.
+    const assetRes1 = await request(BASE_URL)
+      .post("/assets")
+      .set(authHeader)
+      .send({ ip: "10.90.0.1", cpe: cpe1, upstreamApi: "https://example.com" });
+    const assetRes2 = await request(BASE_URL)
+      .post("/assets")
+      .set(authHeader)
+      .send({ ip: "10.90.0.2", cpe: cpe2, upstreamApi: "https://example.com" });
+    expect(assetRes1.status).toBe(200);
+    expect(assetRes2.status).toBe(200);
+    const deviceGroupId1 = assetRes1.body.deviceGroup.id;
+    const deviceGroupId2 = assetRes2.body.deviceGroup.id;
+
     const createRes1 = await request(BASE_URL)
       .post("/deviceArtifacts")
       .set(authHeader)
@@ -478,7 +493,6 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         cpe: cpe1,
         description: "Device artifact for group 1",
       });
-
     const createRes2 = await request(BASE_URL)
       .post("/deviceArtifacts")
       .set(authHeader)
@@ -487,49 +501,47 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         cpe: cpe2,
         description: "Device artifact for group 2",
       });
-
     expect(createRes1.status).toBe(200);
     expect(createRes2.status).toBe(200);
-
-    const deviceGroupId1 = createRes1.body.deviceArtifact.deviceGroup.id;
-    const deviceGroupId2 = createRes2.body.deviceArtifact.deviceGroup.id;
+    const da1Id = createRes1.body.deviceArtifact.id;
+    const da2Id = createRes2.body.deviceArtifact.id;
 
     onTestFinished(async () => {
       await prisma.deviceArtifact
-        .delete({ where: { id: createRes1.body.deviceArtifact.id } })
-        .catch(() => {
-          /* already deleted */
-        });
+        .delete({ where: { id: da1Id } })
+        .catch(() => {});
       await prisma.deviceArtifact
-        .delete({ where: { id: createRes2.body.deviceArtifact.id } })
-        .catch(() => {
-          /* already deleted */
-        });
+        .delete({ where: { id: da2Id } })
+        .catch(() => {});
+      await prisma.asset
+        .delete({ where: { id: assetRes1.body.id } })
+        .catch(() => {});
+      await prisma.asset
+        .delete({ where: { id: assetRes2.body.id } })
+        .catch(() => {});
     });
 
-    // Get device artifacts for group 1
+    // Group 1 lists da1 but not da2
     const group1Res = await request(BASE_URL)
       .get(`/deviceGroups/${deviceGroupId1}/deviceArtifacts`)
       .set(authHeader);
-
     expect(group1Res.status).toBe(200);
-    expect(group1Res.body.items.length).toBeGreaterThan(0);
-    const allInGroup1 = group1Res.body.items.every(
-      (d: DeviceArtifactResponse) => d.deviceGroup.id === deviceGroupId1,
+    const group1Ids = group1Res.body.items.map(
+      (d: DeviceArtifactResponse) => d.id,
     );
-    expect(allInGroup1).toBe(true);
+    expect(group1Ids).toContain(da1Id);
+    expect(group1Ids).not.toContain(da2Id);
 
-    // Get device artifacts for group 2
+    // Group 2 lists da2 but not da1
     const group2Res = await request(BASE_URL)
       .get(`/deviceGroups/${deviceGroupId2}/deviceArtifacts`)
       .set(authHeader);
-
     expect(group2Res.status).toBe(200);
-    expect(group2Res.body.items.length).toBeGreaterThan(0);
-    const allInGroup2 = group2Res.body.items.every(
-      (d: DeviceArtifactResponse) => d.deviceGroup.id === deviceGroupId2,
+    const group2Ids = group2Res.body.items.map(
+      (d: DeviceArtifactResponse) => d.id,
     );
-    expect(allInGroup2).toBe(true);
+    expect(group2Ids).toContain(da2Id);
+    expect(group2Ids).not.toContain(da1Id);
   });
 
   it("empty DeviceArtifact uploadIntegration endpoint int test", async () => {
@@ -579,12 +591,11 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
     await prisma.deviceGroup.deleteMany({
       where: {
-        cpes: {
-          some: {
-            cpe: {
-              contains: "dev_art_integration_",
-            },
-          },
+        cpe: {
+          hasSome: [
+            deviceArtifactsIntegrationPayload.items[0].cpe,
+            deviceArtifactsIntegrationPayload.items[1].cpe,
+          ],
         },
       },
     });
@@ -613,7 +624,9 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         id: mapping1.itemId,
       },
       include: {
-        deviceGroup: { include: { cpes: true } },
+        deviceGroupMatchings: {
+          include: { vendor: true, product: true, version: true },
+        },
         artifacts: true,
       },
     });
@@ -624,8 +637,10 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     expect(foundDeviceArtifact1.description).toBe(daPayload1.description);
     expect(foundDeviceArtifact1.upstreamApi).toBe(daPayload1.upstreamApi);
     expect(
-      foundDeviceArtifact1.deviceGroup.cpes.some(
-        (c) => c.cpe === daPayload1.cpe,
+      foundDeviceArtifact1.deviceGroupMatchings.some(
+        (m: { product: { canonicalName: string } | null }) =>
+          m.product?.canonicalName ===
+          daPayload1.cpe.split(":")[4].toLowerCase(),
       ),
     ).toBe(true);
     expect(foundDeviceArtifact1.artifacts.length).toBe(1);
@@ -643,7 +658,9 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         id: mapping2.itemId,
       },
       include: {
-        deviceGroup: { include: { cpes: true } },
+        deviceGroupMatchings: {
+          include: { vendor: true, product: true, version: true },
+        },
         artifacts: true,
       },
     });
@@ -654,8 +671,10 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     expect(foundDeviceArtifact2.description).toBe(daPayload2.description);
     expect(foundDeviceArtifact2.upstreamApi).toBe(daPayload2.upstreamApi);
     expect(
-      foundDeviceArtifact2.deviceGroup.cpes.some(
-        (c) => c.cpe === daPayload2.cpe,
+      foundDeviceArtifact2.deviceGroupMatchings.some(
+        (m: { product: { canonicalName: string } | null }) =>
+          m.product?.canonicalName ===
+          daPayload2.cpe.split(":")[4].toLowerCase(),
       ),
     ).toBe(true);
     expect(foundDeviceArtifact2.artifacts.length).toBe(1);

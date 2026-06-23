@@ -4,8 +4,7 @@ import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   alohaResponseSchema,
   createIntegrationInputSchema,
-  dgMatchObjectInputSchema,
-  dgMatchObjectResponseSchema,
+  deviceGroupMatchingResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -16,9 +15,12 @@ import {
   artifactWrapperWithUrlsSchema,
 } from "../artifacts/types";
 
+const canonicalRefInclude = {
+  select: { canonicalName: true, canonicalDisplayName: true },
+} as const;
+
 // Validation schemas
 export const remediationInputSchema = z.object({
-  matchObjects: z.array(dgMatchObjectInputSchema).min(1),
   vulnerabilityId: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
@@ -34,7 +36,6 @@ export const integrationRemediationInputSchema = createIntegrationInputSchema(
 
 export const remediationUpdateSchema = z.object({
   id: z.string(),
-  matchObjects: z.array(dgMatchObjectInputSchema).optional(),
   vulnerabilityId: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
@@ -45,11 +46,11 @@ export const remediationUpdateSchema = z.object({
 export const vulnerabilitySchema = z.object({
   id: z.string(),
   url: z.string(),
+  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
 });
 
 export const remediationResponseSchema = z.object({
   id: z.string(),
-  matchObjects: z.array(dgMatchObjectResponseSchema),
   upstreamApi: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
@@ -80,13 +81,19 @@ const remediationVulnerabilitySelect = {
   select: {
     id: true,
     url: true,
+    deviceGroupMatchings: {
+      include: {
+        vendor: canonicalRefInclude,
+        product: canonicalRefInclude,
+        version: canonicalRefInclude,
+      },
+    },
   },
 } as const;
 
 export const remediationInclude = {
   user: userIncludeSelect,
   vulnerability: remediationVulnerabilitySelect,
-  matchObjects: true,
   artifacts: artifactWrapperSelect,
 };
 

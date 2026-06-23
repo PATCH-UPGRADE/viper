@@ -43,7 +43,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Priority } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
-import { matchObjectsSummary } from "@/lib/string-utils";
+import { deviceGroupMatchingsSummary } from "@/lib/string-utils";
 import { cn } from "@/lib/utils";
 import {
   useRemoveVulnerability,
@@ -344,7 +344,7 @@ export const VulnerabilityItem = ({
       </div>
       <div className="flex-1 min-w-0">
         <VulnerabilityDrawer vulnerability={data}>
-          {matchObjectsSummary(data.matchObjects)}
+          {deviceGroupMatchingsSummary(data.deviceGroupMatchings)}
         </VulnerabilityDrawer>
         <div className="text-xs text-muted-foreground mt-1">
           {(data.description ?? "").substring(0, 100)}
@@ -377,7 +377,7 @@ export function VulnerabilityDrawer({
     <EntityDrawer trigger={children} {...props}>
       <DrawerHeader className="gap-1">
         <DrawerTitle>
-          {matchObjectsSummary(vulnerability.matchObjects)}
+          {deviceGroupMatchingsSummary(vulnerability.deviceGroupMatchings)}
         </DrawerTitle>
         <DrawerDescription className="flex items-center gap-2">
           <Badge variant="outline" className="text-destructive">
@@ -424,7 +424,9 @@ export function VulnerabilityDrawer({
                 Affected Products
               </div>
               <CopyCode>
-                {matchObjectsSummary(vulnerability.matchObjects)}
+                {deviceGroupMatchingsSummary(
+                  vulnerability.deviceGroupMatchings,
+                )}
               </CopyCode>
             </div>
 

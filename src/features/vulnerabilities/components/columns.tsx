@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 
 import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
-import { matchObjectsSummary } from "@/lib/string-utils";
+import { deviceGroupMatchingsSummary } from "@/lib/string-utils";
 import type { VulnerabilityResponse } from "../types";
 
 export const columns: ColumnDef<VulnerabilityResponse>[] = [
@@ -23,7 +23,9 @@ export const columns: ColumnDef<VulnerabilityResponse>[] = [
     header: "Affected",
     cell: ({ row }) => {
       return (
-        <CopyCode>{matchObjectsSummary(row.original.matchObjects)}</CopyCode>
+        <CopyCode>
+          {deviceGroupMatchingsSummary(row.original.deviceGroupMatchings)}
+        </CopyCode>
       );
     },
   },

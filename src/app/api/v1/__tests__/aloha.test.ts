@@ -7,12 +7,11 @@ import { authHeader, BASE_URL, generateMatchObject } from "./test-config";
 describe("Aloha Endpoints", () => {
   const vulnPayload = {
     sarif: { tool: { driver: { name: "TestScanner" } } },
-    matchObjects: [generateMatchObject("aloha_vuln_v1")],
+    deviceGroupMatchings: [generateMatchObject("aloha_vuln_v1")],
     description: "Mock -- Aloha test vulnerability",
   };
 
   const remPayload = {
-    matchObjects: [generateMatchObject("aloha_rem_v1")],
     description: "Mock -- Aloha test remediation",
     artifacts: [
       {

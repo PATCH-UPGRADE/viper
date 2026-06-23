@@ -31,13 +31,18 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export default prisma;
 
+const canonicalRefSelect = {
+  select: { canonicalName: true, canonicalDisplayName: true },
+} as const;
+
 const deviceGroupSummarySelect = {
   select: {
     id: true,
-    vendor: true,
-    product: true,
-    version: true,
-    cpes: { select: { cpe: true } },
+    vendor: canonicalRefSelect,
+    product: canonicalRefSelect,
+    version: canonicalRefSelect,
+    versionStatus: true,
+    cpe: true,
   },
 } as const;
 
@@ -60,6 +65,6 @@ export type AssetWithDeviceGroup = Prisma.AssetGetPayload<{
 export type VulnerabilityWithIssues = Prisma.VulnerabilityGetPayload<{
   include: {
     issues: true;
-    matchObjects: true;
+    deviceGroupMatchings: true;
   };
 }>;

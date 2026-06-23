@@ -181,65 +181,124 @@ model Connection {
   @@unique([fromNodeId, toNodeId, fromOutput, toInput])
 }
 
-model DeviceGroup {
-  id      String  @id @default(cuid())
-  vendor  String
-  product String
-  version String?
-  gudid   String?
+enum VersionStatus {
+  UNKNOWN
+  NOT_APPLICABLE
+  KNOWN
+}
 
-  cpes       DeviceGroupCpe[]
+// VERS version-range schemes (https://github.com/package-url/vers-spec)
+enum VersScheme {
+  GENERIC
+  SEMVER
+  NPM
+  PYPI
+  MAVEN
+  RPM
+  DEB
+  GEM
+  NUGET
+  GOLANG
+  ALPINE
+  CARGO
+  COMPOSER
+  CONAN
+}
+
+// Canonical vendor registry. `nameMappings` are aliases that resolve to this row.
+model Vendor {
+  id                   String                @id @default(cuid())
+  canonicalName        String                @unique 
+  canonicalDisplayName String 
+  hasCpe               Boolean               @default(false) 
+  nameMappings         String[]              @default([])
+  deviceGroups         DeviceGroup[]
+  matchings            DeviceGroupMatching[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([canonicalName])
+  @@map("vendor")
+}
+
+model Product {
+  id                   String                @id @default(cuid())
+  canonicalName        String                @unique
+  canonicalDisplayName String
+  hasCpe               Boolean               @default(false)
+  nameMappings         String[]              @default([])
+  deviceGroups         DeviceGroup[]
+  matchings            DeviceGroupMatching[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([canonicalName])
+  @@map("product")
+}
+
+model Version {
+  id                   String                @id @default(cuid())
+  canonicalName        String                @unique
+  canonicalDisplayName String
+  hasCpe               Boolean               @default(false)
+  versScheme           VersScheme?
+  deviceGroups         DeviceGroup[]
+  matchings            DeviceGroupMatching[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@map("version")
+}
+
+model DeviceGroup {
+  id String @id @default(cuid())
+
+  vendorId      String?
+  vendor        Vendor?       @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  productId     String?
+  product       Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  versionId     String?
+  version       Version?      @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  versionStatus VersionStatus @default(UNKNOWN)
+
+  cpe        String[] @default([])
+  udi        String?
   helmSbomId String?
 
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   deviceGroupHistories DeviceGroupHistory[]
   assets               Asset[]
-  deviceArtifacts      DeviceArtifact[]
 
   // NOTE: Postgres treats NULLs as distinct, so this composite unique will NOT
-  // prevent two "unknown version" (version = null) rows for the same
-  // vendor/product. Identity resolution is therefore done in the app via
-  // resolveDeviceGroup() (findFirst + create in a transaction), not upsert.
-  @@unique([vendor, product, version], name: "device_group_identity")
-  @@index([vendor, product])
+  // prevent duplicate rows when versionId is null. Identity resolution is done
+  // in the app via resolveDeviceGroup() (findFirst + create in a transaction).
+  @@unique([vendorId, productId, versionId, versionStatus], name: "device_group_identity")
+  @@index([vendorId, productId])
   @@map("device_group")
 }
 
-model DeviceGroupCpe {
-  id            String      @id @default(cuid())
-  cpe           String
-  deviceGroupId String
-  deviceGroup   DeviceGroup @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
-  createdAt     DateTime    @default(now())
 
-  @@unique([deviceGroupId, cpe])
-  @@index([cpe])
-  @@map("device_group_cpe")
-}
+model DeviceGroupMatching {
+  id String @id @default(cuid())
 
-model DGMatchObject {
-  id           String  @id @default(cuid())
-  vendor       String
-  product      String?
-  version      String?
-  versionRange String? // VERS spec string; e.g. "vers:all/*", "vers:semver/>=2.1.2|<=2.1.4"
+  vendorId  String
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  productId String? // null => wildcard (all products of the vendor)
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  versionId String? // exact version when set
+  version   Version? @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
-  vulnerabilityId String?
-  vulnerability   Vulnerability? @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
-  remediationId   String?
-  remediation     Remediation?   @relation(fields: [remediationId], references: [id], onDelete: Cascade)
-  advisoryId      String?
-  advisory        Advisory?      @relation(fields: [advisoryId], references: [id], onDelete: Cascade)
+  versionRange String?
+
+  vulnerabilities Vulnerability[]  @relation("VulnerabilityMatchings")
+  deviceArtifacts DeviceArtifact[] @relation("DeviceArtifactMatchings")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([vendor, product])
-  @@index([vulnerabilityId])
-  @@index([remediationId])
-  @@index([advisoryId])
-  @@map("dg_match_object")
+  @@index([vendorId, productId])
+  @@map("device_group_matching")
 }
 
 model DeviceGroupHistory {
@@ -431,25 +490,25 @@ enum ArtifactType {
 }
 
 model DeviceArtifact {
-  id               String            @id @default(cuid())
-  deviceGroupId    String
-  deviceGroup      DeviceGroup       @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
-  userId           String
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
 
-  artifacts        ArtifactWrapper[]
-  vulnerability    Vulnerability[]
+  deviceGroupMatchings DeviceGroupMatching[] @relation("DeviceArtifactMatchings")
 
-  upstreamApi      String?           @map("upstream-api")
-  description      String?           @db.Text
-  role             String?
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  artifacts     ArtifactWrapper[]
+  vulnerability Vulnerability[]
+
+  upstreamApi String? @map("upstream-api")
+  description String? @db.Text
+  role        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   externalMappings ExternalDeviceArtifactMapping[]
 
-  @@index([deviceGroupId])
   @@index([userId])
   @@map("device_artifact")
 }
@@ -485,7 +544,7 @@ model Vulnerability {
   cvssVector           String?
   sarif                Json
   affectedComponents   String[]        @default([])
-  matchObjects         DGMatchObject[]
+  deviceGroupMatchings DeviceGroupMatching[] @relation("VulnerabilityMatchings")
   advisories           Advisory[]      @relation("AdvisoryVulnerabilities")
   exploitUri           String?         @map("exploit-uri")
   upstreamApi          String?         @map("upstream-api")
@@ -556,7 +615,6 @@ model Remediation {
   id            String      @id @default(cuid())
   artifacts ArtifactWrapper[]
 
-  matchObjects  DGMatchObject[]
   description   String?      @db.Text // description of remediation
   narrative     String?      @db.Text // how a remediation can be applied 
   upstreamApi   String?      @map("upstream-api")
@@ -769,7 +827,6 @@ model Advisory {
   title                     String?
   user                      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   referencedVulnerabilities Vulnerability[] @relation("AdvisoryVulnerabilities")
-  matchObjects              DGMatchObject[]
   csaf                      Json            @default("{}")
   upstreamUrl               String?         @unique
   severity                  Severity

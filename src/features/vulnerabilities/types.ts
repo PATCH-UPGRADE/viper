@@ -8,8 +8,8 @@ import {
 import {
   alohaResponseSchema,
   createIntegrationInputSchema,
-  dgMatchObjectInputSchema,
-  dgMatchObjectResponseSchema,
+  deviceGroupMatchingInputSchema,
+  deviceGroupMatchingResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -20,10 +20,23 @@ import { remediationCardInclude } from "../remediations/types";
 // Validation schemas
 const severitySchema = z.enum(Object.values(Severity));
 
+const canonicalRefInclude = {
+  select: { canonicalName: true, canonicalDisplayName: true },
+} as const;
+
+/** Include for a DeviceGroupMatching with its canonical vendor/product/version. */
+export const deviceGroupMatchingInclude = {
+  include: {
+    vendor: canonicalRefInclude,
+    product: canonicalRefInclude,
+    version: canonicalRefInclude,
+  },
+} as const;
+
 export const vulnerabilityInputSchema = z.object({
-  matchObjects: z
-    .array(dgMatchObjectInputSchema)
-    .min(1, "At least one match object is required"),
+  deviceGroupMatchings: z
+    .array(deviceGroupMatchingInputSchema)
+    .min(1, "At least one device group matching is required"),
   sarif: z.any(), // JSON data - Prisma JsonValue type
   cveId: z.string().min(1).nullish(),
   description: z.string().min(1).nullish(),
@@ -44,14 +57,17 @@ export const vulnerabilityArrayInputSchema = z.object({
 
 // make these two fields optional so users can update any field independently
 export const vulnerabilityUpdateInputSchema = vulnerabilityInputSchema.extend({
-  matchObjects: z.array(dgMatchObjectInputSchema).min(1).optional(),
+  deviceGroupMatchings: z
+    .array(deviceGroupMatchingInputSchema)
+    .min(1)
+    .optional(),
   sarif: z.any().optional(), // JSON data - Prisma JsonValue type
 });
 
 export const vulnerabilityResponseSchema = z.object({
   id: z.string(),
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  matchObjects: z.array(dgMatchObjectResponseSchema),
+  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
   exploitUri: z.string().nullable(),
   upstreamApi: z.string().nullable(),
   description: z.string().nullable(),
@@ -95,12 +111,12 @@ export const vulnerabilitiesByPriorityInputSchema =
 
 export const vulnerabilityInclude = {
   user: userIncludeSelect,
-  matchObjects: true,
+  deviceGroupMatchings: deviceGroupMatchingInclude,
 };
 
 export const vulnerabilityByPriorityInclude = {
   user: userIncludeSelect,
-  matchObjects: true,
+  deviceGroupMatchings: deviceGroupMatchingInclude,
   issues: {
     include: {
       asset: {

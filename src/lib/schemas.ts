@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { AlohaStatus, AuthType } from "@/generated/prisma";
+import {
+  AlohaStatus,
+  AuthType,
+  VersionStatus,
+  VersScheme,
+} from "@/generated/prisma";
 import { createPaginatedResponseWithLinksSchema } from "./pagination";
 
 /**
@@ -55,13 +60,16 @@ export const dgMatchStatusSchema = z.enum([
 ]);
 export type DGMatchStatus = z.infer<typeof dgMatchStatusSchema>;
 
+export const versionStatusSchema = z.enum(Object.values(VersionStatus));
+export const versSchemeSchema = z.enum(Object.values(VersScheme));
+
 /**
- * Describes a (possibly fuzzy) device-group identity that a vulnerability /
- * remediation / advisory affects. `version` and `versionRange` are mutually
- * exclusive ("nand" — at most one may be set). `versionRange` uses the VERS
- * version-range spec (e.g. "vers:all/*", "vers:semver/>=2.1.2|<=2.1.4").
+ * Input describing a (possibly fuzzy) device-group identity that a vulnerability
+ * affects, in free-text form (resolved to canonical Vendor/Product/Version rows
+ * server-side). `version` and `versionRange` are mutually exclusive ("nand").
+ * `versionRange` uses VERS syntax (e.g. "vers:all/*", "vers:semver/>=2.1.2|<=2.1.4").
  */
-export const dgMatchObjectInputSchema = z
+export const deviceGroupMatchingInputSchema = z
   .object({
     vendor: z.string().min(1),
     product: z.string().min(1).nullish(),
@@ -76,17 +84,27 @@ export const dgMatchObjectInputSchema = z
     message: "version requires product to be specified.",
     path: ["version"],
   });
-export type DGMatchObjectInput = z.infer<typeof dgMatchObjectInputSchema>;
+export type DeviceGroupMatchingInput = z.infer<
+  typeof deviceGroupMatchingInputSchema
+>;
 
-/** A stored match object as returned by the API. */
-export const dgMatchObjectResponseSchema = z.object({
+/** A canonical vendor/product/version reference as returned by the API. */
+const canonicalRefSchema = z.object({
+  canonicalName: z.string(),
+  canonicalDisplayName: z.string(),
+});
+
+/** A stored device-group matching as returned by the API. */
+export const deviceGroupMatchingResponseSchema = z.object({
   id: z.string(),
-  vendor: z.string(),
-  product: z.string().nullable(),
-  version: z.string().nullable(),
+  vendor: canonicalRefSchema,
+  product: canonicalRefSchema.nullable(),
+  version: canonicalRefSchema.nullable(),
   versionRange: z.string().nullable(),
 });
-export type DGMatchObjectResponse = z.infer<typeof dgMatchObjectResponseSchema>;
+export type DeviceGroupMatchingResponse = z.infer<
+  typeof deviceGroupMatchingResponseSchema
+>;
 
 export const basicAuthSchema = z.object({
   username: z.string(),

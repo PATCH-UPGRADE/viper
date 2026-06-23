@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { DownloadIcon, ExternalLinkIcon } from "lucide-react";
+import { DownloadIcon } from "lucide-react";
 import {
   EmptyView,
   EntityContainer,
@@ -28,7 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/string-utils";
+import { deviceGroupMatchingsSummary } from "@/lib/string-utils";
 import {
   useRemoveDeviceArtifact,
   useSuspenseDeviceArtifacts,
@@ -155,7 +155,9 @@ export const DeviceArtifactItem = ({
       <div className="flex-1 min-w-0">
         <DeviceArtifactDrawer deviceArtifact={data} />
         <div className="text-xs text-muted-foreground mt-1">
-          {deviceGroupLabel(data.deviceGroup)} &bull; Updated{" "}
+          {deviceGroupMatchingsSummary(data.deviceGroupMatchings) ||
+            "Unknown device"}{" "}
+          &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
         </div>
       </div>
@@ -218,36 +220,16 @@ function DeviceArtifactDrawer({
 
           <Separator />
 
-          {/* Associated Device Group */}
+          {/* Associated device group matchings */}
           <div className="flex flex-col gap-3">
-            <h3 className="font-semibold">Associated Device Group</h3>
+            <h3 className="font-semibold">Device Group Matchings</h3>
 
             <div className="grid grid-cols-1 gap-3">
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  CPE Identifier
-                </div>
-                <code className="text-xs bg-muted px-2 py-1 rounded break-all">
-                  {deviceGroupCpeList(deviceArtifact.deviceGroup)}
-                </code>
-              </div>
-
-              {deviceArtifact.deviceGroup.sbomUrl && (
-                <div>
-                  <div className="text-xs font-medium text-muted-foreground mb-1">
-                    SBOM
-                  </div>
-                  <a
-                    href={deviceArtifact.deviceGroup.sbomUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-                  >
-                    View SBOM
-                    <ExternalLinkIcon className="size-3 flex-shrink-0" />
-                  </a>
-                </div>
-              )}
+              <code className="text-xs bg-muted px-2 py-1 rounded break-all">
+                {deviceGroupMatchingsSummary(
+                  deviceArtifact.deviceGroupMatchings,
+                ) || "None"}
+              </code>
             </div>
           </div>
 

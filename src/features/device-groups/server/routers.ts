@@ -1,11 +1,18 @@
 import "server-only";
 import { z } from "zod";
+import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { fetchSbom } from "@/lib/helm";
-import { fetchPaginated } from "@/lib/router-utils";
+import {
+  fetchPaginated,
+  resolveProduct,
+  resolveVendor,
+  resolveVersion,
+} from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 import {
+  deviceGroupInputSchema,
   deviceGroupWithDetailsSchema,
   deviceGroupWithUrlsSchema,
   helmSbomResponseSchema,
@@ -16,25 +23,14 @@ import {
 const deviceGroupResponseSchema = deviceGroupWithUrlsSchema;
 const deviceGroupDetailsResponseSchema = deviceGroupWithDetailsSchema;
 
-const deviceGroupInputSchema = z
-  .object({
-    id: z.string(),
-    vendor: z.string().optional(),
-    product: z.string().optional(),
-    version: z.string().nullable().optional(),
-    gudid: z.string().nullable().optional(),
-  })
-  .refine(
-    (data) =>
-      data.vendor !== undefined ||
-      data.product !== undefined ||
-      data.version !== undefined ||
-      data.gudid !== undefined,
-    { message: "At least one field must be provided." },
-  );
+const canonicalRefInclude = {
+  select: { canonicalName: true, canonicalDisplayName: true },
+} as const;
 
-const deviceGroupCpeInclude = {
-  cpes: { select: { cpe: true } },
+const deviceGroupRelationInclude = {
+  vendor: canonicalRefInclude,
+  product: canonicalRefInclude,
+  version: canonicalRefInclude,
 } as const;
 
 const deviceGroupInputHelmIdSchema = z.object({
@@ -70,19 +66,16 @@ export const deviceGroupsRouter = createTRPCRouter({
       }
 
       // Build search filter across multiple fields
+      const insensitive = { contains: search, mode: "insensitive" as const };
       const where = search
         ? {
             OR: [
-              { vendor: { contains: search, mode: "insensitive" as const } },
-              { product: { contains: search, mode: "insensitive" as const } },
-              { gudid: { contains: search, mode: "insensitive" as const } },
-              {
-                cpes: {
-                  some: {
-                    cpe: { contains: search, mode: "insensitive" as const },
-                  },
-                },
-              },
+              { vendor: { is: { canonicalName: insensitive } } },
+              { vendor: { is: { canonicalDisplayName: insensitive } } },
+              { product: { is: { canonicalName: insensitive } } },
+              { product: { is: { canonicalDisplayName: insensitive } } },
+              { udi: insensitive },
+              { cpe: { has: search } },
             ],
             updatedAt,
           }
@@ -90,7 +83,7 @@ export const deviceGroupsRouter = createTRPCRouter({
 
       return fetchPaginated(prisma.deviceGroup, input, {
         where: where,
-        include: deviceGroupCpeInclude,
+        include: deviceGroupRelationInclude,
       });
     }),
 
@@ -111,7 +104,7 @@ export const deviceGroupsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const deviceGroup = await prisma.deviceGroup.findUnique({
         where: { id: input.id },
-        include: deviceGroupCpeInclude,
+        include: deviceGroupRelationInclude,
       });
       return requireExistence(deviceGroup, "DeviceGroup");
     }),
@@ -154,11 +147,30 @@ export const deviceGroupsRouter = createTRPCRouter({
     })
     .output(deviceGroupDetailsResponseSchema)
     .mutation(async ({ input }) => {
-      const { id, ...updateData } = input;
-      return prisma.deviceGroup.update({
-        where: { id },
-        data: updateData,
-        include: deviceGroupCpeInclude,
+      const { id, vendor, product, version, versionStatus, udi } = input;
+      return prisma.$transaction(async (tx) => {
+        const data: Prisma.DeviceGroupUpdateInput = {};
+        if (vendor !== undefined) {
+          const row = await resolveVendor(tx, vendor);
+          data.vendor = { connect: { id: row.id } };
+        }
+        if (product !== undefined) {
+          const row = await resolveProduct(tx, product);
+          data.product = { connect: { id: row.id } };
+        }
+        if (version !== undefined) {
+          data.version = version
+            ? { connect: { id: (await resolveVersion(tx, version)).id } }
+            : { disconnect: true };
+        }
+        if (versionStatus !== undefined) data.versionStatus = versionStatus;
+        if (udi !== undefined) data.udi = udi;
+
+        return tx.deviceGroup.update({
+          where: { id },
+          data,
+          include: deviceGroupRelationInclude,
+        });
       });
     }),
 
@@ -183,7 +195,7 @@ export const deviceGroupsRouter = createTRPCRouter({
         data: {
           helmSbomId: helmSbomId,
         },
-        include: deviceGroupCpeInclude,
+        include: deviceGroupRelationInclude,
       });
     }),
 });

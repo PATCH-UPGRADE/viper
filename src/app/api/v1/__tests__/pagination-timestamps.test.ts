@@ -1,18 +1,18 @@
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
 import prisma from "@/lib/db";
-import { authHeader, BASE_URL, generateCPE } from "./test-config";
+import { authHeader, BASE_URL, generateMatchObject } from "./test-config";
 
 describe("Pagination timestamp filters (GET /vulnerabilities)", () => {
   const vulnPayload1 = {
     sarif: { tool: { driver: { name: "TestScanner" } } },
-    cpes: [generateCPE("pag_ts_v1")],
+    matchObjects: [generateMatchObject("pag_ts_v1")],
     description: "Mock -- Pagination timestamp test vulnerability 1",
   };
 
   const vulnPayload2 = {
     sarif: { tool: { driver: { name: "TestScanner" } } },
-    cpes: [generateCPE("pag_ts_v2")],
+    matchObjects: [generateMatchObject("pag_ts_v2")],
     description: "Mock -- Pagination timestamp test vulnerability 2",
   };
 

@@ -1,3 +1,5 @@
+// Determine if an email is relevant to hospital cybersec or not
+
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
@@ -16,6 +18,7 @@ Determine whether an incoming email is relevant to hospital cybersecurity or ope
 RELEVANT: security advisories, CVE/patch notifications, medical device recalls, FDA/ICS-CERT alerts, threat bulletins, vendor security notices, network incident reports, compliance alerts.
 NOT RELEVANT: marketing emails, sales pitches, meeting invitations, thank-you notes, general newsletters, HR communications, billing receipts.`;
 
+// TODO: Consider also having the model review PDF attachments?
 export async function checkEmailRelevance(email: {
   from: string;
   subject: string | null;

@@ -1,3 +1,5 @@
+// Extract potential VIPER db items from a notification (e.g, find potential device groups)
+
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
@@ -8,7 +10,7 @@ import { fetchPdfAttachments } from "../utils";
 // model can emit whatever identifiers it finds; downstream code skips entries
 // with no usable identifier.
 // TODO: add new fields like UDI after VW-283 gets merged in
-// TODO: add new fields like versionRange after VW-283 gets merged in (used to link individual assets?)
+// TODO: add new fields like versionRange after VW-283 gets merged in (used to create a DeviceGroupMatchObject?)
 // vers schema, if we provide that + maybe a skill to use it if necessary, has a way to provide multiple OR versions
 //  https://www.packageurl.org/docs/vers/schemas
 // TODO: if we can find more data to support this, add something like serialRange

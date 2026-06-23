@@ -1,3 +1,5 @@
+// Match extracted items from notification to VIPER db items (e.g, DeviceGroup)
+
 import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";

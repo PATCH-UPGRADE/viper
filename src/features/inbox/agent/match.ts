@@ -1,3 +1,7 @@
+// LLM compares extracted potential db items (eg, device group) with potential
+// VIPER matches and makes decisions to link them to the notification/update a
+// db item/create a new one
+
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";

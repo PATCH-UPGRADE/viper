@@ -1,3 +1,6 @@
+// Returns details to create a new Notification or update an existing one
+// classifies notification as Advisory/Recall/UpdateAvailable/Other (NotificationType)
+
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";

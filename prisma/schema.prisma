@@ -716,6 +716,9 @@ enum IntegrationType {
   CSAF
 }
 
+// Traffic Light Protocol, governs information sharing
+// www.first.org/tlp/
+// Fairly common to see this in emails/advisories sent to hospitals
 enum Tlp {
   // TLP v1
   WHITE
@@ -853,7 +856,7 @@ model Notification {
   tlp     Tlp?
   title   String?
   summary String?          @db.Text
-  details Json?
+  details Json? // unindexed, NotificationType-specific fields
 
   sources         NotificationSource[]
   reads           NotificationRead[]

@@ -1,3 +1,6 @@
+// Resend webhook -> our api -> this process-inbox-email Inngest function
+// Turns an email into a Notification, if relevant
+
 import "server-only";
 import TurndownService from "turndown";
 import { searchCandidates } from "@/features/inbox/agent/candidate-search";
@@ -155,9 +158,10 @@ export const processInboxEmail = inngest.createFunction(
         });
         return source.id;
       } catch (e) {
+        // TODO: Consider also adding a hash to deduplicate emails?
         if (
           e instanceof Prisma.PrismaClientKnownRequestError &&
-          e.code === "P2002"
+          e.code === "P2002" // unique-constraint
         ) {
           console.log(
             `NotificationSource already exists for emailId=${emailId}, skipping`,

@@ -14,7 +14,7 @@ type ArtifactInput = z.infer<typeof artifactInputSchema>;
  * Central S3 client used across Viper
  */
 export const s3Client = new S3Client({
-  region: process.env.AWS_REGION ?? "us-east-1",
+  region: process.env.AWS_REGION,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
@@ -104,6 +104,9 @@ export function buildDownloadUrl(key: string): string {
   if (process.env.S3_ENDPOINT) {
     return `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET_NAME}/${key}`;
   }
+  if (!process.env.AWS_REGION) {
+    throw new Error("Missing AWS Region");
+  }
   return `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 }
 
@@ -114,6 +117,9 @@ export function keyFromDownloadUrl(url: string): string {
   if (endpoint) {
     const prefix = `${endpoint}/${bucket}/`;
     return url.startsWith(prefix) ? url.slice(prefix.length) : url;
+  }
+  if (!process.env.AWS_REGION) {
+    throw new Error("Missing AWS Region");
   }
   const prefix = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/`;
   return url.startsWith(prefix) ? url.slice(prefix.length) : url;

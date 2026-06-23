@@ -23,12 +23,20 @@ DROP INDEX "device_group_cpe_idx";
 DROP INDEX "device_group_cpe_key";
 
 -- AlterTable
-ALTER TABLE "device_group" DROP COLUMN "cpe",
-DROP COLUMN "manufacturer",
-DROP COLUMN "modelName",
-ADD COLUMN     "gudid" TEXT,
-ADD COLUMN     "product" TEXT NOT NULL,
-ADD COLUMN     "vendor" TEXT NOT NULL;
+-- vendor/product are renames of manufacturer/modelName: rename to preserve
+-- existing values, then backfill any NULLs to the "-" unknown sentinel before
+-- enforcing NOT NULL, so the migration is safe on already-populated tables.
+-- NOTE: CPE strings and vulnerability/remediation/advisory<->device-group links
+-- are intentionally NOT backfilled into device_group_cpe / dg_match_object (the
+-- relationship reset was an accepted decision for this change).
+ALTER TABLE "device_group" RENAME COLUMN "manufacturer" TO "vendor";
+ALTER TABLE "device_group" RENAME COLUMN "modelName" TO "product";
+ALTER TABLE "device_group" ADD COLUMN "gudid" TEXT;
+UPDATE "device_group" SET "vendor" = '-' WHERE "vendor" IS NULL;
+UPDATE "device_group" SET "product" = '-' WHERE "product" IS NULL;
+ALTER TABLE "device_group" ALTER COLUMN "vendor" SET NOT NULL;
+ALTER TABLE "device_group" ALTER COLUMN "product" SET NOT NULL;
+ALTER TABLE "device_group" DROP COLUMN "cpe";
 
 -- DropTable
 DROP TABLE "_AdvisoryDeviceGroups";

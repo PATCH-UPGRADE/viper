@@ -363,7 +363,7 @@ export async function resolveMatchingIdFromCpe(cpe: string): Promise<string> {
 
 /**
  * Resolve a list of CPE strings to shared DeviceGroupMatching rows and return a
- * Prisma `connect` array. This is how the CPE-based upload endpoints (TA3/TA4)
+ * Prisma `connect` array. This is how the CPE-based upload endpoints
  * connect vulnerabilities/remediations to device groups without exposing the
  * match-object input shape.
  */

@@ -2,7 +2,7 @@ name: Build & Publish VIPER Image
 
 on:
   push:
-    branches: [main, VW-285] # TODO: remove vw-285 before merge — temporary trigger to test the build
+    branches: [main, VW-285] # TODO: remove vw-285 before merge  — temporary trigger to test the build
   workflow_dispatch:
 
 env:

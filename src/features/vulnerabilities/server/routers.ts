@@ -283,7 +283,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
           mappingModel: prisma.externalVulnerabilityMapping,
           transformInputItem: async (item, userId) => {
             const { cpes, vendorId: _vendorId, ...itemData } = item;
-            const connect = await cpesToMatchingConnect(cpes);
+            const connect = cpes ? await cpesToMatchingConnect(cpes) : [];
 
             return {
               createData: {
@@ -293,7 +293,9 @@ export const vulnerabilitiesRouter = createTRPCRouter({
               },
               updateData: {
                 ...itemData,
-                deviceGroupMatchings: { set: connect },
+                // Only replace matchings when CPEs were provided; omitting them
+                // on re-sync must not clear a vulnerability's existing matchings.
+                ...(cpes ? { deviceGroupMatchings: { set: connect } } : {}),
               },
               uniqueFieldConditions: [],
               // ^always create unmapped vulns

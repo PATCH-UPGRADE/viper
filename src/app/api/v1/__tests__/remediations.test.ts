@@ -591,4 +591,106 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(foundSync.errorMessage).toBeNullable();
     expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
   });
+
+  it("integration re-sync without cpes preserves existing deviceGroupMatchings", async () => {
+    const { integration } = await setupMockIntegration(mockIntegrationPayload);
+
+    const token = await createIntegrationToken(
+      integration.integrationUserId,
+      ResourceType.Remediation,
+    );
+
+    const externalId = "mockRemediation-preserve-matchings";
+    const cpe = generateCPE("rem_preserve_matchings_v1");
+
+    const basePayload = {
+      vendor: "mockRemediationIntegrationVendor",
+      page: 1,
+      pageSize: 100,
+      totalCount: 1,
+      totalPages: 1,
+      next: null,
+      previous: null,
+    };
+
+    const itemBase = {
+      upstreamApi: "https://mock-rem-upstream-api.com/",
+      narrative: "Discovered during security audit",
+      vendorId: externalId,
+      artifacts: [
+        {
+          name: "mock-remediation-preserve-artifact",
+          artifactType: ArtifactType.Documentation,
+          downloadUrl: "http://mock.example.com",
+        },
+      ],
+    };
+
+    // Sync 1: item carries a CPE -> remediation created with one matching.
+    const firstSync = await request(BASE_URL)
+      .post(`/remediations/integrationUpload/${token}`)
+      .set(jsonHeader)
+      .send({
+        ...basePayload,
+        items: [
+          {
+            ...itemBase,
+            description: "Mock -- preserve matchings, initial",
+            cpes: [cpe],
+          },
+        ],
+      });
+
+    expect(firstSync.status).toBe(200);
+    expect(firstSync.body.createdItemsCount).toBe(1);
+
+    const mapping = await prisma.externalRemediationMapping.findFirstOrThrow({
+      where: { externalId },
+    });
+
+    onTestFinished(async () => {
+      await prisma.remediation
+        .delete({ where: { id: mapping.itemId } })
+        .catch(() => {});
+    });
+
+    const afterCreate = await prisma.remediation.findFirstOrThrow({
+      where: { id: mapping.itemId },
+      include: { deviceGroupMatchings: { include: { version: true } } },
+    });
+    expect(afterCreate.deviceGroupMatchings.length).toBe(1);
+    expect(afterCreate.deviceGroupMatchings[0].version?.canonicalName).toBe(
+      cpe.split(":")[5],
+    );
+
+    // Sync 2: same externalId, NO cpes -> the existing matching must survive
+    // (omitting cpes must not clear it). Integration tokens are single-use, so
+    // mint a fresh one for the re-sync.
+    const secondToken = await createIntegrationToken(
+      integration.integrationUserId,
+      ResourceType.Remediation,
+    );
+    const secondSync = await request(BASE_URL)
+      .post(`/remediations/integrationUpload/${secondToken}`)
+      .set(jsonHeader)
+      .send({
+        ...basePayload,
+        items: [
+          { ...itemBase, description: "Mock -- preserve matchings, updated" },
+        ],
+      });
+
+    expect(secondSync.status).toBe(200);
+    expect(secondSync.body.updatedItemsCount).toBe(1);
+
+    const afterUpdate = await prisma.remediation.findFirstOrThrow({
+      where: { id: mapping.itemId },
+      include: { deviceGroupMatchings: true },
+    });
+    expect(afterUpdate.description).toBe("Mock -- preserve matchings, updated");
+    expect(afterUpdate.deviceGroupMatchings.length).toBe(1);
+    expect(afterUpdate.deviceGroupMatchings[0].id).toBe(
+      afterCreate.deviceGroupMatchings[0].id,
+    );
+  });
 });

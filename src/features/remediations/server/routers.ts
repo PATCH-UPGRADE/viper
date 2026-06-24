@@ -223,7 +223,11 @@ export const remediationsRouter = createTRPCRouter({
               },
               updateData: {
                 ...itemData,
-                deviceGroupMatchings: { set: matchingConnect },
+                // Only replace matchings when CPEs were provided; omitting them
+                // on re-sync must not clear a remediation's existing matchings.
+                ...(cpes
+                  ? { deviceGroupMatchings: { set: matchingConnect } }
+                  : {}),
               },
               uniqueFieldConditions: [],
               artifactsData: {

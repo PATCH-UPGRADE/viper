@@ -2,7 +2,7 @@ name: Build & Publish VIPER Image
 
 on:
   push:
-    branches: [main, VW-285] # TODO: remove VW-285 before merge — temporary trigger to test GITHUB_TOKEN push
+    branches: [main]
   workflow_dispatch:
 
 env:

@@ -8,7 +8,6 @@ import {
   findMatchingIdsForDeviceGroup,
   processIntegrationSync,
   processIntegrationToken,
-  resolveMatchingConnect,
   resolveMatchingIdFromCpe,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
@@ -186,13 +185,9 @@ export const deviceArtifactsRouter = createTRPCRouter({
     })
     .output(deviceArtifactUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      // The CPE resolves to the device's identity matching; component matchings
-      // (if any) join the same set.
+      // The CPE resolves to the device's identity matching.
       const identityMatchingId = await resolveMatchingIdFromCpe(input.cpe);
-      const componentConnect = input.componentMatchings
-        ? await resolveMatchingConnect(input.componentMatchings)
-        : [];
-      const matchingConnect = [{ id: identityMatchingId }, ...componentConnect];
+      const matchingConnect = [{ id: identityMatchingId }];
       const userId = ctx.auth.user.id;
 
       // Handle S3 upload URL -- if the user included a hash/size but no downloadUrl, they want us to host it
@@ -260,21 +255,9 @@ export const deviceArtifactsRouter = createTRPCRouter({
           model: prisma.deviceArtifact,
           mappingModel: prisma.externalDeviceArtifactMapping,
           transformInputItem: async (item, userId) => {
-            const {
-              cpe,
-              componentMatchings,
-              vendorId: _vendorId,
-              artifacts,
-              ...itemData
-            } = item;
+            const { cpe, vendorId: _vendorId, artifacts, ...itemData } = item;
             const identityMatchingId = await resolveMatchingIdFromCpe(cpe);
-            const componentConnect = componentMatchings
-              ? await resolveMatchingConnect(componentMatchings)
-              : [];
-            const matchingConnect = [
-              { id: identityMatchingId },
-              ...componentConnect,
-            ];
+            const matchingConnect = [{ id: identityMatchingId }];
 
             return {
               createData: {
@@ -346,7 +329,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "deviceArtifact");
 
-      const { id, cpe, componentMatchings, ...updateData } = input;
+      const { id, cpe, ...updateData } = input;
 
       // Prepare update data
       const data: Prisma.DeviceArtifactUpdateInput = {
@@ -359,16 +342,11 @@ export const deviceArtifactsRouter = createTRPCRouter({
         }),
       };
 
-      // Add the device's identity matching (from CPE) and/or component matchings
-      // to the artifact's matching set when provided.
-      const matchingConnect = [
-        ...(cpe ? [{ id: await resolveMatchingIdFromCpe(cpe) }] : []),
-        ...(componentMatchings
-          ? await resolveMatchingConnect(componentMatchings)
-          : []),
-      ];
-      if (matchingConnect.length > 0) {
-        data.deviceGroupMatchings = { connect: matchingConnect };
+      // Update the device's identity matching (from CPE) when provided.
+      if (cpe) {
+        data.deviceGroupMatchings = {
+          set: [{ id: await resolveMatchingIdFromCpe(cpe) }],
+        };
       }
 
       const deviceArtifact = await prisma.deviceArtifact.update({

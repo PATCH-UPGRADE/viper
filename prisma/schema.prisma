@@ -292,6 +292,8 @@ model DeviceGroupMatching {
   versionRange String?
 
   vulnerabilities Vulnerability[]  @relation("VulnerabilityMatchings")
+  remediations    Remediation[]    @relation("RemediationMatchings")
+  advisories      Advisory[]       @relation("AdvisoryMatchings")
   deviceArtifacts DeviceArtifact[] @relation("DeviceArtifactMatchings")
 
   createdAt DateTime @default(now())
@@ -615,8 +617,9 @@ model Remediation {
   id            String      @id @default(cuid())
   artifacts ArtifactWrapper[]
 
+  deviceGroupMatchings DeviceGroupMatching[] @relation("RemediationMatchings")
   description   String?      @db.Text // description of remediation
-  narrative     String?      @db.Text // how a remediation can be applied 
+  narrative     String?      @db.Text // how a remediation can be applied
   upstreamApi   String?      @map("upstream-api")
 
   vulnerabilityId String?
@@ -826,8 +829,9 @@ model Advisory {
   userId                    String
   title                     String?
   user                      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  referencedVulnerabilities Vulnerability[] @relation("AdvisoryVulnerabilities")
-  csaf                      Json            @default("{}")
+  referencedVulnerabilities Vulnerability[]       @relation("AdvisoryVulnerabilities")
+  deviceGroupMatchings      DeviceGroupMatching[] @relation("AdvisoryMatchings")
+  csaf                      Json                  @default("{}")
   upstreamUrl               String?         @unique
   severity                  Severity
   summary                   String?         @db.Text

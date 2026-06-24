@@ -748,6 +748,16 @@ function normalizeVersion(v?: string | null): string | null {
   return v;
 }
 
+// Mirror of router-utils' CPE-token → versionStatus mapping so seeded device
+// groups carry the same semantics as ones resolved from CPEs at runtime:
+// "-" => NOT_APPLICABLE, "*"/empty => UNKNOWN, any value => KNOWN.
+function cpeVersionStatus(cpe: string): "UNKNOWN" | "NOT_APPLICABLE" | "KNOWN" {
+  const token = cpe.split(":")[5] ?? "";
+  if (token === "-") return "NOT_APPLICABLE";
+  if (token === "" || token === "*") return "UNKNOWN";
+  return "KNOWN";
+}
+
 // Canonical resolvers (seed avoids importing the server-only router-utils).
 // canonicalName is @unique so upsert is race-safe.
 function upsertVendor(name: string) {
@@ -781,7 +791,7 @@ type GroupIdentity = {
   versionId: string | null;
 };
 
-// Local mirror of computeMatchStatus' applicability test (id-based).
+// Local mirror of matchingAppliesToDeviceGroup's applicability test (id-based).
 function matchingMatchesGroup(m: GroupIdentity, dg: GroupIdentity): boolean {
   if (!dg.vendorId || m.vendorId !== dg.vendorId) return false;
   if (m.productId && m.productId !== dg.productId) return false;
@@ -798,9 +808,14 @@ async function seedDeviceGroups() {
   for (const dg of SAMPLE_DEVICE_GROUPS) {
     const vendor = await upsertVendor(dg.manufacturer);
     const product = await upsertProduct(dg.modelName);
-    const versionName = normalizeVersion(dg.version);
+    // versionStatus follows the CPE's version token; only KNOWN groups get a
+    // version row (NOT_APPLICABLE / UNKNOWN groups have versionId = null).
+    const versionStatus = cpeVersionStatus(dg.cpe);
+    const versionName =
+      versionStatus === "KNOWN"
+        ? (normalizeVersion(dg.version) ?? dg.cpe.split(":")[5])
+        : null;
     const version = versionName ? await upsertVersion(versionName) : null;
-    const versionStatus = version ? "KNOWN" : "UNKNOWN";
 
     const existing = await prisma.deviceGroup.findFirst({
       where: {
@@ -1047,7 +1062,14 @@ async function seedRemediations(userId: string) {
         return null;
       }
 
-      // Remediation targeting is derived from its linked vulnerability.
+      // Link the remediation to the device group via its own matching, and to
+      // the vulnerability that affects the same group.
+      const matchingId = await matchingForGroup({
+        vendorId: deviceGroup.vendorId,
+        productId: deviceGroup.productId,
+        versionId: deviceGroup.versionId,
+      });
+
       const vulnerability = await prisma.vulnerability.findFirst({
         where: {
           deviceGroupMatchings: {
@@ -1070,6 +1092,9 @@ async function seedRemediations(userId: string) {
           narrative: remediation.narrative,
           upstreamApi: remediation.upstreamApi,
           vulnerabilityId: vulnerability.id,
+          deviceGroupMatchings: matchingId
+            ? { connect: { id: matchingId } }
+            : undefined,
           userId,
         },
       });

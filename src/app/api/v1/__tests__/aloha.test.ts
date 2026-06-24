@@ -2,12 +2,12 @@ import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { authHeader, BASE_URL, generateMatchObject } from "./test-config";
+import { authHeader, BASE_URL, generateCPE } from "./test-config";
 
 describe("Aloha Endpoints", () => {
   const vulnPayload = {
     sarif: { tool: { driver: { name: "TestScanner" } } },
-    deviceGroupMatchings: [generateMatchObject("aloha_vuln_v1")],
+    cpes: [generateCPE("aloha_vuln_v1")],
     description: "Mock -- Aloha test vulnerability",
   };
 

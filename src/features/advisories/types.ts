@@ -1,6 +1,17 @@
 import type { Asset, Prisma } from "@/generated/prisma";
 
+const canonicalRefInclude = {
+  select: { canonicalName: true, canonicalDisplayName: true },
+} as const;
+
 export const advisoryInclude = {
+  deviceGroupMatchings: {
+    include: {
+      vendor: canonicalRefInclude,
+      product: canonicalRefInclude,
+      version: canonicalRefInclude,
+    },
+  },
   referencedVulnerabilities: {
     include: {
       issues: {

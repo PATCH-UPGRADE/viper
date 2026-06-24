@@ -14,10 +14,9 @@ import {
 import prisma, { type TransactionClient } from "@/lib/db";
 import { requireExistence } from "@/trpc/middleware";
 import {
-  computeMatchStatus,
   type DeviceGroupIdentity,
-  deviceGroupWhereForMatching,
   type MatchingLike,
+  matchingAppliesToDeviceGroup,
   matchingWhereForDeviceGroup,
   resolveMatches,
 } from "./device-matching";
@@ -26,7 +25,7 @@ import {
   createPaginatedResponse,
   type PaginationInput,
 } from "./pagination";
-import type { DeviceGroupMatchingInput, IntegrationResponse } from "./schemas";
+import type { IntegrationResponse } from "./schemas";
 import { consumeUserToken } from "./tokens";
 
 // ============================================================================
@@ -77,8 +76,12 @@ export async function resolveVendor(
     },
   });
   if (existing) return existing;
-  return tx.vendor.create({
-    data: {
+  // upsert (not create) so concurrent resolves of the same canonical name don't
+  // race on the unique constraint — Postgres handles it via ON CONFLICT.
+  return tx.vendor.upsert({
+    where: { canonicalName },
+    update: {},
+    create: {
       canonicalName,
       canonicalDisplayName: name,
       hasCpe: opts.hasCpe ?? false,
@@ -98,8 +101,10 @@ export async function resolveProduct(
     },
   });
   if (existing) return existing;
-  return tx.product.create({
-    data: {
+  return tx.product.upsert({
+    where: { canonicalName },
+    update: {},
+    create: {
       canonicalName,
       canonicalDisplayName: name,
       hasCpe: opts.hasCpe ?? false,
@@ -115,8 +120,10 @@ export async function resolveVersion(
   const canonicalName = normalizeName(name);
   const existing = await tx.version.findFirst({ where: { canonicalName } });
   if (existing) return existing;
-  return tx.version.create({
-    data: {
+  return tx.version.upsert({
+    where: { canonicalName },
+    update: {},
+    create: {
       canonicalName,
       canonicalDisplayName: name,
       hasCpe: opts.hasCpe ?? false,
@@ -214,15 +221,28 @@ export async function resolveDeviceGroup(identity: DeviceGroupIdentityInput) {
 const CPE_UNKNOWN_TOKENS = new Set(["", "-", "*"]);
 
 /**
+ * Map a CPE 2.3 version token to a DeviceGroup `versionStatus`:
+ * - "-"        => NOT_APPLICABLE (the CPE's NA marker)
+ * - "*"/empty  => UNKNOWN        (the CPE's ANY marker / unspecified)
+ * - any value  => KNOWN
+ */
+function cpeVersionStatus(versionRaw: string): VersionStatus {
+  if (versionRaw === "-") return VersionStatus.NOT_APPLICABLE;
+  if (versionRaw === "" || versionRaw === "*") return VersionStatus.UNKNOWN;
+  return VersionStatus.KNOWN;
+}
+
+/**
  * Parse a CPE 2.3 string into a vendor/product/version identity.
  * Format: cpe:2.3:<part>:<vendor>:<product>:<version>:...
  * Unknown tokens ("-", "*", empty) map to "-" for vendor/product and null for
- * version.
+ * version; `versionStatus` preserves the NA-vs-ANY distinction for the version.
  */
 export function parseCpe(cpe: string): {
   vendor: string;
   product: string;
   version: string | null;
+  versionStatus: VersionStatus;
 } {
   const parts = cpe.split(":");
   const vendorRaw = parts[3] ?? "-";
@@ -234,6 +254,7 @@ export function parseCpe(cpe: string): {
     vendor: norm(vendorRaw, "-"),
     product: norm(productRaw, "-"),
     version: CPE_UNKNOWN_TOKENS.has(versionRaw) ? null : versionRaw,
+    versionStatus: cpeVersionStatus(versionRaw),
   };
 }
 
@@ -243,12 +264,12 @@ export function parseCpe(cpe: string): {
  * canonical rows as CPE-backed.
  */
 export async function cpeToDeviceGroup(cpe: string) {
-  const parsed = parseCpe(cpe);
+  const { versionStatus, ...parsed } = parseCpe(cpe);
   return resolveDeviceGroup({
     ...parsed,
     cpes: [cpe],
     hasCpe: true,
-    versionStatus: parsed.version ? VersionStatus.KNOWN : VersionStatus.UNKNOWN,
+    versionStatus,
   });
 }
 
@@ -263,14 +284,19 @@ export async function cpesToDeviceGroups(cpes: string[]) {
 // DeviceGroupMatching resolution + matching queries
 // ============================================================================
 
+type MatchingResolveInput = {
+  vendor: string;
+  product?: string | null;
+  version?: string | null;
+  versionRange?: string | null;
+};
+
 /**
- * Find-or-create a shared DeviceGroupMatching for a free-text input (vendor/
- * product/version strings resolved to canonical rows). Matchings come from
- * vuln DBs, so canonicals are marked CPE-backed.
+ * Find-or-create a shared DeviceGroupMatching for a vendor/product/version
+ * identity (resolved to canonical rows). Identities come from CPEs, so
+ * canonicals are marked CPE-backed.
  */
-async function resolveMatchingId(
-  input: DeviceGroupMatchingInput,
-): Promise<string> {
+async function resolveMatchingId(input: MatchingResolveInput): Promise<string> {
   return prisma.$transaction(async (tx) => {
     const vendorRow = await resolveVendor(tx, input.vendor, { hasCpe: true });
     const productRow = input.product
@@ -304,18 +330,6 @@ async function resolveMatchingId(
 }
 
 /**
- * Resolve match inputs to shared DeviceGroupMatching rows and return a Prisma
- * `connect` array for nesting onto a vulnerability.
- */
-export async function resolveMatchingConnect(
-  inputs: DeviceGroupMatchingInput[],
-) {
-  const ids = await Promise.all(inputs.map(resolveMatchingId));
-  // dedupe ids in case two inputs resolved to the same shared matching
-  return [...new Set(ids)].map((id) => ({ id }));
-}
-
-/**
  * Resolve a CPE string to a single shared DeviceGroupMatching id (the "identity"
  * of a device artifact — the device it emulates/describes).
  */
@@ -324,26 +338,17 @@ export async function resolveMatchingIdFromCpe(cpe: string): Promise<string> {
   return resolveMatchingId({ vendor, product, version });
 }
 
-const deviceGroupIdentitySelect = {
-  id: true,
-  vendorId: true,
-  productId: true,
-  versionId: true,
-  version: { select: { canonicalName: true } },
-} as const;
-
 /**
- * Resolve a set of matchings to the concrete device groups that exist in VIPER,
- * with each group's computed match status. Matchings may reference device groups
- * that don't exist yet — those simply return nothing.
+ * Resolve a list of CPE strings to shared DeviceGroupMatching rows and return a
+ * Prisma `connect` array. This is how the CPE-based upload endpoints (TA3/TA4)
+ * connect vulnerabilities/remediations to device groups without exposing the
+ * match-object input shape.
  */
-export async function findMatchedDeviceGroups(matchings: MatchingLike[]) {
-  if (matchings.length === 0) return [];
-  const candidates = await prisma.deviceGroup.findMany({
-    where: { OR: matchings.map(deviceGroupWhereForMatching) },
-    select: deviceGroupIdentitySelect,
-  });
-  return resolveMatches(matchings, candidates);
+export async function cpesToMatchingConnect(cpes: string[]) {
+  const ids = await Promise.all(
+    [...new Set(cpes)].map(resolveMatchingIdFromCpe),
+  );
+  return [...new Set(ids)].map((id) => ({ id }));
 }
 
 /**
@@ -399,7 +404,7 @@ function identityAppliesToGroup(
   matching: MatchingLike,
   group: DeviceGroupIdentity,
 ): boolean {
-  if (computeMatchStatus(matching, group)) return true;
+  if (matchingAppliesToDeviceGroup(matching, group)) return true;
   if (group.versionId === null && group.vendorId === matching.vendorId) {
     return (
       matching.productId === null || matching.productId === group.productId
@@ -430,40 +435,6 @@ export async function findMatchingIdsForDeviceGroup(
     .map((matching) => matching.id);
 }
 
-/**
- * Component-level vulnerabilities for a set of device groups. Device artifacts
- * hold a single, undifferentiated set of matchings (the device they're for +
- * their SBOM components). We treat the matchings that apply to the group as the
- * device "identity" and the *remaining* matchings as components, then find
- * vulnerabilities affecting those components.
- */
-export async function findComponentVulnerabilitiesForDeviceGroups(
-  deviceGroups: DeviceGroupIdentity[],
-) {
-  const identityMatchingIds = new Set(
-    (await Promise.all(deviceGroups.map(findMatchingIdsForDeviceGroup))).flat(),
-  );
-  if (identityMatchingIds.size === 0) return [];
-
-  const artifacts = await prisma.deviceArtifact.findMany({
-    where: {
-      deviceGroupMatchings: { some: { id: { in: [...identityMatchingIds] } } },
-    },
-    select: { deviceGroupMatchings: { select: matchingIdentitySelect } },
-  });
-
-  // Component matchings = an artifact's matchings minus the ones that identify
-  // the device itself. Treat each as a device identity and reuse the matcher.
-  const componentIdentities = [
-    ...new Map(
-      artifacts
-        .flatMap((artifact) => artifact.deviceGroupMatchings)
-        .filter((matching) => !identityMatchingIds.has(matching.id))
-        .map((component) => [component.id, component]),
-    ).values(),
-  ];
-  return findVulnerabilitiesMatchingDeviceGroups(componentIdentities);
-}
 export async function fetchPaginated<
   TDelegate extends Pick<PrismaDelegate, "count" | "findMany">,
   TArgs extends Parameters<TDelegate["findMany"]>[0],

@@ -73,11 +73,8 @@ interface RemediationForMarkdown {
   description?: string | null;
   narrative?: string | null;
   vulnerabilityId?: string | null;
-  vulnerability?: {
-    id: string;
-    cveId?: string | null;
-    deviceGroupMatchings?: DeviceGroupMatchingForMarkdown[];
-  } | null;
+  vulnerability?: { id: string; cveId?: string | null } | null;
+  deviceGroupMatchings?: DeviceGroupMatchingForMarkdown[];
   issueRemediations?: Array<{
     issue: {
       status: string;
@@ -265,7 +262,7 @@ export function remediationToMarkdown(r: RemediationForMarkdown): string {
     r.vulnerability?.cveId ?? r.vulnerabilityId ?? "no linked vuln";
   const lines = [`### Remediation rem-${shortId(r.id)} → ${cveRef}`];
 
-  const remediationMatchings = r.vulnerability?.deviceGroupMatchings ?? [];
+  const remediationMatchings = r.deviceGroupMatchings ?? [];
   if (remediationMatchings.length > 0) {
     lines.push(
       `- **Affected Products**: ${deviceGroupMatchingsSummary(remediationMatchings)}`,

@@ -108,7 +108,7 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
             const matchedGroupIds = resolveMatches(
               matchings,
               candidateGroups,
-            ).map((match) => match.deviceGroup.id);
+            ).map((group) => group.id);
 
             if (matchedGroupIds.length > 0) {
               const assets = await client.asset.findMany({

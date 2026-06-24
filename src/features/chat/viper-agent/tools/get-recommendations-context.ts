@@ -276,11 +276,11 @@ export type VulnerabilityForContext = Prisma.VulnerabilityGetPayload<{
 }>;
 
 export const remediationContextInclude = {
+  deviceGroupMatchings: matchingContextSelect,
   vulnerability: {
     select: {
       id: true,
       cveId: true,
-      deviceGroupMatchings: matchingContextSelect,
     },
   },
   issueRemediations: {

@@ -3,6 +3,7 @@ import type { Prisma } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   alohaResponseSchema,
+  cpeSchema,
   createIntegrationInputSchema,
   deviceGroupMatchingResponseSchema,
   safeUrlSchema,
@@ -19,8 +20,18 @@ const canonicalRefInclude = {
   select: { canonicalName: true, canonicalDisplayName: true },
 } as const;
 
+const matchingInclude = {
+  include: {
+    vendor: canonicalRefInclude,
+    product: canonicalRefInclude,
+    version: canonicalRefInclude,
+  },
+} as const;
+
 // Validation schemas
 export const remediationInputSchema = z.object({
+  // TA3/TA4 upload affected devices as CPE strings; resolved to matchings server-side.
+  cpes: z.array(cpeSchema).optional(),
   vulnerabilityId: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
@@ -36,6 +47,7 @@ export const integrationRemediationInputSchema = createIntegrationInputSchema(
 
 export const remediationUpdateSchema = z.object({
   id: z.string(),
+  cpes: z.array(cpeSchema).optional(),
   vulnerabilityId: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
@@ -46,11 +58,11 @@ export const remediationUpdateSchema = z.object({
 export const vulnerabilitySchema = z.object({
   id: z.string(),
   url: z.string(),
-  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
 });
 
 export const remediationResponseSchema = z.object({
   id: z.string(),
+  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
   upstreamApi: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
@@ -81,18 +93,12 @@ const remediationVulnerabilitySelect = {
   select: {
     id: true,
     url: true,
-    deviceGroupMatchings: {
-      include: {
-        vendor: canonicalRefInclude,
-        product: canonicalRefInclude,
-        version: canonicalRefInclude,
-      },
-    },
   },
 } as const;
 
 export const remediationInclude = {
   user: userIncludeSelect,
+  deviceGroupMatchings: matchingInclude,
   vulnerability: remediationVulnerabilitySelect,
   artifacts: artifactWrapperSelect,
 };

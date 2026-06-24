@@ -119,11 +119,27 @@ CREATE TABLE "_VulnerabilityMatchings" (
 );
 
 -- CreateTable
+CREATE TABLE "_RemediationMatchings" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_RemediationMatchings_AB_pkey" PRIMARY KEY ("A","B")
+);
+
+-- CreateTable
 CREATE TABLE "_DeviceArtifactMatchings" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
 
     CONSTRAINT "_DeviceArtifactMatchings_AB_pkey" PRIMARY KEY ("A","B")
+);
+
+-- CreateTable
+CREATE TABLE "_AdvisoryMatchings" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_AdvisoryMatchings_AB_pkey" PRIMARY KEY ("A","B")
 );
 
 -- CreateIndex
@@ -148,7 +164,13 @@ CREATE INDEX "device_group_matching_vendorId_productId_idx" ON "device_group_mat
 CREATE INDEX "_VulnerabilityMatchings_B_index" ON "_VulnerabilityMatchings"("B");
 
 -- CreateIndex
+CREATE INDEX "_RemediationMatchings_B_index" ON "_RemediationMatchings"("B");
+
+-- CreateIndex
 CREATE INDEX "_DeviceArtifactMatchings_B_index" ON "_DeviceArtifactMatchings"("B");
+
+-- CreateIndex
+CREATE INDEX "_AdvisoryMatchings_B_index" ON "_AdvisoryMatchings"("B");
 
 -- CreateIndex
 CREATE INDEX "device_group_vendorId_productId_idx" ON "device_group"("vendorId", "productId");
@@ -181,8 +203,20 @@ ALTER TABLE "_VulnerabilityMatchings" ADD CONSTRAINT "_VulnerabilityMatchings_A_
 ALTER TABLE "_VulnerabilityMatchings" ADD CONSTRAINT "_VulnerabilityMatchings_B_fkey" FOREIGN KEY ("B") REFERENCES "vulnerability"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "_RemediationMatchings" ADD CONSTRAINT "_RemediationMatchings_A_fkey" FOREIGN KEY ("A") REFERENCES "device_group_matching"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_RemediationMatchings" ADD CONSTRAINT "_RemediationMatchings_B_fkey" FOREIGN KEY ("B") REFERENCES "remediation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "_DeviceArtifactMatchings" ADD CONSTRAINT "_DeviceArtifactMatchings_A_fkey" FOREIGN KEY ("A") REFERENCES "device_artifact"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_DeviceArtifactMatchings" ADD CONSTRAINT "_DeviceArtifactMatchings_B_fkey" FOREIGN KEY ("B") REFERENCES "device_group_matching"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_AdvisoryMatchings" ADD CONSTRAINT "_AdvisoryMatchings_A_fkey" FOREIGN KEY ("A") REFERENCES "advisory"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_AdvisoryMatchings" ADD CONSTRAINT "_AdvisoryMatchings_B_fkey" FOREIGN KEY ("B") REFERENCES "device_group_matching"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

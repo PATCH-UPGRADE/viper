@@ -3,7 +3,6 @@ import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   cpeSchema,
   createIntegrationInputSchema,
-  deviceGroupMatchingInputSchema,
   deviceGroupMatchingResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
@@ -30,8 +29,6 @@ const matchingInclude = {
 export const deviceArtifactInputSchema = z.object({
   // The device this artifact is for (resolved to an identity matching).
   cpe: cpeSchema,
-  // Optional SBOM components this artifact contains (auto-parsing deferred).
-  componentMatchings: z.array(deviceGroupMatchingInputSchema).optional(),
   role: z.string().min(1, "Role is required"),
   description: z.string().min(1, "Description is required"),
   upstreamApi: safeUrlSchema.nullish(),
@@ -49,7 +46,6 @@ export const deviceArtifactUpdateSchema = z.object({
   description: z.string().optional(),
   upstreamApi: safeUrlSchema.optional(),
   cpe: cpeSchema.optional(),
-  componentMatchings: z.array(deviceGroupMatchingInputSchema).optional(),
 });
 
 export const deviceArtifactResponseSchema = z.object({

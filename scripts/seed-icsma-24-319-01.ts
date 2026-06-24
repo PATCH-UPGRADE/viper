@@ -727,11 +727,16 @@ async function seedVulnerabilities(userId: string, deviceGroup: GroupIdentity) {
   return vulns;
 }
 
-async function seedAdvisory(userId: string, vulnIds: string[]) {
+async function seedAdvisory(
+  userId: string,
+  deviceGroup: GroupIdentity,
+  vulnIds: string[],
+) {
   console.log("\n🌱 Upserting advisory...");
 
   const UPSTREAM_URL =
     "https://raw.githubusercontent.com/cisagov/CSAF/develop/csaf_files/OT/white/2024/icsma-24-319-01.json";
+  const matchingId = await matchingIdFor(deviceGroup);
 
   const advisory = await prisma.advisory.upsert({
     where: { upstreamUrl: UPSTREAM_URL },
@@ -747,6 +752,9 @@ async function seedAdvisory(userId: string, vulnIds: string[]) {
       referencedVulnerabilities: {
         set: vulnIds.map((id) => ({ id })),
       },
+      deviceGroupMatchings: {
+        set: [{ id: matchingId }],
+      },
     },
     create: {
       userId,
@@ -761,6 +769,9 @@ async function seedAdvisory(userId: string, vulnIds: string[]) {
       csaf: CSAF_JSON,
       referencedVulnerabilities: {
         connect: vulnIds.map((id) => ({ id })),
+      },
+      deviceGroupMatchings: {
+        connect: [{ id: matchingId }],
       },
     },
   });
@@ -781,6 +792,7 @@ async function main() {
   const vulns = await seedVulnerabilities(integrationUser.id, deviceGroup);
   await seedAdvisory(
     integrationUser.id,
+    deviceGroup,
     vulns.map((v) => v.id),
   );
 

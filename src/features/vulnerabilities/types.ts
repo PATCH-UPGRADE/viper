@@ -7,8 +7,8 @@ import {
 } from "@/lib/pagination";
 import {
   alohaResponseSchema,
+  cpeSchema,
   createIntegrationInputSchema,
-  deviceGroupMatchingInputSchema,
   deviceGroupMatchingResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
@@ -34,9 +34,8 @@ export const deviceGroupMatchingInclude = {
 } as const;
 
 export const vulnerabilityInputSchema = z.object({
-  deviceGroupMatchings: z
-    .array(deviceGroupMatchingInputSchema)
-    .min(1, "At least one device group matching is required"),
+  // TA3/TA4 upload affected devices as CPE strings; resolved to matchings server-side.
+  cpes: z.array(cpeSchema).min(1, "At least one CPE is required"),
   sarif: z.any(), // JSON data - Prisma JsonValue type
   cveId: z.string().min(1).nullish(),
   description: z.string().min(1).nullish(),
@@ -57,10 +56,7 @@ export const vulnerabilityArrayInputSchema = z.object({
 
 // make these two fields optional so users can update any field independently
 export const vulnerabilityUpdateInputSchema = vulnerabilityInputSchema.extend({
-  deviceGroupMatchings: z
-    .array(deviceGroupMatchingInputSchema)
-    .min(1)
-    .optional(),
+  cpes: z.array(cpeSchema).min(1).optional(),
   sarif: z.any().optional(), // JSON data - Prisma JsonValue type
 });
 

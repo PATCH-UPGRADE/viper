@@ -3,12 +3,11 @@ import { type AlohaStatus, Priority, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
+  cpesToMatchingConnect,
   fetchPaginated,
-  findComponentVulnerabilitiesForDeviceGroups,
   findVulnerabilitiesMatchingDeviceGroups,
   processIntegrationSync,
   processIntegrationToken,
-  resolveMatchingConnect,
 } from "@/lib/router-utils";
 import { alohaInputSchema, integrationResponseSchema } from "@/lib/schemas";
 import {
@@ -171,53 +170,6 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       });
     }),
 
-  // GET /api/deviceGroups/{deviceGroupId}/componentVulnerabilities
-  // Component-level vulnerabilities: those affecting an SBOM component of one of
-  // the device group's artifacts (vs. device-level, which affect the device itself).
-  getComponentManyByDeviceGroup: protectedProcedure
-    .input(
-      paginationInputSchema.extend({
-        deviceGroupId: z.string(),
-      }),
-    )
-    .meta({
-      openapi: {
-        method: "GET",
-        path: "/deviceGroups/{deviceGroupId}/componentVulnerabilities",
-        tags: ["Vulnerabilities", "DeviceGroups"],
-        summary: "List Component-level Vulnerabilities by Device Group",
-        description:
-          "Get vulnerabilities affecting SBOM components of a device group's artifacts. Any authenticated user can view all vulnerabilities.",
-      },
-    })
-    .output(paginatedVulnerabilityResponseSchema)
-    .query(async ({ input }) => {
-      const { search, deviceGroupId } = input;
-      const searchFilter = createSearchFilter(search);
-
-      const deviceGroup = await prisma.deviceGroup.findUnique({
-        where: { id: deviceGroupId },
-        select: {
-          id: true,
-          vendorId: true,
-          productId: true,
-          versionId: true,
-          version: { select: { canonicalName: true } },
-        },
-      });
-      const matchedVulns = deviceGroup
-        ? await findComponentVulnerabilitiesForDeviceGroups([deviceGroup])
-        : [];
-      const matchedIds = matchedVulns.map((vuln) => vuln.id);
-
-      const idFilter = { id: { in: matchedIds } };
-      const whereFilter = search ? { AND: [searchFilter, idFilter] } : idFilter;
-      return fetchPaginated(prisma.vulnerability, input, {
-        where: whereFilter,
-        include: vulnerabilityInclude,
-      });
-    }),
-
   // GET /api/vulnerabilities/{id} - Get single vulnerability (any authenticated user can access)
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
@@ -255,8 +207,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(vulnerabilityResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { deviceGroupMatchings, ...dataInput } = input;
-      const connect = await resolveMatchingConnect(deviceGroupMatchings);
+      const { cpes, ...dataInput } = input;
+      const connect = await cpesToMatchingConnect(cpes);
 
       return prisma.vulnerability.create({
         data: {
@@ -285,15 +237,13 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // resolve shared matchings up-front (each runs its own transaction)
       const connects = await Promise.all(
-        input.vulnerabilities.map((vuln) =>
-          resolveMatchingConnect(vuln.deviceGroupMatchings),
-        ),
+        input.vulnerabilities.map((vuln) => cpesToMatchingConnect(vuln.cpes)),
       );
 
       // create all vulns in a transaction
       return prisma.$transaction(
         input.vulnerabilities.map((vuln, index) => {
-          const { deviceGroupMatchings: _matchings, ...dataInput } = vuln;
+          const { cpes: _cpes, ...dataInput } = vuln;
           return prisma.vulnerability.create({
             data: {
               ...dataInput,
@@ -332,12 +282,8 @@ export const vulnerabilitiesRouter = createTRPCRouter({
           model: prisma.vulnerability,
           mappingModel: prisma.externalVulnerabilityMapping,
           transformInputItem: async (item, userId) => {
-            const {
-              deviceGroupMatchings,
-              vendorId: _vendorId,
-              ...itemData
-            } = item;
-            const connect = await resolveMatchingConnect(deviceGroupMatchings);
+            const { cpes, vendorId: _vendorId, ...itemData } = item;
+            const connect = await cpesToMatchingConnect(cpes);
 
             return {
               createData: {
@@ -408,16 +354,16 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "vulnerability");
-      const { deviceGroupMatchings, ...dataInput } = input.data;
+      const { cpes, ...dataInput } = input.data;
 
       return prisma.vulnerability.update({
         where: { id: input.id },
         data: {
           ...dataInput,
-          ...(deviceGroupMatchings
+          ...(cpes
             ? {
                 deviceGroupMatchings: {
-                  set: await resolveMatchingConnect(deviceGroupMatchings),
+                  set: await cpesToMatchingConnect(cpes),
                 },
               }
             : {}),

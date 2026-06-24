@@ -175,17 +175,15 @@ function RemediationDrawer({
           variant="link"
           className="text-foreground h-auto p-0 text-left font-medium"
         >
-          {deviceGroupMatchingsSummary(
-            remediation.vulnerability?.deviceGroupMatchings ?? [],
-          ) || "Unknown"}
+          {deviceGroupMatchingsSummary(remediation.deviceGroupMatchings) ||
+            "Unknown"}
         </Button>
       </DrawerTrigger>
       <DrawerContent className={isMobile ? "" : "max-w-2xl ml-auto h-screen"}>
         <DrawerHeader className="gap-1">
           <DrawerTitle>
-            {deviceGroupMatchingsSummary(
-              remediation.vulnerability?.deviceGroupMatchings ?? [],
-            ) || "Unknown"}
+            {deviceGroupMatchingsSummary(remediation.deviceGroupMatchings) ||
+              "Unknown"}
           </DrawerTitle>
           <DrawerDescription className="flex items-center gap-2">
             <Badge variant="outline" className="text-primary">
@@ -253,7 +251,7 @@ function RemediationDrawer({
                 </div>
                 <code className="text-xs bg-muted px-2 py-1 rounded">
                   {deviceGroupMatchingsSummary(
-                    remediation.vulnerability?.deviceGroupMatchings ?? [],
+                    remediation.deviceGroupMatchings,
                   ) || "N/A"}
                 </code>
               </div>

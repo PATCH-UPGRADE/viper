@@ -16,13 +16,13 @@ import {
   BASE_URL,
   createIntegrationToken,
   generateCPE,
-  generateMatchObject,
   jsonHeader,
   setupMockIntegration,
 } from "./test-config";
 
 describe("Remediations Endpoint (/remediations)", () => {
   const payload = {
+    cpes: [generateCPE("rem_v1")],
     description: "Mock -- Firmware update to fix vulnerability",
     narrative: "Apply the latest firmware patch to resolve the issue.",
     upstreamApi: "https://vendor.example.com/patches",
@@ -38,7 +38,7 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   const vulnerabilityPayload = {
     sarif: { tool: { driver: { name: "TestScanner" } } },
-    deviceGroupMatchings: [generateMatchObject("rem_vuln_v1")],
+    cpes: [generateCPE("rem_vuln_v1")],
     exploitUri: "https://exploit-db.com/5678",
     upstreamApi: "https://nvd.nist.gov/api",
     description: "Mock -- Critical vulnerability requiring remediation",
@@ -172,6 +172,15 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(createRes.body).toHaveProperty("id");
     const remediationId = createRes.body.id;
 
+    // The remediation carries its own device-group matchings (resolved from the
+    // uploaded CPEs).
+    expect(
+      createRes.body.deviceGroupMatchings.some(
+        (m: { version: { canonicalName: string } | null }) =>
+          m.version?.canonicalName === payload.cpes[0].split(":")[5],
+      ),
+    ).toBe(true);
+
     onTestFinished(async () => {
       // Cleanup - delete the remediation (which cascades to artifacts)
       await prisma.remediation
@@ -251,13 +260,13 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   it("POST /remediations - Create with vulnerability reference", async () => {
     // First create a vulnerability
-    const newMatchObject = generateMatchObject("rem_with_vuln_ref_v1");
+    const newCpe = generateCPE("rem_with_vuln_ref_v1");
     const vulnRes = await request(BASE_URL)
       .post("/vulnerabilities")
       .set(authHeader)
       .send({
         ...vulnerabilityPayload,
-        deviceGroupMatchings: [newMatchObject],
+        cpes: [newCpe],
       });
 
     expect(vulnRes.status).toBe(200);
@@ -286,7 +295,7 @@ describe("Remediations Endpoint (/remediations)", () => {
         .deleteMany({
           where: {
             cpe: {
-              has: generateCPE(newMatchObject.version),
+              has: newCpe,
             },
           },
         })

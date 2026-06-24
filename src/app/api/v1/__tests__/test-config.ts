@@ -17,15 +17,6 @@ export const AUTH_TOKEN = `Bearer ${process.env.API_KEY}`;
 export const generateCPE = (suffix: string) =>
   `cpe:2.3:o:vendor:product:${suffix}`;
 
-// A match object whose identity matches the device group an asset created from
-// generateCPE(suffix) resolves to (vendor "vendor", product "product",
-// version = suffix).
-export const generateMatchObject = (suffix: string) => ({
-  vendor: "vendor",
-  product: "product",
-  version: suffix,
-});
-
 describe("Configuration Tests", () => {
   it("dummy test", async () => {
     expect(true).toBeTruthy();

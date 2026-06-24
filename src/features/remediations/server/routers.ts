@@ -11,6 +11,7 @@ import {
   fetchPaginated,
   processIntegrationSync,
   processIntegrationToken,
+  cpesToMatchingConnect,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
 import { processArtifactHosting } from "@/lib/s3";
@@ -134,8 +135,9 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { artifacts, ...dataInput } = input;
+      const { artifacts, cpes, ...dataInput } = input;
       const userId = ctx.auth.user.id;
+      const matchingConnect = cpes ? await cpesToMatchingConnect(cpes) : [];
 
       // Handle S3 upload URL -- if the user included a hash/size but no downloadUrl, they want us to host it
       const { processedArtifacts, uploadInstructions } =
@@ -155,6 +157,7 @@ export const remediationsRouter = createTRPCRouter({
         const remediation = await tx.remediation.create({
           data: {
             ...dataInput,
+            deviceGroupMatchings: { connect: matchingConnect },
             userId,
           },
         });
@@ -207,15 +210,20 @@ export const remediationsRouter = createTRPCRouter({
           model: prisma.remediation,
           mappingModel: prisma.externalRemediationMapping,
           transformInputItem: async (item, userId) => {
-            const { vendorId: _vendorId, artifacts, ...itemData } = item;
+            const { vendorId: _vendorId, artifacts, cpes, ...itemData } = item;
+            const matchingConnect = cpes
+              ? await cpesToMatchingConnect(cpes)
+              : [];
 
             return {
               createData: {
                 ...itemData,
                 userId,
+                deviceGroupMatchings: { connect: matchingConnect },
               },
               updateData: {
                 ...itemData,
+                deviceGroupMatchings: { set: matchingConnect },
               },
               uniqueFieldConditions: [],
               artifactsData: {
@@ -360,6 +368,13 @@ export const remediationsRouter = createTRPCRouter({
             vulnerabilityId: updateData.vulnerabilityId,
           }),
         };
+
+        // Replace matchings when CPEs are provided.
+        if (updateData.cpes) {
+          data.deviceGroupMatchings = {
+            set: await cpesToMatchingConnect(updateData.cpes),
+          };
+        }
 
         await tx.remediation.update({
           where: { id },

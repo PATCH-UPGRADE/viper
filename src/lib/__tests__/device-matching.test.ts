@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  computeMatchStatus,
+  matchingAppliesToDeviceGroup,
   parseVers,
   resolveMatches,
   versSatisfies,
@@ -51,7 +51,7 @@ describe("versSatisfies", () => {
   });
 });
 
-describe("computeMatchStatus", () => {
+describe("matchingAppliesToDeviceGroup", () => {
   // device group identity uses canonical FK ids; version carries its string.
   const dg = {
     id: "dg1",
@@ -61,9 +61,9 @@ describe("computeMatchStatus", () => {
     version: { canonicalName: "2.1.3" },
   };
 
-  it("returns null when the vendor differs", () => {
+  it("is false when the vendor differs", () => {
     expect(
-      computeMatchStatus(
+      matchingAppliesToDeviceGroup(
         {
           vendorId: "v-other",
           productId: null,
@@ -72,12 +72,12 @@ describe("computeMatchStatus", () => {
         },
         dg,
       ),
-    ).toBeNull();
+    ).toBe(false);
   });
 
-  it("returns VENDOR for a wildcard-product matching", () => {
+  it("is true for a wildcard-product matching (vendor only)", () => {
     expect(
-      computeMatchStatus(
+      matchingAppliesToDeviceGroup(
         {
           vendorId: "v-acme",
           productId: null,
@@ -86,12 +86,12 @@ describe("computeMatchStatus", () => {
         },
         dg,
       ),
-    ).toBe("VENDOR");
+    ).toBe(true);
   });
 
-  it("returns PRODUCT when vendor+product match and no version constraint", () => {
+  it("is true when vendor+product match and there's no version constraint", () => {
     expect(
-      computeMatchStatus(
+      matchingAppliesToDeviceGroup(
         {
           vendorId: "v-acme",
           productId: "p-radiator",
@@ -100,12 +100,12 @@ describe("computeMatchStatus", () => {
         },
         dg,
       ),
-    ).toBe("PRODUCT");
+    ).toBe(true);
   });
 
-  it("returns VERSION for an exact versionId match", () => {
+  it("is true for an exact versionId match", () => {
     expect(
-      computeMatchStatus(
+      matchingAppliesToDeviceGroup(
         {
           vendorId: "v-acme",
           productId: "p-radiator",
@@ -114,12 +114,12 @@ describe("computeMatchStatus", () => {
         },
         dg,
       ),
-    ).toBe("VERSION");
+    ).toBe(true);
   });
 
-  it("returns null for a versionId mismatch", () => {
+  it("is false for a versionId mismatch", () => {
     expect(
-      computeMatchStatus(
+      matchingAppliesToDeviceGroup(
         {
           vendorId: "v-acme",
           productId: "p-radiator",
@@ -128,12 +128,12 @@ describe("computeMatchStatus", () => {
         },
         dg,
       ),
-    ).toBeNull();
+    ).toBe(false);
   });
 
-  it("returns VERSION_RANGE when the version falls in a VERS range", () => {
+  it("is true when the version falls in a VERS range", () => {
     expect(
-      computeMatchStatus(
+      matchingAppliesToDeviceGroup(
         {
           vendorId: "v-acme",
           productId: "p-radiator",
@@ -142,12 +142,12 @@ describe("computeMatchStatus", () => {
         },
         dg,
       ),
-    ).toBe("VERSION_RANGE");
+    ).toBe(true);
   });
 
-  it("returns null when the version is outside the VERS range", () => {
+  it("is false when the version is outside the VERS range", () => {
     expect(
-      computeMatchStatus(
+      matchingAppliesToDeviceGroup(
         {
           vendorId: "v-acme",
           productId: "p-radiator",
@@ -156,7 +156,7 @@ describe("computeMatchStatus", () => {
         },
         dg,
       ),
-    ).toBeNull();
+    ).toBe(false);
   });
 });
 
@@ -197,11 +197,10 @@ describe("resolveMatches", () => {
       ],
       groups,
     );
-    expect(matches.map((m) => m.deviceGroup.id).sort()).toEqual(["a", "b"]);
-    expect(matches.every((m) => m.matchStatus === "VENDOR")).toBe(true);
+    expect(matches.map((g) => g.id).sort()).toEqual(["a", "b"]);
   });
 
-  it("keeps the strongest match status when multiple matchings overlap", () => {
+  it("dedupes a group matched by more than one matching", () => {
     const matches = resolveMatches(
       [
         {
@@ -209,18 +208,17 @@ describe("resolveMatches", () => {
           productId: null,
           versionId: null,
           versionRange: null,
-        }, // VENDOR for group a
+        }, // matches group a (and b)
         {
           vendorId: "v-acme",
           productId: "p-radiator",
           versionId: "ver-213",
           versionRange: null,
-        }, // VERSION for group a
+        }, // matches group a
       ],
       groups,
     );
-    const groupA = matches.find((m) => m.deviceGroup.id === "a");
-    expect(groupA?.matchStatus).toBe("VERSION");
+    expect(matches.filter((g) => g.id === "a")).toHaveLength(1);
   });
 
   it("returns nothing when no group matches", () => {

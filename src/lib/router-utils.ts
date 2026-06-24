@@ -59,77 +59,112 @@ function normalizeName(name: string): string {
   return name.trim().toLowerCase();
 }
 
+// A lost create-race surfaces as a P2002 unique violation; the row now exists.
+// Duck-typed on `code` rather than `instanceof PrismaClientKnownRequestError`:
+// across Next.js module boundaries the thrown error can be a different copy of
+// the class, so `instanceof` is unreliable.
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
+
 /**
  * Find-or-create the canonical Vendor for a name. Matches an existing row by
- * canonicalName or by membership in its nameMappings (aliases). Must run inside
- * a transaction.
+ * canonicalName or by membership in its nameMappings (aliases).
+ *
+ * Canonicals are an idempotent shared registry, so this runs on the autocommit
+ * client (never inside the caller's transaction): a concurrent create losing the
+ * unique race throws P2002, which would poison an enclosing interactive
+ * transaction. Instead we catch P2002 and re-read the winner's row.
  */
 export async function resolveVendor(
-  tx: TransactionClient,
   name: string,
   opts: { hasCpe?: boolean } = {},
 ) {
   const canonicalName = normalizeName(name);
-  const existing = await tx.vendor.findFirst({
-    where: {
-      OR: [{ canonicalName }, { nameMappings: { has: canonicalName } }],
-    },
-  });
+  const find = () =>
+    prisma.vendor.findFirst({
+      where: {
+        OR: [{ canonicalName }, { nameMappings: { has: canonicalName } }],
+      },
+    });
+  const existing = await find();
   if (existing) return existing;
-  // upsert (not create) so concurrent resolves of the same canonical name don't
-  // race on the unique constraint — Postgres handles it via ON CONFLICT.
-  return tx.vendor.upsert({
-    where: { canonicalName },
-    update: {},
-    create: {
-      canonicalName,
-      canonicalDisplayName: name,
-      hasCpe: opts.hasCpe ?? false,
-    },
-  });
+  try {
+    return await prisma.vendor.create({
+      data: {
+        canonicalName,
+        canonicalDisplayName: name,
+        hasCpe: opts.hasCpe ?? false,
+      },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      const row = await find();
+      if (row) return row;
+    }
+    throw error;
+  }
 }
 
 export async function resolveProduct(
-  tx: TransactionClient,
   name: string,
   opts: { hasCpe?: boolean } = {},
 ) {
   const canonicalName = normalizeName(name);
-  const existing = await tx.product.findFirst({
-    where: {
-      OR: [{ canonicalName }, { nameMappings: { has: canonicalName } }],
-    },
-  });
+  const find = () =>
+    prisma.product.findFirst({
+      where: {
+        OR: [{ canonicalName }, { nameMappings: { has: canonicalName } }],
+      },
+    });
+  const existing = await find();
   if (existing) return existing;
-  return tx.product.upsert({
-    where: { canonicalName },
-    update: {},
-    create: {
-      canonicalName,
-      canonicalDisplayName: name,
-      hasCpe: opts.hasCpe ?? false,
-    },
-  });
+  try {
+    return await prisma.product.create({
+      data: {
+        canonicalName,
+        canonicalDisplayName: name,
+        hasCpe: opts.hasCpe ?? false,
+      },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      const row = await find();
+      if (row) return row;
+    }
+    throw error;
+  }
 }
 
 export async function resolveVersion(
-  tx: TransactionClient,
   name: string,
   opts: { hasCpe?: boolean; versScheme?: VersScheme | null } = {},
 ) {
   const canonicalName = normalizeName(name);
-  const existing = await tx.version.findFirst({ where: { canonicalName } });
+  const find = () => prisma.version.findFirst({ where: { canonicalName } });
+  const existing = await find();
   if (existing) return existing;
-  return tx.version.upsert({
-    where: { canonicalName },
-    update: {},
-    create: {
-      canonicalName,
-      canonicalDisplayName: name,
-      hasCpe: opts.hasCpe ?? false,
-      versScheme: opts.versScheme ?? undefined,
-    },
-  });
+  try {
+    return await prisma.version.create({
+      data: {
+        canonicalName,
+        canonicalDisplayName: name,
+        hasCpe: opts.hasCpe ?? false,
+        versScheme: opts.versScheme ?? undefined,
+      },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      const row = await find();
+      if (row) return row;
+    }
+    throw error;
+  }
 }
 
 // ============================================================================
@@ -155,7 +190,9 @@ export interface DeviceGroupIdentityInput {
  *
  * NOTE: the composite unique on (vendorId, productId, versionId, versionStatus)
  * does not enforce uniqueness when versionId is null (Postgres NULLs are
- * distinct), so we find-then-create inside a transaction rather than upsert.
+ * distinct), so we find-then-create and recover from a P2002 create-race when
+ * the version is known. Canonicals are resolved on the autocommit client so a
+ * lost canonical race never poisons an enclosing transaction.
  */
 export async function resolveDeviceGroup(identity: DeviceGroupIdentityInput) {
   const {
@@ -169,53 +206,49 @@ export async function resolveDeviceGroup(identity: DeviceGroupIdentityInput) {
     hasCpe = false,
   } = identity;
 
-  return prisma.$transaction(async (tx) => {
-    const vendorRow = await resolveVendor(tx, vendor, { hasCpe });
-    const productRow = await resolveProduct(tx, product, { hasCpe });
-    const versionRow = version
-      ? await resolveVersion(tx, version, { hasCpe, versScheme })
-      : null;
-    const status =
-      versionStatus ??
-      (versionRow ? VersionStatus.KNOWN : VersionStatus.UNKNOWN);
+  const vendorRow = await resolveVendor(vendor, { hasCpe });
+  const productRow = await resolveProduct(product, { hasCpe });
+  const versionRow = version
+    ? await resolveVersion(version, { hasCpe, versScheme })
+    : null;
+  const status =
+    versionStatus ?? (versionRow ? VersionStatus.KNOWN : VersionStatus.UNKNOWN);
 
-    let deviceGroup = await tx.deviceGroup.findFirst({
-      where: {
-        vendorId: vendorRow.id,
-        productId: productRow.id,
-        versionId: versionRow?.id ?? null,
-        versionStatus: status,
+  const where = {
+    vendorId: vendorRow.id,
+    productId: productRow.id,
+    versionId: versionRow?.id ?? null,
+    versionStatus: status,
+  };
+  const find = () => prisma.deviceGroup.findFirst({ where });
+
+  let deviceGroup = await find();
+  if (!deviceGroup) {
+    try {
+      deviceGroup = await prisma.deviceGroup.create({
+        data: { ...where, cpe: [...new Set(cpes)], udi: udi ?? undefined },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) deviceGroup = await find();
+      if (!deviceGroup) throw error;
+    }
+  }
+
+  // Union any new CPEs / fill in a missing UDI on the existing/created group.
+  const mergedCpes = [...new Set([...deviceGroup.cpe, ...cpes])];
+  const needsCpe = mergedCpes.length !== deviceGroup.cpe.length;
+  const needsUdi = !!udi && !deviceGroup.udi;
+  if (needsCpe || needsUdi) {
+    deviceGroup = await prisma.deviceGroup.update({
+      where: { id: deviceGroup.id },
+      data: {
+        ...(needsCpe ? { cpe: mergedCpes } : {}),
+        ...(needsUdi ? { udi } : {}),
       },
     });
+  }
 
-    if (!deviceGroup) {
-      deviceGroup = await tx.deviceGroup.create({
-        data: {
-          vendorId: vendorRow.id,
-          productId: productRow.id,
-          versionId: versionRow?.id ?? null,
-          versionStatus: status,
-          cpe: [...new Set(cpes)],
-          udi: udi ?? undefined,
-        },
-      });
-    } else {
-      const mergedCpes = [...new Set([...deviceGroup.cpe, ...cpes])];
-      const needsCpe = mergedCpes.length !== deviceGroup.cpe.length;
-      const needsUdi = !!udi && !deviceGroup.udi;
-      if (needsCpe || needsUdi) {
-        deviceGroup = await tx.deviceGroup.update({
-          where: { id: deviceGroup.id },
-          data: {
-            ...(needsCpe ? { cpe: mergedCpes } : {}),
-            ...(needsUdi ? { udi } : {}),
-          },
-        });
-      }
-    }
-
-    return deviceGroup;
-  });
+  return deviceGroup;
 }
 
 const CPE_UNKNOWN_TOKENS = new Set(["", "-", "*"]);
@@ -297,36 +330,26 @@ type MatchingResolveInput = {
  * canonicals are marked CPE-backed.
  */
 async function resolveMatchingId(input: MatchingResolveInput): Promise<string> {
-  return prisma.$transaction(async (tx) => {
-    const vendorRow = await resolveVendor(tx, input.vendor, { hasCpe: true });
-    const productRow = input.product
-      ? await resolveProduct(tx, input.product, { hasCpe: true })
-      : null;
-    const versionRow = input.version
-      ? await resolveVersion(tx, input.version, { hasCpe: true })
-      : null;
-    const versionRange = input.versionRange ?? null;
+  const vendorRow = await resolveVendor(input.vendor, { hasCpe: true });
+  const productRow = input.product
+    ? await resolveProduct(input.product, { hasCpe: true })
+    : null;
+  const versionRow = input.version
+    ? await resolveVersion(input.version, { hasCpe: true })
+    : null;
 
-    const existing = await tx.deviceGroupMatching.findFirst({
-      where: {
-        vendorId: vendorRow.id,
-        productId: productRow?.id ?? null,
-        versionId: versionRow?.id ?? null,
-        versionRange,
-      },
-    });
-    if (existing) return existing.id;
+  const where = {
+    vendorId: vendorRow.id,
+    productId: productRow?.id ?? null,
+    versionId: versionRow?.id ?? null,
+    versionRange: input.versionRange ?? null,
+  };
 
-    const created = await tx.deviceGroupMatching.create({
-      data: {
-        vendorId: vendorRow.id,
-        productId: productRow?.id ?? null,
-        versionId: versionRow?.id ?? null,
-        versionRange,
-      },
-    });
-    return created.id;
-  });
+  const existing = await prisma.deviceGroupMatching.findFirst({ where });
+  if (existing) return existing.id;
+
+  const created = await prisma.deviceGroupMatching.create({ data: where });
+  return created.id;
 }
 
 /**

@@ -148,29 +148,27 @@ export const deviceGroupsRouter = createTRPCRouter({
     .output(deviceGroupDetailsResponseSchema)
     .mutation(async ({ input }) => {
       const { id, vendor, product, version, versionStatus, udi } = input;
-      return prisma.$transaction(async (tx) => {
-        const data: Prisma.DeviceGroupUpdateInput = {};
-        if (vendor !== undefined) {
-          const row = await resolveVendor(tx, vendor);
-          data.vendor = { connect: { id: row.id } };
-        }
-        if (product !== undefined) {
-          const row = await resolveProduct(tx, product);
-          data.product = { connect: { id: row.id } };
-        }
-        if (version !== undefined) {
-          data.version = version
-            ? { connect: { id: (await resolveVersion(tx, version)).id } }
-            : { disconnect: true };
-        }
-        if (versionStatus !== undefined) data.versionStatus = versionStatus;
-        if (udi !== undefined) data.udi = udi;
+      const data: Prisma.DeviceGroupUpdateInput = {};
+      if (vendor !== undefined) {
+        const row = await resolveVendor(vendor);
+        data.vendor = { connect: { id: row.id } };
+      }
+      if (product !== undefined) {
+        const row = await resolveProduct(product);
+        data.product = { connect: { id: row.id } };
+      }
+      if (version !== undefined) {
+        data.version = version
+          ? { connect: { id: (await resolveVersion(version)).id } }
+          : { disconnect: true };
+      }
+      if (versionStatus !== undefined) data.versionStatus = versionStatus;
+      if (udi !== undefined) data.udi = udi;
 
-        return tx.deviceGroup.update({
-          where: { id },
-          data,
-          include: deviceGroupRelationInclude,
-        });
+      return prisma.deviceGroup.update({
+        where: { id },
+        data,
+        include: deviceGroupRelationInclude,
       });
     }),
 

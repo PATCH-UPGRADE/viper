@@ -2,7 +2,7 @@ name: Build & Publish VIPER Image
 
 on:
   push:
-    branches: [main]
+    branches: [main, VW-285] # TODO: remove VW-285 before merge — temporary trigger to test GITHUB_TOKEN push
   workflow_dispatch:
 
 env:
@@ -29,7 +29,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract image metadata
         id: meta

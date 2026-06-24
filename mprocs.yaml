@@ -1,4 +1,7 @@
 procs:
+  minio:
+    shell: "docker compose -f compose.dev.yml up minio 2>&1 | cat"
+
   inngest:
     cmd: ["npm", "run", "inngest:dev"]
 

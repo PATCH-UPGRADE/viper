@@ -10,8 +10,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 model User {
@@ -41,6 +41,7 @@ model User {
   userTokens UserToken[]
   threads    ChatThread[]
   memories   Memory[]
+  notificationReads         NotificationRead[]
 
   @@unique([email])
   @@map("user")
@@ -196,6 +197,7 @@ model DeviceGroup {
   remediations         Remediation[]        @relation("RemediationDeviceGroups")
   deviceArtifacts      DeviceArtifact[]
   advisories           Advisory[]           @relation("AdvisoryDeviceGroups")
+  notificationMappings NotificationDeviceGroupMapping[]
 
   @@index([cpe])
   @@map("device_group")
@@ -244,6 +246,7 @@ model Asset {
   issues               Issue[]
   deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
+  notificationMappings NotificationAssetMapping[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -470,6 +473,7 @@ model Vulnerability {
 
   remediations         Remediation[]
   issues               Issue[]
+  notificationMappings NotificationVulnerabilityMapping[]
 
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
@@ -524,6 +528,7 @@ model Remediation {
   vulnerability   Vulnerability? @relation(fields: [vulnerabilityId], references: [id], onDelete: SetNull)
 
   issueRemediations    IssueRemediation[]
+  notificationMappings NotificationRemediationMapping[]
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -711,6 +716,9 @@ enum IntegrationType {
   CSAF
 }
 
+// Traffic Light Protocol, governs information sharing
+// www.first.org/tlp/
+// Fairly common to see this in emails/advisories sent to hospitals
 enum Tlp {
   // TLP v1
   WHITE
@@ -812,4 +820,158 @@ model Memory {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+enum NotificationType {
+  Advisory
+  Recall
+  UpdateAvailable
+  Other
+}
+
+enum NotificationChannel {
+  Email
+  PolledApi
+  Crawl
+}
+
+enum ConfidenceLevel {
+  NeedsReview // An LLM matched this but with low confidence
+  Matched // An LLM matched this with high confidence
+  Confirmed // A human confirmed this match was correct
+}
+
+enum NotificationSourceType {
+  // Source: the notification was created as a result of this email
+  Source
+  // Link: the notification already existed, and was linked to this email
+  Link
+}
+
+model Notification {
+  id      String           @id @default(cuid())
+  type    NotificationType
+  tlp     Tlp?
+  title   String?
+  summary String?          @db.Text
+  details Json? // unindexed, NotificationType-specific fields
+
+  sources         NotificationSource[]
+  reads           NotificationRead[]
+  assets          NotificationAssetMapping[]
+  deviceGroups    NotificationDeviceGroupMapping[]
+  vulnerabilities NotificationVulnerabilityMapping[]
+  remediations    NotificationRemediationMapping[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@map("notification")
+}
+
+model NotificationSource {
+  id             String               @id @default(cuid())
+  notificationId String?
+  notification   Notification?        @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  sourceType NotificationSourceType @default(Source)
+  reasonWhy String? @db.Text // why was this email linked to this notification?
+
+  channel      NotificationChannel
+  externalId   String? // for an email, this is the resend email id
+  referenceUrl String?
+  raw          Json
+  markdown     String?              @db.Text
+
+  attachments NotificationAttachment[]
+  receivedAt  DateTime               @default(now())
+
+  @@unique([channel, externalId])
+  @@index([notificationId])
+  @@map("notification_source")
+}
+
+model NotificationAttachment {
+  id          String             @id @default(cuid())
+  sourceId    String
+  source      NotificationSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  filename    String?
+  contentType String?
+  downloadUrl String?
+  hash        String?
+  size        Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([sourceId])
+  @@index([hash])
+  @@map("notification_attachment")
+}
+
+model NotificationRead {
+  id             String       @id @default(cuid())
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt         DateTime     @default(now())
+
+  @@unique([notificationId, userId])
+  @@map("notification_read")
+}
+
+model NotificationAssetMapping {
+  id             String          @id @default(cuid())
+  notificationId String
+  notification   Notification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  assetId        String
+  asset          Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  confidence     ConfidenceLevel?
+  reasonWhy String?
+
+  @@unique([notificationId, assetId])
+  @@map("notification_asset_mapping")
+}
+
+model NotificationDeviceGroupMapping {
+  id             String          @id @default(cuid())
+  notificationId String
+  notification   Notification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  deviceGroupId  String
+  deviceGroup    DeviceGroup     @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
+  confidence     ConfidenceLevel?
+  reasonWhy String?
+
+  @@unique([notificationId, deviceGroupId])
+  @@map("notification_device_group_mapping")
+}
+
+model NotificationVulnerabilityMapping {
+  id              String          @id @default(cuid())
+  notificationId  String
+  notification    Notification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  vulnerabilityId String
+  vulnerability   Vulnerability   @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
+  confidence      ConfidenceLevel?
+  reasonWhy String?
+
+  @@unique([notificationId, vulnerabilityId])
+  @@map("notification_vulnerability_mapping")
+}
+
+model NotificationRemediationMapping {
+  id             String          @id @default(cuid())
+  notificationId String
+  notification   Notification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  remediationId  String
+  remediation    Remediation     @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+  confidence     ConfidenceLevel?
+  reasonWhy String?
+
+  @@unique([notificationId, remediationId])
+  @@map("notification_remediation_mapping")
 }

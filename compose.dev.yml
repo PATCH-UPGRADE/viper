@@ -25,6 +25,7 @@ services:
       - INNGEST_DEV=1
       - INNGEST_BASE_URL=http://inngest:8288
       - PRISMA_CLIENT_ENGINE_TYPE=binary
+      - S3_ENDPOINT=http://minio:9000
     volumes:
       - viper-stamps:/srv/stamps
     ports:
@@ -32,6 +33,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      minio:
+        condition: service_started
 
   inngest:
     build:
@@ -62,6 +65,20 @@ services:
       postgres:
         condition: service_healthy
 
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_SERVER_URL: "http://localhost:9000"
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+
 volumes:
   pgdata:
   viper-stamps:
+  minio-data:

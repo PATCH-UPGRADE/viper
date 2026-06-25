@@ -223,7 +223,7 @@ describe("Assets Endpoint (/assets)", () => {
     const bodyFirst = res.body.at(0);
     expect(bodyFirst).toHaveProperty("id");
     expect(bodyFirst.ip).toBe(payload.ip);
-    expect(bodyFirst.deviceGroup.cpe).toBe(payload.cpe);
+    expect(bodyFirst.deviceGroup.cpe.includes(payload.cpe)).toBe(true);
     expect(bodyFirst.deviceGroup).toHaveProperty("url");
     expect(bodyFirst.deviceGroup).toHaveProperty("sbomUrl");
     expect(bodyFirst.deviceGroup).toHaveProperty("vulnerabilitiesUrl");
@@ -235,7 +235,7 @@ describe("Assets Endpoint (/assets)", () => {
     const bodySecond = res.body.at(1);
     expect(bodySecond).toHaveProperty("id");
     expect(bodySecond.ip).toBe(payload2.ip);
-    expect(bodySecond.deviceGroup.cpe).toBe(payload2.cpe);
+    expect(bodySecond.deviceGroup.cpe.includes(payload2.cpe)).toBe(true);
     expect(bodySecond.role).toBe(payload2.role);
     expect(bodySecond.upstreamApi).toBe(payload2.upstreamApi);
 
@@ -248,7 +248,9 @@ describe("Assets Endpoint (/assets)", () => {
     expect(firstDetailRes.status).toBe(200);
     expect(firstDetailRes.body.id).toBe(firstAssetId);
     expect(firstDetailRes.body.ip).toBe(payload.ip);
-    expect(firstDetailRes.body.deviceGroup.cpe).toBe(payload.cpe);
+    expect(firstDetailRes.body.deviceGroup.cpe.includes(payload.cpe)).toBe(
+      true,
+    );
     expect(firstDetailRes.body.deviceGroup).toHaveProperty("url");
     expect(firstDetailRes.body.role).toBe(payload.role);
     expect(firstDetailRes.body.upstreamApi).toBe(payload.upstreamApi);
@@ -262,7 +264,9 @@ describe("Assets Endpoint (/assets)", () => {
     expect(secondDetailRes.status).toBe(200);
     expect(secondDetailRes.body.id).toBe(secondAssetId);
     expect(secondDetailRes.body.ip).toBe(payload2.ip);
-    expect(secondDetailRes.body.deviceGroup.cpe).toBe(payload2.cpe);
+    expect(secondDetailRes.body.deviceGroup.cpe.includes(payload2.cpe)).toBe(
+      true,
+    );
     expect(secondDetailRes.body.role).toBe(payload2.role);
     expect(secondDetailRes.body.upstreamApi).toBe(payload2.upstreamApi);
 
@@ -399,7 +403,10 @@ describe("Assets Endpoint (/assets)", () => {
     await prisma.deviceGroup.deleteMany({
       where: {
         cpe: {
-          contains: "asset_integration_",
+          hasSome: [
+            assetIntegrationPayload.items[0].cpe,
+            assetIntegrationPayload.items[1].cpe,
+          ],
         },
       },
     });
@@ -442,7 +449,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
     expect(foundAsset1.location).toStrictEqual(assetPayload1.location);
     expect(foundAsset1.status).toBe(assetPayload1.status);
-    expect(foundAsset1.deviceGroup.cpe).toBe(assetPayload1.cpe);
+    expect(foundAsset1.deviceGroup.cpe.includes(assetPayload1.cpe)).toBe(true);
 
     const assetPayload2 = assetIntegrationPayload.items[1];
     const mapping2 = await prisma.externalAssetMapping.findFirstOrThrow({
@@ -471,7 +478,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
     expect(foundAsset2.location).toStrictEqual(assetPayload2.location);
     expect(foundAsset2.status).toBe(assetPayload2.status);
-    expect(foundAsset2.deviceGroup.cpe).toBe(assetPayload2.cpe);
+    expect(foundAsset2.deviceGroup.cpe.includes(assetPayload2.cpe)).toBe(true);
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {
       fail("lastSynced values should not be null");
@@ -577,7 +584,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
     expect(foundAsset1.location).toStrictEqual(assetPayload1.location);
     expect(foundAsset1.status).toBe(assetPayload1.status);
-    expect(foundAsset1.deviceGroup.cpe).toBe(assetPayload1.cpe);
+    expect(foundAsset1.deviceGroup.cpe.includes(assetPayload1.cpe)).toBe(true);
 
     const assetPayload2 = updateAssetsPayload.items[1];
     const mapping2 = await prisma.externalAssetMapping.findFirstOrThrow({
@@ -612,7 +619,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
     expect(foundAsset2.location).toStrictEqual(assetPayload2.location);
     expect(foundAsset2.status).toBe(assetPayload2.status);
-    expect(foundAsset2.deviceGroup.cpe).toBe(assetPayload2.cpe);
+    expect(foundAsset2.deviceGroup.cpe.includes(assetPayload2.cpe)).toBe(true);
 
     const foundSync = await prisma.syncStatus.findFirstOrThrow({
       where: { syncedAt: mapping1.lastSynced },
@@ -712,7 +719,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
     expect(foundAsset1.location).toStrictEqual(assetPayload1.location);
     expect(foundAsset1.status).toBe(assetPayload1.status);
-    expect(foundAsset1.deviceGroup.cpe).toBe(assetPayload1.cpe);
+    expect(foundAsset1.deviceGroup.cpe.includes(assetPayload1.cpe)).toBe(true);
 
     const assetPayload2 = assetIntegrationPayload.items[1];
     const mapping2 = await prisma.externalAssetMapping.findFirstOrThrow({
@@ -741,7 +748,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
     expect(foundAsset2.location).toStrictEqual(assetPayload2.location);
     expect(foundAsset2.status).toBe(assetPayload2.status);
-    expect(foundAsset2.deviceGroup.cpe).toBe(assetPayload2.cpe);
+    expect(foundAsset2.deviceGroup.cpe.includes(assetPayload2.cpe)).toBe(true);
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {
       fail("lastSynced values should not be null");
@@ -848,7 +855,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset1.serialNumber).toBe(updatedAsset.serialNumber);
     expect(foundAsset1.location).toStrictEqual(updatedAsset.location);
     expect(foundAsset1.status).toBe(updatedAsset.status);
-    expect(foundAsset1.deviceGroup.cpe).toBe(updatedAsset.cpe);
+    expect(foundAsset1.deviceGroup.cpe.includes(updatedAsset.cpe)).toBe(true);
 
     if (!mapping1.lastSynced) {
       fail("lastSynced value should not be null");

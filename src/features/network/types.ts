@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+const canonicalRefSchema = z.object({
+  canonicalName: z.string(),
+  canonicalDisplayName: z.string(),
+});
+
 // ============================================================================
 // Network Topology Schema
 // Mirrors what we might be providing TA's like Galois, subject to change
@@ -63,7 +68,10 @@ export const viperAssetDataSchema = z.object({
   hostname: z.string().nullable(),
   status: z.enum(["Active", "Decommissioned", "Maintenance"]).nullable(),
   deviceGroup: z.object({
-    cpe: z.string(),
+    vendor: canonicalRefSchema.nullable(),
+    product: canonicalRefSchema.nullable(),
+    version: canonicalRefSchema.nullable(),
+    cpe: z.array(z.string()),
   }),
 });
 export type ViperAssetData = z.infer<typeof viperAssetDataSchema>;

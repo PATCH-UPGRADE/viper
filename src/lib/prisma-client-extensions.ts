@@ -2,6 +2,7 @@ import { Prisma, TriggerEnum } from "@/generated/prisma";
 import type { PayloadToResult } from "@/generated/prisma/runtime/library";
 import { inngest } from "@/inngest/client";
 import prisma from "./db";
+import { deviceGroupWhereForMatching, resolveMatches } from "./device-matching";
 import { getBaseUrl } from "./url-utils";
 import { sendWebhook } from "./utils";
 
@@ -81,26 +82,49 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
           // cast id to string. we know a string exists since create succeeded
           const vulnerabilityId = vulnerability.id as string;
 
-          // get all assets related to this vuln
-          const assets = await client.asset.findMany({
-            where: {
-              deviceGroup: {
-                vulnerabilities: {
-                  some: { id: vulnerability.id },
-                },
-              },
+          // Resolve this vuln's matchings to concrete device groups, then find
+          // every asset in those groups and open issues for them.
+          const matchings = await client.deviceGroupMatching.findMany({
+            where: { vulnerabilities: { some: { id: vulnerabilityId } } },
+            select: {
+              vendorId: true,
+              productId: true,
+              versionId: true,
+              versionRange: true,
             },
-            select: { id: true },
           });
 
-          // create issues
-          if (assets.length > 0 && vulnerability.id) {
-            await client.issue.createMany({
-              data: assets.map((asset) => ({
-                vulnerabilityId,
-                assetId: asset.id,
-              })),
+          if (matchings.length > 0) {
+            const candidateGroups = await client.deviceGroup.findMany({
+              where: { OR: matchings.map(deviceGroupWhereForMatching) },
+              select: {
+                id: true,
+                vendorId: true,
+                productId: true,
+                versionId: true,
+                version: { select: { canonicalName: true } },
+              },
             });
+            const matchedGroupIds = resolveMatches(
+              matchings,
+              candidateGroups,
+            ).map((group) => group.id);
+
+            if (matchedGroupIds.length > 0) {
+              const assets = await client.asset.findMany({
+                where: { deviceGroupId: { in: matchedGroupIds } },
+                select: { id: true },
+              });
+
+              if (assets.length > 0) {
+                await client.issue.createMany({
+                  data: assets.map((asset) => ({
+                    vulnerabilityId,
+                    assetId: asset.id,
+                  })),
+                });
+              }
+            }
           }
 
           inngest

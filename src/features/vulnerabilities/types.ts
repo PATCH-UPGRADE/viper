@@ -9,21 +9,32 @@ import {
   alohaResponseSchema,
   cpeSchema,
   createIntegrationInputSchema,
+  deviceGroupMatchingResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
 } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
-import {
-  deviceGroupSelect,
-  deviceGroupWithUrlsSchema,
-} from "../device-groups/types";
 import { remediationCardInclude } from "../remediations/types";
 
 // Validation schemas
 const severitySchema = z.enum(Object.values(Severity));
 
+const canonicalRefInclude = {
+  select: { canonicalName: true, canonicalDisplayName: true },
+} as const;
+
+/** Include for a DeviceGroupMatching with its canonical vendor/product/version. */
+export const deviceGroupMatchingInclude = {
+  include: {
+    vendor: canonicalRefInclude,
+    product: canonicalRefInclude,
+    version: canonicalRefInclude,
+  },
+} as const;
+
 export const vulnerabilityInputSchema = z.object({
+  // TA3/TA4 upload affected devices as CPE strings; resolved to matchings server-side.
   cpes: z.array(cpeSchema).min(1, "At least one CPE is required"),
   sarif: z.any(), // JSON data - Prisma JsonValue type
   cveId: z.string().min(1).nullish(),
@@ -52,7 +63,7 @@ export const vulnerabilityUpdateInputSchema = vulnerabilityInputSchema.extend({
 export const vulnerabilityResponseSchema = z.object({
   id: z.string(),
   sarif: z.any(), // JSON data - Prisma JsonValue type
-  affectedDeviceGroups: z.array(deviceGroupWithUrlsSchema),
+  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
   exploitUri: z.string().nullable(),
   upstreamApi: z.string().nullable(),
   description: z.string().nullable(),
@@ -96,12 +107,12 @@ export const vulnerabilitiesByPriorityInputSchema =
 
 export const vulnerabilityInclude = {
   user: userIncludeSelect,
-  affectedDeviceGroups: deviceGroupSelect,
+  deviceGroupMatchings: deviceGroupMatchingInclude,
 };
 
 export const vulnerabilityByPriorityInclude = {
   user: userIncludeSelect,
-  affectedDeviceGroups: deviceGroupSelect,
+  deviceGroupMatchings: deviceGroupMatchingInclude,
   issues: {
     include: {
       asset: {

@@ -1,5 +1,3 @@
-import { createTool } from "@inngest/agent-kit";
-import { z } from "zod";
 import { assetUtilizationSchema } from "@/features/assets/types";
 import {
   type NetworkTopology,
@@ -8,6 +6,7 @@ import {
 import { serializeWorkflow } from "@/features/workflows/utils";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { deviceGroupLabel } from "@/lib/string-utils";
 import {
   assetToMarkdown,
   generateMemoryMarkdown,
@@ -30,10 +29,7 @@ function generateInventorySummaryTable(assets: AssetForContext[]): string {
   const divider = "|---|---|---|---|---|";
   const rows = assets.map((a) => {
     const label = a.hostname ?? a.ip ?? shortId(a.id);
-    const device =
-      [a.deviceGroup.manufacturer, a.deviceGroup.modelName]
-        .filter(Boolean)
-        .join(" ") || a.deviceGroup.cpe;
+    const device = deviceGroupLabel(a.deviceGroup);
     const active = (a.issues ?? []).filter((i) => i.status === "ACTIVE").length;
     return `| ${label} (${shortId(a.id)}) | ${device} | ${a.role ?? "—"} | ${a.status ?? "—"} | ${active} |`;
   });
@@ -221,8 +217,28 @@ function generateNetworkFlowMarkdown(topology: NetworkTopology | null): string {
 
 // ─── Prisma includes ──────────────────────────────────────────────────────────
 
+const canonicalNameSelect = {
+  select: { canonicalDisplayName: true },
+} as const;
+
+const matchingContextSelect = {
+  select: {
+    vendor: canonicalNameSelect,
+    product: canonicalNameSelect,
+    version: canonicalNameSelect,
+    versionRange: true,
+  },
+} as const;
+
 export const assetContextInclude = {
-  deviceGroup: true,
+  deviceGroup: {
+    select: {
+      vendor: canonicalNameSelect,
+      product: canonicalNameSelect,
+      version: canonicalNameSelect,
+      cpe: true,
+    },
+  },
   issues: {
     include: {
       vulnerability: {
@@ -237,9 +253,7 @@ export type AssetForContext = Prisma.AssetGetPayload<{
 }>;
 
 export const vulnerabilityContextInclude = {
-  affectedDeviceGroups: {
-    select: { cpe: true, modelName: true, manufacturer: true },
-  },
+  deviceGroupMatchings: matchingContextSelect,
   remediations: { select: { id: true, description: true } },
   issues: {
     include: {
@@ -262,9 +276,12 @@ export type VulnerabilityForContext = Prisma.VulnerabilityGetPayload<{
 }>;
 
 export const remediationContextInclude = {
-  vulnerability: { select: { id: true, cveId: true } },
-  affectedDeviceGroups: {
-    select: { cpe: true, modelName: true, manufacturer: true },
+  deviceGroupMatchings: matchingContextSelect,
+  vulnerability: {
+    select: {
+      id: true,
+      cveId: true,
+    },
   },
   issueRemediations: {
     include: {
@@ -371,36 +388,34 @@ function generateContextMarkdown(
   return sections.join("\n\n---\n\n");
 }
 
-export const getRecommendationsContext = createTool({
-  name: "get_recommendations_context",
-  description:
-    "Retrieve full context about the current user and environment before responding. Returns saved memories plus all assets, vulnerabilities, remediations, clinical workflows, network flow topology, device utilization windows, and their cross-entity relationships. Call once at the start of a thread.",
-  parameters: z.object({}),
-  handler: async (_, { network }) => {
-    const userId = network?.state.data.userId as string | undefined;
-    if (!userId) return "No user context available.";
+/**
+ * Loads the full recommendations context (memories + assets + vulns +
+ * remediations + workflows + network flow + utilization) as markdown.
+ * The recommendations graph preloads this deterministically (not as a model
+ * tool call).
+ */
+export async function loadRecommendationsContextMarkdown(
+  userId: string,
+  userRole?: string,
+): Promise<string> {
+  const [
+    memories,
+    assets,
+    vulnerabilities,
+    remediations,
+    workflows,
+    networkTopology,
+  ] = await Promise.all([
+    prisma.memory.findMany({
+      where: { userId },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.asset.findMany({ include: assetContextInclude }),
+    prisma.vulnerability.findMany({ include: vulnerabilityContextInclude }),
+    prisma.remediation.findMany({ include: remediationContextInclude }),
+    prisma.workflow.findMany({ include: { nodes: true, connections: true } }),
+    fetchNetworkTopologyForContext(),
+  ]);
 
-    const userRole = network?.state.data.userRole as string | undefined;
-
-    const [
-      memories,
-      assets,
-      vulnerabilities,
-      remediations,
-      workflows,
-      networkTopology,
-    ] = await Promise.all([
-      prisma.memory.findMany({
-        where: { userId },
-        orderBy: { createdAt: "asc" },
-      }),
-      prisma.asset.findMany({ include: assetContextInclude }),
-      prisma.vulnerability.findMany({ include: vulnerabilityContextInclude }),
-      prisma.remediation.findMany({ include: remediationContextInclude }),
-      prisma.workflow.findMany({ include: { nodes: true, connections: true } }),
-      fetchNetworkTopologyForContext(),
-    ]);
-
-    return `${generateMemoryMarkdown(memories)}\n\n---\n\n${generateContextMarkdown(assets, vulnerabilities, remediations, workflows, networkTopology, userRole)}`;
-  },
-});
+  return `${generateMemoryMarkdown(memories)}\n\n---\n\n${generateContextMarkdown(assets, vulnerabilities, remediations, workflows, networkTopology, userRole)}`;
+}

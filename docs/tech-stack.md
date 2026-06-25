@@ -20,12 +20,19 @@ graph TB
 
     subgraph background ["Background Jobs"]
         Inngest["Inngest<br/>Durable Functions"]
-        ChatAgent["Chat Agent<br/>@inngest/agent-kit"]
         IntegrationSync["Integration Sync<br/>Scheduled + Event-Driven"]
         VulnEnrich["Vulnerability Enrichment<br/>EPSS / KEV"]
+        Memory["Memory Persistence<br/>& Token Purge"]
+    end
+
+    subgraph aichat ["AI Chat (Streaming Route)"]
+        ChatRoute["/api/chat<br/>SSE Streaming Route"]
+        LangGraph["LangGraph<br/>Agent Orchestration"]
+        AISDKUI["Vercel AI SDK UI<br/>useChat"]
     end
 
     subgraph ai ["AI Providers"]
+        LangChain["LangChain<br/>ChatAnthropic"]
         VercelAI["Vercel AI SDK"]
         Anthropic["Anthropic<br/>Claude"]
         OpenAIProvider["OpenAI<br/>GPT"]
@@ -62,10 +69,16 @@ graph TB
     OpenAPI --> ExternalAPI
 
     NextJS --> Inngest
-    Inngest --> ChatAgent
     Inngest --> IntegrationSync
     Inngest --> VulnEnrich
-    ChatAgent --> VercelAI
+    Inngest --> Memory
+
+    NextJS --> ChatRoute
+    ChatRoute --> LangGraph
+    ChatRoute --> AISDKUI
+    LangGraph --> LangChain
+    LangChain --> Anthropic
+
     VercelAI --> Anthropic
     VercelAI --> OpenAIProvider
     VercelAI --> Google
@@ -83,7 +96,9 @@ graph TB
 
 **tRPC** serves as the internal API backbone. All client-server communication flows through tRPC procedures (`baseProcedure` for public endpoints, `protectedProcedure` for authenticated ones). For external consumers, `trpc-to-openapi` auto-generates an OpenAPI spec from the same router definitions, exposed at `/api/v1/` and documented at `/api/openapi.json`.
 
-**Inngest** powers all background and long-running work. It runs durable functions for the AI chat agent (via `@inngest/agent-kit`), scheduled integration syncs (cron-triggered), event-driven integration syncs, and daily vulnerability enrichment against EPSS and KEV feeds. Each function benefits from automatic retries and built-in observability.
+**Inngest** powers background and long-running work: scheduled integration syncs (cron-triggered), event-driven integration syncs, daily vulnerability enrichment against EPSS and KEV feeds, chat memory persistence, and expired-token cleanup. Each function benefits from automatic retries and built-in observability.
+
+**AI Chat** runs as a streaming Next.js route (`/api/chat`), not as an Inngest job. LangGraph orchestrates each agent (LangChain `ChatAnthropic` — Haiku for chat, Opus + extended thinking for recommendations), and token + reasoning + tool deltas stream to the client through the Vercel AI SDK UI (`useChat`).
 
 **n8n** acts as an external workflow automation layer. When an integration provider doesn't follow Viper's standardized sync protocol, n8n orchestrates the crawl-and-transform pipeline that normalizes external data before submitting it to Viper's integration upload endpoints.
 

@@ -1,11 +1,11 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/inngest/client";
-import { chatAgent } from "@/inngest/functions/chat-agent";
 import {
   enrichAllVulnerabilities,
   enrichVulnerability,
 } from "@/inngest/functions/enrich-vulnerabilities";
 import { manageMemoriesFn } from "@/inngest/functions/manage-memories";
+import { processInboxEmail } from "@/inngest/functions/process-inbox-email";
 import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-user-tokens";
 import {
   syncAllIntegrations,
@@ -19,8 +19,8 @@ export const { GET, POST, PUT } = serve({
     syncIntegration,
     enrichVulnerability,
     enrichAllVulnerabilities,
-    chatAgent,
     manageMemoriesFn,
     purgeExpiredTokensFn,
+    processInboxEmail,
   ],
 });

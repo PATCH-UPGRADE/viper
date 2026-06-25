@@ -31,26 +31,31 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export default prisma;
 
+const canonicalRefSelect = {
+  select: { canonicalName: true, canonicalDisplayName: true },
+} as const;
+
+const deviceGroupSummarySelect = {
+  select: {
+    id: true,
+    vendor: canonicalRefSelect,
+    product: canonicalRefSelect,
+    version: canonicalRefSelect,
+    versionStatus: true,
+    cpe: true,
+  },
+} as const;
+
 export type AssetWithIssues = Prisma.AssetGetPayload<{
   include: {
     issues: true;
-    deviceGroup: {
-      select: {
-        id: true;
-        cpe: true;
-      };
-    };
+    deviceGroup: typeof deviceGroupSummarySelect;
   };
 }>;
 
 export type AssetWithDeviceGroup = Prisma.AssetGetPayload<{
   include: {
-    deviceGroup: {
-      select: {
-        id: true;
-        cpe: true;
-      };
-    };
+    deviceGroup: typeof deviceGroupSummarySelect;
   };
 }>;
 
@@ -60,11 +65,6 @@ export type AssetWithDeviceGroup = Prisma.AssetGetPayload<{
 export type VulnerabilityWithIssues = Prisma.VulnerabilityGetPayload<{
   include: {
     issues: true;
-    affectedDeviceGroups: {
-      select: {
-        id: true;
-        cpe: true;
-      };
-    };
+    deviceGroupMatchings: true;
   };
 }>;

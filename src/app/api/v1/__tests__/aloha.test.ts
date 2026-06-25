@@ -12,7 +12,6 @@ describe("Aloha Endpoints", () => {
   };
 
   const remPayload = {
-    cpes: [generateCPE("aloha_rem_v1")],
     description: "Mock -- Aloha test remediation",
     artifacts: [
       {

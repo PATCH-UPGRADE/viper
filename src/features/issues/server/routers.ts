@@ -61,7 +61,7 @@ export const issuesRouter = createTRPCRouter({
           ...(type === "vulnerabilities" && {
             vulnerability: {
               include: {
-                affectedDeviceGroups: deviceGroupSelect,
+                deviceGroupMatchings: true,
               },
             },
           }),

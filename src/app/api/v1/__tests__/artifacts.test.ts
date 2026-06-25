@@ -3,14 +3,12 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import type { ArtifactWithUrls } from "@/features/artifacts/types";
 import { ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { authHeader, BASE_URL, generateCPE } from "./test-config";
+import { authHeader, BASE_URL } from "./test-config";
 
 describe("Artifacts Endpoint (/artifacts)", () => {
   // Helper function to create a remediation with artifacts for testing
-  const cpeName = "rem_artifact_test";
   const createRemediationWithArtifacts = async () => {
     const payload = {
-      cpes: [generateCPE(cpeName)],
       description: "Test remediation for artifact testing",
       narrative: "Used to test artifact endpoints",
       artifacts: [
@@ -34,13 +32,6 @@ describe("Artifacts Endpoint (/artifacts)", () => {
         .catch(() => {
           /* already deleted */
         });
-      await prisma.deviceGroup.deleteMany({
-        where: {
-          cpe: {
-            contains: cpeName,
-          },
-        },
-      });
     });
 
     // TODO: Remediation POST now returns { remediation, uploadInstructions }

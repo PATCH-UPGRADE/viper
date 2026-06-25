@@ -2,7 +2,6 @@ import { fail } from "node:assert";
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
 import type { ArtifactWrapperWithUrls } from "@/features/artifacts/types";
-import type { DeviceGroupWithUrls } from "@/features/device-groups/types";
 import type { RemediationResponse } from "@/features/remediations/types";
 import {
   ArtifactType,
@@ -64,7 +63,6 @@ describe("Remediations Endpoint (/remediations)", () => {
     vendor: "mockRemediationIntegrationVendor",
     items: [
       {
-        cpes: ["cpe:2.3:h:mock:rem_integration_v10:*:*:*:*:*:*:*"],
         upstreamApi: "https://mock-rem-upstream-api.com/",
         description: "Mock -- run apt update",
         narrative: "Discovered during security audit",
@@ -78,7 +76,6 @@ describe("Remediations Endpoint (/remediations)", () => {
         ],
       },
       {
-        cpes: ["cpe:2.3:h:mock:rem_integration_v11:*:*:*:*:*:*:*"],
         upstreamApi: "https://mock-rem-upstream-api.com/",
         description: "Mock - Turn it off and on again",
         narrative: "Discovered during security audit",
@@ -146,41 +143,8 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   it("POST /remediations - Create remediation without artifacts should fail", async () => {
     const invalidPayload = {
-      cpes: [generateCPE("rem_v1")],
       description: "No artifacts",
       artifacts: [],
-    };
-
-    const res = await request(BASE_URL)
-      .post("/remediations")
-      .set(authHeader)
-      .send(invalidPayload);
-
-    onTestFinished(async () => {
-      await prisma.deviceGroup.deleteMany({
-        where: {
-          cpe: {
-            contains: invalidPayload.cpes[0],
-          },
-        },
-      });
-    });
-
-    expect(res.status).toBe(400);
-    expect(res.body.code).toBe("BAD_REQUEST");
-  });
-
-  it("POST /remediations - Create remediation without cpes should fail", async () => {
-    const invalidPayload = {
-      cpes: [],
-      description: "No CPEs",
-      artifacts: [
-        {
-          name: "Test artifact",
-          artifactType: ArtifactType.Firmware,
-          downloadUrl: "https://example.com/file.bin",
-        },
-      ],
     };
 
     const res = await request(BASE_URL)
@@ -208,6 +172,15 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(createRes.body).toHaveProperty("id");
     const remediationId = createRes.body.id;
 
+    // The remediation carries its own device-group matchings (resolved from the
+    // uploaded CPEs).
+    expect(
+      createRes.body.deviceGroupMatchings.some(
+        (m: { version: { canonicalName: string } | null }) =>
+          m.version?.canonicalName === payload.cpes[0].split(":")[5],
+      ),
+    ).toBe(true);
+
     onTestFinished(async () => {
       // Cleanup - delete the remediation (which cascades to artifacts)
       await prisma.remediation
@@ -217,23 +190,9 @@ describe("Remediations Endpoint (/remediations)", () => {
         .catch(() => {
           /* already deleted */
         });
-      await prisma.deviceGroup.deleteMany({
-        where: {
-          cpe: {
-            contains: payload.cpes[0],
-          },
-        },
-      });
     });
 
     // Verify the response structure
-    expect(createRes.body).toHaveProperty("affectedDeviceGroups");
-    expect(Array.isArray(createRes.body.affectedDeviceGroups)).toBe(true);
-    expect(createRes.body.affectedDeviceGroups.length).toBe(1);
-    expect(createRes.body.affectedDeviceGroups[0]).toEqual(
-      expect.objectContaining({ cpe: payload.cpes[0] }),
-    );
-
     expect(createRes.body).toHaveProperty("artifacts");
     expect(Array.isArray(createRes.body.artifacts)).toBe(true);
     expect(createRes.body.artifacts.length).toBe(1);
@@ -290,39 +249,6 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(updateRes.body.description).toBe("Updated description");
     expect(updateRes.body.narrative).toBe("Updated narrative");
 
-    // Update CPEs
-    const newCpe = generateCPE("rem_v2");
-    const updateCpesRes = await request(BASE_URL)
-      .put(`/remediations/${remediationId}`)
-      .set(authHeader)
-      .send({
-        id: remediationId,
-        cpes: [payload.cpes[0], newCpe],
-      });
-
-    onTestFinished(async () => {
-      await prisma.deviceGroup.deleteMany({
-        where: {
-          cpe: {
-            contains: newCpe,
-          },
-        },
-      });
-    });
-
-    expect(updateCpesRes.status).toBe(200);
-
-    // TODO: Remediation PUT now returns { remediation, uploadInstructions }
-    // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
-    updateCpesRes.body = updateCpesRes.body.remediation;
-
-    expect(updateCpesRes.body.affectedDeviceGroups.length).toBe(2);
-    const cpes = updateCpesRes.body.affectedDeviceGroups.map(
-      (dg: DeviceGroupWithUrls) => dg.cpe,
-    );
-    expect(cpes).toContain(payload.cpes[0]);
-    expect(cpes).toContain(newCpe);
-
     // Delete the remediation
     const deleteRes = await request(BASE_URL)
       .delete(`/remediations/${remediationId}`)
@@ -338,7 +264,10 @@ describe("Remediations Endpoint (/remediations)", () => {
     const vulnRes = await request(BASE_URL)
       .post("/vulnerabilities")
       .set(authHeader)
-      .send({ ...vulnerabilityPayload, cpes: [newCpe] });
+      .send({
+        ...vulnerabilityPayload,
+        cpes: [newCpe],
+      });
 
     expect(vulnRes.status).toBe(200);
     const vulnerabilityId = vulnRes.body.id;
@@ -346,7 +275,6 @@ describe("Remediations Endpoint (/remediations)", () => {
     // Create remediation linked to the vulnerability
     const payloadWithVuln = {
       ...payload,
-      cpes: [newCpe],
       vulnerabilityId,
     };
 
@@ -364,9 +292,11 @@ describe("Remediations Endpoint (/remediations)", () => {
           /* already deleted */
         });
       await prisma.deviceGroup
-        .delete({
+        .deleteMany({
           where: {
-            cpe: newCpe,
+            cpe: {
+              has: newCpe,
+            },
           },
         })
         .catch(() => {});
@@ -466,7 +396,6 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   it("GET /remediations - Pagination test", async () => {
     // Create multiple remediations
-    const cpeName = "rem_pagination_";
     const createPromises = Array.from({ length: 5 }, (_, i) =>
       request(BASE_URL)
         .post("/remediations")
@@ -474,7 +403,6 @@ describe("Remediations Endpoint (/remediations)", () => {
         .send({
           ...payload,
           description: `Test remediation ${i}`,
-          cpes: [generateCPE(`${cpeName}${i}`)],
         }),
     );
 
@@ -491,13 +419,6 @@ describe("Remediations Endpoint (/remediations)", () => {
           }),
         ),
       );
-      await prisma.deviceGroup.deleteMany({
-        where: {
-          cpe: {
-            contains: cpeName,
-          },
-        },
-      });
     });
 
     // Test pagination
@@ -596,14 +517,6 @@ describe("Remediations Endpoint (/remediations)", () => {
       ResourceType.Remediation,
     );
 
-    await prisma.deviceGroup.deleteMany({
-      where: {
-        cpe: {
-          contains: "rem_integration_",
-        },
-      },
-    });
-
     const integrationRes = await request(BASE_URL)
       .post(`/remediations/integrationUpload/${createToken}`)
       .set(jsonHeader)
@@ -627,7 +540,6 @@ describe("Remediations Endpoint (/remediations)", () => {
         id: mapping1.itemId,
       },
       include: {
-        affectedDeviceGroups: true,
         artifacts: true,
       },
     });
@@ -638,8 +550,6 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(foundRem1.description).toBe(remPayload1.description);
     expect(foundRem1.narrative).toBe(remPayload1.narrative);
     expect(foundRem1.upstreamApi).toBe(remPayload1.upstreamApi);
-    expect(foundRem1.affectedDeviceGroups.length).toBe(remPayload1.cpes.length);
-    expect(foundRem1.affectedDeviceGroups[0].cpe).toBe(remPayload1.cpes[0]);
     expect(foundRem1.artifacts.length).toBe(1);
 
     const remPayload2 = remediationIntegrationPayload.items[1];
@@ -654,7 +564,6 @@ describe("Remediations Endpoint (/remediations)", () => {
         id: mapping2.itemId,
       },
       include: {
-        affectedDeviceGroups: true,
         artifacts: true,
       },
     });
@@ -665,8 +574,6 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(foundRem2.description).toBe(remPayload2.description);
     expect(foundRem2.narrative).toBe(remPayload2.narrative);
     expect(foundRem2.upstreamApi).toBe(remPayload2.upstreamApi);
-    expect(foundRem2.affectedDeviceGroups.length).toBe(remPayload2.cpes.length);
-    expect(foundRem2.affectedDeviceGroups[0].cpe).toBe(remPayload2.cpes[0]);
     expect(foundRem2.artifacts.length).toBe(1);
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {
@@ -683,5 +590,107 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBeNullable();
     expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
+  });
+
+  it("integration re-sync without cpes preserves existing deviceGroupMatchings", async () => {
+    const { integration } = await setupMockIntegration(mockIntegrationPayload);
+
+    const token = await createIntegrationToken(
+      integration.integrationUserId,
+      ResourceType.Remediation,
+    );
+
+    const externalId = "mockRemediation-preserve-matchings";
+    const cpe = generateCPE("rem_preserve_matchings_v1");
+
+    const basePayload = {
+      vendor: "mockRemediationIntegrationVendor",
+      page: 1,
+      pageSize: 100,
+      totalCount: 1,
+      totalPages: 1,
+      next: null,
+      previous: null,
+    };
+
+    const itemBase = {
+      upstreamApi: "https://mock-rem-upstream-api.com/",
+      narrative: "Discovered during security audit",
+      vendorId: externalId,
+      artifacts: [
+        {
+          name: "mock-remediation-preserve-artifact",
+          artifactType: ArtifactType.Documentation,
+          downloadUrl: "http://mock.example.com",
+        },
+      ],
+    };
+
+    // Sync 1: item carries a CPE -> remediation created with one matching.
+    const firstSync = await request(BASE_URL)
+      .post(`/remediations/integrationUpload/${token}`)
+      .set(jsonHeader)
+      .send({
+        ...basePayload,
+        items: [
+          {
+            ...itemBase,
+            description: "Mock -- preserve matchings, initial",
+            cpes: [cpe],
+          },
+        ],
+      });
+
+    expect(firstSync.status).toBe(200);
+    expect(firstSync.body.createdItemsCount).toBe(1);
+
+    const mapping = await prisma.externalRemediationMapping.findFirstOrThrow({
+      where: { externalId },
+    });
+
+    onTestFinished(async () => {
+      await prisma.remediation
+        .delete({ where: { id: mapping.itemId } })
+        .catch(() => {});
+    });
+
+    const afterCreate = await prisma.remediation.findFirstOrThrow({
+      where: { id: mapping.itemId },
+      include: { deviceGroupMatchings: { include: { version: true } } },
+    });
+    expect(afterCreate.deviceGroupMatchings.length).toBe(1);
+    expect(afterCreate.deviceGroupMatchings[0].version?.canonicalName).toBe(
+      cpe.split(":")[5],
+    );
+
+    // Sync 2: same externalId, NO cpes -> the existing matching must survive
+    // (omitting cpes must not clear it). Integration tokens are single-use, so
+    // mint a fresh one for the re-sync.
+    const secondToken = await createIntegrationToken(
+      integration.integrationUserId,
+      ResourceType.Remediation,
+    );
+    const secondSync = await request(BASE_URL)
+      .post(`/remediations/integrationUpload/${secondToken}`)
+      .set(jsonHeader)
+      .send({
+        ...basePayload,
+        items: [
+          { ...itemBase, description: "Mock -- preserve matchings, updated" },
+        ],
+      });
+
+    expect(secondSync.status).toBe(200);
+    expect(secondSync.body.updatedItemsCount).toBe(1);
+
+    const afterUpdate = await prisma.remediation.findFirstOrThrow({
+      where: { id: mapping.itemId },
+      include: { deviceGroupMatchings: true },
+    });
+    expect(afterUpdate.description).toBe("Mock -- preserve matchings, updated");
+    expect(afterUpdate.deviceGroupMatchings.length).toBe(1);
+    expect(afterUpdate.deviceGroupMatchings[0].id).toBe(
+      afterCreate.deviceGroupMatchings[0].id,
+    );
   });
 });

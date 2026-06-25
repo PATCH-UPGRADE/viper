@@ -15,9 +15,13 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     upstreamApi: "https://api.hospital-upstream.com/v1",
   };
 
+  // Unique per run: the update rewrites the device group's (vendor, product,
+  // version) identity, which is now a unique key — a fixed value would collide
+  // with a group left over from a previous run.
+  const updateIdentitySuffix = `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
   const updateDeviceGroupPayload = {
-    manufacturer: "Test Manufacturer",
-    modelName: "Test Model",
+    vendor: `Test Manufacturer ${updateIdentitySuffix}`,
+    product: "Test Model",
     version: "123.456",
   };
 
@@ -112,6 +116,14 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
 
     const assetDeviceGroupId = assetRes.body.deviceGroup.id;
 
+    // This test renames the asset's device group below; deleting the asset does
+    // not remove the group, so clean it up explicitly to avoid orphans.
+    onTestFinished(async () => {
+      await prisma.deviceGroup
+        .delete({ where: { id: assetDeviceGroupId } })
+        .catch(() => {});
+    });
+
     // Get a list of device groups
     const listRes = await request(BASE_URL)
       .get("/deviceGroups")
@@ -126,6 +138,8 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     // grab the last / oldest deviceGroup as it is much less likely to be cleared by another test
     const deviceGroup = listRes.body.items.at(-1);
     expect(deviceGroup).toHaveProperty("id");
+    expect(deviceGroup).toHaveProperty("vendor");
+    expect(deviceGroup).toHaveProperty("product");
     expect(deviceGroup).toHaveProperty("cpe");
     expect(deviceGroup).toHaveProperty("url");
     expect(deviceGroup).toHaveProperty("sbomUrl");
@@ -141,7 +155,9 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
 
     expect(firstDetailRes.status).toBe(200);
     expect(firstDetailRes.body.id).toBe(deviceGroupId);
-    expect(firstDetailRes.body.cpe).toBe(deviceGroup.cpe);
+    expect(firstDetailRes.body.vendor?.canonicalName).toBe(
+      deviceGroup.vendor?.canonicalName,
+    );
     expect(firstDetailRes.body).toHaveProperty("url");
     expect(firstDetailRes.body).toHaveProperty("sbomUrl");
     expect(firstDetailRes.body).toHaveProperty("vulnerabilitiesUrl");
@@ -154,7 +170,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .set(authHeader);
     expect(detailRes.status).toBe(200);
     expect(detailRes.body.id).toBe(assetDeviceGroupId);
-    expect(detailRes.body.cpe).toBe(assetPayload.cpe);
+    expect(detailRes.body.cpe.includes(assetPayload.cpe)).toBe(true);
 
     // Update device group
     const updateDeviceGroup = await request(BASE_URL)
@@ -163,13 +179,13 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .send(updateDeviceGroupPayload);
     expect(updateDeviceGroup.status).toBe(200);
     expect(updateDeviceGroup.body.id).toBe(assetDeviceGroupId);
-    expect(updateDeviceGroup.body.manufacturer).toBe(
-      updateDeviceGroupPayload.manufacturer,
+    expect(updateDeviceGroup.body.vendor?.canonicalDisplayName).toBe(
+      updateDeviceGroupPayload.vendor,
     );
-    expect(updateDeviceGroup.body.modelName).toBe(
-      updateDeviceGroupPayload.modelName,
+    expect(updateDeviceGroup.body.product?.canonicalDisplayName).toBe(
+      updateDeviceGroupPayload.product,
     );
-    expect(updateDeviceGroup.body.version).toBe(
+    expect(updateDeviceGroup.body.version?.canonicalDisplayName).toBe(
       updateDeviceGroupPayload.version,
     );
 

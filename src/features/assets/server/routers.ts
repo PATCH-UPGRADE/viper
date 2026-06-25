@@ -15,6 +15,7 @@ import {
 import {
   cpeToDeviceGroup,
   fetchPaginated,
+  findVulnerabilitiesMatchingDeviceGroups,
   processIntegrationSync,
   processIntegrationToken,
 } from "@/lib/router-utils";
@@ -39,19 +40,23 @@ import {
 } from "../types";
 
 const createSearchFilter = (search: string) => {
+  const insensitive = { contains: search, mode: "insensitive" as const };
   return search
     ? {
         OR: [
-          { ip: { contains: search, mode: "insensitive" as const } },
-          { role: { contains: search, mode: "insensitive" as const } },
+          { ip: insensitive },
+          { role: insensitive },
           {
             deviceGroup: {
-              cpe: {
-                contains: search,
-                mode: "insensitive" as const,
-              },
+              is: { vendor: { is: { canonicalName: insensitive } } },
             },
           },
+          {
+            deviceGroup: {
+              is: { product: { is: { canonicalName: insensitive } } },
+            },
+          },
+          { deviceGroup: { is: { cpe: { has: search } } } },
         ],
       }
     : {};
@@ -344,8 +349,9 @@ export const assetsRouter = createTRPCRouter({
       const where = {
         OR: [
           ...(assetIds?.length ? [{ id: { in: assetIds } }] : []),
-          ...(cpes?.length ? [{ deviceGroup: { cpe: { in: cpes } } }] : []),
-          // TODO:: ^this needs to be a pattern match, not just "in"
+          ...(cpes?.length
+            ? [{ deviceGroup: { is: { cpe: { hasSome: cpes } } } }]
+            : []),
         ],
       };
       const assetsCount = await prisma.asset.count({ where: where });
@@ -356,26 +362,29 @@ export const assetsRouter = createTRPCRouter({
         orderBy: { updatedAt: "desc" },
       });
 
-      const assetCpes = assetItems
-        .map((asset) => asset.deviceGroup.cpe)
-        .filter(Boolean);
-      const allCpes = [...new Set([...(cpes ?? []), ...assetCpes])];
-
-      const vulnsWhere = {
-        affectedDeviceGroups: { some: { cpe: { in: allCpes } } },
-      };
-      const vulnsCount = await prisma.vulnerability.count({
-        where: vulnsWhere,
+      // Collect the distinct device-group identities backing these assets and
+      // find every vulnerability whose matchings apply to them.
+      const deviceGroupIds = [
+        ...new Set(assetItems.map((asset) => asset.deviceGroupId)),
+      ];
+      const deviceGroups = await prisma.deviceGroup.findMany({
+        where: { id: { in: deviceGroupIds } },
+        select: {
+          id: true,
+          vendorId: true,
+          productId: true,
+          versionId: true,
+          version: { select: { canonicalName: true } },
+        },
       });
-      const vulnerabilities = await prisma.vulnerability.findMany({
-        where: vulnsWhere,
-      });
+      const vulnerabilities =
+        await findVulnerabilitiesMatchingDeviceGroups(deviceGroups);
 
       return {
         assets: assetItems,
         assetsCount,
         vulnerabilities,
-        vulnerabilitiesCount: vulnsCount,
+        vulnerabilitiesCount: vulnerabilities.length,
       };
     }),
 

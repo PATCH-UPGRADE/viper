@@ -2,7 +2,7 @@
 
 // Debug script used to return tool call output, largely just for token counting
 
-import { getRecommendationsContext } from "@/features/chat/viper-agent/tools/get-recommendations-context";
+import { loadRecommendationsContextMarkdown } from "@/features/chat/viper-agent/tools/get-recommendations-context";
 import prisma from "@/lib/db";
 
 async function main() {
@@ -11,19 +11,9 @@ async function main() {
       where: { email: "user@example.com" },
     });
 
-    const result = await (
-      getRecommendationsContext as unknown as {
-        handler: (args: unknown, ctx: unknown) => Promise<string>;
-      }
-    ).handler(
-      {},
-      {
-        network: {
-          state: {
-            data: { userId: user.id, userRole: "hospital administration" },
-          },
-        },
-      },
+    const result = await loadRecommendationsContextMarkdown(
+      user.id,
+      "hospital administration",
     );
 
     process.stdout.write(`${result}\n`);

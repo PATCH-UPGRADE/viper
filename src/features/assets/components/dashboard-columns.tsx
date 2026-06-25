@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
+import { deviceGroupLabel } from "@/lib/string-utils";
 import type { AssetWithIssueRelations } from "../types";
 
 type AssetIssue = AssetWithIssueRelations["issues"][number];
@@ -109,7 +110,9 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
           <TooltipTrigger asChild>
             <span className="cursor-default">{row.original.role}</span>
           </TooltipTrigger>
-          <TooltipContent>{row.original.deviceGroup.cpe}</TooltipContent>
+          <TooltipContent>
+            {deviceGroupLabel(row.original.deviceGroup)}
+          </TooltipContent>
         </Tooltip>
       </TooltipProvider>
     ),

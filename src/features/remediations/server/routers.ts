@@ -7,7 +7,7 @@ import {
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
-  cpesToDeviceGroups,
+  cpesToMatchingConnect,
   createArtifactWrappers,
   fetchPaginated,
   processIntegrationSync,
@@ -135,10 +135,9 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { cpes, artifacts, ...dataInput } = input;
-      const uniqueCpes = [...new Set(cpes)];
-      const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
+      const { artifacts, cpes, ...dataInput } = input;
       const userId = ctx.auth.user.id;
+      const matchingConnect = cpes ? await cpesToMatchingConnect(cpes) : [];
 
       // Handle S3 upload URL -- if the user included a hash/size but no downloadUrl, they want us to host it
       const { processedArtifacts, uploadInstructions } =
@@ -158,9 +157,7 @@ export const remediationsRouter = createTRPCRouter({
         const remediation = await tx.remediation.create({
           data: {
             ...dataInput,
-            affectedDeviceGroups: {
-              connect: deviceGroups.map((dg) => ({ id: dg.id })),
-            },
+            deviceGroupMatchings: { connect: matchingConnect },
             userId,
           },
         });
@@ -213,23 +210,24 @@ export const remediationsRouter = createTRPCRouter({
           model: prisma.remediation,
           mappingModel: prisma.externalRemediationMapping,
           transformInputItem: async (item, userId) => {
-            const { cpes, vendorId: _vendorId, artifacts, ...itemData } = item;
-            const uniqueCpes = [...new Set(cpes)];
-            const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
+            const { vendorId: _vendorId, artifacts, cpes, ...itemData } = item;
+            const matchingConnect = cpes
+              ? await cpesToMatchingConnect(cpes)
+              : [];
 
             return {
               createData: {
                 ...itemData,
                 userId,
-                affectedDeviceGroups: {
-                  connect: deviceGroups.map((dg) => ({ id: dg.id })),
-                },
+                deviceGroupMatchings: { connect: matchingConnect },
               },
               updateData: {
                 ...itemData,
-                affectedDeviceGroups: {
-                  set: deviceGroups.map((dg) => ({ id: dg.id })),
-                },
+                // Only replace matchings when CPEs were provided; omitting them
+                // on re-sync must not clear a remediation's existing matchings.
+                ...(cpes
+                  ? { deviceGroupMatchings: { set: matchingConnect } }
+                  : {}),
               },
               uniqueFieldConditions: [],
               artifactsData: {
@@ -353,7 +351,7 @@ export const remediationsRouter = createTRPCRouter({
       // Verify ownership and get current data
       await requireOwnership(input.id, ctx.auth.user.id, "remediation");
 
-      const { id, cpes, artifacts = [], ...updateData } = input;
+      const { id, artifacts = [], ...updateData } = input;
 
       // Prepare update data
       const { processedArtifacts, uploadInstructions } =
@@ -375,12 +373,10 @@ export const remediationsRouter = createTRPCRouter({
           }),
         };
 
-        // Handle CPE/device group update if provided
-        if (cpes) {
-          const uniqueCpes = [...new Set(cpes)];
-          const deviceGroups = await cpesToDeviceGroups(uniqueCpes);
-          data.affectedDeviceGroups = {
-            set: deviceGroups.map((dg) => ({ id: dg.id })),
+        // Replace matchings when CPEs are provided.
+        if (updateData.cpes) {
+          data.deviceGroupMatchings = {
+            set: await cpesToMatchingConnect(updateData.cpes),
           };
         }
 

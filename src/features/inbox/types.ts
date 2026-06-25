@@ -27,6 +27,49 @@ export type NotificationWithRelations = Prisma.NotificationGetPayload<{
 
 export type NotificationSource = NotificationWithRelations["sources"][number];
 
+export const notificationDetailInclude = {
+  deviceGroups: {
+    include: {
+      deviceGroup: {
+        include: {
+          vendor: true,
+          product: true,
+          _count: { select: { assets: true } },
+          assets: {
+            select: {
+              id: true,
+              ip: true,
+              hostname: true,
+              location: true,
+              status: true,
+            },
+          },
+        },
+      },
+    },
+  },
+  sources: {
+    select: {
+      id: true,
+      channel: true,
+      raw: true,
+      markdown: true,
+      receivedAt: true,
+      referenceUrl: true,
+    },
+  },
+  reads: {
+    select: { id: true },
+  },
+} satisfies Prisma.NotificationInclude;
+
+export type NotificationDetailWithRelations = Prisma.NotificationGetPayload<{
+  include: typeof notificationDetailInclude;
+}>;
+
+export type NotificationDetailSource =
+  NotificationDetailWithRelations["sources"][number];
+
 export type RawEmailPayload = {
   from: string;
   subject?: string;

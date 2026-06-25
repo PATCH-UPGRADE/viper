@@ -8,6 +8,7 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { notificationDetailInclude } from "../types";
 
 const ALLOWED_SORT_FIELDS = new Set(["priority", "updatedAt", "createdAt"]);
 
@@ -98,7 +99,7 @@ export const notificationsRouter = createTRPCRouter({
       const notification = await prisma.notification.findUnique({
         where: { id: input.id },
         include: {
-          ...notificationInclude,
+          ...notificationDetailInclude,
           reads: {
             where: { userId: ctx.auth.user.id },
             select: { id: true },

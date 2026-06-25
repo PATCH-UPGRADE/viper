@@ -100,17 +100,27 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
       <SortableHeader header="Priority" column={column} />
     ),
     cell: ({ row }) => {
-      const { priority, reads } = row.original;
+      const { priority, priorityReasonWhy, reads } = row.original;
       const isUnread = reads.length === 0;
+      const badge = priority ? (
+        <PriorityBadge priority={priority} />
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      );
       return (
         <span className="flex items-center gap-1.5">
           {isUnread && (
             <span className="size-2 rounded-full bg-primary shrink-0" />
           )}
-          {priority ? (
-            <PriorityBadge priority={priority} />
+          {priorityReasonWhy ? (
+            <HoverCard openDelay={200}>
+              <HoverCardTrigger asChild>{badge}</HoverCardTrigger>
+              <HoverCardContent className="w-72 text-sm">
+                {priorityReasonWhy}
+              </HoverCardContent>
+            </HoverCard>
           ) : (
-            <span className="text-muted-foreground">—</span>
+            badge
           )}
         </span>
       );

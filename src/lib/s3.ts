@@ -1,5 +1,9 @@
 import "server-only";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { z } from "zod";
 import type { artifactInputSchema } from "@/features/artifacts/types";
@@ -15,13 +19,17 @@ export const s3Client = new S3Client({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
+  ...(process.env.S3_ENDPOINT && {
+    endpoint: process.env.S3_ENDPOINT,
+    forcePathStyle: true,
+  }),
 });
 
 /**
  * Handler for hex MD5
  * S3 requires Base64 MD5 in Content-MD5 header
  */
-function normalizeMd5(hash: string): string {
+export function normalizeMd5(hash: string): string {
   const isHex = /^[0-9a-fA-F]{32}$/.test(hash);
   if (isHex) {
     return Buffer.from(hash, "hex").toString("base64");
@@ -93,5 +101,58 @@ export async function generateUploadUrl(
  * Builds an S3 download URL for a given artifact
  */
 export function buildDownloadUrl(key: string): string {
+  if (process.env.S3_ENDPOINT) {
+    return `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET_NAME}/${key}`;
+  }
+  if (!process.env.AWS_REGION) {
+    throw new Error("Missing AWS Region");
+  }
   return `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+}
+
+/** Reverse of buildDownloadUrl — extracts the S3 object key from a stored download URL. */
+export function keyFromDownloadUrl(url: string): string {
+  const endpoint = process.env.S3_ENDPOINT;
+  const bucket = process.env.S3_BUCKET_NAME!;
+  if (endpoint) {
+    const prefix = `${endpoint}/${bucket}/`;
+    return url.startsWith(prefix) ? url.slice(prefix.length) : url;
+  }
+  if (!process.env.AWS_REGION) {
+    throw new Error("Missing AWS Region");
+  }
+  const prefix = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/`;
+  return url.startsWith(prefix) ? url.slice(prefix.length) : url;
+}
+
+/** Authenticated S3 download — works with private buckets (MinIO and AWS). */
+export async function downloadBufferFromS3(key: string): Promise<Buffer> {
+  const { Body } = await s3Client.send(
+    new GetObjectCommand({ Bucket: process.env.S3_BUCKET_NAME!, Key: key }),
+  );
+  if (!Body) throw new Error(`Empty S3 response for key: ${key}`);
+  return Buffer.from(await Body.transformToByteArray());
+}
+
+/**
+ * Server-side buffer upload to S3. Returns the public download URL.
+ * Use this for server-originated uploads (e.g. Inngest functions).
+ * For client-side uploads use generateUploadUrl() instead.
+ */
+export async function uploadBufferToS3(
+  buffer: Buffer,
+  key: string,
+  contentType: string,
+  contentMd5?: string,
+): Promise<string> {
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+      ...(contentMd5 && { ContentMD5: contentMd5 }),
+    }),
+  );
+  return buildDownloadUrl(key);
 }

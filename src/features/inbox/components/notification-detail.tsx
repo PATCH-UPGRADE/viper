@@ -23,6 +23,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -263,7 +264,7 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
             {" · "}
             {notification.sources.length} source
             {notification.sources.length !== 1 ? "s" : ""} (
-            {notification.sources.map(formatSourceChannel).join(", ")})
+            {[...new Set(notification.sources.map(formatSourceChannel))].join(", ")})
           </>
         )}
       </p>
@@ -318,40 +319,46 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
               <CardTitle>Details</CardTitle>
             </CardHeader>
             <CardContent>
-              <dl className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
-                <div>
-                  <dt className="font-medium text-muted-foreground mb-1">
-                    TLP
-                  </dt>
-                  <dd>
-                    {notification.tlp ? (
-                      <TlpBadge tlp={notification.tlp} />
-                    ) : (
-                      "—"
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-muted-foreground mb-1">
-                    First Received
-                  </dt>
-                  <dd>{format(firstReceived, "PPP p")}</dd>
-                </div>
-                <div className="col-span-2">
-                  <dt className="font-medium text-muted-foreground mb-1">
-                    References
-                  </dt>
-                  <dd className="flex flex-col gap-1.5">
-                    {notification.sources.length === 0 ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : (
-                      notification.sources.map((source) => (
-                        <SourceReference key={source.id} source={source} />
-                      ))
-                    )}
-                  </dd>
-                </div>
-              </dl>
+              <table className="w-full text-sm">
+                <tbody>
+                  <tr className="border-b">
+                    <td className="py-2 pr-3 w-48 align-top">
+                      <Badge variant="secondary">TLP</Badge>
+                    </td>
+                    <td className="py-2 align-top text-muted-foreground">
+                      {notification.tlp ? (
+                        <TlpBadge tlp={notification.tlp} />
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                  <tr className="border-b">
+                    <td className="py-2 pr-3 w-48 align-top">
+                      <Badge variant="secondary">First Received</Badge>
+                    </td>
+                    <td className="py-2 align-top text-muted-foreground">
+                      {format(firstReceived, "PPP p")}
+                    </td>
+                  </tr>
+                  <tr className="last:border-0">
+                    <td className="py-2 pr-3 w-48 align-top">
+                      <Badge variant="secondary">References</Badge>
+                    </td>
+                    <td className="py-2 align-top">
+                      {notification.sources.length === 0 ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <div className="flex flex-col gap-1.5">
+                          {notification.sources.map((source) => (
+                            <SourceReference key={source.id} source={source} />
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </CardContent>
           </Card>
         </TabsContent>
@@ -373,8 +380,11 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
               .map((mapping) => (
                 <Card key={mapping.id}>
                   <CardHeader>
-                    <CardTitle className="text-base">
+                    <CardTitle className="text-base flex items-center gap-2">
                       {deviceGroupLabel(mapping.deviceGroup)}
+                      <Badge variant="secondary" className="font-normal">
+                        {mapping.deviceGroup._count.assets}
+                      </Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>

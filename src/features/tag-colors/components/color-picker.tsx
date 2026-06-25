@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 import {
   formatHueLabel,
   getSwatchClass,
-  type TagHue,
   TAG_PALETTE,
+  type TagHue,
 } from "../palette";
 
 interface ColorPickerProps {

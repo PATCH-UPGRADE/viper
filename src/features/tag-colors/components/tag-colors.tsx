@@ -20,12 +20,12 @@ import {
   useUpdateDepartment,
 } from "@/features/departments/hooks/use-departments";
 import { TicketCategory } from "@/generated/prisma";
-import { ColorPicker } from "./color-picker";
-import { getChipClass, type TagHue } from "../palette";
 import {
   useSetCategoryColor,
   useSuspenseCategoryColors,
 } from "../hooks/use-tag-colors";
+import { getChipClass, type TagHue } from "../palette";
+import { ColorPicker } from "./color-picker";
 
 const categoryLabels: Record<TicketCategory, string> = {
   PATCH: "Patch",
@@ -58,10 +58,7 @@ const DepartmentSection = () => {
             {departments.map((dept) => (
               <TableRow key={dept.id}>
                 <TableCell>
-                  <Badge
-                    variant="outline"
-                    className={getChipClass(dept.color)}
-                  >
+                  <Badge variant="outline" className={getChipClass(dept.color)}>
                     {dept.name}
                   </Badge>
                 </TableCell>

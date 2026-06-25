@@ -160,6 +160,7 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span
+                    role="img"
                     aria-label="Unread"
                     className="size-2 rounded-full bg-blue-500 shrink-0"
                   />
@@ -309,11 +310,14 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
       const showBreakdown = row.depth === 0 && totalCount !== ownCount;
       return (
         <div
+          role="img"
+          aria-label={`${totalCount} comment${totalCount === 1 ? "" : "s"}${
+            showBreakdown ? ` (${ownCount} on this ticket)` : ""
+          }${unread ? ", unread" : ""}`}
           className={cn(
             "flex items-center gap-1",
             unread ? "text-blue-500" : "text-muted-foreground",
           )}
-          aria-label={unread ? "Unread comments" : "Comments"}
         >
           <MessageSquareIcon
             className={cn("size-3.5", unread && "fill-current")}

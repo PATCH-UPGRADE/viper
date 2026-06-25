@@ -37,9 +37,7 @@ export const departmentsRouter = createTRPCRouter({
     }),
 
   update: protectedProcedure
-    .input(
-      departmentInputSchema.partial().extend({ id: z.string() }),
-    )
+    .input(departmentInputSchema.partial().extend({ id: z.string() }))
     .mutation(async ({ input }) => {
       const { id, ...data } = input;
       if (data.name) {

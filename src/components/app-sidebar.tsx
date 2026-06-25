@@ -3,11 +3,11 @@
 import {
   BugIcon,
   ChevronDownIcon,
-  ListChecksIcon,
   ComputerIcon,
   CpuIcon,
   ExternalLink,
   HeartIcon,
+  ListChecksIcon,
   type LucideIcon,
   PlugIcon,
   SettingsIcon,

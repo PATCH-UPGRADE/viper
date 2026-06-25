@@ -106,22 +106,22 @@ type SubTicketsChild = TicketDetail["children"][number];
 
 export const SubTicketsSection = ({
   parentId,
-  children,
+  childTickets,
 }: {
   parentId: string;
-  children: SubTicketsChild[];
+  childTickets: SubTicketsChild[];
 }) => {
   const detach = useDetachChild(parentId);
 
   return (
     <Section
       title="Sub-tickets"
-      count={children.length > 0 ? children.length : undefined}
+      count={childTickets.length > 0 ? childTickets.length : undefined}
       trailing={<AttachChildPopover parentId={parentId} />}
     >
-      {children.length > 0 ? (
+      {childTickets.length > 0 ? (
         <ul className="flex flex-col gap-2">
-          {children.map((child) => (
+          {childTickets.map((child) => (
             <li key={child.id} className="flex items-center gap-2">
               <Link
                 href={`/tracking/${child.id}`}

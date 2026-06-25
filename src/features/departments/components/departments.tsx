@@ -39,7 +39,11 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { ColorPicker } from "@/features/tag-colors/components/color-picker";
-import { DEFAULT_HUE, getChipClass, type TagHue } from "@/features/tag-colors/palette";
+import {
+  DEFAULT_HUE,
+  getChipClass,
+  type TagHue,
+} from "@/features/tag-colors/palette";
 import {
   useCreateDepartment,
   useRemoveDepartment,
@@ -185,7 +189,10 @@ export const DepartmentsList = () => {
               data.map((dept) => (
                 <TableRow key={dept.id}>
                   <TableCell>
-                    <Badge variant="outline" className={getChipClass(dept.color)}>
+                    <Badge
+                      variant="outline"
+                      className={getChipClass(dept.color)}
+                    >
                       {dept.name}
                     </Badge>
                   </TableCell>

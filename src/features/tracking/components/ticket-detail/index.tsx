@@ -198,7 +198,7 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
         </>
       )}
 
-      <SubTicketsSection parentId={data.id} children={data.children} />
+      <SubTicketsSection parentId={data.id} childTickets={data.children} />
 
       <div className="rounded-lg border bg-background p-4">
         <Tabs defaultValue="assets">

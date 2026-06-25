@@ -113,7 +113,7 @@ function EmailSourceModal({
         </DialogHeader>
         <div className="flex flex-col gap-4 overflow-auto min-h-0">
           <Card>
-            <CardContent className="pt-4">
+            <CardContent>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
                 <dt className="font-medium text-muted-foreground">From</dt>
                 <dd>{raw.from}</dd>
@@ -126,7 +126,7 @@ function EmailSourceModal({
           </Card>
           {source.markdown && (
             <Card className="overflow-auto">
-              <CardContent className="pt-4">
+              <CardContent>
                 <div className="text-sm leading-relaxed [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-2 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-1.5 [&_h3]:font-semibold [&_h3]:mb-1 [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3 [&_li]:mb-1 [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground [&_code]:bg-muted [&_code]:px-1 [&_code]:rounded [&_code]:text-xs [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded [&_pre]:overflow-auto [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_hr]:border-border [&_hr]:my-4 [&_table]:w-full [&_th]:text-left [&_th]:font-semibold [&_td]:py-1 [&_tr]:border-b [&_tr]:border-border">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {source.markdown}
@@ -208,7 +208,7 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
   }, [id]);
 
   const displayTitle =
-    notification.summary ?? notification.title ?? notification.id;
+    notification.title ?? notification.summary ?? notification.id;
 
   const yCount = notification.deviceGroups.length;
   const xCount = notification.deviceGroups.filter(

@@ -1,5 +1,9 @@
 // Assigns priority, priorityReasonWhy, and hospitalImpact to a Notification
 
+// TODO: This is where we want our CDST to run here
+// Currently this is just haiku + prompt, we want something more sophisiticated
+// to be coming up with these values
+
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
@@ -18,7 +22,7 @@ const triageSchema = z.object({
   hospitalImpact: z
     .string()
     .describe(
-      "3-5 sentence paragraph describing the clinical and operational impact to the hospital",
+      "3-5 sentence paragraph describing the clinical and operational impact to the hospital, in simple terms",
     ),
 });
 
@@ -44,35 +48,11 @@ function buildTextPrompt(input: {
   notificationTitle: string | null;
   notificationSummary: string | null;
   markdown: string | null;
-  deviceGroups: Array<{
-    vendor: string | null;
-    product: string | null;
-    version: string | null;
-    cpe: string[];
-  }>;
 }): string {
-  const deviceGroupsText =
-    input.deviceGroups.length > 0
-      ? input.deviceGroups
-          .map((dg) => {
-            const parts = [
-              dg.vendor && `Vendor: ${dg.vendor}`,
-              dg.product && `Product: ${dg.product}`,
-              dg.version && `Version: ${dg.version}`,
-              dg.cpe.length > 0 && `CPE: ${dg.cpe.join(", ")}`,
-            ].filter(Boolean);
-            return `- ${parts.join(" | ")}`;
-          })
-          .join("\n")
-      : "(none matched in this hospital's inventory)";
-
   return `--- NOTIFICATION ---
 Type: ${input.notificationType}
 Title: ${input.notificationTitle ?? "(untitled)"}
 Summary: ${input.notificationSummary ?? "(none)"}
-
---- AFFECTED DEVICE GROUPS ---
-${deviceGroupsText}
 
 --- FULL NOTIFICATION BODY ---
 ${input.markdown ?? "(no body)"}`;
@@ -82,7 +62,7 @@ export async function triageNotification(
   sourceId: string,
   notificationId: string,
 ): Promise<TriageResult> {
-  const [source, notification, deviceGroupMappings, pdfAttachments] =
+  const [source, notification, pdfAttachments] =
     await Promise.all([
       prisma.notificationSource.findUnique({
         where: { id: sourceId },
@@ -92,23 +72,8 @@ export async function triageNotification(
         where: { id: notificationId },
         select: { type: true, title: true, summary: true },
       }),
-      prisma.notificationDeviceGroupMapping.findMany({
-        where: { notificationId },
-        include: {
-          deviceGroup: {
-            include: { vendor: true, product: true, version: true },
-          },
-        },
-      }),
       fetchPdfAttachments(sourceId),
     ]);
-
-  const deviceGroups = deviceGroupMappings.map((m) => ({
-    vendor: m.deviceGroup.vendor?.canonicalDisplayName ?? null,
-    product: m.deviceGroup.product?.canonicalDisplayName ?? null,
-    version: m.deviceGroup.version?.canonicalDisplayName ?? null,
-    cpe: m.deviceGroup.cpe,
-  }));
 
   const model = new ChatAnthropic({
     model: MODEL,
@@ -120,7 +85,6 @@ export async function triageNotification(
     notificationTitle: notification?.title ?? null,
     notificationSummary: notification?.summary ?? null,
     markdown: source?.markdown ?? null,
-    deviceGroups,
   });
 
   const userContent = [

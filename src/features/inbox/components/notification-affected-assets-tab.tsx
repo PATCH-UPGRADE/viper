@@ -1,16 +1,8 @@
 "use client";
 
-import { MoreVerticalIcon } from "lucide-react";
-import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -72,20 +64,14 @@ export function NotificationAffectedAssetsTab({
                     <TableCell>{parseLocation(asset.location)}</TableCell>
                     <TableCell>{asset.status ?? "—"}</TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVerticalIcon className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/assets/${asset.id}`}>
-                              View Asset Detail
-                            </Link>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <MoreVerticalDropdownMenu
+                        items={[
+                          {
+                            label: "View asset detail",
+                            href: `/assets/${asset.id}`,
+                          },
+                        ]}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

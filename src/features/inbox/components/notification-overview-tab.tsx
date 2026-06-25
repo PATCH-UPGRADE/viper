@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { ExternalLinkIcon, HeartIcon, MailIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -43,12 +43,23 @@ function EmailSourceModal({
           <Card>
             <CardContent>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-                <dt className="font-medium text-muted-foreground">From</dt>
-                <dd>{raw.from}</dd>
-                <dt className="font-medium text-muted-foreground">Subject</dt>
-                <dd>{raw.subject ?? "—"}</dd>
-                <dt className="font-medium text-muted-foreground">Date</dt>
-                <dd>{format(source.receivedAt, "PPP p")}</dd>
+                {(
+                  [
+                    { label: "From", value: raw.from },
+                    { label: "Subject", value: raw.subject ?? "—" },
+                    {
+                      label: "Date",
+                      value: format(source.receivedAt, "PPP p"),
+                    },
+                  ] satisfies { label: string; value: string }[]
+                ).map(({ label, value }) => (
+                  <Fragment key={label}>
+                    <dt className="font-medium text-muted-foreground">
+                      {label}
+                    </dt>
+                    <dd>{value}</dd>
+                  </Fragment>
+                ))}
               </dl>
             </CardContent>
           </Card>

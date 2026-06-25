@@ -35,11 +35,9 @@ const notificationInclude = {
 
 const createSearchFilter = (search: string) => {
   if (!search) return {};
+  const insensitive = { contains: search, mode: "insensitive" as const };
   return {
-    OR: [
-      { title: { contains: search, mode: "insensitive" as const } },
-      { summary: { contains: search, mode: "insensitive" as const } },
-    ],
+    OR: [{ title: insensitive }, { summary: insensitive }],
   };
 };
 

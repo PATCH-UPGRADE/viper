@@ -1,0 +1,199 @@
+"use client";
+
+import { format } from "date-fns";
+import { ExternalLinkIcon, HeartIcon, MailIcon } from "lucide-react";
+import { type ReactNode, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
+import { TlpBadge } from "@/features/advisories/components/advisories";
+import type {
+  NotificationDetailSource,
+  NotificationDetailWithRelations,
+  RawEmailPayload,
+} from "../types";
+
+// ---------------------------------------------------------------------------
+// EmailSourceModal
+// ---------------------------------------------------------------------------
+
+function EmailSourceModal({
+  source,
+  open,
+  onOpenChange,
+}: {
+  source: NotificationDetailSource;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const raw = source.raw as RawEmailPayload;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Original source email</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4 overflow-auto min-h-0">
+          <Card>
+            <CardContent>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+                <dt className="font-medium text-muted-foreground">From</dt>
+                <dd>{raw.from}</dd>
+                <dt className="font-medium text-muted-foreground">Subject</dt>
+                <dd>{raw.subject ?? "—"}</dd>
+                <dt className="font-medium text-muted-foreground">Date</dt>
+                <dd>{format(source.receivedAt, "PPP p")}</dd>
+              </dl>
+            </CardContent>
+          </Card>
+          {source.markdown && (
+            <Card className="overflow-auto">
+              <CardContent>
+                <MarkdownWithTablesWrapper>
+                  {source.markdown}
+                </MarkdownWithTablesWrapper>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SourceReference
+// ---------------------------------------------------------------------------
+
+function SourceReference({ source }: { source: NotificationDetailSource }) {
+  const [open, setOpen] = useState(false);
+  const raw =
+    source.channel === "Email" ? (source.raw as RawEmailPayload) : null;
+  const label = raw?.subject ?? source.referenceUrl ?? source.channel;
+
+  if (source.channel === "Email") {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex items-center gap-1 text-sm text-primary hover:underline text-left"
+        >
+          <span className="truncate max-w-xs">{label}</span>
+          <MailIcon className="size-3 shrink-0" />
+        </button>
+        <EmailSourceModal source={source} open={open} onOpenChange={setOpen} />
+      </>
+    );
+  }
+
+  return (
+    <a
+      href={source.referenceUrl ?? "#"}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-1 text-sm text-primary hover:underline"
+    >
+      <span className="truncate max-w-xs">{label}</span>
+      <ExternalLinkIcon className="size-3 shrink-0" />
+    </a>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Overview tab
+// ---------------------------------------------------------------------------
+
+export function NotificationOverviewTab({
+  notification,
+  firstReceived,
+}: {
+  notification: NotificationDetailWithRelations;
+  firstReceived: Date;
+}) {
+  const detailRows: { label: string; content: ReactNode }[] = [
+    {
+      label: "TLP",
+      content: notification.tlp ? <TlpBadge tlp={notification.tlp} /> : "—",
+    },
+    {
+      label: "First Received",
+      content: format(firstReceived, "PPP p"),
+    },
+    {
+      label: "References",
+      content:
+        notification.sources.length === 0 ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {notification.sources.map((source) => (
+              <SourceReference key={source.id} source={source} />
+            ))}
+          </div>
+        ),
+    },
+  ];
+
+  return (
+    <>
+      {/* Hospital Impact */}
+      {notification.hospitalImpact && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HeartIcon className="size-4" />
+              Hospital Impact
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm leading-relaxed">
+              {notification.hospitalImpact}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Summary */}
+      {notification.summary && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm leading-relaxed">{notification.summary}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <table className="w-full text-sm">
+            <tbody>
+              {detailRows.map((row) => (
+                <tr key={row.label} className="border-b last:border-0">
+                  <td className="py-2 pr-3 w-48 align-top">
+                    <Badge variant="secondary">{row.label}</Badge>
+                  </td>
+                  <td className="py-2 align-top text-muted-foreground">
+                    {row.content}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+    </>
+  );
+}

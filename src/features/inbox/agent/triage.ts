@@ -62,18 +62,17 @@ export async function triageNotification(
   sourceId: string,
   notificationId: string,
 ): Promise<TriageResult> {
-  const [source, notification, pdfAttachments] =
-    await Promise.all([
-      prisma.notificationSource.findUnique({
-        where: { id: sourceId },
-        select: { markdown: true },
-      }),
-      prisma.notification.findUnique({
-        where: { id: notificationId },
-        select: { type: true, title: true, summary: true },
-      }),
-      fetchPdfAttachments(sourceId),
-    ]);
+  const [source, notification, pdfAttachments] = await Promise.all([
+    prisma.notificationSource.findUnique({
+      where: { id: sourceId },
+      select: { markdown: true },
+    }),
+    prisma.notification.findUnique({
+      where: { id: notificationId },
+      select: { type: true, title: true, summary: true },
+    }),
+    fetchPdfAttachments(sourceId),
+  ]);
 
   const model = new ChatAnthropic({
     model: MODEL,

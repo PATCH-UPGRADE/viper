@@ -208,11 +208,13 @@ const NOTIFICATIONS: NotificationSeed[] = [
     sources: [
       {
         from: "notifications@medsec-research.io",
-        subject: "Research Disclosure: Draeger Perseus A500 Service Port Exposure",
+        subject:
+          "Research Disclosure: Draeger Perseus A500 Service Port Exposure",
       },
       {
         from: "psirt@draeger.com",
-        subject: "Re: Perseus A500 TCP 7788 — Vendor Statement and Patch Timeline",
+        subject:
+          "Re: Perseus A500 TCP 7788 — Vendor Statement and Patch Timeline",
       },
     ],
   },
@@ -231,7 +233,8 @@ const NOTIFICATIONS: NotificationSeed[] = [
     sources: [
       {
         from: "alerts@philips-monitoring.com",
-        subject: "⚠️ TLS Certificate Expiry Alert — IntelliVue Streaming (30 days)",
+        subject:
+          "⚠️ TLS Certificate Expiry Alert — IntelliVue Streaming (30 days)",
       },
     ],
   },
@@ -308,7 +311,8 @@ const NOTIFICATIONS: NotificationSeed[] = [
     sources: [
       {
         from: "updates@med-device-security-alerts.net",
-        subject: "URGENT: Critical Firmware Update Required for Your Medical Devices",
+        subject:
+          "URGENT: Critical Firmware Update Required for Your Medical Devices",
       },
     ],
   },
@@ -328,7 +332,8 @@ const NOTIFICATIONS: NotificationSeed[] = [
     sources: [
       {
         from: "advisories@openssl.org",
-        subject: "OpenSSL Security Advisory: CVE-2024-5535 — SSL_select_next_proto",
+        subject:
+          "OpenSSL Security Advisory: CVE-2024-5535 — SSL_select_next_proto",
       },
       {
         from: "psirt@philips.com",
@@ -349,7 +354,7 @@ async function getSeedUser() {
 }
 
 async function seedNotifications(
-  userId: string,
+  _userId: string,
   deviceGroups: Array<{ deviceGroupId: string }>,
 ) {
   console.log("\n🌱 Seeding notifications...");
@@ -407,7 +412,8 @@ async function seedNotifications(
             Math.random() > 0.3
               ? ConfidenceLevel.Confirmed
               : ConfidenceLevel.Matched,
-          reasonWhy: "Matched by vendor and product name from notification content.",
+          reasonWhy:
+            "Matched by vendor and product name from notification content.",
         },
       });
     }

@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import type { Priority } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 
@@ -33,14 +34,22 @@ export const priorityConfig: Record<
   },
 };
 
-export const PriorityBadge = ({ priority }: { priority: Priority }) => {
+export const PriorityBadge = ({
+  priority,
+  className,
+  ref,
+  ...props
+}: { priority: Priority } & React.ComponentProps<"span">) => {
   const config = priorityConfig[priority];
   return (
     <span
+      ref={ref}
       className={cn(
         "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold",
         config.className,
+        className,
       )}
+      {...props}
     >
       {config.label}
     </span>

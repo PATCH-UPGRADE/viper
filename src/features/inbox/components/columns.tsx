@@ -11,53 +11,10 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import type { NotificationType } from "@/generated/prisma";
+import { Pill } from "@/components/ui/pill";
 import { deviceGroupLabel } from "@/lib/string-utils";
-import { cn } from "@/lib/utils";
 import type { NotificationWithRelations, RawEmailPayload } from "../types";
-
-// ---------------------------------------------------------------------------
-// NotificationTypeBadge
-// ---------------------------------------------------------------------------
-
-const typeConfig: Record<
-  NotificationType,
-  { label: string; className: string }
-> = {
-  Advisory: {
-    label: "Advisory",
-    className: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
-  },
-  Recall: {
-    label: "Recall",
-    className:
-      "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
-  },
-  UpdateAvailable: {
-    label: "New Update",
-    className:
-      "bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300",
-  },
-  Other: {
-    label: "Other",
-    className:
-      "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
-  },
-};
-
-export const NotificationTypeBadge = ({ type }: { type: NotificationType }) => {
-  const config = typeConfig[type];
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold",
-        config.className,
-      )}
-    >
-      {config.label}
-    </span>
-  );
-};
+import { NotificationTypeBadge } from "./notification-type-badge";
 
 // ---------------------------------------------------------------------------
 // Source display helper
@@ -173,19 +130,9 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
             const label = deviceGroupLabel(mapping.deviceGroup);
             const count = mapping.deviceGroup._count.assets;
             return (
-              <span
-                key={mapping.id}
-                title={label}
-                className="inline-flex items-center gap-1 rounded-full border bg-muted px-2 py-0.5 text-xs"
-              >
-                <span className="truncate max-w-[120px]">{label}</span>
-                <Badge
-                  variant="secondary"
-                  className="size-4 rounded-full p-0 text-[10px] flex items-center justify-center shrink-0"
-                >
-                  {count}
-                </Badge>
-              </span>
+              <Pill key={mapping.id} title={label} count={count}>
+                {label}
+              </Pill>
             );
           })}
         </div>

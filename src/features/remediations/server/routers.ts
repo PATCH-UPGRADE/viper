@@ -34,28 +34,17 @@ import {
 } from "../types";
 
 const createSearchFilter = (search: string) => {
+  const insensitive = { contains: search, mode: "insensitive" as const };
   return search
     ? {
         OR: [
-          { narrative: { contains: search, mode: "insensitive" as const } },
-          {
-            description: { contains: search, mode: "insensitive" as const },
-          },
+          { narrative: insensitive },
+          { description: insensitive },
           {
             artifacts: {
               some: {
                 latestArtifact: {
-                  OR: [
-                    {
-                      name: { contains: search, mode: "insensitive" as const },
-                    },
-                    {
-                      downloadUrl: {
-                        contains: search,
-                        mode: "insensitive" as const,
-                      },
-                    },
-                  ],
+                  OR: [{ name: insensitive }, { downloadUrl: insensitive }],
                 },
               },
             },

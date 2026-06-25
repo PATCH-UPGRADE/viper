@@ -7,11 +7,11 @@ import { searchCandidates } from "@/features/inbox/agent/candidate-search";
 import { classifyNotification } from "@/features/inbox/agent/classify";
 import { extractEntities } from "@/features/inbox/agent/extract";
 import { matchAndLinkEntities } from "@/features/inbox/agent/match";
-import { triageNotification } from "@/features/inbox/agent/triage";
 import {
   checkEmailRelevance,
   stripHtml,
 } from "@/features/inbox/agent/relevance";
+import { triageNotification } from "@/features/inbox/agent/triage";
 import { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { normalizeMd5, uploadBufferToS3 } from "@/lib/s3";

@@ -9,7 +9,7 @@ const TOP_K = 5;
 
 export type DeviceGroupCandidate = {
   id: string;
-  cpe: string;
+  cpe: string[];
   manufacturer: string | null;
   modelName: string | null;
   version: string | null;
@@ -39,24 +39,37 @@ async function searchDeviceGroup(
   // TODO: consider something like a fuzzy search?
   // or an embedding. For example, if the identified manufacturer is Draeger Inc, and the db manufactuerer is "Draeger", this contains fails
   for (const term of terms) {
+    const insensitive = { contains: term, mode: "insensitive" as const };
+    // Identity now lives in canonical Vendor/Product rows and the cpe[] array.
+    // cpe is a String[], which supports exact-element `has` (not substring).
     or.push(
-      { cpe: { contains: term, mode: "insensitive" } },
-      { manufacturer: { contains: term, mode: "insensitive" } },
-      { modelName: { contains: term, mode: "insensitive" } },
+      { cpe: { has: term } },
+      { vendor: { canonicalName: insensitive } },
+      { vendor: { canonicalDisplayName: insensitive } },
+      { product: { canonicalName: insensitive } },
+      { product: { canonicalDisplayName: insensitive } },
     );
   }
 
-  return prisma.deviceGroup.findMany({
+  const rows = await prisma.deviceGroup.findMany({
     where: { OR: or },
     select: {
       id: true,
       cpe: true,
-      manufacturer: true,
-      modelName: true,
-      version: true,
+      vendor: { select: { canonicalDisplayName: true } },
+      product: { select: { canonicalDisplayName: true } },
+      version: { select: { canonicalDisplayName: true } },
     },
     take: TOP_K,
   });
+
+  return rows.map((row) => ({
+    id: row.id,
+    cpe: row.cpe,
+    manufacturer: row.vendor?.canonicalDisplayName ?? null,
+    modelName: row.product?.canonicalDisplayName ?? null,
+    version: row.version?.canonicalDisplayName ?? null,
+  }));
 }
 
 export async function searchCandidates(

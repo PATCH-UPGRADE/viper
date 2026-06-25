@@ -6,6 +6,7 @@ import {
 import { serializeWorkflow } from "@/features/workflows/utils";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { deviceGroupLabel } from "@/lib/string-utils";
 import {
   assetToMarkdown,
   generateMemoryMarkdown,
@@ -28,10 +29,7 @@ function generateInventorySummaryTable(assets: AssetForContext[]): string {
   const divider = "|---|---|---|---|---|";
   const rows = assets.map((a) => {
     const label = a.hostname ?? a.ip ?? shortId(a.id);
-    const device =
-      [a.deviceGroup.manufacturer, a.deviceGroup.modelName]
-        .filter(Boolean)
-        .join(" ") || a.deviceGroup.cpe;
+    const device = deviceGroupLabel(a.deviceGroup);
     const active = (a.issues ?? []).filter((i) => i.status === "ACTIVE").length;
     return `| ${label} (${shortId(a.id)}) | ${device} | ${a.role ?? "—"} | ${a.status ?? "—"} | ${active} |`;
   });
@@ -219,8 +217,28 @@ function generateNetworkFlowMarkdown(topology: NetworkTopology | null): string {
 
 // ─── Prisma includes ──────────────────────────────────────────────────────────
 
+const canonicalNameSelect = {
+  select: { canonicalDisplayName: true },
+} as const;
+
+const matchingContextSelect = {
+  select: {
+    vendor: canonicalNameSelect,
+    product: canonicalNameSelect,
+    version: canonicalNameSelect,
+    versionRange: true,
+  },
+} as const;
+
 export const assetContextInclude = {
-  deviceGroup: true,
+  deviceGroup: {
+    select: {
+      vendor: canonicalNameSelect,
+      product: canonicalNameSelect,
+      version: canonicalNameSelect,
+      cpe: true,
+    },
+  },
   issues: {
     include: {
       vulnerability: {
@@ -235,9 +253,7 @@ export type AssetForContext = Prisma.AssetGetPayload<{
 }>;
 
 export const vulnerabilityContextInclude = {
-  affectedDeviceGroups: {
-    select: { cpe: true, modelName: true, manufacturer: true },
-  },
+  deviceGroupMatchings: matchingContextSelect,
   remediations: { select: { id: true, description: true } },
   issues: {
     include: {
@@ -260,9 +276,12 @@ export type VulnerabilityForContext = Prisma.VulnerabilityGetPayload<{
 }>;
 
 export const remediationContextInclude = {
-  vulnerability: { select: { id: true, cveId: true } },
-  affectedDeviceGroups: {
-    select: { cpe: true, modelName: true, manufacturer: true },
+  deviceGroupMatchings: matchingContextSelect,
+  vulnerability: {
+    select: {
+      id: true,
+      cveId: true,
+    },
   },
   issueRemediations: {
     include: {

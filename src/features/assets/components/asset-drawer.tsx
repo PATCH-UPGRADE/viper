@@ -38,6 +38,7 @@ import type {
   NetworkConnection,
 } from "@/features/network/types";
 import { RemediationCard } from "@/features/remediations/components/remediations";
+import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/string-utils";
 import { useTRPC } from "@/trpc/client";
 import {
   type AssetWithIssueRelations,
@@ -393,7 +394,7 @@ function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
   const sections: Section[] = [
     {
       header: "Device Overview",
-      text: `${getAssetRoleLabel(asset)} — ${asset.deviceGroup.cpe}`,
+      text: `${getAssetRoleLabel(asset)} — ${deviceGroupLabel(asset.deviceGroup)}`,
     },
     ...(location
       ? [
@@ -537,7 +538,7 @@ function AssetInfoColumn({ asset }: { asset: AssetWithIssueRelations }) {
         },
         {
           header: "CPE",
-          content: <CopyCode>{asset.deviceGroup.cpe}</CopyCode>,
+          content: <CopyCode>{deviceGroupCpeList(asset.deviceGroup)}</CopyCode>,
         },
         ...(asset.deviceGroup.sbomUrl
           ? [

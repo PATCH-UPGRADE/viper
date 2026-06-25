@@ -52,11 +52,58 @@ const SEED_USER = {
 };
 
 const DEVICE_GROUP = {
-  cpe: "cpe:2.3:h:baxter:life2000_ventilation_system:06.08.00.00:*:*:*:*:*:*:*",
-  manufacturer: "Baxter",
-  modelName: "Life2000 Ventilation System",
+  vendor: "Baxter",
+  product: "Life2000 Ventilation System",
   version: "06.08.00.00",
 };
+const DEVICE_GROUP_CPE =
+  "cpe:2.3:h:baxter:life2000_ventilation_system:06.08.00.00:*:*:*:*:*:*:*";
+
+type GroupIdentity = {
+  vendorId: string | null;
+  productId: string | null;
+  versionId: string | null;
+};
+
+// Canonical resolvers (canonicalName is @unique → upsert is race-safe).
+function upsertVendor(name: string) {
+  const canonicalName = name.trim().toLowerCase();
+  return prisma.vendor.upsert({
+    where: { canonicalName },
+    update: {},
+    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+  });
+}
+function upsertProduct(name: string) {
+  const canonicalName = name.trim().toLowerCase();
+  return prisma.product.upsert({
+    where: { canonicalName },
+    update: {},
+    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+  });
+}
+function upsertVersion(name: string) {
+  const canonicalName = name.trim().toLowerCase();
+  return prisma.version.upsert({
+    where: { canonicalName },
+    update: {},
+    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+  });
+}
+
+// Find-or-create a shared DeviceGroupMatching for a device-group identity.
+async function matchingIdFor(dg: GroupIdentity): Promise<string> {
+  const where = {
+    vendorId: dg.vendorId ?? "",
+    productId: dg.productId,
+    versionId: dg.versionId,
+    versionRange: null,
+  };
+  const existing = await prisma.deviceGroupMatching.findFirst({ where });
+  const matching =
+    existing ?? (await prisma.deviceGroupMatching.create({ data: where }));
+  return matching.id;
+}
 
 const ASSETS = [
   {
@@ -609,13 +656,32 @@ async function createOrGetSeedUser() {
 async function seedDeviceGroup() {
   console.log("\n🌱 Upserting Baxter Life2000 device group...");
 
-  const deviceGroup = await prisma.deviceGroup.upsert({
-    where: { cpe: DEVICE_GROUP.cpe },
-    update: DEVICE_GROUP,
-    create: DEVICE_GROUP,
-  });
+  const vendor = await upsertVendor(DEVICE_GROUP.vendor);
+  const product = await upsertProduct(DEVICE_GROUP.product);
+  const version = await upsertVersion(DEVICE_GROUP.version);
 
-  console.log(`✅ Device group: ${deviceGroup.modelName} (${deviceGroup.id})`);
+  const identity = {
+    vendorId: vendor.id,
+    productId: product.id,
+    versionId: version.id,
+    versionStatus: "KNOWN" as const,
+  };
+
+  const existing = await prisma.deviceGroup.findFirst({ where: identity });
+  const deviceGroup =
+    existing ??
+    (await prisma.deviceGroup.create({
+      data: { ...identity, cpe: [DEVICE_GROUP_CPE] },
+    }));
+
+  if (existing && !existing.cpe.includes(DEVICE_GROUP_CPE)) {
+    await prisma.deviceGroup.update({
+      where: { id: deviceGroup.id },
+      data: { cpe: [...existing.cpe, DEVICE_GROUP_CPE] },
+    });
+  }
+
+  console.log(`✅ Device group: ${DEVICE_GROUP.product} (${deviceGroup.id})`);
   return deviceGroup;
 }
 
@@ -636,8 +702,10 @@ async function seedAssets(userId: string, deviceGroupId: string) {
   return assets;
 }
 
-async function seedVulnerabilities(userId: string, deviceGroupId: string) {
+async function seedVulnerabilities(userId: string, deviceGroup: GroupIdentity) {
   console.log("\n🌱 Seeding vulnerabilities...");
+
+  const matchingId = await matchingIdFor(deviceGroup);
 
   const vulns = await Promise.all(
     VULNERABILITIES.map(async ({ ...data }) => {
@@ -649,7 +717,7 @@ async function seedVulnerabilities(userId: string, deviceGroupId: string) {
         data: {
           ...data,
           userId,
-          affectedDeviceGroups: { connect: { id: deviceGroupId } },
+          deviceGroupMatchings: { connect: { id: matchingId } },
         },
       });
     }),
@@ -661,13 +729,14 @@ async function seedVulnerabilities(userId: string, deviceGroupId: string) {
 
 async function seedAdvisory(
   userId: string,
-  deviceGroupId: string,
+  deviceGroup: GroupIdentity,
   vulnIds: string[],
 ) {
   console.log("\n🌱 Upserting advisory...");
 
   const UPSTREAM_URL =
     "https://raw.githubusercontent.com/cisagov/CSAF/develop/csaf_files/OT/white/2024/icsma-24-319-01.json";
+  const matchingId = await matchingIdFor(deviceGroup);
 
   const advisory = await prisma.advisory.upsert({
     where: { upstreamUrl: UPSTREAM_URL },
@@ -683,8 +752,8 @@ async function seedAdvisory(
       referencedVulnerabilities: {
         set: vulnIds.map((id) => ({ id })),
       },
-      affectedDeviceGroups: {
-        set: [{ id: deviceGroupId }],
+      deviceGroupMatchings: {
+        set: [{ id: matchingId }],
       },
     },
     create: {
@@ -701,8 +770,8 @@ async function seedAdvisory(
       referencedVulnerabilities: {
         connect: vulnIds.map((id) => ({ id })),
       },
-      affectedDeviceGroups: {
-        connect: [{ id: deviceGroupId }],
+      deviceGroupMatchings: {
+        connect: [{ id: matchingId }],
       },
     },
   });
@@ -720,10 +789,10 @@ async function main() {
   const integrationUser = await createOrGetCisaIntegration(user.id);
   const deviceGroup = await seedDeviceGroup();
   await seedAssets(user.id, deviceGroup.id);
-  const vulns = await seedVulnerabilities(integrationUser.id, deviceGroup.id);
+  const vulns = await seedVulnerabilities(integrationUser.id, deviceGroup);
   await seedAdvisory(
     integrationUser.id,
-    deviceGroup.id,
+    deviceGroup,
     vulns.map((v) => v.id),
   );
 

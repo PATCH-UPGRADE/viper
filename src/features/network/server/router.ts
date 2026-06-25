@@ -122,7 +122,20 @@ export const networkRouter = createTRPCRouter({
           role: true,
           hostname: true,
           status: true,
-          deviceGroup: { select: { cpe: true } },
+          deviceGroup: {
+            select: {
+              vendor: {
+                select: { canonicalName: true, canonicalDisplayName: true },
+              },
+              product: {
+                select: { canonicalName: true, canonicalDisplayName: true },
+              },
+              version: {
+                select: { canonicalName: true, canonicalDisplayName: true },
+              },
+              cpe: true,
+            },
+          },
         },
       });
 

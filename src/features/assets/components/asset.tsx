@@ -38,6 +38,7 @@ import {
   type Vulnerability,
 } from "@/generated/prisma";
 import type { PaginatedResponse } from "@/lib/pagination";
+import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/string-utils";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
 import { getAssetRoleLabel } from "../utils";
@@ -330,16 +331,14 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
                   <div className="text-xs font-medium text-muted-foreground mb-1">
                     Class
                   </div>
-                  <CopyCode>
-                    {asset.deviceGroup.cpe.split(":").slice(3, 5).join(" ")}
-                  </CopyCode>
+                  <CopyCode>{deviceGroupLabel(asset.deviceGroup)}</CopyCode>
                 </div>
 
                 <div>
                   <div className="text-xs font-medium text-muted-foreground mb-1">
-                    Group ID
+                    CPE
                   </div>
-                  <CopyCode>{asset.deviceGroup.cpe}</CopyCode>
+                  <CopyCode>{deviceGroupCpeList(asset.deviceGroup)}</CopyCode>
                 </div>
 
                 {asset.deviceGroup.sbomUrl && (

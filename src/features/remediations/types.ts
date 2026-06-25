@@ -5,6 +5,7 @@ import {
   alohaResponseSchema,
   cpeSchema,
   createIntegrationInputSchema,
+  deviceGroupMatchingResponseSchema,
   safeUrlSchema,
   userIncludeSelect,
   userSchema,
@@ -14,11 +15,23 @@ import {
   artifactWrapperSelect,
   artifactWrapperWithUrlsSchema,
 } from "../artifacts/types";
-import { deviceGroupSchema, deviceGroupSelect } from "../device-groups/types";
+
+const canonicalRefInclude = {
+  select: { canonicalName: true, canonicalDisplayName: true },
+} as const;
+
+const matchingInclude = {
+  include: {
+    vendor: canonicalRefInclude,
+    product: canonicalRefInclude,
+    version: canonicalRefInclude,
+  },
+} as const;
 
 // Validation schemas
 export const remediationInputSchema = z.object({
-  cpes: z.array(cpeSchema).min(1),
+  // TA3/TA4 upload affected devices as CPE strings; resolved to matchings server-side.
+  cpes: z.array(cpeSchema).optional(),
   vulnerabilityId: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
@@ -49,7 +62,7 @@ export const vulnerabilitySchema = z.object({
 
 export const remediationResponseSchema = z.object({
   id: z.string(),
-  affectedDeviceGroups: z.array(deviceGroupSchema),
+  deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
   upstreamApi: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
@@ -85,8 +98,8 @@ const remediationVulnerabilitySelect = {
 
 export const remediationInclude = {
   user: userIncludeSelect,
+  deviceGroupMatchings: matchingInclude,
   vulnerability: remediationVulnerabilitySelect,
-  affectedDeviceGroups: deviceGroupSelect,
   artifacts: artifactWrapperSelect,
 };
 

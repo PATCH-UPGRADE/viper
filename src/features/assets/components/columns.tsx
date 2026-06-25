@@ -8,6 +8,7 @@ import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import { handleCopy } from "@/lib/copy";
+import { deviceGroupCpeList } from "@/lib/string-utils";
 import type { AssetResponse } from "../types";
 
 export const columns: ColumnDef<AssetResponse>[] = [
@@ -26,7 +27,9 @@ export const columns: ColumnDef<AssetResponse>[] = [
     meta: { title: "CPE" },
     header: ({ column }) => <SortableHeader header="CPE" column={column} />,
     cell: ({ row }) => {
-      return <CopyCode>{row.original.deviceGroup.cpe}</CopyCode>;
+      return (
+        <CopyCode>{deviceGroupCpeList(row.original.deviceGroup)}</CopyCode>
+      );
     },
   },
   {
@@ -65,10 +68,10 @@ const actionsColumn: ColumnDef<AssetResponse> = {
             label: "Quick Actions",
             items: [
               {
-                label: "Copy Group ID",
+                label: "Copy CPE",
                 icon: <CopyIcon strokeWidth={3} />,
                 onClick: () =>
-                  handleCopy(asset.deviceGroup.cpe, () =>
+                  handleCopy(deviceGroupCpeList(asset.deviceGroup), () =>
                     toast.success("Copied!"),
                   ),
               },

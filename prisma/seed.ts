@@ -742,18 +742,111 @@ async function createOrGetSeedUser() {
   return user;
 }
 
+// "unknown"/"EOL"-style sentinels and CPE wildcards map to a null (unknown) version.
+function normalizeVersion(v?: string | null): string | null {
+  if (!v || v === "unknown" || v === "-" || v === "*") return null;
+  return v;
+}
+
+// Mirror of router-utils' CPE-token → versionStatus mapping so seeded device
+// groups carry the same semantics as ones resolved from CPEs at runtime:
+// "-" => NOT_APPLICABLE, "*"/empty => UNKNOWN, any value => KNOWN.
+function cpeVersionStatus(cpe: string): "UNKNOWN" | "NOT_APPLICABLE" | "KNOWN" {
+  const token = cpe.split(":")[5] ?? "";
+  if (token === "-") return "NOT_APPLICABLE";
+  if (token === "" || token === "*") return "UNKNOWN";
+  return "KNOWN";
+}
+
+// Canonical resolvers (seed avoids importing the server-only router-utils).
+// canonicalName is @unique so upsert is race-safe.
+function upsertVendor(name: string) {
+  const canonicalName = name.trim().toLowerCase();
+  return prisma.vendor.upsert({
+    where: { canonicalName },
+    update: {},
+    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+  });
+}
+function upsertProduct(name: string) {
+  const canonicalName = name.trim().toLowerCase();
+  return prisma.product.upsert({
+    where: { canonicalName },
+    update: {},
+    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+  });
+}
+function upsertVersion(name: string) {
+  const canonicalName = name.trim().toLowerCase();
+  return prisma.version.upsert({
+    where: { canonicalName },
+    update: {},
+    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+  });
+}
+
+type GroupIdentity = {
+  vendorId: string | null;
+  productId: string | null;
+  versionId: string | null;
+};
+
+// Local mirror of matchingAppliesToDeviceGroup's applicability test (id-based).
+function matchingMatchesGroup(m: GroupIdentity, dg: GroupIdentity): boolean {
+  if (!dg.vendorId || m.vendorId !== dg.vendorId) return false;
+  if (m.productId && m.productId !== dg.productId) return false;
+  if (m.versionId && m.versionId !== dg.versionId) return false;
+  return true;
+}
+
 async function seedDeviceGroups() {
   console.log("\n🌱 Seeding device groups...");
 
-  const deviceGroups = await Promise.all(
-    SAMPLE_DEVICE_GROUPS.map((dg) =>
-      prisma.deviceGroup.upsert({
-        where: { cpe: dg.cpe },
-        update: dg,
-        create: dg,
-      }),
-    ),
-  );
+  // Sequential to keep find-or-create of the (vendor, product, version) identity
+  // race-free.
+  const deviceGroups = [];
+  for (const dg of SAMPLE_DEVICE_GROUPS) {
+    const vendor = await upsertVendor(dg.manufacturer);
+    const product = await upsertProduct(dg.modelName);
+    // versionStatus follows the CPE's version token; only KNOWN groups get a
+    // version row (NOT_APPLICABLE / UNKNOWN groups have versionId = null).
+    const versionStatus = cpeVersionStatus(dg.cpe);
+    const versionName =
+      versionStatus === "KNOWN"
+        ? (normalizeVersion(dg.version) ?? dg.cpe.split(":")[5])
+        : null;
+    const version = versionName ? await upsertVersion(versionName) : null;
+
+    const existing = await prisma.deviceGroup.findFirst({
+      where: {
+        vendorId: vendor.id,
+        productId: product.id,
+        versionId: version?.id ?? null,
+        versionStatus,
+      },
+    });
+
+    const group =
+      existing ??
+      (await prisma.deviceGroup.create({
+        data: {
+          vendorId: vendor.id,
+          productId: product.id,
+          versionId: version?.id ?? null,
+          versionStatus,
+          cpe: [dg.cpe],
+        },
+      }));
+
+    if (existing && !existing.cpe.includes(dg.cpe)) {
+      await prisma.deviceGroup.update({
+        where: { id: group.id },
+        data: { cpe: [...existing.cpe, dg.cpe] },
+      });
+    }
+
+    deviceGroups.push(group);
+  }
 
   console.log(`✅ Seeded ${deviceGroups.length} device groups`);
   return deviceGroups;
@@ -765,7 +858,7 @@ async function seedAssets(userId: string) {
   const assets = await Promise.all(
     SAMPLE_ASSETS.map(async (asset) => {
       const deviceGroup = await prisma.deviceGroup.findFirst({
-        where: { cpe: asset.cpe },
+        where: { cpe: { has: asset.cpe } },
       });
 
       if (!deviceGroup) {
@@ -802,39 +895,73 @@ async function seedAssets(userId: string) {
   return successfulAssets;
 }
 
+// Find-or-create a shared DeviceGroupMatching for a device-group identity.
+async function matchingForGroup(dg: GroupIdentity): Promise<string | null> {
+  if (!dg.vendorId) return null;
+  const where = {
+    vendorId: dg.vendorId,
+    productId: dg.productId,
+    versionId: dg.versionId,
+    versionRange: null,
+  };
+  const existing = await prisma.deviceGroupMatching.findFirst({ where });
+  const matching =
+    existing ?? (await prisma.deviceGroupMatching.create({ data: where }));
+  return matching.id;
+}
+
 async function seedVulnerabilities(userId: string) {
   console.log("\n🌱 Seeding vulnerabilities...");
 
-  const vulnerabilities = await Promise.all(
-    SAMPLE_VULNERABILITIES.map(async (vulnerability) => {
-      const { cpes, ...data } = vulnerability;
+  // Sequential so shared DeviceGroupMatching find-or-create is race-free.
+  const vulnerabilities = [];
+  for (const vulnerability of SAMPLE_VULNERABILITIES) {
+    const { cpes, ...data } = vulnerability;
 
-      const deviceGroups = (
-        await Promise.all(
-          cpes.map((cpe) => prisma.deviceGroup.findFirst({ where: { cpe } })),
-        )
-      ).filter((dg): dg is NonNullable<typeof dg> => dg !== null);
+    const deviceGroups = (
+      await Promise.all(
+        cpes.map((cpe) =>
+          prisma.deviceGroup.findFirst({
+            where: { cpe: { has: cpe } },
+            select: {
+              id: true,
+              vendorId: true,
+              productId: true,
+              versionId: true,
+            },
+          }),
+        ),
+      )
+    ).filter((dg): dg is NonNullable<typeof dg> => dg !== null);
 
-      if (deviceGroups.length === 0) {
-        console.warn(`⚠️  No device groups found for CPEs: ${cpes.join(", ")}`);
-        return null;
-      }
+    if (deviceGroups.length === 0) {
+      console.warn(`⚠️  No device groups found for CPEs: ${cpes.join(", ")}`);
+      continue;
+    }
 
-      return prisma.vulnerability.create({
-        data: {
-          ...data,
-          userId,
-          affectedDeviceGroups: {
-            connect: deviceGroups.map((dg) => ({ id: dg.id })),
-          },
+    // Connect a shared matching per distinct device-group identity so the match
+    // resolver (and issue-creation extension) link them back correctly.
+    const uniqueGroups = [
+      ...new Map(deviceGroups.map((dg) => [dg.id, dg])).values(),
+    ];
+    const matchingIds = (
+      await Promise.all(uniqueGroups.map(matchingForGroup))
+    ).filter((id): id is string => id !== null);
+
+    const created = await prisma.vulnerability.create({
+      data: {
+        ...data,
+        userId,
+        deviceGroupMatchings: {
+          connect: matchingIds.map((id) => ({ id })),
         },
-      });
-    }),
-  );
+      },
+    });
+    vulnerabilities.push(created);
+  }
 
-  const successfulVulnerabilities = vulnerabilities.filter((v) => v !== null);
-  console.log(`✅ Seeded ${successfulVulnerabilities.length} vulnerabilities`);
-  return successfulVulnerabilities;
+  console.log(`✅ Seeded ${vulnerabilities.length} vulnerabilities`);
+  return vulnerabilities;
 }
 
 async function seedDeviceArtifacts(userId: string) {
@@ -842,20 +969,26 @@ async function seedDeviceArtifacts(userId: string) {
 
   const deviceArtifacts = await Promise.all(
     SAMPLE_DEVICE_ARTIFACTS.map(async (deviceArtifact) => {
-      const deviceGroup = await prisma.deviceGroup.findFirst({
-        where: { cpe: deviceArtifact.cpe },
+      // Resolve the artifact's identity (the device it's for) from its CPE.
+      const parts = deviceArtifact.cpe.split(":");
+      const norm = (v?: string) => (!v || v === "-" || v === "*" ? null : v);
+      const vendor = await upsertVendor(norm(parts[3]) ?? "-");
+      const product = await upsertProduct(norm(parts[4]) ?? "-");
+      const versionName = norm(parts[5]);
+      const version = versionName ? await upsertVersion(versionName) : null;
+      const identityMatchingId = await matchingForGroup({
+        vendorId: vendor.id,
+        productId: product.id,
+        versionId: version?.id ?? null,
       });
-
-      if (!deviceGroup) {
-        console.warn(`⚠️  No device group found for CPE: ${deviceArtifact.cpe}`);
-        return null;
-      }
 
       const createdDeviceArtifact = await prisma.deviceArtifact.create({
         data: {
           role: deviceArtifact.role,
           description: deviceArtifact.description,
-          deviceGroupId: deviceGroup.id,
+          deviceGroupMatchings: identityMatchingId
+            ? { connect: { id: identityMatchingId } }
+            : undefined,
           userId,
         },
       });
@@ -921,7 +1054,7 @@ async function seedRemediations(userId: string) {
   const remediations = await Promise.all(
     SAMPLE_REMEDIATIONS.map(async (remediation) => {
       const deviceGroup = await prisma.deviceGroup.findFirst({
-        where: { cpe: remediation.cpe },
+        where: { cpe: { has: remediation.cpe } },
       });
 
       if (!deviceGroup) {
@@ -929,10 +1062,21 @@ async function seedRemediations(userId: string) {
         return null;
       }
 
+      // Link the remediation to the device group via its own matching, and to
+      // the vulnerability that affects the same group.
+      const matchingId = await matchingForGroup({
+        vendorId: deviceGroup.vendorId,
+        productId: deviceGroup.productId,
+        versionId: deviceGroup.versionId,
+      });
+
       const vulnerability = await prisma.vulnerability.findFirst({
         where: {
-          affectedDeviceGroups: {
-            some: { id: deviceGroup.id },
+          deviceGroupMatchings: {
+            some: {
+              vendorId: deviceGroup.vendorId ?? undefined,
+              productId: deviceGroup.productId,
+            },
           },
         },
       });
@@ -948,10 +1092,10 @@ async function seedRemediations(userId: string) {
           narrative: remediation.narrative,
           upstreamApi: remediation.upstreamApi,
           vulnerabilityId: vulnerability.id,
+          deviceGroupMatchings: matchingId
+            ? { connect: { id: matchingId } }
+            : undefined,
           userId,
-          affectedDeviceGroups: {
-            connect: { id: deviceGroup.id },
-          },
         },
       });
 
@@ -997,15 +1141,15 @@ async function seedIssues() {
   });
 
   const vulnerabilities = await prisma.vulnerability.findMany({
-    include: { affectedDeviceGroups: true },
+    include: { deviceGroupMatchings: true },
   });
 
   const issues = [];
 
   for (const asset of assets) {
     for (const vulnerability of vulnerabilities) {
-      const isAffected = vulnerability.affectedDeviceGroups.some(
-        (dg) => dg.id === asset.deviceGroupId,
+      const isAffected = vulnerability.deviceGroupMatchings.some((m) =>
+        matchingMatchesGroup(m, asset.deviceGroup),
       );
 
       if (isAffected) {

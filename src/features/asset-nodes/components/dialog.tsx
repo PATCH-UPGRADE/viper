@@ -36,6 +36,7 @@ import { getAssetRoleLabel } from "@/features/assets/utils";
 import type { Vulnerability } from "@/generated/prisma";
 import type { AssetWithDeviceGroup } from "@/lib/db";
 import { cpeSchema } from "@/lib/schemas";
+import { deviceGroupLabel } from "@/lib/string-utils";
 import { DeviceIconType, getIconByType } from "../types";
 import type { AssetNodeData } from "./node";
 
@@ -309,8 +310,8 @@ export const AssetDialog = ({
               <ul className="pl-4">
                 {assets.map((asset, idx) => (
                   <li className="list-disc" key={idx}>
-                    {getAssetRoleLabel(asset)} &bull; {asset.deviceGroup.cpe}{" "}
-                    &bull; {asset.id}
+                    {getAssetRoleLabel(asset)} &bull;{" "}
+                    {deviceGroupLabel(asset.deviceGroup)} &bull; {asset.id}
                   </li>
                 ))}
               </ul>

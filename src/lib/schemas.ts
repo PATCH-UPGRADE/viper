@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { AlohaStatus, AuthType } from "@/generated/prisma";
+import {
+  AlohaStatus,
+  AuthType,
+  VersionStatus,
+  VersScheme,
+} from "@/generated/prisma";
 import { createPaginatedResponseWithLinksSchema } from "./pagination";
 
 /**
@@ -42,6 +47,27 @@ export const safeUrlSchema = z
 export const cpeSchema = z
   .string()
   .regex(/^cpe:2\.3:[^:]+:[^:]+:[^:]+/, "Invalid CPE 2.3 format");
+
+export const versionStatusSchema = z.enum(Object.values(VersionStatus));
+export const versSchemeSchema = z.enum(Object.values(VersScheme));
+
+/** A canonical vendor/product/version reference as returned by the API. */
+const canonicalRefSchema = z.object({
+  canonicalName: z.string(),
+  canonicalDisplayName: z.string(),
+});
+
+/** A stored device-group matching as returned by the API. */
+export const deviceGroupMatchingResponseSchema = z.object({
+  id: z.string(),
+  vendor: canonicalRefSchema,
+  product: canonicalRefSchema.nullable(),
+  version: canonicalRefSchema.nullable(),
+  versionRange: z.string().nullable(),
+});
+export type DeviceGroupMatchingResponse = z.infer<
+  typeof deviceGroupMatchingResponseSchema
+>;
 
 export const basicAuthSchema = z.object({
   username: z.string(),

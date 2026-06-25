@@ -1,0 +1,249 @@
+"use client";
+
+import type { ColumnDef } from "@tanstack/react-table";
+import { formatDistanceToNow } from "date-fns";
+import { MailIcon } from "lucide-react";
+import { PriorityBadge } from "@/components/priority-badge";
+import { Badge } from "@/components/ui/badge";
+import { SortableHeader } from "@/components/ui/data-table";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import type { NotificationType } from "@/generated/prisma";
+import { deviceGroupLabel } from "@/lib/string-utils";
+import { cn } from "@/lib/utils";
+import type { NotificationWithRelations, RawEmailPayload } from "../types";
+
+// ---------------------------------------------------------------------------
+// NotificationTypeBadge
+// ---------------------------------------------------------------------------
+
+const typeConfig: Record<
+  NotificationType,
+  { label: string; className: string }
+> = {
+  Advisory: {
+    label: "Advisory",
+    className: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+  },
+  Recall: {
+    label: "Recall",
+    className:
+      "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
+  },
+  UpdateAvailable: {
+    label: "New Update",
+    className:
+      "bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300",
+  },
+  Other: {
+    label: "Other",
+    className:
+      "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+  },
+};
+
+export const NotificationTypeBadge = ({ type }: { type: NotificationType }) => {
+  const config = typeConfig[type];
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold",
+        config.className,
+      )}
+    >
+      {config.label}
+    </span>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Source display helper
+// ---------------------------------------------------------------------------
+
+function SourceDisplay({
+  source,
+}: {
+  source: NotificationWithRelations["sources"][number];
+}) {
+  const raw =
+    source.channel === "Email" ? (source.raw as RawEmailPayload) : null;
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span className="flex items-center gap-1 text-sm">
+        {source.channel === "Email" && (
+          <MailIcon className="size-3 shrink-0 text-muted-foreground" />
+        )}
+        <span className="truncate max-w-[200px]">
+          {raw?.from ?? source.channel}
+        </span>
+      </span>
+      <span className="text-xs text-muted-foreground">
+        {formatDistanceToNow(source.receivedAt, { addSuffix: true })}
+      </span>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Column definitions
+// ---------------------------------------------------------------------------
+
+export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
+  {
+    id: "priority",
+    accessorKey: "priority",
+    meta: { title: "Priority", headerClassName: "w-36" },
+    header: ({ column }) => (
+      <SortableHeader header="Priority" column={column} />
+    ),
+    cell: ({ row }) => {
+      const { priority, reads } = row.original;
+      const isUnread = reads.length === 0;
+      return (
+        <span className="flex items-center gap-1.5">
+          {isUnread && (
+            <span className="size-2 rounded-full bg-primary shrink-0" />
+          )}
+          {priority ? (
+            <PriorityBadge priority={priority} />
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </span>
+      );
+    },
+  },
+
+  {
+    id: "summary",
+    meta: { title: "Summary" },
+    header: "Summary",
+    cell: ({ row }) => {
+      const { title, summary, type, createdAt, updatedAt, reads } =
+        row.original;
+      const displayText = title ?? summary ?? "—";
+      const isUnread = reads.length === 0;
+      return (
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <p
+            className={`truncate max-w-lg text-sm ${isUnread ? "font-semibold" : ""}`}
+            title={displayText}
+          >
+            {displayText}
+          </p>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground flex-wrap">
+            <NotificationTypeBadge type={type} />
+            <span>•</span>
+            <span>{formatDistanceToNow(createdAt, { addSuffix: true })}</span>
+            <span>•</span>
+            <span>
+              updated {formatDistanceToNow(updatedAt, { addSuffix: true })}
+            </span>
+          </div>
+        </div>
+      );
+    },
+  },
+
+  {
+    id: "assets",
+    meta: { title: "Assets" },
+    header: "Assets",
+    cell: ({ row }) => {
+      const { deviceGroups } = row.original;
+      if (deviceGroups.length === 0) {
+        return <span className="text-muted-foreground text-sm">—</span>;
+      }
+      return (
+        <div className="flex flex-wrap gap-1">
+          {deviceGroups.map((mapping) => {
+            const label = deviceGroupLabel(mapping.deviceGroup);
+            const count = mapping.deviceGroup._count.assets;
+            return (
+              <span
+                key={mapping.id}
+                title={label}
+                className="inline-flex items-center gap-1 rounded-full border bg-muted px-2 py-0.5 text-xs"
+              >
+                <span className="truncate max-w-[120px]">{label}</span>
+                <Badge
+                  variant="secondary"
+                  className="size-4 rounded-full p-0 text-[10px] flex items-center justify-center shrink-0"
+                >
+                  {count}
+                </Badge>
+              </span>
+            );
+          })}
+        </div>
+      );
+    },
+  },
+
+  {
+    id: "sources",
+    meta: { title: "Sources" },
+    header: "Sources",
+    cell: ({ row }) => {
+      const { sources } = row.original;
+      if (sources.length === 0) {
+        return <span className="text-muted-foreground text-sm">—</span>;
+      }
+
+      const [first, ...rest] = sources;
+      return (
+        <div className="flex items-center gap-1.5">
+          <SourceDisplay source={first} />
+          {rest.length > 0 && (
+            <HoverCard openDelay={200}>
+              <HoverCardTrigger asChild>
+                <Badge
+                  variant="secondary"
+                  className="cursor-default shrink-0 text-xs self-start"
+                >
+                  +{rest.length}
+                </Badge>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-80 p-3">
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Additional sources
+                  </p>
+                  {rest.map((source) => {
+                    const raw =
+                      source.channel === "Email"
+                        ? (source.raw as RawEmailPayload)
+                        : null;
+                    return (
+                      <div
+                        key={source.id}
+                        className="flex items-center justify-between gap-3"
+                      >
+                        <span className="flex items-center gap-1 text-sm min-w-0">
+                          {source.channel === "Email" && (
+                            <MailIcon className="size-3 shrink-0 text-muted-foreground" />
+                          )}
+                          <span className="truncate">
+                            {raw?.from ?? source.channel}
+                          </span>
+                        </span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {formatDistanceToNow(source.receivedAt, {
+                            addSuffix: true,
+                          })}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          )}
+        </div>
+      );
+    },
+  },
+];

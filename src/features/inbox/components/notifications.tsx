@@ -57,9 +57,10 @@ function MultiSelectFilter<T extends string>({
       </PopoverTrigger>
       <PopoverContent className="w-44 p-1" align="end">
         {options.map((opt) => (
-          <button
+          <div
             key={opt.value}
-            type="button"
+            role="menuitem"
+            tabIndex={0}
             className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted cursor-pointer"
             onClick={() => {
               const next = value.includes(opt.value)
@@ -67,10 +68,19 @@ function MultiSelectFilter<T extends string>({
                 : [...value, opt.value];
               onChange(next);
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                const next = value.includes(opt.value)
+                  ? value.filter((v) => v !== opt.value)
+                  : [...value, opt.value];
+                onChange(next);
+              }
+            }}
           >
-            <Checkbox checked={value.includes(opt.value)} />
+            <Checkbox checked={value.includes(opt.value)} tabIndex={-1} />
             {opt.label}
-          </button>
+          </div>
         ))}
       </PopoverContent>
     </Popover>

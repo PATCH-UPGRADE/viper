@@ -46,8 +46,8 @@ const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
               {(candidates ?? []).map((a) => {
                 const label = a.hostname ?? a.ip;
                 const model = [
-                  a.deviceGroup?.manufacturer,
-                  a.deviceGroup?.modelName,
+                  a.deviceGroup?.vendor?.canonicalDisplayName,
+                  a.deviceGroup?.product?.canonicalDisplayName,
                 ]
                   .filter(Boolean)
                   .join(" ");

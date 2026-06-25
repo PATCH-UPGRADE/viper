@@ -77,7 +77,10 @@ const {
           hostname: "host-loose-1",
           ip: "10.0.0.1",
           role: "Workstation",
-          deviceGroup: { manufacturer: "Acme", modelName: "X100" },
+          deviceGroup: {
+            vendor: { canonicalDisplayName: "Acme" },
+            product: { canonicalDisplayName: "X100" },
+          },
         },
         {
           id: "asset-2",
@@ -612,8 +615,12 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   deviceGroupId: "dg-1",
   deviceGroup: {
     id: "dg-1",
-    modelName: "Plum 360",
-    manufacturer: "ICU Medical",
+    vendorId: "vendor-icu",
+    productId: "product-plum",
+    versionId: null,
+    vendor: { canonicalDisplayName: "ICU Medical" },
+    product: { canonicalDisplayName: "Plum 360" },
+    version: null,
   },
   ...overrides,
 });
@@ -661,7 +668,7 @@ describe("LinkedAssetsTable", () => {
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(3);
   });
 
-  it("matches a remediation to the asset via deviceGroupId", () => {
+  it("matches a remediation to the asset via device-group matching rules", () => {
     render(
       <LinkedAssetsTable
         assets={[sampleAsset()] as never}
@@ -670,7 +677,14 @@ describe("LinkedAssetsTable", () => {
             {
               id: "rem-1",
               description: "Apply firmware patch v2.3",
-              affectedDeviceGroups: [{ id: "dg-1" }],
+              deviceGroupMatchings: [
+                {
+                  vendorId: "vendor-icu",
+                  productId: "product-plum",
+                  versionId: null,
+                  versionRange: null,
+                },
+              ],
             },
           ] as never
         }
@@ -689,7 +703,14 @@ describe("LinkedAssetsTable", () => {
             {
               id: "rem-1",
               description: "Different group only",
-              affectedDeviceGroups: [{ id: "dg-other" }],
+              deviceGroupMatchings: [
+                {
+                  vendorId: "vendor-other",
+                  productId: null,
+                  versionId: null,
+                  versionRange: null,
+                },
+              ],
             },
           ] as never
         }

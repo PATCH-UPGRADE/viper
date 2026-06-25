@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { matchingAppliesToDeviceGroup } from "@/lib/device-matching";
 import {
   type DetailAsset,
   type DetailRemediation,
@@ -29,15 +30,15 @@ export const LinkedAssetsTable = ({
   onDetach?: (assetId: string) => void;
   detachPending?: boolean;
 }) => {
-  // Map deviceGroupId → first remediation that affects it
-  const remediationByDeviceGroup = new Map<string, DetailRemediation>();
-  for (const r of remediations) {
-    for (const dg of r.affectedDeviceGroups) {
-      if (!remediationByDeviceGroup.has(dg.id)) {
-        remediationByDeviceGroup.set(dg.id, r);
-      }
-    }
-  }
+  // Remediations no longer link device groups directly; each carries
+  // vendor/product/version matching rules. Resolve the first remediation whose
+  // rules apply to a given asset's device group.
+  const remediationForAsset = (a: DetailAsset): DetailRemediation | undefined =>
+    remediations.find((r) =>
+      r.deviceGroupMatchings.some((m) =>
+        matchingAppliesToDeviceGroup(m, a.deviceGroup),
+      ),
+    );
 
   return (
     <Table>
@@ -54,9 +55,12 @@ export const LinkedAssetsTable = ({
       </TableHeader>
       <TableBody>
         {assets.map((a) => {
-          const remediation = remediationByDeviceGroup.get(a.deviceGroupId);
+          const remediation = remediationForAsset(a);
           const model = a.deviceGroup
-            ? [a.deviceGroup.manufacturer, a.deviceGroup.modelName]
+            ? [
+                a.deviceGroup.vendor?.canonicalDisplayName,
+                a.deviceGroup.product?.canonicalDisplayName,
+              ]
                 .filter(Boolean)
                 .join(" ")
             : "—";

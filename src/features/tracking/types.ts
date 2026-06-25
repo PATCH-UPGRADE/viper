@@ -106,7 +106,15 @@ export const ticketDetailInclude = {
       location: true,
       deviceGroupId: true,
       deviceGroup: {
-        select: { id: true, modelName: true, manufacturer: true },
+        select: {
+          id: true,
+          vendorId: true,
+          productId: true,
+          versionId: true,
+          vendor: { select: { canonicalDisplayName: true } },
+          product: { select: { canonicalDisplayName: true } },
+          version: { select: { canonicalName: true } },
+        },
       },
     },
   },
@@ -117,7 +125,14 @@ export const ticketDetailInclude = {
     select: {
       id: true,
       description: true,
-      affectedDeviceGroups: { select: { id: true } },
+      deviceGroupMatchings: {
+        select: {
+          vendorId: true,
+          productId: true,
+          versionId: true,
+          versionRange: true,
+        },
+      },
     },
   },
   advisories: { select: { id: true, title: true, severity: true } },
@@ -297,15 +312,26 @@ const detailLinkedAssetSchema = linkedAssetSchema.extend({
   deviceGroupId: z.string(),
   deviceGroup: z.object({
     id: z.string(),
-    modelName: z.string().nullable(),
-    manufacturer: z.string().nullable(),
+    vendorId: z.string().nullable(),
+    productId: z.string().nullable(),
+    versionId: z.string().nullable(),
+    vendor: z.object({ canonicalDisplayName: z.string() }).nullable(),
+    product: z.object({ canonicalDisplayName: z.string() }).nullable(),
+    version: z.object({ canonicalName: z.string() }).nullable(),
   }),
 });
 
 const detailLinkedRemediationSchema = z.object({
   id: z.string(),
   description: z.string().nullable(),
-  affectedDeviceGroups: z.array(z.object({ id: z.string() })),
+  deviceGroupMatchings: z.array(
+    z.object({
+      vendorId: z.string(),
+      productId: z.string().nullable(),
+      versionId: z.string().nullable(),
+      versionRange: z.string().nullable(),
+    }),
+  ),
 });
 
 const ticketIssueSchema = z.object({

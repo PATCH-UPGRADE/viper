@@ -311,9 +311,7 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
       return (
         <div
           role="img"
-          aria-label={`${totalCount} comment${totalCount === 1 ? "" : "s"}${
-            showBreakdown ? ` (${ownCount} on this ticket)` : ""
-          }${unread ? ", unread" : ""}`}
+          aria-label={unread ? "Unread comments" : "Comments"}
           className={cn(
             "flex items-center gap-1",
             unread ? "text-blue-500" : "text-muted-foreground",

@@ -615,7 +615,12 @@ export const trackingRouter = createTRPCRouter({
           hostname: true,
           ip: true,
           role: true,
-          deviceGroup: { select: { manufacturer: true, modelName: true } },
+          deviceGroup: {
+            select: {
+              vendor: { select: { canonicalDisplayName: true } },
+              product: { select: { canonicalDisplayName: true } },
+            },
+          },
         },
         orderBy: [{ hostname: "asc" }, { ip: "asc" }],
         take: 100,

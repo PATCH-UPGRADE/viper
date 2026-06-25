@@ -7,6 +7,7 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
 import type { ConfidenceLevel } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { cpeToDeviceGroup } from "@/lib/router-utils";
 import type { Candidates } from "./candidate-search";
 import type { ExtractResult } from "./extract";
 
@@ -73,7 +74,7 @@ function renderCandidates(candidates: Candidates): string {
           ? entry.matches
               .map(
                 (m) =>
-                  `    - id: ${m.id} | cpe: ${m.cpe} | manufacturer: ${m.manufacturer ?? "(none)"} | modelName: ${m.modelName ?? "(none)"} | version: ${m.version ?? "(none)"}`,
+                  `    - id: ${m.id} | cpe: ${m.cpe.join(", ") || "(none)"} | manufacturer: ${m.manufacturer ?? "(none)"} | modelName: ${m.modelName ?? "(none)"} | version: ${m.version ?? "(none)"}`,
               )
               .join("\n")
           : "    - (no candidates found)";
@@ -125,8 +126,8 @@ export async function matchAndLinkEntities(
  * Separated from the LLM call so it can be unit-tested in isolation.
  *
  * Idempotent: mappings are upserted on (notificationId, deviceGroupId) and new
- * device groups are upserted on their unique cpe, so replaying does not
- * duplicate rows.
+ * device groups are resolved to their canonical (vendor/product/version)
+ * identity via resolveDeviceGroup, so replaying does not duplicate rows.
  */
 export async function applyDecisions(
   notificationId: string,
@@ -187,12 +188,21 @@ export async function applyDecisions(
           summary.skipped++;
           continue;
         }
+        // Vendor/product/version are part of a device group's identity now and
+        // can't be mutated in place; the only safe enrichment is unioning a new
+        // CPE into the existing group's cpe[] array.
         const data = cleanFields(decision.fields);
-        if (Object.keys(data).length > 0) {
-          await tx.deviceGroup.update({
+        if (data.cpe) {
+          const group = await tx.deviceGroup.findUnique({
             where: { id: decision.targetId },
-            data,
+            select: { cpe: true },
           });
+          if (group && !group.cpe.includes(data.cpe)) {
+            await tx.deviceGroup.update({
+              where: { id: decision.targetId },
+              data: { cpe: { push: data.cpe } },
+            });
+          }
         }
         await upsertMapping(decision.targetId);
         summary.updated++;
@@ -204,18 +214,10 @@ export async function applyDecisions(
           summary.skipped++;
           continue;
         }
-        // Upsert by the unique cpe so concurrent/duplicate runs don't create
-        // duplicate device groups.
-        const created = await tx.deviceGroup.upsert({
-          where: { cpe },
-          create: { ...data, cpe },
-          update: {
-            manufacturer: data.manufacturer,
-            modelName: data.modelName,
-            version: data.version,
-          },
-          select: { id: true },
-        });
+        // The CPE is required and authoritative: cpeToDeviceGroup parses it into
+        // canonical vendor/product/version, sets versionStatus, attaches the CPE
+        // to cpe[], and find-or-creates by identity (race-safe, idempotent).
+        const created = await cpeToDeviceGroup(cpe);
         await upsertMapping(created.id);
         summary.created++;
       }

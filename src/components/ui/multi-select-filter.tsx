@@ -38,7 +38,8 @@ export function MultiSelectFilter<T extends string>({
         {options.map((opt) => (
           <div
             key={opt.value}
-            role="menuitem"
+            role="menuitemcheckbox"
+            aria-checked={value.includes(opt.value)}
             tabIndex={0}
             className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted cursor-pointer"
             onClick={() => {

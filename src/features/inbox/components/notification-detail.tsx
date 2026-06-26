@@ -124,9 +124,7 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
       </div>
 
       {/* Title */}
-      <h1 className="text-3xl font-semibold tracking-tight">
-        {notification.title}
-      </h1>
+      <h1 className="text-3xl font-semibold tracking-tight">{displayTitle}</h1>
 
       {/* Meta line */}
       <p className="text-sm text-muted-foreground -mt-3">

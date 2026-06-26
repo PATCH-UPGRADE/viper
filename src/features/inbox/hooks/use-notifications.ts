@@ -25,8 +25,13 @@ export const useMarkNotificationRead = () => {
 
   return useMutation(
     trpc.notifications.markRead.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (_data, variables) => {
         queryClient.invalidateQueries(trpc.notifications.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.notifications.getOne.queryFilter({
+            id: variables.notificationId,
+          }),
+        );
       },
     }),
   );

@@ -17,12 +17,10 @@ import {
 } from "../types";
 
 const createSearchFilter = (search: string) => {
+  const insensitive = { contains: search, mode: "insensitive" as const };
   return search
     ? {
-        OR: [
-          { title: { contains: search, mode: "insensitive" as const } },
-          { summary: { contains: search, mode: "insensitive" as const } },
-        ],
+        OR: [{ title: insensitive }, { summary: insensitive }],
       }
     : {};
 };

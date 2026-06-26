@@ -1,0 +1,38 @@
+"use client";
+
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
+import { useTRPC } from "@/trpc/client";
+import { useNotificationsParams } from "./use-notifications-params";
+
+export const useSuspenseNotifications = () => {
+  const trpc = useTRPC();
+  const [params] = useNotificationsParams();
+  return useSuspenseQuery(trpc.notifications.getMany.queryOptions(params));
+};
+
+export const useSuspenseNotification = (id: string) => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(trpc.notifications.getOne.queryOptions({ id }));
+};
+
+export const useMarkNotificationRead = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.notifications.markRead.mutationOptions({
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries(trpc.notifications.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.notifications.getOne.queryFilter({
+            id: variables.notificationId,
+          }),
+        );
+      },
+    }),
+  );
+};

@@ -31,37 +31,18 @@ import {
 } from "../types";
 
 const createSearchFilter = (search: string) => {
+  const insensitive = { contains: search, mode: "insensitive" as const };
   return search
     ? {
         OR: [
-          {
-            description: { contains: search, mode: "insensitive" as const },
-          },
-          { impact: { contains: search, mode: "insensitive" as const } },
+          { description: insensitive },
+          { impact: insensitive },
           {
             deviceGroupMatchings: {
               some: {
                 OR: [
-                  {
-                    vendor: {
-                      is: {
-                        canonicalName: {
-                          contains: search,
-                          mode: "insensitive" as const,
-                        },
-                      },
-                    },
-                  },
-                  {
-                    product: {
-                      is: {
-                        canonicalName: {
-                          contains: search,
-                          mode: "insensitive" as const,
-                        },
-                      },
-                    },
-                  },
+                  { vendor: { is: { canonicalName: insensitive } } },
+                  { product: { is: { canonicalName: insensitive } } },
                 ],
               },
             },
@@ -441,13 +422,11 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       const { priority, ...pagination } = input;
       const { search } = pagination;
 
+      const insensitive = { contains: search, mode: "insensitive" as const };
       const where = {
         priority: priority as Priority,
         ...(search && {
-          OR: [
-            { cveId: { contains: search, mode: "insensitive" as const } },
-            { description: { contains: search, mode: "insensitive" as const } },
-          ],
+          OR: [{ cveId: insensitive }, { description: insensitive }],
         }),
       };
 

@@ -3,6 +3,7 @@ import {
   deviceGroupCpeList,
   deviceGroupLabel,
   deviceGroupMatchingsSummary,
+  parseLocation,
 } from "@/lib/string-utils";
 
 // ─── Structural interfaces for markdown rendering ─────────────────────────────
@@ -142,26 +143,6 @@ function truncate(text: string | null | undefined, max = 400): string {
 
 function shortId(id: string): string {
   return id.slice(0, 8);
-}
-
-function parseLocation(raw: unknown): string {
-  if (!raw || typeof raw !== "object") return "—";
-  const loc = raw as {
-    facility?: string;
-    building?: string;
-    floor?: string;
-    room?: string;
-  };
-  return (
-    [
-      loc.facility,
-      loc.building,
-      loc.floor ? `Floor ${loc.floor}` : undefined,
-      loc.room,
-    ]
-      .filter(Boolean)
-      .join(" / ") || "—"
-  );
 }
 
 // ─── Individual entity renderers ──────────────────────────────────────────────

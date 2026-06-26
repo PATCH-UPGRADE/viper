@@ -346,7 +346,10 @@ export function DataTable<
                   <React.Fragment key={row.id}>
                     <TableRow
                       data-state={row.getIsSelected() && "selected"}
-                      className={cn(rowOnclick ? "cursor-pointer" : "")}
+                      className={cn(
+                        rowOnclick ? "cursor-pointer" : "",
+                        row.index % 2 !== 0 ? "bg-muted/30" : "",
+                      )}
                       onClick={rowOnclick ? () => rowOnclick(row) : undefined}
                     >
                       {hasNestedTable && (

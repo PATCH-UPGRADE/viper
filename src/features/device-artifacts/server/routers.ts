@@ -31,28 +31,17 @@ import {
 
 // TODO: do something DRY with `createSearchFilter` in other routers
 const createSearchFilter = (search: string) => {
+  const insensitive = { contains: search, mode: "insensitive" as const };
   return search
     ? {
         OR: [
-          { role: { contains: search, mode: "insensitive" as const } },
-          {
-            description: { contains: search, mode: "insensitive" as const },
-          },
+          { role: insensitive },
+          { description: insensitive },
           {
             artifacts: {
               some: {
                 latestArtifact: {
-                  OR: [
-                    {
-                      name: { contains: search, mode: "insensitive" as const },
-                    },
-                    {
-                      downloadUrl: {
-                        contains: search,
-                        mode: "insensitive" as const,
-                      },
-                    },
-                  ],
+                  OR: [{ name: insensitive }, { downloadUrl: insensitive }],
                 },
               },
             },

@@ -990,22 +990,11 @@ model WorkOrderTicket {
   status      TicketStatus   @default(TO_DO)
   category    TicketCategory @default(OTHER)
 
-  // Human-facing label for the source: the originating email address, the
-  // integration/service name, etc. Null for manually-created tickets (the
-  // `creator` relation identifies who made it). The `sources` relation below
-  // holds the richer source artifact (email, attachments) when ingested.
   sourceLabel String?
-
-  // The ingested source artifact(s) for this ticket (forwarded email, polled
-  // API payload, …), reusing NotificationSource. Empty ⇒ created manually.
   sources NotificationSource[]
 
-  // General work-order body (e.g. the extracted email body). Per-department
-  // TicketDescription rows can be generated from this later.
   body String? @db.Text
 
-  // Raw assignee hint (name/email) when no VIPER user could be matched. The
-  // `assigneeId` relation stays null until a human/agent resolves it.
   suggestedAssignee String?
 
   departments Department[] @relation("WorkOrderTicketDepartments")
@@ -1059,8 +1048,6 @@ model TicketWatch {
   @@map("ticket_watch")
 }
 
-// Per-user "last viewed" timestamp for a ticket. Drives the unread-comments
-// indicator: a ticket has unread comments when lastCommentAt > seenAt.
 model TicketSeen {
   userId   String
   ticketId String
@@ -1193,8 +1180,6 @@ model NotificationSource {
   notificationId String?
   notification   Notification?        @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 
-  // A source can instead belong to a work-order ticket (reused for the
-  // email → work order flow). Exactly one of notification/workOrderTicket is set.
   workOrderTicketId String?
   workOrderTicket   WorkOrderTicket? @relation(fields: [workOrderTicketId], references: [id], onDelete: Cascade)
 

@@ -18,57 +18,18 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
-import { useCategoryColor } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
-import {
-  type NotificationChannel,
-  type TicketCategory,
-  TicketStatus,
-} from "@/generated/prisma";
+import { type NotificationChannel, TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { useSetWatching } from "../hooks/use-tracking";
 import type { TrackingTicketChildRow } from "../types";
-
-const statusLabels: Record<TicketStatus, string> = {
-  TO_DO: "To Do",
-  IN_PROGRESS: "In Progress",
-  REQUIRES_APPROVAL: "Requires Approval",
-  DONE: "Done",
-};
-
-const statusHue: Record<TicketStatus, string> = {
-  TO_DO: "gray",
-  IN_PROGRESS: "blue",
-  REQUIRES_APPROVAL: "yellow",
-  DONE: "green",
-};
-
-const categoryLabels: Record<TicketCategory, string> = {
-  PATCH: "Patch",
-  CONFIG_CHANGE: "Config Change",
-  VULN_REMEDIATION: "Vuln Remediation",
-  ADVISORY_RESPONSE: "Advisory Response",
-  CLINICAL_REVIEW: "Clinical Review",
-  FIRMWARE_UPDATE: "Firmware Update",
-  NETWORK_REMEDIATION: "Network Remediation",
-  NEW_ASSET_PROCUREMENT: "New Asset Procurement",
-  OTHER: "Other",
-};
+import { CategoryChip, statusHue, statusLabels } from "./ticket-detail/shared";
 
 // Icon shown in the Source column for each ingested-source channel.
 const channelIcons: Record<NotificationChannel, LucideIcon> = {
   Email: MailIcon,
   PolledApi: BoxIcon,
   Crawl: BoxIcon,
-};
-
-const CategoryChip = ({ category }: { category: TicketCategory }) => {
-  const color = useCategoryColor(category);
-  return (
-    <Badge variant="outline" className={getChipClass(color)}>
-      {categoryLabels[category]}
-    </Badge>
-  );
 };
 
 const formatScheduled = (date: Date | string | null | undefined) => {

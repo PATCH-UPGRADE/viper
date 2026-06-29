@@ -388,8 +388,7 @@ export function DataTable<
                       data-state={row.getIsSelected() && "selected"}
                       className={cn(
                         rowOnclick ? "cursor-pointer" : "",
-                        isChildRow &&
-                          "bg-blue-100/80 hover:bg-blue-100 dark:bg-muted/60 dark:hover:bg-muted/70",
+                        row.index % 2 !== 0 ? "bg-muted/30" : "",
                       )}
                       onClick={rowOnclick ? () => rowOnclick(row) : undefined}
                     >

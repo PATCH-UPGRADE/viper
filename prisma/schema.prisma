@@ -1170,6 +1170,10 @@ model Notification {
   summary String?          @db.Text
   details Json? // unindexed, NotificationType-specific fields
 
+  priority Priority @default(Unsorted)
+  priorityReasonWhy String? @db.Text
+  hospitalImpact String? @db.Text
+
   sources         NotificationSource[]
   reads           NotificationRead[]
   assets          NotificationAssetMapping[]

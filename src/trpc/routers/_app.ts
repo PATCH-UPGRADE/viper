@@ -6,6 +6,7 @@ import { chatRouter } from "@/features/chat/server/routers";
 import { departmentsRouter } from "@/features/departments/server/routers";
 import { deviceArtifactsRouter } from "@/features/device-artifacts/server/routers";
 import { deviceGroupsRouter } from "@/features/device-groups/server/routers";
+import { notificationsRouter } from "@/features/inbox/server/routers";
 import { integrationsRouter } from "@/features/integrations/server/routers";
 import { issuesRouter } from "@/features/issues/server/routers";
 import { networkRouter } from "@/features/network/server/router";
@@ -20,6 +21,7 @@ import { createTRPCRouter } from "../init";
 
 export const appRouter = createTRPCRouter({
   advisories: advisoriesRouter,
+  notifications: notificationsRouter,
   workflows: workflowsRouter,
   assets: assetsRouter,
   vulnerabilities: vulnerabilitiesRouter,

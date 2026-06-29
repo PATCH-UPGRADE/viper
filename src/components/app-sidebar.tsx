@@ -7,6 +7,7 @@ import {
   CpuIcon,
   ExternalLink,
   HeartIcon,
+  InboxIcon,
   ListChecksIcon,
   type LucideIcon,
   PlugIcon,
@@ -49,6 +50,11 @@ import { NavUser } from "./nav-user";
 import { Separator } from "./ui/separator";
 
 const mainItems = [
+  {
+    title: "Inbox",
+    icon: InboxIcon,
+    url: "/inbox",
+  },
   {
     title: "Workflows",
     icon: WorkflowIcon,

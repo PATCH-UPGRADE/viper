@@ -11,6 +11,7 @@ import {
   checkEmailRelevance,
   stripHtml,
 } from "@/features/inbox/agent/relevance";
+import { triageNotification } from "@/features/inbox/agent/triage";
 import { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { normalizeMd5, uploadBufferToS3 } from "@/lib/s3";
@@ -235,6 +236,21 @@ export const processInboxEmail = inngest.createFunction(
       const candidates = await searchCandidates(extracted);
       return matchAndLinkEntities(notificationId, extracted, candidates);
     });
+
+    // 9. Triage: assign priority, reason, and hospital impact
+    if (notificationId) {
+      await step.run("triage-notification", async () => {
+        const result = await triageNotification(sourceId, notificationId);
+        await prisma.notification.update({
+          where: { id: notificationId },
+          data: {
+            priority: result.priority,
+            priorityReasonWhy: result.priorityReasonWhy,
+            hospitalImpact: result.hospitalImpact,
+          },
+        });
+      });
+    }
 
     return { sourceId, notificationId, emailId, linkSummary };
   },

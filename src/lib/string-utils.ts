@@ -86,3 +86,28 @@ export function deviceGroupMatchingsSummary(
 ): string {
   return matchings.map(deviceGroupMatchingLabel).join(", ");
 }
+
+/**
+ * Human-readable location string from a JSON location value, e.g.
+ * "Main Campus / Tower A / Floor 3 / Room 204". Returns "—" when empty
+ * or not an object.
+ */
+export function parseLocation(raw: unknown): string {
+  if (!raw || typeof raw !== "object") return "—";
+  const loc = raw as {
+    facility?: string;
+    building?: string;
+    floor?: string;
+    room?: string;
+  };
+  return (
+    [
+      loc.facility,
+      loc.building,
+      loc.floor ? `Floor ${loc.floor}` : undefined,
+      loc.room,
+    ]
+      .filter(Boolean)
+      .join(" / ") || "—"
+  );
+}

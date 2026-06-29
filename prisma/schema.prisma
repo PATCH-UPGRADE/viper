@@ -273,7 +273,7 @@ model DeviceGroup {
   // Vulnerabilities / remediations / advisories / device artifacts connect via
   // DeviceGroupMatching now, not a direct relation. notificationMappings is from
   // main's notifications feature and stays.
-  notificationMappings NotificationDeviceGroupMapping[]
+  // notificationMappings NotificationDeviceGroupMapping[]
 
   // NOTE: Postgres treats NULLs as distinct, so this composite unique will NOT
   // prevent duplicate rows when versionId is null. Identity resolution is done
@@ -300,6 +300,7 @@ model DeviceGroupMatching {
   remediations    Remediation[]    @relation("RemediationMatchings")
   advisories      Advisory[]       @relation("AdvisoryMatchings")
   deviceArtifacts DeviceArtifact[] @relation("DeviceArtifactMatchings")
+  notificationMappings  NotificationDeviceGroupMapping[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -966,8 +967,8 @@ model Notification {
 
   sources         NotificationSource[]
   reads           NotificationRead[]
-  assets          NotificationAssetMapping[]
-  deviceGroups    NotificationDeviceGroupMapping[]
+  assets          NotificationAssetMapping[] 
+  deviceGroupsMatchings NotificationDeviceGroupMapping[]
   vulnerabilities NotificationVulnerabilityMapping[]
   remediations    NotificationRemediationMapping[]
 
@@ -1047,12 +1048,12 @@ model NotificationDeviceGroupMapping {
   id             String          @id @default(cuid())
   notificationId String
   notification   Notification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
-  deviceGroupId  String
-  deviceGroup    DeviceGroup     @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
+  deviceGroupMatchingId String
+  deviceGroupMatching DeviceGroupMatching @relation(fields:[deviceGroupMatchingId], references: [id], onDelete: Cascade)
   confidence     ConfidenceLevel?
   reasonWhy String?
 
-  @@unique([notificationId, deviceGroupId])
+  @@unique([notificationId, deviceGroupMatchingId])
   @@map("notification_device_group_mapping")
 }
 

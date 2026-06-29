@@ -33,14 +33,22 @@ const {
   mockOnSearchChange,
   mockRouterPush,
   mockUseRouter,
+  mockSetWatchingMutate,
+  mockUseSetWatching,
 } = vi.hoisted(() => {
   const mockSetParams = vi.fn();
   const mockOnSearchChange = vi.fn();
   const mockRouterPush = vi.fn();
+  const mockSetWatchingMutate = vi.fn();
   return {
     mockSetParams,
     mockOnSearchChange,
     mockRouterPush,
+    mockSetWatchingMutate,
+    mockUseSetWatching: vi.fn(() => ({
+      mutate: mockSetWatchingMutate,
+      isPending: false,
+    })),
     mockUseTrackingParams: vi.fn(() => [
       {
         tab: "suggested",
@@ -85,6 +93,7 @@ vi.mock("../hooks/use-tracking-params", () => ({
 
 vi.mock("../hooks/use-tracking", () => ({
   useSuspenseTrackingTickets: mockUseSuspenseTrackingTickets,
+  useSetWatching: mockUseSetWatching,
 }));
 
 vi.mock("@/hooks/use-entity-search", () => ({
@@ -242,10 +251,11 @@ const sampleTicket = (overrides: Record<string, unknown> = {}) => ({
   status: "TO_DO",
   category: "PATCH",
   source: "MANUAL",
-  sourceWorkflow: null,
+  sourceLabel: null,
   scheduledAt: new Date("2026-06-10T15:00:00Z"),
   departments: [{ id: "d-it", name: "IT", color: "purple" }],
   assignee: { id: "u1", name: "Alice", email: "alice@example.com" },
+  creator: { id: "u1", name: "Alice", image: null },
   vulnerabilities: [],
   assets: [],
   children: [],
@@ -262,8 +272,8 @@ const sampleTicket = (overrides: Record<string, unknown> = {}) => ({
     advisories: 0,
     assets: 0,
   },
-  seenBy: [],
-  lastCommentAt: null,
+  isWatching: false,
+  hasUnreadComments: false,
   ...overrides,
 });
 
@@ -357,10 +367,10 @@ describe("TrackingList", () => {
     expect(mockRouterPush).toHaveBeenCalledWith("/tracking/parent-1");
   });
 
-  it("renders an unread dot when the user has never seen the ticket", () => {
+  it("renders a 'not watching' indicator by default", () => {
     mockUseSuspenseTrackingTickets.mockReturnValueOnce({
       data: {
-        items: [sampleTicket({ seenBy: [] })],
+        items: [sampleTicket({ isWatching: false })],
         page: 1,
         pageSize: 5,
         totalCount: 1,
@@ -370,18 +380,15 @@ describe("TrackingList", () => {
     });
 
     renderTrackingList();
-    expect(screen.getByLabelText("Unread")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/not watching — click to watch/i),
+    ).toBeInTheDocument();
   });
 
-  it("renders an unread dot when the ticket was updated after the user's last view", () => {
+  it("renders a 'watching' indicator when the user watches the ticket", () => {
     mockUseSuspenseTrackingTickets.mockReturnValueOnce({
       data: {
-        items: [
-          sampleTicket({
-            seenBy: [{ seenAt: new Date("2026-05-01T00:00:00Z") }],
-            updatedAt: new Date("2026-05-15T00:00:00Z"),
-          }),
-        ],
+        items: [sampleTicket({ isWatching: true })],
         page: 1,
         pageSize: 5,
         totalCount: 1,
@@ -391,18 +398,16 @@ describe("TrackingList", () => {
     });
 
     renderTrackingList();
-    expect(screen.getByLabelText("Unread")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/watching — click to unwatch/i),
+    ).toBeInTheDocument();
   });
 
-  it("does not render an unread dot when the user's last view is after the ticket's updatedAt", () => {
+  it("toggles watch state when the indicator is clicked", async () => {
+    const user = userEvent.setup();
     mockUseSuspenseTrackingTickets.mockReturnValueOnce({
       data: {
-        items: [
-          sampleTicket({
-            seenBy: [{ seenAt: new Date("2026-05-20T00:00:00Z") }],
-            updatedAt: new Date("2026-05-15T00:00:00Z"),
-          }),
-        ],
+        items: [sampleTicket({ id: "ticket-1", isWatching: false })],
         page: 1,
         pageSize: 5,
         totalCount: 1,
@@ -412,13 +417,20 @@ describe("TrackingList", () => {
     });
 
     renderTrackingList();
-    expect(screen.queryByLabelText("Unread")).not.toBeInTheDocument();
+    await user.click(screen.getByLabelText(/not watching — click to watch/i));
+
+    expect(mockSetWatchingMutate).toHaveBeenCalledWith({
+      ticketId: "ticket-1",
+      watching: true,
+    });
+    // Clicking the indicator must not navigate to the ticket.
+    expect(mockRouterPush).not.toHaveBeenCalled();
   });
 
-  it("shows an outlined Comments icon when the ticket has no comments", () => {
+  it("shows a plain Comments cell when there are no unread comments", () => {
     mockUseSuspenseTrackingTickets.mockReturnValueOnce({
       data: {
-        items: [sampleTicket({ lastCommentAt: null })],
+        items: [sampleTicket({ hasUnreadComments: false })],
         page: 1,
         pageSize: 5,
         totalCount: 1,
@@ -432,16 +444,10 @@ describe("TrackingList", () => {
     expect(screen.queryByLabelText("Unread comments")).not.toBeInTheDocument();
   });
 
-  it("shows a filled Comments icon when a comment is newer than the user's last view", () => {
+  it("highlights the Comments cell when there are unread comments", () => {
     mockUseSuspenseTrackingTickets.mockReturnValueOnce({
       data: {
-        items: [
-          sampleTicket({
-            seenBy: [{ seenAt: new Date("2026-05-10T00:00:00Z") }],
-            lastCommentAt: new Date("2026-05-12T00:00:00Z"),
-            updatedAt: new Date("2026-05-08T00:00:00Z"),
-          }),
-        ],
+        items: [sampleTicket({ hasUnreadComments: true })],
         page: 1,
         pageSize: 5,
         totalCount: 1,
@@ -452,50 +458,7 @@ describe("TrackingList", () => {
 
     renderTrackingList();
     expect(screen.getByLabelText("Unread comments")).toBeInTheDocument();
-  });
-
-  it("shows a filled Comments icon when the user has never seen the ticket but it has comments", () => {
-    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
-      data: {
-        items: [
-          sampleTicket({
-            seenBy: [],
-            lastCommentAt: new Date("2026-05-12T00:00:00Z"),
-          }),
-        ],
-        page: 1,
-        pageSize: 5,
-        totalCount: 1,
-        totalPages: 1,
-      },
-      isFetching: false,
-    });
-
-    renderTrackingList();
-    expect(screen.getByLabelText("Unread comments")).toBeInTheDocument();
-  });
-
-  it("shows an outlined Comments icon when all comments predate the user's last view", () => {
-    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
-      data: {
-        items: [
-          sampleTicket({
-            seenBy: [{ seenAt: new Date("2026-05-20T00:00:00Z") }],
-            lastCommentAt: new Date("2026-05-10T00:00:00Z"),
-            updatedAt: new Date("2026-05-10T00:00:00Z"),
-          }),
-        ],
-        page: 1,
-        pageSize: 5,
-        totalCount: 1,
-        totalPages: 1,
-      },
-      isFetching: false,
-    });
-
-    renderTrackingList();
-    expect(screen.getByLabelText("Comments")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Unread comments")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Comments")).not.toBeInTheDocument();
   });
 
   it("shows a tree-connector on every child row, with an elbow (└) on the last and a T-junction (├) on the others", async () => {
@@ -541,55 +504,20 @@ describe("TrackingList", () => {
     expect(screen.getByText("Last child")).toBeInTheDocument();
   });
 
-  it("fires the unified 'Unread' dot on the parent when any child is unread, even if the parent itself is read", () => {
+  it("renders an independent watch indicator per row (parent and children)", async () => {
+    const user = userEvent.setup();
     mockUseSuspenseTrackingTickets.mockReturnValueOnce({
       data: {
         items: [
           sampleTicket({
             id: "parent-1",
-            // Parent itself is read (seenAt > updatedAt) so the signal can
-            // only come from the unread child.
-            seenBy: [{ seenAt: new Date("2026-06-01T00:00:00Z") }],
-            updatedAt: new Date("2026-05-01T00:00:00Z"),
-            children: [
-              sampleTicket({
-                id: "child-read",
-                seenBy: [{ seenAt: new Date("2026-06-01T00:00:00Z") }],
-                updatedAt: new Date("2026-05-01T00:00:00Z"),
-              }),
-              sampleTicket({
-                id: "child-unread",
-                seenBy: [],
-                updatedAt: new Date("2026-05-15T00:00:00Z"),
-              }),
-            ],
-          }),
-        ],
-        page: 1,
-        pageSize: 5,
-        totalCount: 1,
-        totalPages: 1,
-      },
-      isFetching: false,
-    });
-
-    renderTrackingList();
-    expect(screen.getByLabelText("Unread")).toBeInTheDocument();
-  });
-
-  it("does not fire the dot when neither the parent nor any child is unread", () => {
-    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
-      data: {
-        items: [
-          sampleTicket({
-            id: "parent-1",
-            seenBy: [{ seenAt: new Date("2026-06-01T00:00:00Z") }],
-            updatedAt: new Date("2026-05-01T00:00:00Z"),
+            summary: "Parent ticket",
+            isWatching: true,
             children: [
               sampleTicket({
                 id: "child-1",
-                seenBy: [{ seenAt: new Date("2026-06-01T00:00:00Z") }],
-                updatedAt: new Date("2026-05-01T00:00:00Z"),
+                summary: "Child ticket",
+                isWatching: false,
               }),
             ],
           }),
@@ -603,7 +531,22 @@ describe("TrackingList", () => {
     });
 
     renderTrackingList();
-    expect(screen.queryByLabelText("Unread")).not.toBeInTheDocument();
+
+    // Parent (watching) is shown before expansion.
+    expect(
+      screen.getByLabelText(/watching — click to unwatch/i),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText(/expand nested data/i));
+
+    // After expanding, the child's own (not-watching) indicator appears
+    // independently of the parent's.
+    expect(
+      screen.getByLabelText(/watching — click to unwatch/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/not watching — click to watch/i),
+    ).toBeInTheDocument();
   });
 
   it("renders the parent comments cell as 'X (Y)' when child comments add to the total", () => {
@@ -663,5 +606,44 @@ describe("TrackingList", () => {
     const cell = screen.getByLabelText("Comments");
     expect(cell).toHaveTextContent("3");
     expect(cell.textContent).not.toContain("(");
+  });
+});
+
+describe("TrackingList — source column", () => {
+  const renderWith = (overrides: Record<string, unknown>) => {
+    mockUseSuspenseTrackingTickets.mockReturnValueOnce({
+      data: {
+        items: [sampleTicket(overrides)],
+        page: 1,
+        pageSize: 5,
+        totalCount: 1,
+        totalPages: 1,
+      },
+      isFetching: false,
+    });
+    renderTrackingList();
+  };
+
+  it("MANUAL shows the creator's name", () => {
+    renderWith({
+      source: "MANUAL",
+      creator: { id: "u9", name: "Carol Creator", image: null },
+    });
+    expect(screen.getByText("Carol Creator")).toBeInTheDocument();
+  });
+
+  it("EMAIL shows the originating email address", () => {
+    renderWith({ source: "EMAIL", sourceLabel: "ops@stmary.example.org" });
+    expect(screen.getByText("ops@stmary.example.org")).toBeInTheDocument();
+  });
+
+  it("INTEGRATION shows the service name", () => {
+    renderWith({ source: "INTEGRATION", sourceLabel: "Armis" });
+    expect(screen.getByText("Armis")).toBeInTheDocument();
+  });
+
+  it("OTHER shows the label, falling back to 'Other'", () => {
+    renderWith({ source: "OTHER", sourceLabel: null });
+    expect(screen.getByText("Other")).toBeInTheDocument();
   });
 });

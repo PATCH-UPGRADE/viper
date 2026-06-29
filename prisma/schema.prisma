@@ -48,6 +48,7 @@ model User {
   workOrderTicketsCreated   WorkOrderTicket[]  @relation("WorkOrderTicketCreator")
   workOrderTicketsAssigned  WorkOrderTicket[]  @relation("WorkOrderTicketAssignee")
   ticketComments         TicketComment[]
+  watchedTickets         TicketWatch[]
   ticketSeen             TicketSeen[]
   ticketActivities       TicketActivity[]
 
@@ -129,8 +130,6 @@ model Workflow {
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  sourceWorkOrderTickets WorkOrderTicket[] @relation("WorkOrderTicketSourceWorkflow")
 }
 
 enum NodeType {
@@ -960,10 +959,10 @@ enum TicketCategory {
 }
 
 enum TicketSource {
-  WORKFLOW
-  MANUAL
-  WEBHOOK
-  API
+  MANUAL // Manually created by a Viper user
+  EMAIL // Created from a consumed work-order email
+  INTEGRATION // Created from an external service's work order
+  OTHER // Catch-all for sources not yet modeled
 }
 
 model Department {
@@ -998,9 +997,11 @@ model WorkOrderTicket {
   status      TicketStatus   @default(TO_DO)
   category    TicketCategory @default(OTHER)
 
-  source             TicketSource @default(MANUAL)
-  sourceWorkflowId   String?
-  sourceWorkflow     Workflow?    @relation("WorkOrderTicketSourceWorkflow", fields: [sourceWorkflowId], references: [id], onDelete: SetNull)
+  source      TicketSource @default(MANUAL)
+  // For EMAIL: the originating email address. For INTEGRATION: the service
+  // name. For OTHER: free-text describing the source. Null for MANUAL (the
+  // `creator` relation identifies who created it).
+  sourceLabel String?
 
   departments Department[] @relation("WorkOrderTicketDepartments")
 
@@ -1023,6 +1024,7 @@ model WorkOrderTicket {
 
   comments       TicketComment[]
   descriptions   TicketDescription[]
+  watchers       TicketWatch[]
   seenBy         TicketSeen[]
   activities     TicketActivity[]
   lastCommentAt  DateTime?
@@ -1033,11 +1035,26 @@ model WorkOrderTicket {
   @@index([status])
   @@index([assigneeId])
   @@index([creatorId])
-  @@index([sourceWorkflowId])
   @@index([parentId])
   @@map("work_order_ticket")
 }
 
+model TicketWatch {
+  userId    String
+  ticketId  String
+  createdAt DateTime @default(now())
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@id([userId, ticketId])
+  @@index([userId])
+  @@index([ticketId])
+  @@map("ticket_watch")
+}
+
+// Per-user "last viewed" timestamp for a ticket. Drives the unread-comments
+// indicator: a ticket has unread comments when lastCommentAt > seenAt.
 model TicketSeen {
   userId   String
   ticketId String

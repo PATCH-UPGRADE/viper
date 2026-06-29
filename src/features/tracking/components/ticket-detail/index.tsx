@@ -3,6 +3,8 @@
 import {
   CalendarIcon,
   ClockIcon,
+  EyeIcon,
+  EyeOffIcon,
   PencilIcon,
   SlashIcon,
   UserIcon,
@@ -30,6 +32,7 @@ import { CategoryColorProvider } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
 import {
   useMarkTicketSeen,
+  useSetWatching,
   useSuspenseTrackingTicket,
 } from "../../hooks/use-tracking";
 import { ActivityTimeline } from "./activity-timeline";
@@ -55,10 +58,11 @@ export { LinkedAssetsTable } from "./linked-assets-table";
 export const TicketDetailContent = ({ id }: { id: string }) => {
   const { data } = useSuspenseTrackingTicket(id);
   const [isEditing, setIsEditing] = useState(false);
+  const setWatching = useSetWatching();
   const { mutate: markSeen } = useMarkTicketSeen();
 
-  // Stamp this ticket as seen by the current user once per mount. The
-  // mutation upserts on (userId, ticketId), so re-fires are cheap.
+  // Viewing a ticket marks its comments as seen for the current user, clearing
+  // the unread-comments indicator. Upserts on (userId, ticketId) per mount.
   useEffect(() => {
     markSeen({ ticketId: id });
   }, [id, markSeen]);
@@ -100,14 +104,35 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
               {data.summary}
             </h1>
             {!isEditing && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setIsEditing(true)}
-              >
-                <PencilIcon className="size-3.5" />
-                Edit
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={data.isWatching ? "secondary" : "outline"}
+                  disabled={setWatching.isPending}
+                  aria-pressed={data.isWatching}
+                  onClick={() =>
+                    setWatching.mutate({
+                      ticketId: id,
+                      watching: !data.isWatching,
+                    })
+                  }
+                >
+                  {data.isWatching ? (
+                    <EyeIcon className="size-3.5" />
+                  ) : (
+                    <EyeOffIcon className="size-3.5" />
+                  )}
+                  {data.isWatching ? "Watching" : "Watch"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsEditing(true)}
+                >
+                  <PencilIcon className="size-3.5" />
+                  Edit
+                </Button>
+              </div>
             )}
           </div>
         </div>

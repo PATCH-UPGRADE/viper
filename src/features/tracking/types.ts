@@ -16,11 +16,14 @@ export const ticketBaseInclude = {
     orderBy: { name: "asc" as const },
   },
   assignee: { select: { id: true, name: true, email: true } },
-  sourceWorkflow: { select: { id: true, name: true } },
+  creator: { select: { id: true, name: true, image: true } },
   vulnerabilities: { select: { id: true, cveId: true } },
   assets: { select: { id: true, hostname: true } },
-  // `seenBy` is replaced at the procedure level with a where: { userId } filter.
-  // Including it here keeps the derived TS type consistent across call sites.
+  // `watchers` and `seenBy` are replaced at the procedure level with a
+  // where: { userId } filter so each row reflects only the current user's
+  // watch/seen state. Including them here keeps the derived TS type consistent
+  // across call sites. `seenBy` drives the unread-comments indicator.
+  watchers: { select: { userId: true } },
   seenBy: { select: { seenAt: true } },
   _count: {
     select: {
@@ -48,20 +51,30 @@ type ChildPayload = Prisma.WorkOrderTicketGetPayload<{
 
 export type LinkedPreviewItem = { id: string; label: string };
 
-export type TrackingTicketChildRow = ChildPayload & {
+export type TrackingTicketChildRow = Omit<
+  ChildPayload,
+  "watchers" | "seenBy"
+> & {
   linkedCount: number;
   commentCount: number;
   linkedPreview: LinkedPreviewItem[];
+  isWatching: boolean;
+  hasUnreadComments: boolean;
 };
 
 type ParentPayload = Prisma.WorkOrderTicketGetPayload<{
   include: typeof trackingTicketInclude;
 }>;
 
-export type TrackingTicketRow = Omit<ParentPayload, "children"> & {
+export type TrackingTicketRow = Omit<
+  ParentPayload,
+  "children" | "watchers" | "seenBy"
+> & {
   linkedCount: number;
   commentCount: number;
   linkedPreview: LinkedPreviewItem[];
+  isWatching: boolean;
+  hasUnreadComments: boolean;
   children: TrackingTicketChildRow[];
 };
 
@@ -78,7 +91,6 @@ export const ticketDetailInclude = {
   },
   assignee: { select: { id: true, name: true, email: true } },
   creator: { select: { id: true, name: true, email: true } },
-  sourceWorkflow: { select: { id: true, name: true } },
   parent: { select: { id: true, summary: true } },
   children: {
     select: {
@@ -151,7 +163,7 @@ export const ticketDetailInclude = {
     orderBy: { createdAt: "asc" as const },
   },
   // Replaced at the procedure level with a where: { userId } filter.
-  seenBy: { select: { seenAt: true } },
+  watchers: { select: { userId: true } },
   activities: {
     include: {
       user: { select: { id: true, name: true, image: true } },
@@ -160,9 +172,12 @@ export const ticketDetailInclude = {
   },
 } satisfies Prisma.WorkOrderTicketInclude;
 
-export type TicketDetail = Prisma.WorkOrderTicketGetPayload<{
-  include: typeof ticketDetailInclude;
-}>;
+// What clients receive from the detail endpoints: the per-user `watchers`
+// include is collapsed server-side into an `isWatching` boolean.
+export type TicketDetail = Omit<
+  Prisma.WorkOrderTicketGetPayload<{ include: typeof ticketDetailInclude }>,
+  "watchers"
+> & { isWatching: boolean };
 
 // Include shape for the public list endpoint — base ticket fields plus the linked
 // entities most callers want to slice on.
@@ -172,7 +187,6 @@ export const workOrderListInclude = {
     orderBy: { name: "asc" as const },
   },
   assignee: { select: { id: true, name: true, email: true } },
-  sourceWorkflow: { select: { id: true, name: true } },
   assets: {
     select: { id: true, hostname: true, ip: true, role: true },
   },
@@ -182,7 +196,7 @@ export const workOrderListInclude = {
   advisories: { select: { id: true, title: true, severity: true } },
   remediations: { select: { id: true, description: true } },
   // Replaced at the procedure level with a where: { userId } filter.
-  seenBy: { select: { seenAt: true } },
+  watchers: { select: { userId: true } },
 } satisfies Prisma.WorkOrderTicketInclude;
 
 export type WorkOrderListItem = Prisma.WorkOrderTicketGetPayload<{
@@ -208,11 +222,6 @@ const assigneeItemSchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.string().nullable(),
-});
-
-const sourceWorkflowItemSchema = z.object({
-  id: z.string(),
-  name: z.string(),
 });
 
 const linkedAssetSchema = z.object({
@@ -252,15 +261,14 @@ export const workOrderListItemSchema = z.object({
   parentId: z.string().nullable(),
   creatorId: z.string(),
   assigneeId: z.string().nullable(),
-  sourceWorkflowId: z.string().nullable(),
+  sourceLabel: z.string().nullable(),
   departments: z.array(departmentItemSchema),
   assignee: assigneeItemSchema.nullable(),
-  sourceWorkflow: sourceWorkflowItemSchema.nullable(),
   assets: z.array(linkedAssetSchema),
   vulnerabilities: z.array(linkedVulnerabilitySchema),
   advisories: z.array(linkedAdvisorySchema),
   remediations: z.array(linkedRemediationSchema),
-  lastSeenAt: z.date().nullable(),
+  isWatching: z.boolean(),
 });
 
 export const paginatedWorkOrderListResponseSchema =
@@ -341,8 +349,6 @@ const ticketIssueSchema = z.object({
   vulnerabilityId: z.string(),
 });
 
-const ticketSeenBySchema = z.array(z.object({ seenAt: z.date() }));
-
 const ticketActivityUserSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -385,11 +391,10 @@ export const workOrderDetailResponseSchema = z.object({
   parentId: z.string().nullable(),
   creatorId: z.string(),
   assigneeId: z.string().nullable(),
-  sourceWorkflowId: z.string().nullable(),
+  sourceLabel: z.string().nullable(),
   departments: z.array(departmentItemSchema),
   descriptions: z.array(ticketDescriptionSchema),
   assignee: assigneeItemSchema.nullable(),
-  sourceWorkflow: sourceWorkflowItemSchema.nullable(),
   creator: ticketCreatorSchema,
   parent: ticketParentRefSchema,
   children: z.array(ticketChildRefSchema),
@@ -399,6 +404,6 @@ export const workOrderDetailResponseSchema = z.object({
   remediations: z.array(detailLinkedRemediationSchema),
   issues: z.array(ticketIssueSchema),
   comments: z.array(ticketCommentResponseSchema),
-  seenBy: ticketSeenBySchema,
+  isWatching: z.boolean(),
   activities: z.array(ticketActivitySchema),
 });

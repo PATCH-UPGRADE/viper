@@ -2,7 +2,13 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
-import { MessageSquareIcon } from "lucide-react";
+import {
+  BoxIcon,
+  EyeIcon,
+  EyeOffIcon,
+  MailIcon,
+  MessageSquareIcon,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SortableHeader } from "@/components/ui/data-table";
 import {
@@ -10,6 +16,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { UserAvatar } from "@/components/user-avatar";
 import { useCategoryColor } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
 import {
@@ -18,6 +25,7 @@ import {
   TicketStatus,
 } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
+import { useSetWatching } from "../hooks/use-tracking";
 import type { TrackingTicketChildRow } from "../types";
 
 const statusLabels: Record<TicketStatus, string> = {
@@ -55,13 +63,6 @@ const CategoryChip = ({ category }: { category: TicketCategory }) => {
   );
 };
 
-const sourceLabels: Record<TicketSource, string> = {
-  WORKFLOW: "Workflow",
-  MANUAL: "Manual",
-  WEBHOOK: "Webhook",
-  API: "API",
-};
-
 const formatScheduled = (date: Date | string | null | undefined) => {
   if (!date) return "—";
   const d = date instanceof Date ? date : new Date(date);
@@ -76,20 +77,42 @@ const formatShortDate = (date: Date | string | null | undefined) => {
 
 const COMPLETED_STATUSES: TicketStatus[] = [TicketStatus.DONE];
 
-const isUnread = (row: { seenBy: { seenAt: Date }[]; updatedAt: Date }) => {
-  const lastSeenAt = row.seenBy[0]?.seenAt;
-  if (!lastSeenAt) return true;
-  return new Date(lastSeenAt) < new Date(row.updatedAt);
-};
-
-const hasUnreadComments = (row: {
-  seenBy: { seenAt: Date }[];
-  lastCommentAt: Date | null;
+const WatchToggle = ({
+  ticketId,
+  isWatching,
+}: {
+  ticketId: string;
+  isWatching: boolean;
 }) => {
-  if (!row.lastCommentAt) return false;
-  const lastSeenAt = row.seenBy[0]?.seenAt;
-  if (!lastSeenAt) return true;
-  return new Date(row.lastCommentAt) > new Date(lastSeenAt);
+  const setWatching = useSetWatching();
+  const label = isWatching
+    ? "Watching — click to unwatch"
+    : "Not watching — click to watch";
+  const Icon = isWatching ? EyeIcon : EyeOffIcon;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          aria-pressed={isWatching}
+          disabled={setWatching.isPending}
+          onClick={(e) => {
+            // Don't let the click bubble up and open/navigate the row.
+            e.stopPropagation();
+            setWatching.mutate({ ticketId, watching: !isWatching });
+          }}
+          className={cn(
+            "shrink-0 rounded-sm p-0.5 transition-colors hover:text-foreground",
+            isWatching ? "text-blue-500" : "text-muted-foreground/50",
+          )}
+        >
+          <Icon className="size-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
 };
 
 export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
@@ -110,23 +133,6 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
         0;
       const pct = total > 0 ? (completed / total) * 100 : 0;
       const isComplete = total > 0 && completed === total;
-
-      const selfUnread = isUnread(row.original);
-      const unreadChildCount = children?.filter((c) => isUnread(c)).length ?? 0;
-      const anyUnread = selfUnread || unreadChildCount > 0;
-      const unreadTooltip = (() => {
-        const childPart =
-          unreadChildCount > 0
-            ? `${unreadChildCount} child ticket${unreadChildCount === 1 ? "" : "s"} unread`
-            : null;
-        if (selfUnread && childPart) {
-          return `Updated since you last viewed · ${childPart}`;
-        }
-        if (selfUnread) {
-          return "Updated since you last viewed";
-        }
-        return childPart ?? "";
-      })();
 
       return (
         <div className="flex flex-col gap-1 min-w-0 max-w-96">
@@ -156,28 +162,13 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
                   </span>
                 );
               })()}
-            {anyUnread ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    role="img"
-                    aria-label="Unread"
-                    className="size-2 rounded-full bg-blue-500 shrink-0"
-                  />
-                </TooltipTrigger>
-                <TooltipContent>{unreadTooltip}</TooltipContent>
-              </Tooltip>
-            ) : (
-              <span className="size-2 shrink-0" aria-hidden="true" />
-            )}
+            <WatchToggle
+              ticketId={row.original.id}
+              isWatching={row.original.isWatching}
+            />
             <Tooltip>
               <TooltipTrigger asChild>
-                <span
-                  className={cn(
-                    "truncate",
-                    anyUnread ? "font-semibold" : "font-medium",
-                  )}
-                >
+                <span className="truncate font-medium">
                   {row.original.summary}
                 </span>
               </TooltipTrigger>
@@ -304,7 +295,7 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
       </>
     ),
     cell: ({ row }) => {
-      const unread = hasUnreadComments(row.original);
+      const unread = row.original.hasUnreadComments;
       const totalCount = row.original.commentCount;
       const ownCount = row.original._count.comments;
       const showBreakdown = row.depth === 0 && totalCount !== ownCount;
@@ -334,21 +325,40 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
     id: "source",
     header: "Source",
     cell: ({ row }) => {
-      const source = sourceLabels[row.original.source];
-      if (
-        row.original.source === TicketSource.WORKFLOW &&
-        row.original.sourceWorkflow
-      ) {
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="text-muted-foreground">{source}</span>
-            </TooltipTrigger>
-            <TooltipContent>{row.original.sourceWorkflow.name}</TooltipContent>
-          </Tooltip>
-        );
+      const t = row.original;
+      switch (t.source) {
+        case TicketSource.MANUAL:
+          return (
+            <div className="flex items-center gap-2">
+              <UserAvatar user={t.creator} className="size-5 text-[10px]" />
+              <span className="text-sm truncate">{t.creator.name}</span>
+            </div>
+          );
+        case TicketSource.EMAIL:
+          return (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <MailIcon className="size-3.5 shrink-0" />
+              <span className="text-sm truncate">
+                {t.sourceLabel ?? "Email"}
+              </span>
+            </div>
+          );
+        case TicketSource.INTEGRATION:
+          return (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <BoxIcon className="size-3.5 shrink-0" />
+              <span className="text-sm truncate">
+                {t.sourceLabel ?? "Integration"}
+              </span>
+            </div>
+          );
+        default:
+          return (
+            <span className="text-sm text-muted-foreground">
+              {t.sourceLabel ?? "Other"}
+            </span>
+          );
       }
-      return <span className="text-muted-foreground">{source}</span>;
     },
   },
   {

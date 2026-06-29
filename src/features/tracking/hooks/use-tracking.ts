@@ -55,29 +55,24 @@ export const useMarkTicketSeen = () => {
   const queryClient = useQueryClient();
   return useMutation(
     trpc.tracking.markSeen.mutationOptions({
-      // Optimistically clear the unread dot on every cached tracking list that
-      // contains this ticket (top-level or nested). The server response will
-      // overwrite once it lands, and on error we'd just refetch on `onSettled`.
+      // Optimistically clear the unread-comments indicator on every cached
+      // tracking list that contains this ticket (top-level or nested).
       onMutate: async ({ ticketId }) => {
         const filter = trpc.tracking.getMany.queryFilter();
         await queryClient.cancelQueries(filter);
-        const now = new Date();
         // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape varies
         queryClient.setQueriesData<any>(filter, (old: any) => {
           if (!old?.items) return old;
-          const stamp = (row: { id: string; seenBy: { seenAt: Date }[] }) =>
-            row.id === ticketId ? { ...row, seenBy: [{ seenAt: now }] } : row;
+          const clear = (row: { id: string }) =>
+            row.id === ticketId ? { ...row, hasUnreadComments: false } : row;
           return {
             ...old,
             items: old.items.map(
               // biome-ignore lint/suspicious/noExplicitAny: nested row shape
               (item: any) => {
-                const stamped = stamp(item);
-                if (!item.children) return stamped;
-                return {
-                  ...stamped,
-                  children: item.children.map(stamp),
-                };
+                const cleared = clear(item);
+                if (!item.children) return cleared;
+                return { ...cleared, children: item.children.map(clear) };
               },
             ),
           };
@@ -85,6 +80,59 @@ export const useMarkTicketSeen = () => {
       },
       onSettled: () => {
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+      },
+    }),
+  );
+};
+
+export const useSetWatching = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.tracking.setWatching.mutationOptions({
+      // Optimistically flip the watch state on every cached tracking list that
+      // contains this ticket (top-level or nested) plus its detail view. The
+      // server response lands afterwards, and `onSettled` reconciles on error.
+      onMutate: async ({ ticketId, watching }) => {
+        const listFilter = trpc.tracking.getMany.queryFilter();
+        const detailFilter = trpc.tracking.getOne.queryFilter({ id: ticketId });
+        await Promise.all([
+          queryClient.cancelQueries(listFilter),
+          queryClient.cancelQueries(detailFilter),
+        ]);
+        // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape varies
+        queryClient.setQueriesData<any>(listFilter, (old: any) => {
+          if (!old?.items) return old;
+          const flip = (row: { id: string }) =>
+            row.id === ticketId ? { ...row, isWatching: watching } : row;
+          return {
+            ...old,
+            items: old.items.map(
+              // biome-ignore lint/suspicious/noExplicitAny: nested row shape
+              (item: any) => {
+                const flipped = flip(item);
+                if (!item.children) return flipped;
+                return {
+                  ...flipped,
+                  children: item.children.map(flip),
+                };
+              },
+            ),
+          };
+        });
+        // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape varies
+        queryClient.setQueriesData<any>(detailFilter, (old: any) =>
+          old ? { ...old, isWatching: watching } : old,
+        );
+      },
+      onError: (error) => {
+        toast.error(`Failed to update watch state: ${error.message}`);
+      },
+      onSettled: (_data, _error, { ticketId }) => {
+        queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.tracking.getOne.queryFilter({ id: ticketId }),
+        );
       },
     }),
   );

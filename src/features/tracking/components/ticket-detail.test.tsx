@@ -34,6 +34,8 @@ const {
   mockUseAddTicketComment,
   mockUseSuspenseTrackingTicket,
   mockUseSession,
+  mockSetWatchingMutate,
+  mockUseSetWatching,
   mockMarkSeenMutate,
   mockUseMarkTicketSeen,
   mockAttachMutate,
@@ -49,6 +51,7 @@ const {
 } = vi.hoisted(() => {
   const mockMutate = vi.fn();
   const mockAddCommentMutate = vi.fn();
+  const mockSetWatchingMutate = vi.fn();
   const mockMarkSeenMutate = vi.fn();
   const mockAttachMutate = vi.fn();
   const mockDetachMutate = vi.fn();
@@ -57,6 +60,7 @@ const {
   return {
     mockMutate,
     mockAddCommentMutate,
+    mockSetWatchingMutate,
     mockMarkSeenMutate,
     mockAttachMutate,
     mockDetachMutate,
@@ -90,6 +94,10 @@ const {
           deviceGroup: null,
         },
       ],
+    })),
+    mockUseSetWatching: vi.fn(() => ({
+      mutate: mockSetWatchingMutate,
+      isPending: false,
     })),
     mockUseMarkTicketSeen: vi.fn(() => ({
       mutate: mockMarkSeenMutate,
@@ -155,6 +163,7 @@ vi.mock("../hooks/use-tracking", () => ({
   useDepartments: mockUseDepartments,
   useAddTicketComment: mockUseAddTicketComment,
   useSuspenseTrackingTicket: mockUseSuspenseTrackingTicket,
+  useSetWatching: mockUseSetWatching,
   useMarkTicketSeen: mockUseMarkTicketSeen,
   useAttachChild: mockUseAttachChild,
   useDetachChild: mockUseDetachChild,
@@ -302,12 +311,11 @@ const makeTicket = (
     comments: [],
     creator: { id: "u1", name: "Alice", email: "alice@example.com" },
     source: "MANUAL",
-    sourceWorkflow: null,
-    sourceWorkflowId: null,
+    sourceLabel: null,
     parentId: null,
     creatorId: "u1",
     assigneeId: "u1",
-    seenBy: [],
+    isWatching: false,
     activities: [],
     ...overrides,
     // biome-ignore lint/suspicious/noExplicitAny: test stub for TicketDetail shape
@@ -767,12 +775,11 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
   comments: [],
   creator: { id: "u1", name: "Alice", email: "alice@example.com" },
   source: "MANUAL",
-  sourceWorkflow: null,
-  sourceWorkflowId: null,
+  sourceLabel: null,
   parentId: null,
   creatorId: "u1",
   assigneeId: "u2",
-  seenBy: [],
+  isWatching: false,
   activities: [],
   ...overrides,
 });
@@ -1021,6 +1028,34 @@ describe("TicketDetailContent — markSeen on mount", () => {
     renderDetail();
     expect(mockMarkSeenMutate).toHaveBeenCalledTimes(1);
     expect(mockMarkSeenMutate).toHaveBeenCalledWith({ ticketId: "ticket-1" });
+  });
+});
+
+describe("TicketDetailContent — watch toggle", () => {
+  it("shows a 'Watch' button when the user is not watching", () => {
+    renderDetail({ isWatching: false });
+    expect(
+      screen.getByRole("button", { name: /^watch$/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a 'Watching' button when the user is watching", () => {
+    renderDetail({ isWatching: true });
+    expect(
+      screen.getByRole("button", { name: /watching/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("toggles watch state when the button is clicked", async () => {
+    const user = userEvent.setup();
+    renderDetail({ isWatching: false });
+
+    await user.click(screen.getByRole("button", { name: /^watch$/i }));
+
+    expect(mockSetWatchingMutate).toHaveBeenCalledWith({
+      ticketId: "ticket-1",
+      watching: true,
+    });
   });
 });
 

@@ -798,11 +798,16 @@ type SampleTicket = {
   // for the purpose of the default `description` fallback.
   department: string | string[];
   source: TicketSource;
-  sourceWorkflowName?: string;
+  sourceLabel?: string;
   scheduledAt?: Date;
   linkedCveIds?: string[];
   linkedAssetIds?: string[];
   comments?: string[];
+  // When true, the seed user's "last seen" is stamped *before* the comment
+  // activity, so the ticket renders with the unread-comments indicator. When
+  // false/omitted (and the ticket has comments) it's stamped *after*, i.e.
+  // already read. Tickets without comments never show the indicator.
+  commentsUnread?: boolean;
 };
 
 type SampleParentTicket = SampleTicket & { children?: SampleTicket[] };
@@ -832,6 +837,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
       (_, i) => `rad-pump-${String(i + 1).padStart(3, "0")}`,
     ),
     comments: ["Firmware update available from Baxter support portal."],
+    commentsUnread: true,
     children: [
       {
         summary: "Update firmware on ICU pumps (4 devices)",
@@ -863,6 +869,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         linkedCveIds: ["CVE-2021-12345"],
         linkedAssetIds: ["rad-pump-005", "rad-pump-006", "rad-pump-007"],
         comments: ["Pending Biomed review and scheduling."],
+        commentsUnread: true,
       },
       {
         summary: "Update firmware on Surgery pumps (3 devices)",
@@ -890,8 +897,8 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
       Administration:
         "Imaging-chain EternalBlue remediation. Compliance-relevant: EOL OS exposure on patient-facing systems. PACS server change requires CMO sign-off (separate child ticket) due to imaging chain blast radius. Expected aggregate downtime across all hosts: under 30 minutes during business hours, plus a single overnight maintenance window for PACS.",
     },
-    source: TicketSource.WORKFLOW,
-    sourceWorkflowName: "Emergency CT: Acute Stroke / Trauma Protocol",
+    source: TicketSource.INTEGRATION,
+    sourceLabel: "TriMedX RSQ",
     linkedCveIds: ["CVE-2017-0144"],
     linkedAssetIds: [
       "rad-ws-001",
@@ -911,8 +918,8 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.TO_DO,
         category: TicketCategory.CONFIG_CHANGE,
         department: "Radiology",
-        source: TicketSource.WORKFLOW,
-        sourceWorkflowName: "Emergency CT: Acute Stroke / Trauma Protocol",
+        source: TicketSource.INTEGRATION,
+        sourceLabel: "TriMedX RSQ",
         linkedCveIds: ["CVE-2017-0144"],
         linkedAssetIds: ["rad-ws-001"],
         comments: [
@@ -927,8 +934,8 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.REQUIRES_APPROVAL,
         category: TicketCategory.VULN_REMEDIATION,
         department: "Radiology",
-        source: TicketSource.WORKFLOW,
-        sourceWorkflowName: "Remote Radiology — After-Hours Imaging Coverage",
+        source: TicketSource.EMAIL,
+        sourceLabel: "security@hospital.example.org",
         scheduledAt: inDays(10),
         linkedCveIds: ["CVE-2017-0144"],
         linkedAssetIds: ["rad-pacs-001"],
@@ -982,13 +989,14 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
   },
   {
     summary: "GE Imaging Device Hardening (CVE-2020-25175)",
+    commentsUnread: true,
     description:
       "Umbrella ticket for credential-exposure mitigations across GE BrightSpeed CT, LOGIQ e ultrasounds, and Optima XR200amx per CISA ICSMA-20-343-01.",
     status: TicketStatus.TO_DO,
     category: TicketCategory.VULN_REMEDIATION,
     department: "Radiology",
-    source: TicketSource.WORKFLOW,
-    sourceWorkflowName: "Emergency CT: Acute Stroke / Trauma Protocol",
+    source: TicketSource.INTEGRATION,
+    sourceLabel: "TriMedX RSQ",
     linkedCveIds: ["CVE-2020-25175"],
     linkedAssetIds: ["rad-ct-001", "rad-us-001", "rad-us-002", "rad-xr-001"],
     comments: [
@@ -1002,8 +1010,8 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.TO_DO,
         category: TicketCategory.CONFIG_CHANGE,
         department: "Radiology",
-        source: TicketSource.WORKFLOW,
-        sourceWorkflowName: "Emergency CT: Acute Stroke / Trauma Protocol",
+        source: TicketSource.INTEGRATION,
+        sourceLabel: "TriMedX RSQ",
         linkedCveIds: ["CVE-2020-25175"],
         linkedAssetIds: [
           "rad-ct-001",
@@ -1048,8 +1056,8 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.IN_PROGRESS,
         category: TicketCategory.PATCH,
         department: "IT",
-        source: TicketSource.WORKFLOW,
-        sourceWorkflowName: "Remote Radiology — After-Hours Imaging Coverage",
+        source: TicketSource.EMAIL,
+        sourceLabel: "security@hospital.example.org",
         scheduledAt: inDays(3),
         linkedCveIds: ["CVE-2016-6366"],
         linkedAssetIds: ["rad-vpn-001"],
@@ -1917,6 +1925,13 @@ async function seedDepartments(userId: string) {
   return departments;
 }
 
+// Fixed timestamps so the seeded unread-comments indicator is deterministic:
+// commented tickets get `lastCommentAt = COMMENTED_AT`, and the seed user's
+// `seenAt` lands before (unread) or after (read) that moment.
+const COMMENTED_AT = new Date("2026-06-20T12:00:00Z");
+const SEEN_BEFORE_COMMENT = new Date("2026-06-19T09:00:00Z");
+const SEEN_AFTER_COMMENT = new Date("2026-06-21T09:00:00Z");
+
 async function createWorkOrderTicket(
   ticket: SampleTicket,
   userId: string,
@@ -1936,12 +1951,6 @@ async function createWorkOrderTicket(
   const orderedDepartments = departmentNames
     .map((n) => departmentsByName.get(n))
     .filter((d): d is (typeof departments)[number] => Boolean(d));
-
-  const sourceWorkflow = ticket.sourceWorkflowName
-    ? await prisma.workflow.findFirst({
-        where: { name: ticket.sourceWorkflowName },
-      })
-    : null;
 
   const linkedVulns = ticket.linkedCveIds?.length
     ? await prisma.vulnerability.findMany({
@@ -1994,7 +2003,7 @@ async function createWorkOrderTicket(
       status: ticket.status,
       category: ticket.category,
       source: ticket.source,
-      sourceWorkflowId: sourceWorkflow?.id,
+      sourceLabel: ticket.sourceLabel,
       departments: {
         connect: orderedDepartments.map((d) => ({ id: d.id })),
       },
@@ -2004,6 +2013,22 @@ async function createWorkOrderTicket(
       parentId,
       creatorId: userId,
       assigneeId: userId,
+      // Creator + assignee auto-watch (both are `userId` here, so one row).
+      watchers: { create: [{ userId }] },
+      // Stamp lastCommentAt for commented tickets, and the user's last-seen
+      // before/after it to drive a realistic read/unread mix.
+      lastCommentAt: ticket.comments?.length ? COMMENTED_AT : null,
+      seenBy: {
+        create: [
+          {
+            userId,
+            seenAt:
+              ticket.comments?.length && ticket.commentsUnread
+                ? SEEN_BEFORE_COMMENT
+                : SEEN_AFTER_COMMENT,
+          },
+        ],
+      },
       scheduledAt: ticket.scheduledAt,
       vulnerabilities: { connect: linkedVulns.map((v) => ({ id: v.id })) },
       assets: { connect: linkedAssets.map((a) => ({ id: a.id })) },

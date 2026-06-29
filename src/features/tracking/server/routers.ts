@@ -95,6 +95,63 @@ const buildLinkedPreview = (ticket: {
   })),
 ];
 
+// Per-procedure include scoping `watchers` to the current user so each row only
+// reflects whether *they* are watching. Pair with `withIsWatching` to collapse
+// the (0-or-1 length) array into a boolean.
+const watchedBy = (userId: string) =>
+  ({
+    watchers: { where: { userId }, select: { userId: true } },
+  }) satisfies Prisma.WorkOrderTicketInclude;
+
+const withIsWatching = <T extends { watchers: { userId: string }[] }>(
+  row: T,
+): Omit<T, "watchers"> & { isWatching: boolean } => {
+  const { watchers, ...rest } = row;
+  return { ...rest, isWatching: watchers.length > 0 };
+};
+
+// getMany rows additionally carry the current user's `seenBy` so we can derive
+// the unread-comments indicator. Scopes both watch + seen state to the user.
+const rowStateFor = (userId: string) =>
+  ({
+    watchers: { where: { userId }, select: { userId: true } },
+    seenBy: { where: { userId }, select: { seenAt: true } },
+  }) satisfies Prisma.WorkOrderTicketInclude;
+
+// A ticket has unread comments when its latest comment is newer than the
+// current user's last view (or they've never viewed it).
+const hasUnread = (
+  lastCommentAt: Date | null,
+  seenBy: { seenAt: Date }[],
+): boolean => {
+  if (!lastCommentAt) return false;
+  const seenAt = seenBy[0]?.seenAt;
+  return !seenAt || lastCommentAt > seenAt;
+};
+
+// Collapse the per-user `watchers`/`seenBy` arrays into the booleans the table
+// renders. `lastCommentAt` is passed explicitly so parents can use a value
+// rolled up across their children.
+const withRowFlags = <
+  T extends {
+    watchers: { userId: string }[];
+    seenBy: { seenAt: Date }[];
+  },
+>(
+  row: T,
+  lastCommentAt: Date | null,
+): Omit<T, "watchers" | "seenBy"> & {
+  isWatching: boolean;
+  hasUnreadComments: boolean;
+} => {
+  const { watchers, seenBy, ...rest } = row;
+  return {
+    ...rest,
+    isWatching: watchers.length > 0,
+    hasUnreadComments: hasUnread(lastCommentAt, seenBy),
+  };
+};
+
 export const trackingRouter = createTRPCRouter({
   getMany: protectedProcedure
     .input(trackingInputSchema)
@@ -114,7 +171,9 @@ export const trackingRouter = createTRPCRouter({
           OR: [{ status }, { children: { some: { status } } }],
         };
       } else if (tab === "suggested") {
-        const source = TicketSource.WORKFLOW;
+        // "Suggested" surfaces auto-ingested tickets — anything the system
+        // brought in rather than a user creating it by hand.
+        const source = { not: TicketSource.MANUAL };
         childTabWhere = { source };
         parentTabWhere = {
           OR: [{ source }, { children: { some: { source } } }],
@@ -136,21 +195,16 @@ export const trackingRouter = createTRPCRouter({
       const totalCount = await prisma.workOrderTicket.count({ where });
       const meta = buildPaginationMeta(input, totalCount);
 
-      const seenByMe = {
-        seenBy: {
-          where: { userId: ctx.auth.user.id },
-          select: { seenAt: true },
-        },
-      } as const;
+      const rowState = rowStateFor(ctx.auth.user.id);
       const tickets = await prisma.workOrderTicket.findMany({
         skip: meta.skip,
         take: meta.take,
         where,
         include: {
           ...ticketBaseInclude,
-          ...seenByMe,
+          ...rowState,
           children: {
-            include: { ...ticketBaseInclude, ...seenByMe },
+            include: { ...ticketBaseInclude, ...rowState },
             where: childTabWhere,
             orderBy: { createdAt: "asc" },
           },
@@ -159,12 +213,17 @@ export const trackingRouter = createTRPCRouter({
       });
 
       const items = tickets.map((t) => {
-        const children = t.children.map((c) => ({
-          ...c,
-          linkedCount: ticketLinkedCount(c._count),
-          commentCount: c._count.comments,
-          linkedPreview: buildLinkedPreview(c),
-        }));
+        const children = t.children.map((c) =>
+          withRowFlags(
+            {
+              ...c,
+              linkedCount: ticketLinkedCount(c._count),
+              commentCount: c._count.comments,
+              linkedPreview: buildLinkedPreview(c),
+            },
+            c.lastCommentAt,
+          ),
+        );
 
         const rolledLinked =
           ticketLinkedCount(t._count) +
@@ -185,25 +244,26 @@ export const trackingRouter = createTRPCRouter({
           return true;
         });
 
-        // Roll up the latest comment timestamp across this parent and its
-        // children so the parent row reflects unread comments anywhere in the
-        // tree.
+        // Roll up the latest comment time across the parent and its children so
+        // the parent row flags unread comments anywhere in its subtree.
         const commentTimes = [
           t.lastCommentAt,
-          ...children.map((c) => c.lastCommentAt),
+          ...t.children.map((c) => c.lastCommentAt),
         ].filter((d): d is Date => d !== null);
         const rolledLastCommentAt = commentTimes.length
           ? new Date(Math.max(...commentTimes.map((d) => d.getTime())))
           : null;
 
-        return {
-          ...t,
-          children,
-          linkedCount: rolledLinked,
-          commentCount: rolledComments,
-          linkedPreview: rolledPreview,
-          lastCommentAt: rolledLastCommentAt,
-        };
+        return withRowFlags(
+          {
+            ...t,
+            children,
+            linkedCount: rolledLinked,
+            commentCount: rolledComments,
+            linkedPreview: rolledPreview,
+          },
+          rolledLastCommentAt,
+        );
       });
 
       return createPaginatedResponse(items, meta);
@@ -227,13 +287,10 @@ export const trackingRouter = createTRPCRouter({
         where: { id: input.id },
         include: {
           ...ticketDetailInclude,
-          seenBy: {
-            where: { userId: ctx.auth.user.id },
-            select: { seenAt: true },
-          },
+          ...watchedBy(ctx.auth.user.id),
         },
       });
-      return requireExistence(ticket, "Ticket");
+      return withIsWatching(requireExistence(ticket, "Ticket"));
     }),
 
   list: protectedProcedure
@@ -268,19 +325,16 @@ export const trackingRouter = createTRPCRouter({
         where: { AND: filters },
         include: {
           ...workOrderListInclude,
-          seenBy: {
-            where: { userId: ctx.auth.user.id },
-            select: { seenAt: true },
-          },
+          ...watchedBy(ctx.auth.user.id),
         },
         orderBy: parseSort(input.sort),
       });
 
       return {
         ...result,
-        items: result.items.map(({ seenBy, ...item }) => ({
+        items: result.items.map(({ watchers, ...item }) => ({
           ...item,
-          lastSeenAt: seenBy[0]?.seenAt ?? null,
+          isWatching: watchers.length > 0,
         })),
       };
     }),
@@ -410,17 +464,30 @@ export const trackingRouter = createTRPCRouter({
               ? descriptionsForActivity
               : undefined,
         });
+        // Auto-watch: whoever a ticket is (re)assigned to starts watching it.
+        if (
+          rest.assigneeId !== undefined &&
+          rest.assigneeId !== null &&
+          rest.assigneeId !== before.assigneeId
+        ) {
+          await tx.ticketWatch.upsert({
+            where: {
+              userId_ticketId: { userId: rest.assigneeId, ticketId: id },
+            },
+            create: { userId: rest.assigneeId, ticketId: id },
+            update: {},
+          });
+        }
+
         // Re-fetch so the response includes the freshly-written activity rows.
-        return tx.workOrderTicket.findUniqueOrThrow({
+        const updated = await tx.workOrderTicket.findUniqueOrThrow({
           where: { id },
           include: {
             ...ticketDetailInclude,
-            seenBy: {
-              where: { userId: ctx.auth.user.id },
-              select: { seenAt: true },
-            },
+            ...watchedBy(ctx.auth.user.id),
           },
         });
+        return withIsWatching(updated);
       });
     }),
 
@@ -549,16 +616,14 @@ export const trackingRouter = createTRPCRouter({
         );
         // Re-fetch so activities and the just-attached asset are in the
         // response.
-        return tx.workOrderTicket.findUniqueOrThrow({
+        const refetched = await tx.workOrderTicket.findUniqueOrThrow({
           where: { id: updated.id },
           include: {
             ...ticketDetailInclude,
-            seenBy: {
-              where: { userId: ctx.auth.user.id },
-              select: { seenAt: true },
-            },
+            ...watchedBy(ctx.auth.user.id),
           },
         });
+        return withIsWatching(refetched);
       });
     }),
 
@@ -588,16 +653,14 @@ export const trackingRouter = createTRPCRouter({
           input.assetId,
           "detached",
         );
-        return tx.workOrderTicket.findUniqueOrThrow({
+        const refetched = await tx.workOrderTicket.findUniqueOrThrow({
           where: { id: updated.id },
           include: {
             ...ticketDetailInclude,
-            seenBy: {
-              where: { userId: ctx.auth.user.id },
-              select: { seenAt: true },
-            },
+            ...watchedBy(ctx.auth.user.id),
           },
         });
+        return withIsWatching(refetched);
       });
     }),
 
@@ -627,11 +690,36 @@ export const trackingRouter = createTRPCRouter({
       });
     }),
 
+  setWatching: protectedProcedure
+    .input(z.object({ ticketId: z.string(), watching: z.boolean() }))
+    .mutation(async ({ input, ctx }) => {
+      const key = {
+        userId_ticketId: {
+          userId: ctx.auth.user.id,
+          ticketId: input.ticketId,
+        },
+      };
+      if (input.watching) {
+        await prisma.ticketWatch.upsert({
+          where: key,
+          create: { userId: ctx.auth.user.id, ticketId: input.ticketId },
+          update: {},
+        });
+      } else {
+        await prisma.ticketWatch.deleteMany({
+          where: { userId: ctx.auth.user.id, ticketId: input.ticketId },
+        });
+      }
+      return { ticketId: input.ticketId, isWatching: input.watching };
+    }),
+
+  // Stamp a ticket as seen by the current user (clears its unread-comments
+  // indicator). Upserts on (userId, ticketId) so re-fires are cheap.
   markSeen: protectedProcedure
     .input(z.object({ ticketId: z.string() }))
     .mutation(async ({ input, ctx }) => {
       const now = new Date();
-      return prisma.ticketSeen.upsert({
+      await prisma.ticketSeen.upsert({
         where: {
           userId_ticketId: {
             userId: ctx.auth.user.id,
@@ -645,6 +733,7 @@ export const trackingRouter = createTRPCRouter({
         },
         update: { seenAt: now },
       });
+      return { ticketId: input.ticketId };
     }),
 
   addComment: protectedProcedure

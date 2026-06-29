@@ -18,6 +18,10 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     ticketComment: {
       create: vi.fn(),
     },
+    ticketWatch: {
+      upsert: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     ticketSeen: {
       upsert: vi.fn(),
     },
@@ -77,11 +81,10 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   parentId: null,
   creatorId: FAKE_USER_ID,
   assigneeId: null,
-  sourceWorkflowId: null,
+  sourceLabel: null,
   departments: [],
   descriptions: [],
   assignee: null,
-  sourceWorkflow: null,
   creator: { id: FAKE_USER_ID, name: "Test User", email: "test@example.com" },
   parent: null,
   children: [],
@@ -91,7 +94,7 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   remediations: [],
   issues: [],
   comments: [],
-  seenBy: [],
+  watchers: [],
   activities: [],
   ...overrides,
 });
@@ -644,22 +647,21 @@ describe("trackingRouter.list", () => {
     expect(mockPrisma.workOrderTicket.findMany).not.toHaveBeenCalled();
   });
 
-  it("passes the seenBy include filtered by the current user", async () => {
+  it("passes the watchers include filtered by the current user", async () => {
     const caller = setup();
     emptyResults();
 
     await caller.list(baseInput);
 
     const findManyArg = mockPrisma.workOrderTicket.findMany.mock.calls[0][0];
-    expect(findManyArg.include.seenBy).toEqual({
+    expect(findManyArg.include.watchers).toEqual({
       where: { userId: FAKE_USER_ID },
-      select: { seenAt: true },
+      select: { userId: true },
     });
   });
 
-  it("flattens seenBy into a lastSeenAt field per item", async () => {
+  it("flattens watchers into an isWatching field per item", async () => {
     const caller = setup();
-    const seenAt = new Date("2026-05-20T12:00:00Z");
     const baseItem = {
       summary: "x",
       status: "TO_DO",
@@ -671,10 +673,9 @@ describe("trackingRouter.list", () => {
       parentId: null,
       creatorId: "c1",
       assigneeId: null,
-      sourceWorkflowId: null,
+      sourceLabel: null,
       departments: [],
       assignee: null,
-      sourceWorkflow: null,
       assets: [],
       vulnerabilities: [],
       advisories: [],
@@ -682,111 +683,50 @@ describe("trackingRouter.list", () => {
     };
     mockPrisma.workOrderTicket.count.mockResolvedValue(2);
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      { id: "t-seen", ...baseItem, seenBy: [{ seenAt }] },
-      { id: "t-unseen", ...baseItem, seenBy: [] },
+      { id: "t-watched", ...baseItem, watchers: [{ userId: FAKE_USER_ID }] },
+      { id: "t-unwatched", ...baseItem, watchers: [] },
     ]);
 
     const result = await caller.list(baseInput);
 
     expect(result.items).toEqual([
-      expect.objectContaining({ id: "t-seen", lastSeenAt: seenAt }),
-      expect.objectContaining({ id: "t-unseen", lastSeenAt: null }),
+      expect.objectContaining({ id: "t-watched", isWatching: true }),
+      expect.objectContaining({ id: "t-unwatched", isWatching: false }),
     ]);
-    // Raw `seenBy` should not leak into the response.
-    expect(result.items[0]).not.toHaveProperty("seenBy");
+    // Raw `watchers` should not leak into the response.
+    expect(result.items[0]).not.toHaveProperty("watchers");
   });
 });
 
 describe("trackingRouter.getOne", () => {
-  it("scopes seenBy to the current user when fetching a ticket", async () => {
+  it("scopes watchers to the current user when fetching a ticket", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findUnique.mockResolvedValue(makeTicketDetail());
 
     await caller.getOne({ id: "t1" });
 
     const arg = mockPrisma.workOrderTicket.findUnique.mock.calls[0][0];
-    expect(arg.include.seenBy).toEqual({
+    expect(arg.include.watchers).toEqual({
       where: { userId: FAKE_USER_ID },
-      select: { seenAt: true },
+      select: { userId: true },
     });
   });
-});
 
-describe("trackingRouter.getMany — lastCommentAt rollup", () => {
-  const callGetMany = async () => {
+  it("collapses watchers into an isWatching boolean", async () => {
     const caller = setup();
-    return caller.getMany({
-      tab: "suggested",
-      page: 1,
-      pageSize: 5,
-      search: "",
-      sort: "",
-      lastUpdatedStartTime: "",
-      lastUpdatedEndTime: "",
-    });
-  };
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
+      makeTicketDetail({ watchers: [{ userId: FAKE_USER_ID }] }),
+    );
 
-  const baseTicket = {
-    _count: {
-      comments: 0,
-      issues: 0,
-      vulnerabilities: 0,
-      remediations: 0,
-      advisories: 0,
-      assets: 0,
-    },
-    vulnerabilities: [],
-    assets: [],
-    children: [],
-    seenBy: [],
-  };
+    const result = await caller.getOne({ id: "t1" });
 
-  it("returns the parent's lastCommentAt when there are no children", async () => {
-    const at = new Date("2026-05-10T00:00:00Z");
-    mockPrisma.workOrderTicket.count.mockResolvedValue(1);
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      { id: "t1", ...baseTicket, lastCommentAt: at },
-    ]);
-
-    const result = await callGetMany();
-    expect(result.items[0].lastCommentAt).toEqual(at);
-  });
-
-  it("rolls up to the latest comment across parent and children", async () => {
-    const parentAt = new Date("2026-05-01T00:00:00Z");
-    const childAt = new Date("2026-05-20T00:00:00Z");
-    mockPrisma.workOrderTicket.count.mockResolvedValue(1);
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      {
-        id: "t1",
-        ...baseTicket,
-        lastCommentAt: parentAt,
-        children: [{ id: "c1", ...baseTicket, lastCommentAt: childAt }],
-      },
-    ]);
-
-    const result = await callGetMany();
-    expect(result.items[0].lastCommentAt).toEqual(childAt);
-  });
-
-  it("returns null when neither parent nor children have any comments", async () => {
-    mockPrisma.workOrderTicket.count.mockResolvedValue(1);
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      {
-        id: "t1",
-        ...baseTicket,
-        lastCommentAt: null,
-        children: [{ id: "c1", ...baseTicket, lastCommentAt: null }],
-      },
-    ]);
-
-    const result = await callGetMany();
-    expect(result.items[0].lastCommentAt).toBeNull();
+    expect(result.isWatching).toBe(true);
+    expect(result).not.toHaveProperty("watchers");
   });
 });
 
 describe("trackingRouter.getMany", () => {
-  it("scopes seenBy to the current user on both parents and children", async () => {
+  it("scopes watchers to the current user on both parents and children", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.count.mockResolvedValue(0);
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
@@ -803,13 +743,121 @@ describe("trackingRouter.getMany", () => {
 
     const include =
       mockPrisma.workOrderTicket.findMany.mock.calls[0][0].include;
+    expect(include.watchers).toEqual({
+      where: { userId: FAKE_USER_ID },
+      select: { userId: true },
+    });
     expect(include.seenBy).toEqual({
       where: { userId: FAKE_USER_ID },
       select: { seenAt: true },
     });
+    expect(include.children.include.watchers).toEqual({
+      where: { userId: FAKE_USER_ID },
+      select: { userId: true },
+    });
     expect(include.children.include.seenBy).toEqual({
       where: { userId: FAKE_USER_ID },
       select: { seenAt: true },
+    });
+  });
+
+  it("collapses watchers into isWatching on parents and children", async () => {
+    const caller = setup();
+    const baseTicket = {
+      _count: {
+        comments: 0,
+        issues: 0,
+        vulnerabilities: 0,
+        remediations: 0,
+        advisories: 0,
+        assets: 0,
+      },
+      vulnerabilities: [],
+      assets: [],
+      children: [],
+      watchers: [],
+      seenBy: [],
+      lastCommentAt: null,
+    };
+    mockPrisma.workOrderTicket.count.mockResolvedValue(1);
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      {
+        id: "t1",
+        ...baseTicket,
+        watchers: [{ userId: FAKE_USER_ID }],
+        children: [{ id: "c1", ...baseTicket, watchers: [] }],
+      },
+    ]);
+
+    const result = await caller.getMany({
+      tab: "suggested",
+      page: 1,
+      pageSize: 5,
+      search: "",
+      sort: "",
+      lastUpdatedStartTime: "",
+      lastUpdatedEndTime: "",
+    });
+
+    expect(result.items[0]).toMatchObject({ id: "t1", isWatching: true });
+    expect(result.items[0]).not.toHaveProperty("watchers");
+    expect(result.items[0]).not.toHaveProperty("seenBy");
+    expect(result.items[0].children[0]).toMatchObject({
+      id: "c1",
+      isWatching: false,
+    });
+    expect(result.items[0].children[0]).not.toHaveProperty("watchers");
+  });
+
+  it("flags unread comments when the latest comment is newer than seenAt", async () => {
+    const caller = setup();
+    const base = {
+      _count: {
+        comments: 1,
+        issues: 0,
+        vulnerabilities: 0,
+        remediations: 0,
+        advisories: 0,
+        assets: 0,
+      },
+      vulnerabilities: [],
+      assets: [],
+      children: [],
+      watchers: [],
+    };
+    mockPrisma.workOrderTicket.count.mockResolvedValue(2);
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      {
+        id: "unread",
+        ...base,
+        lastCommentAt: new Date("2026-05-20T00:00:00Z"),
+        seenBy: [{ seenAt: new Date("2026-05-10T00:00:00Z") }],
+      },
+      {
+        id: "read",
+        ...base,
+        lastCommentAt: new Date("2026-05-05T00:00:00Z"),
+        seenBy: [{ seenAt: new Date("2026-05-10T00:00:00Z") }],
+      },
+    ]);
+
+    const result = await caller.getMany({
+      tab: "suggested",
+      page: 1,
+      pageSize: 5,
+      search: "",
+      sort: "",
+      lastUpdatedStartTime: "",
+      lastUpdatedEndTime: "",
+    });
+
+    expect(result.items[0]).toMatchObject({
+      id: "unread",
+      hasUnreadComments: true,
+    });
+    expect(result.items[1]).toMatchObject({
+      id: "read",
+      hasUnreadComments: false,
     });
   });
 });
@@ -826,12 +874,7 @@ describe("trackingRouter.markSeen", () => {
     expect(arg.where).toEqual({
       userId_ticketId: { userId: FAKE_USER_ID, ticketId: "t1" },
     });
-    expect(arg.create).toMatchObject({
-      userId: FAKE_USER_ID,
-      ticketId: "t1",
-    });
     expect(arg.create.seenAt).toBeInstanceOf(Date);
-    expect(arg.update).toMatchObject({});
     expect(arg.update.seenAt).toBeInstanceOf(Date);
   });
 
@@ -842,6 +885,50 @@ describe("trackingRouter.markSeen", () => {
 
     await expect(caller.markSeen({ ticketId: "t1" })).rejects.toThrow();
     expect(mockPrisma.ticketSeen.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("trackingRouter.setWatching", () => {
+  it("upserts a TicketWatch row when watching is true", async () => {
+    const caller = setup();
+    mockPrisma.ticketWatch.upsert.mockResolvedValue({});
+
+    await caller.setWatching({ ticketId: "t1", watching: true });
+
+    expect(mockPrisma.ticketWatch.upsert).toHaveBeenCalledTimes(1);
+    const arg = mockPrisma.ticketWatch.upsert.mock.calls[0][0];
+    expect(arg.where).toEqual({
+      userId_ticketId: { userId: FAKE_USER_ID, ticketId: "t1" },
+    });
+    expect(arg.create).toMatchObject({
+      userId: FAKE_USER_ID,
+      ticketId: "t1",
+    });
+    expect(mockPrisma.ticketWatch.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("deletes the TicketWatch row when watching is false", async () => {
+    const caller = setup();
+    mockPrisma.ticketWatch.deleteMany.mockResolvedValue({ count: 1 });
+
+    await caller.setWatching({ ticketId: "t1", watching: false });
+
+    expect(mockPrisma.ticketWatch.deleteMany).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.ticketWatch.deleteMany.mock.calls[0][0]).toEqual({
+      where: { userId: FAKE_USER_ID, ticketId: "t1" },
+    });
+    expect(mockPrisma.ticketWatch.upsert).not.toHaveBeenCalled();
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    mockGetSession.mockResolvedValue(null);
+    // biome-ignore lint/suspicious/noExplicitAny: stub req
+    const caller = createCaller({ req: {} as any });
+
+    await expect(
+      caller.setWatching({ ticketId: "t1", watching: true }),
+    ).rejects.toThrow();
+    expect(mockPrisma.ticketWatch.upsert).not.toHaveBeenCalled();
   });
 });
 
@@ -1178,6 +1265,15 @@ describe("activity writes", () => {
         to: { id: "u2", name: "Bob" },
       },
     });
+
+    // The new assignee is auto-added as a watcher.
+    expect(mockPrisma.ticketWatch.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId_ticketId: { userId: "u2", ticketId: "t1" },
+        },
+      }),
+    );
   });
 
   it("records department add/remove diffs", async () => {

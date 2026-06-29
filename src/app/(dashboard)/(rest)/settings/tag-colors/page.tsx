@@ -1,3 +1,4 @@
+import "server-only";
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { prefetchDepartments } from "@/features/departments/server/prefetch";
@@ -13,8 +14,7 @@ import { HydrateClient } from "@/trpc/server";
 
 const Page = async () => {
   await requireAuth();
-  prefetchDepartments();
-  prefetchCategoryColors();
+  await Promise.all([prefetchDepartments(), prefetchCategoryColors()]);
 
   return (
     <TagColorsContainer>

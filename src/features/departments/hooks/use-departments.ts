@@ -38,6 +38,7 @@ export const useUpdateDepartment = () => {
         toast.success("Department updated");
         queryClient.invalidateQueries(trpc.departments.getMany.queryFilter());
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        queryClient.invalidateQueries(trpc.tracking.getOne.queryFilter());
       },
       onError: (error) => {
         toast.error(`Failed to update department: ${error.message}`);
@@ -55,6 +56,7 @@ export const useRemoveDepartment = () => {
         toast.success("Department removed");
         queryClient.invalidateQueries(trpc.departments.getMany.queryFilter());
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        queryClient.invalidateQueries(trpc.tracking.getOne.queryFilter());
       },
       onError: (error) => {
         toast.error(`Failed to remove department: ${error.message}`);

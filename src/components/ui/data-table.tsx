@@ -213,6 +213,12 @@ interface DataTableProps<
    * and that child rows are structurally compatible with the parent columns.
    */
   inlineNestedRows?: boolean;
+  /**
+   * Optional signature of the current query/result set (e.g. tab+search+sort).
+   * When it changes, expansion state is reset — use this for tables whose result
+   * set can change without the page number changing.
+   */
+  resetKey?: string | number;
 }
 
 export function DataTable<
@@ -229,6 +235,7 @@ export function DataTable<
   nestedColumns,
   nestedDataKey,
   inlineNestedRows,
+  resetKey,
 }: DataTableProps<TData, TValue, TNestedData, TNestedValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [_params, setParams] = usePaginationParams();
@@ -240,12 +247,14 @@ export function DataTable<
     {},
   );
 
-  // Reset expanded rows when the page data changes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: do use paginated data as dependency here to trigger on page change
+  // Reset expanded rows when the page changes, or when the caller signals the
+  // result set/query changed via `resetKey` (e.g. search/tab/sort), since those
+  // can change the displayed rows without the page number changing.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deps are the reset triggers, not values read in the effect
   React.useEffect(() => {
     setExpandedRows(new Set());
     setExpandedTanstack({});
-  }, [paginatedData.page]);
+  }, [paginatedData.page, resetKey]);
 
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});

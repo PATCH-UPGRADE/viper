@@ -168,8 +168,16 @@ export const useAttachChild = (parentId: string) => {
         const candidate = previousPicker
           .flatMap(([, data]) => (Array.isArray(data) ? data : []))
           .find((c: { id: string }) => c.id === childId) as
-          | { id: string; summary: string; status: string }
+          | {
+              id: string;
+              summary: string;
+              status: string;
+              parent?: { id: string } | null;
+            }
           | undefined;
+        // The child may be moving from another parent — capture it so we can
+        // refresh that old parent's detail after the move.
+        const oldParentId = candidate?.parent?.id ?? null;
 
         if (candidate) {
           // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape
@@ -196,7 +204,7 @@ export const useAttachChild = (parentId: string) => {
           return old.filter((c: { id: string }) => c.id !== childId);
         });
 
-        return { previousDetail, previousPicker };
+        return { previousDetail, previousPicker, oldParentId };
       },
       onError: (error, _vars, context) => {
         for (const [key, data] of context?.previousDetail ?? []) {
@@ -210,7 +218,7 @@ export const useAttachChild = (parentId: string) => {
       onSuccess: () => {
         toast.success("Sub-ticket attached");
       },
-      onSettled: () => {
+      onSettled: (_data, _error, { childId }, context) => {
         queryClient.invalidateQueries(
           trpc.tracking.getOne.queryFilter({ id: parentId }),
         );
@@ -218,6 +226,16 @@ export const useAttachChild = (parentId: string) => {
           trpc.tracking.listAttachableChildren.queryFilter({ parentId }),
         );
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        // The moved child's parent/breadcrumb changed; refresh its detail and
+        // the old parent's detail (if it was reparented from elsewhere).
+        queryClient.invalidateQueries(
+          trpc.tracking.getOne.queryFilter({ id: childId }),
+        );
+        if (context?.oldParentId) {
+          queryClient.invalidateQueries(
+            trpc.tracking.getOne.queryFilter({ id: context.oldParentId }),
+          );
+        }
       },
     }),
   );
@@ -257,7 +275,7 @@ export const useDetachChild = (parentId: string) => {
       onSuccess: () => {
         toast.success("Sub-ticket detached");
       },
-      onSettled: () => {
+      onSettled: (_data, _error, { ticketId }) => {
         queryClient.invalidateQueries(
           trpc.tracking.getOne.queryFilter({ id: parentId }),
         );
@@ -265,6 +283,10 @@ export const useDetachChild = (parentId: string) => {
           trpc.tracking.listAttachableChildren.queryFilter({ parentId }),
         );
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        // The detached child's parent is now null; refresh its detail too.
+        queryClient.invalidateQueries(
+          trpc.tracking.getOne.queryFilter({ id: ticketId }),
+        );
       },
     }),
   );

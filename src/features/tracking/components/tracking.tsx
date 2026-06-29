@@ -65,6 +65,7 @@ export const TrackingTabsNav = () => {
 
 export const TrackingList = () => {
   const { data, isFetching } = useSuspenseTrackingTickets();
+  const [{ tab, search, sort }] = useTrackingParams();
   const router = useRouter();
 
   return (
@@ -78,6 +79,8 @@ export const TrackingList = () => {
           nestedDataKey="children"
           inlineNestedRows
           isLoading={isFetching}
+          // Collapse expanded sub-tickets when the result set changes.
+          resetKey={`${tab}|${search}|${sort}`}
           search={<TrackingSearch />}
           rowOnclick={(row) => {
             // Parents with sub-tickets expand on first click; a second click

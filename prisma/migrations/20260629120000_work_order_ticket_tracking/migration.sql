@@ -16,6 +16,19 @@ CREATE TYPE "TicketActivityType" AS ENUM ('STATUS_CHANGED', 'CATEGORY_CHANGED', 
 ALTER TABLE "notification_device_group_mapping" ADD COLUMN     "workOrderTicketId" TEXT,
 ALTER COLUMN "notificationId" DROP NOT NULL;
 
+-- Defensively remove any rows that would violate the exactly-one-parent
+-- invariant before enforcing it. At this point every existing row has
+-- notificationId set and the just-added workOrderTicketId is null, so this
+-- affects zero rows; it only guards against unexpected data.
+DELETE FROM "notification_device_group_mapping"
+WHERE ("notificationId" IS NULL) = ("workOrderTicketId" IS NULL);
+
+-- Enforce that each device-group mapping references exactly one parent: a
+-- notification OR a work-order ticket, never both and never neither.
+ALTER TABLE "notification_device_group_mapping"
+ADD CONSTRAINT "ndg_mapping_exactly_one_parent"
+CHECK (("notificationId" IS NOT NULL) <> ("workOrderTicketId" IS NOT NULL));
+
 -- AlterTable
 ALTER TABLE "notification_source" ADD COLUMN     "workOrderTicketId" TEXT;
 

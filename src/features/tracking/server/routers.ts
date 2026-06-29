@@ -571,6 +571,10 @@ export const trackingRouter = createTRPCRouter({
           status: true,
           parent: { select: { id: true, summary: true } },
         },
+        orderBy: [
+          { parentId: { sort: "asc", nulls: "first" } },
+          { summary: "asc" },
+        ],
         take: 100,
       });
 
@@ -750,7 +754,6 @@ export const trackingRouter = createTRPCRouter({
     })
     .output(ticketCommentResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      const now = new Date();
       return prisma.$transaction(async (tx) => {
         const comment = await tx.ticketComment.create({
           data: {
@@ -772,7 +775,21 @@ export const trackingRouter = createTRPCRouter({
         });
         await tx.workOrderTicket.update({
           where: { id: input.ticketId },
-          data: { lastCommentAt: now },
+          data: { lastCommentAt: comment.createdAt },
+        });
+        await tx.ticketSeen.upsert({
+          where: {
+            userId_ticketId: {
+              userId: ctx.auth.user.id,
+              ticketId: input.ticketId,
+            },
+          },
+          create: {
+            userId: ctx.auth.user.id,
+            ticketId: input.ticketId,
+            seenAt: comment.createdAt,
+          },
+          update: { seenAt: comment.createdAt },
         });
         return comment;
       });

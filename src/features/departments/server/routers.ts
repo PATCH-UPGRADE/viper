@@ -1,6 +1,7 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
@@ -9,6 +10,20 @@ const departmentInputSchema = z.object({
   description: z.string().max(2000).nullish(),
   color: z.string().nullish(),
 });
+
+const DUPLICATE_NAME_MESSAGE = "A department with that name already exists";
+
+// Translate a racing unique-constraint failure on `name` into a clean CONFLICT,
+// matching the precheck's error. Rethrows anything else unchanged.
+function rethrowDuplicateName(error: unknown): never {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  ) {
+    throw new TRPCError({ code: "CONFLICT", message: DUPLICATE_NAME_MESSAGE });
+  }
+  throw error;
+}
 
 export const departmentsRouter = createTRPCRouter({
   getMany: protectedProcedure.query(async () => {
@@ -30,10 +45,14 @@ export const departmentsRouter = createTRPCRouter({
       if (existing) {
         throw new TRPCError({
           code: "CONFLICT",
-          message: "A department with that name already exists",
+          message: DUPLICATE_NAME_MESSAGE,
         });
       }
-      return prisma.department.create({ data: input });
+      try {
+        return await prisma.department.create({ data: input });
+      } catch (error) {
+        rethrowDuplicateName(error);
+      }
     }),
 
   update: protectedProcedure
@@ -47,11 +66,15 @@ export const departmentsRouter = createTRPCRouter({
         if (collision) {
           throw new TRPCError({
             code: "CONFLICT",
-            message: "A department with that name already exists",
+            message: DUPLICATE_NAME_MESSAGE,
           });
         }
       }
-      return prisma.department.update({ where: { id }, data });
+      try {
+        return await prisma.department.update({ where: { id }, data });
+      } catch (error) {
+        rethrowDuplicateName(error);
+      }
     }),
 
   remove: protectedProcedure

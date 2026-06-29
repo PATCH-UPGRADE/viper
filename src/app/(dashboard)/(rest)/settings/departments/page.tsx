@@ -12,7 +12,7 @@ import { HydrateClient } from "@/trpc/server";
 
 const Page = async () => {
   await requireAuth();
-  prefetchDepartments();
+  await prefetchDepartments();
 
   return (
     <DepartmentsContainer>

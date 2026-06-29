@@ -1,3 +1,8 @@
+-- Work-order ticket tracking + email-ingest schema (squashed).
+-- Replaces the per-step branch migrations: add_work_ticket_tracking,
+-- watch_tickets, ticket_source_schema, restore_ticket_seen,
+-- work_order_email_ingest. Net schema only (churn removed).
+
 -- CreateEnum
 CREATE TYPE "TicketStatus" AS ENUM ('TO_DO', 'IN_PROGRESS', 'REQUIRES_APPROVAL', 'DONE');
 
@@ -5,10 +10,14 @@ CREATE TYPE "TicketStatus" AS ENUM ('TO_DO', 'IN_PROGRESS', 'REQUIRES_APPROVAL',
 CREATE TYPE "TicketCategory" AS ENUM ('PATCH', 'CONFIG_CHANGE', 'VULN_REMEDIATION', 'ADVISORY_RESPONSE', 'CLINICAL_REVIEW', 'FIRMWARE_UPDATE', 'NETWORK_REMEDIATION', 'NEW_ASSET_PROCUREMENT', 'OTHER');
 
 -- CreateEnum
-CREATE TYPE "TicketSource" AS ENUM ('WORKFLOW', 'MANUAL', 'WEBHOOK', 'API');
-
--- CreateEnum
 CREATE TYPE "TicketActivityType" AS ENUM ('STATUS_CHANGED', 'CATEGORY_CHANGED', 'ASSIGNEE_CHANGED', 'DEPARTMENTS_CHANGED', 'SCHEDULED_AT_CHANGED', 'SUMMARY_CHANGED', 'DESCRIPTION_CHANGED', 'CHILD_ATTACHED', 'CHILD_DETACHED', 'ASSET_ATTACHED', 'ASSET_DETACHED');
+
+-- AlterTable
+ALTER TABLE "notification_device_group_mapping" ADD COLUMN     "workOrderTicketId" TEXT,
+ALTER COLUMN "notificationId" DROP NOT NULL;
+
+-- AlterTable
+ALTER TABLE "notification_source" ADD COLUMN     "workOrderTicketId" TEXT;
 
 -- AlterTable
 ALTER TABLE "user" ADD COLUMN     "departmentId" TEXT;
@@ -42,8 +51,9 @@ CREATE TABLE "work_order_ticket" (
     "summary" TEXT NOT NULL,
     "status" "TicketStatus" NOT NULL DEFAULT 'TO_DO',
     "category" "TicketCategory" NOT NULL DEFAULT 'OTHER',
-    "source" "TicketSource" NOT NULL DEFAULT 'MANUAL',
-    "sourceWorkflowId" TEXT,
+    "sourceLabel" TEXT,
+    "body" TEXT,
+    "suggestedAssignee" TEXT,
     "parentId" TEXT,
     "creatorId" TEXT NOT NULL,
     "assigneeId" TEXT,
@@ -53,6 +63,15 @@ CREATE TABLE "work_order_ticket" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "work_order_ticket_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ticket_watch" (
+    "userId" TEXT NOT NULL,
+    "ticketId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ticket_watch_pkey" PRIMARY KEY ("userId","ticketId")
 );
 
 -- CreateTable
@@ -164,10 +183,13 @@ CREATE INDEX "work_order_ticket_assigneeId_idx" ON "work_order_ticket"("assignee
 CREATE INDEX "work_order_ticket_creatorId_idx" ON "work_order_ticket"("creatorId");
 
 -- CreateIndex
-CREATE INDEX "work_order_ticket_sourceWorkflowId_idx" ON "work_order_ticket"("sourceWorkflowId");
+CREATE INDEX "work_order_ticket_parentId_idx" ON "work_order_ticket"("parentId");
 
 -- CreateIndex
-CREATE INDEX "work_order_ticket_parentId_idx" ON "work_order_ticket"("parentId");
+CREATE INDEX "ticket_watch_userId_idx" ON "ticket_watch"("userId");
+
+-- CreateIndex
+CREATE INDEX "ticket_watch_ticketId_idx" ON "ticket_watch"("ticketId");
 
 -- CreateIndex
 CREATE INDEX "ticket_seen_userId_idx" ON "ticket_seen"("userId");
@@ -212,13 +234,19 @@ CREATE INDEX "_WorkOrderTicketAdvisories_B_index" ON "_WorkOrderTicketAdvisories
 CREATE INDEX "_WorkOrderTicketDepartments_B_index" ON "_WorkOrderTicketDepartments"("B");
 
 -- CreateIndex
+CREATE INDEX "notification_device_group_mapping_workOrderTicketId_idx" ON "notification_device_group_mapping"("workOrderTicketId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ndg_mapping_workorder_devicegroup_key" ON "notification_device_group_mapping"("workOrderTicketId", "deviceGroupId");
+
+-- CreateIndex
+CREATE INDEX "notification_source_workOrderTicketId_idx" ON "notification_source"("workOrderTicketId");
+
+-- CreateIndex
 CREATE INDEX "user_departmentId_idx" ON "user"("departmentId");
 
 -- AddForeignKey
 ALTER TABLE "user" ADD CONSTRAINT "user_departmentId_fkey" FOREIGN KEY ("departmentId") REFERENCES "department"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "work_order_ticket" ADD CONSTRAINT "work_order_ticket_sourceWorkflowId_fkey" FOREIGN KEY ("sourceWorkflowId") REFERENCES "Workflow"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "work_order_ticket" ADD CONSTRAINT "work_order_ticket_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "work_order_ticket"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -228,6 +256,12 @@ ALTER TABLE "work_order_ticket" ADD CONSTRAINT "work_order_ticket_creatorId_fkey
 
 -- AddForeignKey
 ALTER TABLE "work_order_ticket" ADD CONSTRAINT "work_order_ticket_assigneeId_fkey" FOREIGN KEY ("assigneeId") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ticket_watch" ADD CONSTRAINT "ticket_watch_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ticket_watch" ADD CONSTRAINT "ticket_watch_ticketId_fkey" FOREIGN KEY ("ticketId") REFERENCES "work_order_ticket"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ticket_seen" ADD CONSTRAINT "ticket_seen_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -252,6 +286,12 @@ ALTER TABLE "ticket_description" ADD CONSTRAINT "ticket_description_ticketId_fke
 
 -- AddForeignKey
 ALTER TABLE "ticket_description" ADD CONSTRAINT "ticket_description_departmentId_fkey" FOREIGN KEY ("departmentId") REFERENCES "department"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "notification_source" ADD CONSTRAINT "notification_source_workOrderTicketId_fkey" FOREIGN KEY ("workOrderTicketId") REFERENCES "work_order_ticket"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "notification_device_group_mapping" ADD CONSTRAINT "notification_device_group_mapping_workOrderTicketId_fkey" FOREIGN KEY ("workOrderTicketId") REFERENCES "work_order_ticket"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_WorkOrderTicketAssets" ADD CONSTRAINT "_WorkOrderTicketAssets_A_fkey" FOREIGN KEY ("A") REFERENCES "asset"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -288,3 +328,4 @@ ALTER TABLE "_WorkOrderTicketDepartments" ADD CONSTRAINT "_WorkOrderTicketDepart
 
 -- AddForeignKey
 ALTER TABLE "_WorkOrderTicketDepartments" ADD CONSTRAINT "_WorkOrderTicketDepartments_B_fkey" FOREIGN KEY ("B") REFERENCES "work_order_ticket"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

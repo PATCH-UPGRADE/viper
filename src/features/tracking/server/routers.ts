@@ -1,12 +1,7 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import {
-  type Prisma,
-  TicketCategory,
-  TicketSource,
-  TicketStatus,
-} from "@/generated/prisma";
+import { type Prisma, TicketCategory, TicketStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   buildPaginationMeta,
@@ -171,12 +166,12 @@ export const trackingRouter = createTRPCRouter({
           OR: [{ status }, { children: { some: { status } } }],
         };
       } else if (tab === "suggested") {
-        // "Suggested" surfaces auto-ingested tickets — anything the system
-        // brought in rather than a user creating it by hand.
-        const source = { not: TicketSource.MANUAL };
-        childTabWhere = { source };
+        // "Suggested" surfaces auto-ingested tickets — those with a source
+        // artifact (email/integration) rather than a user creating it by hand.
+        const ingested = { sources: { some: {} } };
+        childTabWhere = ingested;
         parentTabWhere = {
-          OR: [{ source }, { children: { some: { source } } }],
+          OR: [ingested, { children: { some: ingested } }],
         };
       } else if (tab === "my-department") {
         const me = await prisma.user.findUnique({

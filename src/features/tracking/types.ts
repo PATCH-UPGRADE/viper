@@ -5,7 +5,6 @@ import {
   Severity,
   TicketActivityType,
   TicketCategory,
-  TicketSource,
   TicketStatus,
 } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
@@ -19,6 +18,9 @@ export const ticketBaseInclude = {
   creator: { select: { id: true, name: true, image: true } },
   vulnerabilities: { select: { id: true, cveId: true } },
   assets: { select: { id: true, hostname: true } },
+  // Ingested source artifact(s); the Source column renders by channel (or the
+  // creator avatar when there are none — i.e. a manually-created ticket).
+  sources: { select: { channel: true }, take: 1 },
   // `watchers` and `seenBy` are replaced at the procedure level with a
   // where: { userId } filter so each row reflects only the current user's
   // watch/seen state. Including them here keeps the derived TS type consistent
@@ -254,7 +256,6 @@ export const workOrderListItemSchema = z.object({
   summary: z.string(),
   status: z.enum(TicketStatus),
   category: z.enum(TicketCategory),
-  source: z.enum(TicketSource),
   scheduledAt: z.date().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -383,7 +384,6 @@ export const workOrderDetailResponseSchema = z.object({
   summary: z.string(),
   status: z.enum(TicketStatus),
   category: z.enum(TicketCategory),
-  source: z.enum(TicketSource),
   scheduledAt: z.date().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -392,6 +392,8 @@ export const workOrderDetailResponseSchema = z.object({
   creatorId: z.string(),
   assigneeId: z.string().nullable(),
   sourceLabel: z.string().nullable(),
+  body: z.string().nullable(),
+  suggestedAssignee: z.string().nullable(),
   departments: z.array(departmentItemSchema),
   descriptions: z.array(ticketDescriptionSchema),
   assignee: assigneeItemSchema.nullable(),

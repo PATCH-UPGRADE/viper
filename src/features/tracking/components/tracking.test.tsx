@@ -250,8 +250,8 @@ const sampleTicket = (overrides: Record<string, unknown> = {}) => ({
   summary: "Patch ICU monitors",
   status: "TO_DO",
   category: "PATCH",
-  source: "MANUAL",
   sourceLabel: null,
+  sources: [],
   scheduledAt: new Date("2026-06-10T15:00:00Z"),
   departments: [{ id: "d-it", name: "IT", color: "purple" }],
   assignee: { id: "u1", name: "Alice", email: "alice@example.com" },
@@ -624,26 +624,32 @@ describe("TrackingList — source column", () => {
     renderTrackingList();
   };
 
-  it("MANUAL shows the creator's name", () => {
+  it("shows the creator's name when there is no ingested source (manual)", () => {
     renderWith({
-      source: "MANUAL",
+      sources: [],
       creator: { id: "u9", name: "Carol Creator", image: null },
     });
     expect(screen.getByText("Carol Creator")).toBeInTheDocument();
   });
 
-  it("EMAIL shows the originating email address", () => {
-    renderWith({ source: "EMAIL", sourceLabel: "ops@stmary.example.org" });
+  it("shows the email address for an Email source", () => {
+    renderWith({
+      sources: [{ channel: "Email" }],
+      sourceLabel: "ops@stmary.example.org",
+    });
     expect(screen.getByText("ops@stmary.example.org")).toBeInTheDocument();
   });
 
-  it("INTEGRATION shows the service name", () => {
-    renderWith({ source: "INTEGRATION", sourceLabel: "Armis" });
+  it("shows the service name for a PolledApi (integration) source", () => {
+    renderWith({
+      sources: [{ channel: "PolledApi" }],
+      sourceLabel: "Armis",
+    });
     expect(screen.getByText("Armis")).toBeInTheDocument();
   });
 
-  it("OTHER shows the label, falling back to 'Other'", () => {
-    renderWith({ source: "OTHER", sourceLabel: null });
-    expect(screen.getByText("Other")).toBeInTheDocument();
+  it("falls back to the channel name when sourceLabel is null", () => {
+    renderWith({ sources: [{ channel: "Email" }], sourceLabel: null });
+    expect(screen.getByText("Email")).toBeInTheDocument();
   });
 });

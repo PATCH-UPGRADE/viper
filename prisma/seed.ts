@@ -2,10 +2,10 @@ import { hashPassword } from "better-auth/crypto";
 import {
   type ArtifactType,
   type AssetStatus,
+  NotificationChannel,
   Priority,
   Severity,
   TicketCategory,
-  TicketSource,
   TicketStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -797,7 +797,9 @@ type SampleTicket = {
   // Single primary department or an ordered list — first entry is "primary"
   // for the purpose of the default `description` fallback.
   department: string | string[];
-  source: TicketSource;
+  // When set, the seed creates a linked NotificationSource on this channel
+  // (the ticket renders as ingested). Omitted ⇒ manually created.
+  sourceChannel?: NotificationChannel;
   sourceLabel?: string;
   scheduledAt?: Date;
   linkedCveIds?: string[];
@@ -830,7 +832,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
       Nursing:
         "Infusion pumps in your unit will be pulled for firmware updates in rolling batches of ~4 pumps at a time, by floor. Biomed will deliver swap pumps before pulling each batch — no expected interruption to active infusions, but please verify any in-progress drips are re-programmed on the swap pump and document the channel hand-off in the MAR. Escalate to charge nurse if Biomed can't supply a swap before pulling a pump.",
     },
-    source: TicketSource.MANUAL,
     linkedCveIds: ["CVE-2021-12345"],
     linkedAssetIds: Array.from(
       { length: 23 },
@@ -846,7 +847,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.DONE,
         category: TicketCategory.FIRMWARE_UPDATE,
         department: "Biomed",
-        source: TicketSource.MANUAL,
         linkedCveIds: ["CVE-2021-12345"],
         linkedAssetIds: [
           "rad-pump-001",
@@ -865,7 +865,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.IN_PROGRESS,
         category: TicketCategory.FIRMWARE_UPDATE,
         department: "Biomed",
-        source: TicketSource.MANUAL,
         linkedCveIds: ["CVE-2021-12345"],
         linkedAssetIds: ["rad-pump-005", "rad-pump-006", "rad-pump-007"],
         comments: ["Pending Biomed review and scheduling."],
@@ -878,7 +877,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.TO_DO,
         category: TicketCategory.FIRMWARE_UPDATE,
         department: "Biomed",
-        source: TicketSource.MANUAL,
         linkedCveIds: ["CVE-2021-12345"],
         linkedAssetIds: ["rad-pump-008", "rad-pump-009", "rad-pump-010"],
       },
@@ -897,7 +895,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
       Administration:
         "Imaging-chain EternalBlue remediation. Compliance-relevant: EOL OS exposure on patient-facing systems. PACS server change requires CMO sign-off (separate child ticket) due to imaging chain blast radius. Expected aggregate downtime across all hosts: under 30 minutes during business hours, plus a single overnight maintenance window for PACS.",
     },
-    source: TicketSource.INTEGRATION,
+    sourceChannel: NotificationChannel.PolledApi,
     sourceLabel: "TriMedX RSQ",
     linkedCveIds: ["CVE-2017-0144"],
     linkedAssetIds: [
@@ -918,7 +916,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.TO_DO,
         category: TicketCategory.CONFIG_CHANGE,
         department: "Radiology",
-        source: TicketSource.INTEGRATION,
+        sourceChannel: NotificationChannel.PolledApi,
         sourceLabel: "TriMedX RSQ",
         linkedCveIds: ["CVE-2017-0144"],
         linkedAssetIds: ["rad-ws-001"],
@@ -934,7 +932,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.REQUIRES_APPROVAL,
         category: TicketCategory.VULN_REMEDIATION,
         department: "Radiology",
-        source: TicketSource.EMAIL,
+        sourceChannel: NotificationChannel.Email,
         sourceLabel: "security@hospital.example.org",
         scheduledAt: inDays(10),
         linkedCveIds: ["CVE-2017-0144"],
@@ -950,7 +948,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.IN_PROGRESS,
         category: TicketCategory.CONFIG_CHANGE,
         department: "Radiology",
-        source: TicketSource.MANUAL,
         scheduledAt: inDays(1),
         linkedCveIds: ["CVE-2017-0144"],
         linkedAssetIds: ["rad-rws-001", "rad-rws-002"],
@@ -966,7 +963,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
           Radiology:
             "Networking change on the imaging switch shouldn't be visible from any reading workstation — DICOM traffic (104/TCP) is unaffected. If you see new failures sending studies to PACS or pulling priors, flag IT immediately; we ran post-deploy validation but want eyes on it for the first 48 hours.",
         },
-        source: TicketSource.MANUAL,
         scheduledAt: inDays(-9),
         linkedCveIds: ["CVE-2017-0144"],
         linkedAssetIds: ["rad-sw-001"],
@@ -979,7 +975,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.DONE,
         category: TicketCategory.CONFIG_CHANGE,
         department: "IT",
-        source: TicketSource.MANUAL,
         scheduledAt: inDays(-6),
         linkedCveIds: ["CVE-2020-25175"],
         linkedAssetIds: ["rad-pacs-001", "rad-sw-001"],
@@ -995,7 +990,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
     status: TicketStatus.TO_DO,
     category: TicketCategory.VULN_REMEDIATION,
     department: "Radiology",
-    source: TicketSource.INTEGRATION,
+    sourceChannel: NotificationChannel.PolledApi,
     sourceLabel: "TriMedX RSQ",
     linkedCveIds: ["CVE-2020-25175"],
     linkedAssetIds: ["rad-ct-001", "rad-us-001", "rad-us-002", "rad-xr-001"],
@@ -1010,7 +1005,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.TO_DO,
         category: TicketCategory.CONFIG_CHANGE,
         department: "Radiology",
-        source: TicketSource.INTEGRATION,
+        sourceChannel: NotificationChannel.PolledApi,
         sourceLabel: "TriMedX RSQ",
         linkedCveIds: ["CVE-2020-25175"],
         linkedAssetIds: [
@@ -1032,7 +1027,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
       Administration:
         "EXTRABACON remote-code-execution exposure on perimeter firewall. Patient impact: minimal during business hours (~30 min internet outage); after-hours remote radiology read coverage may be briefly interrupted during VPN upgrade. Recommend approving the staggered upgrade plan from IT. Risk if deferred: known SNMP RCE exploit chain against an internet-facing device.",
     },
-    source: TicketSource.MANUAL,
     linkedCveIds: ["CVE-2016-6366"],
     linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
     children: [
@@ -1043,7 +1037,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.REQUIRES_APPROVAL,
         category: TicketCategory.PATCH,
         department: "IT",
-        source: TicketSource.MANUAL,
         scheduledAt: inDays(7),
         linkedCveIds: ["CVE-2016-6366"],
         linkedAssetIds: ["rad-fw-001"],
@@ -1056,7 +1049,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.IN_PROGRESS,
         category: TicketCategory.PATCH,
         department: "IT",
-        source: TicketSource.EMAIL,
+        sourceChannel: NotificationChannel.Email,
         sourceLabel: "security@hospital.example.org",
         scheduledAt: inDays(3),
         linkedCveIds: ["CVE-2016-6366"],
@@ -1071,7 +1064,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
     status: TicketStatus.TO_DO,
     category: TicketCategory.OTHER,
     department: "Biomed",
-    source: TicketSource.MANUAL,
     children: [
       {
         summary: "Investigate IntelliVue MP5 firmware update availability",
@@ -1080,7 +1072,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.TO_DO,
         category: TicketCategory.OTHER,
         department: "Biomed",
-        source: TicketSource.MANUAL,
         linkedAssetIds: Array.from(
           { length: 13 },
           (_, i) => `rad-mon-${String(i + 1).padStart(3, "0")}`,
@@ -1093,7 +1084,6 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.DONE,
         category: TicketCategory.OTHER,
         department: "Biomed",
-        source: TicketSource.MANUAL,
         linkedAssetIds: Array.from(
           { length: 23 },
           (_, i) => `rad-pump-${String(i + 1).padStart(3, "0")}`,
@@ -2002,8 +1992,12 @@ async function createWorkOrderTicket(
       summary: ticket.summary,
       status: ticket.status,
       category: ticket.category,
-      source: ticket.source,
       sourceLabel: ticket.sourceLabel,
+      // For ingested demo tickets, attach a NotificationSource on the given
+      // channel so the Source column renders the channel icon + label.
+      sources: ticket.sourceChannel
+        ? { create: [{ channel: ticket.sourceChannel, raw: {} }] }
+        : undefined,
       departments: {
         connect: orderedDepartments.map((d) => ({ id: d.id })),
       },

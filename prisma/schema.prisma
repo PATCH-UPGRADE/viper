@@ -958,13 +958,6 @@ enum TicketCategory {
   OTHER
 }
 
-enum TicketSource {
-  MANUAL // Manually created by a Viper user
-  EMAIL // Created from a consumed work-order email
-  INTEGRATION // Created from an external service's work order
-  OTHER // Catch-all for sources not yet modeled
-}
-
 model Department {
   id          String         @id @default(cuid())
   name        String         @unique
@@ -997,11 +990,23 @@ model WorkOrderTicket {
   status      TicketStatus   @default(TO_DO)
   category    TicketCategory @default(OTHER)
 
-  source      TicketSource @default(MANUAL)
-  // For EMAIL: the originating email address. For INTEGRATION: the service
-  // name. For OTHER: free-text describing the source. Null for MANUAL (the
-  // `creator` relation identifies who created it).
+  // Human-facing label for the source: the originating email address, the
+  // integration/service name, etc. Null for manually-created tickets (the
+  // `creator` relation identifies who made it). The `sources` relation below
+  // holds the richer source artifact (email, attachments) when ingested.
   sourceLabel String?
+
+  // The ingested source artifact(s) for this ticket (forwarded email, polled
+  // API payload, …), reusing NotificationSource. Empty ⇒ created manually.
+  sources NotificationSource[]
+
+  // General work-order body (e.g. the extracted email body). Per-department
+  // TicketDescription rows can be generated from this later.
+  body String? @db.Text
+
+  // Raw assignee hint (name/email) when no VIPER user could be matched. The
+  // `assigneeId` relation stays null until a human/agent resolves it.
+  suggestedAssignee String?
 
   departments Department[] @relation("WorkOrderTicketDepartments")
 
@@ -1021,6 +1026,7 @@ model WorkOrderTicket {
   remediations    Remediation[]   @relation("WorkOrderTicketRemediations")
   advisories      Advisory[]      @relation("WorkOrderTicketAdvisories")
   assets          Asset[]         @relation("WorkOrderTicketAssets")
+  deviceGroups    NotificationDeviceGroupMapping[]
 
   comments       TicketComment[]
   descriptions   TicketDescription[]
@@ -1183,6 +1189,11 @@ model NotificationSource {
   notificationId String?
   notification   Notification?        @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 
+  // A source can instead belong to a work-order ticket (reused for the
+  // email → work order flow). Exactly one of notification/workOrderTicket is set.
+  workOrderTicketId String?
+  workOrderTicket   WorkOrderTicket? @relation(fields: [workOrderTicketId], references: [id], onDelete: Cascade)
+
   sourceType NotificationSourceType @default(Source)
   reasonWhy String? @db.Text // why was this email linked to this notification?
 
@@ -1197,6 +1208,7 @@ model NotificationSource {
 
   @@unique([channel, externalId])
   @@index([notificationId])
+  @@index([workOrderTicketId])
   @@map("notification_source")
 }
 
@@ -1245,14 +1257,19 @@ model NotificationAssetMapping {
 
 model NotificationDeviceGroupMapping {
   id             String          @id @default(cuid())
-  notificationId String
-  notification   Notification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  // A mapping belongs to a Notification OR a WorkOrderTicket (exactly one).
+  notificationId String?
+  notification   Notification?   @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  workOrderTicketId String?
+  workOrderTicket   WorkOrderTicket? @relation(fields: [workOrderTicketId], references: [id], onDelete: Cascade)
   deviceGroupId  String
   deviceGroup    DeviceGroup     @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
   confidence     ConfidenceLevel?
   reasonWhy String?
 
   @@unique([notificationId, deviceGroupId])
+  @@unique([workOrderTicketId, deviceGroupId], map: "ndg_mapping_workorder_devicegroup_key")
+  @@index([workOrderTicketId])
   @@map("notification_device_group_mapping")
 }
 

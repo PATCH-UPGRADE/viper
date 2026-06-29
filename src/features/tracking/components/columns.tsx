@@ -6,6 +6,7 @@ import {
   BoxIcon,
   EyeIcon,
   EyeOffIcon,
+  type LucideIcon,
   MailIcon,
   MessageSquareIcon,
 } from "lucide-react";
@@ -20,8 +21,8 @@ import { UserAvatar } from "@/components/user-avatar";
 import { useCategoryColor } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
 import {
+  type NotificationChannel,
   type TicketCategory,
-  TicketSource,
   TicketStatus,
 } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,13 @@ const categoryLabels: Record<TicketCategory, string> = {
   NETWORK_REMEDIATION: "Network Remediation",
   NEW_ASSET_PROCUREMENT: "New Asset Procurement",
   OTHER: "Other",
+};
+
+// Icon shown in the Source column for each ingested-source channel.
+const channelIcons: Record<NotificationChannel, LucideIcon> = {
+  Email: MailIcon,
+  PolledApi: BoxIcon,
+  Crawl: BoxIcon,
 };
 
 const CategoryChip = ({ category }: { category: TicketCategory }) => {
@@ -326,39 +334,25 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
     header: "Source",
     cell: ({ row }) => {
       const t = row.original;
-      switch (t.source) {
-        case TicketSource.MANUAL:
-          return (
-            <div className="flex items-center gap-2">
-              <UserAvatar user={t.creator} className="size-5 text-[10px]" />
-              <span className="text-sm truncate">{t.creator.name}</span>
-            </div>
-          );
-        case TicketSource.EMAIL:
-          return (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MailIcon className="size-3.5 shrink-0" />
-              <span className="text-sm truncate">
-                {t.sourceLabel ?? "Email"}
-              </span>
-            </div>
-          );
-        case TicketSource.INTEGRATION:
-          return (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <BoxIcon className="size-3.5 shrink-0" />
-              <span className="text-sm truncate">
-                {t.sourceLabel ?? "Integration"}
-              </span>
-            </div>
-          );
-        default:
-          return (
-            <span className="text-sm text-muted-foreground">
-              {t.sourceLabel ?? "Other"}
-            </span>
-          );
+      const source = t.sources[0];
+      // No ingested source ⇒ manually created: show the creator.
+      if (!source) {
+        return (
+          <div className="flex items-center gap-2">
+            <UserAvatar user={t.creator} className="size-5 text-[10px]" />
+            <span className="text-sm truncate">{t.creator.name}</span>
+          </div>
+        );
       }
+      const Icon = channelIcons[source.channel];
+      return (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Icon className="size-3.5 shrink-0" />
+          <span className="text-sm truncate">
+            {t.sourceLabel ?? source.channel}
+          </span>
+        </div>
+      );
     },
   },
   {

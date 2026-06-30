@@ -24,25 +24,39 @@ export const extractedDeviceGroupSchema = z.object({
   versionRange: z.string().nullish(),
 });
 
+export const extractedVulnerabilitySchema = z.object({
+  cveId: z.string().regex(/^CVE-\d{4}-\d{4,}$/i).nullish(), 
+  manufacturer: z.string().nullish(),
+  modelName: z.string().nullish()
+})
+
 // TODO: extend this, which has just device groups for now, with vulnerabilities
 // and remediations
 export const extractSchema = z.object({
   deviceGroups: z.array(extractedDeviceGroupSchema),
+  vulnerabilities: z.array(extractedVulnerabilitySchema)
 });
 
 export type ExtractedDeviceGroup = z.infer<typeof extractedDeviceGroupSchema>;
+export type ExtractedVulnerability = z.infer<typeof extractedVulnerabilitySchema>;
 export type ExtractResult = z.infer<typeof extractSchema>;
 
 const MODEL = "claude-haiku-4-5-20251001";
 
 const SYSTEM_PROMPT = `You are an extraction agent for a hospital cybersecurity platform that reads security notifications (advisories, recalls, update notices) and their PDF attachments.
 
-Your task: extract the DEVICE GROUPS that the notification is about. A device group is a class of affected product, identified by some combination of:
+Your task: extract the DEVICE GROUPS and VULNERABILITIES that the notification is about. A device group is a class of affected product, identified by some combination of:
+
+For DEVICE GROUPS:
 - CPE string (e.g. "cpe:2.3:a:vendor:product:1.0:*:*:*:*:*:*:*")
 - manufacturer / vendor (e.g. "Philips", "GE Healthcare")
 - model name (e.g. "IntelliVue MX40", "Alaris Pump")
 - version / firmware (e.g. "2.3.1")
 - versionRange: if the notification specifies a range (e.g. "affects firmware 2.1 through 2.3"), express it as a VERS string (e.g, "vers:generic />2.1|<=2.3"). Omit if only a single exact version is mentioned.
+
+FOR VULNERABILITIES: CVEids or security issues explicitly named
+- cveId: must match format CVE-YYYY-NNNNN (e.g CVE-2020-25175). Omit if not explicitly named.
+- manufacturer / modelName of the affected device if mentioned alongside the CVE
 
 RULES:
 - Extract ONLY device groups explicitly referenced in the notification or its attachments.

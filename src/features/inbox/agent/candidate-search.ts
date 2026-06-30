@@ -3,7 +3,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import type { ExtractedDeviceGroup, ExtractResult } from "./extract";
+import type { ExtractedDeviceGroup, ExtractedVulnerability, ExtractResult } from "./extract";
 import { normalizeName } from "@/lib/router-utils"
 
 const TOP_K = 5;
@@ -16,12 +16,22 @@ export type DeviceGroupMatchingCandidate = {
   versionRange: string | null;
 };
 
+export type VulnerabilitiyCandidate = {
+  id: string;
+  cveId: string | null;
+  description: string | null
+}
+
 export type Candidates = {
   // Parallel to ExtractResult: one candidate list per extracted entity, in order.
   deviceGroups: Array<{
     extracted: ExtractedDeviceGroup;
     matches: DeviceGroupMatchingCandidate[];
   }>;
+  vulnerabilities: Array<{
+    extracted: ExtractedVulnerability;
+    matches: VulnerabilitiyCandidate[]
+  }>
 };
 
 const nameOrClauses = (term: string) => [
@@ -78,15 +88,55 @@ async function searchDeviceGroupMatching(
   }));
 }
 
+async function searchVulnerability(extracted: ExtractedVulnerability): Promise<VulnerabilitiyCandidate[]> {
+  const or: Prisma.VulnerabilityWhereInput[] = [];
+  if(extracted.cveId) {
+    or.push({ cveId: { contains: extracted.cveId, mode: "insensitive"}})
+  }
+  if(extracted.manufacturer) {
+    or.push({
+      deviceGroupMatchings: {
+        some: {vendor: { OR: vendorNameOr(extracted.manufacturer)}}
+      }
+    })
+  }
+  if(extracted.modelName) {
+    or.push({
+      deviceGroupMatchings: {
+        some: { product: { OR: productNameOr(extracted.modelName)}}
+      }
+    })
+  }
+  if(or.length === 0) return [];
+
+  const rows = await prisma.vulnerability.findMany({
+    where: { OR: or },
+    select: { id: true, cveId: true, description: true },
+    take: TOP_K
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    cveId: row.cveId ?? null,
+    description: row.description ?? null
+  }));
+}
+
 export async function searchCandidates(
   extracted: ExtractResult,
 ): Promise<Candidates> {
-  const deviceGroups = await Promise.all(
-    extracted.deviceGroups.map(async (dg) => ({
-      extracted: dg,
-      matches: await searchDeviceGroupMatching(dg),
-    })),
+  const [deviceGroups, vulnerabilities] = await Promise.all(
+    [
+      Promise.all(extracted.deviceGroups.map(async (dg) => ({
+        extracted: dg,
+        matches: await searchDeviceGroupMatching(dg),
+      }))),
+      Promise.all(extracted.vulnerabilities.map(async (v)=> ({
+        extracted: v,
+        matches: await searchVulnerability(v)
+      })))
+    ]
   );
 
-  return { deviceGroups };
+  return { deviceGroups, vulnerabilities };
 }

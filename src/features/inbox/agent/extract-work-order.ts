@@ -5,6 +5,7 @@
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
+import prisma from "@/lib/db";
 import { type WorkOrderPayload, workOrderPayloadSchema } from "../types";
 import { fetchPdfAttachments } from "../utils";
 
@@ -17,9 +18,9 @@ Produce:
 - category: the best-fit work category from the allowed set; use OTHER when unsure
 - scheduledAt: an ISO 8601 date (YYYY-MM-DD or full timestamp) ONLY if the email states a due/scheduled date; otherwise null
 - suggestedAssignee: the responsible party if the email names one (often an external vendor or a person/team); otherwise null
-- departmentNames: hospital department names the email implies (e.g. Radiology, Biomed/Clinical Engineering, IT); empty if none are implied
+- departmentNames: EVERY hospital department mentioned or implied anywhere in the email — including ones named only in a coordination/aside note (e.g. "have Biomed stage the units"). Choose names ONLY from the "Valid departments" list provided below, copying the spelling exactly; return [] if none apply.
 
-Only include values you are reasonably confident about. Do not invent dates, assignees, or departments.`;
+Only include values you are reasonably confident about. Do not invent dates or assignees, and never invent a department that isn't in the provided list.`;
 
 function buildTextPrompt(email: {
   from: string;
@@ -37,7 +38,15 @@ export async function extractWorkOrder(
   sourceId: string,
   email: { from: string; subject: string | null; markdown: string },
 ): Promise<WorkOrderPayload> {
-  const pdfAttachments = await fetchPdfAttachments(sourceId);
+  const [pdfAttachments, departments] = await Promise.all([
+    fetchPdfAttachments(sourceId),
+    prisma.department.findMany({
+      select: { name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+  const validDepartments =
+    departments.map((d) => d.name).join(", ") || "(none configured)";
 
   const model = new ChatAnthropic({
     model: MODEL,
@@ -45,7 +54,10 @@ export async function extractWorkOrder(
   }).withStructuredOutput(workOrderPayloadSchema);
 
   const userContent = [
-    { type: "text" as const, text: buildTextPrompt(email) },
+    {
+      type: "text" as const,
+      text: `${buildTextPrompt(email)}\n\nValid departments (choose only from these): ${validDepartments}`,
+    },
     ...pdfAttachments.map((pdf) => ({
       type: "document",
       source: {

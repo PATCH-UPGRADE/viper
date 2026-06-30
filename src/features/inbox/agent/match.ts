@@ -39,6 +39,12 @@ const matchSchema = z.object({
 
 export type Decision = z.infer<typeof decisionSchema>;
 
+// A device-group mapping belongs to exactly one parent — a Notification or a
+// WorkOrderTicket. Callers pick which by passing the matching key.
+export type MatchOwner =
+  | { notificationId: string }
+  | { workOrderTicketId: string };
+
 export type MatchSummary = {
   linked: number;
   updated: number;
@@ -100,7 +106,7 @@ function cleanFields(fields: Decision["fields"]): {
 }
 
 export async function matchAndLinkEntities(
-  notificationId: string,
+  owner: MatchOwner,
   extracted: ExtractResult,
   candidates: Candidates,
 ): Promise<MatchSummary> {
@@ -118,19 +124,19 @@ export async function matchAndLinkEntities(
     { role: "user", content: renderCandidates(candidates) },
   ]);
 
-  return applyDecisions(notificationId, decisions, candidates);
+  return applyDecisions(owner, decisions, candidates);
 }
 
 /**
  * Deterministically apply a list of matching decisions to the database.
  * Separated from the LLM call so it can be unit-tested in isolation.
  *
- * Idempotent: mappings are upserted on (notificationId, deviceGroupId) and new
- * device groups are resolved to their canonical (vendor/product/version)
- * identity via resolveDeviceGroup, so replaying does not duplicate rows.
+ * Idempotent: mappings are upserted on (owner, deviceGroupId) and new device
+ * groups are resolved to their canonical (vendor/product/version) identity via
+ * resolveDeviceGroup, so replaying does not duplicate rows.
  */
 export async function applyDecisions(
-  notificationId: string,
+  owner: MatchOwner,
   decisions: Decision[],
   candidates: Candidates,
 ): Promise<MatchSummary> {
@@ -159,18 +165,37 @@ export async function applyDecisions(
         decision.confidence === "Matched" ? "Matched" : "NeedsReview";
 
       const upsertMapping = (deviceGroupId: string) =>
-        tx.notificationDeviceGroupMapping.upsert({
-          where: {
-            notificationId_deviceGroupId: { notificationId, deviceGroupId },
-          },
-          create: {
-            notificationId,
-            deviceGroupId,
-            confidence,
-            reasonWhy: decision.reasonWhy,
-          },
-          update: { confidence, reasonWhy: decision.reasonWhy },
-        });
+        "notificationId" in owner
+          ? tx.notificationDeviceGroupMapping.upsert({
+              where: {
+                notificationId_deviceGroupId: {
+                  notificationId: owner.notificationId,
+                  deviceGroupId,
+                },
+              },
+              create: {
+                notificationId: owner.notificationId,
+                deviceGroupId,
+                confidence,
+                reasonWhy: decision.reasonWhy,
+              },
+              update: { confidence, reasonWhy: decision.reasonWhy },
+            })
+          : tx.notificationDeviceGroupMapping.upsert({
+              where: {
+                workOrderTicketId_deviceGroupId: {
+                  workOrderTicketId: owner.workOrderTicketId,
+                  deviceGroupId,
+                },
+              },
+              create: {
+                workOrderTicketId: owner.workOrderTicketId,
+                deviceGroupId,
+                confidence,
+                reasonWhy: decision.reasonWhy,
+              },
+              update: { confidence, reasonWhy: decision.reasonWhy },
+            });
 
       // link the device group to the notification
       if (decision.op === "link") {

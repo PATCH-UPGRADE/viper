@@ -11,11 +11,13 @@ const relevanceSchema = z.object({
   reason: z.string(),
 });
 
-const SYSTEM_PROMPT = `You are a triage agent for a hospital cybersecurity platform.
+const SYSTEM_PROMPT = `You are a triage agent for a hospital cybersecurity and operations platform.
 
-Determine whether an incoming email is relevant to hospital cybersecurity or operational security.
+Determine whether an incoming email is relevant to hospital cybersecurity, medical-device security, or device/infrastructure operations.
 
-RELEVANT: security advisories, CVE/patch notifications, medical device recalls, FDA/ICS-CERT alerts, threat bulletins, vendor security notices, network incident reports, compliance alerts.
+RELEVANT:
+- Informational: security advisories, CVE/patch notifications, medical device recalls, FDA/ICS-CERT alerts, threat bulletins, vendor security notices, network incident reports, compliance alerts.
+- Actionable: medical-device or infrastructure service/maintenance requests, vendor work orders, requests to patch/update/configure/schedule work on devices, or other tasks asking the hospital to act.
 NOT RELEVANT: marketing emails, sales pitches, meeting invitations, thank-you notes, general newsletters, HR communications, billing receipts.`;
 
 // TODO: Consider also having the model review PDF attachments?

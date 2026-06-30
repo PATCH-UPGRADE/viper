@@ -5,7 +5,9 @@ import "server-only";
 import TurndownService from "turndown";
 import { searchCandidates } from "@/features/inbox/agent/candidate-search";
 import { classifyNotification } from "@/features/inbox/agent/classify";
+import { classifyEmailKind } from "@/features/inbox/agent/classify-kind";
 import { extractEntities } from "@/features/inbox/agent/extract";
+import { extractWorkOrder } from "@/features/inbox/agent/extract-work-order";
 import { matchAndLinkEntities } from "@/features/inbox/agent/match";
 import {
   checkEmailRelevance,
@@ -13,11 +15,19 @@ import {
 } from "@/features/inbox/agent/relevance";
 import { triageNotification } from "@/features/inbox/agent/triage";
 import { Prisma } from "@/generated/prisma";
+import { getAutomationUser } from "@/lib/automation-user";
 import prisma from "@/lib/db";
 import { normalizeMd5, uploadBufferToS3 } from "@/lib/s3";
 import { inngest } from "../client";
 
 const turndown = new TurndownService();
+
+// Parse an LLM-provided date string, treating anything unparseable as absent.
+function parseScheduledAt(value: string | null): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 export const processInboxEmail = inngest.createFunction(
   { id: "process-inbox-email" },
@@ -175,7 +185,94 @@ export const processInboxEmail = inngest.createFunction(
 
     if (!sourceId) return { skipped: true, reason: "duplicate", emailId };
 
-    // 6. Classify email and upsert Notification
+    // 6. Route the email: informational Notification vs actionable Work Order.
+    const { kind } = await step.run("classify-kind", () =>
+      classifyEmailKind(sourceId, {
+        from: email.from,
+        subject: email.subject,
+        markdown: markdown ?? "",
+      }),
+    );
+
+    // 6w. Work-order path: extract fields, create the ticket linked to this
+    // email source, then tag matched device groups onto the ticket.
+    if (kind === "work_order") {
+      const wo = await step.run("extract-work-order", () =>
+        extractWorkOrder(sourceId, {
+          from: email.from,
+          subject: email.subject,
+          markdown: markdown ?? "",
+        }),
+      );
+
+      const workOrderTicketId = await step.run(
+        "create-work-order",
+        async () => {
+          const automation = await getAutomationUser();
+
+          // Match extracted department names to existing departments
+          // case-insensitively (the table is small; never auto-create).
+          const wanted = new Set(
+            wo.departmentNames.map((n) => n.trim().toLowerCase()),
+          );
+          const departmentIds = wanted.size
+            ? (
+                await prisma.department.findMany({
+                  select: { id: true, name: true },
+                })
+              )
+                .filter((d) => wanted.has(d.name.toLowerCase()))
+                .map((d) => d.id)
+            : [];
+
+          const ticket = await prisma.workOrderTicket.create({
+            data: {
+              summary: wo.summary,
+              body: markdown,
+              category: wo.category,
+              scheduledAt: parseScheduledAt(wo.scheduledAt),
+              suggestedAssignee: wo.suggestedAssignee,
+              sourceLabel: email.from,
+              creatorId: automation.id,
+              departments: {
+                connect: departmentIds.map((id) => ({ id })),
+              },
+              // Links the email NotificationSource to this ticket (sets its
+              // workOrderTicketId; notificationId stays null).
+              sources: { connect: { id: sourceId } },
+            },
+          });
+          return ticket.id;
+        },
+      );
+
+      const extracted = await step.run("extract-work-order-entities", () =>
+        extractEntities(sourceId, {
+          from: email.from,
+          subject: email.subject,
+          markdown: markdown ?? "",
+        }),
+      );
+
+      const linkSummary = await step.run(
+        "match-work-order-entities",
+        async () => {
+          if (Object.values(extracted).every((v) => v.length === 0)) {
+            return { linked: 0, updated: 0, created: 0, skipped: 0 };
+          }
+          const candidates = await searchCandidates(extracted);
+          return matchAndLinkEntities(
+            { workOrderTicketId },
+            extracted,
+            candidates,
+          );
+        },
+      );
+
+      return { workOrderTicketId, sourceId, emailId, linkSummary };
+    }
+
+    // 7. Classify email and upsert Notification
     const notificationId = await step.run("classify-notification", async () => {
       const result = await classifyNotification(sourceId, {
         from: email.from,
@@ -216,7 +313,7 @@ export const processInboxEmail = inngest.createFunction(
       return notification.id;
     });
 
-    // 7. Extract entities (device groups) referenced in the notification
+    // 8. Extract entities (device groups) referenced in the notification
     const extracted = await step.run("extract-entities", () =>
       extractEntities(sourceId, {
         from: email.from,
@@ -225,7 +322,7 @@ export const processInboxEmail = inngest.createFunction(
       }),
     );
 
-    // 8. Fuzzy-search the DB for matches and link/update/create them
+    // 9. Fuzzy-search the DB for matches and link/update/create them
     const linkSummary = await step.run("match-and-link-entities", async () => {
       if (
         !notificationId ||
@@ -234,10 +331,10 @@ export const processInboxEmail = inngest.createFunction(
         return { linked: 0, updated: 0, created: 0, skipped: 0 };
       }
       const candidates = await searchCandidates(extracted);
-      return matchAndLinkEntities(notificationId, extracted, candidates);
+      return matchAndLinkEntities({ notificationId }, extracted, candidates);
     });
 
-    // 9. Triage: assign priority, reason, and hospital impact
+    // 10. Triage: assign priority, reason, and hospital impact
     if (notificationId) {
       await step.run("triage-notification", async () => {
         const result = await triageNotification(sourceId, notificationId);

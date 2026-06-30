@@ -21,6 +21,7 @@ export const extractedDeviceGroupSchema = z.object({
   manufacturer: z.string().nullish(),
   modelName: z.string().nullish(),
   version: z.string().nullish(),
+  versionRange: z.string().nullish(),
 });
 
 // TODO: extend this, which has just device groups for now, with vulnerabilities
@@ -41,6 +42,7 @@ Your task: extract the DEVICE GROUPS that the notification is about. A device gr
 - manufacturer / vendor (e.g. "Philips", "GE Healthcare")
 - model name (e.g. "IntelliVue MX40", "Alaris Pump")
 - version / firmware (e.g. "2.3.1")
+- versionRange: if the notification specifies a range (e.g. "affects firmware 2.1 through 2.3"), express it as a VERS string (e.g, "vers:generic />2.1|<=2.3"). Omit if only a single exact version is mentioned.
 
 RULES:
 - Extract ONLY device groups explicitly referenced in the notification or its attachments.

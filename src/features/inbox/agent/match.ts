@@ -7,7 +7,7 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
 import type { ConfidenceLevel } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { cpeToDeviceGroup } from "@/lib/router-utils";
+import { resolveMatchingId } from "@/lib/router-utils";
 import type { Candidates } from "./candidate-search";
 import type { ExtractResult } from "./extract";
 
@@ -20,10 +20,11 @@ const deviceGroupFieldsSchema = z.object({
   manufacturer: z.string().nullish(),
   modelName: z.string().nullish(),
   version: z.string().nullish(),
+  versionRange: z.string().nullish()
 });
 
 const decisionSchema = z.object({
-  kind: z.enum(["deviceGroup"]), // TODO: add vulnerability, remediation, maybe asset...
+  kind: z.enum(["deviceGroupMatching"]), // TODO: add vulnerability, remediation, maybe asset...
   op: z.enum(["link", "update", "create"]),
   // The id of an existing candidate to link/update. Omitted for create.
   targetId: z.string().nullish(),
@@ -52,8 +53,8 @@ You are given, for each device group extracted from the notification, a list of 
 
 For each extracted device group, choose exactly ONE action:
 - "link": the device group clearly matches an existing candidate. Set targetId to that candidate's id.
-- "update": the device group matches an existing candidate, but the notification contains additional/missing identifier info worth saving (e.g. a version the record lacks). Set targetId to that candidate's id and put the new values in fields.
-- "create": none of the candidates match. Put the device group's identifiers in fields. A cpe is required to create — if you cannot supply one, prefer "link" to the closest candidate or omit the decision entirely.
+- "update": the device group matches an existing candidate, but the notification contains additional/missing identifier info worth saving (e.g. a versionRange the record lacks). Set targetId to that candidate's id and put the new values in fields.
+- "create": none of the candidates match. Put the device group's identifiers in fields. Manufacturer is required to create — if you cannot supply one, prefer "link" to the closest candidate or omit the decision entirely.
 
 CONFIDENCE (you may only use these two):
 - "Matched": strong identifier match (same CPE, or same manufacturer + model).
@@ -68,13 +69,13 @@ function renderCandidates(candidates: Candidates): string {
   return candidates.deviceGroups
     .map((entry, i) => {
       const e = entry.extracted;
-      const extractedLine = `Device group #${i + 1} extracted: cpe=${e.cpe ?? "?"} | manufacturer=${e.manufacturer ?? "?"} | modelName=${e.modelName ?? "?"} | version=${e.version ?? "?"}`;
+      const extractedLine = `Device group #${i + 1} extracted: cpe=${e.cpe ?? "?"} | manufacturer=${e.manufacturer ?? "?"} | modelName=${e.modelName ?? "?"} | version=${e.version ?? "?"} | versionRange=${e.versionRange ?? "?"}`;
       const matches =
         entry.matches.length > 0
           ? entry.matches
               .map(
                 (m) =>
-                  `    - id: ${m.id} | cpe: ${m.cpe.join(", ") || "(none)"} | manufacturer: ${m.manufacturer ?? "(none)"} | modelName: ${m.modelName ?? "(none)"} | version: ${m.version ?? "(none)"}`,
+                  `    - id: ${m.id} | manufacturer: ${m.manufacturer ?? "(none)"} | modelName: ${m.modelName ?? "(none)"} | version: ${m.version ?? "(none)"}`,
               )
               .join("\n")
           : "    - (no candidates found)";
@@ -85,14 +86,14 @@ function renderCandidates(candidates: Candidates): string {
 
 // Build a Prisma data object from LLM-provided fields, dropping empties.
 function cleanFields(fields: Decision["fields"]): {
-  cpe?: string;
   manufacturer?: string;
   modelName?: string;
   version?: string;
+  versionRange? :string
 } {
   const out: Record<string, string> = {};
   if (!fields) return out;
-  for (const key of ["cpe", "manufacturer", "modelName", "version"] as const) {
+  for (const key of ["manufacturer", "modelName", "version", "versionRange"] as const) {
     const val = fields[key];
     if (typeof val === "string" && val.trim().length > 0) out[key] = val.trim();
   }
@@ -149,7 +150,7 @@ export async function applyDecisions(
 
   await prisma.$transaction(async (tx) => {
     for (const decision of decisions) {
-      if (decision.kind !== "deviceGroup") {
+      if (decision.kind !== "deviceGroupMatching") {
         summary.skipped++;
         continue;
       }
@@ -158,14 +159,14 @@ export async function applyDecisions(
       const confidence: ConfidenceLevel =
         decision.confidence === "Matched" ? "Matched" : "NeedsReview";
 
-      const upsertMapping = (deviceGroupId: string) =>
+      const upsertMapping = (deviceGroupMatchingId: string) =>
         tx.notificationDeviceGroupMapping.upsert({
           where: {
-            notificationId_deviceGroupId: { notificationId, deviceGroupId },
+            notificationId_deviceGroupMatchingId: { notificationId, deviceGroupMatchingId },
           },
           create: {
             notificationId,
-            deviceGroupId,
+            deviceGroupMatchingId,
             confidence,
             reasonWhy: decision.reasonWhy,
           },
@@ -192,33 +193,56 @@ export async function applyDecisions(
         // can't be mutated in place; the only safe enrichment is unioning a new
         // CPE into the existing group's cpe[] array.
         const data = cleanFields(decision.fields);
-        if (data.cpe) {
-          const group = await tx.deviceGroup.findUnique({
+        if(data.versionRange){
+          const existing = await tx.deviceGroupMatching.findUnique({
             where: { id: decision.targetId },
-            select: { cpe: true },
+            select: { versionRange: true }
           });
-          if (group && !group.cpe.includes(data.cpe)) {
-            await tx.deviceGroup.update({
+          if( existing && !existing.versionRange) {
+            await tx.deviceGroupMatching.update({
               where: { id: decision.targetId },
-              data: { cpe: { push: data.cpe } },
-            });
+              data: { versionRange: data.versionRange}
+            })
           }
         }
+        // if (data.cpe) {
+        //   const group = await tx.deviceGroup.findUnique({
+        //     where: { id: decision.targetId },
+        //     select: { cpe: true },
+        //   });
+        //   if (group && !group.cpe.includes(data.cpe)) {
+        //     await tx.deviceGroup.update({
+        //       where: { id: decision.targetId },
+        //       data: { cpe: { push: data.cpe } },
+        //     });
+        //   }
+        // }
         await upsertMapping(decision.targetId);
         summary.updated++;
       } else {
         // create
         const data = cleanFields(decision.fields);
-        const cpe = data.cpe;
-        if (!cpe) {
+        // const cpe = data.cpe;
+        // if (!cpe) {
+        //   summary.skipped++;
+        //   continue;
+        // }
+        // // The CPE is required and authoritative: cpeToDeviceGroup parses it into
+        // // canonical vendor/product/version, sets versionStatus, attaches the CPE
+        // // to cpe[], and find-or-creates by identity (race-safe, idempotent).
+        // const created = await cpeToDeviceGroup(cpe);
+        if(!data.manufacturer){
           summary.skipped++;
           continue;
         }
-        // The CPE is required and authoritative: cpeToDeviceGroup parses it into
-        // canonical vendor/product/version, sets versionStatus, attaches the CPE
-        // to cpe[], and find-or-creates by identity (race-safe, idempotent).
-        const created = await cpeToDeviceGroup(cpe);
-        await upsertMapping(created.id);
+        const matchingId = await resolveMatchingId({
+          vendor: data.manufacturer,
+          product: data.modelName,
+          version: data.version,
+          versionRange: data.versionRange,
+          hasCpe: false
+        })
+        await upsertMapping(matchingId);
         summary.created++;
       }
     }

@@ -12,6 +12,13 @@ import { requireOwnership } from "@/trpc/middleware";
 import { apiTokenInputSchema } from "../types";
 
 export const userRouter = createTRPCRouter({
+  listAssignable: protectedProcedure.query(async () => {
+    return prisma.user.findMany({
+      select: { id: true, name: true, email: true, image: true },
+      orderBy: { name: "asc" },
+    });
+  }),
+
   getManyApiTokens: protectedProcedure
     .input(paginationInputSchema)
     .query(async ({ ctx, input }) => {

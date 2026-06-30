@@ -8,6 +8,7 @@ import {
   ExternalLink,
   HeartIcon,
   InboxIcon,
+  ListChecksIcon,
   type LucideIcon,
   PlugIcon,
   SettingsIcon,
@@ -79,6 +80,11 @@ const mainItems = [
     title: "Advisories",
     icon: ShieldAlertIcon,
     url: "/advisories",
+  },
+  {
+    title: "Tracking",
+    icon: ListChecksIcon,
+    url: "/tracking",
   },
   {
     title: "Settings",

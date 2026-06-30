@@ -43,7 +43,17 @@ model User {
   memories   Memory[]
   notificationReads         NotificationRead[]
 
+  departmentId           String?
+  department             Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  workOrderTicketsCreated   WorkOrderTicket[]  @relation("WorkOrderTicketCreator")
+  workOrderTicketsAssigned  WorkOrderTicket[]  @relation("WorkOrderTicketAssignee")
+  ticketComments         TicketComment[]
+  watchedTickets         TicketWatch[]
+  ticketSeen             TicketSeen[]
+  ticketActivities       TicketActivity[]
+
   @@unique([email])
+  @@index([departmentId])
   @@map("user")
 }
 
@@ -351,6 +361,7 @@ model Asset {
   issues               Issue[]
   deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
+  workOrderTickets        WorkOrderTicket[]       @relation("WorkOrderTicketAssets")
   notificationMappings NotificationAssetMapping[]
 
   createdAt DateTime @default(now())
@@ -578,6 +589,7 @@ model Vulnerability {
 
   remediations         Remediation[]
   issues               Issue[]
+  workOrderTickets        WorkOrderTicket[]  @relation("WorkOrderTicketVulns")
   notificationMappings NotificationVulnerabilityMapping[]
 
   createdAt            DateTime        @default(now())
@@ -610,6 +622,7 @@ model Issue {
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
   issueRemediations  IssueRemediation[]
+  workOrderTickets      WorkOrderTicket[]     @relation("WorkOrderTicketIssues")
 
   status IssueStatus @default(ACTIVE)
 
@@ -633,6 +646,7 @@ model Remediation {
   vulnerability   Vulnerability? @relation(fields: [vulnerabilityId], references: [id], onDelete: SetNull)
 
   issueRemediations    IssueRemediation[]
+  workOrderTickets        WorkOrderTicket[]     @relation("WorkOrderTicketRemediations")
   notificationMappings NotificationRemediationMapping[]
 
   userId String
@@ -852,6 +866,7 @@ model Advisory {
   createdAt                 DateTime        @default(now())
   updatedAt                 DateTime        @updatedAt
   externalMappings          ExternalAdvisoryMapping[]
+  workOrderTickets             WorkOrderTicket[]  @relation("WorkOrderTicketAdvisories")
 
   @@index([userId])
   @@map("advisory")
@@ -924,6 +939,188 @@ model Memory {
   @@index([userId])
 }
 
+enum TicketStatus {
+  TO_DO
+  IN_PROGRESS
+  REQUIRES_APPROVAL
+  DONE
+}
+
+enum TicketCategory {
+  PATCH
+  CONFIG_CHANGE
+  VULN_REMEDIATION
+  ADVISORY_RESPONSE
+  CLINICAL_REVIEW
+  FIRMWARE_UPDATE
+  NETWORK_REMEDIATION
+  NEW_ASSET_PROCUREMENT
+  OTHER
+}
+
+model Department {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  description String?        @db.Text
+  color       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  users              User[]
+  tickets            WorkOrderTicket[]   @relation("WorkOrderTicketDepartments")
+  ticketDescriptions TicketDescription[]
+
+  @@map("department")
+}
+
+model CategoryColor {
+  id        String         @id @default(cuid())
+  category  TicketCategory @unique
+  color     String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@map("category_color")
+}
+
+model WorkOrderTicket {
+  id          String         @id @default(cuid())
+  summary     String
+
+  status      TicketStatus   @default(TO_DO)
+  category    TicketCategory @default(OTHER)
+
+  sourceLabel String?
+  sources NotificationSource[]
+
+  body String? @db.Text
+
+  suggestedAssignee String?
+
+  departments Department[] @relation("WorkOrderTicketDepartments")
+
+  parentId  String?
+  parent    WorkOrderTicket?  @relation("WorkOrderTicketChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children  WorkOrderTicket[] @relation("WorkOrderTicketChildren")
+
+  creatorId   String
+  creator     User           @relation("WorkOrderTicketCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  assigneeId  String?
+  assignee    User?          @relation("WorkOrderTicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  scheduledAt DateTime?
+
+  issues          Issue[]         @relation("WorkOrderTicketIssues")
+  vulnerabilities Vulnerability[] @relation("WorkOrderTicketVulns")
+  remediations    Remediation[]   @relation("WorkOrderTicketRemediations")
+  advisories      Advisory[]      @relation("WorkOrderTicketAdvisories")
+  assets          Asset[]         @relation("WorkOrderTicketAssets")
+  deviceGroups    NotificationDeviceGroupMapping[]
+
+  comments       TicketComment[]
+  descriptions   TicketDescription[]
+  watchers       TicketWatch[]
+  seenBy         TicketSeen[]
+  activities     TicketActivity[]
+  lastCommentAt  DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([assigneeId])
+  @@index([creatorId])
+  @@index([parentId])
+  @@map("work_order_ticket")
+}
+
+model TicketWatch {
+  userId    String
+  ticketId  String
+  createdAt DateTime @default(now())
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@id([userId, ticketId])
+  @@index([userId])
+  @@index([ticketId])
+  @@map("ticket_watch")
+}
+
+model TicketSeen {
+  userId   String
+  ticketId String
+  seenAt   DateTime @default(now())
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@id([userId, ticketId])
+  @@index([userId])
+  @@index([ticketId])
+  @@map("ticket_seen")
+}
+
+enum TicketActivityType {
+  STATUS_CHANGED
+  CATEGORY_CHANGED
+  ASSIGNEE_CHANGED
+  DEPARTMENTS_CHANGED
+  SCHEDULED_AT_CHANGED
+  SUMMARY_CHANGED
+  DESCRIPTION_CHANGED
+  CHILD_ATTACHED
+  CHILD_DETACHED
+  ASSET_ATTACHED
+  ASSET_DETACHED
+}
+
+model TicketActivity {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      TicketActivityType
+  data      Json     // shape varies by `type`; structured server-side
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([userId])
+  @@map("ticket_activity")
+}
+
+model TicketComment {
+  id        String       @id @default(cuid())
+  ticketId  String
+  ticket    WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body      String       @db.Text
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([ticketId, createdAt])
+  @@index([authorId])
+  @@map("ticket_comment")
+}
+
+model TicketDescription {
+  id           String          @id @default(cuid())
+  ticketId     String
+  ticket       WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  departmentId String
+  department   Department      @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  body         String          @db.Text
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@unique([ticketId, departmentId])
+  @@index([departmentId])
+  @@map("ticket_description")
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 enum NotificationType {
@@ -983,6 +1180,9 @@ model NotificationSource {
   notificationId String?
   notification   Notification?        @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 
+  workOrderTicketId String?
+  workOrderTicket   WorkOrderTicket? @relation(fields: [workOrderTicketId], references: [id], onDelete: Cascade)
+
   sourceType NotificationSourceType @default(Source)
   reasonWhy String? @db.Text // why was this email linked to this notification?
 
@@ -997,6 +1197,7 @@ model NotificationSource {
 
   @@unique([channel, externalId])
   @@index([notificationId])
+  @@index([workOrderTicketId])
   @@map("notification_source")
 }
 
@@ -1045,14 +1246,19 @@ model NotificationAssetMapping {
 
 model NotificationDeviceGroupMapping {
   id             String          @id @default(cuid())
-  notificationId String
-  notification   Notification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  // A mapping belongs to a Notification OR a WorkOrderTicket (exactly one).
+  notificationId String?
+  notification   Notification?   @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  workOrderTicketId String?
+  workOrderTicket   WorkOrderTicket? @relation(fields: [workOrderTicketId], references: [id], onDelete: Cascade)
   deviceGroupId  String
   deviceGroup    DeviceGroup     @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
   confidence     ConfidenceLevel?
   reasonWhy String?
 
   @@unique([notificationId, deviceGroupId])
+  @@unique([workOrderTicketId, deviceGroupId], map: "ndg_mapping_workorder_devicegroup_key")
+  @@index([workOrderTicketId])
   @@map("notification_device_group_mapping")
 }
 

@@ -3,8 +3,10 @@
 import {
   type Column,
   type ColumnDef,
+  type ExpandedState,
   flexRender,
   getCoreRowModel,
+  getExpandedRowModel,
   type Row,
   type RowData,
   type SortingState,
@@ -205,6 +207,18 @@ interface DataTableProps<
   nestedColumns?: ColumnDef<TNestedData, TNestedValue>[];
   /** Key on each row's data that holds the nested array. */
   nestedDataKey?: keyof TData;
+  /**
+   * When true, child rows render inline in the main table (sharing column
+   * widths) instead of as a separate nested mini-table. Requires nestedDataKey
+   * and that child rows are structurally compatible with the parent columns.
+   */
+  inlineNestedRows?: boolean;
+  /**
+   * Optional signature of the current query/result set (e.g. tab+search+sort).
+   * When it changes, expansion state is reset — use this for tables whose result
+   * set can change without the page number changing.
+   */
+  resetKey?: string | number;
 }
 
 export function DataTable<
@@ -220,6 +234,8 @@ export function DataTable<
   rowOnclick,
   nestedColumns,
   nestedDataKey,
+  inlineNestedRows,
+  resetKey,
 }: DataTableProps<TData, TValue, TNestedData, TNestedValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [_params, setParams] = usePaginationParams();
@@ -227,12 +243,18 @@ export function DataTable<
   const [expandedRows, setExpandedRows] = React.useState<Set<string>>(
     new Set(),
   );
+  const [expandedTanstack, setExpandedTanstack] = React.useState<ExpandedState>(
+    {},
+  );
 
-  // Reset expanded rows when the page data changes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: do use paginated data as dependency here to trigger on page change
+  // Reset expanded rows when the page changes, or when the caller signals the
+  // result set/query changed via `resetKey` (e.g. search/tab/sort), since those
+  // can change the displayed rows without the page number changing.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deps are the reset triggers, not values read in the effect
   React.useEffect(() => {
     setExpandedRows(new Set());
-  }, [paginatedData.page]);
+    setExpandedTanstack({});
+  }, [paginatedData.page, resetKey]);
 
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -256,6 +278,9 @@ export function DataTable<
     }
   }, [sorting, setParams]);
 
+  const hasNestedTable = nestedColumns && nestedDataKey;
+  const isInlineNested = !!(inlineNestedRows && nestedDataKey);
+
   const table = useReactTable({
     data: paginatedData.items,
     columns,
@@ -263,12 +288,23 @@ export function DataTable<
     manualSorting: true,
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
-    state: { sorting, columnVisibility, pagination },
+    state: {
+      sorting,
+      columnVisibility,
+      pagination,
+      ...(isInlineNested ? { expanded: expandedTanstack } : {}),
+    },
     manualPagination: true,
     rowCount: paginatedData.totalCount,
+    ...(isInlineNested && nestedDataKey
+      ? {
+          getSubRows: (row: TData) =>
+            (row[nestedDataKey] as unknown as TData[]) ?? undefined,
+          getExpandedRowModel: getExpandedRowModel(),
+          onExpandedChange: setExpandedTanstack,
+        }
+      : {}),
   });
-
-  const hasNestedTable = nestedColumns && nestedDataKey;
 
   const toggleRow = (rowId: string) => {
     setExpandedRows((prev) => {
@@ -311,7 +347,9 @@ export function DataTable<
           <TableHeader className="bg-muted">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {hasNestedTable && <TableHead className="w-12 py-2 pl-4" />}
+                {(hasNestedTable || isInlineNested) && (
+                  <TableHead className="w-12 py-2 pl-4" />
+                )}
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
@@ -335,12 +373,23 @@ export function DataTable<
           <TableBody className={isPending ? "opacity-50" : ""}>
             {!isLoading && table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => {
-                const nestedData = hasNestedTable
-                  ? (row.original[nestedDataKey] as TNestedData[])
-                  : [];
+                const nestedData =
+                  hasNestedTable && !isInlineNested
+                    ? (row.original[nestedDataKey] as TNestedData[])
+                    : [];
                 const hasNestedData =
                   Array.isArray(nestedData) && nestedData.length > 0;
-                const isExpanded = expandedRows.has(row.id);
+                const legacyExpanded =
+                  hasNestedTable && !isInlineNested && expandedRows.has(row.id);
+
+                const inlineCanExpand = isInlineNested && row.getCanExpand();
+                const inlineIsExpanded = isInlineNested && row.getIsExpanded();
+                const showChevron = hasNestedTable || isInlineNested;
+                const chevronVisible = isInlineNested ? inlineCanExpand : true;
+                const chevronExpanded = isInlineNested
+                  ? inlineIsExpanded
+                  : !!legacyExpanded;
+                const isChildRow = isInlineNested && row.depth > 0;
 
                 return (
                   <React.Fragment key={row.id}>
@@ -352,47 +401,58 @@ export function DataTable<
                       )}
                       onClick={rowOnclick ? () => rowOnclick(row) : undefined}
                     >
-                      {hasNestedTable && (
-                        <TableCell className="py-4 pl-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleRow(row.id);
-                            }}
-                            className="h-8 w-8 p-0"
-                            disabled={!hasNestedData}
-                            aria-label={
-                              isExpanded
-                                ? "Collapse nested data"
-                                : "Expand nested data"
-                            }
-                            aria-expanded={isExpanded}
-                          >
-                            {isExpanded ? (
-                              <ChevronDown
-                                className="h-4 w-4"
-                                aria-hidden="true"
-                              />
-                            ) : (
-                              <ChevronRight
-                                className="h-4 w-4"
-                                aria-hidden="true"
-                              />
-                            )}
-                          </Button>
+                      {showChevron && (
+                        <TableCell className="py-4 pl-4 w-12">
+                          {chevronVisible && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isInlineNested) {
+                                  row.toggleExpanded();
+                                } else {
+                                  toggleRow(row.id);
+                                }
+                              }}
+                              className="h-8 w-8 p-0"
+                              disabled={
+                                isInlineNested
+                                  ? !inlineCanExpand
+                                  : !hasNestedData
+                              }
+                              aria-label={
+                                chevronExpanded
+                                  ? "Collapse nested data"
+                                  : "Expand nested data"
+                              }
+                              aria-expanded={chevronExpanded}
+                            >
+                              {chevronExpanded ? (
+                                <ChevronDown
+                                  className="h-4 w-4"
+                                  aria-hidden="true"
+                                />
+                              ) : (
+                                <ChevronRight
+                                  className="h-4 w-4"
+                                  aria-hidden="true"
+                                />
+                              )}
+                            </Button>
+                          )}
                         </TableCell>
                       )}
                       {(() => {
                         const cells = row.getVisibleCells();
                         const rendered: React.ReactNode[] = [];
                         let skip = 0;
-                        for (const cell of cells) {
+                        for (let i = 0; i < cells.length; i++) {
                           if (skip > 0) {
                             skip--;
                             continue;
                           }
+                          const cell = cells[i];
                           const colSpan =
                             cell.column.columnDef.meta?.colSpan?.(row) ?? 1;
                           if (colSpan > 1) {
@@ -405,7 +465,15 @@ export function DataTable<
                               className={cn(
                                 "py-4 first-of-type:pl-4 last-of-type:pr-4",
                                 cell.column.columnDef.meta?.cellClassName,
+                                isChildRow && i === 0 && "relative",
                               )}
+                              style={
+                                isChildRow && i === 0
+                                  ? {
+                                      paddingLeft: `${(row.depth - 1) * 1.5 + 1}rem`,
+                                    }
+                                  : undefined
+                              }
                             >
                               {flexRender(
                                 cell.column.columnDef.cell,
@@ -418,7 +486,7 @@ export function DataTable<
                       })()}
                     </TableRow>
 
-                    {hasNestedTable && isExpanded && (
+                    {hasNestedTable && !isInlineNested && legacyExpanded && (
                       <TableRow>
                         <TableCell colSpan={columns.length + 1} className="p-0">
                           <div className="overflow-x-auto pl-12 pr-4 py-4 bg-muted/50">
@@ -436,7 +504,9 @@ export function DataTable<
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length + (hasNestedTable ? 1 : 0)}
+                  colSpan={
+                    columns.length + (hasNestedTable || isInlineNested ? 1 : 0)
+                  }
                   className="h-24 text-center"
                 >
                   {isLoading ? (

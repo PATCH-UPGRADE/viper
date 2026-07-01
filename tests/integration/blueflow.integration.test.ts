@@ -46,7 +46,9 @@ try {
       "utf8",
     ),
   ) as Fixture;
-} catch {
+} catch (err) {
+  // A missing fixture is a normal skip; surface parse/other errors.
+  if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") throw err;
   fixture = null;
 }
 const EXPECTED_ASSET_COUNT = fixture?.length ?? 0;
@@ -56,14 +58,17 @@ const SAMPLE_HOSTNAMES = fixture
       5,
     ) as string[])
   : [];
-const canRoundTrip = Boolean(VIPER_CALLBACK_URL && fixture);
+const canRoundTrip = Boolean(VIPER_CALLBACK_URL) && EXPECTED_ASSET_COUNT > 0;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Fail fast if a container stalls, instead of hanging until the global timeout.
+const REQUEST_TIMEOUT_MS = 15_000;
 
 async function getAssetsPage(page: number, pageSize: number) {
   const res = await fetch(
     `${VIPER_API_URL}/assets?page=${page}&pageSize=${pageSize}`,
-    { headers: authHeaders },
+    { headers: authHeaders, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
   );
   expect(res.status).toBe(200);
   return (await res.json()) as {

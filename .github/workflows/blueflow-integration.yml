@@ -29,6 +29,7 @@ jobs:
     name: VIPER <-> Blueflow API integration
     runs-on: ubuntu-latest
     continue-on-error: true
+    timeout-minutes: 30
 
     env:
       VIPER_IMAGE: viper:ci
@@ -40,6 +41,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # --- Step 1: Build the VIPER image ----------------------------------
       - name: Set up Docker Buildx

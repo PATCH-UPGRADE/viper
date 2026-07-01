@@ -7,7 +7,12 @@
 // capture. The token is single-use (consumed on first request), so mint it
 // immediately before registering the Blueflow webhook and push a single page.
 
-import { AuthType, IntegrationType, ResourceType } from "@/generated/prisma";
+import {
+  AuthType,
+  IntegrationType,
+  Prisma,
+  ResourceType,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createUserToken } from "@/lib/tokens";
 
@@ -29,9 +34,21 @@ async function main() {
     where: { name: INTEGRATION_NAME, userId: seedUser.id },
   });
   if (existing) {
-    await prisma.user
-      .delete({ where: { id: existing.integrationUserId } })
-      .catch(() => {});
+    try {
+      await prisma.user.delete({
+        where: { id: existing.integrationUserId },
+      });
+    } catch (err) {
+      // Ignore only "record already gone" (e.g. a concurrent cleanup);
+      // rethrow anything else so real failures aren't hidden and stale
+      // Integration rows can't silently pile up.
+      if (
+        !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+        err.code !== "P2025"
+      ) {
+        throw err;
+      }
+    }
   }
 
   // Mirror integrations.create: an Integration owns a dedicated integrationUser

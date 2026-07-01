@@ -5,7 +5,9 @@
 This is Blueflow's own seed data, pulled live from their `develop` branch so the
 integration test always runs against their current fixture:
 
-    https://raw.githubusercontent.com/virtalabs/blueflow/develop/data/assets.json
+```text
+https://raw.githubusercontent.com/virtalabs/blueflow/develop/data/assets.json
+```
 
 - **CI** fetches it automatically (see the "Fetch Blueflow asset fixture" step in
   [`.github/workflows/blueflow-integration.yml`](../../../.github/workflows/blueflow-integration.yml)).

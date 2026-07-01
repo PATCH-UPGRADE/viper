@@ -7,7 +7,7 @@ webhook push.
 
 ## The flow
 
-```
+```text
  blueflow-db ← Blueflow (virtalabsinc/blueflow:latest, Docker Hub, :8000)
                  1. entrypoint auto-runs `manage.py migrate`
                  2. create_assets → assets inserted into Blueflow's DB

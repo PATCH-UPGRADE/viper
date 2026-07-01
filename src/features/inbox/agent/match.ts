@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { ConfidenceLevel } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { cpeToDeviceGroup } from "@/lib/router-utils";
+import { deviceIdentityInline } from "@/lib/string-utils";
 import type { Candidates } from "./candidate-search";
 import type { ExtractResult } from "./extract";
 
@@ -67,15 +68,11 @@ function renderCandidates(candidates: Candidates): string {
 
   return candidates.deviceGroups
     .map((entry, i) => {
-      const e = entry.extracted;
-      const extractedLine = `Device group #${i + 1} extracted: cpe=${e.cpe ?? "?"} | manufacturer=${e.manufacturer ?? "?"} | modelName=${e.modelName ?? "?"} | version=${e.version ?? "?"}`;
+      const extractedLine = `Device group #${i + 1} extracted: ${deviceIdentityInline(entry.extracted)}`;
       const matches =
         entry.matches.length > 0
           ? entry.matches
-              .map(
-                (m) =>
-                  `    - id: ${m.id} | cpe: ${m.cpe.join(", ") || "(none)"} | manufacturer: ${m.manufacturer ?? "(none)"} | modelName: ${m.modelName ?? "(none)"} | version: ${m.version ?? "(none)"}`,
-              )
+              .map((m) => `    - id: ${m.id} | ${deviceIdentityInline(m)}`)
               .join("\n")
           : "    - (no candidates found)";
       return `${extractedLine}\n  Candidates:\n${matches}`;

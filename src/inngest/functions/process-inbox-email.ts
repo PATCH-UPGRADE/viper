@@ -12,6 +12,7 @@ import {
   stripHtml,
 } from "@/features/inbox/agent/relevance";
 import { triageNotification } from "@/features/inbox/agent/triage";
+import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
 import { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { normalizeMd5, uploadBufferToS3 } from "@/lib/s3";
@@ -237,7 +238,19 @@ export const processInboxEmail = inngest.createFunction(
       return matchAndLinkEntities(notificationId, extracted, candidates);
     });
 
-    // 9. Triage: assign priority, reason, and hospital impact
+    // 9. VEX sort: if the notification has linked vulnerabilities, sort each
+    // baseline Issue into at-risk / possibly-at-risk / unaffected. Runs before
+    // triage so priority/hospital-impact reasoning can reflect the results.
+    const vexSummary = await step.run("sort-vulnerabilities", async () => {
+      if (!notificationId) return { vexSkipped: true as const };
+      const vulnCount = await prisma.notificationVulnerabilityMapping.count({
+        where: { notificationId },
+      });
+      if (vulnCount === 0) return { vexSkipped: true as const };
+      return sortNotificationVulnerabilities(notificationId);
+    });
+
+    // 10. Triage: assign priority, reason, and hospital impact
     if (notificationId) {
       await step.run("triage-notification", async () => {
         const result = await triageNotification(sourceId, notificationId);
@@ -252,6 +265,6 @@ export const processInboxEmail = inngest.createFunction(
       });
     }
 
-    return { sourceId, notificationId, emailId, linkSummary };
+    return { sourceId, notificationId, emailId, linkSummary, vexSummary };
   },
 );

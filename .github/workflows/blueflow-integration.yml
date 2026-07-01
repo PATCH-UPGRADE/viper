@@ -24,6 +24,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: blueflow-integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   integration-test:
     name: VIPER <-> Blueflow API integration
@@ -67,11 +71,8 @@ jobs:
       - name: Start integration stack
         run: BLUEFLOW_IMAGE="$BLUEFLOW_IMAGE" $COMPOSE up -d
 
-      - name: Wait for VIPER API
-        run: npx --yes wait-on -t 180000 http://localhost:3000/api/inngest
-
-      - name: Wait for Blueflow API
-        run: npx --yes wait-on -t 120000 tcp:localhost:8000
+      - name: Wait for VIPER + Blueflow APIs
+        run: npx --yes wait-on -t 180000 http://localhost:3000/api/inngest tcp:localhost:8000
 
       # --- Step 4: Fetch Blueflow's fixture, then seed --------------------
       - name: Fetch Blueflow asset fixture (develop)

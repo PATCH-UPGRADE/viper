@@ -2,7 +2,10 @@ import { Prisma, TriggerEnum } from "@/generated/prisma";
 import type { PayloadToResult } from "@/generated/prisma/runtime/library";
 import { inngest } from "@/inngest/client";
 import prisma from "./db";
-import { deviceGroupWhereForMatching, resolveMatches } from "./device-matching";
+import {
+  deviceGroupWhereForMatching,
+  matchingAppliesToDeviceGroup,
+} from "./device-matching";
 import { getBaseUrl } from "./url-utils";
 import { sendWebhook } from "./utils";
 
@@ -82,11 +85,13 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
           // cast id to string. we know a string exists since create succeeded
           const vulnerabilityId = vulnerability.id as string;
 
-          // Resolve this vuln's matchings to concrete device groups, then find
-          // every asset in those groups and open issues for them.
+          // Resolve this vuln's matchings to concrete device groups, then open
+          // one issue per matching that actually affects a real asset (not one
+          // issue per asset).
           const matchings = await client.deviceGroupMatching.findMany({
             where: { vulnerabilities: { some: { id: vulnerabilityId } } },
             select: {
+              id: true,
               vendorId: true,
               productId: true,
               versionId: true,
@@ -105,25 +110,36 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
                 version: { select: { canonicalName: true } },
               },
             });
-            const matchedGroupIds = resolveMatches(
-              matchings,
-              candidateGroups,
-            ).map((group) => group.id);
 
-            if (matchedGroupIds.length > 0) {
-              const assets = await client.asset.findMany({
-                where: { deviceGroupId: { in: matchedGroupIds } },
-                select: { id: true },
+            const groupsWithAssets = new Set(
+              (
+                await client.asset.findMany({
+                  where: {
+                    deviceGroupId: { in: candidateGroups.map((g) => g.id) },
+                  },
+                  select: { deviceGroupId: true },
+                  distinct: ["deviceGroupId"],
+                })
+              ).map((asset) => asset.deviceGroupId),
+            );
+
+            const affectedMatchingIds = matchings
+              .filter((matching) =>
+                candidateGroups.some(
+                  (group) =>
+                    groupsWithAssets.has(group.id) &&
+                    matchingAppliesToDeviceGroup(matching, group),
+                ),
+              )
+              .map((matching) => matching.id);
+
+            if (affectedMatchingIds.length > 0) {
+              await client.issue.createMany({
+                data: affectedMatchingIds.map((deviceGroupMatchingId) => ({
+                  vulnerabilityId,
+                  deviceGroupMatchingId,
+                })),
               });
-
-              if (assets.length > 0) {
-                await client.issue.createMany({
-                  data: assets.map((asset) => ({
-                    vulnerabilityId,
-                    assetId: asset.id,
-                  })),
-                });
-              }
             }
           }
 

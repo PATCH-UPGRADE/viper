@@ -30,7 +30,9 @@ function generateInventorySummaryTable(assets: AssetForContext[]): string {
   const rows = assets.map((a) => {
     const label = a.hostname ?? a.ip ?? shortId(a.id);
     const device = deviceGroupLabel(a.deviceGroup);
-    const active = (a.issues ?? []).filter((i) => i.status === "ACTIVE").length;
+    const active = (a.issues ?? []).filter(
+      (i) => i.status === "AFFECTED",
+    ).length;
     return `| ${label} (${shortId(a.id)}) | ${device} | ${a.role ?? "—"} | ${a.status ?? "—"} | ${active} |`;
   });
 
@@ -53,7 +55,11 @@ function generateVulnAssetRemMap(
     const assetLabels =
       v.issues && v.issues.length > 0
         ? v.issues
-            .map((i) => i.asset.hostname ?? i.asset.ip ?? shortId(i.asset.id))
+            .map((i) =>
+              i.asset
+                ? (i.asset.hostname ?? i.asset.ip ?? shortId(i.asset.id))
+                : "device group",
+            )
             .join(", ")
         : "—";
     const remLabels =

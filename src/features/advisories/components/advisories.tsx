@@ -193,10 +193,10 @@ function AdvisoryIssueProgressBar({
   if (total === 0) return null;
 
   const remediated = issues.filter(
-    (i) => i.status === IssueStatus.REMEDIATED,
+    (i) => i.status === IssueStatus.FIXED,
   ).length;
   const falsePos = issues.filter(
-    (i) => i.status === IssueStatus.FALSE_POSITIVE,
+    (i) => i.status === IssueStatus.NOT_AFFECTED,
   ).length;
   const active = total - remediated - falsePos;
 

@@ -346,7 +346,7 @@ const detailLinkedRemediationSchema = z.object({
 const ticketIssueSchema = z.object({
   id: z.string(),
   status: z.enum(IssueStatus),
-  assetId: z.string(),
+  assetId: z.string().nullable(),
   vulnerabilityId: z.string(),
 });
 

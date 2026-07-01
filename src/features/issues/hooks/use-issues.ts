@@ -22,11 +22,13 @@ export const useUpdateIssueStatus = () => {
         queryClient.invalidateQueries(
           trpc.issues.getOne.queryFilter({ id: data.id }),
         );
-        queryClient.invalidateQueries(
-          trpc.issues.getManyInternalByStatusAndAssetId.queryFilter({
-            assetId: data.assetId,
-          }),
-        );
+        if (data.assetId) {
+          queryClient.invalidateQueries(
+            trpc.issues.getManyInternalByStatusAndAssetId.queryFilter({
+              assetId: data.assetId,
+            }),
+          );
+        }
         queryClient.invalidateQueries(
           trpc.assets.getIssueMetricsInternal.queryFilter(),
         );

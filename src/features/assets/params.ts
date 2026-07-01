@@ -16,7 +16,9 @@ for (const status of Object.values(IssueStatus)) {
 
 export const assetDetailParams = {
   ...issueStatusPageParams,
-  issueStatus: parseAsStringEnum<IssueStatus>(Object.values(IssueStatus))
-    .withDefault(IssueStatus.ACTIVE)
+  issueStatus: parseAsStringEnum<IssueStatus>(
+    Object.values(IssueStatus),
+  )
+    .withDefault(IssueStatus.AFFECTED)
     .withOptions({ clearOnDefault: true }),
 };

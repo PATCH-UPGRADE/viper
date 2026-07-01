@@ -168,9 +168,4 @@ describe("round trip: Blueflow webhook push -> VIPER ingest", () => {
       }
     },
   );
-
-  it.skipIf(canRoundTrip)(
-    "round trip skipped: needs VIPER_CALLBACK_URL (integration token) and the fetched Blueflow fixture",
-    () => {},
-  );
 });

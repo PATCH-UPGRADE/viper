@@ -54,3 +54,4 @@ next-env.d.ts
 
 # mprocs log
 mprocs.log
+tests/integration/fixtures/blueflow-assets.json

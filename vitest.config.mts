@@ -1,7 +1,7 @@
 import path from "node:path";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [tsconfigPaths(), react()],
@@ -9,6 +9,9 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
     testTimeout: 60_000,
+    // Integration tests run against live containers via their own config
+    // (vitest.integration.config.mts / `npm run test:integration`).
+    exclude: [...configDefaults.exclude, "tests/integration/**"],
   },
   resolve: {
     alias: {

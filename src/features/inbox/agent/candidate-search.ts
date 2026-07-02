@@ -97,7 +97,7 @@ async function searchDeviceGroupMatching(
 
       const identity = {
         vendorId: deviceGroup.vendorId,
-        prodcutId: deviceGroup.productId,
+        productId: deviceGroup.productId,
         versionId: deviceGroup.versionId
       };
 
@@ -126,7 +126,7 @@ async function searchDeviceGroupMatching(
     extracted.modelName,
   ].filter((t): t is string => !!t && t.trim().length > 0);
 
-  if (terms.length === 0) return [];
+  if (terms.length === 0) return [...matched.values()];
 
   const or: Prisma.DeviceGroupMatchingWhereInput[] = [];
   // TODO: consider something like a fuzzy search?
@@ -223,7 +223,7 @@ async function searchRemediation(extracted: ExtractedRemediation): Promise<Remed
 async function searchAsset(extracted: ExtractedAsset): Promise<AssetCandidate[]> {
   const or: Prisma.AssetWhereInput[] = [];
   if(extracted.ip) {
-    or.push({ip: {contains: extracted.ip}})
+    or.push({ip: {contains: extracted.ip, mode: "insensitive"}})
   }
   if(extracted.hostname) {
     or.push({ hostname: { contains: extracted.hostname, mode: "insensitive"}})

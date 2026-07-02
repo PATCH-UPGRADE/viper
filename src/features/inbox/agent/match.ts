@@ -57,8 +57,17 @@ For each extracted device group, choose exactly ONE action:
 - "update": the device group matches an existing candidate, but the notification contains additional/missing identifier info worth saving (e.g. a versionRange the record lacks). Set targetId to that candidate's id and put the new values in fields.
 - "create": none of the candidates match. Put the device group's identifiers in fields. Manufacturer is required to create — if you cannot supply one, prefer "link" to the closest candidate or omit the decision entirely.
 
+For each extracted Vulnerability, choose exactly ONE action:
+- "link": the vulnerability clearly matches an existing candidate (same CVE id). Set targetId to that candidate's id.
+
+For each extracted Remediation, choose exactly ONE action:
+- "link": the remediation clearly matches an existing candidate. Set targetId to that candidate's id.
+
+For each extracted Asset, choose exactly ONE action:
+- "link": the asset clearly matches an existing candidate (same IP/hostname). Set targetId to that candidate's id.
+
 CONFIDENCE (you may only use these two):
-- "Matched": strong identifier match (same CVE id, or same manufacturer + model).
+- "Matched": strong identifier match (same CVE id, same IP/hostname, or same manufacturer + model).
 - "NeedsReview": plausible but uncertain match, or a newly created record that a human should verify.
 
 Always give a concise reasonWhy explaining the match. Only emit decisions you are reasonably confident about; it is fine to return fewer decisions than extracted entities.`;
@@ -101,7 +110,7 @@ function renderCandidates(candidates: Candidates): string {
           .map((m) => ` - id: ${m.id} | cveId: ${m.cveId ?? "(none)"} | description: ${m.description} ?? "(none)"}`).join("\n")
          : "    - (no candidates found)";
       
-         return `${line}\n Candidates: \m${matches}`;
+         return `${line}\n Candidates: \n${matches}`;
       })
       .join("\n\n"),
     );
@@ -111,13 +120,13 @@ function renderCandidates(candidates: Candidates): string {
     sections.push("\n"+
       candidates.remediations.map((entry, i) => {
         const e = entry.extracted;
-        const line = `Remediations #${i+1}: linkedtoCveId=${e.linkedCveId ?? "?"} | ip=${e.description ?? "?"}`;
+        const line = `Remediations #${i+1}: linkedtoCveId=${e.linkedCveId ?? "?"} | description=${e.description} ?? "?"}`;
         const matches = entry.matches.length > 0
         ? entry.matches
-          .map((m) => ` - id: ${m.id} | linkedtoCveId: ${m.linkedCveId ?? "(none"} | description: ${m.description ?? "(none)"}`).join("\n")
+          .map((m) => ` - id: ${m.id} | linkedtoCveId: ${m.linkedCveId ?? "(none)"} | description: ${m.description ?? "(none)"}`).join("\n")
          : "    - (no candidates found)";
       
-         return `${line}\n Candidates: \m${matches}`;
+         return `${line}\n Candidates: \n${matches}`;
       })
       .join("\n\n"),
     );
@@ -127,13 +136,13 @@ function renderCandidates(candidates: Candidates): string {
     sections.push("\n"+
       candidates.assets.map((entry, i) => {
         const e = entry.extracted;
-        const line = `Asset #${i+1}: ip=${e.ip ?? "?"} | hostname=${e.hostname ?? "?"}`;
+        const line = `Asset #${i+1}: ip=${e.ip ?? "?"} | hostname=${e.hostname} ?? "?"}`;
         const matches = entry.matches.length > 0
         ? entry.matches
           .map((m) => ` - id: ${m.id} | ip: ${m.ip ?? "(none)"} | hostname: ${m.hostname} ?? "(none)"}`).join("\n")
          : "    - (no candidates found)";
       
-         return `${line}\n Candidates: \m${matches}`;
+         return `${line}\n Candidates: \n${matches}`;
       })
       .join("\n\n"),
     );

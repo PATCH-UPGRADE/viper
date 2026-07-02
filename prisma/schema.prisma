@@ -1258,7 +1258,7 @@ model NotificationDeviceGroupMapping {
   reasonWhy String?
 
   @@unique([notificationId, deviceGroupMatchingId])
-  @@unique([workOrderTicketId, deviceGroupMatchingId], map: "ndg_mapping_workorder_devicegroup_key")
+  @@unique([workOrderTicketId, deviceGroupMatchingId], map: "ndg_mapping_workorder_devicegroupmatching_key")
   @@index([workOrderTicketId])
 
   @@map("notification_device_group_mapping")

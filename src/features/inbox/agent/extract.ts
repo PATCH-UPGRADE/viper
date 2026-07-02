@@ -9,8 +9,6 @@ import { fetchPdfAttachments } from "../utils";
 // A device group referenced by a notification. All fields are optional so the
 // model can emit whatever identifiers it finds; downstream code skips entries
 // with no usable identifier.
-// TODO: add new fields like UDI after VW-283 gets merged in
-// TODO: add new fields like versionRange after VW-283 gets merged in (used to create a DeviceGroupMatchObject?)
 // vers schema, if we provide that + maybe a skill to use it if necessary, has a way to provide multiple OR versions
 //  https://www.packageurl.org/docs/vers/schemas
 // TODO: if we can find more data to support this, add something like serialRange
@@ -18,6 +16,7 @@ import { fetchPdfAttachments } from "../utils";
 //    something like externalId on an Integration model
 export const extractedDeviceGroupSchema = z.object({
   cpe: z.string().nullish(),
+  udi: z.string().nullish(),
   manufacturer: z.string().nullish(),
   modelName: z.string().nullish(),
   version: z.string().nullish(),
@@ -26,29 +25,40 @@ export const extractedDeviceGroupSchema = z.object({
 
 export const extractedVulnerabilitySchema = z.object({
   cveId: z.string().regex(/^CVE-\d{4}-\d{4,}$/i).nullish(), 
-  manufacturer: z.string().nullish(),
-  modelName: z.string().nullish()
+});
+
+export const extractedRemediationSchema = z.object({
+  linkedCveId: z.string().regex(/^CVE-\d{4}-\d{4,}$/i).nullish(),
+  description: z.string().nullish()
+});
+
+export const extractedAssetSchema = z.object({
+  ip: z.string().nullish(),
+  hostname: z.string().nullish()
 })
 
-// TODO: extend this, which has just device groups for now, with vulnerabilities
-// and remediations
 export const extractSchema = z.object({
   deviceGroups: z.array(extractedDeviceGroupSchema),
-  vulnerabilities: z.array(extractedVulnerabilitySchema)
+  vulnerabilities: z.array(extractedVulnerabilitySchema),
+  remediations: z.array(extractedRemediationSchema),
+  assets: z.array(extractedAssetSchema)
 });
 
 export type ExtractedDeviceGroup = z.infer<typeof extractedDeviceGroupSchema>;
 export type ExtractedVulnerability = z.infer<typeof extractedVulnerabilitySchema>;
+export type ExtractedRemediation = z.infer<typeof extractedRemediationSchema>;
+export type ExtractedAsset = z.infer<typeof extractedAssetSchema>;
 export type ExtractResult = z.infer<typeof extractSchema>;
 
 const MODEL = "claude-haiku-4-5-20251001";
 
 const SYSTEM_PROMPT = `You are an extraction agent for a hospital cybersecurity platform that reads security notifications (advisories, recalls, update notices) and their PDF attachments.
 
-Your task: extract the DEVICE GROUPS and VULNERABILITIES that the notification is about. A device group is a class of affected product, identified by some combination of:
+Your task: extract the following Entities that the notification is about. 
 
-For DEVICE GROUPS:
+FOR DEVICE GROUPS: A device group is a class of affected product, identified by some combination of:
 - CPE string (e.g. "cpe:2.3:a:vendor:product:1.0:*:*:*:*:*:*:*")
+- UDI: a device-label identifier (distinct from a CPE)
 - manufacturer / vendor (e.g. "Philips", "GE Healthcare")
 - model name (e.g. "IntelliVue MX40", "Alaris Pump")
 - version / firmware (e.g. "2.3.1")
@@ -56,13 +66,20 @@ For DEVICE GROUPS:
 
 FOR VULNERABILITIES: CVEids or security issues explicitly named
 - cveId: must match format CVE-YYYY-NNNNN (e.g CVE-2020-25175). Omit if not explicitly named.
-- manufacturer / modelName of the affected device if mentioned alongside the CVE
+
+FOR REMEDIATIONS: Patches, firmware updates, or mitigations explicitly described
+- linkedCveId: must match format CVE-YYYY-NNNNN (e.g CVE-2020-25175). Omit if not explicitly named.
+- description: a short description of the fix (e.g Apply GE Healthcare ICS security controls per CISA advisory)
+
+FOR ASSETS: Specific devices named by network identity
+- ip address (IPv4 or IPv6)
+- hostname 
 
 RULES:
-- Extract ONLY device groups explicitly referenced in the notification or its attachments.
+- Extract ONLY Entities explicitly referenced in the notification or its attachments.
 - Omit any field you are unsure about; do not guess or fabricate CPEs, models, or versions.
-- If the notification references no specific device, return an empty deviceGroups array.
-- Each distinct affected product should be its own entry.`;
+- If the notification references no specific info, return an empty array for each entity.
+- Each distinct affected product/vulnerability/remediation/asset should be its own entry.`;
 
 export async function extractEntities(
   sourceId: string,

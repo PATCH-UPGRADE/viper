@@ -79,7 +79,7 @@ export type NotificationDetailWithRelations = Omit<
   NotificationDetailBasePayload,
   "deviceGroupsMatchings"
 > & {
-  deviceGroupMatchings: (NotificationDetailBasePayload["deviceGroupsMatchings"][number] & {
+  deviceGroupsMatchings: (NotificationDetailBasePayload["deviceGroupsMatchings"][number] & {
     assetCount: number;
     assets: ResolvedDeviceGroupAsset[];
   })[];

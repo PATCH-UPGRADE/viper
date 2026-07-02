@@ -337,7 +337,7 @@ export async function enrichDeviceGroupIdentifiers(
     const mergedCpes = updates.cpe ? [...new Set([...deviceGroup.cpe, updates.cpe])] : deviceGroup.cpe;
     const needsCpe = mergedCpes.length !== deviceGroup.cpe.length;
     const needsUdi = !!updates.udi && !deviceGroup.udi;
-    if (!needsCpe || !needsUdi) return;
+    if (!needsCpe && !needsUdi) return;
 
     await prisma.deviceGroup.update({
       where: { id: deviceGroup.id },

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { planVexWrites, type VexContext, type VexResult } from "../vex";
+import type { VexContext } from "../context";
+import { planVexWrites } from "../process_output";
+import type { VexResult } from "../tools";
 
 // A notification linking one vuln whose matching resolves to a device group with
 // two assets, plus a second vuln/issue with no assets.

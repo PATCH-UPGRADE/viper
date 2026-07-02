@@ -82,10 +82,7 @@ export const vulnerabilityExtension = Prisma.defineExtension((client) =>
           const vulnerabilityId = vulnerability.id as string;
 
           // Open one baseline issue per DeviceGroupMatching linked to this
-          // vulnerability, regardless of whether any assets exist yet. The VEX
-          // sorting agent later refines these (status/justification) and may add
-          // asset-level override issues. skipDuplicates keeps replays idempotent
-          // (issues are unique per [deviceGroupMatchingId, vulnerabilityId]).
+          // vulnerability, regardless of whether any assets exist yet.
           const matchings = await client.deviceGroupMatching.findMany({
             where: { vulnerabilities: { some: { id: vulnerabilityId } } },
             select: { id: true },

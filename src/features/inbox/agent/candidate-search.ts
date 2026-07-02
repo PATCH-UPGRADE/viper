@@ -3,6 +3,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { normalizeName } from "@/lib/router-utils";
 import type {
   ExtractedAsset,
   ExtractedDeviceGroup,
@@ -10,8 +11,6 @@ import type {
   ExtractedVulnerability,
   ExtractResult,
 } from "./extract";
-import { normalizeName } from "@/lib/router-utils";
-import { PrimitiveAtom } from "jotai";
 
 const TOP_K = 5;
 

@@ -8,8 +8,8 @@ import { z } from "zod";
 import type { ConfidenceLevel } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
-  addVendorAlias,
   addProductAlias,
+  addVendorAlias,
   enrichDeviceGroupIdentifiers,
   resolveMatchingId,
 } from "@/lib/router-utils";

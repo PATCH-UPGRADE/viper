@@ -88,7 +88,7 @@ interface PrismaClientLike {
 // ============================================================================
 
 // Normalize a name for canonical lookup (the displayName keeps the original).
-function normalizeName(name: string): string {
+export function normalizeName(name: string): string {
   return name.trim().toLowerCase();
 }
 
@@ -200,6 +200,49 @@ export async function resolveVersion(
   }
 }
 
+export async function addVendorAlias(id: string, alias: string): Promise<void> {
+  const normalized = normalizeName(alias);
+  const row = await prisma.vendor.findUnique({
+    where: { id },
+    select: { canonicalName: true, nameMappings: true },
+  });
+
+  if (!row) return;
+  if (
+    normalized === row.canonicalName ||
+    row.nameMappings.includes(normalized)
+  ) {
+    return;
+  }
+  await prisma.vendor.update({
+    where: { id },
+    data: { nameMappings: { push: normalized } },
+  });
+}
+
+export async function addProductAlias(
+  id: string,
+  alias: string,
+): Promise<void> {
+  const normalized = normalizeName(alias);
+  const row = await prisma.product.findUnique({
+    where: { id },
+    select: { canonicalName: true, nameMappings: true },
+  });
+
+  if (!row) return;
+  if (
+    normalized === row.canonicalName ||
+    row.nameMappings.includes(normalized)
+  ) {
+    return;
+  }
+  await prisma.product.update({
+    where: { id },
+    data: { nameMappings: { push: normalized } },
+  });
+}
+
 // ============================================================================
 // DeviceGroup resolution
 // ============================================================================
@@ -266,7 +309,6 @@ export async function resolveDeviceGroup(identity: DeviceGroupIdentityInput) {
       if (!deviceGroup) throw error;
     }
   }
-
   // Union any new CPEs / fill in a missing UDI on the existing/created group.
   const mergedCpes = [...new Set([...deviceGroup.cpe, ...cpes])];
   const needsCpe = mergedCpes.length !== deviceGroup.cpe.length;
@@ -282,6 +324,42 @@ export async function resolveDeviceGroup(identity: DeviceGroupIdentityInput) {
   }
 
   return deviceGroup;
+}
+
+// This is similiar to the above resolveDeviceGroup except it doesn't create. From
+// Notification mentioning an identifier isn't evidence the hospital owns the device
+// creating one from notification would pollute inventory
+export async function enrichDeviceGroupIdentifiers(
+  identity: {
+    vendorId: string;
+    productId: string | null;
+    versionId: string | null;
+  },
+  updates: { cpe?: string | null; udi?: string | null },
+): Promise<void> {
+  const deviceGroup = await prisma.deviceGroup.findFirst({
+    where: {
+      vendorId: identity.vendorId,
+      productId: identity.productId,
+      versionId: identity.versionId,
+    },
+  });
+  if (!deviceGroup) return;
+
+  const mergedCpes = updates.cpe
+    ? [...new Set([...deviceGroup.cpe, updates.cpe])]
+    : deviceGroup.cpe;
+  const needsCpe = mergedCpes.length !== deviceGroup.cpe.length;
+  const needsUdi = !!updates.udi && !deviceGroup.udi;
+  if (!needsCpe && !needsUdi) return;
+
+  await prisma.deviceGroup.update({
+    where: { id: deviceGroup.id },
+    data: {
+      ...(needsCpe ? { cpe: mergedCpes } : {}),
+      ...(needsUdi ? { udi: updates.udi } : {}),
+    },
+  });
 }
 
 const CPE_UNKNOWN_TOKENS = new Set(["", "-", "*"]);
@@ -355,6 +433,7 @@ type MatchingResolveInput = {
   product?: string | null;
   version?: string | null;
   versionRange?: string | null;
+  hasCpe?: boolean;
 };
 
 /**
@@ -362,13 +441,16 @@ type MatchingResolveInput = {
  * identity (resolved to canonical rows). Identities come from CPEs, so
  * canonicals are marked CPE-backed.
  */
-async function resolveMatchingId(input: MatchingResolveInput): Promise<string> {
-  const vendorRow = await resolveVendor(input.vendor, { hasCpe: true });
+export async function resolveMatchingId(
+  input: MatchingResolveInput,
+): Promise<string> {
+  const hasCpe = input.hasCpe ?? true;
+  const vendorRow = await resolveVendor(input.vendor, { hasCpe });
   const productRow = input.product
-    ? await resolveProduct(input.product, { hasCpe: true })
+    ? await resolveProduct(input.product, { hasCpe })
     : null;
   const versionRow = input.version
-    ? await resolveVersion(input.version, { hasCpe: true })
+    ? await resolveVersion(input.version, { hasCpe })
     : null;
 
   const where = {

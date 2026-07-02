@@ -1,14 +1,14 @@
 import { z } from "zod";
-import type { Prisma } from "@/generated/prisma";
+import type { AssetStatus, Prisma } from "@/generated/prisma";
 
 export const notificationInclude = {
-  deviceGroups: {
+  deviceGroupsMatchings: {
     include: {
-      deviceGroup: {
+      deviceGroupMatching: {
         include: {
           vendor: true,
           product: true,
-          _count: { select: { assets: true } },
+          version: true,
         },
       },
     },
@@ -21,29 +21,29 @@ export const notificationInclude = {
   },
 } satisfies Prisma.NotificationInclude;
 
-export type NotificationWithRelations = Prisma.NotificationGetPayload<{
+type NotificationBasePayload = Prisma.NotificationGetPayload<{
   include: typeof notificationInclude;
 }>;
+
+export type NotificationWithRelations = Omit<
+  NotificationBasePayload,
+  "deviceGroupsMatchings"
+> & {
+  deviceGroupsMatchings: (NotificationBasePayload["deviceGroupsMatchings"][number] & {
+    assetCount: number;
+  })[];
+};
 
 export type NotificationSource = NotificationWithRelations["sources"][number];
 
 export const notificationDetailInclude = {
-  deviceGroups: {
+  deviceGroupsMatchings: {
     include: {
-      deviceGroup: {
+      deviceGroupMatching: {
         include: {
           vendor: true,
           product: true,
-          _count: { select: { assets: true } },
-          assets: {
-            select: {
-              id: true,
-              ip: true,
-              hostname: true,
-              location: true,
-              status: true,
-            },
-          },
+          version: true,
         },
       },
     },
@@ -63,9 +63,27 @@ export const notificationDetailInclude = {
   },
 } satisfies Prisma.NotificationInclude;
 
-export type NotificationDetailWithRelations = Prisma.NotificationGetPayload<{
+type NotificationDetailBasePayload = Prisma.NotificationGetPayload<{
   include: typeof notificationDetailInclude;
 }>;
+
+export type ResolvedDeviceGroupAsset = {
+  id: string;
+  ip: string;
+  hostname: string | null;
+  location: unknown;
+  status: AssetStatus | null;
+};
+
+export type NotificationDetailWithRelations = Omit<
+  NotificationDetailBasePayload,
+  "deviceGroupsMatchings"
+> & {
+  deviceGroupMatchings: (NotificationDetailBasePayload["deviceGroupsMatchings"][number] & {
+    assetCount: number;
+    assets: ResolvedDeviceGroupAsset[];
+  })[];
+};
 
 export type NotificationDetailSource =
   NotificationDetailWithRelations["sources"][number];

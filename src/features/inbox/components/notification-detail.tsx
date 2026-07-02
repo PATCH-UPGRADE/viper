@@ -73,11 +73,10 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
   const displayTitle =
     notification.title ?? notification.summary ?? notification.id;
 
-  const totalDeviceGroups = notification.deviceGroups.length;
-  const deviceGroupsWithAssets = notification.deviceGroups.filter(
-    (m) => m.deviceGroup._count.assets > 0,
+  const totalDeviceGroups = notification.deviceGroupsMatchings.length;
+  const deviceGroupsWithAssets = notification.deviceGroupsMatchings.filter(
+    (m) => m.assetCount > 0,
   ).length;
-
   const firstReceived =
     notification.sources.length > 0
       ? new Date(
@@ -173,7 +172,7 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
           className="flex flex-col gap-4 mt-4"
         >
           <NotificationAffectedAssetsTab
-            deviceGroups={notification.deviceGroups}
+            deviceGroupsMatchings={notification.deviceGroupsMatchings}
           />
         </TabsContent>
       </Tabs>

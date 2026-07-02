@@ -12,9 +12,11 @@
     "dev:all": "mprocs",
     "db:seed": "prisma db seed",
     "db:create-test-api-key": "tsx scripts/create-test-api-key.ts",
+    "db:create-blueflow-integration": "tsx scripts/create-blueflow-integration.ts",
     "openapi:generate": "tsx scripts/generate-openapi.ts",
     "postinstall": "prisma generate",
-    "test": "vitest"
+    "test": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.mts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

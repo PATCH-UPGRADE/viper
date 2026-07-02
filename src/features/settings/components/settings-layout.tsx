@@ -1,6 +1,6 @@
 "use client";
 
-import { PlugIcon, WebhookIcon } from "lucide-react";
+import { BuildingIcon, PaletteIcon, PlugIcon, WebhookIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -28,7 +28,13 @@ export const SettingsSubheader = ({
 
 export const SettingsLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const activeTab = pathname.includes("webhooks") ? "webhooks" : "integrations";
+  const activeTab = pathname.includes("webhooks")
+    ? "webhooks"
+    : pathname.includes("departments")
+      ? "departments"
+      : pathname.includes("tag-colors")
+        ? "tag-colors"
+        : "integrations";
 
   // path and name for tab
   const tabs = [
@@ -42,6 +48,18 @@ export const SettingsLayout = ({ children }: { children: React.ReactNode }) => {
       "webhooks",
       <>
         <WebhookIcon /> Webhooks
+      </>,
+    ],
+    [
+      "departments",
+      <>
+        <BuildingIcon /> Departments
+      </>,
+    ],
+    [
+      "tag-colors",
+      <>
+        <PaletteIcon /> Tag Colors
       </>,
     ],
   ] as const;

@@ -81,7 +81,10 @@ async function seedDeviceGroups(userId: string) {
     const existing = await prisma.deviceGroup.findFirst({ where: identity });
     const deviceGroup =
       existing ?? (await prisma.deviceGroup.create({ data: identity }));
-
+    const existingMatching = await prisma.deviceGroupMatching.findFirst({
+      where: { vendorId: vendor.id, productId: product.id, versionId: null }
+    });
+    const deviceGroupMatching = existingMatching ?? (await prisma.deviceGroupMatching.create({ data: identity}))
     const existingAssets = await prisma.asset.count({
       where: { deviceGroupId: deviceGroup.id },
     });
@@ -104,7 +107,7 @@ async function seedDeviceGroups(userId: string) {
     console.log(
       `  ✅ ${dg.vendor} ${dg.product} (${deviceGroup.id}) — ${dg.assetCount} assets`,
     );
-    results.push({ ...dg, deviceGroupId: deviceGroup.id });
+    results.push({ ...dg, deviceGroupId: deviceGroup.id, deviceGroupMatchingId: deviceGroupMatching.id });
   }
 
   return results;
@@ -355,7 +358,7 @@ async function getSeedUser() {
 
 async function seedNotifications(
   _userId: string,
-  deviceGroups: Array<{ deviceGroupId: string }>,
+  deviceGroups: Array<{ deviceGroupMatchingId: string }>,
 ) {
   console.log("\n🌱 Seeding notifications...");
 
@@ -407,7 +410,7 @@ async function seedNotifications(
       await prisma.notificationDeviceGroupMapping.create({
         data: {
           notificationId: notification.id,
-          deviceGroupId: dg.deviceGroupId,
+          deviceGroupMatchingId: dg.deviceGroupMatchingId,
           confidence:
             Math.random() > 0.3
               ? ConfidenceLevel.Confirmed

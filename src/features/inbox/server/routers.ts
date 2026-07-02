@@ -3,35 +3,29 @@ import { z } from "zod";
 import { NotificationType, Priority } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
+  deviceGroupWhereForMatching, 
+  matchingAppliesToDeviceGroup,
+} from "@/lib/device-matching";
+import {
   buildPaginationMeta,
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { notificationDetailInclude } from "../types";
+import { notificationDetailInclude, notificationInclude } from "../types";
+
+type MatchingIdentity = {
+  vendorId: string;
+  productId: string | null;
+  versionId: string | null;
+  versionRange: string | null;
+};
 
 const ALLOWED_SORT_FIELDS = new Set(["priority", "updatedAt", "createdAt"]);
 
 function getSortValue(segment: string): "asc" | "desc" {
   return segment.startsWith("-") ? "desc" : "asc";
 }
-
-const notificationInclude = {
-  deviceGroups: {
-    include: {
-      deviceGroup: {
-        include: {
-          vendor: true,
-          product: true,
-          _count: { select: { assets: true } },
-        },
-      },
-    },
-  },
-  sources: {
-    select: { id: true, channel: true, raw: true, receivedAt: true },
-  },
-} as const;
 
 const createSearchFilter = (search: string) => {
   if (!search) return {};
@@ -40,6 +34,47 @@ const createSearchFilter = (search: string) => {
     OR: [{ title: insensitive }, { summary: insensitive }],
   };
 };
+
+async function resolvedDeviceGroupAssetCount(
+  matching: MatchingIdentity,
+): Promise<number> {
+  const candidates = await prisma.deviceGroup.findMany({
+    where: deviceGroupWhereForMatching(matching), 
+    select: {
+      id: true,
+      vendorId: true,
+      productId: true, 
+      versionId: true,
+      version: { select: { canonicalName: true }},
+      _count: { select: { assets: true }}
+    },
+  });
+  return candidates.filter((dg) => matchingAppliesToDeviceGroup(matching, dg)).reduce((sum, dg) => sum +dg._count.assets, 0);
+};
+
+async function resolveDeviceGroupAssets(matching: MatchingIdentity) {
+  const candidates = await prisma.deviceGroup.findMany({
+    where: deviceGroupWhereForMatching(matching),
+    select: {
+      id: true,
+      vendorId: true,
+      productId: true,
+      versionId: true,
+      version: { select: { canonicalName: true }},
+      assets: {
+        select: {
+          id: true,
+          ip: true,
+          hostname: true,
+          location: true,
+          status: true
+        }
+      }
+    }
+  });
+  return candidates.filter((dg) => matchingAppliesToDeviceGroup(matching, dg)).flatMap((dg) => dg.assets);
+}
+
 
 export const notificationsRouter = createTRPCRouter({
   getMany: protectedProcedure
@@ -88,7 +123,19 @@ export const notificationsRouter = createTRPCRouter({
             : { updatedAt: "desc" },
       });
 
-      return createPaginatedResponse(notifications, meta);
+      const items = await Promise.all(
+        notifications.map(async (n) => ({
+        ...n,
+        deviceGroupsMatchings: await Promise.all(
+          n.deviceGroupsMatchings.map(async(m) => ({
+            ...m,
+            assetCount: await resolvedDeviceGroupAssetCount(m.deviceGroupMatching),
+          })),
+        ),
+      })),
+    );
+
+      return createPaginatedResponse(items, meta);
     }),
 
   getOne: protectedProcedure
@@ -108,8 +155,13 @@ export const notificationsRouter = createTRPCRouter({
       if (!notification) {
         throw new Error("Notification not found");
       }
-
-      return notification;
+      const deviceGroupsMatchings = await Promise.all(
+        notification.deviceGroupsMatchings.map(async (m) => {
+          const assets = await resolveDeviceGroupAssets(m.deviceGroupMatching);
+          return { ...m, assetCount: assets.length, assets }
+        })
+      )
+      return {...notification, deviceGroupsMatchings};
     }),
 
   markRead: protectedProcedure

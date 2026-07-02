@@ -11,16 +11,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { deviceGroupLabel, parseLocation } from "@/lib/string-utils";
+import { deviceGroupMatchingLabel, parseLocation } from "@/lib/string-utils";
 import type { NotificationDetailWithRelations } from "../types";
 
 export function NotificationAffectedAssetsTab({
-  deviceGroups,
+  deviceGroupsMatchings,
 }: {
-  deviceGroups: NotificationDetailWithRelations["deviceGroups"];
+  deviceGroupsMatchings: NotificationDetailWithRelations["deviceGroupsMatchings"];
 }) {
-  const withAssets = deviceGroups.filter(
-    (m) => m.deviceGroup._count.assets > 0,
+  const withAssets = deviceGroupsMatchings.filter(
+    (m) => m.assetCount > 0,
   );
 
   if (withAssets.length === 0) {
@@ -37,9 +37,9 @@ export function NotificationAffectedAssetsTab({
         <Card key={mapping.id}>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              {deviceGroupLabel(mapping.deviceGroup)}
+              {deviceGroupMatchingLabel(mapping.deviceGroupMatching)}
               <Badge variant="secondary" className="font-normal">
-                {mapping.deviceGroup._count.assets}
+                {mapping.assetCount}
               </Badge>
             </CardTitle>
           </CardHeader>
@@ -55,7 +55,7 @@ export function NotificationAffectedAssetsTab({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mapping.deviceGroup.assets.map((asset) => (
+                {mapping.assets.map((asset) => (
                   <TableRow key={asset.id}>
                     <TableCell className="font-mono text-xs">
                       {asset.hostname ?? asset.id}

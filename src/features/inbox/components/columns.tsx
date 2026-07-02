@@ -12,7 +12,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Pill } from "@/components/ui/pill";
-import { deviceGroupLabel } from "@/lib/string-utils";
+import { deviceGroupMatchingLabel } from "@/lib/string-utils";
 import type { NotificationWithRelations, RawEmailPayload } from "../types";
 import { NotificationTypeBadge } from "./notification-type-badge";
 
@@ -120,15 +120,15 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
     meta: { title: "Assets" },
     header: "Assets",
     cell: ({ row }) => {
-      const { deviceGroups } = row.original;
-      if (deviceGroups.length === 0) {
+      const { deviceGroupsMatchings } = row.original;
+      if (deviceGroupsMatchings.length === 0) {
         return <span className="text-muted-foreground text-sm">—</span>;
       }
       return (
         <div className="flex flex-wrap gap-1">
-          {deviceGroups.map((mapping) => {
-            const label = deviceGroupLabel(mapping.deviceGroup);
-            const count = mapping.deviceGroup._count.assets;
+          {deviceGroupsMatchings.map((mapping) => {
+            const label = deviceGroupMatchingLabel(mapping.deviceGroupMatching);
+            const count = mapping.assetCount;
             return (
               <Pill key={mapping.id} title={label} count={count}>
                 {label}

@@ -24,28 +24,36 @@ export const extractedDeviceGroupSchema = z.object({
 });
 
 export const extractedVulnerabilitySchema = z.object({
-  cveId: z.string().regex(/^CVE-\d{4}-\d{4,}$/i).nullish(), 
+  cveId: z
+    .string()
+    .regex(/^CVE-\d{4}-\d{4,}$/i)
+    .nullish(),
 });
 
 export const extractedRemediationSchema = z.object({
-  linkedCveId: z.string().regex(/^CVE-\d{4}-\d{4,}$/i).nullish(),
-  description: z.string().nullish()
+  linkedCveId: z
+    .string()
+    .regex(/^CVE-\d{4}-\d{4,}$/i)
+    .nullish(),
+  description: z.string().nullish(),
 });
 
 export const extractedAssetSchema = z.object({
   ip: z.string().nullish(),
-  hostname: z.string().nullish()
-})
+  hostname: z.string().nullish(),
+});
 
 export const extractSchema = z.object({
   deviceGroups: z.array(extractedDeviceGroupSchema),
   vulnerabilities: z.array(extractedVulnerabilitySchema),
   remediations: z.array(extractedRemediationSchema),
-  assets: z.array(extractedAssetSchema)
+  assets: z.array(extractedAssetSchema),
 });
 
 export type ExtractedDeviceGroup = z.infer<typeof extractedDeviceGroupSchema>;
-export type ExtractedVulnerability = z.infer<typeof extractedVulnerabilitySchema>;
+export type ExtractedVulnerability = z.infer<
+  typeof extractedVulnerabilitySchema
+>;
 export type ExtractedRemediation = z.infer<typeof extractedRemediationSchema>;
 export type ExtractedAsset = z.infer<typeof extractedAssetSchema>;
 export type ExtractResult = z.infer<typeof extractSchema>;

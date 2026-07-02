@@ -82,9 +82,11 @@ async function seedDeviceGroups(userId: string) {
     const deviceGroup =
       existing ?? (await prisma.deviceGroup.create({ data: identity }));
     const existingMatching = await prisma.deviceGroupMatching.findFirst({
-      where: { vendorId: vendor.id, productId: product.id, versionId: null }
+      where: { vendorId: vendor.id, productId: product.id, versionId: null },
     });
-    const deviceGroupMatching = existingMatching ?? (await prisma.deviceGroupMatching.create({ data: identity}))
+    const deviceGroupMatching =
+      existingMatching ??
+      (await prisma.deviceGroupMatching.create({ data: identity }));
     const existingAssets = await prisma.asset.count({
       where: { deviceGroupId: deviceGroup.id },
     });
@@ -107,7 +109,11 @@ async function seedDeviceGroups(userId: string) {
     console.log(
       `  ✅ ${dg.vendor} ${dg.product} (${deviceGroup.id}) — ${dg.assetCount} assets`,
     );
-    results.push({ ...dg, deviceGroupId: deviceGroup.id, deviceGroupMatchingId: deviceGroupMatching.id });
+    results.push({
+      ...dg,
+      deviceGroupId: deviceGroup.id,
+      deviceGroupMatchingId: deviceGroupMatching.id,
+    });
   }
 
   return results;

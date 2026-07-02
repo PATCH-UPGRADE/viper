@@ -7,7 +7,12 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
 import type { ConfidenceLevel } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { addVendorAlias, addProductAlias, enrichDeviceGroupIdentifiers, resolveMatchingId } from "@/lib/router-utils";
+import {
+  addVendorAlias,
+  addProductAlias,
+  enrichDeviceGroupIdentifiers,
+  resolveMatchingId,
+} from "@/lib/router-utils";
 import type { Candidates } from "./candidate-search";
 import type { ExtractResult } from "./extract";
 
@@ -21,11 +26,16 @@ const deviceGroupFieldsSchema = z.object({
   manufacturer: z.string().nullish(),
   modelName: z.string().nullish(),
   version: z.string().nullish(),
-  versionRange: z.string().nullish()
+  versionRange: z.string().nullish(),
 });
 
 const decisionSchema = z.object({
-  kind: z.enum(["deviceGroupMatching", "vulnerability", "remediation", "asset"]), 
+  kind: z.enum([
+    "deviceGroupMatching",
+    "vulnerability",
+    "remediation",
+    "asset",
+  ]),
   op: z.enum(["link", "update", "create"]),
   // The id of an existing candidate to link/update. Omitted for create.
   targetId: z.string().nullish(),
@@ -75,80 +85,108 @@ Always give a concise reasonWhy explaining the match. Only emit decisions you ar
 function renderCandidates(candidates: Candidates): string {
   const sections: string[] = [];
 
-  if(candidates.deviceGroups.length === 0 && candidates.vulnerabilities.length === 0 && candidates.remediations.length === 0 && candidates.assets.length === 0){
+  if (
+    candidates.deviceGroups.length === 0 &&
+    candidates.vulnerabilities.length === 0 &&
+    candidates.remediations.length === 0 &&
+    candidates.assets.length === 0
+  ) {
     return "(no entities extracted)";
   }
 
-  if(candidates.deviceGroups.length > 0) {
+  if (candidates.deviceGroups.length > 0) {
     sections.push(
       candidates.deviceGroups
-      .map((entry, i) => {
-      const e = entry.extracted;
-      const extractedLine = `Device group #${i + 1} extracted: cpe=${e.cpe ?? "?"} | manufacturer=${e.manufacturer ?? "?"} | modelName=${e.modelName ?? "?"} | version=${e.version ?? "?"} | versionRange=${e.versionRange ?? "?"}`;
-      const matches =
-        entry.matches.length > 0
-          ? entry.matches
-              .map(
-                (m) =>
-                  `    - id: ${m.id} | manufacturer: ${m.manufacturer ?? "(none)"} | modelName: ${m.modelName ?? "(none)"} | version: ${m.version ?? "(none)"}`,
-              )
-              .join("\n")
-          : "    - (no candidates found)";
-      return `${extractedLine}\n  Candidates:\n${matches}`;
-    })
-    .join("\n\n")
+        .map((entry, i) => {
+          const e = entry.extracted;
+          const extractedLine = `Device group #${i + 1} extracted: cpe=${e.cpe ?? "?"} | manufacturer=${e.manufacturer ?? "?"} | modelName=${e.modelName ?? "?"} | version=${e.version ?? "?"} | versionRange=${e.versionRange ?? "?"}`;
+          const matches =
+            entry.matches.length > 0
+              ? entry.matches
+                  .map(
+                    (m) =>
+                      `    - id: ${m.id} | manufacturer: ${m.manufacturer ?? "(none)"} | modelName: ${m.modelName ?? "(none)"} | version: ${m.version ?? "(none)"}`,
+                  )
+                  .join("\n")
+              : "    - (no candidates found)";
+          return `${extractedLine}\n  Candidates:\n${matches}`;
+        })
+        .join("\n\n"),
     );
   }
 
-  if(candidates.vulnerabilities.length > 0) {
-    sections.push("\n"+
-      candidates.vulnerabilities.map((entry, i) => {
-        const e = entry.extracted;
-        const line = `Vulnerability #${i+1}: cveId=${e.cveId ?? "?"}`;
-        const matches = entry.matches.length > 0
-        ? entry.matches
-          .map((m) => ` - id: ${m.id} | cveId: ${m.cveId ?? "(none)"} | description: ${m.description} ?? "(none)"}`).join("\n")
-         : "    - (no candidates found)";
-      
-         return `${line}\n Candidates: \n${matches}`;
-      })
-      .join("\n\n"),
+  if (candidates.vulnerabilities.length > 0) {
+    sections.push(
+      "\n" +
+        candidates.vulnerabilities
+          .map((entry, i) => {
+            const e = entry.extracted;
+            const line = `Vulnerability #${i + 1}: cveId=${e.cveId ?? "?"}`;
+            const matches =
+              entry.matches.length > 0
+                ? entry.matches
+                    .map(
+                      (m) =>
+                        ` - id: ${m.id} | cveId: ${m.cveId ?? "(none)"} | description: ${m.description} ?? "(none)"}`,
+                    )
+                    .join("\n")
+                : "    - (no candidates found)";
+
+            return `${line}\n Candidates: \n${matches}`;
+          })
+          .join("\n\n"),
     );
   }
 
-  if(candidates.remediations.length > 0) {
-    sections.push("\n"+
-      candidates.remediations.map((entry, i) => {
-        const e = entry.extracted;
-        const line = `Remediations #${i+1}: linkedtoCveId=${e.linkedCveId ?? "?"} | description=${e.description} ?? "?"}`;
-        const matches = entry.matches.length > 0
-        ? entry.matches
-          .map((m) => ` - id: ${m.id} | linkedtoCveId: ${m.linkedCveId ?? "(none)"} | description: ${m.description ?? "(none)"}`).join("\n")
-         : "    - (no candidates found)";
-      
-         return `${line}\n Candidates: \n${matches}`;
-      })
-      .join("\n\n"),
+  if (candidates.remediations.length > 0) {
+    sections.push(
+      "\n" +
+        candidates.remediations
+          .map((entry, i) => {
+            const e = entry.extracted;
+            const line = `Remediations #${i + 1}: linkedtoCveId=${e.linkedCveId ?? "?"} | description=${e.description} ?? "?"}`;
+            const matches =
+              entry.matches.length > 0
+                ? entry.matches
+                    .map(
+                      (m) =>
+                        ` - id: ${m.id} | linkedtoCveId: ${m.linkedCveId ?? "(none)"} | description: ${m.description ?? "(none)"}`,
+                    )
+                    .join("\n")
+                : "    - (no candidates found)";
+
+            return `${line}\n Candidates: \n${matches}`;
+          })
+          .join("\n\n"),
     );
   }
 
-  if(candidates.assets.length >0){
-    sections.push("\n"+
-      candidates.assets.map((entry, i) => {
-        const e = entry.extracted;
-        const line = `Asset #${i+1}: ip=${e.ip ?? "?"} | hostname=${e.hostname} ?? "?"}`;
-        const matches = entry.matches.length > 0
-        ? entry.matches
-          .map((m) => ` - id: ${m.id} | ip: ${m.ip ?? "(none)"} | hostname: ${m.hostname} ?? "(none)"}`).join("\n")
-         : "    - (no candidates found)";
-      
-         return `${line}\n Candidates: \n${matches}`;
-      })
-      .join("\n\n"),
+  if (candidates.assets.length > 0) {
+    sections.push(
+      "\n" +
+        candidates.assets
+          .map((entry, i) => {
+            const e = entry.extracted;
+            const line = `Asset #${i + 1}: ip=${e.ip ?? "?"} | hostname=${e.hostname} ?? "?"}`;
+            const matches =
+              entry.matches.length > 0
+                ? entry.matches
+                    .map(
+                      (m) =>
+                        ` - id: ${m.id} | ip: ${m.ip ?? "(none)"} | hostname: ${m.hostname} ?? "(none)"}`,
+                    )
+                    .join("\n")
+                : "    - (no candidates found)";
+
+            return `${line}\n Candidates: \n${matches}`;
+          })
+          .join("\n\n"),
     );
   }
 
-  return sections.length > 0 ? sections.join("\n\n") : "(No Match Record Found)"
+  return sections.length > 0
+    ? sections.join("\n\n")
+    : "(No Match Record Found)";
 }
 
 // Build a Prisma data object from LLM-provided fields, dropping empties.
@@ -156,13 +194,20 @@ function cleanFields(fields: Decision["fields"]): {
   manufacturer?: string;
   modelName?: string;
   version?: string;
-  versionRange? :string;
+  versionRange?: string;
   cpe?: string;
   udi?: string;
 } {
   const out: Record<string, string> = {};
   if (!fields) return out;
-  for (const key of ["manufacturer", "modelName", "version", "versionRange", "cpe", "udi"] as const) {
+  for (const key of [
+    "manufacturer",
+    "modelName",
+    "version",
+    "versionRange",
+    "cpe",
+    "udi",
+  ] as const) {
     const val = fields[key];
     if (typeof val === "string" && val.trim().length > 0) out[key] = val.trim();
   }
@@ -214,7 +259,6 @@ export async function applyDecisions(
   // Only allow link/update against ids the search actually surfaced — guards
   // against hallucinated targetIds causing FK errors.
 
-
   const validIds = {
     deviceGroupMatching: new Set(
       candidates.deviceGroups.flatMap((e) => e.matches.map((m) => m.id)),
@@ -227,7 +271,7 @@ export async function applyDecisions(
     ),
     asset: new Set(
       candidates.assets.flatMap((e) => e.matches.map((m) => m.id)),
-    )
+    ),
   };
 
   await prisma.$transaction(async (tx) => {
@@ -236,46 +280,64 @@ export async function applyDecisions(
       const confidence: ConfidenceLevel =
         decision.confidence === "Matched" ? "Matched" : "NeedsReview";
 
-      if(decision.kind === "deviceGroupMatching"){
+      if (decision.kind === "deviceGroupMatching") {
         const upsertMapping = (deviceGroupMatchingId: string) =>
-        tx.notificationDeviceGroupMapping.upsert({
-          where: {
-            notificationId_deviceGroupMatchingId: { notificationId, deviceGroupMatchingId },
-          },
-          create: {
-            notificationId,
-            deviceGroupMatchingId,
-            confidence,
-            reasonWhy: decision.reasonWhy,
-          },
-          update: { confidence, reasonWhy: decision.reasonWhy },
-        });
-
-        const enrichDeviceGroup = async (deviceGroupMatchingId: string, data: ReturnType<typeof cleanFields>) => {
-          if(!data.cpe && !data.udi) return ;
-          const matching = await tx.deviceGroupMatching.findUnique({
-            where: {id: deviceGroupMatchingId},
-            select: { vendorId: true, productId: true, versionId: true},
+          tx.notificationDeviceGroupMapping.upsert({
+            where: {
+              notificationId_deviceGroupMatchingId: {
+                notificationId,
+                deviceGroupMatchingId,
+              },
+            },
+            create: {
+              notificationId,
+              deviceGroupMatchingId,
+              confidence,
+              reasonWhy: decision.reasonWhy,
+            },
+            update: { confidence, reasonWhy: decision.reasonWhy },
           });
-          if(matching) {
-            await enrichDeviceGroupIdentifiers(matching, { cpe: data.cpe, udi: data.udi });
+
+        const enrichDeviceGroup = async (
+          deviceGroupMatchingId: string,
+          data: ReturnType<typeof cleanFields>,
+        ) => {
+          if (!data.cpe && !data.udi) return;
+          const matching = await tx.deviceGroupMatching.findUnique({
+            where: { id: deviceGroupMatchingId },
+            select: { vendorId: true, productId: true, versionId: true },
+          });
+          if (matching) {
+            await enrichDeviceGroupIdentifiers(matching, {
+              cpe: data.cpe,
+              udi: data.udi,
+            });
           }
-        }
+        };
 
         // link the device group to the notification
         if (decision.op === "link") {
-          if (!decision.targetId || !validIds.deviceGroupMatching.has(decision.targetId)) {
+          if (
+            !decision.targetId ||
+            !validIds.deviceGroupMatching.has(decision.targetId)
+          ) {
             summary.skipped++;
             continue;
           }
           await upsertMapping(decision.targetId);
-          await enrichDeviceGroup(decision.targetId, cleanFields(decision.fields));
+          await enrichDeviceGroup(
+            decision.targetId,
+            cleanFields(decision.fields),
+          );
           summary.linked++;
         }
         // update the device group and link it to the notification
         // TODO: consider, we may want to separate this into 'update' and 'update_and_link' actions
         else if (decision.op === "update") {
-          if (!decision.targetId || !validIds.deviceGroupMatching.has(decision.targetId)) {
+          if (
+            !decision.targetId ||
+            !validIds.deviceGroupMatching.has(decision.targetId)
+          ) {
             summary.skipped++;
             continue;
           }
@@ -283,23 +345,32 @@ export async function applyDecisions(
           // can't be mutated in place; the only safe enrichment is unioning a new
           // CPE into the existing group's cpe[] array.
           const data = cleanFields(decision.fields);
-     
+
           const targetMatching = await tx.deviceGroupMatching.findUnique({
             where: { id: decision.targetId },
-            select: { versionRange: true, vendorId: true, productId: true, versionId: true }
+            select: {
+              versionRange: true,
+              vendorId: true,
+              productId: true,
+              versionId: true,
+            },
           });
 
-          if(data.versionRange && targetMatching && !targetMatching.versionRange) {
-              await tx.deviceGroupMatching.update({
-                where: { id: decision.targetId },
-                data: { versionRange: data.versionRange}
-              })
+          if (
+            data.versionRange &&
+            targetMatching &&
+            !targetMatching.versionRange
+          ) {
+            await tx.deviceGroupMatching.update({
+              where: { id: decision.targetId },
+              data: { versionRange: data.versionRange },
+            });
           }
-          if(targetMatching) {
-            if(data.manufacturer) {
+          if (targetMatching) {
+            if (data.manufacturer) {
               await addVendorAlias(targetMatching.vendorId, data.manufacturer);
             }
-            if(data.modelName && targetMatching.productId) {
+            if (data.modelName && targetMatching.productId) {
               await addProductAlias(targetMatching.productId, data.modelName);
             }
           }
@@ -309,7 +380,7 @@ export async function applyDecisions(
         } else {
           // create
           const data = cleanFields(decision.fields);
-          if(!data.manufacturer){
+          if (!data.manufacturer) {
             summary.skipped++;
             continue;
           }
@@ -318,48 +389,78 @@ export async function applyDecisions(
             product: data.modelName,
             version: data.version,
             versionRange: data.versionRange,
-            hasCpe: false
-          })
+            hasCpe: false,
+          });
           await upsertMapping(matchingId);
           await enrichDeviceGroup(matchingId, data);
           summary.created++;
         }
       } else if (decision.kind === "vulnerability") {
-        if(!decision.targetId || !validIds.vulnerability.has(decision.targetId)) {
+        if (
+          !decision.targetId ||
+          !validIds.vulnerability.has(decision.targetId)
+        ) {
           summary.skipped++;
           continue;
         }
         await tx.notificationVulnerabilityMapping.upsert({
           where: {
-            notificationId_vulnerabilityId: { notificationId, vulnerabilityId: decision.targetId}
+            notificationId_vulnerabilityId: {
+              notificationId,
+              vulnerabilityId: decision.targetId,
+            },
           },
-          create: { notificationId, vulnerabilityId: decision.targetId, confidence, reasonWhy: decision.reasonWhy},
-          update: { confidence, reasonWhy: decision.reasonWhy}
+          create: {
+            notificationId,
+            vulnerabilityId: decision.targetId,
+            confidence,
+            reasonWhy: decision.reasonWhy,
+          },
+          update: { confidence, reasonWhy: decision.reasonWhy },
         });
         summary.linked++;
       } else if (decision.kind === "remediation") {
-        if(!decision.targetId || !validIds.remediation.has(decision.targetId)) {
+        if (
+          !decision.targetId ||
+          !validIds.remediation.has(decision.targetId)
+        ) {
           summary.skipped++;
           continue;
         }
         await tx.notificationRemediationMapping.upsert({
           where: {
-            notificationId_remediationId: { notificationId, remediationId: decision.targetId }
-          }, 
-          create: { notificationId, remediationId: decision.targetId, confidence, reasonWhy: decision.reasonWhy},
+            notificationId_remediationId: {
+              notificationId,
+              remediationId: decision.targetId,
+            },
+          },
+          create: {
+            notificationId,
+            remediationId: decision.targetId,
+            confidence,
+            reasonWhy: decision.reasonWhy,
+          },
           update: { confidence, reasonWhy: decision.reasonWhy },
         });
         summary.linked++;
       } else if (decision.kind === "asset") {
-        if(!decision.targetId || !validIds.asset.has(decision.targetId)) {
+        if (!decision.targetId || !validIds.asset.has(decision.targetId)) {
           summary.skipped++;
           continue;
         }
         await tx.notificationAssetMapping.upsert({
           where: {
-            notificationId_assetId: { notificationId, assetId: decision.targetId }
-          }, 
-          create: { notificationId, assetId: decision.targetId, confidence, reasonWhy: decision.reasonWhy},
+            notificationId_assetId: {
+              notificationId,
+              assetId: decision.targetId,
+            },
+          },
+          create: {
+            notificationId,
+            assetId: decision.targetId,
+            confidence,
+            reasonWhy: decision.reasonWhy,
+          },
           update: { confidence, reasonWhy: decision.reasonWhy },
         });
         summary.linked++;

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { NotificationType, Priority } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
-  deviceGroupWhereForMatching, 
+  deviceGroupWhereForMatching,
   matchingAppliesToDeviceGroup,
 } from "@/lib/device-matching";
 import {
@@ -39,18 +39,20 @@ async function resolvedDeviceGroupAssetCount(
   matching: MatchingIdentity,
 ): Promise<number> {
   const candidates = await prisma.deviceGroup.findMany({
-    where: deviceGroupWhereForMatching(matching), 
+    where: deviceGroupWhereForMatching(matching),
     select: {
       id: true,
       vendorId: true,
-      productId: true, 
+      productId: true,
       versionId: true,
-      version: { select: { canonicalName: true }},
-      _count: { select: { assets: true }}
+      version: { select: { canonicalName: true } },
+      _count: { select: { assets: true } },
     },
   });
-  return candidates.filter((dg) => matchingAppliesToDeviceGroup(matching, dg)).reduce((sum, dg) => sum +dg._count.assets, 0);
-};
+  return candidates
+    .filter((dg) => matchingAppliesToDeviceGroup(matching, dg))
+    .reduce((sum, dg) => sum + dg._count.assets, 0);
+}
 
 async function resolveDeviceGroupAssets(matching: MatchingIdentity) {
   const candidates = await prisma.deviceGroup.findMany({
@@ -60,21 +62,22 @@ async function resolveDeviceGroupAssets(matching: MatchingIdentity) {
       vendorId: true,
       productId: true,
       versionId: true,
-      version: { select: { canonicalName: true }},
+      version: { select: { canonicalName: true } },
       assets: {
         select: {
           id: true,
           ip: true,
           hostname: true,
           location: true,
-          status: true
-        }
-      }
-    }
+          status: true,
+        },
+      },
+    },
   });
-  return candidates.filter((dg) => matchingAppliesToDeviceGroup(matching, dg)).flatMap((dg) => dg.assets);
+  return candidates
+    .filter((dg) => matchingAppliesToDeviceGroup(matching, dg))
+    .flatMap((dg) => dg.assets);
 }
-
 
 export const notificationsRouter = createTRPCRouter({
   getMany: protectedProcedure
@@ -125,15 +128,17 @@ export const notificationsRouter = createTRPCRouter({
 
       const items = await Promise.all(
         notifications.map(async (n) => ({
-        ...n,
-        deviceGroupsMatchings: await Promise.all(
-          n.deviceGroupsMatchings.map(async(m) => ({
-            ...m,
-            assetCount: await resolvedDeviceGroupAssetCount(m.deviceGroupMatching),
-          })),
-        ),
-      })),
-    );
+          ...n,
+          deviceGroupsMatchings: await Promise.all(
+            n.deviceGroupsMatchings.map(async (m) => ({
+              ...m,
+              assetCount: await resolvedDeviceGroupAssetCount(
+                m.deviceGroupMatching,
+              ),
+            })),
+          ),
+        })),
+      );
 
       return createPaginatedResponse(items, meta);
     }),
@@ -158,10 +163,10 @@ export const notificationsRouter = createTRPCRouter({
       const deviceGroupsMatchings = await Promise.all(
         notification.deviceGroupsMatchings.map(async (m) => {
           const assets = await resolveDeviceGroupAssets(m.deviceGroupMatching);
-          return { ...m, assetCount: assets.length, assets }
-        })
-      )
-      return {...notification, deviceGroupsMatchings};
+          return { ...m, assetCount: assets.length, assets };
+        }),
+      );
+      return { ...notification, deviceGroupsMatchings };
     }),
 
   markRead: protectedProcedure

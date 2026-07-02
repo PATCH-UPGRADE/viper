@@ -204,36 +204,44 @@ export async function addVendorAlias(id: string, alias: string): Promise<void> {
   const normalized = normalizeName(alias);
   const row = await prisma.vendor.findUnique({
     where: { id },
-    select: { canonicalName: true, nameMappings: true}
+    select: { canonicalName: true, nameMappings: true },
   });
 
-  if(!row) return;
-  if(normalized === row.canonicalName || row.nameMappings.includes(normalized)) {
+  if (!row) return;
+  if (
+    normalized === row.canonicalName ||
+    row.nameMappings.includes(normalized)
+  ) {
     return;
   }
   await prisma.vendor.update({
-    where:{ id },
-    data: { nameMappings: { push: normalized }}
+    where: { id },
+    data: { nameMappings: { push: normalized } },
   });
-};
+}
 
-export async function addProductAlias(id: string, alias: string): Promise<void> {
+export async function addProductAlias(
+  id: string,
+  alias: string,
+): Promise<void> {
   const normalized = normalizeName(alias);
   const row = await prisma.product.findUnique({
     where: { id },
-    select: { canonicalName: true, nameMappings: true }
+    select: { canonicalName: true, nameMappings: true },
   });
 
-  if(!row) return;
-  if(normalized === row.canonicalName || row.nameMappings.includes(normalized)) {
+  if (!row) return;
+  if (
+    normalized === row.canonicalName ||
+    row.nameMappings.includes(normalized)
+  ) {
     return;
   }
   await prisma.product.update({
-    where:{ id },
-    data: { nameMappings: { push: normalized }}
+    where: { id },
+    data: { nameMappings: { push: normalized } },
   });
-};
-
+}
 
 // ============================================================================
 // DeviceGroup resolution
@@ -322,31 +330,37 @@ export async function resolveDeviceGroup(identity: DeviceGroupIdentityInput) {
 // Notification mentioning an identifier isn't evidence the hospital owns the device
 // creating one from notification would pollute inventory
 export async function enrichDeviceGroupIdentifiers(
-    identity: { vendorId: string; productId: string | null; versionId: string | null},
-    updates: { cpe?: string | null; udi?: string | null },
-  ): Promise<void> {
-    const deviceGroup = await prisma.deviceGroup.findFirst({
-      where: {
-        vendorId: identity.vendorId,
-        productId: identity.productId,
-        versionId: identity.versionId
-      },
-    });
-    if(!deviceGroup) return;
+  identity: {
+    vendorId: string;
+    productId: string | null;
+    versionId: string | null;
+  },
+  updates: { cpe?: string | null; udi?: string | null },
+): Promise<void> {
+  const deviceGroup = await prisma.deviceGroup.findFirst({
+    where: {
+      vendorId: identity.vendorId,
+      productId: identity.productId,
+      versionId: identity.versionId,
+    },
+  });
+  if (!deviceGroup) return;
 
-    const mergedCpes = updates.cpe ? [...new Set([...deviceGroup.cpe, updates.cpe])] : deviceGroup.cpe;
-    const needsCpe = mergedCpes.length !== deviceGroup.cpe.length;
-    const needsUdi = !!updates.udi && !deviceGroup.udi;
-    if (!needsCpe && !needsUdi) return;
+  const mergedCpes = updates.cpe
+    ? [...new Set([...deviceGroup.cpe, updates.cpe])]
+    : deviceGroup.cpe;
+  const needsCpe = mergedCpes.length !== deviceGroup.cpe.length;
+  const needsUdi = !!updates.udi && !deviceGroup.udi;
+  if (!needsCpe && !needsUdi) return;
 
-    await prisma.deviceGroup.update({
-      where: { id: deviceGroup.id },
-      data: {
-        ...(needsCpe ? { cpe: mergedCpes } : {}),
-        ...(needsUdi ? { udi: updates.udi } : {}),
-      }
-    })
-  }
+  await prisma.deviceGroup.update({
+    where: { id: deviceGroup.id },
+    data: {
+      ...(needsCpe ? { cpe: mergedCpes } : {}),
+      ...(needsUdi ? { udi: updates.udi } : {}),
+    },
+  });
+}
 
 const CPE_UNKNOWN_TOKENS = new Set(["", "-", "*"]);
 
@@ -427,7 +441,9 @@ type MatchingResolveInput = {
  * identity (resolved to canonical rows). Identities come from CPEs, so
  * canonicals are marked CPE-backed.
  */
-export async function resolveMatchingId(input: MatchingResolveInput): Promise<string> {
+export async function resolveMatchingId(
+  input: MatchingResolveInput,
+): Promise<string> {
   const hasCpe = input.hasCpe ?? true;
   const vendorRow = await resolveVendor(input.vendor, { hasCpe });
   const productRow = input.product

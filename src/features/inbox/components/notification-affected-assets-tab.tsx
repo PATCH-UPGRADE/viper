@@ -19,9 +19,7 @@ export function NotificationAffectedAssetsTab({
 }: {
   deviceGroupsMatchings: NotificationDetailWithRelations["deviceGroupsMatchings"];
 }) {
-  const withAssets = deviceGroupsMatchings.filter(
-    (m) => m.assetCount > 0,
-  );
+  const withAssets = deviceGroupsMatchings.filter((m) => m.assetCount > 0);
 
   if (withAssets.length === 0) {
     return (

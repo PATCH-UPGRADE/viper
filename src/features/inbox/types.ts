@@ -22,11 +22,16 @@ export const notificationInclude = {
 } satisfies Prisma.NotificationInclude;
 
 type NotificationBasePayload = Prisma.NotificationGetPayload<{
-  include: typeof notificationInclude
+  include: typeof notificationInclude;
 }>;
 
-export type NotificationWithRelations = Omit<NotificationBasePayload, "deviceGroupsMatchings"> & { 
-  deviceGroupsMatchings: ( NotificationBasePayload["deviceGroupsMatchings"][number] & { assetCount: number})[]
+export type NotificationWithRelations = Omit<
+  NotificationBasePayload,
+  "deviceGroupsMatchings"
+> & {
+  deviceGroupsMatchings: (NotificationBasePayload["deviceGroupsMatchings"][number] & {
+    assetCount: number;
+  })[];
 };
 
 export type NotificationSource = NotificationWithRelations["sources"][number];
@@ -38,7 +43,7 @@ export const notificationDetailInclude = {
         include: {
           vendor: true,
           product: true,
-          version: true
+          version: true,
         },
       },
     },
@@ -68,14 +73,16 @@ export type ResolvedDeviceGroupAsset = {
   hostname: string | null;
   location: unknown;
   status: AssetStatus | null;
-}
+};
 
 export type NotificationDetailWithRelations = Omit<
-  NotificationDetailBasePayload, "deviceGroupsMatchings"> & {
-    deviceGroupMatchings: (NotificationDetailBasePayload["deviceGroupsMatchings"][number] & {
-      assetCount: number;
-      assets: ResolvedDeviceGroupAsset[];
-    })[];
+  NotificationDetailBasePayload,
+  "deviceGroupsMatchings"
+> & {
+  deviceGroupMatchings: (NotificationDetailBasePayload["deviceGroupsMatchings"][number] & {
+    assetCount: number;
+    assets: ResolvedDeviceGroupAsset[];
+  })[];
 };
 
 export type NotificationDetailSource =

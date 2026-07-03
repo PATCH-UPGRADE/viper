@@ -22,10 +22,12 @@ export type DeviceGroupMatchingCandidate = {
   versionRange: string | null;
 };
 
-export type VulnerabilitiyCandidate = {
+export type VulnerabilityCandidate = {
   id: string;
   cveId: string | null;
   description: string | null;
+  cvssScore: number | null;
+  cvssVector: string | null;
 };
 
 export type RemediationCandidate = {
@@ -38,6 +40,8 @@ export type AssetCandidate = {
   id: string;
   ip: string | null;
   hostname: string | null;
+  macAddress: string | null;
+  serialNumber: string | null;
 };
 
 export type Candidates = {
@@ -48,7 +52,7 @@ export type Candidates = {
   }>;
   vulnerabilities: Array<{
     extracted: ExtractedVulnerability;
-    matches: VulnerabilitiyCandidate[];
+    matches: VulnerabilityCandidate[];
   }>;
   remediations: Array<{
     extracted: ExtractedRemediation;
@@ -173,7 +177,7 @@ async function searchDeviceGroupMatching(
 
 async function searchVulnerability(
   extracted: ExtractedVulnerability,
-): Promise<VulnerabilitiyCandidate[]> {
+): Promise<VulnerabilityCandidate[]> {
   const or: Prisma.VulnerabilityWhereInput[] = [];
   if (extracted.cveId) {
     or.push({ cveId: { contains: extracted.cveId, mode: "insensitive" } });
@@ -183,7 +187,13 @@ async function searchVulnerability(
 
   const rows = await prisma.vulnerability.findMany({
     where: { OR: or },
-    select: { id: true, cveId: true, description: true },
+    select: {
+      id: true,
+      cveId: true,
+      description: true,
+      cvssScore: true,
+      cvssVector: true,
+    },
     take: TOP_K,
   });
 
@@ -191,6 +201,8 @@ async function searchVulnerability(
     id: row.id,
     cveId: row.cveId ?? null,
     description: row.description ?? null,
+    cvssScore: row.cvssScore ?? null,
+    cvssVector: row.cvssVector ?? null,
   }));
 }
 
@@ -257,6 +269,8 @@ async function searchAsset(
       id: true,
       ip: true,
       hostname: true,
+      macAddress: true,
+      serialNumber: true,
       deviceGroup: {
         select: {
           vendor: { select: { canonicalDisplayName: true } },
@@ -271,6 +285,8 @@ async function searchAsset(
     id: row.id,
     ip: row.ip ?? null,
     hostname: row.hostname ?? null,
+    macAddress: row.macAddress ?? null,
+    serialNumber: row.serialNumber ?? null,
   }));
 }
 

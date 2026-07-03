@@ -7,12 +7,15 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
 import type { ConfidenceLevel } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { resolveMatchingId } from "@/lib/router-utils";
 import {
   addProductAlias,
   addVendorAlias,
+  enrichAssetIdentifiers,
   enrichDeviceGroupIdentifiers,
-  resolveMatchingId,
-} from "@/lib/router-utils";
+  enrichVulnerabilityCvss,
+  parseCvssScore,
+} from "../utils";
 import type { Candidates } from "./candidate-search";
 import type { ExtractResult } from "./extract";
 
@@ -20,13 +23,26 @@ const MODEL = "claude-haiku-4-5-20251001";
 
 // Fields the LLM may set when creating/updating a device group. Kept flat and
 // optional so the schema stays a top-level object (Anthropic requirement).
-const deviceGroupFieldsSchema = z.object({
+const detailsFieldsSchema = z.object({
   cpe: z.string().nullish(),
   udi: z.string().nullish(),
   manufacturer: z.string().nullish(),
   modelName: z.string().nullish(),
   version: z.string().nullish(),
   versionRange: z.string().nullish(),
+  cveId: z
+    .string()
+    .regex(/^CVE-\d{4}-\d{4,}$/i)
+    .nullish(),
+  linkedCveId: z
+    .string()
+    .regex(/^CVE-\d{4}-\d{4,}$/i)
+    .nullish(),
+  description: z.string().nullish(),
+  cvssScore: z.number().min(0).max(10).nullish(),
+  cvssVector: z.string().nullish(),
+  macAddress: z.string().nullish(),
+  serialNumber: z.string().nullish(),
 });
 
 const decisionSchema = z.object({
@@ -42,7 +58,7 @@ const decisionSchema = z.object({
   // The LLM may only express these two — Confirmed is reserved for humans.
   confidence: z.enum(["NeedsReview", "Matched"]),
   reasonWhy: z.string(),
-  fields: deviceGroupFieldsSchema.nullish(),
+  fields: detailsFieldsSchema.nullish(),
 });
 
 const matchSchema = z.object({
@@ -69,15 +85,17 @@ For each extracted device group, choose exactly ONE action:
 
 For each extracted Vulnerability, choose exactly ONE action:
 - "link": the vulnerability clearly matches an existing candidate (same CVE id). Set targetId to that candidate's id.
+- "update": matches an existing candidate, but the notification has new info worth saving (cvssScore, cvssVector, description). Set targetId and put the new values in fields.
 
 For each extracted Remediation, choose exactly ONE action:
 - "link": the remediation clearly matches an existing candidate. Set targetId to that candidate's id.
+- "update": matches an existing candidate, but the notification has new info worth saving (description) Set targetId and put the new value in fields.
 
 For each extracted Asset, choose exactly ONE action:
-- "link": the asset clearly matches an existing candidate (same IP/hostname). Set targetId to that candidate's id.
+- "link": the asset clearly matches an existing candidate (same IP/hostname/Mac Address/serial number). Set targetId to that candidate's id. If the notification states a MAC address or serial number the matched record is missing, include it in fields so it can be saved.
 
 CONFIDENCE (you may only use these two):
-- "Matched": strong identifier match (same CVE id, same IP/hostname, or same manufacturer + model).
+- "Matched": strong identifier match (same CVE id, same IP/hostname/MAC address/serial number, or same manufacturer + model).
 - "NeedsReview": plausible but uncertain match, or a newly created record that a human should verify.
 
 Always give a concise reasonWhy explaining the match. Only emit decisions you are reasonably confident about; it is fine to return fewer decisions than extracted entities.`;
@@ -127,7 +145,7 @@ function renderCandidates(candidates: Candidates): string {
                 ? entry.matches
                     .map(
                       (m) =>
-                        ` - id: ${m.id} | cveId: ${m.cveId ?? "(none)"} | description: ${m.description} ?? "(none)"}`,
+                        ` - id: ${m.id} | cveId: ${m.cveId ?? "(none)"} | description: ${m.description} ?? "(none)"} | cvssScore: ${m.cvssScore ?? "(none)"} | cvssVector: ${m.cvssVector ?? "(none)"}`,
                     )
                     .join("\n")
                 : "    - (no candidates found)";
@@ -167,13 +185,13 @@ function renderCandidates(candidates: Candidates): string {
         candidates.assets
           .map((entry, i) => {
             const e = entry.extracted;
-            const line = `Asset #${i + 1}: ip=${e.ip ?? "?"} | hostname=${e.hostname} ?? "?"}`;
+            const line = `Asset #${i + 1}: ip=${e.ip ?? "?"} | hostname=${e.hostname} ?? "?"} | macAddress=${e.macAddress} ?? "?"} | serialNumber=${e.serialNumber} ?? "?"}`;
             const matches =
               entry.matches.length > 0
                 ? entry.matches
                     .map(
                       (m) =>
-                        ` - id: ${m.id} | ip: ${m.ip ?? "(none)"} | hostname: ${m.hostname} ?? "(none)"}`,
+                        ` - id: ${m.id} | ip: ${m.ip ?? "(none)"} | hostname: ${m.hostname} ?? "(none)"} | macAddress: ${m.macAddress} ?? "(none)"} | serialNumber=${e.serialNumber} ?? "(none)"}`,
                     )
                     .join("\n")
                 : "    - (no candidates found)";
@@ -197,19 +215,40 @@ function cleanFields(fields: Decision["fields"]): {
   versionRange?: string;
   cpe?: string;
   udi?: string;
+  cveId?: string;
+  description?: string;
+  linkedCveId?: string;
+  cvssScore?: number;
+  cvssVector?: string;
+  macAddress?: string;
+  serialNumber?: string;
 } {
-  const out: Record<string, string> = {};
+  const out: Record<string, string | number> = {};
   if (!fields) return out;
   for (const key of [
     "manufacturer",
     "modelName",
     "version",
     "versionRange",
+    "cveId",
+    "linkedCveId",
     "cpe",
     "udi",
+    "description",
+    "cvssScore",
+    "cvssVector",
+    "macAddress",
+    "serialNumber",
   ] as const) {
     const val = fields[key];
     if (typeof val === "string" && val.trim().length > 0) out[key] = val.trim();
+  }
+  if (typeof fields.cvssScore === "number") out.cvssScore = fields.cvssScore;
+  if (
+    typeof fields.cvssVector === "string" &&
+    fields.cvssVector.trim().length > 0
+  ) {
+    out.cvssVector = fields.cvssVector.trim();
   }
   return out;
 }
@@ -418,7 +457,22 @@ export async function applyDecisions(
           },
           update: { confidence, reasonWhy: decision.reasonWhy },
         });
-        summary.linked++;
+        const data = cleanFields(decision.fields);
+        if (decision.op === "update" && data.description) {
+          await tx.vulnerability.update({
+            where: { id: decision.targetId },
+            data: { description: data.description },
+          });
+        }
+        const cvssScore = parseCvssScore(data.cvssScore);
+        if (cvssScore !== null || data.cvssVector) {
+          await enrichVulnerabilityCvss(decision.targetId, {
+            cvssScore,
+            cvssVector: data.cvssVector,
+          });
+        }
+        if (decision.op === "update") summary.updated++;
+        else summary.linked++;
       } else if (decision.kind === "remediation") {
         if (
           !decision.targetId ||
@@ -442,7 +496,18 @@ export async function applyDecisions(
           },
           update: { confidence, reasonWhy: decision.reasonWhy },
         });
-        summary.linked++;
+        if (decision.op === "update") {
+          const data = cleanFields(decision.fields);
+          if (data.description) {
+            await tx.remediation.update({
+              where: { id: decision.targetId },
+              data: { description: data.description },
+            });
+          }
+          summary.updated++;
+        } else {
+          summary.linked++;
+        }
       } else if (decision.kind === "asset") {
         if (!decision.targetId || !validIds.asset.has(decision.targetId)) {
           summary.skipped++;
@@ -463,6 +528,13 @@ export async function applyDecisions(
           },
           update: { confidence, reasonWhy: decision.reasonWhy },
         });
+        const data = cleanFields(decision.fields);
+        if (data.macAddress || data.serialNumber) {
+          await enrichAssetIdentifiers(decision.targetId, {
+            macAddress: data.macAddress,
+            serialNumber: data.serialNumber,
+          });
+        }
         summary.linked++;
       } else {
         summary.skipped++;

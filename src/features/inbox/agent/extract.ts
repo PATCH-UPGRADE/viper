@@ -28,6 +28,8 @@ export const extractedVulnerabilitySchema = z.object({
     .string()
     .regex(/^CVE-\d{4}-\d{4,}$/i)
     .nullish(),
+  cvssScore: z.number().min(0).max(10).nullish,
+  cvssVector: z.string().nullish(),
 });
 
 export const extractedRemediationSchema = z.object({
@@ -41,6 +43,8 @@ export const extractedRemediationSchema = z.object({
 export const extractedAssetSchema = z.object({
   ip: z.string().nullish(),
   hostname: z.string().nullish(),
+  macAddress: z.string().nullish(),
+  serialNumber: z.string().nullish(),
 });
 
 export const extractSchema = z.object({
@@ -60,13 +64,14 @@ export type ExtractResult = z.infer<typeof extractSchema>;
 
 const MODEL = "claude-haiku-4-5-20251001";
 
+// cvssScore format reference: https://nvd.nist.gov/vuln-metrics/cvss
 const SYSTEM_PROMPT = `You are an extraction agent for a hospital cybersecurity platform that reads security notifications (advisories, recalls, update notices) and their PDF attachments.
 
 Your task: extract the following Entities that the notification is about. 
 
 FOR DEVICE GROUPS: A device group is a class of affected product, identified by some combination of:
 - CPE string (e.g. "cpe:2.3:a:vendor:product:1.0:*:*:*:*:*:*:*")
-- UDI: a device-label identifier (distinct from a CPE)
+- UDI: the FDA-assigned Device Identifier (DI) - a fixed code identifying the labeler and specific device model (e.g, "04048675556176"), distinct from a CPE. If the notification quotes a full UDI label string that also encodes a Production Identifier (PI) in GS1 format "(01) 00855361005016", extract ONLY the DI segment.
 - manufacturer / vendor (e.g. "Philips", "GE Healthcare")
 - model name (e.g. "IntelliVue MX40", "Alaris Pump")
 - version / firmware (e.g. "2.3.1")
@@ -74,14 +79,18 @@ FOR DEVICE GROUPS: A device group is a class of affected product, identified by 
 
 FOR VULNERABILITIES: CVEids or security issues explicitly named
 - cveId: must match format CVE-YYYY-NNNNN (e.g CVE-2020-25175). Omit if not explicitly named.
+- cvssScore: the CVSS base score(0.0-10.0), only if explicity stated. Omit if not given.
+- cvssVector: the CVSS vector string (e.g CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H), only if explicitly stated. Omit if not given.
 
 FOR REMEDIATIONS: Patches, firmware updates, or mitigations explicitly described
 - linkedCveId: must match format CVE-YYYY-NNNNN (e.g CVE-2020-25175). Omit if not explicitly named.
 - description: a short description of the fix (e.g Apply GE Healthcare ICS security controls per CISA advisory)
 
 FOR ASSETS: Specific devices named by network identity
-- ip address (IPv4 or IPv6)
-- hostname 
+- ip address: (in IPv4 or IPv6 format)
+- hostname: A structured breakdown of standard healthcare hostnames uses a format like: [Location]-[Device][OS]-[ID] (e.g ER-DW-0452)
+- macAddress: A MAC address is a 12-character physical hardware identifier formatted in hexadecimal (using 0-9 and A-F). For example, a Philips patient monitor network card has the MAC address 00:30:A3:1B:4C:D2.
+- serialNumber: A hospital asset serial number uniquely identifies an individual piece of medical, IT, or facility equipment. Serial numbers are assigned by the manufacturer and are immutable, whereas asset tag numbers are assigned by the hospital for tracking purposes (e.g Infusion Pump: SN: 702-839201-A, Defibrillator: SN: US22045981)
 
 RULES:
 - Extract ONLY Entities explicitly referenced in the notification or its attachments.

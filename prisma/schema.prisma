@@ -280,14 +280,7 @@ model DeviceGroup {
   updatedAt            DateTime             @updatedAt
   deviceGroupHistories DeviceGroupHistory[]
   assets               Asset[]
-  // Vulnerabilities / remediations / advisories / device artifacts connect via
-  // DeviceGroupMatching now, not a direct relation. notificationMappings is from
-  // main's notifications feature and stays.
-  // notificationMappings NotificationDeviceGroupMapping[]
 
-  // NOTE: Postgres treats NULLs as distinct, so this composite unique will NOT
-  // prevent duplicate rows when versionId is null. Identity resolution is done
-  // in the app via resolveDeviceGroup() (findFirst + create in a transaction).
   @@unique([vendorId, productId, versionId, versionStatus], name: "device_group_identity")
   @@index([vendorId, productId])
   @@map("device_group")

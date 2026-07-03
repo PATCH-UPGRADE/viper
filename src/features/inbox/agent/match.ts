@@ -14,7 +14,6 @@ import {
   enrichAssetIdentifiers,
   enrichDeviceGroupIdentifiers,
   enrichVulnerabilityCvss,
-  parseCvssScore,
 } from "../utils";
 import type { Candidates } from "./candidate-search";
 import type { ExtractResult } from "./extract";
@@ -185,13 +184,13 @@ function renderCandidates(candidates: Candidates): string {
         candidates.assets
           .map((entry, i) => {
             const e = entry.extracted;
-            const line = `Asset #${i + 1}: ip=${e.ip ?? "?"} | hostname=${e.hostname} ?? "?"} | macAddress=${e.macAddress} ?? "?"} | serialNumber=${e.serialNumber} ?? "?"}`;
+            const line = `Asset #${i + 1}: ip=${e.ip ?? "?"} | hostname=${e.hostname ?? "?"} | macAddress=${e.macAddress ?? "?"} | serialNumber=${e.serialNumber ?? "?"}`;
             const matches =
               entry.matches.length > 0
                 ? entry.matches
                     .map(
                       (m) =>
-                        ` - id: ${m.id} | ip: ${m.ip ?? "(none)"} | hostname: ${m.hostname} ?? "(none)"} | macAddress: ${m.macAddress} ?? "(none)"} | serialNumber=${e.serialNumber} ?? "(none)"}`,
+                        ` - id: ${m.id} | ip: ${m.ip ?? "(none)"} | hostname: ${m.hostname ?? "(none)"} | macAddress: ${m.macAddress ?? "(none)"} | serialNumber=${e.serialNumber ?? "(none)"}`,
                     )
                     .join("\n")
                 : "    - (no candidates found)";
@@ -464,7 +463,7 @@ export async function applyDecisions(
             data: { description: data.description },
           });
         }
-        const cvssScore = parseCvssScore(data.cvssScore);
+        const cvssScore = data.cvssScore;
         if (cvssScore !== null || data.cvssVector) {
           await enrichVulnerabilityCvss(decision.targetId, {
             cvssScore,

@@ -172,10 +172,3 @@ export async function addProductAlias(
   });
 }
 
-export function parseCvssScore(value: string | undefined): number | undefined {
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 20
-    ? parsed
-    : undefined;
-}

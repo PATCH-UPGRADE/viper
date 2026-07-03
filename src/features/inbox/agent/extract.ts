@@ -28,7 +28,7 @@ export const extractedVulnerabilitySchema = z.object({
     .string()
     .regex(/^CVE-\d{4}-\d{4,}$/i)
     .nullish(),
-  cvssScore: z.number().min(0).max(10).nullish,
+  cvssScore: z.number().min(0).max(10).nullish(),
   cvssVector: z.string().nullish(),
 });
 

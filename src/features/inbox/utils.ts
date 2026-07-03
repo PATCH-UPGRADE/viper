@@ -171,4 +171,3 @@ export async function addProductAlias(
     data: { nameMappings: { push: normalized } },
   });
 }
-

@@ -1,43 +1,23 @@
-// Central helper for resolving which Notes are relevant to a given scope.
+// Central helper for matching notes to VIPER models.
 //
-// A Note is relevant either because its status is PERSISTENT (always applies)
-// or because it directly references an in-scope entity via targetModel +
-// instanceId. This mirrors the inline query the VEX context used to run, and is
-// the single place note relevance should be computed.
-//
-// This is intentionally a MINIMAL implementation. Two future relevance sources
-// are stubbed out with TODOs below and not yet wired up:
-//   1. EntityFilterMatch — notes attached via an EntityFilter, matched to
-//      concrete entities by a future Inngest job that memoizes matches.
-//   2. Device-group-matching resolution — a note on a DeviceGroupMatching whose
-//      vendor/product/versionRange matches an asset's device group (e.g. a
-//      "vers:all/*" range matching every version of a product).
+// A Note is relevant to an object either because it directly references that
+// object via targetModel + instanceId, or via EntityFilterMatch 
 
 import "server-only";
 import type { NoteStatus, ScopeTargetModel } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
-/** The projection of a Note returned by the relevance helpers. */
+/** The projection of a Note returned by the note helpers. */
 export type RelevantNote = {
+  id: string;
   text: string;
   status: NoteStatus;
   targetModel: ScopeTargetModel | null;
   instanceId: string | null;
 };
 
-/**
- * In-scope entity ids, grouped by the model they belong to. Any omitted or
- * empty list simply contributes no direct references.
- */
-export type NoteScope = {
-  vulnerabilityIds?: string[];
-  remediationIds?: string[];
-  deviceGroupIds?: string[];
-  deviceGroupMatchingIds?: string[];
-  assetIds?: string[];
-};
-
 const NOTE_SELECT = {
+  id: true,
   text: true,
   status: true,
   targetModel: true,
@@ -45,75 +25,94 @@ const NOTE_SELECT = {
 } as const;
 
 /**
- * All notes relevant to the given scope: every PERSISTENT note plus any note
- * whose targetModel/instanceId points at one of the supplied ids.
+ * Notes matching one or more objects of a single targetModel, by id. Does not
+ * include PERSISTENT notes (see getRelevantNotes for that).
  */
-export async function getRelevantNotes(
-  scope: NoteScope,
+export async function getNotesForInstance(
+  targetModel: ScopeTargetModel,
+  ids: string[],
 ): Promise<RelevantNote[]> {
-  const direct: Array<{ targetModel: ScopeTargetModel; ids: string[] }> = [
-    { targetModel: "VULNERABILITY", ids: scope.vulnerabilityIds ?? [] },
-    { targetModel: "REMEDIATION", ids: scope.remediationIds ?? [] },
-    { targetModel: "DEVICE_GROUP", ids: scope.deviceGroupIds ?? [] },
-    {
-      targetModel: "DEVICE_GROUP_MATCHING",
-      ids: scope.deviceGroupMatchingIds ?? [],
-    },
-    { targetModel: "ASSET", ids: scope.assetIds ?? [] },
-  ];
+  if (ids.length === 0) return [];
 
-  const or: Array<{
-    status?: NoteStatus;
-    targetModel?: ScopeTargetModel;
-    instanceId?: { in: string[] };
-  }> = [{ status: "PERSISTENT" }];
+  // TODO(EntityFilterMatch): VW-358 -- also include notes that match
+  // via EntityFilterMatch
 
-  for (const { targetModel, ids } of direct) {
-    if (ids.length > 0) or.push({ targetModel, instanceId: { in: ids } });
-  }
-
-  // TODO(EntityFilterMatch): once a background job populates EntityFilterMatch
-  // from EntityFilter, also include notes reachable via
-  // EntityFilterMatch.targetId ∈ scope ids → EntityFilter.noteId (scoped by
-  // EntityFilter.targetModel). Not implemented yet, so filter-based notes are
-  // not returned today.
-
-  return prisma.note.findMany({ where: { OR: or }, select: NOTE_SELECT });
+  return prisma.note.findMany({
+    where: { targetModel, instanceId: { in: ids } },
+    select: NOTE_SELECT,
+  });
 }
 
 /**
- * All notes relevant to a single asset: notes attached directly to the asset,
- * notes attached to its device group, and all PERSISTENT notes.
+ * Notes matching a single device group. Stubbed today: notes cannot attach to a
+ * device group directly, only to device group matchings.
+ */
+export async function getNotesForDeviceGroup(
+  _deviceGroupId: string,
+): Promise<RelevantNote[]> {
+  // TODO(device-group-matching): resolve the DeviceGroupMatchings that match
+  // this device group (reuse matchingWhereForDeviceGroup +
+  // matchingAppliesToDeviceGroup from @/lib/device-matching), then
+  // `return getNotesForInstance("DEVICE_GROUP_MATCHING", matchingIds)`.
+  return [];
+}
+
+/**
+ * Notes matching a single asset. Today: notes attached directly to the asset.
  */
 export async function getNotesForAsset(
   assetId: string,
 ): Promise<RelevantNote[]> {
-  const asset = await prisma.asset.findUnique({
-    where: { id: assetId },
-    select: { deviceGroupId: true },
-  });
-
-  // TODO(device-group-matching): also include notes on DeviceGroupMatchings
-  // that apply to this asset's device group. Resolve candidates with
-  // matchingWhereForDeviceGroup + matchingAppliesToDeviceGroup from
-  // @/lib/device-matching, then pass their ids as deviceGroupMatchingIds.
-
-  return getRelevantNotes({
-    assetIds: [assetId],
-    deviceGroupIds: asset ? [asset.deviceGroupId] : [],
-  });
+  // TODO(device-group-matching): also include notes on the DeviceGroupMatching(s)
+  // this asset's device group belongs to — look up asset.deviceGroupId and
+  // delegate to getNotesForDeviceGroup.
+  return getNotesForInstance("ASSET", [assetId]);
 }
 
 /**
- * All notes relevant to a single device group: notes attached directly to the
- * group, plus all PERSISTENT notes.
+ * In-scope entity ids, grouped by the model they belong to. Any omitted or
+ * empty list simply contributes no references.
  */
-export async function getNotesForDeviceGroup(
-  deviceGroupId: string,
-): Promise<RelevantNote[]> {
-  // TODO(device-group-matching): also include notes on DeviceGroupMatchings
-  // that apply to this device group (see matchingWhereForDeviceGroup +
-  // matchingAppliesToDeviceGroup in @/lib/device-matching).
+export type NoteScope = {
+  vulnerabilityIds?: string[];
+  remediationIds?: string[];
+  deviceGroupMatchingIds?: string[];
+  assetIds?: string[];
+};
 
-  return getRelevantNotes({ deviceGroupIds: [deviceGroupId] });
+/**
+ * All notes relevant to the given scope: every PERSISTENT note plus any note
+ * that matches one of the supplied entities. Deduped by note id.
+ */
+export async function getRelevantNotes(
+  scope: NoteScope,
+): Promise<RelevantNote[]> {
+  const [persistent, vulnerabilities, remediations, matchings, assets] =
+    await Promise.all([
+      prisma.note.findMany({
+        where: { status: "PERSISTENT" },
+        select: NOTE_SELECT,
+      }),
+      getNotesForInstance("VULNERABILITY", scope.vulnerabilityIds ?? []),
+      getNotesForInstance("REMEDIATION", scope.remediationIds ?? []),
+      getNotesForInstance(
+        "DEVICE_GROUP_MATCHING",
+        scope.deviceGroupMatchingIds ?? [],
+      ),
+      Promise.all((scope.assetIds ?? []).map(getNotesForAsset)).then(
+        (results) => results.flat(),
+      ),
+    ]);
+
+  const byId = new Map<string, RelevantNote>();
+  for (const note of [
+    ...persistent,
+    ...vulnerabilities,
+    ...remediations,
+    ...matchings,
+    ...assets,
+  ]) {
+    byId.set(note.id, note);
+  }
+  return [...byId.values()];
 }

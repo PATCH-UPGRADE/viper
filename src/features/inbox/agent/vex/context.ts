@@ -165,14 +165,12 @@ export async function gatherVexContext(
 
   // Notes: direct (targetModel + instanceId points at an in-scope entity) plus
   // all PERSISTENT notes (which always apply to the hospital).
-  const groupIds = candidateGroups.map((g) => g.id);
   const allAssetIds = [
     ...new Set(candidateGroups.flatMap((g) => g.assets.map((a) => a.id))),
   ];
   const notes = await getRelevantNotes({
     vulnerabilityIds: vulnerabilities.map((v) => v.id),
     remediationIds: remediations.map((r) => r.id),
-    deviceGroupIds: groupIds,
     deviceGroupMatchingIds: matchings.map((m) => m.id),
     assetIds: allAssetIds,
   });
@@ -224,8 +222,6 @@ function renderNoteTarget(
   switch (note.targetModel) {
     case "ASSET":
       return `Asset ${labels.assetLabel.get(id) ?? id} (id: ${id})`;
-    case "DEVICE_GROUP":
-      return `Device group ${labels.groupLabel.get(id) ?? id}`;
     case "DEVICE_GROUP_MATCHING":
       return `Matching ${labels.matchingLabel.get(id) ?? id}`;
     case "VULNERABILITY":

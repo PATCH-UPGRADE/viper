@@ -16,7 +16,7 @@ CREATE TYPE "NotAffectedJustification" AS ENUM ('COMPONENT_NOT_PRESENT', 'VULNER
 CREATE TYPE "NoteStatus" AS ENUM ('PERSISTENT', 'SCOPED');
 
 -- CreateEnum
-CREATE TYPE "ScopeTargetModel" AS ENUM ('DEVICE_GROUP', 'DEVICE_GROUP_MATCHING', 'ASSET', 'VULNERABILITY', 'REMEDIATION');
+CREATE TYPE "ScopeTargetModel" AS ENUM ('DEVICE_GROUP_MATCHING', 'ASSET', 'VULNERABILITY', 'REMEDIATION');
 
 -- AlterTable
 -- Remap "advisory"."status" to the new IssueStatus values without dropping

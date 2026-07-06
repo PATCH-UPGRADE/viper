@@ -1,0 +1,146 @@
+name: Blueflow Integration Test
+
+# Builds a VIPER image, pulls the latest Blueflow image, stands both up together,
+# loads assets into Blueflow with `create_assets`, registers a webhook, and
+# confirms Blueflow's asset push lands in VIPER via /api/v1/assets/integrationUpload.
+#
+# Blueflow publishes to Docker Hub (public), so no registry auth is needed.
+# Pin a different tag/image with the `blueflow_image` input or
+# `vars.BLUEFLOW_IMAGE` (defaults to virtalabsinc/blueflow:latest).
+
+on:
+  workflow_dispatch:
+    inputs:
+      blueflow_image:
+        description: "Blueflow image ref (overrides vars.BLUEFLOW_IMAGE)"
+        required: false
+        type: string
+      blueflow_fixture_url:
+        description: "Raw URL of Blueflow's data/assets.json (overrides default develop)"
+        required: false
+        type: string
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blueflow-integration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-test:
+    name: VIPER <-> Blueflow API integration
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 30
+
+    env:
+      VIPER_IMAGE: viper:ci
+      BLUEFLOW_IMAGE: ${{ inputs.blueflow_image || vars.BLUEFLOW_IMAGE || 'virtalabsinc/blueflow:latest' }}
+      BLUEFLOW_FIXTURE_URL: ${{ inputs.blueflow_fixture_url || vars.BLUEFLOW_FIXTURE_URL || 'https://raw.githubusercontent.com/virtalabs/blueflow/develop/data/assets.json' }}
+      FIXTURE_PATH: tests/integration/fixtures/blueflow-assets.json
+      COMPOSE: docker compose --env-file .env.ci -f docker/ci/compose.blueflow.yml
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # --- Step 1: Build the VIPER image ----------------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build VIPER image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/viper/Dockerfile
+          tags: ${{ env.VIPER_IMAGE }}
+          load: true
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- Step 2: Pull the latest Blueflow image (public Docker Hub) -----
+      - name: Pull Blueflow image
+        run: docker pull --platform linux/amd64 "$BLUEFLOW_IMAGE"
+
+      # --- Step 3: Stand up both services ---------------------------------
+      - name: Start integration stack
+        run: BLUEFLOW_IMAGE="$BLUEFLOW_IMAGE" $COMPOSE up -d
+
+      - name: Wait for VIPER + Blueflow APIs
+        run: npx --yes wait-on -t 180000 http://localhost:3000/api/inngest tcp:localhost:8000
+
+      # --- Step 4: Fetch Blueflow's fixture, then seed --------------------
+      - name: Fetch Blueflow asset fixture (develop)
+        run: curl -fsSL "$BLUEFLOW_FIXTURE_URL" -o "$FIXTURE_PATH"
+
+      # Loads the fetched fixture into Blueflow via its own `create_assets`
+      # command. Advisory (continue-on-error): a Blueflow-side load failure
+      # never blocks a merge. See docs/blueflow-integration-testing.md.
+      - name: Load assets into Blueflow
+        id: load
+        continue-on-error: true
+        run: |
+          $COMPOSE cp "$FIXTURE_PATH" blueflow:/tmp/assets.json
+          $COMPOSE exec -T blueflow /app/.venv/bin/python project/manage.py create_assets --filepath /tmp/assets.json
+
+      # --- Step 5: Mint VIPER credentials ---------------------------------
+      - name: Mint VIPER test API key
+        run: |
+          KEY="$($COMPOSE exec -T viper npm run db:create-test-api-key --silent | grep '^API_KEY=' | cut -d= -f2- | tr -d '\r')"
+          echo "::add-mask::$KEY"
+          echo "VIPER_API_KEY=$KEY" >> "$GITHUB_ENV"
+
+      - name: Mint VIPER integration token (Blueflow callback)
+        run: |
+          TOKEN="$($COMPOSE exec -T viper npm run db:create-blueflow-integration --silent | grep '^INTEGRATION_TOKEN=' | cut -d= -f2- | tr -d '\r')"
+          echo "::add-mask::$TOKEN"
+          echo "VIPER_CALLBACK_URL=http://viper:3000/api/v1/assets/integrationUpload/$TOKEN" >> "$GITHUB_ENV"
+
+      # --- Step 6: Run the cross-service tests ----------------------------
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install test deps
+        run: npm ci
+
+      - name: Run Blueflow integration tests
+        id: tests
+        continue-on-error: true
+        env:
+          VIPER_API_URL: http://localhost:3000/api/v1
+          BLUEFLOW_URL: http://localhost:8000
+        run: npm run test:integration
+
+      - name: Dump container logs (on load/test failure)
+        if: always() && (steps.load.outcome == 'failure' || steps.tests.outcome == 'failure')
+        run: $COMPOSE logs --no-color
+
+      - name: Report result to PR summary
+        if: always()
+        run: |
+          load="${{ steps.load.outcome }}"
+          tests="${{ steps.tests.outcome }}"
+          {
+            echo "## Blueflow integration (advisory — does not block merge)"
+            echo ""
+            echo "| Stage | Outcome |"
+            echo "| --- | --- |"
+            echo "| Load assets (create_assets) | \`${load:-skipped}\` |"
+            echo "| Blueflow integration tests | \`${tests:-skipped}\` |"
+            echo ""
+            if [ "$load" = "failure" ]; then
+              echo "> ℹ️ Asset load failed — usually a Blueflow-side format/schema mismatch between \`create_assets\` and \`data/assets.json\`. This check is advisory and does not block merging. See docs/blueflow-integration-testing.md."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tear down
+        if: always()
+        run: $COMPOSE down -v

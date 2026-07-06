@@ -51,21 +51,17 @@ export async function gatherVexContext(
     where: { id: notificationId },
     include: {
       sources: { select: { markdown: true, channel: true } },
-      deviceGroupsMatchings: {
-        include: {
-          deviceGroupMatching: {
-            include: {
-              vendor: { select: { canonicalDisplayName: true } },
-              product: { select: { canonicalDisplayName: true } },
-              version: { select: { canonicalDisplayName: true } },
-            },
-          },
-        },
-      },
       vulnerabilities: {
         include: {
           vulnerability: {
             include: {
+              deviceGroupMatchings: {
+                include: {
+                  vendor: { select: { canonicalDisplayName: true } },
+                  product: { select: { canonicalDisplayName: true } },
+                  version: { select: { canonicalDisplayName: true } },
+                },
+              },
               issues: { where: { deviceGroupMatchingId: { not: null } } },
               // TODO/cassidy: should this include all issues?
             },
@@ -89,10 +85,13 @@ export async function gatherVexContext(
 
   const remediations = notification.remediations.map((m) => m.remediation);
 
-  // All matchings linked to this notification directly
+  // All matchings referenced by the linked vulnerabilities.
+  // NOTE: An Issue relates a device group matching to a vuln. We only grab
+  // DGM's related to vulns (not DGM's related to the notification) since this
+  // agent only cares about Issue's, not the entire notification
   const matchingsById = new Map<string, MatchingWithRefs>();
-  for (const m of notification.deviceGroupsMatchings) {
-    matchingsById.set(m.deviceGroupMatching.id, m.deviceGroupMatching);
+  for (const v of vulnerabilities) {
+    for (const dgm of v.deviceGroupMatchings) matchingsById.set(dgm.id, dgm);
   }
   const matchings = [...matchingsById.values()];
 

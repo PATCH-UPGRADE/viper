@@ -99,9 +99,7 @@ export async function getRelevantNotes(
         "DEVICE_GROUP_MATCHING",
         scope.deviceGroupMatchingIds ?? [],
       ),
-      Promise.all((scope.assetIds ?? []).map(getNotesForAsset)).then(
-        (results) => results.flat(),
-      ),
+      getNotesForInstance("ASSET", scope.assetIds ?? []),
     ]);
 
   const byId = new Map<string, RelevantNote>();

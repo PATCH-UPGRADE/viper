@@ -64,7 +64,8 @@ export async function gatherVexContext(
                 },
               },
               issues: { where: { deviceGroupMatchingId: { not: null } } },
-              // TODO/cassidy: should this include all issues?
+              // TODO: continue testing, may need to include asset-level issues
+              // here as well
             },
           },
         },
@@ -97,6 +98,8 @@ export async function gatherVexContext(
   const matchings = [...matchingsById.values()];
 
   // Resolve matchings → concrete device groups (with their assets) in one query.
+  // TODO: if there's a device group with unknown version, that needs to create
+  // an UNDER_INVESTIGATION issue
   const candidateGroups =
     matchings.length > 0
       ? await prisma.deviceGroup.findMany({

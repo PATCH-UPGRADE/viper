@@ -1,0 +1,98 @@
+# Integration-test stack for CI: VIPER <-> Blueflow cross-service test.
+#
+# Stands up, on one user-defined network so containers resolve each other by
+# service name:
+#   postgres      VIPER's database
+#   viper         the freshly-built VIPER image (${VIPER_IMAGE})
+#   inngest       VIPER background jobs
+#   blueflow-db   Blueflow's database ("create blueflow db")
+#   blueflow      virtalabs Blueflow (Docker Hub, public) -- pushes assets to VIPER
+#
+# Flow (driven by the workflow + integration test):
+#   create_assets -> POST /api/viper/webhook/ -> Blueflow POSTs asset pages to
+#   http://viper:3000/api/v1/assets/integrationUpload/<token>
+#
+# Usage:
+#   docker compose --env-file .env.ci -f docker/ci/compose.blueflow.yml up -d
+
+name: viper-ci
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: viper
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d viper"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  viper:
+    image: ${VIPER_IMAGE:-viper:ci}
+    platform: linux/amd64
+    env_file: ../../.env.ci
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/viper
+      - INNGEST_DEV=1
+      - INNGEST_BASE_URL=http://inngest:8288
+      - PRISMA_CLIENT_ENGINE_TYPE=binary
+    volumes:
+      - viper-stamps:/srv/stamps
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  inngest:
+    image: inngest/inngest:v1.17.2
+    environment:
+      - INNGEST_BOOTSTRAP_URL=http://viper:3000/api/inngest
+      - INNGEST_DEV=true
+      - INNGEST_PORT=8288
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["inngest dev -u $$INNGEST_BOOTSTRAP_URL"]
+    ports:
+      - "8288:8288"
+    depends_on:
+      - viper
+
+  # --- Blueflow (the service under integration test) ------------------------
+  blueflow-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: blueflow
+      POSTGRES_PASSWORD: blueflow
+      POSTGRES_DB: blueflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blueflow -d blueflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  blueflow:
+    image: ${BLUEFLOW_IMAGE:-virtalabsinc/blueflow:latest}
+    platform: linux/amd64
+    environment:
+      - DATABASE_URL=postgresql://blueflow:blueflow@blueflow-db:5432/blueflow
+      - DJANGO_SETTINGS_MODULE=project.settings.development
+      - DJANGO_SECRET_KEY=ci-secret-key-not-for-production
+      - DJANGO_DEBUG=true
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,blueflow,*
+      - BASE_URL=http://blueflow:8000
+      - CELERY_TASK_ALWAYS_EAGER=true
+      - VIPER_CALLBACK_ALLOWED_HOSTS=viper
+      - VIPER_CALLBACK_TIMEOUT=30
+    ports:
+      - "8000:8000"
+    depends_on:
+      blueflow-db:
+        condition: service_healthy
+
+volumes:
+  viper-stamps:

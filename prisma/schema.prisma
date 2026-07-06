@@ -280,14 +280,7 @@ model DeviceGroup {
   updatedAt            DateTime             @updatedAt
   deviceGroupHistories DeviceGroupHistory[]
   assets               Asset[]
-  // Vulnerabilities / remediations / advisories / device artifacts connect via
-  // DeviceGroupMatching now, not a direct relation. notificationMappings is from
-  // main's notifications feature and stays.
-  notificationMappings NotificationDeviceGroupMapping[]
 
-  // NOTE: Postgres treats NULLs as distinct, so this composite unique will NOT
-  // prevent duplicate rows when versionId is null. Identity resolution is done
-  // in the app via resolveDeviceGroup() (findFirst + create in a transaction).
   @@unique([vendorId, productId, versionId, versionStatus], name: "device_group_identity")
   @@index([vendorId, productId])
   @@map("device_group")
@@ -310,6 +303,7 @@ model DeviceGroupMatching {
   remediations    Remediation[]    @relation("RemediationMatchings")
   advisories      Advisory[]       @relation("AdvisoryMatchings")
   deviceArtifacts DeviceArtifact[] @relation("DeviceArtifactMatchings")
+  notificationMappings  NotificationDeviceGroupMapping[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1163,8 +1157,8 @@ model Notification {
 
   sources         NotificationSource[]
   reads           NotificationRead[]
-  assets          NotificationAssetMapping[]
-  deviceGroups    NotificationDeviceGroupMapping[]
+  assets          NotificationAssetMapping[] 
+  deviceGroupsMatchings NotificationDeviceGroupMapping[]
   vulnerabilities NotificationVulnerabilityMapping[]
   remediations    NotificationRemediationMapping[]
 
@@ -1251,14 +1245,15 @@ model NotificationDeviceGroupMapping {
   notification   Notification?   @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   workOrderTicketId String?
   workOrderTicket   WorkOrderTicket? @relation(fields: [workOrderTicketId], references: [id], onDelete: Cascade)
-  deviceGroupId  String
-  deviceGroup    DeviceGroup     @relation(fields: [deviceGroupId], references: [id], onDelete: Cascade)
+  deviceGroupMatchingId String
+  deviceGroupMatching DeviceGroupMatching @relation(fields:[deviceGroupMatchingId], references: [id], onDelete: Cascade)
   confidence     ConfidenceLevel?
   reasonWhy String?
 
-  @@unique([notificationId, deviceGroupId])
-  @@unique([workOrderTicketId, deviceGroupId], map: "ndg_mapping_workorder_devicegroup_key")
+  @@unique([notificationId, deviceGroupMatchingId])
+  @@unique([workOrderTicketId, deviceGroupMatchingId], map: "ndg_mapping_workorder_devicegroupmatching_key")
   @@index([workOrderTicketId])
+
   @@map("notification_device_group_mapping")
 }
 

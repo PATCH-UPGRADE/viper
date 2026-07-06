@@ -6,7 +6,7 @@ vi.mock("server-only", () => ({}));
 const { mockPrisma } = vi.hoisted(() => {
   const prisma = {
     notificationDeviceGroupMapping: { upsert: vi.fn() },
-    deviceGroup: { findUnique: vi.fn(), update: vi.fn() },
+    deviceGroupMatching: { findUnique: vi.fn(), update: vi.fn() },
     // applyDecisions runs inside prisma.$transaction(async (tx) => …) — invoke
     // the callback with the same mock so call assertions still work.
     // biome-ignore lint/suspicious/noExplicitAny: callback shape varies
@@ -18,11 +18,12 @@ const { mockPrisma } = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
-vi.mock("@/lib/router-utils", () => ({ cpeToDeviceGroup: vi.fn() }));
+vi.mock("@/lib/router-utils", () => ({ resolveMatchingId: vi.fn() }));
 
+import type { Candidates } from "./candidate-search";
 import { applyDecisions, type Decision } from "./match";
 
-const candidates = {
+const candidates: Candidates = {
   deviceGroups: [
     {
       extracted: {
@@ -34,18 +35,21 @@ const candidates = {
       matches: [
         {
           id: "dg-1",
-          cpe: [],
           manufacturer: "Acme",
           modelName: "X1",
           version: null,
+          versionRange: null,
         },
       ],
     },
   ],
+  vulnerabilities: [],
+  remediations: [],
+  assets: [],
 };
 
 const linkDecision: Decision = {
-  kind: "deviceGroup",
+  kind: "deviceGroupMatching",
   op: "link",
   targetId: "dg-1",
   confidence: "Matched",
@@ -74,14 +78,14 @@ describe("applyDecisions — device-group mapping owner", () => {
     ).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          workOrderTicketId_deviceGroupId: {
+          workOrderTicketId_deviceGroupMatchingId: {
             workOrderTicketId: "wo-1",
-            deviceGroupId: "dg-1",
+            deviceGroupMatchingId: "dg-1",
           },
         },
         create: expect.objectContaining({
           workOrderTicketId: "wo-1",
-          deviceGroupId: "dg-1",
+          deviceGroupMatchingId: "dg-1",
           confidence: "Matched",
         }),
       }),
@@ -101,14 +105,14 @@ describe("applyDecisions — device-group mapping owner", () => {
     ).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          notificationId_deviceGroupId: {
+          notificationId_deviceGroupMatchingId: {
             notificationId: "n-1",
-            deviceGroupId: "dg-1",
+            deviceGroupMatchingId: "dg-1",
           },
         },
         create: expect.objectContaining({
           notificationId: "n-1",
-          deviceGroupId: "dg-1",
+          deviceGroupMatchingId: "dg-1",
         }),
       }),
     );

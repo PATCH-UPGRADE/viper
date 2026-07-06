@@ -107,7 +107,7 @@ async function main() {
       deviceGroups: {
         select: {
           confidence: true,
-          deviceGroup: {
+          deviceGroupMatching: {
             select: {
               vendor: { select: { canonicalDisplayName: true } },
               product: { select: { canonicalDisplayName: true } },
@@ -142,7 +142,7 @@ async function main() {
     full.deviceGroups
       .map(
         (d) =>
-          `${d.deviceGroup.vendor?.canonicalDisplayName ?? "?"} ${d.deviceGroup.product?.canonicalDisplayName ?? ""} [${d.confidence}]`,
+          `${d.deviceGroupMatching.vendor?.canonicalDisplayName ?? "?"} ${d.deviceGroupMatching.product?.canonicalDisplayName ?? ""} [${d.confidence}]`,
       )
       .join(" | ") || "—",
   );

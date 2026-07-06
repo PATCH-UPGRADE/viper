@@ -1,7 +1,7 @@
 // Central helper for matching notes to VIPER models.
 //
 // A Note is relevant to an object either because it directly references that
-// object via targetModel + instanceId, or via EntityFilterMatch 
+// object via targetModel + instanceId, or via EntityFilterMatch
 
 import "server-only";
 import type { NoteStatus, ScopeTargetModel } from "@/generated/prisma";

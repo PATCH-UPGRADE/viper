@@ -1,4 +1,4 @@
-// the structured output schema the agent's tool call is validated against, 
+// the structured output schema the agent's tool call is validated against,
 //
 // Example:
 // {

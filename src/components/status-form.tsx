@@ -37,10 +37,7 @@ export const StatusFormBase = ({
 }: {
   id: string;
   initialStatus: IssueStatus;
-  onUpdate: (input: {
-    id: string;
-    status: IssueStatus;
-  }) => Promise<unknown>;
+  onUpdate: (input: { id: string; status: IssueStatus }) => Promise<unknown>;
   className?: string;
 }) => {
   const [status, setStatus] = useState<IssueStatus>(initialStatus);

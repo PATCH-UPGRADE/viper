@@ -18,7 +18,7 @@ export async function sortVulnerabilities(
   const issueIds = context.issues.map((i) => i.issueId);
   const schema = buildVexSchema(issueIds);
 
-  const TOOL_NAME = "update_and_create_issues"; 
+  const TOOL_NAME = "update_and_create_issues";
   const recordTool = tool(async () => "ok", {
     name: TOOL_NAME,
     description:
@@ -39,9 +39,7 @@ export async function sortVulnerabilities(
     { role: "user", content: context.markdown },
   ]);
 
-  const call = res.tool_calls?.find(
-    (c) => c.name === TOOL_NAME,
-  );
+  const call = res.tool_calls?.find((c) => c.name === TOOL_NAME);
   if (!call) return {};
 
   const parsed = schema.safeParse(call.args);

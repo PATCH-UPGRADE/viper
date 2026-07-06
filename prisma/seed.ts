@@ -48,7 +48,7 @@ const SAMPLE_DEVICE_GROUPS = [
     version: "unknown",
   },
   // ── EOL OS platforms (exist for vulnerability targeting; no assets use these
-  //    as primary CPE, but EternalBlue affectedDeviceGroups connects here too) 
+  //    as primary CPE, but EternalBlue affectedDeviceGroups connects here too)
   {
     cpe: "cpe:2.3:o:microsoft:windows_7:-:*:*:*:*:*:*:*",
     manufacturer: "Microsoft",

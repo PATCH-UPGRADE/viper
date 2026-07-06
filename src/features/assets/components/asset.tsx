@@ -173,8 +173,7 @@ const TabulatedVulnList = ({ assetId }: TabulatedVulnListProps) => {
   const [currentTab, setCurrentTab] = useState(params.issueStatus);
 
   const handleUpdateTab = (newStatus: string) => {
-    const issueStatus =
-      IssueStatus[newStatus as keyof typeof IssueStatus];
+    const issueStatus = IssueStatus[newStatus as keyof typeof IssueStatus];
     if (issueStatus === undefined) {
       return;
     }

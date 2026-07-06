@@ -10,48 +10,48 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 model User {
-  id               String            @id
-  name             String
-  email            String?
-  emailVerified    Boolean           @default(false)
-  image            String?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @default(now()) @updatedAt
-  sessions         Session[]
-  accounts         Account[]
-  workflows        Workflow[]
-  assets           Asset[]
-  vulnerabilities  Vulnerability[]
-  remediations     Remediation[]
-  deviceArtifacts  DeviceArtifact[]
-  artifacts        Artifact[]
-  artifactWrappers ArtifactWrapper[]
-  advisories       Advisory[]
+  id                        String           @id
+  name                      String
+  email                     String?
+  emailVerified             Boolean          @default(false)
+  image                     String?
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @default(now()) @updatedAt
+  sessions                  Session[]
+  accounts                  Account[]
+  workflows                 Workflow[]
+  assets                    Asset[]
+  vulnerabilities           Vulnerability[]
+  remediations              Remediation[]
+  deviceArtifacts           DeviceArtifact[]
+  artifacts                 Artifact[]
+  artifactWrappers          ArtifactWrapper[]
+  advisories                Advisory[]
 
-  apikeys           Apikey[]
-  apiKeyConnectors  ApiKeyConnector[]
-  integration       Integration[]
-  integrationUser   Integration?       @relation("integration_user")
-  webhooks          Webhook[]
-  userTokens        UserToken[]
-  threads           ChatThread[]
-  memories          Memory[]
-  notificationReads NotificationRead[]
+  apikeys                   Apikey[]
+  apiKeyConnectors          ApiKeyConnector[]
+  integration               Integration[]
+  integrationUser          Integration?     @relation("integration_user")
+  webhooks                  Webhook[]
+  userTokens UserToken[]
+  threads    ChatThread[]
+  memories   Memory[]
+  notificationReads         NotificationRead[]
 
-  departmentId             String?
-  department               Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  workOrderTicketsCreated  WorkOrderTicket[] @relation("WorkOrderTicketCreator")
-  workOrderTicketsAssigned WorkOrderTicket[] @relation("WorkOrderTicketAssignee")
-  ticketComments           TicketComment[]
-  watchedTickets           TicketWatch[]
-  ticketSeen               TicketSeen[]
-  ticketActivities         TicketActivity[]
-  notes                    Note[]
+  departmentId           String?
+  department             Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  workOrderTicketsCreated   WorkOrderTicket[]  @relation("WorkOrderTicketCreator")
+  workOrderTicketsAssigned  WorkOrderTicket[]  @relation("WorkOrderTicketAssignee")
+  ticketComments         TicketComment[]
+  watchedTickets         TicketWatch[]
+  ticketSeen             TicketSeen[]
+  ticketActivities       TicketActivity[]
+  notes                  Note[]
 
   @@unique([email])
   @@index([departmentId])
@@ -107,13 +107,13 @@ model Verification {
 }
 
 model UserToken {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash   String   @unique
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
   permissions String? // what can the token be used for?
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([expiresAt])
@@ -220,9 +220,9 @@ enum VersScheme {
 // Canonical vendor registry. `nameMappings` are aliases that resolve to this row.
 model Vendor {
   id                   String                @id @default(cuid())
-  canonicalName        String                @unique
-  canonicalDisplayName String
-  hasCpe               Boolean               @default(false)
+  canonicalName        String                @unique 
+  canonicalDisplayName String 
+  hasCpe               Boolean               @default(false) 
   nameMappings         String[]              @default([])
   deviceGroups         DeviceGroup[]
   matchings            DeviceGroupMatching[]
@@ -277,8 +277,8 @@ model DeviceGroup {
   udi        String?
   helmSbomId String?
 
-  createdAt            DateTime                         @default(now())
-  updatedAt            DateTime                         @updatedAt
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
   deviceGroupHistories DeviceGroupHistory[]
   assets               Asset[]
 
@@ -356,7 +356,7 @@ model Asset {
   issues               Issue[]
   deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
-  workOrderTickets     WorkOrderTicket[]          @relation("WorkOrderTicketAssets")
+  workOrderTickets        WorkOrderTicket[]       @relation("WorkOrderTicketAssets")
   notificationMappings NotificationAssetMapping[]
 
   createdAt DateTime @default(now())
@@ -371,7 +371,7 @@ model ExternalAssetMapping {
   id            String      @id @default(cuid())
   itemId        String
   integrationId String
-  externalId    String // the id the asset has on say, Blueflow
+  externalId    String      // the id the asset has on say, Blueflow
   // Relationships
   item          Asset       @relation(fields: [itemId], references: [id], onDelete: Cascade)
   integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
@@ -406,14 +406,14 @@ model ExternalDeviceArtifactMapping {
 }
 
 model ExternalRemediationMapping {
-  id            String      @id @default(cuid())
+  id            String        @id @default(cuid())
   itemId        String
   integrationId String
   externalId    String
-  item          Remediation @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  item          Remediation   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  integration   Integration   @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   lastSynced    DateTime?
 
   @@unique([itemId, integrationId], name: "external_remediation_mappings_item_integration_key")
@@ -440,23 +440,23 @@ model ExternalVulnerabilityMapping {
 }
 
 model ArtifactWrapper {
-  id String @id @default(cuid())
+  id            String        @id @default(cuid())
 
   deviceArtifactId String?
-  deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: Cascade)
-  remediationId    String?
-  remediation      Remediation?    @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+  deviceArtifact DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: Cascade)
+  remediationId String?
+  remediation Remediation? @relation(fields: [remediationId], references: [id], onDelete: Cascade)
 
-  latestArtifactId String?   @unique
-  latestArtifact   Artifact? @relation("LatestArtifact", fields: [latestArtifactId], references: [id], onDelete: SetNull)
+  latestArtifactId String? @unique
+  latestArtifact Artifact? @relation("LatestArtifact", fields: [latestArtifactId], references: [id], onDelete: SetNull)
 
   artifacts Artifact[] @relation("ArtifactWrapper") // back of fk relation
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   @@index([remediationId])
   @@index([deviceArtifactId])
@@ -466,19 +466,19 @@ model ArtifactWrapper {
 }
 
 model Artifact {
-  id        String          @id @default(cuid())
+  id            String        @id @default(cuid())
   wrapperId String
-  wrapper   ArtifactWrapper @relation("ArtifactWrapper", fields: [wrapperId], references: [id], onDelete: Cascade)
+  wrapper ArtifactWrapper @relation("ArtifactWrapper", fields: [wrapperId], references: [id], onDelete: Cascade)
 
-  name         String?
+  name String?
   artifactType ArtifactType
-  downloadUrl  String?      @map("download-url") // Either provided by the performer or an artifact in S3 uploaded to us
-  hash         String? // Verify incomplete or invalid uploads
-  size         Int? // size in bytes
+  downloadUrl String? @map("download-url") // Either provided by the performer or an artifact in S3 uploaded to us
+  hash  String? // Verify incomplete or invalid uploads
+  size Int? // size in bytes
 
-  prevVersionId String?   @unique // null for v1
-  prevVersion   Artifact? @relation("VersionChain", fields: [prevVersionId], references: [id], onDelete: SetNull)
-  nextVersion   Artifact? @relation("VersionChain") // opposite side of prevVersion
+  prevVersionId String? @unique // null for v1
+  prevVersion Artifact? @relation("VersionChain", fields: [prevVersionId], references: [id], onDelete: SetNull)
+  nextVersion Artifact? @relation("VersionChain") // opposite side of prevVersion
 
   versionNumber Int // 1, 2, 3...
 
@@ -487,8 +487,8 @@ model Artifact {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   @@unique([wrapperId, versionNumber])
   @@index([wrapperId])
@@ -550,49 +550,49 @@ enum AlohaStatus {
 }
 
 model Vulnerability {
-  id                   String                @id @default(cuid())
+  id                   String        @id @default(cuid())
   cveId                String?
-  description          String?               @db.Text // description of vulnerability
-  narrative            String?               @db.Text // how a vulnerability could be exploited
-  impact               String?               @db.Text // clinical impact
-  severity             Severity              @default(Medium)
+  description          String?       @db.Text // description of vulnerability
+  narrative            String?       @db.Text // how a vulnerability could be exploited
+  impact               String?       @db.Text // clinical impact
+  severity             Severity      @default(Medium)
   cvssScore            Float?
   cvssVector           String?
   sarif                Json
-  affectedComponents   String[]              @default([])
+  affectedComponents   String[]        @default([])
   deviceGroupMatchings DeviceGroupMatching[] @relation("VulnerabilityMatchings")
-  advisories           Advisory[]            @relation("AdvisoryVulnerabilities")
-  exploitUri           String?               @map("exploit-uri")
-  upstreamApi          String?               @map("upstream-api")
+  advisories           Advisory[]      @relation("AdvisoryVulnerabilities")
+  exploitUri           String?         @map("exploit-uri")
+  upstreamApi          String?         @map("upstream-api")
 
   // EPSS (Exploit Prediction Scoring System) fields
-  epss        Float? // Probability score between 0.0 and 1.0
-  updatedEpss DateTime? // When EPSS score was last updated
-
+  epss                 Float?        // Probability score between 0.0 and 1.0
+  updatedEpss          DateTime?     // When EPSS score was last updated
+  
   // KEV (Known Exploited Vulnerabilities) fields
-  inKEV        Boolean   @default(false) // Whether in CISA KEV catalog
-  updatedInKev DateTime? // When KEV status was last checked/updated
+  inKEV                Boolean       @default(false) // Whether in CISA KEV catalog
+  updatedInKev         DateTime?     // When KEV status was last checked/updated
 
-  priority Priority @default(Unsorted)
+  priority             Priority      @default(Unsorted)
 
   alohaStatus AlohaStatus?
-  alohaLog    Json         @default("{}")
+  alohaLog Json @default("{}")
 
-  deviceArtifactId String?
-  deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
+  deviceArtifactId     String?
+  deviceArtifact       DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   remediations         Remediation[]
   issues               Issue[]
-  workOrderTickets     WorkOrderTicket[]                  @relation("WorkOrderTicketVulns")
+  workOrderTickets        WorkOrderTicket[]  @relation("WorkOrderTicketVulns")
   notificationMappings NotificationVulnerabilityMapping[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
-  externalMappings ExternalVulnerabilityMapping[]
+  externalMappings     ExternalVulnerabilityMapping[]
 
   @@index([userId])
   @@index([deviceArtifactId])
@@ -637,8 +637,8 @@ model Issue {
   statusConfidence         ConfidenceLevel?
   statusNotes              String?                   @db.Text
 
-  issueRemediations IssueRemediation[]
-  workOrderTickets  WorkOrderTicket[]  @relation("WorkOrderTicketIssues")
+  issueRemediations  IssueRemediation[]
+  workOrderTickets      WorkOrderTicket[]     @relation("WorkOrderTicketIssues")
   filters           EntityFilter[]
 
   createdAt DateTime @default(now())
@@ -725,26 +725,26 @@ model EntityFilterMatch {
 }
 
 model Remediation {
-  id        String            @id @default(cuid())
+  id            String      @id @default(cuid())
   artifacts ArtifactWrapper[]
 
   deviceGroupMatchings DeviceGroupMatching[] @relation("RemediationMatchings")
-  description          String?               @db.Text // description of remediation
-  narrative            String?               @db.Text // how a remediation can be applied
-  upstreamApi          String?               @map("upstream-api")
+  description   String?      @db.Text // description of remediation
+  narrative     String?      @db.Text // how a remediation can be applied
+  upstreamApi   String?      @map("upstream-api")
 
   vulnerabilityId String?
   vulnerability   Vulnerability? @relation(fields: [vulnerabilityId], references: [id], onDelete: SetNull)
 
   issueRemediations    IssueRemediation[]
-  workOrderTickets     WorkOrderTicket[]                @relation("WorkOrderTicketRemediations")
+  workOrderTickets        WorkOrderTicket[]     @relation("WorkOrderTicketRemediations")
   notificationMappings NotificationRemediationMapping[]
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   alohaStatus AlohaStatus?
-  alohaLog    Json         @default("{}")
+  alohaLog Json @default("{}")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -757,11 +757,11 @@ model Remediation {
 }
 
 model IssueRemediation {
-  issueId       String
-  remediationId String
+  issueId         String
+  remediationId   String
 
-  issue       Issue       @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  remediation Remediation @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+  issue           Issue           @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  remediation     Remediation     @relation(fields: [remediationId], references: [id], onDelete: Cascade)
 
   @@id([issueId, remediationId])
   @@map("issue_remediation")
@@ -791,37 +791,37 @@ model Apikey {
   permissions         String?
   metadata            String?
 
-  connector ApiKeyConnector?
+  connector           ApiKeyConnector?
 
   @@map("apikey")
 }
 
 model Integration {
-  id                 String          @id @default(cuid())
-  name               String
-  platform           String? // The name of the integration platform, e.g "BlueFlow"
-  integrationUri     String          @map("integration-uri")
-  integrationType    IntegrationType
+  id                     String            @id @default(cuid())
+  name                   String
+  platform               String?           // The name of the integration platform, e.g "BlueFlow"
+  integrationUri         String            @map("integration-uri")
+  integrationType        IntegrationType
   // ^PARTNER: Helm, Blueflow. Follows VIPER standard 
   // AI: uses AI to pull data from any platform
   // CSAF: parses CSAF security advisories (Vulnerability resource type only)
-  prompt             String?         @db.Text // optional, additional instructions for AI
-  authType           AuthType
-  resourceType       ResourceType
-  authentication     Json? // TODO: this needs to be encrypted
-  syncEvery          Int // e.g 300, sync every 300 seconds
-  syncStatus         SyncStatus[]
+  prompt                 String?           @db.Text // optional, additional instructions for AI
+  authType               AuthType
+  resourceType           ResourceType
+  authentication         Json?             // TODO: this needs to be encrypted
+  syncEvery              Int               // e.g 300, sync every 300 seconds
+  syncStatus             SyncStatus[]
   lastSuccessfulSync DateTime?
 
-  apiKeyConnector ApiKeyConnector?
+  apiKeyConnector        ApiKeyConnector?
 
   // The user who created the integration
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                 String
+  user                   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // the user that this integration creates
-  integrationUserId String @unique
-  integrationUser   User   @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
+  integrationUserId      String @unique
+  integrationUser        User             @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
 
   assetMappings          ExternalAssetMapping[]
   deviceArtifactMappings ExternalDeviceArtifactMapping[]
@@ -829,8 +829,8 @@ model Integration {
   vulnerabilityMappings  ExternalVulnerabilityMapping[]
   advisoryMappings       ExternalAdvisoryMapping[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
   @@index([userId])
   @@index([integrationUserId])
@@ -839,21 +839,21 @@ model Integration {
 
 // separate out to preserve between ApiKey rotations
 model ApiKeyConnector {
-  id String @id @default(cuid())
+  id                  String           @id @default(cuid())
 
-  name         String?
-  resourceType ResourceType?
-  lastRequest  DateTime?
+  name                String?
+  resourceType        ResourceType?
+  lastRequest         DateTime?
 
-  apiKeyId      String?      @unique
-  apiKey        Apikey?      @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
-  integrationId String?      @unique
-  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
-  userId        String
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiKeyId            String?          @unique
+  apiKey              Apikey?          @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  integrationId       String?          @unique
+  integration         Integration?     @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  userId              String
+  user                User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
   @@index([userId])
   @@map("api_key_connector")
@@ -871,15 +871,15 @@ model SyncStatus {
   integrationId String
   status        SyncStatusEnum @default(Pending)
   errorMessage  String?
-  syncedAt      DateTime       @default(now())
+  syncedAt      DateTime    @default(now())
 
   @@map("sync_status")
 }
 
 model Webhook {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   triggers       TriggerEnum[]
   callbackUrl    String
@@ -887,8 +887,8 @@ model Webhook {
   authType       AuthType
   authentication Json?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([userId])
 }
@@ -941,23 +941,23 @@ enum Tlp {
 }
 
 model Advisory {
-  id                        String                    @id @default(cuid())
+  id                        String          @id @default(cuid())
   userId                    String
   title                     String?
-  user                      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  referencedVulnerabilities Vulnerability[]           @relation("AdvisoryVulnerabilities")
-  deviceGroupMatchings      DeviceGroupMatching[]     @relation("AdvisoryMatchings")
-  csaf                      Json                      @default("{}")
-  upstreamUrl               String?                   @unique
+  user                      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referencedVulnerabilities Vulnerability[]       @relation("AdvisoryVulnerabilities")
+  deviceGroupMatchings      DeviceGroupMatching[] @relation("AdvisoryMatchings")
+  csaf                      Json                  @default("{}")
+  upstreamUrl               String?         @unique
   severity                  Severity
-  summary                   String?                   @db.Text
-  status                    IssueStatus               @default(AFFECTED)
+  summary                   String?         @db.Text
+  status                    IssueStatus     @default(AFFECTED)
   tlp                       Tlp?
   publishedAt               DateTime?
-  createdAt                 DateTime                  @default(now())
-  updatedAt                 DateTime                  @updatedAt
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
   externalMappings          ExternalAdvisoryMapping[]
-  workOrderTickets          WorkOrderTicket[]         @relation("WorkOrderTicketAdvisories")
+  workOrderTickets             WorkOrderTicket[]  @relation("WorkOrderTicketAdvisories")
 
   @@index([userId])
   @@map("advisory")
@@ -981,13 +981,13 @@ model ExternalAdvisoryMapping {
 }
 
 model ChatThread {
-  id        String        @id @default(cuid())
-  userId    String
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  messages  ChatMessage[]
+  id            String      @id @default(cuid())
+  userId String
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title String?
+  createdAt                 DateTime         @default(now())
+  updatedAt DateTime @updatedAt
+  messages ChatMessage[]
 
   @@index([userId])
 }
@@ -1004,17 +1004,17 @@ enum ChatMessageRole {
 }
 
 model ChatMessage {
-  id         String             @id @default(cuid())
-  threadId   String
-  thread     ChatThread         @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  status     ChatMessageStatus?
-  role       ChatMessageRole
-  content    String?            @db.Text
-  toolCalls  Json?
+  id        String             @id @default(cuid())
+  threadId  String
+  thread    ChatThread         @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  status    ChatMessageStatus?
+  role      ChatMessageRole
+  content   String?            @db.Text
+  toolCalls Json?
   toolStatus String?
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
-  checksum   String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  checksum  String?
 
   @@index([threadId, createdAt])
 }
@@ -1050,12 +1050,12 @@ enum TicketCategory {
 }
 
 model Department {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String?  @db.Text
+  id          String         @id @default(cuid())
+  name        String         @unique
+  description String?        @db.Text
   color       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   users              User[]
   tickets            WorkOrderTicket[]   @relation("WorkOrderTicketDepartments")
@@ -1075,14 +1075,14 @@ model CategoryColor {
 }
 
 model WorkOrderTicket {
-  id      String @id @default(cuid())
-  summary String
+  id          String         @id @default(cuid())
+  summary     String
 
-  status   TicketStatus   @default(TO_DO)
-  category TicketCategory @default(OTHER)
+  status      TicketStatus   @default(TO_DO)
+  category    TicketCategory @default(OTHER)
 
   sourceLabel String?
-  sources     NotificationSource[]
+  sources NotificationSource[]
 
   body String? @db.Text
 
@@ -1090,33 +1090,33 @@ model WorkOrderTicket {
 
   departments Department[] @relation("WorkOrderTicketDepartments")
 
-  parentId String?
-  parent   WorkOrderTicket?  @relation("WorkOrderTicketChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children WorkOrderTicket[] @relation("WorkOrderTicketChildren")
+  parentId  String?
+  parent    WorkOrderTicket?  @relation("WorkOrderTicketChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children  WorkOrderTicket[] @relation("WorkOrderTicketChildren")
 
-  creatorId  String
-  creator    User    @relation("WorkOrderTicketCreator", fields: [creatorId], references: [id], onDelete: Cascade)
-  assigneeId String?
-  assignee   User?   @relation("WorkOrderTicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creatorId   String
+  creator     User           @relation("WorkOrderTicketCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  assigneeId  String?
+  assignee    User?          @relation("WorkOrderTicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
 
   scheduledAt DateTime?
 
-  issues          Issue[]                          @relation("WorkOrderTicketIssues")
-  vulnerabilities Vulnerability[]                  @relation("WorkOrderTicketVulns")
-  remediations    Remediation[]                    @relation("WorkOrderTicketRemediations")
-  advisories      Advisory[]                       @relation("WorkOrderTicketAdvisories")
-  assets          Asset[]                          @relation("WorkOrderTicketAssets")
+  issues          Issue[]         @relation("WorkOrderTicketIssues")
+  vulnerabilities Vulnerability[] @relation("WorkOrderTicketVulns")
+  remediations    Remediation[]   @relation("WorkOrderTicketRemediations")
+  advisories      Advisory[]      @relation("WorkOrderTicketAdvisories")
+  assets          Asset[]         @relation("WorkOrderTicketAssets")
   deviceGroups    NotificationDeviceGroupMapping[]
 
-  comments      TicketComment[]
-  descriptions  TicketDescription[]
-  watchers      TicketWatch[]
-  seenBy        TicketSeen[]
-  activities    TicketActivity[]
-  lastCommentAt DateTime?
+  comments       TicketComment[]
+  descriptions   TicketDescription[]
+  watchers       TicketWatch[]
+  seenBy         TicketSeen[]
+  activities     TicketActivity[]
+  lastCommentAt  DateTime?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([status])
   @@index([assigneeId])
@@ -1168,14 +1168,14 @@ enum TicketActivityType {
 }
 
 model TicketActivity {
-  id        String             @id @default(cuid())
+  id        String   @id @default(cuid())
   ticketId  String
-  ticket    WorkOrderTicket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticket    WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   userId    String
-  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      TicketActivityType
-  data      Json // shape varies by `type`; structured server-side
-  createdAt DateTime           @default(now())
+  data      Json     // shape varies by `type`; structured server-side
+  createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])
   @@index([userId])
@@ -1183,14 +1183,14 @@ model TicketActivity {
 }
 
 model TicketComment {
-  id        String          @id @default(cuid())
+  id        String       @id @default(cuid())
   ticketId  String
   ticket    WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   authorId  String
-  author    User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  body      String          @db.Text
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  author    User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body      String       @db.Text
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
   @@index([ticketId, createdAt])
   @@index([authorId])
@@ -1248,9 +1248,9 @@ model Notification {
   summary String?          @db.Text
   details Json? // unindexed, NotificationType-specific fields
 
-  priority          Priority @default(Unsorted)
-  priorityReasonWhy String?  @db.Text
-  hospitalImpact    String?  @db.Text
+  priority Priority @default(Unsorted)
+  priorityReasonWhy String? @db.Text
+  hospitalImpact String? @db.Text
 
   sources         NotificationSource[]
   reads           NotificationRead[]
@@ -1267,24 +1267,24 @@ model Notification {
 }
 
 model NotificationSource {
-  id             String        @id @default(cuid())
+  id             String               @id @default(cuid())
   notificationId String?
-  notification   Notification? @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  notification   Notification?        @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 
   workOrderTicketId String?
   workOrderTicket   WorkOrderTicket? @relation(fields: [workOrderTicketId], references: [id], onDelete: Cascade)
 
   sourceType NotificationSourceType @default(Source)
-  reasonWhy  String?                @db.Text // why was this email linked to this notification?
+  reasonWhy String? @db.Text // why was this email linked to this notification?
 
   channel      NotificationChannel
   externalId   String? // for an email, this is the resend email id
   referenceUrl String?
   raw          Json
-  markdown     String?             @db.Text
+  markdown     String?              @db.Text
 
   attachments NotificationAttachment[]
-  receivedAt  DateTime                 @default(now())
+  receivedAt  DateTime               @default(now())
 
   @@unique([channel, externalId])
   @@index([notificationId])
@@ -1293,9 +1293,9 @@ model NotificationSource {
 }
 
 model NotificationAttachment {
-  id       String             @id @default(cuid())
-  sourceId String
-  source   NotificationSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  id          String             @id @default(cuid())
+  sourceId    String
+  source      NotificationSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
   filename    String?
   contentType String?
@@ -1323,23 +1323,23 @@ model NotificationRead {
 }
 
 model NotificationAssetMapping {
-  id             String           @id @default(cuid())
+  id             String          @id @default(cuid())
   notificationId String
-  notification   Notification     @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  notification   Notification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   assetId        String
-  asset          Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  asset          Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
   confidence     ConfidenceLevel?
-  reasonWhy      String?
+  reasonWhy String?
 
   @@unique([notificationId, assetId])
   @@map("notification_asset_mapping")
 }
 
 model NotificationDeviceGroupMapping {
-  id                String           @id @default(cuid())
+  id             String          @id @default(cuid())
   // A mapping belongs to a Notification OR a WorkOrderTicket (exactly one).
-  notificationId    String?
-  notification      Notification?    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  notificationId String?
+  notification   Notification?   @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   workOrderTicketId String?
   workOrderTicket   WorkOrderTicket? @relation(fields: [workOrderTicketId], references: [id], onDelete: Cascade)
   deviceGroupMatchingId String
@@ -1355,26 +1355,26 @@ model NotificationDeviceGroupMapping {
 }
 
 model NotificationVulnerabilityMapping {
-  id              String           @id @default(cuid())
+  id              String          @id @default(cuid())
   notificationId  String
-  notification    Notification     @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  notification    Notification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   vulnerabilityId String
-  vulnerability   Vulnerability    @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
+  vulnerability   Vulnerability   @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
   confidence      ConfidenceLevel?
-  reasonWhy       String?
+  reasonWhy String?
 
   @@unique([notificationId, vulnerabilityId])
   @@map("notification_vulnerability_mapping")
 }
 
 model NotificationRemediationMapping {
-  id             String           @id @default(cuid())
+  id             String          @id @default(cuid())
   notificationId String
-  notification   Notification     @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  notification   Notification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   remediationId  String
-  remediation    Remediation      @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+  remediation    Remediation     @relation(fields: [remediationId], references: [id], onDelete: Cascade)
   confidence     ConfidenceLevel?
-  reasonWhy      String?
+  reasonWhy String?
 
   @@unique([notificationId, remediationId])
   @@map("notification_remediation_mapping")

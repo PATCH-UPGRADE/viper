@@ -703,8 +703,7 @@ model EntityFilter {
   note    Note?   @relation(fields: [noteId], references: [id], onDelete: Cascade)
   issueId String?
   issue   Issue?  @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  // Exactly one of noteId/issueId must be set — enforce at the app layer (tRPC input
-  // validation); a raw-SQL check constraint could be added later via a manual migration.
+  // Exactly one of noteId/issueId must be set
 
   matches        EntityFilterMatch[]
   lastResolvedAt DateTime? // null until a future memoization job runs

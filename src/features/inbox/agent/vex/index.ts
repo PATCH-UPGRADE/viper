@@ -18,10 +18,11 @@ export async function sortVulnerabilities(
   const issueIds = context.issues.map((i) => i.issueId);
   const schema = buildVexSchema(issueIds);
 
+  const TOOL_NAME = "update_and_create_issues"; 
   const recordTool = tool(async () => "ok", {
-    name: "record_vex_determinations",
+    name: TOOL_NAME,
     description:
-      "Record the VEX determination for each issue, keyed by issue id. Omit issues that are unchanged.",
+      "Record the issue status determination for each issue, keyed by id. Omit issues that are unchanged.",
     schema,
   });
 
@@ -39,7 +40,7 @@ export async function sortVulnerabilities(
   ]);
 
   const call = res.tool_calls?.find(
-    (c) => c.name === "record_vex_determinations",
+    (c) => c.name === TOOL_NAME,
   );
   if (!call) return {};
 

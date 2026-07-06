@@ -1,5 +1,5 @@
-// VEX sorting agent deterministic apply: turns the agent's structured output
-// into deterministic write ops and applies them to the database.
+// turns the agent's structured output into deterministic write ops and
+// applies them to the database.
 
 import "server-only";
 import type { ConfidenceLevel, IssueStatus } from "@/generated/prisma";
@@ -46,7 +46,7 @@ function normalizeStatus(status: StatusValue | undefined): {
  * Turn an agent VexResult into deterministic write ops. Pure + guarded (no DB):
  * skips ids that aren't baseline issues in context (hallucinations), skips
  * NOT_AFFECTED without a justification, and skips asset overrides whose id isn't
- * reachable through the issue. Unit-tested in isolation.
+ * reachable through the issue.
  */
 export function planVexWrites(
   context: VexContext,

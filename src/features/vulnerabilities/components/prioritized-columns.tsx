@@ -116,6 +116,8 @@ export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
       row.original.asset
         ? getAssetRoleLabel(row.original.asset)
         : "Device Group",
+        // TODO: Consider a backend change where device group issues still get displayed
+        // in the frontend as one issue per asset in that device group
   },
   {
     accessorKey: "status",

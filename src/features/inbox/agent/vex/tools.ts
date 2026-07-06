@@ -1,7 +1,4 @@
-// VEX sorting agent tool/schema definitions: the structured output schema the
-// agent's tool call is validated against, plus the loose types used by the
-// deterministic planner so it can be unit-tested without constructing the
-// dynamic zod schema.
+// the structured output schema the agent's tool call is validated against, 
 //
 // Example:
 // {

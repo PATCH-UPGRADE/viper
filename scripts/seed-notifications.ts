@@ -4,7 +4,10 @@ import {
   NotificationChannel,
   NotificationType,
   Priority,
+  ScopeTargetModel,
+  Severity,
   Tlp,
+  VersionStatus,
 } from "@/generated/prisma";
 import prisma from "../src/lib/db";
 
@@ -28,6 +31,15 @@ function upsertVendor(name: string) {
 function upsertProduct(name: string) {
   const canonicalName = name.trim().toLowerCase();
   return prisma.product.upsert({
+    where: { canonicalName },
+    update: {},
+    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+  });
+}
+
+function upsertVersion(name: string) {
+  const canonicalName = name.trim().toLowerCase();
+  return prisma.version.upsert({
     where: { canonicalName },
     update: {},
     create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
@@ -353,6 +365,217 @@ const NOTIFICATIONS: NotificationSeed[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Siemens syngo.plaza VEX scenario (SSA-016040 / CVE-2024-52334)
+// ---------------------------------------------------------------------------
+//
+// Exercises the vex agent's asset-level override path: the device group as a
+// whole is affected by the CVE, but a Note on one specific asset gives the
+// agent grounds to mark that asset NOT_AFFECTED while the sibling asset (and
+// the group-level issue) stay AFFECTED.
+
+const SYNGO_PLAZA = {
+  vendor: "Siemens Healthineers",
+  product: "syngo.plaza",
+  version: "VB30E",
+};
+
+const SYNGO_PLAZA_ASSETS = [
+  {
+    ip: "10.50.0.11",
+    hostname: "pacs-syngo-01",
+    serialNumber: "SYNGO-PLZ-VB30E-001",
+    role: "PACS Workstation",
+    networkSegment: "RADIOLOGY-PACS",
+  },
+  {
+    ip: "10.50.0.12",
+    hostname: "pacs-syngo-02",
+    serialNumber: "SYNGO-PLZ-VB30E-002",
+    role: "PACS Workstation",
+    networkSegment: "RADIOLOGY-PACS",
+  },
+];
+
+async function seedSyngoPlazaVexScenario(userId: string) {
+  console.log("\n🌱 Seeding Siemens syngo.plaza VEX scenario...");
+
+  const vendor = await upsertVendor(SYNGO_PLAZA.vendor);
+  const product = await upsertProduct(SYNGO_PLAZA.product);
+  const version = await upsertVersion(SYNGO_PLAZA.version);
+
+  const groupIdentity = {
+    vendorId: vendor.id,
+    productId: product.id,
+    versionId: version.id,
+    versionStatus: VersionStatus.KNOWN,
+  };
+  const deviceGroup =
+    (await prisma.deviceGroup.findFirst({ where: groupIdentity })) ??
+    (await prisma.deviceGroup.create({ data: groupIdentity }));
+
+  const assets = await Promise.all(
+    SYNGO_PLAZA_ASSETS.map(async (asset) => {
+      const existing = await prisma.asset.findFirst({
+        where: { serialNumber: asset.serialNumber },
+      });
+      if (existing) return existing;
+      return prisma.asset.create({
+        data: {
+          ...asset,
+          upstreamApi: "https://example.com/placeholder",
+          status: "Active" as AssetStatus,
+          deviceGroupId: deviceGroup.id,
+          userId,
+        },
+      });
+    }),
+  );
+
+  // TODO: matching fn for something like  "vers:generic/<VB30E_HF07"
+  const versionRange = `vers:generic/${version.canonicalName}`;
+  const matching =
+    (await prisma.deviceGroupMatching.findFirst({
+      where: {
+        vendorId: vendor.id,
+        productId: product.id,
+        versionId: null,
+        versionRange,
+      },
+    })) ??
+    (await prisma.deviceGroupMatching.create({
+      data: { vendorId: vendor.id, productId: product.id, versionRange },
+    }));
+
+  const vulnerability =
+    (await prisma.vulnerability.findFirst({
+      where: { cveId: "CVE-2024-52334" },
+    })) ??
+    (await prisma.vulnerability.create({
+      data: {
+        cveId: "CVE-2024-52334",
+        severity: Severity.Medium,
+        cvssScore: 5.3,
+        cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
+        description:
+          "syngo.plaza VB30E contains an insecure password encryption vulnerability that could allow an attacker to extract original passwords and might gain unauthorized access.",
+        narrative:
+          "The affected application does not encrypt passwords properly. An attacker who can read the stored credential material can recover the original passwords and use them to authenticate as a legitimate user.",
+        impact:
+          "Unauthorized access to the syngo.plaza PACS system used to display, process, and report on diagnostic images, including mammography.",
+        userId,
+        sarif: {
+          version: "2.1.0",
+          runs: [
+            {
+              tool: { driver: { name: "Siemens Healthineers PSIRT" } },
+              results: [
+                {
+                  ruleId: "CVE-2024-52334",
+                  level: "warning",
+                  message: {
+                    text: "Insecure password encryption in syngo.plaza VB30E (SSA-016040)",
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        deviceGroupMatchings: { connect: { id: matching.id } },
+      },
+    }));
+
+  const title =
+    "Siemens Healthineers syngo.plaza VB30E — Insecure Password Encryption (SSA-016040 / CVE-2024-52334)";
+
+  const existingNotification = await prisma.notification.findFirst({
+    where: { title },
+  });
+  if (existingNotification) {
+    console.log(`  ⏭️  Already exists: ${title}`);
+    return;
+  }
+
+  const notification = await prisma.notification.create({
+    data: {
+      title,
+      summary:
+        "Siemens Healthineers has disclosed an insecure password encryption vulnerability in syngo.plaza VB30E (CVE-2024-52334). The affected application does not encrypt passwords properly, which could allow an attacker to extract original passwords and gain unauthorized access. A hot fix (HF07) is available.",
+      type: NotificationType.Advisory,
+      priority: Priority.High,
+      tlp: Tlp.WHITE,
+      hospitalImpact:
+        "Affects 2 syngo.plaza PACS workstations running pre-hotfix VB30E. If exploited, an attacker with access to stored credential material could recover passwords and gain unauthorized access to the PACS system.",
+      priorityReasonWhy:
+        "No known active exploitation and requires access to stored credential material, but affects PACS authentication broadly. Siemens has published hot fix HF07 — schedule during the next maintenance window.",
+    },
+  });
+
+  await prisma.notificationSource.create({
+    data: {
+      notificationId: notification.id,
+      channel: NotificationChannel.Email,
+      sourceType: "Source",
+      raw: {
+        from: "psirt@siemens-healthineers.com",
+        subject:
+          "SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E",
+        to: "security@hospital.org",
+      },
+      markdown: `# SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E
+
+**Publication Date**: 2026-02-10 · **CVSS v3.1**: 5.3 · **CVSS v4.0**: 6.3
+
+## Summary
+syngo.plaza VB30E contains an insecure password encryption vulnerability that could allow an attacker to extract original passwords and might gain unauthorized access.
+
+Siemens Healthineers has released a new hot fix (HF07) for syngo.plaza version VB30E and recommends updating to the latest version.
+
+## Affected products and solution
+- **syngo.plaza VB30E**, all versions < VB30E_HF07 — affected by CVE-2024-52334
+- **Remediation**: Update to VB30E_HF07 or later.
+
+## Vulnerability classification (CVE-2024-52334)
+The affected application does not encrypt passwords properly. This could allow an attacker to recover the original passwords and might gain unauthorized access.
+
+- CVSS v3.1 Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N
+- CWE-261: Weak Encoding for Password`,
+      receivedAt: new Date(),
+    },
+  });
+
+  await prisma.notificationVulnerabilityMapping.create({
+    data: {
+      notificationId: notification.id,
+      vulnerabilityId: vulnerability.id,
+      confidence: ConfidenceLevel.Confirmed,
+      reasonWhy: "CVE-2024-52334 explicitly named in the vendor advisory.",
+    },
+  });
+
+  await prisma.notificationDeviceGroupMapping.create({
+    data: {
+      notificationId: notification.id,
+      deviceGroupMatchingId: matching.id,
+      confidence: ConfidenceLevel.Confirmed,
+      reasonWhy:
+        "Vendor, product, and affected version range matched from the advisory's affected-products table.",
+    },
+  });
+
+  const notedAsset = assets[1];
+  await prisma.note.create({
+    data: {
+      userId,
+      text: `${notedAsset.hostname} had its local password store migrated to the hospital's centralized SSO/Active Directory integration. This asset no longer manages its own password store.`,
+      targetModel: ScopeTargetModel.ASSET,
+      instanceId: notedAsset.id,
+    },
+  });
+
+  console.log(`  ✅ Created: ${title}`);
+}
+
+// ---------------------------------------------------------------------------
 // Main seed function
 // ---------------------------------------------------------------------------
 
@@ -437,6 +660,7 @@ async function main() {
   const user = await getSeedUser();
   const deviceGroups = await seedDeviceGroups(user.id);
   await seedNotifications(user.id, deviceGroups);
+  await seedSyngoPlazaVexScenario(user.id);
 
   console.log("\n✨ Done.");
   await prisma.$disconnect();

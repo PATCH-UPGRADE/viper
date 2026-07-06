@@ -4,6 +4,7 @@
 // separated so gather + render can be inspected independently of the model call.
 
 import "server-only";
+import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
 import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
@@ -168,27 +169,12 @@ export async function gatherVexContext(
   const allAssetIds = [
     ...new Set(candidateGroups.flatMap((g) => g.assets.map((a) => a.id))),
   ];
-  const notes = await prisma.note.findMany({
-    where: {
-      OR: [
-        { status: "PERSISTENT" },
-        {
-          targetModel: "VULNERABILITY",
-          instanceId: { in: vulnerabilities.map((v) => v.id) },
-        },
-        {
-          targetModel: "REMEDIATION",
-          instanceId: { in: remediations.map((r) => r.id) },
-        },
-        { targetModel: "DEVICE_GROUP", instanceId: { in: groupIds } },
-        {
-          targetModel: "DEVICE_GROUP_MATCHING",
-          instanceId: { in: matchings.map((m) => m.id) },
-        },
-        { targetModel: "ASSET", instanceId: { in: allAssetIds } },
-      ],
-    },
-    select: { text: true, status: true, targetModel: true, instanceId: true },
+  const notes = await getRelevantNotes({
+    vulnerabilityIds: vulnerabilities.map((v) => v.id),
+    remediationIds: remediations.map((r) => r.id),
+    deviceGroupIds: groupIds,
+    deviceGroupMatchingIds: matchings.map((m) => m.id),
+    assetIds: allAssetIds,
   });
 
   // Label lookups for rendering note targets.

@@ -88,7 +88,7 @@ interface PrismaClientLike {
 // ============================================================================
 
 // Normalize a name for canonical lookup (the displayName keeps the original).
-function normalizeName(name: string): string {
+export function normalizeName(name: string): string {
   return name.trim().toLowerCase();
 }
 
@@ -266,7 +266,6 @@ export async function resolveDeviceGroup(identity: DeviceGroupIdentityInput) {
       if (!deviceGroup) throw error;
     }
   }
-
   // Union any new CPEs / fill in a missing UDI on the existing/created group.
   const mergedCpes = [...new Set([...deviceGroup.cpe, ...cpes])];
   const needsCpe = mergedCpes.length !== deviceGroup.cpe.length;
@@ -355,6 +354,7 @@ type MatchingResolveInput = {
   product?: string | null;
   version?: string | null;
   versionRange?: string | null;
+  hasCpe?: boolean;
 };
 
 /**
@@ -362,13 +362,16 @@ type MatchingResolveInput = {
  * identity (resolved to canonical rows). Identities come from CPEs, so
  * canonicals are marked CPE-backed.
  */
-async function resolveMatchingId(input: MatchingResolveInput): Promise<string> {
-  const vendorRow = await resolveVendor(input.vendor, { hasCpe: true });
+export async function resolveMatchingId(
+  input: MatchingResolveInput,
+): Promise<string> {
+  const hasCpe = input.hasCpe ?? true;
+  const vendorRow = await resolveVendor(input.vendor, { hasCpe });
   const productRow = input.product
-    ? await resolveProduct(input.product, { hasCpe: true })
+    ? await resolveProduct(input.product, { hasCpe })
     : null;
   const versionRow = input.version
-    ? await resolveVersion(input.version, { hasCpe: true })
+    ? await resolveVersion(input.version, { hasCpe })
     : null;
 
   const where = {

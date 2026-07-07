@@ -161,7 +161,7 @@ function renderCandidates(candidates: Candidates): string {
         candidates.remediations
           .map((entry, i) => {
             const e = entry.extracted;
-            const line = `Remediations #${i + 1} extracted: linkedtoCveId=${e.linkedCveId ?? "?"} | description=${e.description} ?? "?"}`;
+            const line = `Remediations #${i + 1} extracted: linkedtoCveId=${e.linkedCveId ?? "?"} | description=${e.description ?? "?"}`;
             const matches =
               entry.matches.length > 0
                 ? entry.matches

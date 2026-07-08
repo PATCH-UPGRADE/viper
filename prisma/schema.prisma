@@ -42,6 +42,7 @@ model User {
   threads    ChatThread[]
   memories   Memory[]
   notificationReads         NotificationRead[]
+  matchFeedback             MatchFeedback[]
 
   departmentId           String?
   department             Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
@@ -1134,6 +1135,7 @@ enum ConfidenceLevel {
   NeedsReview // An LLM matched this but with low confidence
   Matched // An LLM matched this with high confidence
   Confirmed // A human confirmed this match was correct
+  Rejected  // A human marked this match as incorrect
 }
 
 enum NotificationSourceType {
@@ -1161,6 +1163,7 @@ model Notification {
   deviceGroupsMatchings NotificationDeviceGroupMapping[]
   vulnerabilities NotificationVulnerabilityMapping[]
   remediations    NotificationRemediationMapping[]
+  matchFeedback   MatchFeedback[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1281,4 +1284,38 @@ model NotificationRemediationMapping {
 
   @@unique([notificationId, remediationId])
   @@map("notification_remediation_mapping")
+}
+
+// ─── Feedback ────────────────────────────────────────────────────────────
+
+enum MatchFeedbackTargetType {
+  NotificationDeviceGroupMapping
+  NotificationAssetMapping
+  NotificationRemediationMapping
+  NotificationVulnerabilityMapping
+}
+
+enum MatchFeedbackCategory {
+  Incorrect
+  Correct
+}
+
+model MatchFeedback {
+  id String @id @default(cuid())
+  targetType MatchFeedbackTargetType
+  targetId  String
+  category  MatchFeedbackCategory
+  comment String?
+
+  userId String
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  notificationId  String?
+  notification  Notification? @relation(fields:[notificationId], references:[id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([notificationId])
+  @@map("match_feedback")
 }

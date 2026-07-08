@@ -21,7 +21,7 @@ async function main() {
 
   await prisma.apikey.deleteMany({
     where: {
-      userId: user.id,
+      referenceId: user.id,
       name: API_KEY_NAME,
     },
   });

@@ -47,7 +47,9 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
   const { valid, error, key } = await verifyApiKey(ctx.req as Request);
 
   if (valid && key && !error) {
-    return next({ ctx: { ...ctx, auth: { user: { id: key.userId }, key } } });
+    return next({
+      ctx: { ...ctx, auth: { user: { id: key.referenceId }, key } },
+    });
   }
 
   throw new TRPCError({

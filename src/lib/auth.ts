@@ -1,6 +1,6 @@
+import { apiKey } from "@better-auth/api-key";
 import { APIError, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { apiKey } from "better-auth/plugins";
 import { MIN_PASSWORD_LENGTH } from "@/config/constants";
 import prisma from "@/lib/db";
 import { sendEmail } from "@/lib/mail";

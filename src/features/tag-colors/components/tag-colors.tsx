@@ -36,6 +36,7 @@ const categoryLabels: Record<TicketCategory, string> = {
   FIRMWARE_UPDATE: "Firmware Update",
   NETWORK_REMEDIATION: "Network Remediation",
   NEW_ASSET_PROCUREMENT: "New Asset Procurement",
+  MAINTENANCE: "Maintenance",
   OTHER: "Other",
 };
 

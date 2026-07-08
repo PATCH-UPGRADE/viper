@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   IssueStatus,
+  NotificationChannel,
   type Prisma,
   Severity,
   TicketActivityType,
@@ -8,6 +9,7 @@ import {
   TicketStatus,
 } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
+import { createIntegrationInputSchema } from "@/lib/schemas";
 
 export const ticketBaseInclude = {
   departments: {
@@ -204,6 +206,41 @@ export const workOrderListInclude = {
 export type WorkOrderListItem = Prisma.WorkOrderTicketGetPayload<{
   include: typeof workOrderListInclude;
 }>;
+
+// --- Integration ingestion -------------------------------------------------
+
+// One work-order item as pushed by an integration (e.g. a Fleet activity mapped
+// by the AI sync). `summary` is the only required field; everything else falls
+// back to model defaults. `scheduledAt` is an ISO-8601 string, coerced to a
+// Date at upload time.
+export const workOrderIntegrationItemSchema = z.object({
+  summary: z.string().min(1, "summary is required"),
+  status: z.enum(TicketStatus).optional(),
+  category: z.enum(TicketCategory).optional(),
+  body: z.string().nullish(),
+  sourceLabel: z.string().nullish(),
+  suggestedAssignee: z.string().nullish(),
+  // Fleet emits naive local datetimes (e.g. "2026-07-22T13:02:00"); the mapper
+  // should append the request's UTC offset, but we accept both offset and local
+  // forms so one un-offset value can't reject the entire batch.
+  scheduledAt: z.string().datetime({ offset: true, local: true }).nullish(),
+  // Optional ingested-source metadata. When present, a NotificationSource is
+  // attached to the created ticket so it shows a source badge (by channel) and
+  // appears in the Suggested (triage) tab. `raw` holds the upstream record.
+  source: z
+    .object({
+      channel: z.enum(NotificationChannel),
+      externalId: z.string().nullish(),
+      referenceUrl: z.string().nullish(),
+      markdown: z.string().nullish(),
+      raw: z.any().optional(),
+    })
+    .optional(),
+});
+
+export const integrationWorkOrderInputSchema = createIntegrationInputSchema(
+  workOrderIntegrationItemSchema,
+);
 
 // --- Input ----------------------------------------------------------------
 

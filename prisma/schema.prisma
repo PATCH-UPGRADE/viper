@@ -421,6 +421,23 @@ model ExternalRemediationMapping {
   @@map("external_remediation_mappings")
 }
 
+model ExternalWorkOrderMapping {
+  id            String          @id @default(cuid())
+  itemId        String
+  integrationId String
+  externalId    String
+  item          WorkOrderTicket @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  integration   Integration     @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  lastSynced    DateTime?
+
+  @@unique([itemId, integrationId], name: "external_work_order_mappings_item_integration_key")
+  @@unique([integrationId, externalId], name: "external_work_order_mappings_integration_external_key")
+  @@index([itemId])
+  @@map("external_work_order_mappings")
+}
+
 model ExternalVulnerabilityMapping {
   id            String        @id @default(cuid())
   itemId        String
@@ -731,6 +748,7 @@ model Integration {
   remediationMappings    ExternalRemediationMapping[]
   vulnerabilityMappings  ExternalVulnerabilityMapping[]
   advisoryMappings       ExternalAdvisoryMapping[]
+  workOrderMappings      ExternalWorkOrderMapping[]
 
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
@@ -821,12 +839,14 @@ enum ResourceType {
   Vulnerability
   DeviceArtifact
   Remediation
+  WorkOrder
 }
 
 enum IntegrationType {
   PARTNER
   AI
   CSAF
+  REST
 }
 
 // Traffic Light Protocol, governs information sharing
@@ -949,6 +969,7 @@ enum TicketCategory {
   FIRMWARE_UPDATE
   NETWORK_REMEDIATION
   NEW_ASSET_PROCUREMENT
+  MAINTENANCE
   OTHER
 }
 
@@ -1016,6 +1037,7 @@ model WorkOrderTicket {
   watchers       TicketWatch[]
   seenBy         TicketSeen[]
   activities     TicketActivity[]
+  externalMappings ExternalWorkOrderMapping[]
   lastCommentAt  DateTime?
 
   createdAt   DateTime @default(now())

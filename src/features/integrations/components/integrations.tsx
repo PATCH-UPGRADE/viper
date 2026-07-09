@@ -159,6 +159,14 @@ export const IntegrationCreateModal = ({
       badge: "Universal & Adaptive",
       icon: <Sparkles size={15} />,
     },
+    {
+      value: IntegrationType.REST,
+      id: "rest",
+      title: "REST Integration",
+      description: "Direct pull from a REST API with a built-in adapter",
+      badge: "e.g., Siemens Fleet",
+      icon: null,
+    },
     ...(resourceType === "Vulnerability"
       ? [
           {

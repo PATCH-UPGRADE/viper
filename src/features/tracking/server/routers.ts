@@ -1,18 +1,34 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { type Prisma, TicketCategory, TicketStatus } from "@/generated/prisma";
+import {
+  type Prisma,
+  ResourceType,
+  TicketCategory,
+  TicketStatus,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { createSortParser, fetchPaginated } from "@/lib/router-utils";
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import {
+  createSortParser,
+  fetchPaginated,
+  processIntegrationSync,
+  processIntegrationToken,
+} from "@/lib/router-utils";
+import { integrationResponseSchema } from "@/lib/schemas";
+import {
+  baseProcedure,
+  createTRPCRouter,
+  protectedProcedure,
+} from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 import { TRACKING_TABS } from "../params";
 import {
+  integrationWorkOrderInputSchema,
   paginatedWorkOrderListResponseSchema,
   ticketBaseInclude,
   ticketCommentResponseSchema,
@@ -793,5 +809,74 @@ export const trackingRouter = createTRPCRouter({
         });
         return comment;
       });
+    }),
+
+  processIntegrationCreate: baseProcedure
+    .input(integrationWorkOrderInputSchema)
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/workOrders/integrationUpload/{token}",
+        tags: ["Work Orders"],
+        summary: "Synchronize Work Orders with integration",
+        description:
+          "Synchronize Work Order tickets on VIPER from a partnered platform",
+      },
+    })
+    .output(integrationResponseSchema)
+    .mutation(async ({ input }) => {
+      const { userId, integrationId } = await processIntegrationToken(
+        input.token,
+        ResourceType.WorkOrder,
+      );
+
+      return processIntegrationSync(
+        prisma,
+        {
+          model: prisma.workOrderTicket,
+          mappingModel: prisma.externalWorkOrderMapping,
+          transformInputItem: async (item, creatorId) => {
+            const { vendorId, scheduledAt, source, ...fields } = item;
+            const scheduled = scheduledAt ? new Date(scheduledAt) : null;
+            return {
+              // The integration user (resolved from the token) owns tickets it
+              // creates; WorkOrderTicket requires a creator.
+              createData: {
+                ...fields,
+                scheduledAt: scheduled,
+                creator: { connect: { id: creatorId } },
+                // Attach an ingested-source record (created once with the
+                // ticket) so it shows a source badge and lands in the Suggested
+                // tab. Re-syncs take the update path and leave sources alone.
+                ...(source
+                  ? {
+                      sources: {
+                        create: {
+                          channel: source.channel,
+                          externalId: source.externalId ?? vendorId,
+                          referenceUrl: source.referenceUrl ?? null,
+                          markdown: source.markdown ?? null,
+                          raw: source.raw ?? {},
+                        },
+                      },
+                    }
+                  : {}),
+              },
+              // Never reassign creator on re-sync; only refresh mutable fields.
+              updateData: {
+                ...fields,
+                scheduledAt: scheduled,
+              },
+              // No natural business key for a work order — always create a new
+              // ticket when there's no existing external mapping.
+              uniqueFieldConditions: [],
+              artifactsData: undefined,
+            };
+          },
+        },
+        input,
+        userId,
+        integrationId,
+      );
     }),
 });

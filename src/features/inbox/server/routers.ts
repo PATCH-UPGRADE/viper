@@ -1,9 +1,9 @@
 import "server-only";
 import { z } from "zod";
 import {
+  MatchFeedbackTargetType,
   NotificationType,
   Priority,
-  MatchFeedbackTargetType,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {

@@ -8,7 +8,6 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { requireOwnership } from "@/trpc/middleware";
 import { apiTokenInputSchema } from "../types";
 
 export const userRouter = createTRPCRouter({
@@ -25,7 +24,7 @@ export const userRouter = createTRPCRouter({
       const { search } = input;
 
       const whereFilter = {
-        userId: ctx.auth.user.id,
+        referenceId: ctx.auth.user.id,
         name: {
           contains: search,
           mode: "insensitive" as const,
@@ -92,12 +91,11 @@ export const userRouter = createTRPCRouter({
   removeApiToken: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Verify ownership
-      await requireOwnership(input.id, ctx.auth.user.id, "apikey");
-
       await prisma.$transaction(async (tx) => {
-        const apiKeyResult = await tx.apikey.findUniqueOrThrow({
-          where: { id: input.id },
+        // Scope to the owner (referenceId) so a user can only delete their own
+        // key; throws if it's missing or not theirs.
+        const apiKeyResult = await tx.apikey.findFirstOrThrow({
+          where: { id: input.id, referenceId: ctx.auth.user.id },
           select: {
             name: true,
             lastRequest: true,

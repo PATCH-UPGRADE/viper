@@ -1304,7 +1304,7 @@ model MatchFeedback {
   id String @id @default(cuid())
   targetType MatchFeedbackTargetType
   targetId  String
-  category  MatchFeedbackCategory
+  category  MatchFeedbackCategory @default(Incorrect)
   comment String?
 
   userId String

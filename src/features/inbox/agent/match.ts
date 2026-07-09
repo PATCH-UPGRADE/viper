@@ -299,8 +299,8 @@ export async function applyDecisions(
   const rejectedDeviceGroupMatchingIds = new Set(
     (
       await prisma.notificationDeviceGroupMapping.findMany({
-        where: { notificationId, confidence: "Rejected"},
-        select: { deviceGroupMatchingId: true }
+        where: { notificationId, confidence: "Rejected" },
+        select: { deviceGroupMatchingId: true },
       })
     ).map((m) => m.deviceGroupMatchingId),
   );
@@ -310,8 +310,9 @@ export async function applyDecisions(
 
   const validIds = {
     deviceGroupMatching: new Set(
-      candidates.deviceGroups.flatMap((e) => e.matches.map((m) => m.id))
-      .filter((id) => !rejectedDeviceGroupMatchingIds.has(id)),
+      candidates.deviceGroups
+        .flatMap((e) => e.matches.map((m) => m.id))
+        .filter((id) => !rejectedDeviceGroupMatchingIds.has(id)),
     ),
     vulnerability: new Set(
       candidates.vulnerabilities.flatMap((e) => e.matches.map((m) => m.id)),
@@ -442,7 +443,7 @@ export async function applyDecisions(
             hasCpe: false,
           });
 
-          if(rejectedDeviceGroupMatchingIds.has(matchingId)) {
+          if (rejectedDeviceGroupMatchingIds.has(matchingId)) {
             summary.skipped++;
             continue;
           }

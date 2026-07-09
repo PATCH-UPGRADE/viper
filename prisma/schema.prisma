@@ -676,8 +676,10 @@ model Apikey {
   start               String?
   prefix              String?
   key                 String
-  userId              String
-  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // better-auth's owner column for a key; holds the user's id, so we keep the FK.
+  referenceId         String
+  configId            String    @default("default")
+  user                User      @relation(fields: [referenceId], references: [id], onDelete: Cascade)
   refillInterval      Int?
   refillAmount        Int?
   lastRefillAt        DateTime?
@@ -696,6 +698,7 @@ model Apikey {
 
   connector           ApiKeyConnector?
 
+  @@index([referenceId])
   @@map("apikey")
 }
 

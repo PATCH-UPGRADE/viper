@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 const handleOnClickPlayWright = async () => {
   toast.info("Testing playwright");

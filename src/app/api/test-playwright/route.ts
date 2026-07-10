@@ -10,6 +10,7 @@ export async function GET() {
   try {
     const userName = process.env.FLEET_ADVISORY_USERNAME;
     const password = process.env.FLEET_ADVISORY_PASSWORD;
+
     if (!userName || !password) {
       return NextResponse.json(
         { ok: false, error: "env vars not set" },
@@ -21,6 +22,7 @@ export async function GET() {
       userName,
       password,
     );
+    console.log("session ", session);
     return NextResponse.json({ ok: true, cookieLength: session.value.length });
   } catch (err) {
     return NextResponse.json(

@@ -11,6 +11,7 @@ export const resourceTypeSchema = z.enum([
   "DeviceArtifact",
   "Remediation",
   "WorkOrder",
+  "Advisory"
 ]);
 
 export const integrationInputSchema = authSchema
@@ -66,6 +67,10 @@ export const integrationsMapping = {
     name: "Work Order",
     type: ResourceType.WorkOrder,
   },
+  advisories: {
+    name: "Advisory",
+    type: ResourceType.Advisory
+  }
 };
 
 export type IntegrationWithRelations = inferOutput<

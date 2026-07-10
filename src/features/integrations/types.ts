@@ -10,6 +10,7 @@ export const resourceTypeSchema = z.enum([
   "Vulnerability",
   "DeviceArtifact",
   "Remediation",
+  "WorkOrder",
 ]);
 
 export const integrationInputSchema = authSchema
@@ -17,7 +18,7 @@ export const integrationInputSchema = authSchema
     name: z.string().min(1, "Name is required"),
     platform: z.string().optional(),
     integrationUri: safeUrlSchema,
-    integrationType: z.enum(["PARTNER", "AI", "CSAF"]),
+    integrationType: z.enum(["PARTNER", "AI", "CSAF", "REST"]),
     prompt: z.string().optional(),
     resourceType: resourceTypeSchema,
     syncEvery: z
@@ -60,6 +61,10 @@ export const integrationsMapping = {
   vulnerabilities: {
     name: "Vulnerability",
     type: ResourceType.Vulnerability,
+  },
+  workOrders: {
+    name: "Work Order",
+    type: ResourceType.WorkOrder,
   },
 };
 

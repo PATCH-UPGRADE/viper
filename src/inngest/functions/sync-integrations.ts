@@ -5,9 +5,18 @@ import { integrationAssetInputSchema } from "@/features/assets/types";
 import { integrationDeviceArtifactInputSchema } from "@/features/device-artifacts/types";
 import type { IntegrationWithStringDates } from "@/features/integrations/types";
 import { integrationRemediationInputSchema } from "@/features/remediations/types";
+import {
+  deriveOffsetFromUrl,
+  mapFleetActivities,
+} from "@/features/tracking/server/fleet-mapper";
+import { integrationWorkOrderInputSchema } from "@/features/tracking/types";
 import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/types";
-import type { ResourceType } from "@/generated/prisma";
-import { AuthType, IntegrationType, SyncStatusEnum } from "@/generated/prisma";
+import {
+  AuthType,
+  IntegrationType,
+  ResourceType,
+  SyncStatusEnum,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createUserToken, DEFAULT_TOKEN_TTL_SECONDS } from "@/lib/tokens";
 import { getBaseUrl } from "@/lib/url-utils";
@@ -91,6 +100,11 @@ const getResponseConfig = async (
       return {
         path: `/vulnerabilities/integrationUpload/${raw}`,
         schema: z.toJSONSchema(integrationVulnerabilityInputSchema),
+      };
+    case "WorkOrder":
+      return {
+        path: `/workOrders/integrationUpload/${raw}`,
+        schema: z.toJSONSchema(integrationWorkOrderInputSchema),
       };
     default:
       throw new Error(`Unhandled ResourceType: ${resourceType}`);
@@ -188,6 +202,103 @@ async function syncPartnerIntegration(
   return { success: true, data };
 }
 
+// Registry of built-in REST adapters, keyed by (URL host, resourceType). The
+// integration URL is the authoritative identity of the upstream system —
+// unlike the free-text name/platform, it can't drift from what's actually being
+// called. `hostMatch` is matched case-insensitively as a substring of the URL's
+// hostname. A single host can expose multiple endpoints (e.g. Fleet serves
+// activities → WorkOrder and security-advisories → Advisory), so resourceType
+// disambiguates which adapter to run.
+const REST_MAPPERS: Array<{
+  hostMatch: string;
+  resourceType: ResourceType;
+  map: (raw: unknown, url: string) => unknown[];
+}> = [
+  {
+    hostMatch: "fleet.siemens-healthineers.com",
+    resourceType: ResourceType.WorkOrder,
+    map: (raw, url) =>
+      mapFleetActivities(raw, { offset: deriveOffsetFromUrl(url) }),
+  },
+];
+
+function selectRestMapper(integration: IntegrationWithStringDates) {
+  let host = "";
+  try {
+    host = new URL(integration.integrationUri).hostname.toLowerCase();
+  } catch {
+    // Malformed URL → no adapter matches; the caller throws a clear error.
+  }
+  return REST_MAPPERS.find(
+    (m) =>
+      m.resourceType === integration.resourceType && host.includes(m.hostMatch),
+  );
+}
+
+// Helper for REST Integration: the worker pulls the URL itself, maps the
+// response with a built-in adapter, then hands the items to the same upload
+// endpoint the AI/PARTNER callbacks use (shared dedup + sync-status logic).
+async function syncRestIntegration(
+  integration: IntegrationWithStringDates,
+): Promise<SyncResult> {
+  const mapper = selectRestMapper(integration);
+  if (!mapper) {
+    throw new Error(
+      `No REST adapter for integration "${integration.name}" (url: ${integration.integrationUri}, resourceType: ${integration.resourceType})`,
+    );
+  }
+
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (integration.authType !== AuthType.None) {
+    const { header, value } = parseAuthenticationJson(integration);
+    headers[header] = value;
+  }
+
+  // 1. Pull directly from the REST API.
+  const upstream = await fetch(integration.integrationUri, {
+    method: "GET",
+    headers,
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!upstream.ok) {
+    throw new Error(
+      `Failed to fetch data: ${upstream.status} ${upstream.statusText}`,
+    );
+  }
+  const rawData = await upstream.json();
+
+  // 2. Map with the platform adapter.
+  const items = mapper.map(rawData, integration.integrationUri);
+
+  // 3. Hand off to the token-scoped upload endpoint (token is in the path).
+  const { path: responsePath } = await getResponseConfig(
+    integration.integrationUserId,
+    integration.resourceType,
+  );
+  const uploadResponse = await fetch(`${getBaseUrl()}/api/v1${responsePath}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(30000),
+    body: JSON.stringify({
+      items,
+      page: 1,
+      pageSize: items.length,
+      totalCount: items.length,
+      totalPages: 1,
+      next: null,
+      previous: null,
+    }),
+  });
+  if (!uploadResponse.ok) {
+    const detail = await uploadResponse.text().catch(() => "");
+    throw new Error(
+      `Upload failed: ${uploadResponse.status} ${uploadResponse.statusText} ${detail}`.trim(),
+    );
+  }
+
+  return { success: true, data: await uploadResponse.json() };
+}
+
 export const syncIntegration = inngest.createFunction(
   { id: "sync-integration" },
   { event: "integration/sync.requested" },
@@ -223,6 +334,8 @@ export const syncIntegration = inngest.createFunction(
           return await syncAiIntegration(integration);
         } else if (integration.integrationType === IntegrationType.PARTNER) {
           return await syncPartnerIntegration(integration);
+        } else if (integration.integrationType === IntegrationType.REST) {
+          return await syncRestIntegration(integration);
         } else if (integration.integrationType === IntegrationType.CSAF) {
           throw "TODO: VW-227";
         } else {

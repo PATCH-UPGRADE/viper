@@ -1,4 +1,4 @@
-name: Viper
+name: viper
 
 services:
   postgres:

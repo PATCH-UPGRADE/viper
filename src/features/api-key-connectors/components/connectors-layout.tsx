@@ -2,6 +2,7 @@
 
 import {
   BugIcon,
+  ClipboardListIcon,
   ComputerIcon,
   CpuIcon,
   HeartIcon,
@@ -27,6 +28,10 @@ const resourceTypeIcons = {
   },
   [ResourceType.Remediation]: { icon: <HeartIcon />, name: "Remediations" },
   [ResourceType.Vulnerability]: { icon: <BugIcon />, name: "Vulnerabilities" },
+  [ResourceType.WorkOrder]: {
+    icon: <ClipboardListIcon />,
+    name: "Work Orders",
+  },
 };
 
 export const ConnectorsLayout = ({

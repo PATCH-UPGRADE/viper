@@ -144,13 +144,13 @@ function renderCandidates(candidates: Candidates): string {
         candidates.vulnerabilities
           .map((entry, i) => {
             const e = entry.extracted;
-            const line = `Vulnerability #${i + 1}: cveId=${e.cveId ?? "?"}`;
+            const line = `Vulnerability #${i + 1} extracted: cveId=${e.cveId ?? "?"} | cvssScore: ${e.cvssScore ?? "?"} | cvssVector: ${e.cvssVector ?? "?"}`;
             const matches =
               entry.matches.length > 0
                 ? entry.matches
                     .map(
                       (m) =>
-                        ` - id: ${m.id} | cveId: ${m.cveId ?? "(none)"} | description: ${m.description} ?? "(none)"} | cvssScore: ${m.cvssScore ?? "(none)"} | cvssVector: ${m.cvssVector ?? "(none)"}`,
+                        ` - id: ${m.id} | cveId: ${m.cveId ?? "(none)"} | cvssScore: ${m.cvssScore ?? "(none)"} | cvssVector: ${m.cvssVector ?? "(none)"}`,
                     )
                     .join("\n")
                 : "    - (no candidates found)";
@@ -167,7 +167,7 @@ function renderCandidates(candidates: Candidates): string {
         candidates.remediations
           .map((entry, i) => {
             const e = entry.extracted;
-            const line = `Remediations #${i + 1}: linkedtoCveId=${e.linkedCveId ?? "?"} | description=${e.description} ?? "?"}`;
+            const line = `Remediations #${i + 1} extracted: linkedtoCveId=${e.linkedCveId ?? "?"} | description=${e.description ?? "?"}`;
             const matches =
               entry.matches.length > 0
                 ? entry.matches
@@ -190,13 +190,13 @@ function renderCandidates(candidates: Candidates): string {
         candidates.assets
           .map((entry, i) => {
             const e = entry.extracted;
-            const line = `Asset #${i + 1}: ip=${e.ip ?? "?"} | hostname=${e.hostname ?? "?"} | macAddress=${e.macAddress ?? "?"} | serialNumber=${e.serialNumber ?? "?"}`;
+            const line = `Asset #${i + 1} extracted: ip=${e.ip ?? "?"} | hostname=${e.hostname ?? "?"} | macAddress=${e.macAddress ?? "?"} | serialNumber=${e.serialNumber ?? "?"}`;
             const matches =
               entry.matches.length > 0
                 ? entry.matches
                     .map(
                       (m) =>
-                        ` - id: ${m.id} | ip: ${m.ip ?? "(none)"} | hostname: ${m.hostname ?? "(none)"} | macAddress: ${m.macAddress ?? "(none)"} | serialNumber=${e.serialNumber ?? "(none)"}`,
+                        ` - id: ${m.id} | ip: ${m.ip ?? "(none)"} | hostname: ${m.hostname ?? "(none)"} | macAddress: ${m.macAddress ?? "(none)"} | serialNumber=${m.serialNumber ?? "(none)"}`,
                     )
                     .join("\n")
                 : "    - (no candidates found)";
@@ -300,12 +300,24 @@ export async function applyDecisions(
     skipped: 0,
   };
 
+  // Pull rejectedDeviceGroupMatching ids
+  const rejectedDeviceGroupMatchingIds = new Set(
+    (
+      await prisma.notificationDeviceGroupMapping.findMany({
+        where: { notificationId, confidence: "Rejected" },
+        select: { deviceGroupMatchingId: true },
+      })
+    ).map((m) => m.deviceGroupMatchingId),
+  );
+
   // Only allow link/update against ids the search actually surfaced — guards
   // against hallucinated targetIds causing FK errors.
 
   const validIds = {
     deviceGroupMatching: new Set(
-      candidates.deviceGroups.flatMap((e) => e.matches.map((m) => m.id)),
+      candidates.deviceGroups
+        .flatMap((e) => e.matches.map((m) => m.id))
+        .filter((id) => !rejectedDeviceGroupMatchingIds.has(id)),
     ),
     vulnerability: new Set(
       candidates.vulnerabilities.flatMap((e) => e.matches.map((m) => m.id)),
@@ -454,6 +466,12 @@ export async function applyDecisions(
             versionRange: data.versionRange,
             hasCpe: false,
           });
+
+          if (rejectedDeviceGroupMatchingIds.has(matchingId)) {
+            summary.skipped++;
+            continue;
+          }
+
           await upsertMapping(matchingId);
           await enrichDeviceGroup(matchingId, data);
           summary.created++;

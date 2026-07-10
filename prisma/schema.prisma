@@ -42,6 +42,7 @@ model User {
   threads    ChatThread[]
   memories   Memory[]
   notificationReads         NotificationRead[]
+  matchFeedback             MatchFeedback[]
 
   departmentId           String?
   department             Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
@@ -421,6 +422,23 @@ model ExternalRemediationMapping {
   @@map("external_remediation_mappings")
 }
 
+model ExternalWorkOrderMapping {
+  id            String          @id @default(cuid())
+  itemId        String
+  integrationId String
+  externalId    String
+  item          WorkOrderTicket @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  integration   Integration     @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  lastSynced    DateTime?
+
+  @@unique([itemId, integrationId], name: "external_work_order_mappings_item_integration_key")
+  @@unique([integrationId, externalId], name: "external_work_order_mappings_integration_external_key")
+  @@index([itemId])
+  @@map("external_work_order_mappings")
+}
+
 model ExternalVulnerabilityMapping {
   id            String        @id @default(cuid())
   itemId        String
@@ -676,8 +694,10 @@ model Apikey {
   start               String?
   prefix              String?
   key                 String
-  userId              String
-  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // better-auth's owner column for a key; holds the user's id, so we keep the FK.
+  referenceId         String
+  configId            String    @default("default")
+  user                User      @relation(fields: [referenceId], references: [id], onDelete: Cascade)
   refillInterval      Int?
   refillAmount        Int?
   lastRefillAt        DateTime?
@@ -696,6 +716,7 @@ model Apikey {
 
   connector           ApiKeyConnector?
 
+  @@index([referenceId])
   @@map("apikey")
 }
 
@@ -731,6 +752,7 @@ model Integration {
   remediationMappings    ExternalRemediationMapping[]
   vulnerabilityMappings  ExternalVulnerabilityMapping[]
   advisoryMappings       ExternalAdvisoryMapping[]
+  workOrderMappings      ExternalWorkOrderMapping[]
 
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
@@ -821,12 +843,14 @@ enum ResourceType {
   Vulnerability
   DeviceArtifact
   Remediation
+  WorkOrder
 }
 
 enum IntegrationType {
   PARTNER
   AI
   CSAF
+  REST
 }
 
 // Traffic Light Protocol, governs information sharing
@@ -949,6 +973,7 @@ enum TicketCategory {
   FIRMWARE_UPDATE
   NETWORK_REMEDIATION
   NEW_ASSET_PROCUREMENT
+  MAINTENANCE
   OTHER
 }
 
@@ -1016,6 +1041,7 @@ model WorkOrderTicket {
   watchers       TicketWatch[]
   seenBy         TicketSeen[]
   activities     TicketActivity[]
+  externalMappings ExternalWorkOrderMapping[]
   lastCommentAt  DateTime?
 
   createdAt   DateTime @default(now())
@@ -1134,6 +1160,7 @@ enum ConfidenceLevel {
   NeedsReview // An LLM matched this but with low confidence
   Matched // An LLM matched this with high confidence
   Confirmed // A human confirmed this match was correct
+  Rejected  // A human marked this match as incorrect
 }
 
 enum NotificationSourceType {
@@ -1161,6 +1188,7 @@ model Notification {
   deviceGroupsMatchings NotificationDeviceGroupMapping[]
   vulnerabilities NotificationVulnerabilityMapping[]
   remediations    NotificationRemediationMapping[]
+  matchFeedback   MatchFeedback[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1281,4 +1309,38 @@ model NotificationRemediationMapping {
 
   @@unique([notificationId, remediationId])
   @@map("notification_remediation_mapping")
+}
+
+// ─── Feedback ────────────────────────────────────────────────────────────
+
+enum MatchFeedbackTargetType {
+  NotificationDeviceGroupMapping
+  NotificationAssetMapping
+  NotificationRemediationMapping
+  NotificationVulnerabilityMapping
+}
+
+enum MatchFeedbackCategory {
+  Incorrect
+  Correct
+}
+
+model MatchFeedback {
+  id String @id @default(cuid())
+  targetType MatchFeedbackTargetType
+  targetId  String
+  category  MatchFeedbackCategory @default(Incorrect)
+  comment String?
+
+  userId String
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  notificationId  String?
+  notification  Notification? @relation(fields:[notificationId], references:[id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([notificationId])
+  @@map("match_feedback")
 }

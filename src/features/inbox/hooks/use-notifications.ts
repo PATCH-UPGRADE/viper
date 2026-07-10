@@ -5,6 +5,7 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import { useNotificationsParams } from "./use-notifications-params";
 
@@ -32,6 +33,27 @@ export const useMarkNotificationRead = () => {
             id: variables.notificationId,
           }),
         );
+      },
+    }),
+  );
+};
+
+export const useMarkMatchIncorrect = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.notifications.markMatchIncorrect.mutationOptions({
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries(trpc.notifications.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.notifications.getOne.queryFilter({
+            id: variables.notificationId,
+          }),
+        );
+      },
+      onError: (error) => {
+        toast.error(`Failed to unlink match: ${error.message}`);
       },
     }),
   );

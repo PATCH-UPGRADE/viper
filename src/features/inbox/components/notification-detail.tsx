@@ -172,6 +172,7 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
           className="flex flex-col gap-4 mt-4"
         >
           <NotificationAffectedAssetsTab
+            notificationId={notification.id}
             deviceGroupsMatchings={notification.deviceGroupsMatchings}
           />
         </TabsContent>

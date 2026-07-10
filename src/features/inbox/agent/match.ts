@@ -281,6 +281,7 @@ export async function matchAndLinkEntities(
  * Idempotent: mappings are upserted on (notificationId, deviceGroupId) and new
  * device groups are resolved to their canonical (vendor/product/version)
  * identity via resolveDeviceGroup, so replaying does not duplicate rows.
+ * Also it does not resurrect a match a human already rejected
  */
 export async function applyDecisions(
   notificationId: string,
@@ -294,12 +295,24 @@ export async function applyDecisions(
     skipped: 0,
   };
 
+  // Pull rejectedDeviceGroupMatching ids
+  const rejectedDeviceGroupMatchingIds = new Set(
+    (
+      await prisma.notificationDeviceGroupMapping.findMany({
+        where: { notificationId, confidence: "Rejected" },
+        select: { deviceGroupMatchingId: true },
+      })
+    ).map((m) => m.deviceGroupMatchingId),
+  );
+
   // Only allow link/update against ids the search actually surfaced — guards
   // against hallucinated targetIds causing FK errors.
 
   const validIds = {
     deviceGroupMatching: new Set(
-      candidates.deviceGroups.flatMap((e) => e.matches.map((m) => m.id)),
+      candidates.deviceGroups
+        .flatMap((e) => e.matches.map((m) => m.id))
+        .filter((id) => !rejectedDeviceGroupMatchingIds.has(id)),
     ),
     vulnerability: new Set(
       candidates.vulnerabilities.flatMap((e) => e.matches.map((m) => m.id)),
@@ -429,6 +442,12 @@ export async function applyDecisions(
             versionRange: data.versionRange,
             hasCpe: false,
           });
+
+          if (rejectedDeviceGroupMatchingIds.has(matchingId)) {
+            summary.skipped++;
+            continue;
+          }
+
           await upsertMapping(matchingId);
           await enrichDeviceGroup(matchingId, data);
           summary.created++;

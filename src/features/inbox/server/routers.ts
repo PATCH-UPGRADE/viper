@@ -1,6 +1,10 @@
 import "server-only";
 import { z } from "zod";
-import { NotificationType, Priority } from "@/generated/prisma";
+import {
+  MatchFeedbackTargetType,
+  NotificationType,
+  Priority,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
@@ -130,12 +134,14 @@ export const notificationsRouter = createTRPCRouter({
         notifications.map(async (n) => ({
           ...n,
           deviceGroupsMatchings: await Promise.all(
-            n.deviceGroupsMatchings.map(async (m) => ({
-              ...m,
-              assetCount: await resolvedDeviceGroupAssetCount(
-                m.deviceGroupMatching,
-              ),
-            })),
+            n.deviceGroupsMatchings
+              .filter((m) => m.confidence !== "Rejected")
+              .map(async (m) => ({
+                ...m,
+                assetCount: await resolvedDeviceGroupAssetCount(
+                  m.deviceGroupMatching,
+                ),
+              })),
           ),
         })),
       );
@@ -161,10 +167,14 @@ export const notificationsRouter = createTRPCRouter({
         throw new Error("Notification not found");
       }
       const deviceGroupsMatchings = await Promise.all(
-        notification.deviceGroupsMatchings.map(async (m) => {
-          const assets = await resolveDeviceGroupAssets(m.deviceGroupMatching);
-          return { ...m, assetCount: assets.length, assets };
-        }),
+        notification.deviceGroupsMatchings
+          .filter((m) => m.confidence !== "Rejected")
+          .map(async (m) => {
+            const assets = await resolveDeviceGroupAssets(
+              m.deviceGroupMatching,
+            );
+            return { ...m, assetCount: assets.length, assets };
+          }),
       );
       return { ...notification, deviceGroupsMatchings };
     }),
@@ -184,6 +194,35 @@ export const notificationsRouter = createTRPCRouter({
           notificationId: input.notificationId,
           userId: ctx.auth.user.id,
         },
+      });
+    }),
+
+  markMatchIncorrect: protectedProcedure
+    .input(
+      z.object({
+        targetType: z.enum(MatchFeedbackTargetType),
+        targetId: z.string(),
+        notificationId: z.string(),
+        comment: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      await prisma.$transaction(async (tx) => {
+        if (input.targetType === "NotificationDeviceGroupMapping") {
+          await tx.notificationDeviceGroupMapping.update({
+            where: { id: input.targetId },
+            data: { confidence: "Rejected" },
+          });
+        }
+        await tx.matchFeedback.create({
+          data: {
+            targetType: input.targetType,
+            targetId: input.targetId,
+            comment: input.comment,
+            userId: ctx.auth.user.id,
+            notificationId: input.notificationId,
+          },
+        });
       });
     }),
 });

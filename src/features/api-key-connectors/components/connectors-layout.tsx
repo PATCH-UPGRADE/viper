@@ -7,6 +7,7 @@ import {
   CpuIcon,
   HeartIcon,
   PlugIcon,
+  SirenIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { notFound, usePathname } from "next/navigation";
@@ -31,6 +32,10 @@ const resourceTypeIcons = {
   [ResourceType.WorkOrder]: {
     icon: <ClipboardListIcon />,
     name: "Work Orders",
+  },
+  [ResourceType.Advisory]: {
+    icon: <SirenIcon />,
+    name: "Advisory",
   },
 };
 

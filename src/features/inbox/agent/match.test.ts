@@ -5,7 +5,10 @@ vi.mock("server-only", () => ({}));
 
 const { mockPrisma } = vi.hoisted(() => {
   const prisma = {
-    notificationDeviceGroupMapping: { upsert: vi.fn() },
+    notificationDeviceGroupMapping: {
+      upsert: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     deviceGroupMatching: { findUnique: vi.fn(), update: vi.fn() },
     // applyDecisions runs inside prisma.$transaction(async (tx) => …) — invoke
     // the callback with the same mock so call assertions still work.

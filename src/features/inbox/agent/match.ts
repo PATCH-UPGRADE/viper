@@ -304,7 +304,7 @@ export async function applyDecisions(
   const rejectedDeviceGroupMatchingIds = new Set(
     (
       await prisma.notificationDeviceGroupMapping.findMany({
-        where: { notificationId, confidence: "Rejected" },
+        where: { ...owner, confidence: "Rejected" },
         select: { deviceGroupMatchingId: true },
       })
     ).map((m) => m.deviceGroupMatchingId),

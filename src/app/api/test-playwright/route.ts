@@ -35,7 +35,7 @@ export async function GET() {
     const notification = await prisma.notification.create({
       data: {
         type: "Advisory",
-        title: "Fleet Security Advisories (test2)",
+        title: "Fleet Security Advisories (test3)",
         summary: JSON.stringify(data, null, 2),
         sources: {
           create: {

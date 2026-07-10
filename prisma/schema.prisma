@@ -844,6 +844,7 @@ enum ResourceType {
   DeviceArtifact
   Remediation
   WorkOrder
+  Advisory
 }
 
 enum IntegrationType {

@@ -14,12 +14,12 @@ const handleOnClickPlayWright = async () => {
     console.log("raw body ", text);
     console.log("test playwright result ", data);
     if (data.ok) {
-      toast.success(`Success: Cookie length: ${data.cookieLength}`);
+      toast.success(`Success: Cookie length: ${data.cookieLength} : `);
     } else {
       toast.error(`Failed: ${data.error} `);
     }
   } catch (err) {
-    console.error(err);
+    console.error("err ", err);
     toast.error("Request failed entirely");
   }
 };

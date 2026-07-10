@@ -22,8 +22,12 @@ export async function GET() {
       userName,
       password,
     );
-    console.log("session ", session);
-    return NextResponse.json({ ok: true, cookieLength: session.value.length });
+
+    return NextResponse.json({
+      ok: true,
+      cookieLength: session.value.length,
+      session: session,
+    });
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : String(err) },

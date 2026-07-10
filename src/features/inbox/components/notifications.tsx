@@ -18,6 +18,7 @@ import {
 } from "../hooks/use-notifications";
 import { useNotificationsParams } from "../hooks/use-notifications-params";
 import { notificationColumns } from "./columns";
+import { TestPlaywrightButton } from "./test-playwright-button";
 
 // ---------------------------------------------------------------------------
 // Filter controls
@@ -120,7 +121,12 @@ export const NotificationsContainer = ({
 }: {
   children: React.ReactNode;
 }) => (
-  <EntityContainer header={<NotificationsHeader />}>{children}</EntityContainer>
+  <EntityContainer header={<NotificationsHeader />}>
+    <div>
+      <TestPlaywrightButton />
+    </div>
+    {children}
+  </EntityContainer>
 );
 
 export const NotificationsLoading = () => (

@@ -61,7 +61,17 @@ export const processInboxEmail = inngest.createFunction(
       }),
     );
 
-    if (decision === "not_relevant") {
+    // The relevance check only sees the body text, not attachments. A PDF-only
+    // work order (uninformative body, real content in the PDF) can read as
+    // not_relevant here — so when a PDF is attached, defer past this gate to
+    // the attachment-aware routing in classifyEmailKind rather than dropping it.
+    const hasPdfAttachment = email.attachments?.some(
+      (att) =>
+        att.content_type?.startsWith("application/pdf") ||
+        att.filename?.toLowerCase().endsWith(".pdf"),
+    );
+
+    if (decision === "not_relevant" && !hasPdfAttachment) {
       return { skipped: true, emailId };
     }
 

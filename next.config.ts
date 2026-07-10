@@ -4,6 +4,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   devIndicators: false,
   serverExternalPackages: ["playwright-core", "@sparticuz/chromium"],
+  outputFileTracingIncludes: {
+    "/api/test-playwright": ["./node_modules/playwright-core/**", "./node_modules/@sparticuz/chromium/**"]
+  },
   async redirects() {
     return [
       {

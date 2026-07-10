@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 
 const handleOnClickPlayWright = async () => {
   toast.info("Testing playwright");
+  const res = await fetch("/api/test-playwright");
+  //const data = await res.json();
+  const text = await res.text();
   try {
-    const res = await fetch("/api/test-playwright");
-    const data = await res.json();
-    const text = await res.text();
+    const data = JSON.parse(text);
     console.log("status ", res.status);
     console.log("raw body ", text);
     console.log("test playwright result ", data);

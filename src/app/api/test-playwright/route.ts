@@ -7,20 +7,29 @@ import {
 export const maxDuration = 60;
 
 export async function GET() {
+  const envCheck = {
+    userName: !!process.env.FLEET_ADVISORY_USERNAME,
+    password: !!process.env.FLEET_ADVISORY_PASSWORD,
+    userNameLength: process.env.FLEET_ADVISORY_USERNAME?.length ?? 0,
+    matchingKeys: Object.keys(process.env).filter((k) =>
+      k.toUpperCase().includes("FLEET"),
+    ),
+  };
+  console.log("TEST PLAYWRIGHT ", envCheck);
+  if (
+    !process.env.FLEET_ADVISORY_USERNAME ||
+    !process.env.FLEET_ADVISORY_PASSWORD
+  ) {
+    return NextResponse.json(
+      { ok: false, error: "env vars not set" },
+      { status: 500 },
+    );
+  }
   try {
-    const userName = process.env.FLEET_ADVISORY_USERNAME;
-    const password = process.env.FLEET_ADVISORY_PASSWORD;
-
-    if (!userName || !password) {
-      return NextResponse.json(
-        { ok: false, error: "env vars not set" },
-        { status: 500 },
-      );
-    }
     const session = await grabSessionCookie(
       FLEET_LOGIN_CONFIG,
-      userName,
-      password,
+      process.env.FLEET_ADVISORY_USERNAME,
+      process.env.FLEET_ADVISORY_PASSWORD,
     );
 
     return NextResponse.json({

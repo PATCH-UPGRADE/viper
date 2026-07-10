@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
-  grabSessionCookie,
-  FLEET_LOGIN_CONFIG,
+    FLEET_LOGIN_CONFIG,
+    grabSessionCookie,
 } from "@/lib/vendor-session-capture";
 
 export const maxDuration = 60;

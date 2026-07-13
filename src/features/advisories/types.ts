@@ -32,7 +32,9 @@ export function getAffectedAssets(advisory: AdvisoryWithRelations): Asset[] {
   const assetMap = new Map<string, Asset>();
   for (const vuln of advisory.referencedVulnerabilities) {
     for (const issue of vuln.issues) {
-      assetMap.set(issue.asset.id, issue.asset);
+      if (issue.asset) {
+        assetMap.set(issue.asset.id, issue.asset);
+      }
     }
   }
   return [...assetMap.values()];

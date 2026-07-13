@@ -65,7 +65,7 @@ interface VulnerabilityForMarkdown {
   remediations?: Array<{ id: string; description?: string | null }>;
   issues?: Array<{
     status: string;
-    asset: { id: string; hostname?: string | null; ip?: string | null };
+    asset: { id: string; hostname?: string | null; ip?: string | null } | null;
   }>;
 }
 
@@ -79,7 +79,11 @@ interface RemediationForMarkdown {
   issueRemediations?: Array<{
     issue: {
       status: string;
-      asset: { id: string; hostname?: string | null; ip?: string | null };
+      asset: {
+        id: string;
+        hostname?: string | null;
+        ip?: string | null;
+      } | null;
     };
   }>;
   artifacts?: Array<{
@@ -220,6 +224,10 @@ export function vulnerabilityToMarkdown(
   if (opts.includeAssets && v.issues && v.issues.length > 0) {
     lines.push(`- **Affected Assets** (${v.issues.length}):`);
     for (const issue of v.issues) {
+      if (!issue.asset) {
+        lines.push(`  - device group — issue status: ${issue.status}`);
+        continue;
+      }
       const label = issue.asset.hostname ?? issue.asset.ip ?? issue.asset.id;
       lines.push(
         `  - ${label} (${shortId(issue.asset.id)}) — issue status: ${issue.status}`,
@@ -253,6 +261,10 @@ export function remediationToMarkdown(r: RemediationForMarkdown): string {
   if (r.issueRemediations && r.issueRemediations.length > 0) {
     lines.push(`- **Affected Assets** (${r.issueRemediations.length}):`);
     for (const ir of r.issueRemediations) {
+      if (!ir.issue.asset) {
+        lines.push(`  - device group — issue status: ${ir.issue.status}`);
+        continue;
+      }
       const label =
         ir.issue.asset.hostname ?? ir.issue.asset.ip ?? ir.issue.asset.id;
       lines.push(

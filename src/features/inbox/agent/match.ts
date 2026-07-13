@@ -340,38 +340,41 @@ export async function applyDecisions(
         // A device-group mapping is the only link kind a WorkOrderTicket can
         // own; Notifications additionally own vulnerability/remediation/asset
         // mappings (handled below). Pick the matching compound key from `owner`.
-        const upsertMapping = (deviceGroupMatchingId: string) =>
-          "notificationId" in owner
-            ? tx.notificationDeviceGroupMapping.upsert({
-                where: {
-                  notificationId_deviceGroupMatchingId: {
-                    notificationId: owner.notificationId,
-                    deviceGroupMatchingId,
-                  },
-                },
-                create: {
+        const upsertMapping = (deviceGroupMatchingId: string) => {
+          const isNotification = "notificationId" in owner;
+          const where = isNotification
+            ? {
+                notificationId_deviceGroupMatchingId: {
                   notificationId: owner.notificationId,
                   deviceGroupMatchingId,
-                  confidence,
-                  reasonWhy: decision.reasonWhy,
                 },
-                update: { confidence, reasonWhy: decision.reasonWhy },
-              })
-            : tx.notificationDeviceGroupMapping.upsert({
-                where: {
-                  workOrderTicketId_deviceGroupMatchingId: {
-                    workOrderTicketId: owner.workOrderTicketId,
-                    deviceGroupMatchingId,
-                  },
-                },
-                create: {
+              }
+            : {
+                workOrderTicketId_deviceGroupMatchingId: {
                   workOrderTicketId: owner.workOrderTicketId,
                   deviceGroupMatchingId,
-                  confidence,
-                  reasonWhy: decision.reasonWhy,
                 },
-                update: { confidence, reasonWhy: decision.reasonWhy },
-              });
+              };
+          const create = isNotification
+            ? {
+                notificationId: owner.notificationId,
+                deviceGroupMatchingId,
+                confidence,
+                reasonWhy: decision.reasonWhy,
+              }
+            : {
+                workOrderTicketId: owner.workOrderTicketId,
+                deviceGroupMatchingId,
+                confidence,
+                reasonWhy: decision.reasonWhy,
+              };
+          const update = { confidence, reasonWhy: decision.reasonWhy };
+          return tx.notificationDeviceGroupMapping.upsert({
+            where,
+            create,
+            update,
+          });
+        };
 
         const enrichDeviceGroup = async (
           deviceGroupMatchingId: string,

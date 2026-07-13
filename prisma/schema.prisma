@@ -52,6 +52,7 @@ model User {
   watchedTickets         TicketWatch[]
   ticketSeen             TicketSeen[]
   ticketActivities       TicketActivity[]
+  notes                  Note[]
 
   @@unique([email])
   @@index([departmentId])
@@ -287,7 +288,6 @@ model DeviceGroup {
   @@map("device_group")
 }
 
-
 model DeviceGroupMatching {
   id String @id @default(cuid())
 
@@ -304,6 +304,7 @@ model DeviceGroupMatching {
   remediations    Remediation[]    @relation("RemediationMatchings")
   advisories      Advisory[]       @relation("AdvisoryMatchings")
   deviceArtifacts DeviceArtifact[] @relation("DeviceArtifactMatchings")
+  issues          Issue[]
   notificationMappings  NotificationDeviceGroupMapping[]
 
   createdAt DateTime @default(now())
@@ -474,6 +475,7 @@ model ArtifactWrapper {
 
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+
   @@index([remediationId])
   @@index([deviceArtifactId])
   @@index([userId])
@@ -505,9 +507,10 @@ model Artifact {
 
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+
+  @@unique([wrapperId, versionNumber])
   @@index([wrapperId])
   @@index([userId])
-  @@unique([wrapperId, versionNumber])
   @@map("artifact")
 }
 
@@ -619,30 +622,123 @@ model Vulnerability {
 }
 
 enum IssueStatus {
-  ACTIVE
-  FALSE_POSITIVE
-  REMEDIATED
+  NOT_AFFECTED
+  AFFECTED
+  FIXED
+  UNDER_INVESTIGATION
+}
+
+enum NotAffectedJustification {
+  COMPONENT_NOT_PRESENT
+  VULNERABLE_CODE_NOT_PRESENT
+  VULNERABLE_CODE_NOT_IN_EXECUTE_PATH
+  VULNERABLE_CODE_CANNOT_BE_CONTROLLED_BY_ADVERSARY
+  INLINE_MITIGATIONS_ALREADY_EXIST
+  HOSPITAL_COMPENSATING_CONTROL
+  HOSPITAL_ACCEPTS_RISK
 }
 
 model Issue {
   id String @id @default(cuid())
 
-  assetId String
-  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  deviceGroupMatchingId String?
+  deviceGroupMatching   DeviceGroupMatching? @relation(fields: [deviceGroupMatchingId], references: [id], onDelete: Cascade)
+
+  assetId String? // now optional; when set, overrides the deviceGroupMatching-level Issue for this vuln
+  asset   Asset?  @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   vulnerabilityId String
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
+  status                   IssueStatus               @default(AFFECTED)
+  notAffectedJustification NotAffectedJustification?
+  statusConfidence         ConfidenceLevel?
+  statusNotes              String?                   @db.Text
+
   issueRemediations  IssueRemediation[]
   workOrderTickets      WorkOrderTicket[]     @relation("WorkOrderTicketIssues")
-
-  status IssueStatus @default(ACTIVE)
+  filters           EntityFilter[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([assetId, vulnerabilityId])
+  @@unique([deviceGroupMatchingId, vulnerabilityId])
+  @@index([assetId])
+  @@index([deviceGroupMatchingId])
+  @@index([vulnerabilityId])
   @@map("issue")
+}
+
+enum NoteStatus {
+  PERSISTENT // always included in relevant LLM prompts, regardless of scope
+  SCOPED
+}
+
+enum ScopeTargetModel {
+  DEVICE_GROUP_MATCHING
+  ASSET
+  VULNERABILITY
+  REMEDIATION
+}
+
+model Note {
+  id     String     @id @default(cuid())
+  text   String     @db.Text
+  status NoteStatus @default(SCOPED)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  filters EntityFilter[]
+
+  targetModel ScopeTargetModel?
+  instanceId  String? // weak reference — app validates this id exists in targetModel's table
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([targetModel, instanceId])
+  @@index([userId])
+  @@index([status])
+  @@map("note")
+}
+
+model EntityFilter {
+  id          String           @id @default(cuid())
+  label       String? // e.g. "All infusion pumps in the ICU"
+  targetModel ScopeTargetModel
+  filter      Json // WHERE-clause fragment evaluated against targetModel's table
+
+  noteId  String?
+  note    Note?   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  issueId String?
+  issue   Issue?  @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  // Exactly one of noteId/issueId must be set
+
+  matches        EntityFilterMatch[]
+  lastResolvedAt DateTime? // null until a future memoization job runs
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([noteId])
+  @@index([issueId])
+  @@index([targetModel])
+  @@map("entity_filter")
+}
+
+model EntityFilterMatch {
+  id             String       @id @default(cuid())
+  entityFilterId String
+  entityFilter   EntityFilter @relation(fields: [entityFilterId], references: [id], onDelete: Cascade)
+  targetId       String // weak reference into whatever table entityFilter.targetModel points to
+
+  createdAt DateTime @default(now())
+
+  @@unique([entityFilterId, targetId])
+  @@index([targetId])
+  @@map("entity_filter_match")
 }
 
 model Remediation {
@@ -878,7 +974,7 @@ model Advisory {
   upstreamUrl               String?         @unique
   severity                  Severity
   summary                   String?         @db.Text
-  status                    IssueStatus     @default(ACTIVE)
+  status                    IssueStatus     @default(AFFECTED)
   tlp                       Tlp?
   publishedAt               DateTime?
   createdAt                 DateTime        @default(now())

@@ -48,8 +48,7 @@ const SAMPLE_DEVICE_GROUPS = [
     version: "unknown",
   },
   // ── EOL OS platforms (exist for vulnerability targeting; no assets use these
-  //    as primary CPE, but EternalBlue affectedDeviceGroups connects here too
-  //    so seedIssues creates Issue records for all Windows hosts) ──────────────
+  //    as primary CPE, but EternalBlue affectedDeviceGroups connects here too)
   {
     cpe: "cpe:2.3:o:microsoft:windows_7:-:*:*:*:*:*:*:*",
     manufacturer: "Microsoft",
@@ -568,7 +567,7 @@ const SAMPLE_VULNERABILITIES = [
       ],
     },
     // Connects to both the EOL OS device groups AND the application-level device
-    // groups so seedIssues() creates Issue records for every affected asset
+    // groups
     cpes: [
       "cpe:2.3:o:microsoft:windows_7:-:*:*:*:*:*:*:*",
       "cpe:2.3:o:microsoft:windows_server_2008:r2:sp1:*:*:*:*:x64:*",
@@ -1552,48 +1551,6 @@ async function seedRemediations(userId: string) {
   return successfulRemediations;
 }
 
-async function seedIssues() {
-  console.log("\n🌱 Seeding issues (linking assets to vulnerabilities)...");
-
-  const assets = await prisma.asset.findMany({
-    include: { deviceGroup: true },
-  });
-
-  const vulnerabilities = await prisma.vulnerability.findMany({
-    include: { deviceGroupMatchings: true },
-  });
-
-  const issues = [];
-
-  for (const asset of assets) {
-    for (const vulnerability of vulnerabilities) {
-      const isAffected = vulnerability.deviceGroupMatchings.some((m) =>
-        matchingMatchesGroup(m, asset.deviceGroup),
-      );
-
-      if (isAffected) {
-        try {
-          const issue = await prisma.issue.create({
-            data: {
-              assetId: asset.id,
-              vulnerabilityId: vulnerability.id,
-              status: "ACTIVE",
-            },
-          });
-          issues.push(issue);
-        } catch (_error) {
-          console.warn(
-            `⚠️  Issue already exists for asset ${asset.id} and vulnerability ${vulnerability.id}`,
-          );
-        }
-      }
-    }
-  }
-
-  console.log(`✅ Seeded ${issues.length} issues`);
-  return issues;
-}
-
 async function seedMemories(userId: string) {
   console.log("\n🌱 Seeding memories...");
 
@@ -2080,7 +2037,6 @@ async function main() {
     await seedVulnerabilities(user.id);
     await seedDeviceArtifacts(user.id);
     await seedRemediations(user.id);
-    await seedIssues();
     await seedWorkflows(user.id);
     await seedMemories(user.id);
     await seedWorkOrderTickets(user.id);

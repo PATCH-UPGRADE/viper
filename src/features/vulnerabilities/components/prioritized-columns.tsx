@@ -112,7 +112,12 @@ export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
   {
     accessorKey: "asset",
     header: "Affected Asset",
-    cell: ({ row }) => getAssetRoleLabel(row.original.asset),
+    cell: ({ row }) =>
+      row.original.asset
+        ? getAssetRoleLabel(row.original.asset)
+        : "Device Group",
+    // TODO: Consider a backend change where device group issues still get displayed
+    // in the frontend as one issue per asset in that device group
   },
   {
     accessorKey: "status",
@@ -133,10 +138,12 @@ export const issueColumns: ColumnDef<VulnerabilityIssue>[] = [
     cell: ({ row }) => (
       <MoreVerticalDropdownMenu
         items={[
-          {
-            label: "Go to Asset Details",
-            href: `/assets/${row.original.asset.id}`,
-          },
+          row.original.asset
+            ? {
+                label: "Go to Asset Details",
+                href: `/assets/${row.original.asset.id}`,
+              }
+            : false,
           { label: "Go to Issue Details", href: `/issues/${row.original.id}` },
         ]}
       />

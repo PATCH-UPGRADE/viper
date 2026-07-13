@@ -141,13 +141,20 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     });
 
     expect(foundIssue.length).toBe(1);
-    expect(foundIssue[0].assetId).toBe(postAssetRes.body.id);
+    expect(foundIssue[0].assetId).toBeNull();
     expect(foundIssue[0].vulnerabilityId).toBe(res.body.id);
 
     expect(Array.isArray(detailRes.body.deviceGroupMatchings)).toBe(true);
 
     // Check that the array has one element
     expect(detailRes.body.deviceGroupMatchings.length).toBe(1);
+
+    // The single issue should be scoped to that one device group matching,
+    // not to the individual asset (one issue per affected device group, not
+    // one per asset).
+    expect(foundIssue[0].deviceGroupMatchingId).toBe(
+      detailRes.body.deviceGroupMatchings[0].id,
+    );
 
     // Check that the single object in the array has the correct match values
     // (resolved from the uploaded CPE: cpe:2.3:<part>:<vendor>:<product>:<version>)

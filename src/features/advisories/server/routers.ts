@@ -76,7 +76,7 @@ export const advisoriesRouter = createTRPCRouter({
 
       const allIssues = affectedAssetsWithIssues.flatMap((a) => a.issues);
       const nonActiveCount = allIssues.filter(
-        (i) => i.status !== IssueStatus.ACTIVE,
+        (i) => i.status !== IssueStatus.AFFECTED,
       ).length;
       const progressPercent =
         allIssues.length > 0

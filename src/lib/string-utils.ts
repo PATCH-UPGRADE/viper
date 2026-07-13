@@ -58,6 +58,40 @@ export function deviceGroupCpeList(dg: DeviceGroupDisplay): string {
   return (dg.cpe ?? []).join(", ");
 }
 
+/**
+ * Markdown block for a canonical device group, e.g.
+ * ```
+ * ### Acme InfusionPump (2.1.3)
+ * - **CPE**: cpe:2.3:...
+ * ```
+ * Used by the chat/recommendations renderers and the VEX sorting agent so a
+ * device group is described consistently wherever it appears.
+ */
+export function deviceGroupToMarkdown(dg: DeviceGroupDisplay): string {
+  const version = displayName(dg.version);
+  const heading = `### ${deviceGroupLabel(dg)}${version ? ` (${version})` : ""}`;
+  const cpe = deviceGroupCpeList(dg);
+  return cpe ? `${heading}\n- **CPE**: ${cpe}` : heading;
+}
+
+/**
+ * Inline identifier line for a loosely-typed device (CPE + manufacturer + model
+ * + version), e.g. "cpe=… | manufacturer=Acme | modelName=Pump | version=2.1".
+ * Shared by the notification matching agent for both the extracted device and
+ * its search candidates. Missing fields render as "?".
+ */
+export function deviceIdentityInline(fields: {
+  cpe?: string[] | string | null;
+  manufacturer?: string | null;
+  modelName?: string | null;
+  version?: string | null;
+}): string {
+  const cpe = Array.isArray(fields.cpe)
+    ? fields.cpe.join(", ") || "(none)"
+    : (fields.cpe ?? "?");
+  return `cpe=${cpe} | manufacturer=${fields.manufacturer ?? "?"} | modelName=${fields.modelName ?? "?"} | version=${fields.version ?? "?"}`;
+}
+
 type DeviceGroupMatchingDisplay = {
   vendor?: CanonicalRef;
   product?: CanonicalRef;

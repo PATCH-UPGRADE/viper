@@ -82,7 +82,6 @@ export async function grabSessionCookie(
       return { header: "Cookie", value, expiresAt };
     } catch (err) {
       lastError = err;
-      console.log("some error ", err);
     } finally {
       await browser.close();
     }

@@ -1448,7 +1448,7 @@ model VendorSession {
   value String
   expiresAt DateTime?
   createdAt DateTime @default(now())
-  udatedAt DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 
   @@map("vendor_session")
 }

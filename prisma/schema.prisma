@@ -1440,3 +1440,15 @@ model MatchFeedback {
   @@index([notificationId])
   @@map("match_feedback")
 }
+
+model VendorSession {
+  id  String @id @default(cuid())
+  host String @unique
+  header String 
+  value String
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  udatedAt DateTime @updatedAt
+
+  @@map("vendor_session")
+}

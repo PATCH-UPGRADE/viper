@@ -747,7 +747,7 @@ async function seedAdvisory(
       summary:
         "Successful exploitation of these vulnerabilities could lead to information disclosure and/or disruption of the device's function without detection.",
       publishedAt: new Date("2024-11-14T07:00:00.000Z"),
-      status: IssueStatus.ACTIVE,
+      status: IssueStatus.AFFECTED,
       csaf: CSAF_JSON,
       referencedVulnerabilities: {
         set: vulnIds.map((id) => ({ id })),
@@ -765,7 +765,7 @@ async function seedAdvisory(
       summary:
         "Successful exploitation of these vulnerabilities could lead to information disclosure and/or disruption of the device's function without detection.",
       publishedAt: new Date("2024-11-14T07:00:00.000Z"),
-      status: IssueStatus.ACTIVE,
+      status: IssueStatus.AFFECTED,
       csaf: CSAF_JSON,
       referencedVulnerabilities: {
         connect: vulnIds.map((id) => ({ id })),

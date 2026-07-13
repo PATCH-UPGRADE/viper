@@ -12,12 +12,16 @@ import {
 import { IssueStatus } from "@/generated/prisma";
 
 export const statusDetails = {
-  [IssueStatus.FALSE_POSITIVE]: {
-    name: "False Positive",
+  [IssueStatus.NOT_AFFECTED]: {
+    name: "Not Affected",
+    color: "bg-gray-500",
+  },
+  [IssueStatus.AFFECTED]: { name: "Active", color: "bg-red-500" },
+  [IssueStatus.FIXED]: { name: "Remediated", color: "bg-green-500" },
+  [IssueStatus.UNDER_INVESTIGATION]: {
+    name: "Under Investigation",
     color: "bg-yellow-500",
   },
-  [IssueStatus.ACTIVE]: { name: "Active", color: "bg-red-500" },
-  [IssueStatus.REMEDIATED]: { name: "Remediated", color: "bg-green-500" },
 };
 
 export const IssueStatusBadge = ({ status }: { status: IssueStatus }) => {

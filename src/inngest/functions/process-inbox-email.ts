@@ -1,5 +1,5 @@
 // Resend webhook -> our api -> this process-inbox-email Inngest function
-// Turns an email into a Notification, if relevant
+// Turns an email into a Notification or a Work Order ticket, if relevant
 
 import "server-only";
 import TurndownService from "turndown";
@@ -9,12 +9,9 @@ import { classifyEmailKind } from "@/features/inbox/agent/classify-kind";
 import { extractEntities } from "@/features/inbox/agent/extract";
 import { extractWorkOrder } from "@/features/inbox/agent/extract-work-order";
 import { matchAndLinkEntities } from "@/features/inbox/agent/match";
-import {
-  checkEmailRelevance,
-  stripHtml,
-} from "@/features/inbox/agent/relevance";
 import { triageNotification } from "@/features/inbox/agent/triage";
 import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
+import { fetchPdfAttachmentsFromResend } from "@/features/inbox/utils";
 import { Prisma } from "@/generated/prisma";
 import { getAutomationUser } from "@/lib/automation-user";
 import prisma from "@/lib/db";
@@ -49,34 +46,34 @@ export const processInboxEmail = inngest.createFunction(
       return data;
     });
 
-    // 2. Check relevance (first X words of plain text)
-    const WORD_COUNT = 1000;
-    const plainText = email.text ?? stripHtml(email.html ?? "");
-    const bodyPreview = plainText.split(/\s+/).slice(0, WORD_COUNT).join(" ");
+    // 2. Convert email HTML body to markdown (every downstream agent reads it)
+    const markdown = await step.run("html-to-markdown", async () => {
+      if (email.html) return turndown.turndown(email.html);
+      return email.text ?? null;
+    });
 
-    const { decision } = await step.run("check-relevance", () =>
-      checkEmailRelevance({
-        from: email.from,
-        subject: email.subject,
-        bodyPreview,
-      }),
-    );
+    // 3. Triage: is this relevant at all, and if so is it an informational
+    // Notification or an actionable Work Order?
+    const { kind } = await step.run("classify-email", async () => {
+      const pdfAttachments = await fetchPdfAttachmentsFromResend(
+        emailId,
+        email.attachments ?? [],
+      );
+      return classifyEmailKind(
+        {
+          from: email.from,
+          subject: email.subject,
+          markdown: markdown ?? "",
+        },
+        pdfAttachments,
+      );
+    });
 
-    // The relevance check only sees the body text, not attachments. A PDF-only
-    // work order (uninformative body, real content in the PDF) can read as
-    // not_relevant here — so when a PDF is attached, defer past this gate to
-    // the attachment-aware routing in classifyEmailKind rather than dropping it.
-    const hasPdfAttachment = email.attachments?.some(
-      (att) =>
-        att.content_type?.startsWith("application/pdf") ||
-        att.filename?.toLowerCase().endsWith(".pdf"),
-    );
-
-    if (decision === "not_relevant" && !hasPdfAttachment) {
+    if (kind === "not_relevant") {
       return { skipped: true, emailId };
     }
 
-    // 3. Upload attachments to S3
+    // 4. Upload attachments to S3
     const uploadedAttachments = await step.run(
       "upload-attachments",
       async () => {
@@ -143,12 +140,6 @@ export const processInboxEmail = inngest.createFunction(
       },
     );
 
-    // 4. Convert email HTML body to markdown
-    const markdown = await step.run("html-to-markdown", async () => {
-      if (email.html) return turndown.turndown(email.html);
-      return email.text ?? null;
-    });
-
     // 5. Persist NotificationSource + NotificationAttachment
     const sourceId = await step.run("save-source", async () => {
       // DEV: uncomment to reset duplicate so you can replay the same email webhook
@@ -195,15 +186,6 @@ export const processInboxEmail = inngest.createFunction(
     });
 
     if (!sourceId) return { skipped: true, reason: "duplicate", emailId };
-
-    // 6. Route the email: informational Notification vs actionable Work Order.
-    const { kind } = await step.run("classify-kind", () =>
-      classifyEmailKind(sourceId, {
-        from: email.from,
-        subject: email.subject,
-        markdown: markdown ?? "",
-      }),
-    );
 
     // 6w. Work-order path: extract fields, create the ticket linked to this
     // email source, then tag matched device groups onto the ticket.

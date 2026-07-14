@@ -110,10 +110,11 @@ export const notificationPayloadSchema = z.object({
 
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 
-// Routes a relevant email to the right entity: an informational Notification or
-// an actionable Work Order. Kept a flat object (Anthropic tool-schema rule).
+// The single triage decision for an inbound email: drop it, or route it to an
+// informational Notification or an actionable Work Order. Kept a flat object
+// (Anthropic tool-schema rule).
 export const emailKindSchema = z.object({
-  kind: z.enum(["notification", "work_order"]),
+  kind: z.enum(["not_relevant", "notification", "work_order"]),
   reasonWhy: z.string(),
 });
 

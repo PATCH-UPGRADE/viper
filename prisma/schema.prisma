@@ -1441,7 +1441,7 @@ model MatchFeedback {
   @@map("match_feedback")
 }
 
-model VendorSession {
+model IntegrationSession {
   id  String @id @default(cuid())
   host String @unique
   header String 
@@ -1450,5 +1450,5 @@ model VendorSession {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("vendor_session")
+  @@map("integration_session")
 }

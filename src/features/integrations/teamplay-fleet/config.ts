@@ -20,19 +20,3 @@ export const FLEET = new IntegrationSessionClient(
   "FLEET_ADVISORY_PASSWORD",
   FLEET_LOGIN_CONFIG,
 );
-
-const INTEGRATION_SESSION_CLIENTS: IntegrationSessionClient[] = [FLEET];
-
-export function getIntegrationSession(
-  url: string,
-): IntegrationSessionClient | undefined {
-  let host = "";
-  try {
-    host = new URL(url).hostname.toLowerCase();
-  } catch {
-    return undefined;
-  }
-  return INTEGRATION_SESSION_CLIENTS.find(
-    (integration) => integration.host === host,
-  );
-}

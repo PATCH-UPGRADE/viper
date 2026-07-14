@@ -5,15 +5,9 @@ import type { AffectedAssetsSummary, MatchingWithLabels } from "../types";
 // Affected-assets triage bucketing
 // ============================================================================
 //
-// Sorts the assets of a device group matching into triage buckets **without
-// loading any asset rows**. A single device group can hold 100+ assets, but the
-// number of `Issue` rows is low, so bucket membership + counts are derived from
-// the issues plus one asset COUNT per matching. Asset rows are fetched later,
-// per (matching, bucket), via `getAffectedAssetsPage`.
-//
-// Effective status of an (asset, vuln) pair: the asset-level Issue if present,
-// otherwise the matching-level Issue. `FIXED` issues are excluded upstream, so
-// they never appear here and never contribute to a bucket.
+// Sorts the assets of a device group matching into triage buckets.
+// Since we have fewer issues than assets, fetch `Issue` rows, and fetch assets
+// later per (matching, bucket) via `getAffectedAssetsPage`
 
 export const AFFECTED_BUCKETS = [
   "needsAttention",

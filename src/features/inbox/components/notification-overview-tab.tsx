@@ -6,14 +6,7 @@ import { Fragment, type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +15,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { TlpBadge } from "@/features/advisories/components/advisories";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
@@ -173,6 +174,20 @@ export function NotificationOverviewTab({
     (m) => m.assetCount > 0,
   );
 
+  // Group matchings by vendor (first-seen order) so the vendor cell can span
+  // all of that vendor's product rows in the table below.
+  const vendorGroups = withAssets.reduce<Map<string, DeviceGroupMapping[]>>(
+    (groups, m) => {
+      const vendor =
+        displayName(m.deviceGroupMatching.vendor) ?? "Unknown vendor";
+      const existing = groups.get(vendor);
+      if (existing) existing.push(m);
+      else groups.set(vendor, [m]);
+      return groups;
+    },
+    new Map(),
+  );
+
   const [rejecting, setRejecting] = useState<DeviceGroupMapping | null>(null);
   const [comment, setComment] = useState("");
   const markMatchIncorrect = useMarkMatchIncorrect();
@@ -235,49 +250,57 @@ export function NotificationOverviewTab({
             listed
           </span>
         </CardHeader>
-        <CardContent className="grid-cols-2 grid gap-4">
-          {/*TODO: Explore using a table layout for this instead...*/}
-          {withAssets.map((m) => (
-            <Card className="gap-4" key={m.id}>
-              <CardHeader>
-                <span className="text-muted-foreground uppercase text-xs">
-                  {displayName(m.deviceGroupMatching.vendor)}
-                </span>
-                <CardTitle>
-                  {displayName(m.deviceGroupMatching.product)}
-                </CardTitle>
-                <CardAction>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive"
-                    onClick={() => setRejecting(m)}
-                    aria-label="Unlink this device group"
-                  >
-                    <Unlink className="size-4" />
-                  </Button>
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                <Badge variant={"secondary"}>
-                  {displayName(m.deviceGroupMatching.version) ??
-                    m.deviceGroupMatching.versionRange}
-                </Badge>
-              </CardContent>
-              <CardFooter className="border-t pt-2!">
-                <dl className="flex gap-4 text-sm">
-                  <div className="flex flex-row-reverse gap-1">
-                    <dt>assets affected {/*TODO: plural*/}</dt>
-                    <dd className="font-bold">{m.assetCount}</dd>
-                  </div>
-                  <div className="flex flex-row-reverse gap-1">
-                    <dt>vuln{/*TODO: Issues here...*/}</dt>
-                    <dd className="font-bold">1</dd>
-                  </div>
-                </dl>
-              </CardFooter>
-            </Card>
-          ))}
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Vendor</TableHead>
+                <TableHead>Product</TableHead>
+                <TableHead>Affected Versions</TableHead>
+                <TableHead className="text-right">Affected Assets</TableHead>
+                <TableHead className="w-0" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...vendorGroups.entries()].map(([vendor, matchings]) =>
+                matchings.map((m, index) => (
+                  <TableRow key={m.id}>
+                    {index === 0 && (
+                      <TableCell
+                        rowSpan={matchings.length}
+                        className="border-r align-top font-semibold"
+                      >
+                        {vendor}
+                      </TableCell>
+                    )}
+                    <TableCell className="font-medium">
+                      {displayName(m.deviceGroupMatching.product)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {displayName(m.deviceGroupMatching.version) ??
+                          m.deviceGroupMatching.versionRange}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-bold">
+                      {m.assetCount}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive"
+                        onClick={() => setRejecting(m)}
+                        aria-label="Unlink this device group"
+                      >
+                        <Unlink className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )),
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
@@ -321,28 +344,28 @@ export function NotificationOverviewTab({
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             {rejecting &&
-              "This device group has been unlinked from the notification. Add a short note on why - it's recorded in the activity log."}
+              "This product should not have been attached to this notification"}
           </p>
           <Textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="Add a comment (optional)"
+            placeholder="Add a comment describing the error (optional)"
             rows={3}
           />
           <DialogFooter>
             <Button
               variant="ghost"
-              onClick={() => confirmUnlink(undefined)}
+              onClick={closeDialog}
               disabled={markMatchIncorrect.isPending}
             >
-              Skip
+              Cancel 
             </Button>
             <Button
               variant="destructive"
               onClick={() => confirmUnlink(comment.trim() || undefined)}
               disabled={markMatchIncorrect.isPending}
             >
-              Save reason
+              Unlink 
             </Button>
           </DialogFooter>
         </DialogContent>

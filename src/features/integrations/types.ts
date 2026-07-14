@@ -17,7 +17,7 @@ export const integrationInputSchema = authSchema.safeExtend({
   name: z.string().min(1, "Name is required"),
   platform: z.string().optional(),
   integrationUri: safeUrlSchema,
-  integrationType: z.enum(["PARTNER", "AI", "REST"]),
+  integrationType: z.enum(["PARTNER", "AI", "CSAF", "REST"]),
   prompt: z.string().optional(),
   resourceType: resourceTypeSchema,
   syncEvery: z

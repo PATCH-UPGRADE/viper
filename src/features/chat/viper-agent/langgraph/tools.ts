@@ -8,7 +8,15 @@
 import "server-only";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
+import type { FleetWorkOrderProposal } from "@/features/chat/types";
+import {
+  listFleetManagedAssets,
+  resolveFleetAssets,
+  UnmanagedAssetsError,
+} from "@/features/tracking/server/fleet-client";
+import { TicketCategory } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
+import { TOOL_REJECTED_PREFIX } from "./build-graph";
 
 /** ```viper-ask-user ...``` block the chat UI parses to render question chips. */
 const askUserQuestions = tool(
@@ -108,7 +116,119 @@ Do not save one-time queries or transient requests.`,
   );
 }
 
+// ─── Siemens Healthineers Fleet work orders ──────────────────────────────────
+
+/**
+ * The inventory the agent is allowed to file Fleet work orders against. Needed
+ * as a tool (not just context) because the chat graph preloads memories only —
+ * it has no asset context at all — and because it hands the model the FULL
+ * asset ids that propose_fleet_work_order expects.
+ */
+const listFleetManagedAssetsTool = tool(
+  async () => {
+    const assets = await listFleetManagedAssets();
+    if (assets.length === 0) {
+      return "No assets in this hospital are managed by Siemens Healthineers, so no Fleet work order can be opened.";
+    }
+    return JSON.stringify(assets, null, 2);
+  },
+  {
+    name: "list_fleet_managed_assets",
+    description:
+      "List the assets managed (serviced) by Siemens Healthineers, with the full asset id needed by propose_fleet_work_order. These are the ONLY assets a teamplay Fleet work order can be opened for. Call this before proposing a work order to confirm the asset qualifies.",
+    schema: z.object({}),
+  },
+);
+
+/**
+ * Proposes — never creates. The result is rendered as an approval card; the work
+ * order is only filed on Fleet when the user clicks Accept (which calls
+ * tracking.createFleetWorkOrder, where the Siemens-managed check runs again).
+ */
+const proposeFleetWorkOrder = tool(
+  async ({
+    assetIds,
+    summary,
+    description,
+    category,
+    scheduledAt,
+    rationale,
+  }) => {
+    try {
+      const assets = await resolveFleetAssets(assetIds);
+      const proposal: FleetWorkOrderProposal = {
+        type: "fleet_work_order_proposal",
+        assets: assets.map((a) => ({
+          assetId: a.assetId,
+          hostname: a.hostname,
+          equipmentKey: a.equipmentKey,
+        })),
+        summary,
+        description,
+        category,
+        scheduledAt: scheduledAt ?? null,
+        rationale: rationale ?? null,
+      };
+      return JSON.stringify(proposal);
+    } catch (error) {
+      if (error instanceof UnmanagedAssetsError) {
+        // Prefixed so the graph does NOT end the turn (see build-graph) — the
+        // model needs to explain the refusal instead of leaving a dead card.
+        return `${TOOL_REJECTED_PREFIX} ${error.message}`;
+      }
+      throw error;
+    }
+  },
+  {
+    name: "propose_fleet_work_order",
+    description: `Propose a work order on the Siemens Healthineers teamplay Fleet platform for one or more Siemens-managed assets.
+This does NOT create anything: it presents a recommendation the user must explicitly accept. Never tell the user the work order has been created or scheduled — say you have proposed one for their approval.
+Only assets managed by Siemens Healthineers are eligible (use list_fleet_managed_assets). Proposing any other asset is refused.
+Use this when the remediation is service work Siemens would perform — a firmware/software update, or maintenance on one of their devices.`,
+    schema: z.object({
+      assetIds: z
+        .array(z.string())
+        .min(1)
+        .describe(
+          "Full VIPER asset ids (from list_fleet_managed_assets or the provided context) the work order covers. One Fleet work order is filed per asset.",
+        ),
+      summary: z
+        .string()
+        .describe(
+          "Short title for the work order, e.g. 'Firmware update: MRI-01'.",
+        ),
+      description: z
+        .string()
+        .describe(
+          "What the Siemens engineer needs to do and why, including the vulnerability or maintenance driver. Do not invent CVSS scores or version numbers.",
+        ),
+      category: z
+        .enum(TicketCategory)
+        .describe(
+          "FIRMWARE_UPDATE for software/firmware service, MAINTENANCE for preventive or corrective maintenance.",
+        ),
+      scheduledAt: z
+        .string()
+        .nullish()
+        .describe(
+          "Proposed service window start as an ISO-8601 datetime. Base it on device utilization windows; omit if unknown.",
+        ),
+      rationale: z
+        .string()
+        .nullish()
+        .describe(
+          "One or two sentences shown to the user on the approval card explaining why this work order is recommended now.",
+        ),
+    }),
+  },
+);
+
 /** All model-facing tools for the Chat agent, bound to a user. */
 export function buildChatTools(userId: string) {
-  return [makeManageMemoriesTool(userId), askUserQuestions];
+  return [
+    makeManageMemoriesTool(userId),
+    askUserQuestions,
+    listFleetManagedAssetsTool,
+    proposeFleetWorkOrder,
+  ];
 }

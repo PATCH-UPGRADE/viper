@@ -1,12 +1,54 @@
 import { z } from "zod";
 import type { AssetWithIssueRelations } from "@/features/assets/types";
 import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
-import type { Prisma } from "@/generated/prisma";
+import { type Prisma, TicketCategory } from "@/generated/prisma";
 
 export interface UseChatAgentConfig {
   agent?: "chat" | "giveRecommendations";
   assetData?: AssetWithIssueRelations;
   vulnerabilityData?: VulnerabilityWithRelations;
+}
+
+// ─── Fleet work-order proposal ───────────────────────────────────────────────
+
+/**
+ * What `propose_fleet_work_order` returns and the chat card renders. It is the
+ * tool's OUTPUT, not its input: the assets here have been resolved server-side
+ * against the Fleet-managed set, so a card can only ever exist for a proposal
+ * that passed the Siemens-managed check. Nothing has been created on Fleet at
+ * this point — that happens when the user accepts.
+ */
+export const fleetProposalAssetSchema = z.object({
+  assetId: z.string(),
+  hostname: z.string().nullable(),
+  equipmentKey: z.string(),
+});
+
+export const fleetWorkOrderProposalSchema = z.object({
+  type: z.literal("fleet_work_order_proposal"),
+  assets: z.array(fleetProposalAssetSchema).min(1),
+  summary: z.string(),
+  description: z.string(),
+  category: z.enum(TicketCategory),
+  scheduledAt: z.string().nullable(),
+  rationale: z.string().nullable(),
+});
+
+export type FleetWorkOrderProposal = z.infer<
+  typeof fleetWorkOrderProposalSchema
+>;
+
+/** Parse a tool part's output into a proposal, or null if it isn't one. */
+export function parseFleetProposal(
+  output: unknown,
+): FleetWorkOrderProposal | null {
+  if (typeof output !== "string") return null;
+  try {
+    const parsed = fleetWorkOrderProposalSchema.safeParse(JSON.parse(output));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null; // rejection strings and partial streams land here
+  }
 }
 
 export const fetchThreadsSchema = z.object({

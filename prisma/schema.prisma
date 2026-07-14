@@ -1016,6 +1016,11 @@ model WorkOrderTicket {
 
   suggestedAssignee String?
 
+  // Set when the ticket was created by accepting an agent's work-order proposal
+  // in chat. Unique so a double-click / retry of the same proposal can't file a
+  // second work order on the external platform.
+  chatToolCallId String? @unique
+
   departments Department[] @relation("WorkOrderTicketDepartments")
 
   parentId  String?

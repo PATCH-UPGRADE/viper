@@ -3,6 +3,7 @@ import {
   type NetworkTopology,
   networkTopologySchema,
 } from "@/features/network/types";
+import { listFleetManagedAssets } from "@/features/tracking/server/fleet-client";
 import { serializeWorkflow } from "@/features/workflows/utils";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -311,6 +312,8 @@ function generateContextMarkdown(
   remediations: RemediationForContext[],
   workflows: WorkflowWithRelations[],
   networkTopology: NetworkTopology | null,
+  /** assetId → Fleet equipmentKey, for assets Siemens Healthineers services. */
+  fleetManaged: Map<string, string>,
   role?: string,
 ): string {
   const sections: string[] = [];
@@ -331,7 +334,15 @@ function generateContextMarkdown(
     assets.length === 0
       ? "_No assets found._"
       : assets
-          .map((a) => assetToMarkdown(a, { includeIssues: true }))
+          .map((a) => {
+            const markdown = assetToMarkdown(a, { includeIssues: true });
+            const equipmentKey = fleetManaged.get(a.id);
+            // The full id (assetToMarkdown prints only an 8-char shortId) is what
+            // propose_fleet_work_order needs back from the model.
+            return equipmentKey
+              ? `${markdown}\n- **Siemens Healthineers Fleet**: managed (equipment ${equipmentKey}, asset id \`${a.id}\`) — eligible for propose_fleet_work_order`
+              : markdown;
+          })
           .join("\n\n");
   sections.push(`## Assets (full)\n\n${assetSection}`);
 
@@ -405,6 +416,7 @@ export async function loadRecommendationsContextMarkdown(
     remediations,
     workflows,
     networkTopology,
+    fleetAssets,
   ] = await Promise.all([
     prisma.memory.findMany({
       where: { userId },
@@ -415,7 +427,12 @@ export async function loadRecommendationsContextMarkdown(
     prisma.remediation.findMany({ include: remediationContextInclude }),
     prisma.workflow.findMany({ include: { nodes: true, connections: true } }),
     fetchNetworkTopologyForContext(),
+    listFleetManagedAssets(),
   ]);
 
-  return `${generateMemoryMarkdown(memories)}\n\n---\n\n${generateContextMarkdown(assets, vulnerabilities, remediations, workflows, networkTopology, userRole)}`;
+  const fleetManaged = new Map(
+    fleetAssets.map((a) => [a.assetId, a.equipmentKey]),
+  );
+
+  return `${generateMemoryMarkdown(memories)}\n\n---\n\n${generateContextMarkdown(assets, vulnerabilities, remediations, workflows, networkTopology, fleetManaged, userRole)}`;
 }

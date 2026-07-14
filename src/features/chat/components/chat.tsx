@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Fullscreen,
   Loader2,
   MessageSquarePlus,
@@ -62,8 +63,16 @@ import {
   useViperChat,
   type ViperChat,
 } from "@/features/chat/hooks/use-viper-chat";
-import type { UseChatAgentConfig } from "@/features/chat/types";
+import {
+  type FleetWorkOrderProposal,
+  parseFleetProposal,
+  type UseChatAgentConfig,
+} from "@/features/chat/types";
 import { USER_ROLES, type UserRole } from "@/features/chat/utils";
+import {
+  useAcceptFleetWorkOrder,
+  useFleetProposalStatus,
+} from "@/features/tracking/hooks/use-tracking";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
@@ -390,6 +399,117 @@ function AskUserQuestionsMessage({
   );
 }
 
+/**
+ * Approval card for a Siemens Healthineers Fleet work order the agent proposed.
+ * Nothing has been created upstream at this point — Accept is what files it.
+ * Rendered from the tool's OUTPUT (not its input) so a card can only appear for
+ * a proposal that passed the Siemens-managed check server-side.
+ */
+function FleetWorkOrderProposalCard({
+  proposal,
+  toolCallId,
+}: {
+  proposal: FleetWorkOrderProposal;
+  toolCallId: string;
+}) {
+  const { data: status, isLoading } = useFleetProposalStatus(toolCallId);
+  const accept = useAcceptFleetWorkOrder();
+  const [dismissed, setDismissed] = useState(false);
+
+  const accepted = Boolean(status);
+  const window = proposal.scheduledAt
+    ? new Date(proposal.scheduledAt).toLocaleString()
+    : "Not specified";
+
+  return (
+    <div className="mt-2 space-y-3 rounded-lg border bg-background p-3">
+      <div className="flex items-start gap-2">
+        <ClipboardCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <div className="space-y-0.5">
+          <p className="text-sm font-medium">{proposal.summary}</p>
+          <p className="text-xs text-muted-foreground">
+            Proposed work order · Siemens Healthineers teamplay Fleet
+          </p>
+        </div>
+      </div>
+
+      <dl className="space-y-1 text-xs">
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">Assets</dt>
+          <dd>
+            {proposal.assets
+              .map((a) => `${a.hostname ?? a.assetId} (${a.equipmentKey})`)
+              .join(", ")}
+          </dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">Category</dt>
+          <dd>{proposal.category.replace(/_/g, " ").toLowerCase()}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">Window</dt>
+          <dd>{window}</dd>
+        </div>
+      </dl>
+
+      <p className="text-xs whitespace-pre-wrap">{proposal.description}</p>
+      {proposal.rationale && (
+        <p className="text-xs italic text-muted-foreground">
+          {proposal.rationale}
+        </p>
+      )}
+
+      {accepted ? (
+        <p className="text-xs font-medium text-muted-foreground">
+          Accepted · Fleet {status?.externalIds.join(", ")}
+        </p>
+      ) : dismissed ? (
+        <p className="text-xs text-muted-foreground">
+          Dismissed — no work order was created.
+        </p>
+      ) : (
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            disabled={accept.isPending || isLoading}
+            onClick={() =>
+              accept.mutate({
+                toolCallId,
+                assetIds: proposal.assets.map((a) => a.assetId),
+                summary: proposal.summary,
+                description: proposal.description,
+                category: proposal.category,
+                scheduledAt: proposal.scheduledAt,
+              })
+            }
+          >
+            {accept.isPending ? (
+              <>
+                <Loader2 className="size-3 animate-spin" /> Sending…
+              </>
+            ) : (
+              "Accept"
+            )}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={accept.isPending}
+            onClick={() => setDismissed(true)}
+          >
+            Dismiss
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {proposal.assets.length > 1
+              ? `Files ${proposal.assets.length} work orders on Fleet`
+              : "Files a work order on Fleet"}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AnswerSummary({
   answers,
 }: {
@@ -490,6 +610,20 @@ function ChatMessage({
                   onAnswer={onAnswer}
                 />
               );
+            }
+            if (toolName(part) === "propose_fleet_work_order") {
+              // Only a validated proposal parses; a refusal (or a still-streaming
+              // call) falls through to the accordion, which shows the reason.
+              const proposal = parseFleetProposal(part.output);
+              if (proposal) {
+                return (
+                  <FleetWorkOrderProposalCard
+                    key={part.toolCallId}
+                    proposal={proposal}
+                    toolCallId={part.toolCallId}
+                  />
+                );
+              }
             }
             return <ToolCallAccordion key={part.toolCallId} part={part} />;
           }

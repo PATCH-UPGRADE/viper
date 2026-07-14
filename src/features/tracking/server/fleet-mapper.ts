@@ -98,6 +98,28 @@ function buildBody(a: FleetActivity): string {
     .join("\n");
 }
 
+// Permissive view of a Fleet /equipment record — the device inventory Siemens
+// services. Only the fields we match on are declared.
+const fleetEquipmentSchema = z.object({
+  equipmentKey: z.string(),
+  serialNumber: z.string().nullish(),
+  hostname: z.string().nullish(),
+  materialNumber: z.string().nullish(),
+  productName: z.string().nullish(),
+});
+
+export type FleetEquipment = z.infer<typeof fleetEquipmentSchema>;
+
+/**
+ * Map a Fleet /equipment payload. Pure and deterministic. These records are
+ * what make an asset "managed by Siemens Healthineers": each one that matches a
+ * VIPER asset becomes an ExternalAssetMapping whose externalId is the
+ * equipmentKey — the handle Fleet needs to attach a work order to a device.
+ */
+export function mapFleetEquipment(raw: unknown): FleetEquipment[] {
+  return z.array(fleetEquipmentSchema).parse(raw);
+}
+
 /**
  * Map a Siemens Healthineers Fleet /activities payload into Work Order upload
  * items. Pure and deterministic. Throws if `raw` isn't the expected array

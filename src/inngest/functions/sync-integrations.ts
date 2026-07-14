@@ -5,9 +5,11 @@ import { integrationAssetInputSchema } from "@/features/assets/types";
 import { integrationDeviceArtifactInputSchema } from "@/features/device-artifacts/types";
 import type { IntegrationWithStringDates } from "@/features/integrations/types";
 import { integrationRemediationInputSchema } from "@/features/remediations/types";
+import { FLEET_HOST } from "@/features/tracking/server/fleet-client";
 import {
   deriveOffsetFromUrl,
   mapFleetActivities,
+  mapFleetEquipment,
 } from "@/features/tracking/server/fleet-mapper";
 import { integrationWorkOrderInputSchema } from "@/features/tracking/types";
 import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/types";
@@ -18,6 +20,7 @@ import {
   SyncStatusEnum,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { upsertSyncStatus } from "@/lib/router-utils";
 import { createUserToken, DEFAULT_TOKEN_TTL_SECONDS } from "@/lib/tokens";
 import { getBaseUrl } from "@/lib/url-utils";
 import { parseAuthenticationJson } from "@/lib/utils";
@@ -235,12 +238,118 @@ function selectRestMapper(integration: IntegrationWithStringDates) {
   );
 }
 
+function isFleetEquipmentSync(
+  integration: IntegrationWithStringDates,
+): boolean {
+  if (integration.resourceType !== ResourceType.Asset) return false;
+  try {
+    return new URL(integration.integrationUri).hostname
+      .toLowerCase()
+      .includes(FLEET_HOST);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fleet /equipment → ExternalAssetMapping. LINK-ONLY: it attaches a Fleet
+ * equipmentKey to assets we already know about and NEVER creates one. It
+ * deliberately bypasses the generic /assets/integrationUpload path, whose
+ * schema requires `ip` and `upstreamApi` — fields a Fleet equipment record
+ * doesn't carry — so routing it there would fabricate phantom assets for every
+ * unmatched device.
+ *
+ * The mappings this writes are what make an asset "managed by Siemens
+ * Healthineers", which is the gate on filing a Fleet work order.
+ */
+async function syncFleetEquipmentMappings(
+  integration: IntegrationWithStringDates,
+): Promise<SyncResult> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (integration.authType !== AuthType.None) {
+    const { header, value } = parseAuthenticationJson(integration);
+    headers[header] = value;
+  }
+
+  const upstream = await fetch(integration.integrationUri, {
+    method: "GET",
+    headers,
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!upstream.ok) {
+    throw new Error(
+      `Failed to fetch Fleet equipment: ${upstream.status} ${upstream.statusText}`,
+    );
+  }
+
+  const equipment = mapFleetEquipment(await upstream.json());
+  const lastSynced = new Date();
+  let linked = 0;
+  let unmatched = 0;
+
+  for (const item of equipment) {
+    // Serial number is the reliable join between a Fleet equipment record and a
+    // network-discovered asset; hostname is a fallback.
+    const conditions = [
+      item.serialNumber ? { serialNumber: item.serialNumber } : null,
+      item.hostname ? { hostname: item.hostname } : null,
+    ].filter((c): c is NonNullable<typeof c> => c !== null);
+
+    const asset = conditions.length
+      ? await prisma.asset.findFirst({ where: { OR: conditions } })
+      : null;
+
+    if (!asset) {
+      unmatched++;
+      continue;
+    }
+
+    await prisma.externalAssetMapping.upsert({
+      where: {
+        external_asset_mappings_item_integration_key: {
+          itemId: asset.id,
+          integrationId: integration.id,
+        },
+      },
+      create: {
+        itemId: asset.id,
+        integrationId: integration.id,
+        externalId: item.equipmentKey,
+        lastSynced,
+      },
+      update: { externalId: item.equipmentKey, lastSynced },
+    });
+    linked++;
+  }
+
+  // The generic path records sync status inside processIntegrationSync; this one
+  // sidesteps it, so close out the PENDING record ourselves.
+  await upsertSyncStatus(
+    integration.id,
+    {
+      message: "success",
+      createdItemsCount: linked,
+      updatedItemsCount: 0,
+      shouldRetry: false,
+      syncedAt: lastSynced.toISOString(),
+    },
+    lastSynced,
+  );
+
+  return { success: true, data: { linked, unmatched } };
+}
+
 // Helper for REST Integration: the worker pulls the URL itself, maps the
 // response with a built-in adapter, then hands the items to the same upload
 // endpoint the AI/PARTNER callbacks use (shared dedup + sync-status logic).
 async function syncRestIntegration(
   integration: IntegrationWithStringDates,
 ): Promise<SyncResult> {
+  // Fleet equipment doesn't go through the upload endpoint — see above.
+  if (isFleetEquipmentSync(integration)) {
+    return syncFleetEquipmentMappings(integration);
+  }
+
   const mapper = selectRestMapper(integration);
   if (!mapper) {
     throw new Error(

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { TicketCategory, TicketStatus } from "@/generated/prisma";
-import { deriveOffsetFromUrl, mapFleetActivities } from "./fleet-mapper";
+import {
+  deriveOffsetFromUrl,
+  mapFleetActivities,
+  mapFleetEquipment,
+} from "./fleet-mapper";
 
 // Representative records from a real Fleet /activities response.
 const SAMPLE = [
@@ -97,5 +101,25 @@ describe("mapFleetActivities", () => {
 
   it("throws on a record missing ticketKey rather than dropping it", () => {
     expect(() => mapFleetActivities([{ shortText: "x" }])).toThrow();
+  });
+});
+
+describe("mapFleetEquipment", () => {
+  it("keeps the equipmentKey and the serial number we join assets on", () => {
+    const equipment = mapFleetEquipment([
+      {
+        equipmentKey: "US_1064669350",
+        serialNumber: "SH-MAG-2021-001",
+        productName: "MAGNETOM Sola",
+        siemensOnlyField: "ignored",
+      },
+    ]);
+
+    expect(equipment[0].equipmentKey).toBe("US_1064669350");
+    expect(equipment[0].serialNumber).toBe("SH-MAG-2021-001");
+  });
+
+  it("throws on a record missing equipmentKey — the handle a work order needs", () => {
+    expect(() => mapFleetEquipment([{ serialNumber: "x" }])).toThrow();
   });
 });

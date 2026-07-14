@@ -7,6 +7,7 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
   const prisma = {
     workOrderTicket: {
       count: vi.fn(),
+      create: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
@@ -60,7 +61,24 @@ vi.mock("@/lib/auth-utils", () => ({
   verifyApiKey: vi.fn(),
 }));
 
+// The Fleet client is exercised directly in fleet-client.test.ts; here we stub
+// its network + lookup surface and keep the real UnmanagedAssetsError so the
+// router's rejection path is the one that actually runs.
+const { mockFleet } = vi.hoisted(() => ({
+  mockFleet: {
+    resolveFleetAssets: vi.fn(),
+    createFleetWorkOrder: vi.fn(),
+    getFleetWorkOrderIntegration: vi.fn(),
+  },
+}));
+
+vi.mock("./fleet-client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./fleet-client")>()),
+  ...mockFleet,
+}));
+
 import { createCallerFactory } from "@/trpc/init";
+import { UnmanagedAssetsError } from "./fleet-client";
 import { trackingRouter } from "./routers";
 
 const createCaller = createCallerFactory(trackingRouter);
@@ -83,6 +101,7 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   sourceLabel: null,
   body: null,
   suggestedAssignee: null,
+  chatToolCallId: null,
   departments: [],
   descriptions: [],
   assignee: null,
@@ -1362,5 +1381,136 @@ describe("activity writes", () => {
         data: { assetId: "a1", assetLabel: "10.0.0.42" },
       },
     });
+  });
+});
+
+describe("trackingRouter.createFleetWorkOrder", () => {
+  const MRI = {
+    assetId: "rad-mri-001",
+    hostname: "MR-MAGNETOM-001",
+    ip: "10.40.1.60",
+    role: "MRI Scanner",
+    equipmentKey: "US_1064669350",
+  };
+
+  const INTEGRATION = { id: "int-fleet", authType: "None" };
+
+  const proposal = {
+    toolCallId: "call_abc",
+    assetIds: [MRI.assetId],
+    summary: "Firmware update: MR-MAGNETOM-001",
+    description: "Apply the Siemens firmware update.",
+    category: "FIRMWARE_UPDATE" as const,
+    scheduledAt: "2026-07-22T22:00:00-05:00",
+  };
+
+  beforeEach(() => {
+    // No prior acceptance of this proposal, unless a test says otherwise.
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(null);
+    mockPrisma.workOrderTicket.create.mockResolvedValue({ id: "t-new" });
+    mockFleet.getFleetWorkOrderIntegration.mockResolvedValue(INTEGRATION);
+    mockFleet.resolveFleetAssets.mockResolvedValue([MRI]);
+    mockFleet.createFleetWorkOrder.mockResolvedValue({
+      equipmentKey: MRI.equipmentKey,
+      assetId: MRI.assetId,
+      externalId: "US_400501937577",
+      raw: {},
+    });
+  });
+
+  it("files the work order on Fleet and maps the ticket to it", async () => {
+    const caller = setup();
+
+    const result = await caller.createFleetWorkOrder(proposal);
+
+    expect(mockFleet.createFleetWorkOrder).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ticketId: "t-new",
+      externalIds: ["US_400501937577"],
+      alreadyAccepted: false,
+      failures: [],
+    });
+
+    const data = mockPrisma.workOrderTicket.create.mock.calls[0][0].data;
+    expect(data.chatToolCallId).toBe("call_abc");
+    expect(data.sourceLabel).toBe("Siemens Healthineers Fleet");
+    expect(data.assets).toEqual({ connect: { id: MRI.assetId } });
+    // The mapping is what makes the next inbound sync update this ticket
+    // rather than duplicate it.
+    expect(data.externalMappings.create).toMatchObject({
+      integrationId: "int-fleet",
+      externalId: "US_400501937577",
+    });
+  });
+
+  it("refuses an asset Siemens does not manage, before calling Fleet", async () => {
+    const caller = setup();
+    mockFleet.resolveFleetAssets.mockRejectedValue(
+      new UnmanagedAssetsError(["PUMP-SIGMA-001"]),
+    );
+
+    await expect(
+      caller.createFleetWorkOrder({ ...proposal, assetIds: ["rad-pump-001"] }),
+    ).rejects.toThrow(/PUMP-SIGMA-001/);
+
+    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
+    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
+  });
+
+  it("is idempotent — re-accepting the same proposal files nothing new", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t-existing",
+      externalMappings: [{ externalId: "US_400501937577" }],
+      children: [],
+    });
+
+    const result = await caller.createFleetWorkOrder(proposal);
+
+    expect(result).toMatchObject({
+      ticketId: "t-existing",
+      externalIds: ["US_400501937577"],
+      alreadyAccepted: true,
+    });
+    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
+    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
+  });
+
+  it("still tracks the orders Fleet accepted when one of them fails", async () => {
+    const caller = setup();
+    const CT = { ...MRI, assetId: "rad-ct-002", hostname: "CT-SOMATOM-001" };
+    mockFleet.resolveFleetAssets.mockResolvedValue([MRI, CT]);
+    mockFleet.createFleetWorkOrder
+      .mockResolvedValueOnce({
+        equipmentKey: MRI.equipmentKey,
+        assetId: MRI.assetId,
+        externalId: "US_400501937577",
+        raw: {},
+      })
+      .mockRejectedValueOnce(new Error("503 Service Unavailable"));
+
+    const result = await caller.createFleetWorkOrder({
+      ...proposal,
+      assetIds: [MRI.assetId, CT.assetId],
+    });
+
+    // One order exists upstream, so it must exist here too — and the caller is
+    // told which asset failed rather than the failure being swallowed.
+    expect(result.externalIds).toEqual(["US_400501937577"]);
+    expect(result.failures).toEqual([
+      { asset: "CT-SOMATOM-001", message: "503 Service Unavailable" },
+    ]);
+  });
+
+  it("fails loudly when Fleet accepts nothing", async () => {
+    const caller = setup();
+    mockFleet.createFleetWorkOrder.mockRejectedValue(
+      new Error("401 Forbidden"),
+    );
+
+    await expect(caller.createFleetWorkOrder(proposal)).rejects.toThrow(
+      /401 Forbidden/,
+    );
+    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
   });
 });

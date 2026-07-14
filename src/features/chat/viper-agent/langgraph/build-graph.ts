@@ -8,8 +8,9 @@
  *   forced model tool call — so extended thinking survives
  *   and the context is guaranteed loaded once per run.
  * - agent: the model (with tools bound), prepended with the system message.
- * - tools: ToolNode; if ask_user_questions was called, END so the user can
- *   reply (human-in-the-loop).
+ * - tools: ToolNode; if a HALT_TOOL was called, END so the user can act on it
+ *   (human-in-the-loop): answer the questions, or accept/dismiss the proposed
+ *   work order.
  */
 import "server-only";
 import {
@@ -17,6 +18,7 @@ import {
   type BaseMessage,
   HumanMessage,
   type SystemMessage,
+  type ToolMessage,
 } from "@langchain/core/messages";
 import type { Runnable } from "@langchain/core/runnables";
 import type { StructuredToolInterface } from "@langchain/core/tools";
@@ -31,6 +33,20 @@ import { ToolNode } from "@langchain/langgraph/prebuilt";
 const lastAi = (messages: BaseMessage[]) =>
   messages.at(-1) as AIMessage | undefined;
 
+/**
+ * Tools that hand control back to the user: the turn ends after them and only
+ * resumes when the user answers / accepts.
+ */
+const HALT_TOOLS = new Set(["ask_user_questions", "propose_fleet_work_order"]);
+
+/**
+ * A halting tool prefixes its result with this when it refuses the call (e.g. a
+ * work order proposed for an asset Siemens doesn't manage). Such a turn must
+ * NOT halt — the model has to see the refusal and correct itself or explain it,
+ * and the UI must not render an approval card for a proposal that was rejected.
+ */
+export const TOOL_REJECTED_PREFIX = "REJECTED:";
+
 /** Names of tools called in the most recent assistant tool-call turn. */
 function lastToolCallNames(messages: BaseMessage[]): string[] {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -38,6 +54,28 @@ function lastToolCallNames(messages: BaseMessage[]): string[] {
     if (m.tool_calls?.length) return m.tool_calls.map((t) => t.name);
   }
   return [];
+}
+
+/** Results of the tool batch that just ran (the trailing ToolMessages). */
+function trailingToolResults(messages: BaseMessage[]): string[] {
+  const results: string[] = [];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.getType() !== "tool") break;
+    const content = (m as ToolMessage).content;
+    results.push(
+      typeof content === "string" ? content : JSON.stringify(content),
+    );
+  }
+  return results;
+}
+
+function shouldHalt(messages: BaseMessage[]): boolean {
+  const halting = lastToolCallNames(messages).some((n) => HALT_TOOLS.has(n));
+  if (!halting) return false;
+  return !trailingToolResults(messages).some((r) =>
+    r.startsWith(TOOL_REJECTED_PREFIX),
+  );
 }
 
 export function buildAgentGraph({
@@ -65,9 +103,7 @@ export function buildAgentGraph({
     .addEdge(START, "preload")
     .addEdge("preload", "agent")
     .addConditionalEdges("tools", (state) =>
-      lastToolCallNames(state.messages).includes("ask_user_questions")
-        ? END
-        : "agent",
+      shouldHalt(state.messages) ? END : "agent",
     )
     .addConditionalEdges("agent", (state) =>
       lastAi(state.messages)?.tool_calls?.length ? "tools" : END,

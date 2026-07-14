@@ -43,6 +43,34 @@ import {
   recordUpdateActivities,
   snapshotBeforeUpdate,
 } from "./activities";
+import {
+  createFleetWorkOrder,
+  FLEET_SOURCE_LABEL,
+  type FleetContact,
+  type FleetManagedAsset,
+  type FleetWorkOrderResult,
+  getFleetWorkOrderIntegration,
+  resolveFleetAssets,
+  UnmanagedAssetsError,
+} from "./fleet-client";
+
+/**
+ * Siemens calls whoever approved the work order, so the contact is the accepting
+ * user. Their phone isn't in the user record; FLEET_CONTACT_PHONE is the
+ * hospital's callback number for VIPER-raised orders.
+ */
+function fleetContactFor(user: {
+  name?: string | null;
+  email?: string | null;
+}): FleetContact {
+  const [firstName, ...rest] = (user.name ?? "").trim().split(/\s+/);
+  return {
+    email: user.email ?? "",
+    firstName: firstName || "VIPER",
+    lastName: rest.join(" ") || "User",
+    phone: process.env.FLEET_CONTACT_PHONE ?? "",
+  };
+}
 
 const trackingInputSchema = paginationInputSchema.extend({
   tab: z.enum(TRACKING_TABS).default("suggested"),
@@ -809,6 +837,216 @@ export const trackingRouter = createTRPCRouter({
         });
         return comment;
       });
+    }),
+
+  // ─── Siemens Healthineers Fleet work orders (proposed in chat) ─────────────
+
+  /**
+   * Has this chat proposal already been accepted? Chat history rehydrates stored
+   * tool parts on reload, so without this the card would offer a live Accept
+   * button again for a work order that has already been filed.
+   */
+  getFleetProposalStatus: protectedProcedure
+    .input(z.object({ toolCallId: z.string() }))
+    .query(async ({ input }) => {
+      const ticket = await prisma.workOrderTicket.findUnique({
+        where: { chatToolCallId: input.toolCallId },
+        select: {
+          id: true,
+          externalMappings: { select: { externalId: true } },
+          children: {
+            select: { externalMappings: { select: { externalId: true } } },
+          },
+        },
+      });
+      if (!ticket) return null;
+
+      return {
+        ticketId: ticket.id,
+        externalIds: [
+          ...ticket.externalMappings.map((m) => m.externalId),
+          ...ticket.children.flatMap((c) =>
+            c.externalMappings.map((m) => m.externalId),
+          ),
+        ],
+      };
+    }),
+
+  /**
+   * Accept an agent's work-order proposal: file it on teamplay Fleet, then
+   * record it in VIPER. Fleet models activities per equipment, so a proposal
+   * covering N assets files N work orders; when N > 1 they become children of a
+   * parent ticket that carries the proposal's toolCallId.
+   */
+  createFleetWorkOrder: protectedProcedure
+    .input(
+      z.object({
+        /** The chat tool call this proposal came from — the idempotency key. */
+        toolCallId: z.string(),
+        assetIds: z.array(z.string()).min(1),
+        summary: z.string().min(1),
+        description: z.string().default(""),
+        category: z.enum(TicketCategory),
+        scheduledAt: z.string().nullish(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.auth.user.id;
+
+      // Idempotency: a double-click or a retried request must not file a second
+      // work order on Fleet.
+      const existing = await prisma.workOrderTicket.findUnique({
+        where: { chatToolCallId: input.toolCallId },
+        select: {
+          id: true,
+          externalMappings: { select: { externalId: true } },
+          children: {
+            select: { externalMappings: { select: { externalId: true } } },
+          },
+        },
+      });
+      if (existing) {
+        return {
+          ticketId: existing.id,
+          externalIds: [
+            ...existing.externalMappings.map((m) => m.externalId),
+            ...existing.children.flatMap((c) =>
+              c.externalMappings.map((m) => m.externalId),
+            ),
+          ],
+          alreadyAccepted: true,
+          failures: [] as { asset: string; message: string }[],
+        };
+      }
+
+      // Re-check the Siemens-managed scope server-side. The tool already checked
+      // it, but the model and the client are both untrusted inputs here.
+      let assets: FleetManagedAsset[];
+      try {
+        assets = await resolveFleetAssets(input.assetIds);
+      } catch (error) {
+        if (error instanceof UnmanagedAssetsError) {
+          throw new TRPCError({ code: "FORBIDDEN", message: error.message });
+        }
+        throw error;
+      }
+
+      const integration = await getFleetWorkOrderIntegration();
+      const contact = fleetContactFor(ctx.auth.user);
+      const scheduledAt = input.scheduledAt
+        ? new Date(input.scheduledAt)
+        : null;
+
+      // File on Fleet BEFORE writing any rows, so VIPER never shows a work order
+      // that doesn't exist upstream. Failures are collected per asset rather than
+      // aborting: an order Fleet did accept must still end up tracked here.
+      const filed: {
+        asset: FleetManagedAsset;
+        result: FleetWorkOrderResult;
+      }[] = [];
+      const failures: { asset: string; message: string }[] = [];
+
+      for (const asset of assets) {
+        try {
+          const result = await createFleetWorkOrder(integration, asset, {
+            summary: input.summary,
+            description: input.description,
+            category: input.category,
+            scheduledAt: input.scheduledAt ?? null,
+            contact,
+            // Our reference on the Fleet ticket, so an order can be traced back
+            // to the proposal it came from.
+            ownIncidentNumber: input.toolCallId,
+          });
+          filed.push({ asset, result });
+        } catch (error) {
+          failures.push({
+            asset: asset.hostname ?? asset.ip,
+            message: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+
+      if (filed.length === 0) {
+        throw new TRPCError({
+          code: "BAD_GATEWAY",
+          message: `Fleet did not accept the work order: ${failures.map((f) => f.message).join("; ")}`,
+        });
+      }
+
+      const isMulti = filed.length > 1;
+
+      const ticketId = await prisma.$transaction(async (tx) => {
+        // The external mapping (integrationId, externalId) is what makes the next
+        // inbound /activities poll UPDATE this ticket instead of duplicating it.
+        const createOne = (
+          asset: FleetManagedAsset,
+          result: FleetWorkOrderResult,
+          parentId: string | null,
+        ) =>
+          tx.workOrderTicket.create({
+            data: {
+              summary: isMulti
+                ? `${input.summary} — ${asset.hostname ?? asset.ip}`
+                : input.summary,
+              body: input.description,
+              category: input.category,
+              status: TicketStatus.TO_DO,
+              scheduledAt,
+              sourceLabel: FLEET_SOURCE_LABEL,
+              // Children hang off a parent that already carries the proposal id.
+              chatToolCallId: parentId ? undefined : input.toolCallId,
+              creator: { connect: { id: userId } },
+              assets: { connect: { id: asset.assetId } },
+              ...(parentId ? { parent: { connect: { id: parentId } } } : {}),
+              externalMappings: {
+                create: {
+                  integrationId: integration.id,
+                  externalId: result.externalId,
+                  lastSynced: new Date(),
+                },
+              },
+            },
+            select: { id: true },
+          });
+
+        if (!isMulti) {
+          const { asset, result } = filed[0];
+          const ticket = await createOne(asset, result, null);
+          return ticket.id;
+        }
+
+        // Parent carries the proposal (and every affected asset); each child
+        // carries one Fleet work order and its mapping.
+        const parent = await tx.workOrderTicket.create({
+          data: {
+            summary: input.summary,
+            body: input.description,
+            category: input.category,
+            status: TicketStatus.TO_DO,
+            scheduledAt,
+            sourceLabel: FLEET_SOURCE_LABEL,
+            chatToolCallId: input.toolCallId,
+            creator: { connect: { id: userId } },
+            assets: {
+              connect: filed.map(({ asset }) => ({ id: asset.assetId })),
+            },
+          },
+          select: { id: true },
+        });
+
+        for (const { asset, result } of filed) {
+          await createOne(asset, result, parent.id);
+        }
+        return parent.id;
+      });
+
+      return {
+        ticketId,
+        externalIds: filed.map(({ result }) => result.externalId),
+        alreadyAccepted: false,
+        failures,
+      };
     }),
 
   processIntegrationCreate: baseProcedure

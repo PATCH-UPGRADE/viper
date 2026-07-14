@@ -431,6 +431,8 @@ export const workOrderDetailResponseSchema = z.object({
   sourceLabel: z.string().nullable(),
   body: z.string().nullable(),
   suggestedAssignee: z.string().nullable(),
+  // Set when the ticket came from accepting an agent's Fleet work-order proposal.
+  chatToolCallId: z.string().nullable(),
   departments: z.array(departmentItemSchema),
   descriptions: z.array(ticketDescriptionSchema),
   assignee: assigneeItemSchema.nullable(),

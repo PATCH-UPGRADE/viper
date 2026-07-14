@@ -1,11 +1,14 @@
 "use client";
 
 import { format } from "date-fns";
-import { ExternalLinkIcon, HeartIcon, MailIcon } from "lucide-react";
+import { ExternalLinkIcon, HeartIcon, MailIcon, Unlink } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardFooter,
   CardHeader,
@@ -14,18 +17,24 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
+import { Textarea } from "@/components/ui/textarea";
 import { TlpBadge } from "@/features/advisories/components/advisories";
+import { deviceGroupMatchingLabel } from "@/lib/markdown";
+import { displayName } from "@/lib/markdown/device-group";
+import { useMarkMatchIncorrect } from "../hooks/use-notifications";
 import type {
   NotificationDetailSource,
   NotificationDetailWithRelations,
   RawEmailPayload,
 } from "../types";
-import { deviceGroupLabel, deviceGroupMatchingLabel } from "@/lib/markdown";
-import { displayName } from "@/lib/markdown/device-group";
+
+type DeviceGroupMapping =
+  NotificationDetailWithRelations["deviceGroupsMatchings"][number];
 
 // ---------------------------------------------------------------------------
 // EmailSourceModal
@@ -164,6 +173,28 @@ export function NotificationOverviewTab({
     (m) => m.assetCount > 0,
   );
 
+  const [rejecting, setRejecting] = useState<DeviceGroupMapping | null>(null);
+  const [comment, setComment] = useState("");
+  const markMatchIncorrect = useMarkMatchIncorrect();
+
+  const closeDialog = () => {
+    setRejecting(null);
+    setComment("");
+  };
+
+  const confirmUnlink = async (commentToSave: string | undefined) => {
+    if (!rejecting) return;
+    const label = deviceGroupMatchingLabel(rejecting.deviceGroupMatching);
+    await markMatchIncorrect.mutateAsync({
+      targetType: "NotificationDeviceGroupMapping",
+      targetId: rejecting.id,
+      notificationId: notification.id,
+      comment: commentToSave,
+    });
+    toast.success(`${label} unlinked from notification`);
+    closeDialog();
+  };
+
   return (
     <>
       {/* Hospital Impact */}
@@ -215,6 +246,17 @@ export function NotificationOverviewTab({
                 <CardTitle>
                   {displayName(m.deviceGroupMatching.product)}
                 </CardTitle>
+                <CardAction>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    onClick={() => setRejecting(m)}
+                    aria-label="Unlink this device group"
+                  >
+                    <Unlink className="size-4" />
+                  </Button>
+                </CardAction>
               </CardHeader>
               <CardContent>
                 <Badge variant={"secondary"}>
@@ -261,6 +303,50 @@ export function NotificationOverviewTab({
           </table>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={!!rejecting}
+        onOpenChange={(open) => !open && closeDialog()}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Unlink className="size-4 text-destructive" />
+              Unlink{" "}
+              {rejecting
+                ? deviceGroupMatchingLabel(rejecting.deviceGroupMatching)
+                : ""}
+              ?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {rejecting &&
+              "This device group has been unlinked from the notification. Add a short note on why - it's recorded in the activity log."}
+          </p>
+          <Textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Add a comment (optional)"
+            rows={3}
+          />
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => confirmUnlink(undefined)}
+              disabled={markMatchIncorrect.isPending}
+            >
+              Skip
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => confirmUnlink(comment.trim() || undefined)}
+              disabled={markMatchIncorrect.isPending}
+            >
+              Save reason
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

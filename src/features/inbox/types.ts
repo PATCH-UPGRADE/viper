@@ -48,6 +48,9 @@ export const notificationDetailInclude = {
       },
     },
   },
+  vulnerabilities: {
+    select: { vulnerabilityId: true },
+  },
   sources: {
     select: {
       id: true,
@@ -76,14 +79,39 @@ export type ResolvedDeviceGroupAsset = {
   status: AssetStatus | null;
 };
 
+/** A device group matching with its resolved vendor/product/version labels. */
+export type MatchingWithLabels =
+  NotificationDetailBasePayload["deviceGroupsMatchings"][number]["deviceGroupMatching"];
+
+/**
+ * One device group matching in a triage bucket, with the number of assets that
+ * fall in that bucket. Asset rows are fetched lazily/paginated (see
+ * `getAffectedAssetsPage`) — never eagerly loaded here.
+ */
+export type AffectedAssetGroupSummary = {
+  /** NotificationDeviceGroupMapping id when the matching is linked to the notification. */
+  mappingId: string | null;
+  deviceGroupMatching: MatchingWithLabels;
+  assetCount: number;
+};
+
+/** Device group matchings grouped by triage status for the affected-assets tab. */
+export type AffectedAssetsSummary = {
+  needsAttention: AffectedAssetGroupSummary[];
+  needsInformation: AffectedAssetGroupSummary[];
+  lowConcern: AffectedAssetGroupSummary[];
+  /** Notification-linked matchings with no issues at all (current plain-card behavior). */
+  unaffected: AffectedAssetGroupSummary[];
+};
+
 export type NotificationDetailWithRelations = Omit<
   NotificationDetailBasePayload,
   "deviceGroupsMatchings"
 > & {
   deviceGroupsMatchings: (NotificationDetailBasePayload["deviceGroupsMatchings"][number] & {
     assetCount: number;
-    assets: ResolvedDeviceGroupAsset[];
   })[];
+  affectedAssets: AffectedAssetsSummary;
 };
 
 export type NotificationDetailSource =

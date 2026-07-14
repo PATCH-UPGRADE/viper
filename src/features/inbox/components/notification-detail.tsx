@@ -174,6 +174,7 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
         >
           <NotificationAffectedAssetsTab
             notificationId={notification.id}
+            affectedAssets={notification.affectedAssets}
             deviceGroupsMatchings={notification.deviceGroupsMatchings}
           />
         </TabsContent>

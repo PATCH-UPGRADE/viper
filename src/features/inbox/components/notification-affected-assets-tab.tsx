@@ -111,6 +111,7 @@ export function NotificationAffectedAssetsTab({
                   <TableHead>Asset ID</TableHead>
                   <TableHead>IP Address</TableHead>
                   <TableHead>Location</TableHead>
+                  <TableHead>Version</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
@@ -123,6 +124,7 @@ export function NotificationAffectedAssetsTab({
                     </TableCell>
                     <TableCell>{asset.ip}</TableCell>
                     <TableCell>{parseLocation(asset.location)}</TableCell>
+                    <TableCell>{asset.version ?? "—"}</TableCell>
                     <TableCell>{asset.status ?? "—"}</TableCell>
                     <TableCell>
                       <MoreVerticalDropdownMenu
@@ -142,9 +144,9 @@ export function NotificationAffectedAssetsTab({
         </Card>
       ))}
       {withoutAssets.length > 0 && (
-        <Card>
+        <Card className="gap-2">
           <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">
+            <CardTitle className="text-sm font-normal">
               This advisory applies to{" "}
               <b>{withAssets.length} of your products</b>. The vendor bulletin
               listed <b>{deviceGroupsMatchings.length}</b>.
@@ -154,7 +156,7 @@ export function NotificationAffectedAssetsTab({
             <Collapsible open={showMissing} onOpenChange={setShowMissing}>
               <CollapsibleTrigger
                 chevron
-                className="text-sm text-muted-foreground hover:text-foreground"
+                className="text-sm hover:text-foreground"
               >
                 {showMissing ? "Hide" : "Show"} the {withoutAssets.length}{" "}
                 products not in your inventory

@@ -72,6 +72,7 @@ export type ResolvedDeviceGroupAsset = {
   ip: string;
   hostname: string | null;
   location: unknown;
+  version: string | null;
   status: AssetStatus | null;
 };
 

@@ -4,7 +4,13 @@ import { format } from "date-fns";
 import { ExternalLinkIcon, HeartIcon, MailIcon } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +24,8 @@ import type {
   NotificationDetailWithRelations,
   RawEmailPayload,
 } from "../types";
+import { deviceGroupLabel, deviceGroupMatchingLabel } from "@/lib/markdown";
+import { displayName } from "@/lib/markdown/device-group";
 
 // ---------------------------------------------------------------------------
 // EmailSourceModal
@@ -152,6 +160,10 @@ export function NotificationOverviewTab({
     },
   ];
 
+  const withAssets = notification.deviceGroupsMatchings.filter(
+    (m) => m.assetCount > 0,
+  );
+
   return (
     <>
       {/* Hospital Impact */}
@@ -182,6 +194,49 @@ export function NotificationOverviewTab({
           </CardContent>
         </Card>
       )}
+
+      {/* Affected Products */}
+      <Card>
+        <CardHeader className="flex justify-between items-center">
+          <CardTitle>Affected Products</CardTitle>
+          <span className="text-muted-foreground text-sm">
+            {withAssets.length} of {notification.deviceGroupsMatchings.length}{" "}
+            listed
+          </span>
+        </CardHeader>
+        <CardContent className="grid-cols-2 grid gap-4">
+          {withAssets.map((m) => (
+            <Card className="gap-4">
+              <CardHeader>
+                <span className="text-muted-foreground uppercase text-xs">
+                  {displayName(m.deviceGroupMatching.vendor)}
+                </span>
+                <CardTitle>
+                  {displayName(m.deviceGroupMatching.product)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Badge variant={"secondary"}>
+                  {displayName(m.deviceGroupMatching.version) ??
+                    m.deviceGroupMatching.versionRange}
+                </Badge>
+              </CardContent>
+              <CardFooter className="border-t pt-2!">
+                <dl className="flex gap-4 text-sm">
+                  <div className="flex flex-row-reverse gap-1">
+                    <dt>assets affected</dt>
+                    <dd className="font-bold">{m.assetCount}</dd>
+                  </div>
+                  <div className="flex flex-row-reverse gap-1">
+                    <dt>vuln TODO</dt>
+                    <dd className="font-bold">1</dd>
+                  </div>
+                </dl>
+              </CardFooter>
+            </Card>
+          ))}
+        </CardContent>
+      </Card>
 
       {/* Details */}
       <Card>

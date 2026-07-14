@@ -105,7 +105,8 @@ export function versSatisfies(version: string | null, range: string): boolean {
 
   // Non-semver schemes: fall back to exact string equality on an "=" constraint.
   return parsed.constraints.some(
-    (c) => c.operator === "=" && c.version === version,
+    (c) =>
+      c.operator === "=" && c.version.toLowerCase() === version.toLowerCase(),
   );
 }
 

@@ -80,7 +80,12 @@ async function resolveDeviceGroupAssets(matching: MatchingIdentity) {
   });
   return candidates
     .filter((dg) => matchingAppliesToDeviceGroup(matching, dg))
-    .flatMap((dg) => dg.assets);
+    .flatMap((dg) =>
+      dg.assets.map((asset) => ({
+        ...asset,
+        version: dg.version?.canonicalName ?? null,
+      })),
+    );
 }
 
 export const notificationsRouter = createTRPCRouter({
@@ -176,7 +181,6 @@ export const notificationsRouter = createTRPCRouter({
             return { ...m, assetCount: assets.length, assets };
           }),
       );
-      console.log("HEY", deviceGroupsMatchings)
       return { ...notification, deviceGroupsMatchings };
     }),
 

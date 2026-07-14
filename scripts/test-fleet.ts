@@ -1,8 +1,8 @@
+import { grabSessionCookie } from "../src/features/integrations/teamplay-fleet/capture";
 import {
+  FLEET,
   FLEET_LOGIN_CONFIG,
-  grabSessionCookie,
-} from "@/lib/teamplay-fleet-session-capture";
-import { fetchWithVendorSession } from "../src/features/advisories/server/fleet-advisory-sync";
+} from "../src/features/integrations/teamplay-fleet/config";
 import prisma from "../src/lib/db";
 
 const url =
@@ -42,13 +42,13 @@ async function main() {
   const data = await results.json();
   console.log("data ", data);
 
-  const before = await prisma.vendorSession.findUnique({
+  const before = await prisma.integrationSession.findUnique({
     where: { host },
   });
   console.log("before: ", before);
-  const res = await fetchWithVendorSession(url);
+  const res = await FLEET.fetchWithSession(url);
   console.log("status: ", res.status);
-  const after = await prisma.vendorSession.findUnique({
+  const after = await prisma.integrationSession.findUnique({
     where: { host },
   });
   console.log("after: ", after);

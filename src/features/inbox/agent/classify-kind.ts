@@ -8,8 +8,9 @@
 
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { HumanMessage } from "@langchain/core/messages";
+import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import { emailKindSchema } from "../types";
+import { emailPromptText, type InboundEmail } from "./prompt";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -26,43 +27,17 @@ When an email is relevant but you are unsure between the other two, prefer "noti
 
 Always give a concise reasonWhy.`;
 
-function buildTextPrompt(email: {
-  from: string;
-  subject: string | null;
-  markdown: string;
-}): string {
-  return `From: ${email.from}
-Subject: ${email.subject ?? "(no subject)"}
-
---- EMAIL BODY ---
-${email.markdown}`;
-}
-
 export async function classifyEmailKind(
-  email: { from: string; subject: string | null; markdown: string },
-  pdfAttachments: Array<{ filename: string | null; base64: string }> = [],
+  email: InboundEmail,
+  pdfAttachments: PdfAttachment[] = [],
 ) {
   const model = new ChatAnthropic({
     model: MODEL,
     maxTokens: 256,
   }).withStructuredOutput(emailKindSchema);
 
-  const userContent = [
-    { type: "text" as const, text: buildTextPrompt(email) },
-    ...pdfAttachments.map((pdf) => ({
-      type: "document",
-      source: {
-        type: "base64",
-        media_type: "application/pdf",
-        data: pdf.base64,
-      },
-      title: pdf.filename ?? "attachment.pdf",
-    })),
-  ];
-
   return model.invoke([
     { role: "system", content: SYSTEM_PROMPT },
-    // biome-ignore lint/suspicious/noExplicitAny: cast userContent type for langchain
-    new HumanMessage({ content: userContent as any }),
+    buildUserMessage(emailPromptText(email), pdfAttachments),
   ]);
 }

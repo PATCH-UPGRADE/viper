@@ -6,8 +6,8 @@
 
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { HumanMessage } from "@langchain/core/messages";
 import { z } from "zod";
+import { buildUserMessage } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { fetchPdfAttachments } from "../utils";
 
@@ -86,22 +86,8 @@ export async function triageNotification(
     markdown: source?.markdown ?? null,
   });
 
-  const userContent = [
-    { type: "text" as const, text: textPrompt },
-    ...pdfAttachments.map((pdf) => ({
-      type: "document",
-      source: {
-        type: "base64",
-        media_type: "application/pdf",
-        data: pdf.base64,
-      },
-      title: pdf.filename ?? "attachment.pdf",
-    })),
-  ];
-
   return model.invoke([
     { role: "system", content: SYSTEM_PROMPT },
-    // biome-ignore lint/suspicious/noExplicitAny: cast userContent type for langchain
-    new HumanMessage({ content: userContent as any }),
+    buildUserMessage(textPrompt, pdfAttachments),
   ]);
 }

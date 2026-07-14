@@ -4,10 +4,11 @@
 
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { HumanMessage } from "@langchain/core/messages";
+import { buildUserMessage } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { type WorkOrderPayload, workOrderPayloadSchema } from "../types";
 import { fetchPdfAttachments } from "../utils";
+import { emailPromptText, type InboundEmail } from "./prompt";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -22,21 +23,9 @@ Produce:
 
 Only include values you are reasonably confident about. Do not invent dates or assignees, and never invent a department that isn't in the provided list.`;
 
-function buildTextPrompt(email: {
-  from: string;
-  subject: string | null;
-  markdown: string;
-}): string {
-  return `From: ${email.from}
-Subject: ${email.subject ?? "(no subject)"}
-
---- EMAIL BODY ---
-${email.markdown}`;
-}
-
 export async function extractWorkOrder(
   sourceId: string,
-  email: { from: string; subject: string | null; markdown: string },
+  email: InboundEmail,
 ): Promise<WorkOrderPayload> {
   const [pdfAttachments, departments] = await Promise.all([
     fetchPdfAttachments(sourceId),
@@ -53,25 +42,11 @@ export async function extractWorkOrder(
     maxTokens: 1024,
   }).withStructuredOutput(workOrderPayloadSchema);
 
-  const userContent = [
-    {
-      type: "text" as const,
-      text: `${buildTextPrompt(email)}\n\nValid departments (choose only from these): ${validDepartments}`,
-    },
-    ...pdfAttachments.map((pdf) => ({
-      type: "document",
-      source: {
-        type: "base64",
-        media_type: "application/pdf",
-        data: pdf.base64,
-      },
-      title: pdf.filename ?? "attachment.pdf",
-    })),
-  ];
-
   return model.invoke([
     { role: "system", content: SYSTEM_PROMPT },
-    // biome-ignore lint/suspicious/noExplicitAny: cast userContent type for langchain
-    new HumanMessage({ content: userContent as any }),
+    buildUserMessage(
+      `${emailPromptText(email)}\n\nValid departments (choose only from these): ${validDepartments}`,
+      pdfAttachments,
+    ),
   ]);
 }

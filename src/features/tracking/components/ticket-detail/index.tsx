@@ -9,14 +9,12 @@ import {
   SlashIcon,
   UserIcon,
 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   EntityContainer,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import { SeverityBadge } from "@/components/severity-badge";
 import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
@@ -251,24 +249,6 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
           </TabsContent>
         </Tabs>
       </div>
-
-      {data.advisories.length > 0 && (
-        <Section title="Advisories" count={data.advisories.length}>
-          <ul className="flex flex-col gap-2">
-            {data.advisories.map((a) => (
-              <li key={a.id}>
-                <Link
-                  href={`/advisories/${a.id}`}
-                  className="flex items-center justify-between gap-3 rounded-md border bg-background hover:bg-muted/50 transition px-3 py-2"
-                >
-                  <span className="text-sm">{a.title ?? a.id}</span>
-                  <SeverityBadge severity={a.severity} />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
 
       <ActivityTimeline
         ticketId={data.id}

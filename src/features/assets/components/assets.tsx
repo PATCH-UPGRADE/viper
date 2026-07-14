@@ -48,7 +48,7 @@ import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { Severity } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import type { AssetWithDeviceGroup, AssetWithIssues } from "@/lib/db";
-import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/string-utils";
+import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useAssetsParams } from "../hooks/use-asset-params";
 import {

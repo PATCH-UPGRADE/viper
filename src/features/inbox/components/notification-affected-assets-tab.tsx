@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { deviceGroupMatchingLabel, parseLocation } from "@/lib/string-utils";
+import { deviceGroupMatchingLabel, parseLocation } from "@/lib/markdown";
 import { useMarkMatchIncorrect } from "../hooks/use-notifications";
 import type { NotificationDetailWithRelations } from "../types";
 

@@ -35,8 +35,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { getAssetRoleLabel } from "@/features/assets/utils";
 import type { Vulnerability } from "@/generated/prisma";
 import type { AssetWithDeviceGroup } from "@/lib/db";
+import { deviceGroupLabel } from "@/lib/markdown";
 import { cpeSchema } from "@/lib/schemas";
-import { deviceGroupLabel } from "@/lib/string-utils";
 import { DeviceIconType, getIconByType } from "../types";
 import type { AssetNodeData } from "./node";
 

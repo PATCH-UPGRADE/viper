@@ -1,7 +1,3 @@
-// Device-group (and device-group-matching) markdown/label helpers. Shared by the
-// UI tables, the chat/recommendations renderers, and the inbox agents so a device
-// group is described consistently wherever it appears.
-
 import type { CanonicalRef } from "./shared";
 
 const displayName = (ref: CanonicalRef): string | undefined =>
@@ -38,8 +34,6 @@ export function deviceGroupCpeList(dg: DeviceGroupDisplay): string {
  * ### Acme InfusionPump (2.1.3)
  * - **CPE**: cpe:2.3:...
  * ```
- * Used by the chat/recommendations renderers and the VEX sorting agent so a
- * device group is described consistently wherever it appears.
  */
 export function deviceGroupToMarkdown(dg: DeviceGroupDisplay): string {
   const version = displayName(dg.version);
@@ -61,8 +55,7 @@ export interface DeviceIdentity {
  * Inline identifier line for a device identity (CPE + manufacturer + model +
  * version + versionRange), e.g.
  * "cpe=… | manufacturer=Acme | modelName=Pump | version=2.1 | versionRange=?".
- * Shared by the notification matching agent for the extracted device. Missing
- * fields render as "?".
+ * Missing fields render as "?".
  */
 export function deviceIdentityInline(fields: DeviceIdentity): string {
   const cpe = Array.isArray(fields.cpe)

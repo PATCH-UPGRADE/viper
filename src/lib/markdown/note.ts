@@ -1,8 +1,3 @@
-// Note → markdown target-label renderer. A note points at some in-scope entity
-// (asset, device-group matching, vulnerability, remediation) or is a persistent
-// hospital-wide note; this resolves that target to a human-readable label given
-// pre-built id → label lookups.
-
 export type NoteRow = {
   text: string;
   status: string;

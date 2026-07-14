@@ -1,6 +1,3 @@
-// Memory → markdown renderer. Used by the chat and recommendations graphs to
-// preload saved memories into the model context.
-
 export function generateMemoryMarkdown(
   memories: { id: string; content: string | null }[],
 ): string {

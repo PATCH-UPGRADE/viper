@@ -1,11 +1,10 @@
-// Barrel for the db-item → markdown renderers. Import everything from
-// "@/lib/markdown" so entity renderers and their shared primitives live behind a
-// single module boundary.
+// Barrel for the db-item → markdown renderers.
 
 export {
   type AssetForMarkdown,
   assetToMarkdown,
   parseLocation,
+  renderUtilization,
 } from "./asset";
 export {
   type DeviceIdentity,
@@ -26,14 +25,7 @@ export {
   type RemediationForMarkdown,
   remediationToMarkdown,
 } from "./remediation";
-export {
-  type CanonicalRef,
-  DAY_NAMES,
-  renderUtilization,
-  shortId,
-  truncate,
-  utilizationBucket,
-} from "./shared";
+export { type CanonicalRef, shortId, truncate } from "./shared";
 export {
   type VulnerabilityForMarkdown,
   vulnerabilityToMarkdown,

@@ -12,13 +12,12 @@ import { SystemMessage } from "@langchain/core/messages";
 import type { AssetWithIssueRelations } from "@/features/assets/types";
 import {
   ASSET_ROLE_INSTRUCTIONS,
-  assetToMarkdown,
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
   VULNERABILITY_ROLE_INSTRUCTIONS,
-  vulnerabilityToMarkdown,
 } from "@/features/chat/utils";
 import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
+import { assetToMarkdown, vulnerabilityToMarkdown } from "@/lib/markdown";
 import { loadRecommendationsContextMarkdown } from "../tools/get-recommendations-context";
 import { buildAgentGraph } from "./build-graph";
 import { buildChatTools } from "./tools";

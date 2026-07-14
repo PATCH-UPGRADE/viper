@@ -37,8 +37,8 @@ import {
   IssueStatus,
   type Vulnerability,
 } from "@/generated/prisma";
+import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
 import type { PaginatedResponse } from "@/lib/pagination";
-import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/string-utils";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
 import { getAssetRoleLabel } from "../utils";

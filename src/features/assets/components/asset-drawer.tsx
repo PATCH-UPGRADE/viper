@@ -38,7 +38,7 @@ import type {
   NetworkConnection,
 } from "@/features/network/types";
 import { RemediationCard } from "@/features/remediations/components/remediations";
-import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/string-utils";
+import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
 import { useTRPC } from "@/trpc/client";
 import {
   type AssetWithIssueRelations,

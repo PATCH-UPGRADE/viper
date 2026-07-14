@@ -30,7 +30,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArtifactsDrawerEntry } from "@/features/artifacts/components/artifacts";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { deviceGroupMatchingsSummary } from "@/lib/string-utils";
+import { deviceGroupMatchingsSummary } from "@/lib/markdown";
 import { formatFileSize } from "@/lib/utils";
 import {
   useRemoveRemediation,

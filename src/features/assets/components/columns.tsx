@@ -8,7 +8,7 @@ import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import { handleCopy } from "@/lib/copy";
-import { deviceGroupCpeList } from "@/lib/string-utils";
+import { deviceGroupCpeList } from "@/lib/markdown";
 import type { AssetResponse } from "../types";
 
 export const columns: ColumnDef<AssetResponse>[] = [

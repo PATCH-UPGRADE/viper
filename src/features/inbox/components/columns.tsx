@@ -12,7 +12,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Pill } from "@/components/ui/pill";
-import { deviceGroupMatchingLabel } from "@/lib/string-utils";
+import { deviceGroupMatchingLabel } from "@/lib/markdown";
 import type { NotificationWithRelations, RawEmailPayload } from "../types";
 import { NotificationTypeBadge } from "./notification-type-badge";
 

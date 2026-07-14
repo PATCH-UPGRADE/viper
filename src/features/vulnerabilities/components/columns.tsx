@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 
 import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
-import { deviceGroupMatchingsSummary } from "@/lib/string-utils";
+import { deviceGroupMatchingsSummary } from "@/lib/markdown";
 import type { VulnerabilityResponse } from "../types";
 
 export const columns: ColumnDef<VulnerabilityResponse>[] = [

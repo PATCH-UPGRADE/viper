@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
-import { deviceGroupLabel } from "@/lib/string-utils";
+import { deviceGroupLabel } from "@/lib/markdown";
 import type { AssetWithIssueRelations } from "../types";
 
 type AssetIssue = AssetWithIssueRelations["issues"][number];

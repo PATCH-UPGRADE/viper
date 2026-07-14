@@ -1,4 +1,4 @@
-FROM node:trixie
+FROM docker.io/node:trixie
 WORKDIR /srv
 RUN apt-get update && apt-get install -y openssl
 COPY package.json package-lock.json ./

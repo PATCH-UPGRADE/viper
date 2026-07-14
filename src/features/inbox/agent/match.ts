@@ -7,6 +7,7 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
 import type { ConfidenceLevel } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { deviceIdentityInline } from "@/lib/markdown";
 import { resolveMatchingId } from "@/lib/router-utils";
 import {
   addProductAlias,
@@ -122,7 +123,7 @@ function renderCandidates(candidates: Candidates): string {
       candidates.deviceGroups
         .map((entry, i) => {
           const e = entry.extracted;
-          const extractedLine = `Device group #${i + 1} extracted: cpe=${e.cpe ?? "?"} | manufacturer=${e.manufacturer ?? "?"} | modelName=${e.modelName ?? "?"} | version=${e.version ?? "?"} | versionRange=${e.versionRange ?? "?"}`;
+          const extractedLine = `Device group #${i + 1} extracted: ${deviceIdentityInline(e)}`;
           const matches =
             entry.matches.length > 0
               ? entry.matches

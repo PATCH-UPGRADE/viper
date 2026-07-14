@@ -17,6 +17,7 @@ services:
       - "5432:5432"
 
   viper:
+    image: ghcr.io/patch-upgrade/viper:latest # Use the image if it is pre-pulled (to avoid long build times on AWS)
     build:
       context: .
       dockerfile: docker/viper/Dockerfile
@@ -49,6 +50,7 @@ services:
       - viper
 
   prisma-studio:
+    image: ghcr.io/patch-upgrade/viper:latest # Use the image if it is pre-pulled (to avoid long build times on AWS)
     build: 
       context: .
       dockerfile: docker/viper/Dockerfile

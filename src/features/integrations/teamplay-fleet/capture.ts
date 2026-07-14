@@ -89,16 +89,3 @@ export async function grabSessionCookie(
   throw lastError;
 }
 
-export const FLEET_LOGIN_CONFIG: SessionLoginConfig = {
-  welcomeUrl: "https://fleet.siemens-healthineers.com/welcome",
-  cookieBannerAcceptSelector:
-    "#CybotCookiebotDialogBodyLevelButtonLevelOptinDeclineAll",
-  welcomeLoginButtonSelector: '[data-cy="btn-login"]',
-  userNameSelector: "#email",
-  continueSelector: "#next_link_container",
-  passwordSelector: "#password",
-  submitSelector: "#btn-login",
-  cookieOrigin: "https://fleet.siemens-healthineers.com",
-  authUrl:
-    "https://fleet.siemens-healthineers.com/rest/v1/security-advisories/active",
-};

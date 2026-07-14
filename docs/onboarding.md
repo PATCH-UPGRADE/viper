@@ -101,6 +101,16 @@ How do I log in?
 What's our production environment?
 - See, "What's our staging environment?". This is a research project.
 
+## Using ngrok
+
+If you're testing with Resend or n8n, you'll likely need to use ngrok (or a similar tool, like localtunnel).
+
+Install ngrok (homebrew should work on mac). Run `ngrok 3000` to tunnel/forward localhost:3000 to the public internet. This should give you a url.
+
+Run VIPER with `NEXT_PUBLIC_APP_URL="https://<YOUR_URL_HERE>.ngrok-free.dev" npm run dev:all`
+
+You should be able to view your app on the web at `https://<YOUR_URL_HERE>.ngrok-free.dev`.
+
 ## Additional Resources
 
 - [CLAUDE.md](/CLAUDE.md) - Additional project background, including code patterns

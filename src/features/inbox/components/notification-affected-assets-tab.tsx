@@ -13,6 +13,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -44,8 +49,10 @@ export function NotificationAffectedAssetsTab({
   deviceGroupsMatchings: NotificationDetailWithRelations["deviceGroupsMatchings"];
 }) {
   const withAssets = deviceGroupsMatchings.filter((m) => m.assetCount > 0);
+  const withoutAssets = deviceGroupsMatchings.filter((m) => m.assetCount === 0);
   const [rejecting, setRejecting] = useState<DeviceGroupMapping | null>(null);
   const [comment, setComment] = useState("");
+  const [showMissing, setShowMissing] = useState(false);
   const markMatchIncorrect = useMarkMatchIncorrect();
 
   const closeDialog = () => {
@@ -134,6 +141,37 @@ export function NotificationAffectedAssetsTab({
           </CardContent>
         </Card>
       ))}
+      {withoutAssets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">
+              This advisory applies to{" "}
+              <b>{withAssets.length} of your products</b>. The vendor bulletin
+              listed <b>{deviceGroupsMatchings.length}</b>.
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Collapsible open={showMissing} onOpenChange={setShowMissing}>
+              <CollapsibleTrigger
+                chevron
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                {showMissing ? "Hide" : "Show"} the {withoutAssets.length}{" "}
+                products not in your inventory
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <ol className="mt-2 space-y-1 pl-5 text-sm text-muted-foreground list-decimal">
+                  {withoutAssets.map((mapping) => (
+                    <li key={mapping.id}>
+                      {deviceGroupMatchingLabel(mapping.deviceGroupMatching)}
+                    </li>
+                  ))}
+                </ol>
+              </CollapsibleContent>
+            </Collapsible>
+          </CardContent>
+        </Card>
+      )}
       <Dialog
         open={!!rejecting}
         onOpenChange={(open) => !open && closeDialog()}

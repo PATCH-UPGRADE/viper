@@ -176,6 +176,7 @@ export const notificationsRouter = createTRPCRouter({
             return { ...m, assetCount: assets.length, assets };
           }),
       );
+      console.log("HEY", deviceGroupsMatchings)
       return { ...notification, deviceGroupsMatchings };
     }),
 

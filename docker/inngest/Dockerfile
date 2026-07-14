@@ -1,2 +1,2 @@
-FROM inngest/inngest:v1.17.2
+FROM docker.io/inngest/inngest:v1.17.2
 EXPOSE 8288

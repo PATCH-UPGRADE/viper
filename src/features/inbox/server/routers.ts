@@ -181,6 +181,7 @@ export const notificationsRouter = createTRPCRouter({
             return { ...m, assetCount: assets.length, assets };
           }),
       );
+      // TODO: Add a withAssetsCount, and withoutAssetsCount here. Use that in affected-assets-tab, overview-tab
       return { ...notification, deviceGroupsMatchings };
     }),
 

@@ -205,8 +205,9 @@ export function NotificationOverviewTab({
           </span>
         </CardHeader>
         <CardContent className="grid-cols-2 grid gap-4">
+          {/*TODO: Explore using a table layout for this instead...*/}
           {withAssets.map((m) => (
-            <Card className="gap-4">
+            <Card className="gap-4" key={m.id}>
               <CardHeader>
                 <span className="text-muted-foreground uppercase text-xs">
                   {displayName(m.deviceGroupMatching.vendor)}
@@ -224,11 +225,11 @@ export function NotificationOverviewTab({
               <CardFooter className="border-t pt-2!">
                 <dl className="flex gap-4 text-sm">
                   <div className="flex flex-row-reverse gap-1">
-                    <dt>assets affected</dt>
+                    <dt>assets affected {/*TODO: plural*/}</dt>
                     <dd className="font-bold">{m.assetCount}</dd>
                   </div>
                   <div className="flex flex-row-reverse gap-1">
-                    <dt>vuln TODO</dt>
+                    <dt>vuln{/*TODO: Issues here...*/}</dt>
                     <dd className="font-bold">1</dd>
                   </div>
                 </dl>

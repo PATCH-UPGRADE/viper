@@ -3,6 +3,7 @@
 import { format } from "date-fns";
 import { ExternalLinkIcon, HeartIcon, MailIcon } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
+import { TlpBadge } from "@/components/tlp-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -12,7 +13,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
-import { TlpBadge } from "@/features/advisories/components/advisories";
 import type {
   NotificationDetailSource,
   NotificationDetailWithRelations,

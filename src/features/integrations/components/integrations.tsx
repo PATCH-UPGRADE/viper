@@ -167,7 +167,8 @@ export const IntegrationCreateModal = ({
       badge: "e.g., Siemens Fleet",
       icon: null,
     },
-    ...(resourceType === "Vulnerability"
+    /* TODO: Consider using a CSAF type for notification integrations?
+     * ...(resourceType === "Vulnerability"
       ? [
           {
             value: IntegrationType.CSAF,
@@ -178,7 +179,7 @@ export const IntegrationCreateModal = ({
             icon: null,
           },
         ]
-      : []),
+      : []),*/
   ];
 
   return (

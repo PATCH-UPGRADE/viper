@@ -1,3 +1,4 @@
+import type { HospitalImpact } from "@/features/inbox/types";
 import {
   type AssetStatus,
   ConfidenceLevel,
@@ -141,7 +142,7 @@ type NotificationSeed = {
   type: NotificationType;
   priority: Priority;
   tlp: Tlp | null;
-  hospitalImpact: string;
+  hospitalImpact: HospitalImpact;
   priorityReasonWhy: string;
   deviceGroupIndices: number[];
   sources: Array<{
@@ -158,8 +159,14 @@ const NOTIFICATIONS: NotificationSeed[] = [
     type: NotificationType.Advisory,
     priority: Priority.Critical,
     tlp: Tlp.AMBER,
-    hospitalImpact:
-      "Affects 8 ICU patient monitors. Alarm suppression or threshold manipulation could delay nurse response to life-threatening events.",
+    hospitalImpact: {
+      byline:
+        "Alarm tampering on 8 ICU patient monitors could delay nurse response to life-threatening events.",
+      impactStatement:
+        "Affects 8 ICU patient monitors. Alarm suppression or threshold manipulation could delay nurse response to life-threatening events.",
+      careAreas: "ICU — Patient Monitoring",
+      likelihood: "Unauthenticated network access · hard-coded credentials",
+    },
     priorityReasonWhy:
       "Network-accessible, no authentication required, directly impacts life-safety alarms in ICU. Immediate containment recommended.",
     deviceGroupIndices: [0],
@@ -182,8 +189,14 @@ const NOTIFICATIONS: NotificationSeed[] = [
     type: NotificationType.Recall,
     priority: Priority.Critical,
     tlp: Tlp.GREEN,
-    hospitalImpact:
-      "14 infusion pumps in pharmacy and patient floors. Unexpected device resets during active infusion could interrupt vasoactive drips or antibiotic delivery.",
+    hospitalImpact: {
+      byline:
+        "Device resets on 14 infusion pumps could interrupt critical IV medication delivery.",
+      impactStatement:
+        "14 infusion pumps in pharmacy and patient floors. Unexpected device resets during active infusion could interrupt vasoactive drips or antibiotic delivery.",
+      careAreas: "Pharmacy, Patient Floors — Infusion Pumps",
+      likelihood: "FDA Class II recall · documented field failures",
+    },
     priorityReasonWhy:
       "FDA Class II recall with documented field failures. Direct patient safety impact. Firmware update required before continued clinical use.",
     deviceGroupIndices: [1],
@@ -201,8 +214,14 @@ const NOTIFICATIONS: NotificationSeed[] = [
     type: NotificationType.UpdateAvailable,
     priority: Priority.High,
     tlp: Tlp.GREEN,
-    hospitalImpact:
-      "6 medication dispensing cabinets across nursing stations. Path traversal could allow authorized users to access configuration files outside their permission scope.",
+    hospitalImpact: {
+      byline:
+        "Path traversal on 6 medication dispensing cabinets could expose configuration outside permission scope.",
+      impactStatement:
+        "6 medication dispensing cabinets across nursing stations. Path traversal could allow authorized users to access configuration files outside their permission scope.",
+      careAreas: "Nursing Stations — Medication Dispensing",
+      likelihood: "Authenticated access required · no active exploitation",
+    },
     priorityReasonWhy:
       "Not actively exploited, but the audit log improvement is important for DEA compliance. Schedule update in next maintenance window.",
     deviceGroupIndices: [2],
@@ -221,8 +240,14 @@ const NOTIFICATIONS: NotificationSeed[] = [
     type: NotificationType.Advisory,
     priority: Priority.High,
     tlp: Tlp.AMBER,
-    hospitalImpact:
-      "4 anesthesia workstations in OR suites. Exposure limited to OR network segment — clinical staff with network access could query case parameters without authentication.",
+    hospitalImpact: {
+      byline:
+        "An exposed service port on 4 OR anesthesia workstations could leak case parameters.",
+      impactStatement:
+        "4 anesthesia workstations in OR suites. Exposure limited to OR network segment — clinical staff with network access could query case parameters without authentication.",
+      careAreas: "Operating Rooms — Anesthesia Workstations",
+      likelihood: "Unauthenticated read on OR segment · vendor patch pending",
+    },
     priorityReasonWhy:
       "Not remotely exploitable from outside OR segment. Draeger patch pending (Q2 2025). Recommend network segmentation of OR VLAN as interim mitigation.",
     deviceGroupIndices: [3],
@@ -246,8 +271,14 @@ const NOTIFICATIONS: NotificationSeed[] = [
     type: NotificationType.Advisory,
     priority: Priority.Monitor,
     tlp: null,
-    hospitalImpact:
-      "Affects waveform data confidentiality for all monitored patients. Not life-safety, but represents a HIPAA compliance gap if not addressed.",
+    hospitalImpact: {
+      byline:
+        "Expiring TLS certificates could expose patient waveform data on the network.",
+      impactStatement:
+        "Affects waveform data confidentiality for all monitored patients. Not life-safety, but represents a HIPAA compliance gap if not addressed.",
+      careAreas: "ICU — Patient Monitoring / Central Station",
+      likelihood: "Confidentiality risk on expiry · 30-day lead time",
+    },
     priorityReasonWhy:
       "Certificate renewal is routine maintenance. 30 days is sufficient lead time. Monitor to ensure renewal is completed.",
     deviceGroupIndices: [0],
@@ -266,8 +297,14 @@ const NOTIFICATIONS: NotificationSeed[] = [
     type: NotificationType.Other,
     priority: Priority.Monitor,
     tlp: Tlp.WHITE,
-    hospitalImpact:
-      "14 affected pumps will become unsupported. Post-EOS vulnerabilities will not be patched by vendor. Include in capital equipment budget cycle.",
+    hospitalImpact: {
+      byline:
+        "14 infusion pumps lose vendor security support after December 2025.",
+      impactStatement:
+        "14 affected pumps will become unsupported. Post-EOS vulnerabilities will not be patched by vendor. Include in capital equipment budget cycle.",
+      careAreas: "Pharmacy, Patient Floors — Infusion Pumps",
+      likelihood: "No active exploit · end-of-support planning item",
+    },
     priorityReasonWhy:
       "Not immediately actionable — 12+ months until EOS. Flag for capital planning and biomedical engineering roadmap.",
     deviceGroupIndices: [1],
@@ -286,8 +323,14 @@ const NOTIFICATIONS: NotificationSeed[] = [
     type: NotificationType.Other,
     priority: Priority.Defer,
     tlp: null,
-    hospitalImpact:
-      "No immediate clinical or security impact. Compliance housekeeping. Failure to archive could result in audit findings during DEA or Joint Commission inspection.",
+    hospitalImpact: {
+      byline:
+        "Routine controlled-substance audit-log archival to stay compliant.",
+      impactStatement:
+        "No immediate clinical or security impact. Compliance housekeeping. Failure to archive could result in audit findings during DEA or Joint Commission inspection.",
+      careAreas: "Pharmacy — Medication Dispensing",
+      likelihood: "No vulnerability · compliance housekeeping",
+    },
     priorityReasonWhy:
       "Routine compliance task. No vulnerability. Defer to pharmacy informatics team.",
     deviceGroupIndices: [2],
@@ -306,8 +349,14 @@ const NOTIFICATIONS: NotificationSeed[] = [
     type: NotificationType.UpdateAvailable,
     priority: Priority.Defer,
     tlp: Tlp.WHITE,
-    hospitalImpact:
-      "No security impact. OR scheduling team should evaluate interoperability improvements before next planned OR downtime.",
+    hospitalImpact: {
+      byline:
+        "Non-security OR integration update for evaluation before deployment.",
+      impactStatement:
+        "No security impact. OR scheduling team should evaluate interoperability improvements before next planned OR downtime.",
+      careAreas: "Operating Rooms — Anesthesia Workstations",
+      likelihood: "No security impact · interoperability update",
+    },
     priorityReasonWhy:
       "Non-security update. No urgency. Defer to OR systems team for evaluation during next scheduled maintenance window.",
     deviceGroupIndices: [3],
@@ -325,7 +374,12 @@ const NOTIFICATIONS: NotificationSeed[] = [
     type: NotificationType.Other,
     priority: Priority.Unsorted,
     tlp: null,
-    hospitalImpact: "Unknown. Flagged for security team review.",
+    hospitalImpact: {
+      byline: "Suspected phishing email flagged for security-team review.",
+      impactStatement: "Unknown. Flagged for security team review.",
+      careAreas: "",
+      likelihood: "Unverified sender · possible phishing",
+    },
     priorityReasonWhy:
       "Cannot assess priority until email content is reviewed and sender verified. Marked Unsorted pending triage.",
     deviceGroupIndices: [],
@@ -345,8 +399,14 @@ const NOTIFICATIONS: NotificationSeed[] = [
     type: NotificationType.Advisory,
     priority: Priority.Unsorted,
     tlp: Tlp.GREEN,
-    hospitalImpact:
-      "Potential impact scope unclear — awaiting vendor confirmation from Philips, GE, BD, and Draeger. No confirmed exploitation in medical device context.",
+    hospitalImpact: {
+      byline:
+        "An OpenSSL flaw may affect medical-device middleware across four vendors — impact unconfirmed.",
+      impactStatement:
+        "Potential impact scope unclear — awaiting vendor confirmation from Philips, GE, BD, and Draeger. No confirmed exploitation in medical device context.",
+      careAreas: "ICU, Pharmacy, Nursing Stations, Operating Rooms",
+      likelihood: "Vendor impact unconfirmed · no medical-device exploitation",
+    },
     priorityReasonWhy:
       "Vendor impact not yet confirmed. Priority set to Unsorted until vendor advisories are received and device inventory cross-referenced.",
     deviceGroupIndices: [0, 1, 2, 3],
@@ -503,8 +563,14 @@ async function seedSyngoPlazaVexScenario(userId: string) {
       type: NotificationType.Advisory,
       priority: Priority.High,
       tlp: Tlp.WHITE,
-      hospitalImpact:
-        "Affects 2 syngo.plaza PACS workstations running pre-hotfix VB30E. If exploited, an attacker with access to stored credential material could recover passwords and gain unauthorized access to the PACS system.",
+      hospitalImpact: {
+        byline:
+          "Recoverable stored passwords on 2 PACS workstations could grant unauthorized access.",
+        impactStatement:
+          "Affects 2 syngo.plaza PACS workstations running pre-hotfix VB30E. If exploited, an attacker with access to stored credential material could recover passwords and gain unauthorized access to the PACS system.",
+        careAreas: "Radiology — PACS Workstations",
+        likelihood: "Requires access to stored credentials · hot fix available",
+      },
       priorityReasonWhy:
         "No known active exploitation and requires access to stored credential material, but affects PACS authentication broadly. Siemens has published hot fix HF07 — schedule during the next maintenance window.",
     },

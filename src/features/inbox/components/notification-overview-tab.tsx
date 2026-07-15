@@ -1,11 +1,21 @@
 "use client";
 
 import { format } from "date-fns";
-import { ExternalLinkIcon, HeartIcon, MailIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ExternalLinkIcon,
+  HeartIcon,
+  MailIcon,
+} from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 import { TlpBadge } from "@/components/tlp-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -13,10 +23,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
-import type {
-  NotificationDetailSource,
-  NotificationDetailWithRelations,
-  RawEmailPayload,
+import {
+  hospitalImpactSchema,
+  type NotificationDetailSource,
+  type NotificationDetailWithRelations,
+  type RawEmailPayload,
 } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -128,6 +139,16 @@ export function NotificationOverviewTab({
   notification: NotificationDetailWithRelations;
   firstReceived: Date;
 }) {
+  // hospitalImpact is jsonb (default {}). Parse it; treat a failed parse or an
+  // empty object as "not triaged yet" and hide the card (note: {} is truthy).
+  const impactParse = hospitalImpactSchema.safeParse(
+    notification.hospitalImpact,
+  );
+  const impact = impactParse.success ? impactParse.data : null;
+  const hasImpact =
+    impact !== null &&
+    (impact.byline.trim() !== "" || impact.impactStatement.trim() !== "");
+
   const detailRows: { label: string; content: ReactNode }[] = [
     {
       label: "TLP",
@@ -155,19 +176,41 @@ export function NotificationOverviewTab({
   return (
     <>
       {/* Hospital Impact */}
-      {notification.hospitalImpact && (
+      {hasImpact && impact && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <Collapsible defaultOpen>
+            <CollapsibleTrigger className="group flex w-full items-center gap-2 px-6 text-left">
+              <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=closed]:-rotate-90" />
               <HeartIcon className="size-4" />
-              Hospital Impact
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-relaxed">
-              {notification.hospitalImpact}
-            </p>
-          </CardContent>
+              <span className="font-semibold">Hospital Impact</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-6 pt-4">
+              <div className="flex flex-col gap-4">
+                {impact.byline && (
+                  <p className="font-semibold leading-snug">{impact.byline}</p>
+                )}
+                {impact.impactStatement && (
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {impact.impactStatement}
+                  </p>
+                )}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Care Areas
+                    </p>
+                    <p className="mt-1 text-sm">{impact.careAreas || "—"}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Likelihood
+                    </p>
+                    <p className="mt-1 text-sm">{impact.likelihood || "—"}</p>
+                  </div>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </Card>
       )}
 

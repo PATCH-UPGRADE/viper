@@ -30,3 +30,4 @@ export {
   type VulnerabilityForMarkdown,
   vulnerabilityToMarkdown,
 } from "./vulnerability";
+export { generateWorkflowsMarkdown, workflowClinicalSummary } from "./workflow";

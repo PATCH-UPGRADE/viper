@@ -1,34 +1,34 @@
-// Assigns priority, priorityReasonWhy, and hospitalImpact to a Notification
-
-// TODO: This is where we want our CDST to run here
-// Currently this is just haiku + prompt, we want something more sophisiticated
-// to be coming up with these values
+// Assigns priority, priorityReasonWhy, and a structured hospitalImpact to a
+// Notification. Unlike the earlier version, the agent is given the resolved
+// hospital reality around the notification (linked vulns + VEX verdicts,
+// device groups → assets, the clinical workflows those assets sit in, device
+// utilization, and notes) via gatherTriageContext, so its impact assessment is
+// grounded in real data rather than the email text alone.
 
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage } from "@langchain/core/messages";
 import { z } from "zod";
 import prisma from "@/lib/db";
+import { hospitalImpactSchema } from "../types";
 import { fetchPdfAttachments } from "../utils";
+import { gatherTriageContext } from "./triage-context";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
-// Flat schema required: Anthropic's tool input_schema must have a top-level "type": "object"
+// Flat top-level object required by Anthropic tool input_schema; the nested
+// hospitalImpact object is fine (it is not a union/discriminatedUnion).
 const triageSchema = z.object({
   priority: z.enum(["Critical", "High", "Monitor", "Defer"]),
   priorityReasonWhy: z
     .string()
     .describe("1-2 sentences explaining why this priority was assigned"),
-  hospitalImpact: z
-    .string()
-    .describe(
-      "3-5 sentence paragraph describing the clinical and operational impact to the hospital, in simple terms",
-    ),
+  hospitalImpact: hospitalImpactSchema,
 });
 
 export type TriageResult = z.infer<typeof triageSchema>;
 
-const SYSTEM_PROMPT = `You are a triage agent for a hospital cybersecurity platform. Given a security notification and its context, your job is to assign a priority tier, explain why, and describe the clinical and operational impact on the hospital.
+const SYSTEM_PROMPT = `You are a triage agent for a hospital cybersecurity platform. Given a security notification and the resolved hospital context, assign a priority tier, explain why, and describe the clinical and operational impact on the hospital.
 
 PRIORITY TIERS:
 - Critical: Immediate patient safety risk or active exploitation in the wild. Requires same-day action.
@@ -36,18 +36,25 @@ PRIORITY TIERS:
 - Monitor: Notable issue but low immediate risk; no active exploitation known. Track and plan remediation in the next maintenance cycle.
 - Defer: Informational or low-severity. No current risk; review at a scheduled interval.
 
+HOSPITAL IMPACT — return a JSON object with exactly these fields:
+- byline: One bold headline sentence naming what could happen and to which devices/areas. Concrete and specific (e.g. "Alarm tampering on 8 ICU patient monitors could delay response to life-threatening events").
+- impactStatement: 2-4 sentences describing the clinical and operational impact in plain terms — what systems/workflows are affected, the patient-safety risk, and the operational disruption of remediating.
+- careAreas: A short string naming the affected clinical areas and device types. You MUST phrase this ONLY from the "Care areas" section of the provided context (its locations, roles, and device types). If no care areas are provided, return an empty string. Do NOT invent department or ward names.
+- likelihood: A short free-text descriptor of exploitation likelihood, grounded in the actual evidence — CVSS score/vector, EPSS, CISA KEV status, exploit availability, and the VEX determinations in the context (e.g. "Unauthenticated network RCE · PoC exploit code exists"). Never invent numbers.
+
 RULES:
-- You MUST pick exactly one tier — never leave priority ambiguous.
-- Base your decision on the notification type (Advisory/Recall/UpdateAvailable/Other), the affected device groups, and any CVSS scores, active exploitation indicators, or patient-safety language in the content.
-- If known device groups are listed, factor in whether they support clinical functions (life support, medication delivery, diagnostics) — those elevate priority.
-- priorityReasonWhy: 1-2 sentences. Cite the most important factor (e.g. CVSS score, active exploitation, device type).
-- hospitalImpact: 3-5 sentences. Describe which hospital systems or clinical workflows are affected, what patient-safety risk exists, and what operational disruption remediation would cause.`;
+- You MUST pick exactly one priority tier — never leave it ambiguous.
+- Base every field on the notification content and the provided hospital context. Never invent device counts, CVSS/EPSS numbers, care areas, or exploitation facts — use only what the context states.
+- Factor VEX determinations into impact and priority: assets marked NOT_AFFECTED reduce the real exposure; AFFECTED / UNDER_INVESTIGATION raise it.
+- If known device groups support clinical functions (life support, medication delivery, diagnostics), that elevates priority.
+- priorityReasonWhy: 1-2 sentences. Cite the most important factor (e.g. CVSS score, active exploitation, device type, VEX result).`;
 
 function buildTextPrompt(input: {
   notificationType: string;
   notificationTitle: string | null;
   notificationSummary: string | null;
   markdown: string | null;
+  contextMarkdown: string;
 }): string {
   return `--- NOTIFICATION ---
 Type: ${input.notificationType}
@@ -55,14 +62,17 @@ Title: ${input.notificationTitle ?? "(untitled)"}
 Summary: ${input.notificationSummary ?? "(none)"}
 
 --- FULL NOTIFICATION BODY ---
-${input.markdown ?? "(no body)"}`;
+${input.markdown ?? "(no body)"}
+
+--- RESOLVED HOSPITAL CONTEXT ---
+${input.contextMarkdown}`;
 }
 
 export async function triageNotification(
   sourceId: string,
   notificationId: string,
 ): Promise<TriageResult> {
-  const [source, notification, pdfAttachments] = await Promise.all([
+  const [source, notification, pdfAttachments, context] = await Promise.all([
     prisma.notificationSource.findUnique({
       where: { id: sourceId },
       select: { markdown: true },
@@ -72,11 +82,12 @@ export async function triageNotification(
       select: { type: true, title: true, summary: true },
     }),
     fetchPdfAttachments(sourceId),
+    gatherTriageContext(notificationId),
   ]);
 
   const model = new ChatAnthropic({
     model: MODEL,
-    maxTokens: 1024,
+    maxTokens: 2048,
   }).withStructuredOutput(triageSchema);
 
   const textPrompt = buildTextPrompt({
@@ -84,6 +95,7 @@ export async function triageNotification(
     notificationTitle: notification?.title ?? null,
     notificationSummary: notification?.summary ?? null,
     markdown: source?.markdown ?? null,
+    contextMarkdown: context.markdown,
   });
 
   const userContent = [

@@ -2,13 +2,13 @@ import {
   type NetworkTopology,
   networkTopologySchema,
 } from "@/features/network/types";
-import { serializeWorkflow } from "@/features/workflows/utils";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   assetToMarkdown,
   deviceGroupLabel,
   generateMemoryMarkdown,
+  generateWorkflowsMarkdown,
   remediationToMarkdown,
   renderUtilization,
   shortId,
@@ -71,28 +71,11 @@ function generateVulnAssetRemMap(
 
 // ─── Workflow markdown ────────────────────────────────────────────────────────
 
+// generateWorkflowsMarkdown now lives in @/lib/markdown/workflow (shared with
+// the inbox triage agent). The type below is still used by generateContextMarkdown.
 type WorkflowWithRelations = Prisma.WorkflowGetPayload<{
   include: { nodes: true; connections: true };
 }>;
-
-function generateWorkflowsMarkdown(workflows: WorkflowWithRelations[]): string {
-  if (workflows.length === 0) return "_No clinical workflows defined._";
-
-  return workflows
-    .map((wf) => {
-      const serialized = serializeWorkflow(wf);
-      const { edges: _edges, ...withoutEdges } = serialized;
-      const lines = [`### ${serialized.name} (${shortId(serialized.id)})`];
-      if (serialized.description) {
-        lines.push(`\n${serialized.description}`);
-      }
-      lines.push(
-        `\n\`\`\`json\n${JSON.stringify(withoutEdges, null, 2)}\n\`\`\``,
-      );
-      return lines.join("\n");
-    })
-    .join("\n\n");
-}
 
 // ─── Network flow ─────────────────────────────────────────────────────────────
 

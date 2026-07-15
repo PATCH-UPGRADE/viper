@@ -217,7 +217,7 @@ export const assetsRouter = createTRPCRouter({
       function activeBySeverity(asset: AssetRow, severity: Severity): number {
         return asset.issues.filter(
           (i) =>
-            i.status === IssueStatus.ACTIVE &&
+            i.status === IssueStatus.AFFECTED &&
             i.vulnerability.severity === severity,
         ).length;
       }
@@ -227,7 +227,7 @@ export const assetsRouter = createTRPCRouter({
         let total = 0;
         for (const issue of asset.issues) {
           if (
-            issue.status === IssueStatus.ACTIVE &&
+            issue.status === IssueStatus.AFFECTED &&
             !seen.has(issue.vulnerabilityId)
           ) {
             seen.add(issue.vulnerabilityId);
@@ -283,7 +283,7 @@ export const assetsRouter = createTRPCRouter({
           severities.map((s) =>
             prisma.issue.count({
               where: {
-                status: IssueStatus.ACTIVE,
+                status: IssueStatus.AFFECTED,
                 vulnerability: { severity: s },
               },
             }),
@@ -293,7 +293,7 @@ export const assetsRouter = createTRPCRouter({
           severities.map((s) =>
             prisma.issue.count({
               where: {
-                status: IssueStatus.ACTIVE,
+                status: IssueStatus.AFFECTED,
                 vulnerability: { severity: s, remediations: { some: {} } },
               },
             }),
@@ -303,7 +303,7 @@ export const assetsRouter = createTRPCRouter({
           severities.map((s) =>
             prisma.issue.count({
               where: {
-                status: IssueStatus.REMEDIATED,
+                status: IssueStatus.FIXED,
                 vulnerability: { severity: s },
               },
             }),
@@ -552,7 +552,7 @@ export const assetsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const where = {
         createdAt: { gte: input.createdAfter },
-        issues: { some: { status: IssueStatus.ACTIVE } },
+        issues: { some: { status: IssueStatus.AFFECTED } },
       };
       const [totalCount, items] = await Promise.all([
         prisma.asset.count({ where }),

@@ -2,11 +2,11 @@ import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { SystemMessage } from "@langchain/core/messages";
 import {
-  generateMemoryMarkdown,
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
 } from "@/features/chat/utils";
 import prisma from "@/lib/db";
+import { generateMemoryMarkdown } from "@/lib/markdown";
 import { buildAgentGraph } from "./build-graph";
 import { buildChatTools } from "./tools";
 

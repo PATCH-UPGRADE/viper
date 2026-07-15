@@ -35,7 +35,6 @@ export const ticketBaseInclude = {
       issues: true,
       vulnerabilities: true,
       remediations: true,
-      advisories: true,
       assets: true,
     },
   },
@@ -151,7 +150,6 @@ export const ticketDetailInclude = {
       },
     },
   },
-  advisories: { select: { id: true, title: true, severity: true } },
   comments: {
     include: {
       author: {
@@ -197,7 +195,6 @@ export const workOrderListInclude = {
   vulnerabilities: {
     select: { id: true, cveId: true, severity: true, cvssScore: true },
   },
-  advisories: { select: { id: true, title: true, severity: true } },
   remediations: { select: { id: true, description: true } },
   // Replaced at the procedure level with a where: { userId } filter.
   watchers: { select: { userId: true } },
@@ -277,12 +274,6 @@ const linkedVulnerabilitySchema = z.object({
   cvssScore: z.number().nullable(),
 });
 
-const linkedAdvisorySchema = z.object({
-  id: z.string(),
-  title: z.string().nullable(),
-  severity: z.enum(Severity),
-});
-
 const linkedRemediationSchema = z.object({
   id: z.string(),
   description: z.string().nullable(),
@@ -304,7 +295,6 @@ export const workOrderListItemSchema = z.object({
   assignee: assigneeItemSchema.nullable(),
   assets: z.array(linkedAssetSchema),
   vulnerabilities: z.array(linkedVulnerabilitySchema),
-  advisories: z.array(linkedAdvisorySchema),
   remediations: z.array(linkedRemediationSchema),
   isWatching: z.boolean(),
 });
@@ -383,7 +373,7 @@ const detailLinkedRemediationSchema = z.object({
 const ticketIssueSchema = z.object({
   id: z.string(),
   status: z.enum(IssueStatus),
-  assetId: z.string(),
+  assetId: z.string().nullable(),
   vulnerabilityId: z.string(),
 });
 
@@ -441,7 +431,6 @@ export const workOrderDetailResponseSchema = z.object({
   children: z.array(ticketChildRefSchema),
   assets: z.array(detailLinkedAssetSchema),
   vulnerabilities: z.array(linkedVulnerabilitySchema),
-  advisories: z.array(linkedAdvisorySchema),
   remediations: z.array(detailLinkedRemediationSchema),
   issues: z.array(ticketIssueSchema),
   comments: z.array(ticketCommentResponseSchema),

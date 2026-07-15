@@ -37,8 +37,8 @@ import {
   IssueStatus,
   type Vulnerability,
 } from "@/generated/prisma";
+import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
 import type { PaginatedResponse } from "@/lib/pagination";
-import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/string-utils";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
 import { getAssetRoleLabel } from "../utils";
@@ -158,9 +158,10 @@ const VulnList = ({
 };
 
 const issueStatusNames = {
-  [IssueStatus.ACTIVE]: "Active",
-  [IssueStatus.FALSE_POSITIVE]: "False Positive",
-  [IssueStatus.REMEDIATED]: "Remediated",
+  [IssueStatus.NOT_AFFECTED]: "Not Affected",
+  [IssueStatus.AFFECTED]: "Active",
+  [IssueStatus.FIXED]: "Remediated",
+  [IssueStatus.UNDER_INVESTIGATION]: "Under Investigation",
 };
 
 interface TabulatedVulnListProps {
@@ -204,23 +205,29 @@ const TabulatedVulnList = ({ assetId }: TabulatedVulnListProps) => {
     return 1;
   };
 
+  const naResult = useSuspenseIssuesByAssetId({
+    assetId,
+    issueStatus: IssueStatus.NOT_AFFECTED,
+  });
   const aResult = useSuspenseIssuesByAssetId({
     assetId,
-    issueStatus: IssueStatus.ACTIVE,
-  });
-  const fpResult = useSuspenseIssuesByAssetId({
-    assetId,
-    issueStatus: IssueStatus.FALSE_POSITIVE,
+    issueStatus: IssueStatus.AFFECTED,
   });
   const rResult = useSuspenseIssuesByAssetId({
     assetId,
-    issueStatus: IssueStatus.REMEDIATED,
+    issueStatus: IssueStatus.FIXED,
+  });
+  const uiResult = useSuspenseIssuesByAssetId({
+    assetId,
+    issueStatus: IssueStatus.UNDER_INVESTIGATION,
   });
 
+  // Order must match Object.values(IssueStatus) (NOT_AFFECTED, AFFECTED,
+  // FIXED, UNDER_INVESTIGATION) since results are indexed positionally below.
   const results: PaginatedResponse<{ vulnerability: Vulnerability } & Issue>[] =
     [];
   let showTabs = false;
-  for (const res of [aResult, fpResult, rResult]) {
+  for (const res of [naResult, aResult, rResult, uiResult]) {
     results.push(res.data);
     if (res.data.totalCount > 0) {
       showTabs = true;

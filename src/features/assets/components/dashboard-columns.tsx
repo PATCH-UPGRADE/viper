@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/tooltip";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
-import { deviceGroupLabel } from "@/lib/string-utils";
+import { deviceGroupLabel } from "@/lib/markdown";
 import type { AssetWithIssueRelations } from "../types";
 
 type AssetIssue = AssetWithIssueRelations["issues"][number];
@@ -26,12 +26,13 @@ function countActiveBySeverity(
 ): number {
   return issues.filter(
     (i) =>
-      i.status === IssueStatus.ACTIVE && i.vulnerability.severity === severity,
+      i.status === IssueStatus.AFFECTED &&
+      i.vulnerability.severity === severity,
   ).length;
 }
 
 function totalActiveIssues(issues: AssetIssue[]): number {
-  return issues.filter((i) => i.status === IssueStatus.ACTIVE).length;
+  return issues.filter((i) => i.status === IssueStatus.AFFECTED).length;
 }
 
 const SEVERITY_COL_COUNT = 4;
@@ -85,7 +86,7 @@ function createSeverityColumn(
 function countUniqueRemediations(issues: AssetIssue[]): number {
   const ids = new Set<string>();
   for (const issue of issues) {
-    if (issue.status === IssueStatus.ACTIVE) {
+    if (issue.status === IssueStatus.AFFECTED) {
       ids.add(issue.vulnerabilityId);
     }
   }

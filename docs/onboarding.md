@@ -41,6 +41,7 @@
 ### Misc 
 - [n8n](https://docs.n8n.io/) - Additional backend, AI automation workflows. Accessed with webhooks.
 - Code Rabbit - Automatic code reviews. It's free for us, we found it helpful especially initially with a smaller team.
+- [Resend](https://resend.com/emails) - Email management
 
 ## Tests
 
@@ -51,7 +52,7 @@ See [Next.js Guide to Testing](https://nextjs.org/docs/app/guides/testing).
 Ideally, we have:
 - component tests focused on regression testings (i.e, does this internal api endpoint still return data in the correct format?)
 - comprehensive end to end and unit tests for API endpoints, with a specific focus on our external API endpoints
-- Playwright tests for the most common user tasks (i.e, logging in and viewing assets)
+- (later) Playwright tests for the most common user tasks (i.e, logging in and viewing assets)
 
 Existing Vitest tests are in `__tests__` directories, i.e `src/app/api/v1/__tests__/assets.test.ts`. Component level tests go with their components.
 
@@ -83,8 +84,32 @@ Currently API endpoints that need auth (pretty much all of them, except sign up)
 - If there is no Jira ticket, and you really don't think there should be one, use `[VW-0]`, ex `[VW-0] chore: fixed typo`
 - PR's must receive a human approval, although anyone can approve. You should request a review from someone relevant
     - We found Code Rabbit's automated PR's a helpful additional resource
+    - Post a link to your PR and tag reviewers in #vmp-dev channel. After approval, you must merge in yourself
 - Should be able to test PR yourself in Vercel deployment
-- Must past GitHub Actions pipeline (code builds and deploys successfully, is linted/formatted, tests pass, etc) 
+- Must pass GitHub Actions pipeline (code builds and deploys successfully, is linted/formatted, tests pass, etc)
+    - Run these first before you open a PR:
+        - `npm run lint` - lint. Can use `npm run format` to format, `npx biome check --write --unsafe` to auto-fix linter errors if you verify it's safe
+        - `npx tsc` - compile, type checks
+        - `npm run db:create-test-api-key` and `API_KEY=${api_key_from_last_test} npm run tests`- run vitest
+
+What's our staging environment?
+- [viper-xi.vercel.app](https://viper-xi.vercel.app/)
+
+How do I log in?
+- Can either use email/password, or use "Continue with GitHub" if the email associated with your gh is linked to a whitelisted domain (e.g, @bugcrowd.com)
+
+What's our production environment?
+- See, "What's our staging environment?". This is a research project.
+
+## Using ngrok
+
+If you're testing with Resend or n8n, you'll likely need to use ngrok (or a similar tool, like localtunnel).
+
+Install ngrok (homebrew should work on mac). Run `ngrok 3000` to tunnel/forward localhost:3000 to the public internet. This should give you a url.
+
+Run VIPER with `NEXT_PUBLIC_APP_URL="https://<YOUR_URL_HERE>.ngrok-free.dev" npm run dev:all`
+
+You should be able to view your app on the web at `https://<YOUR_URL_HERE>.ngrok-free.dev`.
 
 ## Additional Resources
 

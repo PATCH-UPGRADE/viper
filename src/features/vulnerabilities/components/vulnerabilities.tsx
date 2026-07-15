@@ -43,7 +43,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Priority } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
-import { deviceGroupMatchingsSummary } from "@/lib/string-utils";
+import { deviceGroupMatchingsSummary } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import {
   useRemoveVulnerability,

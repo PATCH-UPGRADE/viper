@@ -1,4 +1,4 @@
-FROM node:trixie as builder
+FROM docker.io/node:trixie as builder
 WORKDIR /srv
 RUN apt-get update && apt-get install -y openssl
 COPY . .
@@ -7,7 +7,7 @@ RUN npx prisma generate
 RUN npm run build
 
 
-FROM node:trixie-slim
+FROM docker.io/node:trixie-slim
 WORKDIR /srv
 RUN apt-get update && apt-get install -y openssl && mkdir -p /srv/stamps && chown -R node:node /srv 
 COPY --from=builder --chown=node:node /srv/ .

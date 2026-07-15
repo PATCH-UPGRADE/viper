@@ -1,4 +1,3 @@
-import { assetUtilizationSchema } from "@/features/assets/types";
 import {
   type NetworkTopology,
   networkTopologySchema,
@@ -7,21 +6,19 @@ import { listFleetManagedAssets } from "@/features/tracking/server/fleet-client"
 import { serializeWorkflow } from "@/features/workflows/utils";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { deviceGroupLabel } from "@/lib/string-utils";
 import {
   assetToMarkdown,
+  deviceGroupLabel,
   generateMemoryMarkdown,
   remediationToMarkdown,
+  renderUtilization,
+  shortId,
   vulnerabilityToMarkdown,
-} from "../../utils";
+} from "@/lib/markdown";
 
 const NETWORK_FLOW_URL = process.env.NETWORK_FLOW_URL;
 const NETWORK_FLOW_TOKEN = process.env.NETWORK_FLOW_TOKEN;
 const NETWORK_FLOW_TIMEOUT = 15 * 1000;
-
-function shortId(id: string): string {
-  return id.slice(0, 8);
-}
 
 function generateInventorySummaryTable(assets: AssetForContext[]): string {
   if (assets.length === 0) return "_No assets in inventory._";
@@ -31,7 +28,9 @@ function generateInventorySummaryTable(assets: AssetForContext[]): string {
   const rows = assets.map((a) => {
     const label = a.hostname ?? a.ip ?? shortId(a.id);
     const device = deviceGroupLabel(a.deviceGroup);
-    const active = (a.issues ?? []).filter((i) => i.status === "ACTIVE").length;
+    const active = (a.issues ?? []).filter(
+      (i) => i.status === "AFFECTED",
+    ).length;
     return `| ${label} (${shortId(a.id)}) | ${device} | ${a.role ?? "—"} | ${a.status ?? "—"} | ${active} |`;
   });
 
@@ -54,7 +53,11 @@ function generateVulnAssetRemMap(
     const assetLabels =
       v.issues && v.issues.length > 0
         ? v.issues
-            .map((i) => i.asset.hostname ?? i.asset.ip ?? shortId(i.asset.id))
+            .map((i) =>
+              i.asset
+                ? (i.asset.hostname ?? i.asset.ip ?? shortId(i.asset.id))
+                : "device group",
+            )
             .join(", ")
         : "—";
     const remLabels =
@@ -65,59 +68,6 @@ function generateVulnAssetRemMap(
   });
 
   return [header, divider, ...rows].join("\n");
-}
-
-// ─── Utilization helpers ──────────────────────────────────────────────────────
-
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-function utilizationBucket(
-  value: number,
-): "Offline" | "Low" | "Medium" | "High" {
-  if (value === 0) return "Offline";
-  if (value <= 30) return "Low";
-  if (value <= 50) return "Medium";
-  return "High";
-}
-
-function renderUtilizationBuckets(raw: unknown): string | null {
-  const parsed = assetUtilizationSchema.safeParse(raw);
-  if (!parsed.success) return null;
-  const data = parsed.data;
-
-  const parts: string[] = [];
-  for (let dayIdx = 0; dayIdx < data.length; dayIdx++) {
-    const dayData = data[dayIdx];
-    const dayName = DAY_NAMES[dayIdx] ?? `Day${dayIdx}`;
-    const hours = Object.keys(dayData)
-      .map(Number)
-      .sort((a, b) => a - b);
-
-    if (hours.length === 0) {
-      parts.push(`${dayName}: Offline`);
-      continue;
-    }
-
-    // Group consecutive hours with the same bucket
-    const segments: { bucket: string; start: number; end: number }[] = [];
-    for (const hour of hours) {
-      const bucket = utilizationBucket(dayData[String(hour)] ?? 0);
-      const last = segments[segments.length - 1];
-      if (last && last.bucket === bucket && last.end === hour - 1) {
-        last.end = hour;
-      } else {
-        segments.push({ bucket, start: hour, end: hour });
-      }
-    }
-
-    const segStrs = segments.map(({ bucket, start, end }) => {
-      const range = start === end ? `${start}:00` : `${start}:00–${end + 1}:00`;
-      return `${range} [${bucket}]`;
-    });
-    parts.push(`${dayName}: ${segStrs.join(", ")}`);
-  }
-
-  return parts.join(" | ");
 }
 
 // ─── Workflow markdown ────────────────────────────────────────────────────────
@@ -376,7 +326,7 @@ function generateContextMarkdown(
   // Device utilization: only include assets that have utilization data
   const utilizationLines: string[] = [];
   for (const asset of assets) {
-    const rendered = renderUtilizationBuckets(asset.utilization);
+    const rendered = renderUtilization(asset.utilization);
     if (rendered) {
       const label = asset.hostname ?? asset.ip ?? shortId(asset.id);
       utilizationLines.push(

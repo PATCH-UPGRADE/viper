@@ -31,7 +31,6 @@ model User {
   deviceArtifacts           DeviceArtifact[]
   artifacts                 Artifact[]
   artifactWrappers          ArtifactWrapper[]
-  advisories                Advisory[]
 
   apikeys                   Apikey[]
   apiKeyConnectors          ApiKeyConnector[]
@@ -52,6 +51,7 @@ model User {
   watchedTickets         TicketWatch[]
   ticketSeen             TicketSeen[]
   ticketActivities       TicketActivity[]
+  notes                  Note[]
 
   @@unique([email])
   @@index([departmentId])
@@ -287,7 +287,6 @@ model DeviceGroup {
   @@map("device_group")
 }
 
-
 model DeviceGroupMatching {
   id String @id @default(cuid())
 
@@ -302,8 +301,8 @@ model DeviceGroupMatching {
 
   vulnerabilities Vulnerability[]  @relation("VulnerabilityMatchings")
   remediations    Remediation[]    @relation("RemediationMatchings")
-  advisories      Advisory[]       @relation("AdvisoryMatchings")
   deviceArtifacts DeviceArtifact[] @relation("DeviceArtifactMatchings")
+  issues          Issue[]
   notificationMappings  NotificationDeviceGroupMapping[]
 
   createdAt DateTime @default(now())
@@ -474,6 +473,7 @@ model ArtifactWrapper {
 
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+
   @@index([remediationId])
   @@index([deviceArtifactId])
   @@index([userId])
@@ -505,9 +505,10 @@ model Artifact {
 
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+
+  @@unique([wrapperId, versionNumber])
   @@index([wrapperId])
   @@index([userId])
-  @@unique([wrapperId, versionNumber])
   @@map("artifact")
 }
 
@@ -576,7 +577,6 @@ model Vulnerability {
   sarif                Json
   affectedComponents   String[]        @default([])
   deviceGroupMatchings DeviceGroupMatching[] @relation("VulnerabilityMatchings")
-  advisories           Advisory[]      @relation("AdvisoryVulnerabilities")
   exploitUri           String?         @map("exploit-uri")
   upstreamApi          String?         @map("upstream-api")
 
@@ -619,30 +619,123 @@ model Vulnerability {
 }
 
 enum IssueStatus {
-  ACTIVE
-  FALSE_POSITIVE
-  REMEDIATED
+  NOT_AFFECTED
+  AFFECTED
+  FIXED
+  UNDER_INVESTIGATION
+}
+
+enum NotAffectedJustification {
+  COMPONENT_NOT_PRESENT
+  VULNERABLE_CODE_NOT_PRESENT
+  VULNERABLE_CODE_NOT_IN_EXECUTE_PATH
+  VULNERABLE_CODE_CANNOT_BE_CONTROLLED_BY_ADVERSARY
+  INLINE_MITIGATIONS_ALREADY_EXIST
+  HOSPITAL_COMPENSATING_CONTROL
+  HOSPITAL_ACCEPTS_RISK
 }
 
 model Issue {
   id String @id @default(cuid())
 
-  assetId String
-  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  deviceGroupMatchingId String?
+  deviceGroupMatching   DeviceGroupMatching? @relation(fields: [deviceGroupMatchingId], references: [id], onDelete: Cascade)
+
+  assetId String? // now optional; when set, overrides the deviceGroupMatching-level Issue for this vuln
+  asset   Asset?  @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   vulnerabilityId String
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
+  status                   IssueStatus               @default(AFFECTED)
+  notAffectedJustification NotAffectedJustification?
+  statusConfidence         ConfidenceLevel?
+  statusNotes              String?                   @db.Text
+
   issueRemediations  IssueRemediation[]
   workOrderTickets      WorkOrderTicket[]     @relation("WorkOrderTicketIssues")
-
-  status IssueStatus @default(ACTIVE)
+  filters           EntityFilter[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([assetId, vulnerabilityId])
+  @@unique([deviceGroupMatchingId, vulnerabilityId])
+  @@index([assetId])
+  @@index([deviceGroupMatchingId])
+  @@index([vulnerabilityId])
   @@map("issue")
+}
+
+enum NoteStatus {
+  PERSISTENT // always included in relevant LLM prompts, regardless of scope
+  SCOPED
+}
+
+enum ScopeTargetModel {
+  DEVICE_GROUP_MATCHING
+  ASSET
+  VULNERABILITY
+  REMEDIATION
+}
+
+model Note {
+  id     String     @id @default(cuid())
+  text   String     @db.Text
+  status NoteStatus @default(SCOPED)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  filters EntityFilter[]
+
+  targetModel ScopeTargetModel?
+  instanceId  String? // weak reference — app validates this id exists in targetModel's table
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([targetModel, instanceId])
+  @@index([userId])
+  @@index([status])
+  @@map("note")
+}
+
+model EntityFilter {
+  id          String           @id @default(cuid())
+  label       String? // e.g. "All infusion pumps in the ICU"
+  targetModel ScopeTargetModel
+  filter      Json // WHERE-clause fragment evaluated against targetModel's table
+
+  noteId  String?
+  note    Note?   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  issueId String?
+  issue   Issue?  @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  // Exactly one of noteId/issueId must be set
+
+  matches        EntityFilterMatch[]
+  lastResolvedAt DateTime? // null until a future memoization job runs
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([noteId])
+  @@index([issueId])
+  @@index([targetModel])
+  @@map("entity_filter")
+}
+
+model EntityFilterMatch {
+  id             String       @id @default(cuid())
+  entityFilterId String
+  entityFilter   EntityFilter @relation(fields: [entityFilterId], references: [id], onDelete: Cascade)
+  targetId       String // weak reference into whatever table entityFilter.targetModel points to
+
+  createdAt DateTime @default(now())
+
+  @@unique([entityFilterId, targetId])
+  @@index([targetId])
+  @@map("entity_filter_match")
 }
 
 model Remediation {
@@ -751,7 +844,6 @@ model Integration {
   deviceArtifactMappings ExternalDeviceArtifactMapping[]
   remediationMappings    ExternalRemediationMapping[]
   vulnerabilityMappings  ExternalVulnerabilityMapping[]
-  advisoryMappings       ExternalAdvisoryMapping[]
   workOrderMappings      ExternalWorkOrderMapping[]
 
   createdAt              DateTime          @default(now())
@@ -865,46 +957,6 @@ enum Tlp {
   // TLP v2
   CLEAR
   AMBER_STRICT
-}
-
-model Advisory {
-  id                        String          @id @default(cuid())
-  userId                    String
-  title                     String?
-  user                      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  referencedVulnerabilities Vulnerability[]       @relation("AdvisoryVulnerabilities")
-  deviceGroupMatchings      DeviceGroupMatching[] @relation("AdvisoryMatchings")
-  csaf                      Json                  @default("{}")
-  upstreamUrl               String?         @unique
-  severity                  Severity
-  summary                   String?         @db.Text
-  status                    IssueStatus     @default(ACTIVE)
-  tlp                       Tlp?
-  publishedAt               DateTime?
-  createdAt                 DateTime        @default(now())
-  updatedAt                 DateTime        @updatedAt
-  externalMappings          ExternalAdvisoryMapping[]
-  workOrderTickets             WorkOrderTicket[]  @relation("WorkOrderTicketAdvisories")
-
-  @@index([userId])
-  @@map("advisory")
-}
-
-model ExternalAdvisoryMapping {
-  id            String      @id @default(cuid())
-  itemId        String
-  integrationId String
-  externalId    String
-  item          Advisory    @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  lastSynced    DateTime?
-
-  @@unique([itemId, integrationId], name: "external_advisory_mappings_itemId_integrationId_key")
-  @@unique([integrationId, externalId], name: "external_advisory_mappings_integrationId_externalId_key")
-  @@index([itemId])
-  @@map("external_advisory_mappings")
 }
 
 model ChatThread {
@@ -1037,7 +1089,6 @@ model WorkOrderTicket {
   issues          Issue[]         @relation("WorkOrderTicketIssues")
   vulnerabilities Vulnerability[] @relation("WorkOrderTicketVulns")
   remediations    Remediation[]   @relation("WorkOrderTicketRemediations")
-  advisories      Advisory[]      @relation("WorkOrderTicketAdvisories")
   assets          Asset[]         @relation("WorkOrderTicketAssets")
   deviceGroups    NotificationDeviceGroupMapping[]
 
@@ -1348,4 +1399,16 @@ model MatchFeedback {
   @@index([targetType, targetId])
   @@index([notificationId])
   @@map("match_feedback")
+}
+
+model IntegrationSession {
+  id  String @id @default(cuid())
+  host String @unique
+  header String 
+  value String
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("integration_session")
 }

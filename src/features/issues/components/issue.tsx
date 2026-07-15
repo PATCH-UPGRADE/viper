@@ -65,8 +65,16 @@ export const IssueDetailPage = ({ id }: { id: string }) => {
         </div>
         <IssueStatusForm issue={issue.data} />
       </div>
-      <h2 className="text-lg font-semibold">Asset</h2>
-      <AssetItem data={issue.data.asset} />
+      {issue.data.asset ? (
+        <>
+          <h2 className="text-lg font-semibold">Asset</h2>
+          <AssetItem data={issue.data.asset} />
+        </>
+      ) : (
+        <p className="text-muted-foreground text-sm">
+          This issue applies to a device group, not a single asset.
+        </p>
+      )}
       <h2 className="text-lg font-semibold">Vulnerability</h2>
       <VulnerabilityItem data={issue.data.vulnerability} />
     </>
@@ -103,7 +111,7 @@ export const IssuesSidebarList = ({
   );
 
   const nonActiveIssuesCount = Object.values(IssueStatus)
-    .filter((status) => status !== IssueStatus.ACTIVE)
+    .filter((status) => status !== IssueStatus.AFFECTED)
     .map((issueStatus) => ({
       issueStatus,
       count: issues.filter((i) => i.status === issueStatus).length,
@@ -158,7 +166,7 @@ export const IssuesSidebarList = ({
                   <>
                     <div className="flex flex-col gap-1">
                       <p className="font-semibold">
-                        {getAssetRoleLabel(asset)}
+                        {asset ? getAssetRoleLabel(asset) : "Device Group"}
                       </p>
                       {locationParts.length > 0 && (
                         <p className="text-xs text-muted-foreground">
@@ -183,11 +191,13 @@ export const IssuesSidebarList = ({
                       href: `/vulnerabilities/${issue.vulnerabilityId}`,
                       className: "cursor-pointer",
                     },
-                    type === "assets" && {
-                      label: "Go to Asset Details",
-                      href: `/assets/${issue.assetId}`,
-                      className: "cursor-pointer",
-                    },
+                    type === "assets" && issue.assetId
+                      ? {
+                          label: "Go to Asset Details",
+                          href: `/assets/${issue.assetId}`,
+                          className: "cursor-pointer",
+                        }
+                      : false,
                   ]}
                 />
               </Link>
@@ -196,7 +206,7 @@ export const IssuesSidebarList = ({
         })}
       </ul>
 
-      {isIssuesOverflow && (
+      {isIssuesOverflow && assetId && (
         <div className="flex justify-between pt-2">
           <p>
             Viewing {ACTIVE_ISSUES_SHOWN_MAX} of {issues.length} Active Issues
@@ -212,7 +222,7 @@ export const IssuesSidebarList = ({
         </div>
       )}
 
-      {nonActiveIssuesCount.length > 0 && (
+      {nonActiveIssuesCount.length > 0 && assetId && (
         <div className="flex flex-col gap-2 pt-2">
           <h5 className="font-bold">Non-Active Issues</h5>
           {nonActiveIssuesCount.map(({ issueStatus, count }) => (

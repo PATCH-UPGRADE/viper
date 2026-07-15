@@ -199,13 +199,17 @@ export function NotificationOverviewTab({
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Care Areas
                     </p>
-                    <p className="mt-1 text-sm">{impact.careAreas || "—"}</p>
+                    <p className="mt-1 text-sm font-medium">
+                      {impact.careAreas || "—"}
+                    </p>
                   </div>
                   <div className="rounded-lg border p-3">
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Likelihood
                     </p>
-                    <p className="mt-1 text-sm">{impact.likelihood || "—"}</p>
+                    <p className="mt-1 text-sm font-medium">
+                      {impact.likelihood || "—"}
+                    </p>
                   </div>
                 </div>
               </div>

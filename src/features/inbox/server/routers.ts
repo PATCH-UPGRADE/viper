@@ -17,6 +17,7 @@ import {
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { notificationDetailInclude, notificationInclude } from "../types";
+import { recordFieldCorrections } from "@/lib/field-correction";
 
 type MatchingIdentity = {
   vendorId: string;
@@ -225,4 +226,40 @@ export const notificationsRouter = createTRPCRouter({
         });
       });
     }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        type: z.enum(NotificationType).optional(),
+        priority: z.enum(Priority).optional(),
+        reason: z.string().optional(),
+      }),
+    )
+    .mutation(async ({input, ctx}) => {
+      const { id, reason, ...changes } = input;
+      return prisma.$transaction(async (tx) => {
+        const before = await tx.notification.findUniqueOrThrow({
+          where: {id},
+          select: { type: true, priority: true }
+        });
+
+        const notification = await tx.notification.update({
+          where: {id},
+          data: changes,
+          select: { id: true, type: true, priority: true }
+        });
+
+        await recordFieldCorrections(tx, {
+          targetType: "Notification",
+          targetId: id,
+          userId: ctx.auth.user.id,
+          reason,
+          before,
+          after: changes
+        });
+
+        return notification;
+      })
+    })
 });

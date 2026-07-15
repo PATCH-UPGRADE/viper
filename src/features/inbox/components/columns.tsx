@@ -123,24 +123,23 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
     header: "Assets",
     cell: ({ row }) => {
       const { deviceGroupsMatchings } = row.original;
-      if (deviceGroupsMatchings.length === 0) {
+      const visibleMatchings = deviceGroupsMatchings.filter(
+        (m) => m.assetCount > 0,
+      );
+      if (visibleMatchings.length === 0) {
         return <span className="text-muted-foreground text-sm">—</span>;
       }
       return (
         <div className="flex flex-wrap gap-1">
-          {deviceGroupsMatchings
-            .filter((m) => m.assetCount > 0)
-            .map((mapping) => {
-              const label = deviceGroupMatchingLabel(
-                mapping.deviceGroupMatching,
-              );
-              const count = mapping.assetCount;
-              return (
-                <Pill key={mapping.id} title={label} count={count}>
-                  {label}
-                </Pill>
-              );
-            })}
+          {visibleMatchings.map((mapping) => {
+            const label = deviceGroupMatchingLabel(mapping.deviceGroupMatching);
+            const count = mapping.assetCount;
+            return (
+              <Pill key={mapping.id} title={label} count={count}>
+                {label}
+              </Pill>
+            );
+          })}
         </div>
       );
     },

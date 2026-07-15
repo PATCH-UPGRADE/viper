@@ -202,14 +202,19 @@ export function NotificationOverviewTab({
   const confirmUnlink = async (commentToSave: string | undefined) => {
     if (!rejecting) return;
     const label = deviceGroupMatchingLabel(rejecting.deviceGroupMatching);
-    await markMatchIncorrect.mutateAsync({
-      targetType: "NotificationDeviceGroupMapping",
-      targetId: rejecting.id,
-      notificationId: notification.id,
-      comment: commentToSave,
-    });
-    toast.success(`${label} unlinked from notification`);
-    closeDialog();
+    try {
+      await markMatchIncorrect.mutateAsync({
+        targetType: "NotificationDeviceGroupMapping",
+        targetId: rejecting.id,
+        notificationId: notification.id,
+        comment: commentToSave,
+      });
+      toast.success(`${label} unlinked from notification`);
+      closeDialog();
+    } catch {
+      // Failure toast is surfaced by useMarkMatchIncorrect's onError; keep the
+      // dialog open so the user can retry.
+    }
   };
 
   return (

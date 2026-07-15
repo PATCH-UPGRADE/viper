@@ -26,6 +26,7 @@ import {
 } from "../types";
 import type { AffectedBucket } from "./affected-assets";
 import {
+  bucketForStatus,
   buildAffectedAssetsSummary,
   computeMatchingBuckets,
   type MatchingBucketGroup,
@@ -127,7 +128,6 @@ async function buildMatchingContexts(
       : await prisma.issue.findMany({
           where: {
             vulnerabilityId: { in: vulnIds },
-            status: { not: IssueStatus.FIXED },
           },
           select: {
             vulnerabilityId: true,
@@ -138,8 +138,14 @@ async function buildMatchingContexts(
           },
         });
 
+  // Matching-level FIXED issues are dropped here (bucketing assumes FIXED is
+  // filtered upstream); asset-level FIXED overrides are kept so a fixed asset
+  // is excluded from its matching's default bucket.
   const matchingLevelIssues = issues.filter(
-    (i) => i.assetId === null && i.deviceGroupMatchingId !== null,
+    (i) =>
+      i.assetId === null &&
+      i.deviceGroupMatchingId !== null &&
+      i.status !== IssueStatus.FIXED,
   );
   const assetLevelIssues = issues.filter((i) => i.assetId !== null);
 
@@ -473,10 +479,21 @@ export const notificationsRouter = createTRPCRouter({
       };
 
       // Asset-level override notes for this matching, one joined string per asset.
+      // Only keep notes whose vuln status maps to the bucket being paged, so an
+      // asset shown in one bucket doesn't surface a note from another bucket.
       // TODO: Consider using a dict to separate these by vuln?
       const noteByAsset = new Map<string, string>();
       for (const o of ctx.overrides) {
-        const notes = [...new Set(Object.values(o.notesByVuln))];
+        const notes = [
+          ...new Set(
+            Object.entries(o.notesByVuln)
+              .filter(
+                ([vulnId]) =>
+                  bucketForStatus(o.statusByVuln[vulnId]) === bucket,
+              )
+              .map(([, note]) => note),
+          ),
+        ];
         if (notes.length > 0) {
           noteByAsset.set(o.assetId, notes.join("\n"));
         }

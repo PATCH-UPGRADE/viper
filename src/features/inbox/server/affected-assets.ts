@@ -1,3 +1,4 @@
+import "server-only";
 import { IssueStatus } from "@/generated/prisma";
 import type { AffectedAssetsSummary, MatchingWithLabels } from "../types";
 
@@ -142,7 +143,7 @@ export type MatchingBucketGroup = {
 };
 
 /** The single triage bucket a matching-level status maps to (FIXED is filtered upstream). */
-function bucketForStatus(status: IssueStatus): TriageBucket | null {
+export function bucketForStatus(status: IssueStatus): TriageBucket | null {
   switch (status) {
     case IssueStatus.AFFECTED:
       return "needsAttention";

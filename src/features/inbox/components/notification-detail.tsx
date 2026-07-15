@@ -141,19 +141,6 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
         )}
       </p>
 
-      {/* Device group coverage alert */}
-      {totalDeviceGroups > deviceGroupsWithAssets && (
-        <Alert>
-          <AlertDescription>
-            <b>
-              This advisory applies to {deviceGroupsWithAssets} of your
-              products.
-            </b>{" "}
-            The original notification listed {totalDeviceGroups} products.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Tabs */}
       <Tabs defaultValue="overview">
         <TabsList variant="line">

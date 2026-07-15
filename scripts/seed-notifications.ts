@@ -198,7 +198,9 @@ async function seedSyngoPlazaVexScenario(userId: string) {
         vulnerabilityId: vulnerability.id,
       },
     },
-    update: {},
+    update: {
+      status: IssueStatus.UNDER_INVESTIGATION,
+    },
     create: {
       assetId: issueAsset.id,
       vulnerabilityId: vulnerability.id,
@@ -580,7 +582,14 @@ async function seedDeserializationScenario(userId: string) {
           vulnerabilityId: vulnerability.id,
         },
       },
-      update: {},
+      update: {
+        status: IssueStatus.NOT_AFFECTED,
+        notAffectedJustification:
+          NotAffectedJustification.HOSPITAL_COMPENSATING_CONTROL,
+        statusConfidence: ConfidenceLevel.Confirmed,
+        statusNotes:
+          "Ports 32912/tcp and 32914/tcp are blocked inbound at the IMAGING-NUCMED segment firewall for all but trusted service clients, so the deserialization RCE path is unreachable on this SPECT/CT console.",
+      },
       create: {
         assetId: symbiaAsset.id,
         vulnerabilityId: vulnerability.id,

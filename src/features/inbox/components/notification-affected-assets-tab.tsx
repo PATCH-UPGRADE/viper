@@ -49,13 +49,14 @@ function MatchingAssetTable({
   const [rows, setRows] = useState<ResolvedDeviceGroupAsset[]>([]);
   const appendedPages = useRef(new Set<number>());
 
-  const { data, isLoading, isFetching } = useAffectedAssetsPage({
-    notificationId,
-    matchingId: group.deviceGroupMatching.id,
-    bucket,
-    page,
-    pageSize: PAGE_SIZE,
-  });
+  const { data, isLoading, isFetching, isError, refetch } =
+    useAffectedAssetsPage({
+      notificationId,
+      matchingId: group.deviceGroupMatching.id,
+      bucket,
+      page,
+      pageSize: PAGE_SIZE,
+    });
 
   useEffect(() => {
     if (!data) return;
@@ -140,6 +141,25 @@ function MatchingAssetTable({
                 </TableCell>
               </TableRow>
             )}
+            {isError && rows.length === 0 && (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="text-sm text-muted-foreground"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    Failed to load assets.
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => refetch()}
+                    >
+                      Retry
+                    </Button>
+                  </span>
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
         {(data?.hasNextPage ?? false) && (
@@ -187,7 +207,7 @@ function BucketSection({
       </div>
       {groups.map((group) => (
         <MatchingAssetTable
-          key={`${bucket}-${group.deviceGroupMatching.id}`}
+          key={`${notificationId}-${bucket}-${group.deviceGroupMatching.id}`}
           notificationId={notificationId}
           group={group}
           bucket={bucket}
@@ -257,7 +277,7 @@ export function NotificationAffectedAssetsTab({
 
       {unaffected.map((group) => (
         <MatchingAssetTable
-          key={`unaffected-${group.deviceGroupMatching.id}`}
+          key={`${notificationId}-unaffected-${group.deviceGroupMatching.id}`}
           notificationId={notificationId}
           group={group}
           bucket="unaffected"

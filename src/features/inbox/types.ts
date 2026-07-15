@@ -85,8 +85,7 @@ export type MatchingWithLabels =
 
 /**
  * One device group matching in a triage bucket, with the number of assets that
- * fall in that bucket. Asset rows are fetched lazily/paginated (see
- * `getAffectedAssetsPage`) — never eagerly loaded here.
+ * fall in that bucket.
  */
 export type AffectedAssetGroupSummary = {
   /** NotificationDeviceGroupMapping id when the matching is linked to the notification. */
@@ -100,7 +99,7 @@ export type AffectedAssetsSummary = {
   needsAttention: AffectedAssetGroupSummary[];
   needsInformation: AffectedAssetGroupSummary[];
   lowConcern: AffectedAssetGroupSummary[];
-  /** Notification-linked matchings with no issues at all (current plain-card behavior). */
+  /** Notification-linked matchings with no issues at all  */
   unaffected: AffectedAssetGroupSummary[];
 };
 

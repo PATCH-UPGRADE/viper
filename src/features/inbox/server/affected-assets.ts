@@ -18,7 +18,6 @@ export const AFFECTED_BUCKETS = [
 
 export type AffectedBucket = (typeof AFFECTED_BUCKETS)[number];
 
-/** The three status-driven buckets (excludes the issue-less "unaffected" bucket). */
 const TRIAGE_BUCKETS = [
   "needsAttention",
   "needsInformation",
@@ -39,11 +38,11 @@ export type AssetPageFilter =
 export type MatchingBucketResult = { count: number; filter: AssetPageFilter };
 
 export type ComputeMatchingBucketsInput = {
-  /** Matching-level Issue status per vulnerability id (S(M, v)). FIXED pre-excluded. */
+  /** vulnerability id to issue status */
   matchingStatusByVuln: Record<string, IssueStatus>;
-  /** Asset-level override Issues belonging to this matching (low cardinality). */
+  /** Asset-level override Issues belonging to this matching. */
   overrides: { assetId: string; statusByVuln: Record<string, IssueStatus> }[];
-  /** Total assets the matching resolves to (a COUNT — never a row load). */
+  /** Total assets the matching resolves to. */
   totalAssetCount: number;
   /** Whether the matching is linked to the notification via NotificationDeviceGroupMapping. */
   isNotificationLinked: boolean;
@@ -76,7 +75,6 @@ export function computeMatchingBuckets(
     totalAssetCount,
     isNotificationLinked,
   } = input;
-
   const defaultStatuses = Object.values(matchingStatusByVuln);
   const hasAnyIssue = defaultStatuses.length > 0 || overrides.length > 0;
 

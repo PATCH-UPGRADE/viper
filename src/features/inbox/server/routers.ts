@@ -29,6 +29,7 @@ import {
   computeMatchingBuckets,
   type MatchingBucketGroup,
 } from "./affected-assets";
+import { TRPCError } from "@trpc/server";
 
 type MatchingIdentity = {
   vendorId: string;
@@ -49,6 +50,7 @@ type AffectedMatchingContext = {
   matchingStatusByVuln: Record<string, IssueStatus>;
   overrides: { assetId: string; statusByVuln: Record<string, IssueStatus> }[];
   isNotificationLinked: boolean;
+  // ^true if \exists NotificationDeviceGroupMapping n s.t n.dgm.id=am.id
 };
 
 const ALLOWED_SORT_FIELDS = new Set(["priority", "updatedAt", "createdAt"]);
@@ -104,10 +106,11 @@ async function resolveMatchedDeviceGroupIds(
 }
 
 /**
- * Gather, for the union of a notification's device group matchings and the
- * matchings referenced by its vulns' Issues, everything needed to bucket assets.
- * Issues are few, so this loads no asset rows (except the handful of override
- * assets). Shared by `getOne` (summary) and `getAffectedAssetsPage` (rows).
+ * Get all non-Fixed Issues that are associated with vulnerabilities from this notification
+ * Sort issues into DGM issues, and asset issues
+ * Build displayMatchings, DGM's that are linked to notification union DGM's found via issues
+ * statusByMatching links {DGM.id -> {vuln.id -> status}}
+ * Get all DGM's of the Issue assets to know where to exclude them
  */
 async function buildMatchingContexts(
   notifMatchings: { id: string; deviceGroupMatching: MatchingWithLabels }[],
@@ -126,6 +129,7 @@ async function buildMatchingContexts(
             deviceGroupMatchingId: true,
             assetId: true,
             status: true,
+            statusNotes: true,
           },
         });
 
@@ -134,7 +138,7 @@ async function buildMatchingContexts(
   );
   const assetLevelIssues = issues.filter((i) => i.assetId !== null);
 
-  // Display matchings: notification-linked ∪ issue-referenced.
+  // Display matchings: notification-linked `union` issue-referenced.
   const displayMatchings = new Map<
     string,
     { mappingId: string | null; deviceGroupMatching: MatchingWithLabels }
@@ -184,6 +188,8 @@ async function buildMatchingContexts(
   }
 
   // Fetch the few override assets' device-group identity to assign them to matchings.
+  // NOTE: to be efficient, assumes |assetLevelIssues.length| is small
+  // Possible TODO in the future here...
   const overrideAssetIds = [...overrideByAsset.keys()];
   const overrideAssets =
     overrideAssetIds.length === 0
@@ -312,7 +318,7 @@ export const notificationsRouter = createTRPCRouter({
       });
 
       if (!notification) {
-        throw new Error("Notification not found");
+        throw new TRPCError({ code: "NOT_FOUND" });
       }
 
       const notifMatchings = notification.deviceGroupsMatchings.filter(
@@ -330,7 +336,7 @@ export const notificationsRouter = createTRPCRouter({
         vulnIds,
       );
 
-      // One COUNT per display matching — no asset rows loaded here.
+      // One COUNT per display matching
       const countByMatchingId = new Map<string, number>();
       await Promise.all(
         contexts.map(async (c) => {
@@ -394,7 +400,7 @@ export const notificationsRouter = createTRPCRouter({
         },
       });
       if (!notification) {
-        throw new Error("Notification not found");
+        throw new TRPCError({ code: "NOT_FOUND" });
       }
 
       const emptyMeta = buildPaginationMeta(input, 0);

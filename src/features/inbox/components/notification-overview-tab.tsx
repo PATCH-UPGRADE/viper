@@ -358,14 +358,14 @@ export function NotificationOverviewTab({
               onClick={closeDialog}
               disabled={markMatchIncorrect.isPending}
             >
-              Cancel 
+              Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={() => confirmUnlink(comment.trim() || undefined)}
               disabled={markMatchIncorrect.isPending}
             >
-              Unlink 
+              Unlink
             </Button>
           </DialogFooter>
         </DialogContent>

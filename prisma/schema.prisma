@@ -43,6 +43,7 @@ model User {
   memories   Memory[]
   notificationReads         NotificationRead[]
   matchFeedback             MatchFeedback[]
+  fieldCorrections          FieldCorrection[]
 
   departmentId           String?
   department             Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
@@ -1420,7 +1421,6 @@ enum MatchFeedbackCategory {
   Incorrect
   Correct
 }
-
 model MatchFeedback {
   id String @id @default(cuid())
   targetType MatchFeedbackTargetType
@@ -1451,4 +1451,31 @@ model IntegrationSession {
   updatedAt DateTime @updatedAt
 
   @@map("integration_session")
+}
+
+// ─── Correction ────────────────────────────────────────────────────────────
+
+enum CorrectionTargetType {
+  Notification
+  // other models 
+}
+
+model FieldCorrection {  
+  id  String @id @default(uuid())
+  targetType CorrectionTargetType
+  targetId  String
+  field   String
+  fromValue Json?
+  toValue Json?
+  reason String?
+
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([userId])
+  @@index([field, createdAt])
+  @@map("field_correction")
 }

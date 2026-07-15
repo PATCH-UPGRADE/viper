@@ -238,10 +238,19 @@ async function seedSyngoPlazaVexScenario(userId: string) {
       channel: NotificationChannel.Email,
       sourceType: "Source",
       raw: {
-        from: "psirt@siemens-healthineers.com",
-        subject:
-          "SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E",
-        to: "security@hospital.org",
+        type: "email.received",
+        created_at: "2026-02-10T09:00:00.000Z",
+        data: {
+          email_id: "seed-ssa-016040",
+          created_at: "2026-02-10T09:00:00.000Z",
+          from: "psirt@siemens-healthineers.com",
+          to: ["security@hospital.org"],
+          cc: [],
+          bcc: [],
+          subject:
+            "SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E",
+          attachments: [],
+        },
       },
       markdown: `# SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E
 
@@ -617,10 +626,19 @@ async function seedDeserializationScenario(userId: string) {
       channel: NotificationChannel.Email,
       sourceType: "Source",
       raw: {
-        from: "psirt@siemens-healthineers.com",
-        subject:
-          "SSA-220609: Deserialization Vulnerability in Healthcare Products",
-        to: "security@hospital.org",
+        type: "email.received",
+        created_at: "2022-06-09T09:00:00.000Z",
+        data: {
+          email_id: "seed-ssa-220609",
+          created_at: "2022-06-09T09:00:00.000Z",
+          from: "psirt@siemens-healthineers.com",
+          to: ["security@hospital.org"],
+          cc: [],
+          bcc: [],
+          subject:
+            "SSA-220609: Deserialization Vulnerability in Healthcare Products",
+          attachments: [],
+        },
       },
       markdown: `# SSA-220609: Deserialization Vulnerability in Healthcare Products
 

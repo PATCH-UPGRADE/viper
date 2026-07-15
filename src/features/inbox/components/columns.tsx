@@ -26,7 +26,9 @@ function SourceDisplay({
   source: NotificationWithRelations["sources"][number];
 }) {
   const raw =
-    source.channel === "Email" ? (source.raw as RawEmailPayload) : null;
+    source.channel === "Email"
+      ? (source.raw as unknown as RawEmailPayload)
+      : null;
   return (
     <span className="flex flex-col gap-0.5">
       <span className="flex items-center gap-1 text-sm">
@@ -34,7 +36,7 @@ function SourceDisplay({
           <MailIcon className="size-3 shrink-0 text-muted-foreground" />
         )}
         <span className="truncate max-w-[200px]">
-          {raw?.from ?? source.channel}
+          {raw?.data?.from ?? source.channel}
         </span>
       </span>
       <span className="text-xs text-muted-foreground">
@@ -126,15 +128,19 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
       }
       return (
         <div className="flex flex-wrap gap-1">
-          {deviceGroupsMatchings.map((mapping) => {
-            const label = deviceGroupMatchingLabel(mapping.deviceGroupMatching);
-            const count = mapping.assetCount;
-            return (
-              <Pill key={mapping.id} title={label} count={count}>
-                {label}
-              </Pill>
-            );
-          })}
+          {deviceGroupsMatchings
+            .filter((m) => m.assetCount > 0)
+            .map((mapping) => {
+              const label = deviceGroupMatchingLabel(
+                mapping.deviceGroupMatching,
+              );
+              const count = mapping.assetCount;
+              return (
+                <Pill key={mapping.id} title={label} count={count}>
+                  {label}
+                </Pill>
+              );
+            })}
         </div>
       );
     },
@@ -172,7 +178,7 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
                   {rest.map((source) => {
                     const raw =
                       source.channel === "Email"
-                        ? (source.raw as RawEmailPayload)
+                        ? (source.raw as unknown as RawEmailPayload)
                         : null;
                     return (
                       <div
@@ -184,7 +190,7 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
                             <MailIcon className="size-3 shrink-0 text-muted-foreground" />
                           )}
                           <span className="truncate">
-                            {raw?.from ?? source.channel}
+                            {raw?.data?.from ?? source.channel}
                           </span>
                         </span>
                         <span className="text-xs text-muted-foreground shrink-0">

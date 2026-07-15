@@ -1,3 +1,4 @@
+import type { EmailReceivedEvent } from "resend";
 import { z } from "zod";
 import type { AssetStatus, Prisma } from "@/generated/prisma";
 
@@ -116,11 +117,10 @@ export type NotificationDetailWithRelations = Omit<
 export type NotificationDetailSource =
   NotificationDetailWithRelations["sources"][number];
 
-export type RawEmailPayload = {
-  from: string;
-  subject?: string;
-  to?: string;
-};
+/**
+ * The value stored in `NotificationSource.raw` for email sources
+ */
+export type RawEmailPayload = EmailReceivedEvent;
 
 // TODO: Get a discriminated union of what fields should actually live on Advisory|Recall|UpdateAvailable (see `details`)
 export const notificationPayloadSchema = z.object({

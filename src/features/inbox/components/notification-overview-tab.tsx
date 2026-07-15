@@ -50,7 +50,7 @@ function EmailSourceModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const raw = source.raw as RawEmailPayload;
+  const raw = source.raw as unknown as RawEmailPayload;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
@@ -63,8 +63,8 @@ function EmailSourceModal({
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
                 {(
                   [
-                    { label: "From", value: raw.from },
-                    { label: "Subject", value: raw.subject ?? "—" },
+                    { label: "From", value: raw.data?.from ?? "—" },
+                    { label: "Subject", value: raw.data?.subject ?? "—" },
                     {
                       label: "Date",
                       value: format(source.receivedAt, "PPP p"),
@@ -103,8 +103,10 @@ function EmailSourceModal({
 function SourceReference({ source }: { source: NotificationDetailSource }) {
   const [open, setOpen] = useState(false);
   const raw =
-    source.channel === "Email" ? (source.raw as RawEmailPayload) : null;
-  const label = raw?.subject ?? source.referenceUrl ?? source.channel;
+    source.channel === "Email"
+      ? (source.raw as unknown as RawEmailPayload)
+      : null;
+  const label = raw?.data?.subject ?? source.referenceUrl ?? source.channel;
 
   if (source.channel === "Email") {
     return (

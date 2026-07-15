@@ -33,7 +33,7 @@ services:
       - "5432:5432"
 
   viper:
-    image: ${VIPER_IMAGE:-viper:ci}
+    image: ${VIPER_IMAGE:-ghcr.io/patch-upgrade/viper:ci}
     platform: linux/amd64
     env_file: ../../.env.ci
     environment:
@@ -76,7 +76,7 @@ services:
       retries: 10
 
   blueflow:
-    image: ${BLUEFLOW_IMAGE:-virtalabsinc/blueflow:latest}
+    image: ${BLUEFLOW_IMAGE:-docker.io/virtalabsinc/blueflow:latest}
     platform: linux/amd64
     environment:
       - DATABASE_URL=postgresql://blueflow:blueflow@blueflow-db:5432/blueflow

@@ -1,0 +1,164 @@
+name: viper
+
+networks:
+  viper_stack:
+    driver: bridge
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: docker/db/Dockerfile
+    env_file: .db.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes: 
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - viper_stack
+
+  viper:
+    image: ghcr.io/patch-upgrade/viper:latest # Use the image if it is pre-pulled (to avoid long build times on AWS)
+    build:
+      context: .
+      dockerfile: docker/viper/Dockerfile
+    env_file: .env
+    environment:
+      - INNGEST_DEV=1
+      - INNGEST_BASE_URL=http://inngest:8288
+      - PRISMA_CLIENT_ENGINE_TYPE=binary
+    volumes:
+      - viper-stamps:/srv/stamps
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - viper_stack
+
+  inngest:
+    build:
+      context: .
+      dockerfile: docker/inngest/Dockerfile
+    environment:
+      - INNGEST_BOOTSTRAP_URL=http://viper:3000/api/inngest
+      - INNGEST_DEV=true
+      - INNGEST_PORT=8288
+    ports:
+      - "8288:8288"
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["inngest dev -u $$INNGEST_BOOTSTRAP_URL"]
+    depends_on:
+      - viper
+    networks:
+      - viper_stack
+
+  blueflow-postgres:
+    image: docker.io/postgres:16-alpine
+    environment:
+      POSTGRES_DB: blueflow
+      POSTGRES_USER: blueflow
+      POSTGRES_PASSWORD: blueflow
+    volumes:
+      - blueflow-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5433:5433"
+    networks:
+      - viper_stack
+
+  blueflow-redis:
+    image: docker.io/redis:7-alpine
+    volumes:
+      - blueflow-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - 6379:6379
+    networks:
+      - viper_stack
+
+  blueflow:
+    image: docker.io/virtalabsinc/blueflow:demo-0.3.5-rc8
+    volumes:
+      - ./init:/blueflow-init:ro
+    depends_on:
+      blueflow-postgres:
+        condition: service_healthy
+      blueflow-redis:
+        condition: service_healthy
+    environment:
+      DATABSE_URL: postgresql://blueflow:blueflow@blueflow-postgres:5433/blueflow
+      RESDIS_URL: resdis://blueflow-redis:6379/0
+      CELERY_BROKER_URL: redis://blueflow-redis:6379/0
+      DJANGO_SETTINGS_MODULE: project.settings.development
+      DJANGO_ALLOWED_HOSTS: blueflow,localhost,127.0.0.1
+      SECRET_KEY: demo-only-not-for-production
+      RUN_MIGRATIONS: "1"
+      DEFAULT_USERNAME: admin
+      DEFAULT_PASSWORD: admin
+      API_TOKEN: demo-tapirxl-token-not-for-production
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/').getcode() < 400 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports: 
+      - "8000:8000"
+    networks:
+      - viper_stack
+
+  blueflow-worker:
+    image: docker.io/virtalabsinc/blueflow:demo-0.3.5-rc8
+    depends_on:
+      blueflow:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://blueflow:demo@blueflow-psql:5433/blueflow
+      REDIS_URL: redis://blueflow-redis:6379/0
+      CELERY_BROKER_URL: redis://blueflow-redis:6379/0
+      DJANGO_SETTINGS_MODULE: project.settings.development
+      SECRET_KEY: demo-only-not-for-production
+    command:  ["uv", "run", "celery", "-A", "blueflow.celery", "worker", "-l", "info"]
+    networks:
+      - viper_stack
+    
+  tapirxl:
+    image: docker.io/tapirxl:demo-0.3.3
+    volumes:
+      - ./pcap:/pcap:ro
+      - ./init:/blueflow-init:ro
+      - tapirxl-spool:/var/lib/vector/data
+    depends_on:
+      blueflow:
+        condition: service_healthy
+    cap_add:
+      - NET_ADMIN
+    environment:
+      BLUEFLOW_URL: http://blueflow:8000
+      BLUEFLOW_TOKEN: demo-tapirxl-token-not-for-production
+      TAPIRXL_MODE: pcap
+      TAPIRXL_PCAP_PATH: /pcap/synthetic_philips_demo.pcap
+      TAPIRXL_INTERFACE: eth0
+    networks:
+      - viper_stack
+
+volumes:
+  pgdata:
+  viper-stamps:
+  blueflow-pgdata:
+  blueflow-redis-data:
+  tapirxl-spool:

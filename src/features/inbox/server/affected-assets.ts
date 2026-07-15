@@ -136,8 +136,24 @@ export function computeMatchingBuckets(
 export type MatchingBucketGroup = {
   mappingId: string | null;
   deviceGroupMatching: MatchingWithLabels;
+  statusByVuln: Record<string, IssueStatus>; // vuln id to Issue Status
+  notesByVuln: Record<string, string>; // vuln id to issue notes (string concat)
   buckets: Partial<Record<AffectedBucket, MatchingBucketResult>>;
 };
+
+/** The single triage bucket a matching-level status maps to (FIXED is filtered upstream). */
+function bucketForStatus(status: IssueStatus): TriageBucket | null {
+  switch (status) {
+    case IssueStatus.AFFECTED:
+      return "needsAttention";
+    case IssueStatus.UNDER_INVESTIGATION:
+      return "needsInformation";
+    case IssueStatus.NOT_AFFECTED:
+      return "lowConcern";
+    default:
+      return null;
+  }
+}
 
 /**
  * Flatten per-matching bucket results into the four summary arrays consumed by
@@ -156,10 +172,18 @@ export function buildAffectedAssetsSummary(
     for (const bucket of AFFECTED_BUCKETS) {
       const res = group.buckets[bucket];
       if (res && res.count > 0) {
+        // Only show a matching-level note on the bucket its status maps to.
+        const notesByVuln: Record<string, string> = {};
+        for (const [vulnId, note] of Object.entries(group.notesByVuln)) {
+          if (bucketForStatus(group.statusByVuln[vulnId]) === bucket) {
+            notesByVuln[vulnId] = note;
+          }
+        }
         summary[bucket].push({
           mappingId: group.mappingId,
           deviceGroupMatching: group.deviceGroupMatching,
           assetCount: res.count,
+          notesByVuln,
         });
       }
     }

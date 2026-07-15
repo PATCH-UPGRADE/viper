@@ -77,6 +77,7 @@ export type ResolvedDeviceGroupAsset = {
   location: unknown;
   version: string | null;
   status: AssetStatus | null;
+  statusNotes: string | null;
 };
 
 /** A device group matching with its resolved vendor/product/version labels. */
@@ -88,10 +89,10 @@ export type MatchingWithLabels =
  * fall in that bucket.
  */
 export type AffectedAssetGroupSummary = {
-  /** NotificationDeviceGroupMapping id when the matching is linked to the notification. */
   mappingId: string | null;
   deviceGroupMatching: MatchingWithLabels;
   assetCount: number;
+  notesByVuln: Record<string, string>;
 };
 
 /** Device group matchings grouped by triage status for the affected-assets tab. */
@@ -99,7 +100,6 @@ export type AffectedAssetsSummary = {
   needsAttention: AffectedAssetGroupSummary[];
   needsInformation: AffectedAssetGroupSummary[];
   lowConcern: AffectedAssetGroupSummary[];
-  /** Notification-linked matchings with no issues at all  */
   unaffected: AffectedAssetGroupSummary[];
 };
 

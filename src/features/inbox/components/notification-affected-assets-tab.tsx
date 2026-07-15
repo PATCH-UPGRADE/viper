@@ -10,6 +10,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
+import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import {
   Table,
   TableBody,
@@ -78,6 +79,13 @@ function MatchingAssetTable({
             {group.assetCount}
           </Badge>
         </CardTitle>
+        {Object.keys(group.notesByVuln).length > 0 && (
+          <ul className="mt-1 space-y-1 text-sm text-muted-foreground list-disc pl-5">
+            {Object.entries(group.notesByVuln).map(([vulnId, note]) => (
+              <li key={vulnId}>{note}</li>
+            ))}
+          </ul>
+        )}
       </CardHeader>
       <CardContent>
         <Table>
@@ -95,7 +103,16 @@ function MatchingAssetTable({
             {rows.map((asset) => (
               <TableRow key={asset.id}>
                 <TableCell className="font-mono text-xs">
-                  {asset.hostname ?? asset.id}
+                  <span className="inline-flex items-center gap-1">
+                    {asset.hostname ?? asset.id}
+                    {asset.statusNotes && (
+                      <QuestionTooltip>
+                        <span className="whitespace-pre-line">
+                          {asset.statusNotes}
+                        </span>
+                      </QuestionTooltip>
+                    )}
+                  </span>
                 </TableCell>
                 <TableCell>{asset.ip}</TableCell>
                 <TableCell>{parseLocation(asset.location)}</TableCell>

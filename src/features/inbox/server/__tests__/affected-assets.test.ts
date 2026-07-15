@@ -117,6 +117,8 @@ describe("buildAffectedAssetsSummary", () => {
       {
         mappingId: "m1",
         deviceGroupMatching: dg1,
+        statusByVuln: { v1: AFFECTED, v2: AFFECTED },
+        notesByVuln: {},
         buckets: computeMatchingBuckets({
           matchingStatusByVuln: { v1: AFFECTED, v2: AFFECTED },
           overrides: [],
@@ -127,6 +129,8 @@ describe("buildAffectedAssetsSummary", () => {
       {
         mappingId: "m2",
         deviceGroupMatching: dg2,
+        statusByVuln: { v1: NOT_AFFECTED, v2: AFFECTED },
+        notesByVuln: {},
         buckets: computeMatchingBuckets({
           matchingStatusByVuln: { v1: NOT_AFFECTED, v2: AFFECTED },
           overrides: [],
@@ -137,6 +141,8 @@ describe("buildAffectedAssetsSummary", () => {
       {
         mappingId: "m3",
         deviceGroupMatching: dg3,
+        statusByVuln: { v1: AFFECTED, v2: UNDER_INVESTIGATION },
+        notesByVuln: { v1: "under review by clinical team" },
         buckets: computeMatchingBuckets({
           matchingStatusByVuln: { v1: AFFECTED, v2: UNDER_INVESTIGATION },
           overrides: [{ assetId: "3.1", statusByVuln: { v1: NOT_AFFECTED } }],
@@ -146,16 +152,44 @@ describe("buildAffectedAssetsSummary", () => {
       },
     ]);
 
+    // dg3's note is for v1 (AFFECTED) → shows only on the Needs Attention card,
+    // not on the Needs Information / Low Concern cards it reaches via v2 / override.
+    const dg3Notes = { v1: "under review by clinical team" };
     expect(summary.needsAttention).toEqual([
-      { mappingId: "m1", deviceGroupMatching: dg1, assetCount: 1 },
-      { mappingId: "m2", deviceGroupMatching: dg2, assetCount: 2 },
-      { mappingId: "m3", deviceGroupMatching: dg3, assetCount: 2 },
+      {
+        mappingId: "m1",
+        deviceGroupMatching: dg1,
+        assetCount: 1,
+        notesByVuln: {},
+      },
+      {
+        mappingId: "m2",
+        deviceGroupMatching: dg2,
+        assetCount: 2,
+        notesByVuln: {},
+      },
+      {
+        mappingId: "m3",
+        deviceGroupMatching: dg3,
+        assetCount: 2,
+        notesByVuln: dg3Notes,
+      },
     ]);
     expect(summary.needsInformation).toEqual([
-      { mappingId: "m3", deviceGroupMatching: dg3, assetCount: 3 },
+      {
+        mappingId: "m3",
+        deviceGroupMatching: dg3,
+        assetCount: 3,
+        notesByVuln: {},
+      },
     ]);
     expect(summary.lowConcern).toEqual([
-      { mappingId: "m3", deviceGroupMatching: dg3, assetCount: 1 },
+      {
+        mappingId: "m3",
+        deviceGroupMatching: dg3,
+        assetCount: 1,
+        notesByVuln: {},
+      },
     ]);
     expect(summary.unaffected).toEqual([]);
   });

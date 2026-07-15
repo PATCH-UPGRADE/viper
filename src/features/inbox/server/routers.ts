@@ -1,4 +1,5 @@
 import "server-only";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   IssueStatus,
@@ -29,7 +30,6 @@ import {
   computeMatchingBuckets,
   type MatchingBucketGroup,
 } from "./affected-assets";
-import { TRPCError } from "@trpc/server";
 
 type MatchingIdentity = {
   vendorId: string;
@@ -48,7 +48,12 @@ type AffectedMatchingContext = {
   mappingId: string | null;
   deviceGroupMatching: MatchingWithLabels;
   matchingStatusByVuln: Record<string, IssueStatus>;
-  overrides: { assetId: string; statusByVuln: Record<string, IssueStatus> }[];
+  matchingNotesByVuln: Record<string, string>; // issue statusNotes
+  overrides: {
+    assetId: string;
+    statusByVuln: Record<string, IssueStatus>;
+    notesByVuln: Record<string, string>; // issue statusNotes
+  }[];
   isNotificationLinked: boolean;
   // ^true if \exists NotificationDeviceGroupMapping n s.t n.dgm.id=am.id
 };
@@ -169,22 +174,34 @@ async function buildMatchingContexts(
     }
   }
 
-  // Matching-level status per (matching, vuln).
+  // Matching-level status (and notes) per (matching, vuln).
   const statusByMatching = new Map<string, Record<string, IssueStatus>>();
+  const notesByMatching = new Map<string, Record<string, string>>();
   for (const i of matchingLevelIssues) {
     const mid = i.deviceGroupMatchingId as string;
     const rec = statusByMatching.get(mid) ?? {};
     rec[i.vulnerabilityId] = i.status;
     statusByMatching.set(mid, rec);
+    if (i.statusNotes) {
+      const notes = notesByMatching.get(mid) ?? {};
+      notes[i.vulnerabilityId] = i.statusNotes;
+      notesByMatching.set(mid, notes);
+    }
   }
 
-  // Asset-level override status per (asset, vuln).
+  // Asset-level override status (and notes) per (asset, vuln).
   const overrideByAsset = new Map<string, Record<string, IssueStatus>>();
+  const overrideNotesByAsset = new Map<string, Record<string, string>>();
   for (const i of assetLevelIssues) {
     const aid = i.assetId as string;
     const rec = overrideByAsset.get(aid) ?? {};
     rec[i.vulnerabilityId] = i.status;
     overrideByAsset.set(aid, rec);
+    if (i.statusNotes) {
+      const notes = overrideNotesByAsset.get(aid) ?? {};
+      notes[i.vulnerabilityId] = i.statusNotes;
+      overrideNotesByAsset.set(aid, notes);
+    }
   }
 
   // Fetch the few override assets' device-group identity to assign them to matchings.
@@ -224,12 +241,14 @@ async function buildMatchingContexts(
       .map((a) => ({
         assetId: a.id,
         statusByVuln: overrideByAsset.get(a.id) ?? {},
+        notesByVuln: overrideNotesByAsset.get(a.id) ?? {},
       }));
     contexts.push({
       matchingId,
       mappingId,
       deviceGroupMatching,
       matchingStatusByVuln: statusByMatching.get(matchingId) ?? {},
+      matchingNotesByVuln: notesByMatching.get(matchingId) ?? {},
       overrides,
       isNotificationLinked: mappingId !== null,
     });
@@ -350,6 +369,8 @@ export const notificationsRouter = createTRPCRouter({
       const groups: MatchingBucketGroup[] = contexts.map((c) => ({
         mappingId: c.mappingId,
         deviceGroupMatching: c.deviceGroupMatching,
+        statusByVuln: c.matchingStatusByVuln,
+        notesByVuln: c.matchingNotesByVuln,
         buckets: computeMatchingBuckets({
           matchingStatusByVuln: c.matchingStatusByVuln,
           overrides: c.overrides,
@@ -451,6 +472,16 @@ export const notificationsRouter = createTRPCRouter({
         ...(idFilter ? { id: idFilter } : {}),
       };
 
+      // Asset-level override notes for this matching, one joined string per asset.
+      // TODO: Consider using a dict to separate these by vuln?
+      const noteByAsset = new Map<string, string>();
+      for (const o of ctx.overrides) {
+        const notes = [...new Set(Object.values(o.notesByVuln))];
+        if (notes.length > 0) {
+          noteByAsset.set(o.assetId, notes.join("\n"));
+        }
+      }
+
       const totalCount = await prisma.asset.count({ where });
       const meta = buildPaginationMeta(input, totalCount);
       const assets = await prisma.asset.findMany({
@@ -477,6 +508,7 @@ export const notificationsRouter = createTRPCRouter({
         location: a.location,
         status: a.status,
         version: a.deviceGroup.version?.canonicalName ?? null,
+        statusNotes: noteByAsset.get(a.id) ?? null,
       }));
       return createPaginatedResponse(items, meta);
     }),

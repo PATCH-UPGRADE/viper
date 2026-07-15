@@ -1,6 +1,7 @@
 // Shared builders for the user message sent to an agent. Any agent that reads
 // attached documents alongside its prompt goes through here.
 
+import "server-only";
 import { HumanMessage } from "@langchain/core/messages";
 
 export type PdfAttachment = {

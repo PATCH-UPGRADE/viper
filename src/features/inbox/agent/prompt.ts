@@ -1,6 +1,8 @@
 // Prompt fragments shared by the inbound-email agents. Kept here rather than in
 // @/lib because only the inbox deals in emails — the chat agents never see one.
 
+import "server-only";
+
 export type InboundEmail = {
   from: string;
   subject: string | null;

@@ -8,7 +8,7 @@ const isPdf = (a: {
   contentType?: string | null;
 }): boolean =>
   Boolean(
-    a.contentType?.startsWith("application/pdf") ||
+    a.contentType?.toLowerCase().startsWith("application/pdf") ||
       a.filename?.toLowerCase().endsWith(".pdf"),
   );
 

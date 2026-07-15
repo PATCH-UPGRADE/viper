@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { ExternalLinkIcon, HeartIcon, MailIcon, Unlink } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 import { toast } from "sonner";
+import { TlpBadge } from "@/components/tlp-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +25,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { TlpBadge } from "@/features/advisories/components/advisories";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
 import { displayName } from "@/lib/markdown/device-group";
 import { useMarkMatchIncorrect } from "../hooks/use-notifications";

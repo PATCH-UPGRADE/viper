@@ -13,21 +13,21 @@ export const resourceTypeSchema = z.enum([
   "WorkOrder",
 ]);
 
-export const integrationInputSchema = authSchema
-  .safeExtend({
-    name: z.string().min(1, "Name is required"),
-    platform: z.string().optional(),
-    integrationUri: safeUrlSchema,
-    integrationType: z.enum(["PARTNER", "AI", "CSAF", "REST"]),
-    prompt: z.string().optional(),
-    resourceType: resourceTypeSchema,
-    syncEvery: z
-      .number()
-      .int()
-      .positive()
-      .min(INTEGRATION_SYNC_EVERY_MIN * 60),
-  })
-  .refine(
+export const integrationInputSchema = authSchema.safeExtend({
+  name: z.string().min(1, "Name is required"),
+  platform: z.string().optional(),
+  integrationUri: safeUrlSchema,
+  integrationType: z.enum(["PARTNER", "AI", "CSAF", "REST"]),
+  prompt: z.string().optional(),
+  resourceType: resourceTypeSchema,
+  syncEvery: z
+    .number()
+    .int()
+    .positive()
+    .min(INTEGRATION_SYNC_EVERY_MIN * 60),
+});
+/* TODO: consider adding a CSAF integration type for notifications?
+   * .refine(
     (data) =>
       data.integrationType !== "CSAF" ||
       data.resourceType === ResourceType.Vulnerability,
@@ -36,7 +36,7 @@ export const integrationInputSchema = authSchema
         "CSAF integrations are only available for Vulnerability resource type",
       path: ["integrationType"],
     },
-  );
+  )*/
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;
 
 export function isValidResourceTypeKey(

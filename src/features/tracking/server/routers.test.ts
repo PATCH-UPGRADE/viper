@@ -599,7 +599,6 @@ describe("trackingRouter.list", () => {
       assignee: expect.any(Object),
       assets: expect.any(Object),
       vulnerabilities: expect.any(Object),
-      advisories: expect.any(Object),
       remediations: expect.any(Object),
     });
   });

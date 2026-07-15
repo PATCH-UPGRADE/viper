@@ -1,4 +1,3 @@
-import { advisoriesRouter } from "@/features/advisories/server/routers";
 import { apiKeyConnectorsRouter } from "@/features/api-key-connectors/server/routers";
 import { artifactsRouter } from "@/features/artifacts/server/routers";
 import { assetsRouter } from "@/features/assets/server/routers";
@@ -20,7 +19,6 @@ import { workflowsRouter } from "@/features/workflows/server/routers";
 import { createTRPCRouter } from "../init";
 
 export const appRouter = createTRPCRouter({
-  advisories: advisoriesRouter,
   notifications: notificationsRouter,
   workflows: workflowsRouter,
   assets: assetsRouter,

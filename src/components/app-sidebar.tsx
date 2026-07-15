@@ -12,7 +12,6 @@ import {
   type LucideIcon,
   PlugIcon,
   SettingsIcon,
-  ShieldAlertIcon,
   Sparkles,
   WorkflowIcon,
 } from "lucide-react";
@@ -75,11 +74,6 @@ const mainItems = [
     title: "Vulnerability Dashboard",
     icon: BugIcon,
     url: "/vulnerabilities",
-  },
-  {
-    title: "Advisories",
-    icon: ShieldAlertIcon,
-    url: "/advisories",
   },
   {
     title: "Tracking",

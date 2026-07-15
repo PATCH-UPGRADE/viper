@@ -2,9 +2,10 @@
 
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { HumanMessage } from "@langchain/core/messages";
 import { z } from "zod";
+import { buildUserMessage } from "@/lib/agent-messages";
 import { fetchPdfAttachments } from "../utils";
+import { emailPromptText, type InboundEmail } from "./prompt";
 
 // A device group referenced by a notification. All fields are optional so the
 // model can emit whatever identifiers it finds; downstream code skips entries
@@ -100,7 +101,7 @@ RULES:
 
 export async function extractEntities(
   sourceId: string,
-  email: { from: string; subject: string | null; markdown: string },
+  email: InboundEmail,
 ): Promise<ExtractResult> {
   const pdfAttachments = await fetchPdfAttachments(sourceId);
 
@@ -109,28 +110,11 @@ export async function extractEntities(
     maxTokens: 2048,
   }).withStructuredOutput(extractSchema);
 
-  const textPrompt = `From: ${email.from}
-Subject: ${email.subject ?? "(no subject)"}
-
---- NOTIFICATION BODY ---
-${email.markdown}`;
-
-  const userContent = [
-    { type: "text" as const, text: textPrompt },
-    ...pdfAttachments.map((pdf) => ({
-      type: "document",
-      source: {
-        type: "base64",
-        media_type: "application/pdf",
-        data: pdf.base64,
-      },
-      title: pdf.filename ?? "attachment.pdf",
-    })),
-  ];
-
   return model.invoke([
     { role: "system", content: SYSTEM_PROMPT },
-    // biome-ignore lint/suspicious/noExplicitAny: cast userContent type for langchain
-    new HumanMessage({ content: userContent as any }),
+    buildUserMessage(
+      emailPromptText(email, "NOTIFICATION BODY"),
+      pdfAttachments,
+    ),
   ]);
 }

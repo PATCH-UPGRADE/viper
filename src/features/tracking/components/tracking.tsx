@@ -100,7 +100,7 @@ export const TrackingList = () => {
 export const TrackingHeader = () => {
   return (
     <EntityHeader
-      title="Tracking"
+      title="Work Orders"
       description="Work order tickets and approval gates for in-flight remediations."
     />
   );

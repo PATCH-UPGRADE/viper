@@ -3,6 +3,63 @@ import prisma from "@/lib/db";
 import { normalizeName } from "@/lib/router-utils";
 import { downloadBufferFromS3, keyFromDownloadUrl } from "@/lib/s3";
 
+const isPdf = (a: {
+  filename?: string | null;
+  contentType?: string | null;
+}): boolean =>
+  Boolean(
+    a.contentType?.toLowerCase().startsWith("application/pdf") ||
+      a.filename?.toLowerCase().endsWith(".pdf"),
+  );
+
+/**
+ * Fetch an inbound email's PDF attachments straight from Resend, as base64
+ * `document` blocks. Used by the triage gate, which runs before we upload to
+ * S3 or write a NotificationSource and so cannot use `fetchPdfAttachments`
+ */
+export async function fetchPdfAttachmentsFromResend(
+  emailId: string,
+  attachments: Array<{
+    id: string;
+    filename?: string | null;
+    content_type?: string | null;
+  }>,
+): Promise<Array<{ filename: string | null; base64: string }>> {
+  const pdfs = attachments.filter((a) =>
+    isPdf({ filename: a.filename, contentType: a.content_type }),
+  );
+  if (pdfs.length === 0) return [];
+
+  const { Resend } = await import("resend");
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
+  const results = await Promise.all(
+    pdfs.map(async (a) => {
+      try {
+        const { data, error } = await resend.emails.receiving.attachments.get({
+          emailId,
+          id: a.id,
+        });
+        if (error || !data?.download_url) return null;
+
+        const res = await fetch(data.download_url);
+        if (!res.ok) return null;
+
+        const buffer = Buffer.from(await res.arrayBuffer());
+        return {
+          filename: a.filename ?? null,
+          base64: buffer.toString("base64"),
+        };
+      } catch (err) {
+        console.warn(`Failed to download attachment ${a.id}:`, err);
+        return null;
+      }
+    }),
+  );
+
+  return results.filter((a) => a !== null);
+}
+
 /**
  * Fetch all PDF attachments for a NotificationSource and return them as
  * base64-encoded buffers, ready to be passed to Claude as `document` blocks.
@@ -18,12 +75,7 @@ export async function fetchPdfAttachments(
 
   const results = await Promise.all(
     attachments
-      .filter(
-        (a) =>
-          (a.contentType?.startsWith("application/pdf") ||
-            a.filename?.toLowerCase().endsWith(".pdf")) &&
-          a.downloadUrl !== null,
-      )
+      .filter((a) => isPdf(a) && a.downloadUrl !== null)
       .map(async (a) => {
         try {
           const key = keyFromDownloadUrl(a.downloadUrl!);

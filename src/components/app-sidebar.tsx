@@ -12,6 +12,7 @@ import {
   type LucideIcon,
   PlugIcon,
   SettingsIcon,
+  ShieldAlertIcon,
   Sparkles,
   WorkflowIcon,
 } from "lucide-react";
@@ -76,7 +77,12 @@ const mainItems = [
     url: "/vulnerabilities",
   },
   {
-    title: "Tracking",
+    title: "Advisories",
+    icon: ShieldAlertIcon,
+    url: "/advisories",
+  },
+  {
+    title: "Work Orders",
     icon: ListChecksIcon,
     url: "/tracking",
   },

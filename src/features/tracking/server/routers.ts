@@ -83,14 +83,8 @@ const ticketLinkedCount = (count: {
   issues: number;
   vulnerabilities: number;
   remediations: number;
-  advisories: number;
   assets: number;
-}) =>
-  count.issues +
-  count.vulnerabilities +
-  count.remediations +
-  count.advisories +
-  count.assets;
+}) => count.issues + count.vulnerabilities + count.remediations + count.assets;
 
 const buildLinkedPreview = (ticket: {
   vulnerabilities: { id: string; cveId: string | null }[];
@@ -313,7 +307,7 @@ export const trackingRouter = createTRPCRouter({
         tags: ["Work Orders"],
         summary: "List work-order tickets",
         description:
-          "Return a paginated set of work-order tickets matching the given filters, with linked entities (assets, vulnerabilities, advisories, remediations) included.",
+          "Return a paginated set of work-order tickets matching the given filters, with linked entities (assets, vulnerabilities, remediations) included.",
       },
     })
     .output(paginatedWorkOrderListResponseSchema)

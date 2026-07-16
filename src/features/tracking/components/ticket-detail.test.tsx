@@ -307,7 +307,6 @@ const makeTicket = (
     vulnerabilities: [],
     issues: [],
     remediations: [],
-    advisories: [],
     comments: [],
     creator: { id: "u1", name: "Alice", email: "alice@example.com" },
     sourceLabel: null,
@@ -770,7 +769,6 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
   vulnerabilities: [],
   issues: [],
   remediations: [],
-  advisories: [],
   comments: [],
   creator: { id: "u1", name: "Alice", email: "alice@example.com" },
   sourceLabel: null,
@@ -866,20 +864,6 @@ describe("TicketDetailContent — view mode", () => {
     expect(screen.getByText("Patch ICU room 302")).toBeInTheDocument();
     expect(screen.getByText("To Do")).toBeInTheDocument();
     expect(screen.getByText("Done")).toBeInTheDocument();
-  });
-
-  it("renders advisories with links to each advisory page", () => {
-    renderDetail({
-      advisories: [
-        {
-          id: "adv-1",
-          title: "Apache Log4j CVE-2021-44228",
-          severity: "Critical",
-        },
-      ],
-    });
-    const link = screen.getByRole("link", { name: /apache log4j/i });
-    expect(link).toHaveAttribute("href", "/advisories/adv-1");
   });
 
   it("shows 'No assets linked' when there are no linked assets", () => {

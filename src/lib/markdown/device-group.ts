@@ -1,6 +1,6 @@
 import type { CanonicalRef } from "./shared";
 
-const displayName = (ref: CanonicalRef): string | undefined =>
+export const displayName = (ref: CanonicalRef): string | undefined =>
   ref && ref.canonicalDisplayName !== "-"
     ? ref.canonicalDisplayName
     : undefined;
@@ -75,13 +75,18 @@ type DeviceGroupMatchingDisplay = {
  * Human-readable label for a device-group matching, e.g. "Acme Radiator 2.1.3"
  * or "Acme Radiator vers:semver/>=2.0|<3.0".
  */
+export interface DeviceGroupMatchingLabelOpts {
+  hideVersion?: boolean;
+}
+
 export function deviceGroupMatchingLabel(
   m: DeviceGroupMatchingDisplay,
+  opts?: DeviceGroupMatchingLabelOpts,
 ): string {
   const parts = [
     displayName(m.vendor),
     displayName(m.product),
-    displayName(m.version) ?? m.versionRange ?? undefined,
+    !opts?.hideVersion ? (displayName(m.version) ?? m.versionRange) : undefined,
   ].filter(Boolean);
   return parts.join(" ");
 }
@@ -90,5 +95,5 @@ export function deviceGroupMatchingLabel(
 export function deviceGroupMatchingsSummary(
   matchings: DeviceGroupMatchingDisplay[],
 ): string {
-  return matchings.map(deviceGroupMatchingLabel).join(", ");
+  return matchings.map((d) => deviceGroupMatchingLabel(d)).join(", ");
 }

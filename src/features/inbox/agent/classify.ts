@@ -3,11 +3,12 @@
 
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { HumanMessage } from "@langchain/core/messages";
 import { z } from "zod";
+import { buildUserMessage } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { notificationPayloadSchema } from "../types";
 import { fetchPdfAttachments } from "../utils";
+import { emailPromptText, type InboundEmail } from "./prompt";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -55,21 +56,19 @@ UPSERT DECISION:
 // > Return action "update" only when this email is clearly a follow-up or amendment to one of the provided existing notifications (same CVE IDs, same recall number, same product + version, explicit reference to a prior advisory)
 // This could almost certainly be made deterministic, or at least improved upon
 
-function buildTextPrompt(input: {
-  from: string;
-  subject: string | null;
-  markdown: string;
+function buildTextPrompt(
+  email: InboundEmail,
   existingNotifications: Array<{
     id: string;
     type: string;
     title: string | null;
     summary: string | null;
-  }>;
-}): string {
+  }>,
+): string {
   // TODO: This could certainly be improved upon with something like a vector db, rather than just context-stuffing
   const existing =
-    input.existingNotifications.length > 0
-      ? input.existingNotifications
+    existingNotifications.length > 0
+      ? existingNotifications
           .map(
             (n) =>
               `- id: ${n.id} | type: ${n.type} | title: ${n.title ?? "(untitled)"} | summary: ${n.summary ?? "(none)"}`,
@@ -77,11 +76,7 @@ function buildTextPrompt(input: {
           .join("\n")
       : "(none)";
 
-  return `From: ${input.from}
-Subject: ${input.subject ?? "(no subject)"}
-
---- EMAIL BODY ---
-${input.markdown}
+  return `${emailPromptText(email)}
 
 --- EXISTING NOTIFICATIONS ---
 ${existing}`;
@@ -89,7 +84,7 @@ ${existing}`;
 
 export async function classifyNotification(
   sourceId: string,
-  email: { from: string; subject: string | null; markdown: string },
+  email: InboundEmail,
 ): Promise<ClassifyResult> {
   const [pdfAttachments, existingNotifications] = await Promise.all([
     fetchPdfAttachments(sourceId),
@@ -104,26 +99,12 @@ export async function classifyNotification(
     maxTokens: 1024,
   }).withStructuredOutput(classifySchema);
 
-  const userContent = [
-    {
-      type: "text" as const,
-      text: buildTextPrompt({ ...email, existingNotifications }),
-    },
-    ...pdfAttachments.map((pdf) => ({
-      type: "document",
-      source: {
-        type: "base64",
-        media_type: "application/pdf",
-        data: pdf.base64,
-      },
-      title: pdf.filename ?? "attachment.pdf",
-    })),
-  ];
-
   const result = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },
-    // biome-ignore lint/suspicious/noExplicitAny: cast userContent type for langchain
-    new HumanMessage({ content: userContent as any }),
+    buildUserMessage(
+      buildTextPrompt(email, existingNotifications),
+      pdfAttachments,
+    ),
   ]);
 
   return result;

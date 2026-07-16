@@ -1,6 +1,8 @@
 import "server-only";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
+  IssueStatus,
   MatchFeedbackTargetType,
   NotificationType,
   Priority,
@@ -16,14 +18,46 @@ import {
   paginationInputSchema,
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { notificationDetailInclude, notificationInclude } from "../types";
 import { recordFieldCorrections } from "@/lib/field-correction";
+import {
+  type MatchingWithLabels,
+  notificationDetailInclude,
+  notificationInclude,
+  type ResolvedDeviceGroupAsset,
+} from "../types";
+import type { AffectedBucket } from "./affected-assets";
+import {
+  bucketForStatus,
+  buildAffectedAssetsSummary,
+  computeMatchingBuckets,
+  type MatchingBucketGroup,
+} from "./affected-assets";
 
 type MatchingIdentity = {
   vendorId: string;
   productId: string | null;
   versionId: string | null;
   versionRange: string | null;
+};
+
+/**
+ * Per-matching inputs needed to bucket its assets: the matching-level Issue
+ * status per vuln, the asset-level override Issues that belong to this matching,
+ * and whether it is linked to the notification.
+ */
+type AffectedMatchingContext = {
+  matchingId: string;
+  mappingId: string | null;
+  deviceGroupMatching: MatchingWithLabels;
+  matchingStatusByVuln: Record<string, IssueStatus>;
+  matchingNotesByVuln: Record<string, string>; // issue statusNotes
+  overrides: {
+    assetId: string;
+    statusByVuln: Record<string, IssueStatus>;
+    notesByVuln: Record<string, string>; // issue statusNotes
+  }[];
+  isNotificationLinked: boolean;
+  // ^true if \exists NotificationDeviceGroupMapping n s.t n.dgm.id=am.id
 };
 
 const ALLOWED_SORT_FIELDS = new Set(["priority", "updatedAt", "createdAt"]);
@@ -59,7 +93,10 @@ async function resolvedDeviceGroupAssetCount(
     .reduce((sum, dg) => sum + dg._count.assets, 0);
 }
 
-async function resolveDeviceGroupAssets(matching: MatchingIdentity) {
+/** Ids of the concrete device groups a matching resolves to (for paginated asset queries). */
+async function resolveMatchedDeviceGroupIds(
+  matching: MatchingIdentity,
+): Promise<string[]> {
   const candidates = await prisma.deviceGroup.findMany({
     where: deviceGroupWhereForMatching(matching),
     select: {
@@ -68,20 +105,162 @@ async function resolveDeviceGroupAssets(matching: MatchingIdentity) {
       productId: true,
       versionId: true,
       version: { select: { canonicalName: true } },
-      assets: {
-        select: {
-          id: true,
-          ip: true,
-          hostname: true,
-          location: true,
-          status: true,
-        },
-      },
     },
   });
   return candidates
     .filter((dg) => matchingAppliesToDeviceGroup(matching, dg))
-    .flatMap((dg) => dg.assets);
+    .map((dg) => dg.id);
+}
+
+/**
+ * Get all non-Fixed Issues that are associated with vulnerabilities from this notification
+ * Sort issues into DGM issues, and asset issues
+ * Build displayMatchings, DGM's that are linked to notification union DGM's found via issues
+ * statusByMatching links {DGM.id -> {vuln.id -> status}}
+ * Get all DGM's of the Issue assets to know where to exclude them
+ */
+async function buildMatchingContexts(
+  notifMatchings: { id: string; deviceGroupMatching: MatchingWithLabels }[],
+  vulnIds: string[],
+): Promise<AffectedMatchingContext[]> {
+  const issues =
+    vulnIds.length === 0
+      ? []
+      : await prisma.issue.findMany({
+          where: {
+            vulnerabilityId: { in: vulnIds },
+          },
+          select: {
+            vulnerabilityId: true,
+            deviceGroupMatchingId: true,
+            assetId: true,
+            status: true,
+            statusNotes: true,
+          },
+        });
+
+  // Matching-level FIXED issues are dropped here (bucketing assumes FIXED is
+  // filtered upstream); asset-level FIXED overrides are kept so a fixed asset
+  // is excluded from its matching's default bucket.
+  const matchingLevelIssues = issues.filter(
+    (i) =>
+      i.assetId === null &&
+      i.deviceGroupMatchingId !== null &&
+      i.status !== IssueStatus.FIXED,
+  );
+  const assetLevelIssues = issues.filter((i) => i.assetId !== null);
+
+  // Display matchings: notification-linked `union` issue-referenced.
+  const displayMatchings = new Map<
+    string,
+    { mappingId: string | null; deviceGroupMatching: MatchingWithLabels }
+  >();
+  for (const m of notifMatchings) {
+    if (!displayMatchings.has(m.deviceGroupMatching.id)) {
+      displayMatchings.set(m.deviceGroupMatching.id, {
+        mappingId: m.id,
+        deviceGroupMatching: m.deviceGroupMatching,
+      });
+    }
+  }
+  const extraIds = [
+    ...new Set(
+      matchingLevelIssues.map((i) => i.deviceGroupMatchingId as string),
+    ),
+  ].filter((id) => !displayMatchings.has(id));
+  if (extraIds.length > 0) {
+    const extra = await prisma.deviceGroupMatching.findMany({
+      where: { id: { in: extraIds } },
+      include: { vendor: true, product: true, version: true },
+    });
+    for (const dm of extra) {
+      displayMatchings.set(dm.id, {
+        mappingId: null,
+        deviceGroupMatching: dm,
+      });
+    }
+  }
+
+  // Matching-level status (and notes) per (matching, vuln).
+  const statusByMatching = new Map<string, Record<string, IssueStatus>>();
+  const notesByMatching = new Map<string, Record<string, string>>();
+  for (const i of matchingLevelIssues) {
+    const mid = i.deviceGroupMatchingId as string;
+    const rec = statusByMatching.get(mid) ?? {};
+    rec[i.vulnerabilityId] = i.status;
+    statusByMatching.set(mid, rec);
+    if (i.statusNotes) {
+      const notes = notesByMatching.get(mid) ?? {};
+      notes[i.vulnerabilityId] = i.statusNotes;
+      notesByMatching.set(mid, notes);
+    }
+  }
+
+  // Asset-level override status (and notes) per (asset, vuln).
+  const overrideByAsset = new Map<string, Record<string, IssueStatus>>();
+  const overrideNotesByAsset = new Map<string, Record<string, string>>();
+  for (const i of assetLevelIssues) {
+    const aid = i.assetId as string;
+    const rec = overrideByAsset.get(aid) ?? {};
+    rec[i.vulnerabilityId] = i.status;
+    overrideByAsset.set(aid, rec);
+    if (i.statusNotes) {
+      const notes = overrideNotesByAsset.get(aid) ?? {};
+      notes[i.vulnerabilityId] = i.statusNotes;
+      overrideNotesByAsset.set(aid, notes);
+    }
+  }
+
+  // Fetch the few override assets' device-group identity to assign them to matchings.
+  // NOTE: to be efficient, assumes |assetLevelIssues.length| is small
+  // Possible TODO in the future here...
+  const overrideAssetIds = [...overrideByAsset.keys()];
+  const overrideAssets =
+    overrideAssetIds.length === 0
+      ? []
+      : await prisma.asset.findMany({
+          where: { id: { in: overrideAssetIds } },
+          select: {
+            id: true,
+            deviceGroup: {
+              select: {
+                vendorId: true,
+                productId: true,
+                versionId: true,
+                version: { select: { canonicalName: true } },
+              },
+            },
+          },
+        });
+
+  const contexts: AffectedMatchingContext[] = [];
+  for (const [
+    matchingId,
+    { mappingId, deviceGroupMatching },
+  ] of displayMatchings) {
+    const overrides = overrideAssets
+      .filter((a) =>
+        matchingAppliesToDeviceGroup(deviceGroupMatching, {
+          id: a.id,
+          ...a.deviceGroup,
+        }),
+      )
+      .map((a) => ({
+        assetId: a.id,
+        statusByVuln: overrideByAsset.get(a.id) ?? {},
+        notesByVuln: overrideNotesByAsset.get(a.id) ?? {},
+      }));
+    contexts.push({
+      matchingId,
+      mappingId,
+      deviceGroupMatching,
+      matchingStatusByVuln: statusByMatching.get(matchingId) ?? {},
+      matchingNotesByVuln: notesByMatching.get(matchingId) ?? {},
+      overrides,
+      isNotificationLinked: mappingId !== null,
+    });
+  }
+  return contexts;
 }
 
 export const notificationsRouter = createTRPCRouter({
@@ -165,19 +344,191 @@ export const notificationsRouter = createTRPCRouter({
       });
 
       if (!notification) {
-        throw new Error("Notification not found");
+        throw new TRPCError({ code: "NOT_FOUND" });
       }
-      const deviceGroupsMatchings = await Promise.all(
-        notification.deviceGroupsMatchings
-          .filter((m) => m.confidence !== "Rejected")
-          .map(async (m) => {
-            const assets = await resolveDeviceGroupAssets(
-              m.deviceGroupMatching,
-            );
-            return { ...m, assetCount: assets.length, assets };
-          }),
+
+      const notifMatchings = notification.deviceGroupsMatchings.filter(
+        (m) => m.confidence !== "Rejected",
       );
-      return { ...notification, deviceGroupsMatchings };
+      const vulnIds = notification.vulnerabilities.map(
+        (v) => v.vulnerabilityId,
+      );
+
+      const contexts = await buildMatchingContexts(
+        notifMatchings.map((m) => ({
+          id: m.id,
+          deviceGroupMatching: m.deviceGroupMatching,
+        })),
+        vulnIds,
+      );
+
+      // One COUNT per display matching
+      const countByMatchingId = new Map<string, number>();
+      await Promise.all(
+        contexts.map(async (c) => {
+          countByMatchingId.set(
+            c.matchingId,
+            await resolvedDeviceGroupAssetCount(c.deviceGroupMatching),
+          );
+        }),
+      );
+
+      const groups: MatchingBucketGroup[] = contexts.map((c) => ({
+        mappingId: c.mappingId,
+        deviceGroupMatching: c.deviceGroupMatching,
+        statusByVuln: c.matchingStatusByVuln,
+        notesByVuln: c.matchingNotesByVuln,
+        buckets: computeMatchingBuckets({
+          matchingStatusByVuln: c.matchingStatusByVuln,
+          overrides: c.overrides,
+          totalAssetCount: countByMatchingId.get(c.matchingId) ?? 0,
+          isNotificationLinked: c.isNotificationLinked,
+        }),
+      }));
+      const affectedAssets = buildAffectedAssetsSummary(groups);
+
+      const deviceGroupsMatchings = notifMatchings.map((m) => ({
+        ...m,
+        assetCount: countByMatchingId.get(m.deviceGroupMatching.id) ?? 0,
+      }));
+
+      return { ...notification, deviceGroupsMatchings, affectedAssets };
+    }),
+
+  getAffectedAssetsPage: protectedProcedure
+    .input(
+      paginationInputSchema.extend({
+        notificationId: z.string(),
+        matchingId: z.string(),
+        bucket: z.enum([
+          "needsAttention",
+          "needsInformation",
+          "lowConcern",
+          "unaffected",
+        ]),
+      }),
+    )
+    .query(async ({ input }) => {
+      const { notificationId, matchingId } = input;
+      const bucket = input.bucket as AffectedBucket;
+
+      const notification = await prisma.notification.findUnique({
+        where: { id: notificationId },
+        select: {
+          vulnerabilities: { select: { vulnerabilityId: true } },
+          deviceGroupsMatchings: {
+            select: {
+              id: true,
+              confidence: true,
+              deviceGroupMatching: {
+                include: { vendor: true, product: true, version: true },
+              },
+            },
+          },
+        },
+      });
+      if (!notification) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      const emptyMeta = buildPaginationMeta(input, 0);
+      const notifMatchings = notification.deviceGroupsMatchings.filter(
+        (m) => m.confidence !== "Rejected",
+      );
+      const vulnIds = notification.vulnerabilities.map(
+        (v) => v.vulnerabilityId,
+      );
+
+      const contexts = await buildMatchingContexts(
+        notifMatchings.map((m) => ({
+          id: m.id,
+          deviceGroupMatching: m.deviceGroupMatching,
+        })),
+        vulnIds,
+      );
+      const ctx = contexts.find((c) => c.matchingId === matchingId);
+      if (!ctx) {
+        return createPaginatedResponse<ResolvedDeviceGroupAsset>([], emptyMeta);
+      }
+
+      const totalAssetCount = await resolvedDeviceGroupAssetCount(
+        ctx.deviceGroupMatching,
+      );
+      const buckets = computeMatchingBuckets({
+        matchingStatusByVuln: ctx.matchingStatusByVuln,
+        overrides: ctx.overrides,
+        totalAssetCount,
+        isNotificationLinked: ctx.isNotificationLinked,
+      });
+      const result = buckets[bucket];
+      if (!result) {
+        return createPaginatedResponse<ResolvedDeviceGroupAsset>([], emptyMeta);
+      }
+
+      const deviceGroupIds = await resolveMatchedDeviceGroupIds(
+        ctx.deviceGroupMatching,
+      );
+      const idFilter =
+        result.filter.kind === "only"
+          ? { in: result.filter.assetIds }
+          : result.filter.excludedAssetIds.length > 0
+            ? { notIn: result.filter.excludedAssetIds }
+            : undefined;
+      const where = {
+        deviceGroupId: { in: deviceGroupIds },
+        ...(idFilter ? { id: idFilter } : {}),
+      };
+
+      // Asset-level override notes for this matching, one joined string per asset.
+      // Only keep notes whose vuln status maps to the bucket being paged, so an
+      // asset shown in one bucket doesn't surface a note from another bucket.
+      // TODO: Consider using a dict to separate these by vuln?
+      const noteByAsset = new Map<string, string>();
+      for (const o of ctx.overrides) {
+        const notes = [
+          ...new Set(
+            Object.entries(o.notesByVuln)
+              .filter(
+                ([vulnId]) =>
+                  bucketForStatus(o.statusByVuln[vulnId]) === bucket,
+              )
+              .map(([, note]) => note),
+          ),
+        ];
+        if (notes.length > 0) {
+          noteByAsset.set(o.assetId, notes.join("\n"));
+        }
+      }
+
+      const totalCount = await prisma.asset.count({ where });
+      const meta = buildPaginationMeta(input, totalCount);
+      const assets = await prisma.asset.findMany({
+        skip: meta.skip,
+        take: meta.take,
+        where,
+        select: {
+          id: true,
+          ip: true,
+          hostname: true,
+          location: true,
+          status: true,
+          deviceGroup: {
+            select: { version: { select: { canonicalName: true } } },
+          },
+        },
+        orderBy: { id: "asc" },
+      });
+
+      const items: ResolvedDeviceGroupAsset[] = assets.map((a) => ({
+        id: a.id,
+        ip: a.ip,
+        hostname: a.hostname,
+        location: a.location,
+        status: a.status,
+        version: a.deviceGroup.version?.canonicalName ?? null,
+        statusNotes: noteByAsset.get(a.id) ?? null,
+      }));
+      return createPaginatedResponse(items, meta);
     }),
 
   markRead: protectedProcedure

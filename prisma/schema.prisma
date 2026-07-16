@@ -31,7 +31,6 @@ model User {
   deviceArtifacts           DeviceArtifact[]
   artifacts                 Artifact[]
   artifactWrappers          ArtifactWrapper[]
-  advisories                Advisory[]
 
   apikeys                   Apikey[]
   apiKeyConnectors          ApiKeyConnector[]
@@ -303,7 +302,6 @@ model DeviceGroupMatching {
 
   vulnerabilities Vulnerability[]  @relation("VulnerabilityMatchings")
   remediations    Remediation[]    @relation("RemediationMatchings")
-  advisories      Advisory[]       @relation("AdvisoryMatchings")
   deviceArtifacts DeviceArtifact[] @relation("DeviceArtifactMatchings")
   issues          Issue[]
   notificationMappings  NotificationDeviceGroupMapping[]
@@ -580,7 +578,6 @@ model Vulnerability {
   sarif                Json
   affectedComponents   String[]        @default([])
   deviceGroupMatchings DeviceGroupMatching[] @relation("VulnerabilityMatchings")
-  advisories           Advisory[]      @relation("AdvisoryVulnerabilities")
   exploitUri           String?         @map("exploit-uri")
   upstreamApi          String?         @map("upstream-api")
 
@@ -848,7 +845,6 @@ model Integration {
   deviceArtifactMappings ExternalDeviceArtifactMapping[]
   remediationMappings    ExternalRemediationMapping[]
   vulnerabilityMappings  ExternalVulnerabilityMapping[]
-  advisoryMappings       ExternalAdvisoryMapping[]
   workOrderMappings      ExternalWorkOrderMapping[]
 
   createdAt              DateTime          @default(now())
@@ -962,46 +958,6 @@ enum Tlp {
   // TLP v2
   CLEAR
   AMBER_STRICT
-}
-
-model Advisory {
-  id                        String          @id @default(cuid())
-  userId                    String
-  title                     String?
-  user                      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  referencedVulnerabilities Vulnerability[]       @relation("AdvisoryVulnerabilities")
-  deviceGroupMatchings      DeviceGroupMatching[] @relation("AdvisoryMatchings")
-  csaf                      Json                  @default("{}")
-  upstreamUrl               String?         @unique
-  severity                  Severity
-  summary                   String?         @db.Text
-  status                    IssueStatus     @default(AFFECTED)
-  tlp                       Tlp?
-  publishedAt               DateTime?
-  createdAt                 DateTime        @default(now())
-  updatedAt                 DateTime        @updatedAt
-  externalMappings          ExternalAdvisoryMapping[]
-  workOrderTickets             WorkOrderTicket[]  @relation("WorkOrderTicketAdvisories")
-
-  @@index([userId])
-  @@map("advisory")
-}
-
-model ExternalAdvisoryMapping {
-  id            String      @id @default(cuid())
-  itemId        String
-  integrationId String
-  externalId    String
-  item          Advisory    @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  lastSynced    DateTime?
-
-  @@unique([itemId, integrationId], name: "external_advisory_mappings_itemId_integrationId_key")
-  @@unique([integrationId, externalId], name: "external_advisory_mappings_integrationId_externalId_key")
-  @@index([itemId])
-  @@map("external_advisory_mappings")
 }
 
 model ChatThread {
@@ -1129,7 +1085,6 @@ model WorkOrderTicket {
   issues          Issue[]         @relation("WorkOrderTicketIssues")
   vulnerabilities Vulnerability[] @relation("WorkOrderTicketVulns")
   remediations    Remediation[]   @relation("WorkOrderTicketRemediations")
-  advisories      Advisory[]      @relation("WorkOrderTicketAdvisories")
   assets          Asset[]         @relation("WorkOrderTicketAssets")
   deviceGroups    NotificationDeviceGroupMapping[]
 

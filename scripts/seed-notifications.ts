@@ -1,6 +1,8 @@
 import {
   type AssetStatus,
   ConfidenceLevel,
+  IssueStatus,
+  NotAffectedJustification,
   NotificationChannel,
   NotificationType,
   Priority,
@@ -45,325 +47,6 @@ function upsertVersion(name: string) {
     create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
   });
 }
-
-// ---------------------------------------------------------------------------
-// Device groups + assets
-// ---------------------------------------------------------------------------
-
-const DEVICE_GROUPS = [
-  {
-    vendor: "Philips",
-    product: "IntelliVue MX800 Patient Monitor",
-    assetCount: 8,
-    assetRole: "Patient Monitor",
-    networkSegment: "ICU-MONITORS",
-  },
-  {
-    vendor: "GE HealthCare",
-    product: "Alaris 8015 PC Unit Infusion Pump",
-    assetCount: 14,
-    assetRole: "Infusion Pump",
-    networkSegment: "PHARMACY-PUMPS",
-  },
-  {
-    vendor: "BD",
-    product: "Pyxis MedStation 4000 ES",
-    assetCount: 6,
-    assetRole: "Medication Dispenser",
-    networkSegment: "NURSING-STATIONS",
-  },
-  {
-    vendor: "Draeger",
-    product: "Perseus A500 Anesthesia Workstation",
-    assetCount: 4,
-    assetRole: "Anesthesia Workstation",
-    networkSegment: "OR-SUITE",
-  },
-];
-
-async function seedDeviceGroups(userId: string) {
-  console.log("\n🌱 Seeding device groups and assets...");
-  const results = [];
-
-  for (const dg of DEVICE_GROUPS) {
-    const vendor = await upsertVendor(dg.vendor);
-    const product = await upsertProduct(dg.product);
-
-    const identity = { vendorId: vendor.id, productId: product.id };
-    const existing = await prisma.deviceGroup.findFirst({ where: identity });
-    const deviceGroup =
-      existing ?? (await prisma.deviceGroup.create({ data: identity }));
-    const existingMatching = await prisma.deviceGroupMatching.findFirst({
-      where: { vendorId: vendor.id, productId: product.id, versionId: null },
-    });
-    const deviceGroupMatching =
-      existingMatching ??
-      (await prisma.deviceGroupMatching.create({ data: identity }));
-    const existingAssets = await prisma.asset.count({
-      where: { deviceGroupId: deviceGroup.id },
-    });
-
-    if (existingAssets < dg.assetCount) {
-      const toCreate = dg.assetCount - existingAssets;
-      const assets = Array.from({ length: toCreate }).map((_, i) => ({
-        ip: `10.${DEVICE_GROUPS.indexOf(dg) + 1}.0.${existingAssets + i + 1}`,
-        role: dg.assetRole,
-        networkSegment: dg.networkSegment,
-        hostname: `${dg.assetRole.toLowerCase().replace(/\s+/g, "-")}-${String(existingAssets + i + 1).padStart(2, "0")}`,
-        upstreamApi: "https://example.com/placeholder",
-        status: "Active" as AssetStatus,
-        deviceGroupId: deviceGroup.id,
-        userId,
-      }));
-      await prisma.asset.createMany({ data: assets, skipDuplicates: true });
-    }
-
-    console.log(
-      `  ✅ ${dg.vendor} ${dg.product} (${deviceGroup.id}) — ${dg.assetCount} assets`,
-    );
-    results.push({
-      ...dg,
-      deviceGroupId: deviceGroup.id,
-      deviceGroupMatchingId: deviceGroupMatching.id,
-    });
-  }
-
-  return results;
-}
-
-// ---------------------------------------------------------------------------
-// Notification seed data
-// ---------------------------------------------------------------------------
-
-type NotificationSeed = {
-  title: string;
-  summary: string;
-  type: NotificationType;
-  priority: Priority;
-  tlp: Tlp | null;
-  hospitalImpact: string;
-  priorityReasonWhy: string;
-  deviceGroupIndices: number[];
-  sources: Array<{
-    from: string;
-    subject: string;
-  }>;
-};
-
-const NOTIFICATIONS: NotificationSeed[] = [
-  {
-    title: "Philips IntelliVue MX800 — Hard-Coded Credentials (CVE-2023-40539)",
-    summary:
-      "Philips has disclosed a critical vulnerability in the IntelliVue MX800 patient monitor series. Hard-coded service credentials allow unauthenticated access to clinical configuration interfaces over the hospital network, enabling silent modification of alarm thresholds and waveform display settings.",
-    type: NotificationType.Advisory,
-    priority: Priority.Critical,
-    tlp: Tlp.AMBER,
-    hospitalImpact:
-      "Affects 8 ICU patient monitors. Alarm suppression or threshold manipulation could delay nurse response to life-threatening events.",
-    priorityReasonWhy:
-      "Network-accessible, no authentication required, directly impacts life-safety alarms in ICU. Immediate containment recommended.",
-    deviceGroupIndices: [0],
-    sources: [
-      {
-        from: "psirt@philips.com",
-        subject:
-          "Security Advisory: IntelliVue MX800 Hard-Coded Credentials — CVE-2023-40539",
-      },
-      {
-        from: "alerts@cisa.gov",
-        subject: "ICS-CERT Alert: Philips IntelliVue Vulnerability Disclosure",
-      },
-    ],
-  },
-  {
-    title: "GE Alaris 8015 PC Unit — Firmware Recall Notice",
-    summary:
-      "GE HealthCare has issued a Class II Device Recall for the Alaris 8015 PC Unit running firmware versions 11.1.2 through 11.1.5. A buffer overflow in the drug library parser can cause device resets during infusion, potentially interrupting critical IV medication delivery.",
-    type: NotificationType.Recall,
-    priority: Priority.Critical,
-    tlp: Tlp.GREEN,
-    hospitalImpact:
-      "14 infusion pumps in pharmacy and patient floors. Unexpected device resets during active infusion could interrupt vasoactive drips or antibiotic delivery.",
-    priorityReasonWhy:
-      "FDA Class II recall with documented field failures. Direct patient safety impact. Firmware update required before continued clinical use.",
-    deviceGroupIndices: [1],
-    sources: [
-      {
-        from: "recall-notifications@gehealthcare.com",
-        subject: "URGENT: Class II Recall — Alaris 8015 Firmware 11.1.2–11.1.5",
-      },
-    ],
-  },
-  {
-    title: "BD Pyxis MedStation 4000 ES — Firmware Update 1.8.2",
-    summary:
-      "BD has released firmware update 1.8.2 for the Pyxis MedStation 4000 ES, addressing two moderate-severity vulnerabilities: an authenticated path traversal (CVE-2024-11923) and an insecure TLS downgrade (CVE-2024-11924). The update also improves controlled substance audit log tamper detection.",
-    type: NotificationType.UpdateAvailable,
-    priority: Priority.High,
-    tlp: Tlp.GREEN,
-    hospitalImpact:
-      "6 medication dispensing cabinets across nursing stations. Path traversal could allow authorized users to access configuration files outside their permission scope.",
-    priorityReasonWhy:
-      "Not actively exploited, but the audit log improvement is important for DEA compliance. Schedule update in next maintenance window.",
-    deviceGroupIndices: [2],
-    sources: [
-      {
-        from: "security@bd.com",
-        subject: "Pyxis MedStation 4000 ES — Firmware 1.8.2 Security Update",
-      },
-    ],
-  },
-  {
-    title:
-      "Draeger Perseus A500 — Unencrypted Service Port Exposed on OR Network",
-    summary:
-      "Security research published by MedSec has identified that Draeger Perseus A500 anesthesia workstations expose a legacy service port (TCP 7788) without TLS when connected to a flat OR network segment. The port accepts unauthenticated read queries for device configuration and recent case parameters.",
-    type: NotificationType.Advisory,
-    priority: Priority.High,
-    tlp: Tlp.AMBER,
-    hospitalImpact:
-      "4 anesthesia workstations in OR suites. Exposure limited to OR network segment — clinical staff with network access could query case parameters without authentication.",
-    priorityReasonWhy:
-      "Not remotely exploitable from outside OR segment. Draeger patch pending (Q2 2025). Recommend network segmentation of OR VLAN as interim mitigation.",
-    deviceGroupIndices: [3],
-    sources: [
-      {
-        from: "notifications@medsec-research.io",
-        subject:
-          "Research Disclosure: Draeger Perseus A500 Service Port Exposure",
-      },
-      {
-        from: "psirt@draeger.com",
-        subject:
-          "Re: Perseus A500 TCP 7788 — Vendor Statement and Patch Timeline",
-      },
-    ],
-  },
-  {
-    title: "Philips IntelliVue — TLS Certificate Expiry Warning (30 days)",
-    summary:
-      "The TLS certificates used for IntelliVue waveform streaming to the central monitoring station are expiring in 30 days. After expiry, encrypted data channels will fall back to unencrypted transmission per device default configuration, exposing real-time patient waveform data on the network.",
-    type: NotificationType.Advisory,
-    priority: Priority.Monitor,
-    tlp: null,
-    hospitalImpact:
-      "Affects waveform data confidentiality for all monitored patients. Not life-safety, but represents a HIPAA compliance gap if not addressed.",
-    priorityReasonWhy:
-      "Certificate renewal is routine maintenance. 30 days is sufficient lead time. Monitor to ensure renewal is completed.",
-    deviceGroupIndices: [0],
-    sources: [
-      {
-        from: "alerts@philips-monitoring.com",
-        subject:
-          "⚠️ TLS Certificate Expiry Alert — IntelliVue Streaming (30 days)",
-      },
-    ],
-  },
-  {
-    title: "GE Alaris — End of Software Support Notice (December 2025)",
-    summary:
-      "GE HealthCare has announced that software support for the Alaris 8015 PC Unit Series 1 will end on December 31, 2025. After this date, no security patches or bug fixes will be issued. Customers should begin planning migration to the Alaris 35 series or equivalent alternative.",
-    type: NotificationType.Other,
-    priority: Priority.Monitor,
-    tlp: Tlp.WHITE,
-    hospitalImpact:
-      "14 affected pumps will become unsupported. Post-EOS vulnerabilities will not be patched by vendor. Include in capital equipment budget cycle.",
-    priorityReasonWhy:
-      "Not immediately actionable — 12+ months until EOS. Flag for capital planning and biomedical engineering roadmap.",
-    deviceGroupIndices: [1],
-    sources: [
-      {
-        from: "customer-success@gehealthcare.com",
-        subject:
-          "Important: Alaris 8015 Series 1 End of Software Support — December 2025",
-      },
-    ],
-  },
-  {
-    title: "BD Pyxis — Routine HIPAA Audit Log Archival Reminder",
-    summary:
-      "Quarterly reminder from BD to archive and verify controlled substance audit logs from Pyxis MedStation units per 21 CFR Part 11 requirements. Logs older than 90 days should be exported and stored in a HIPAA-compliant archive before the device log buffer overwrites them.",
-    type: NotificationType.Other,
-    priority: Priority.Defer,
-    tlp: null,
-    hospitalImpact:
-      "No immediate clinical or security impact. Compliance housekeeping. Failure to archive could result in audit findings during DEA or Joint Commission inspection.",
-    priorityReasonWhy:
-      "Routine compliance task. No vulnerability. Defer to pharmacy informatics team.",
-    deviceGroupIndices: [2],
-    sources: [
-      {
-        from: "compliance@bd.com",
-        subject: "Quarterly Reminder: Pyxis Audit Log Archival — Q2 2025",
-      },
-    ],
-  },
-  {
-    title:
-      "Draeger — Software Release Notes: OR Suite Device Integration Update",
-    summary:
-      "Draeger has published release notes for a non-security software update to the Perseus A500 integration module, adding improved OR scheduling system interoperability and updated IHE PCD profiles. No security relevance identified. Review for compatibility with your OR management system before deployment.",
-    type: NotificationType.UpdateAvailable,
-    priority: Priority.Defer,
-    tlp: Tlp.WHITE,
-    hospitalImpact:
-      "No security impact. OR scheduling team should evaluate interoperability improvements before next planned OR downtime.",
-    priorityReasonWhy:
-      "Non-security update. No urgency. Defer to OR systems team for evaluation during next scheduled maintenance window.",
-    deviceGroupIndices: [3],
-    sources: [
-      {
-        from: "releases@draeger.com",
-        subject: "Perseus A500 — Software Update v2.3.1 Release Notes",
-      },
-    ],
-  },
-  {
-    title: "Unknown Vendor Email: Possible Phishing — Medical Device Offer",
-    summary:
-      "An unsolicited email was received from an unknown sender claiming to offer a firmware update for unspecified medical devices. The email contains a suspicious link and was flagged by the email security gateway. This notification was created for triage.",
-    type: NotificationType.Other,
-    priority: Priority.Unsorted,
-    tlp: null,
-    hospitalImpact: "Unknown. Flagged for security team review.",
-    priorityReasonWhy:
-      "Cannot assess priority until email content is reviewed and sender verified. Marked Unsorted pending triage.",
-    deviceGroupIndices: [],
-    sources: [
-      {
-        from: "updates@med-device-security-alerts.net",
-        subject:
-          "URGENT: Critical Firmware Update Required for Your Medical Devices",
-      },
-    ],
-  },
-  {
-    title:
-      "Multi-Vendor Advisory: OpenSSL 3.x Vulnerability Affects Medical Device Middleware (CVE-2024-5535)",
-    summary:
-      "OpenSSL 3.x versions prior to 3.3.2 contain a vulnerability in SSL_select_next_proto that can cause out-of-bounds memory reads in applications using ALPN callback functions. Multiple medical device vendors use OpenSSL in middleware components. Cross-reference with your device inventory and contact vendors for patch timelines.",
-    type: NotificationType.Advisory,
-    priority: Priority.Unsorted,
-    tlp: Tlp.GREEN,
-    hospitalImpact:
-      "Potential impact scope unclear — awaiting vendor confirmation from Philips, GE, BD, and Draeger. No confirmed exploitation in medical device context.",
-    priorityReasonWhy:
-      "Vendor impact not yet confirmed. Priority set to Unsorted until vendor advisories are received and device inventory cross-referenced.",
-    deviceGroupIndices: [0, 1, 2, 3],
-    sources: [
-      {
-        from: "advisories@openssl.org",
-        subject:
-          "OpenSSL Security Advisory: CVE-2024-5535 — SSL_select_next_proto",
-      },
-      {
-        from: "psirt@philips.com",
-        subject: "Re: CVE-2024-5535 — IntelliVue Impact Assessment (Pending)",
-      },
-    ],
-  },
-];
-
 // ---------------------------------------------------------------------------
 // Siemens syngo.plaza VEX scenario (SSA-016040 / CVE-2024-52334)
 // ---------------------------------------------------------------------------
@@ -378,6 +61,8 @@ const SYNGO_PLAZA = {
   product: "syngo.plaza",
   version: "VB30E",
 };
+
+const REMEDIATION_TEXT = "Update to VB30E_HF07 or later";
 
 const SYNGO_PLAZA_ASSETS = [
   {
@@ -431,19 +116,21 @@ async function seedSyngoPlazaVexScenario(userId: string) {
     }),
   );
 
-  // TODO: matching fn for something like  "vers:generic/<VB30E_HF07"
-  const versionRange = `vers:generic/${version.canonicalName}`;
   const matching =
     (await prisma.deviceGroupMatching.findFirst({
       where: {
         vendorId: vendor.id,
         productId: product.id,
-        versionId: null,
-        versionRange,
+        versionId: version.id,
+        versionRange: null,
       },
     })) ??
     (await prisma.deviceGroupMatching.create({
-      data: { vendorId: vendor.id, productId: product.id, versionRange },
+      data: {
+        vendorId: vendor.id,
+        productId: product.id,
+        versionId: version.id,
+      },
     }));
 
   const vulnerability =
@@ -484,6 +171,43 @@ async function seedSyngoPlazaVexScenario(userId: string) {
       },
     }));
 
+  const remediation =
+    (await prisma.remediation.findFirst({
+      where: {
+        vulnerabilityId: vulnerability.id,
+        description: REMEDIATION_TEXT,
+      },
+    })) ??
+    (await prisma.remediation.create({
+      data: {
+        description: REMEDIATION_TEXT,
+        narrative:
+          "Siemens Healthineers has released hot fix HF07 for syngo.plaza VB30E. Apply the hot fix during the next maintenance window to remediate the insecure password encryption.",
+        vulnerabilityId: vulnerability.id,
+        userId,
+        deviceGroupMatchings: { connect: { id: matching.id } },
+      },
+    }));
+
+  // Group-level Issue lives on one asset; the sibling asset keeps the Note below.
+  const issueAsset = assets[0];
+  await prisma.issue.upsert({
+    where: {
+      assetId_vulnerabilityId: {
+        assetId: issueAsset.id,
+        vulnerabilityId: vulnerability.id,
+      },
+    },
+    update: {
+      status: IssueStatus.UNDER_INVESTIGATION,
+    },
+    create: {
+      assetId: issueAsset.id,
+      vulnerabilityId: vulnerability.id,
+      status: IssueStatus.UNDER_INVESTIGATION,
+    },
+  });
+
   const title =
     "Siemens Healthineers syngo.plaza VB30E — Insecure Password Encryption (SSA-016040 / CVE-2024-52334)";
 
@@ -516,10 +240,19 @@ async function seedSyngoPlazaVexScenario(userId: string) {
       channel: NotificationChannel.Email,
       sourceType: "Source",
       raw: {
-        from: "psirt@siemens-healthineers.com",
-        subject:
-          "SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E",
-        to: "security@hospital.org",
+        type: "email.received",
+        created_at: "2026-02-10T09:00:00.000Z",
+        data: {
+          email_id: "seed-ssa-016040",
+          created_at: "2026-02-10T09:00:00.000Z",
+          from: "psirt@siemens-healthineers.com",
+          to: ["security@hospital.org"],
+          cc: [],
+          bcc: [],
+          subject:
+            "SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E",
+          attachments: [],
+        },
       },
       markdown: `# SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E
 
@@ -562,6 +295,16 @@ The affected application does not encrypt passwords properly. This could allow a
     },
   });
 
+  await prisma.notificationRemediationMapping.create({
+    data: {
+      notificationId: notification.id,
+      remediationId: remediation.id,
+      confidence: ConfidenceLevel.Confirmed,
+      reasonWhy:
+        "Advisory's affected-products table lists 'Update to VB30E_HF07 or later' as the remediation.",
+    },
+  });
+
   const notedAsset = assets[1];
   await prisma.note.create({
     data: {
@@ -576,6 +319,383 @@ The affected application does not encrypt passwords properly. This could allow a
 }
 
 // ---------------------------------------------------------------------------
+// Siemens deserialization scenario (SSA-220609 / CVE-2022-29875)
+// ---------------------------------------------------------------------------
+//
+// A single notification spanning ~18 Siemens Healthineers products, all affected
+// by one CVE (CVSS 9.8, unauthenticated RCE). Exercises multi-matching
+// notifications plus an asset-level NOT_AFFECTED issue backed by a compensating
+// control (the vulnerable ports are firewalled at the segment boundary).
+
+const DESERIALIZATION_VENDOR = "Siemens Healthineers";
+
+// Affected products from the advisory's affected-products table. Use `versionRange`
+// (a `vers:` string) when the advisory enumerates multiple versions; otherwise an
+// exact `version`.
+const DESERIALIZATION_MATCHINGS: Array<{
+  product: string;
+  version?: string;
+  versionRange?: string;
+}> = [
+  { product: "Biograph Horizon PET/CT Systems", version: "VJ30" },
+  {
+    product: "MAGNETOM Family",
+    versionRange: "vers:generic/VA10B|VA12M|VA12S|VA20A|VA30A|VA31A",
+  },
+  { product: "MAMMOMAT Revelation", version: "VC20D" },
+  { product: "NAEOTOM Alpha", version: "VA40" },
+  { product: "SOMATOM go.All", version: "VA30 SP5" },
+  { product: "SOMATOM go.Now", version: "VA30 SP5" },
+  { product: "SOMATOM go.Open Pro", version: "VA30 SP5" },
+  { product: "SOMATOM go.Sim", version: "VA30 SP5" },
+  { product: "SOMATOM go.Top", version: "VA30 SP5" },
+  { product: "SOMATOM go.Up", version: "VA30 SP5" },
+  { product: "SOMATOM X.cite", version: "VA30 SP5" },
+  { product: "SOMATOM X.creed", version: "VA30 SP5" },
+  { product: "Symbia E/S", version: "VB22" },
+  { product: "Symbia Evo", version: "VB22" },
+  { product: "Symbia Intevo", version: "VB22" },
+  { product: "Symbia T", version: "VB22" },
+  { product: "Symbia.net", version: "VB22" },
+  {
+    product: "syngo.via",
+    versionRange: "vers:generic/VB10|VB20|VB30|VB40|VB50|VB60",
+  },
+];
+
+// Assets, each bucketed into a DeviceGroup keyed by exact version.
+const DESERIALIZATION_ASSETS: Array<{
+  product: string;
+  version: string;
+  ip: string;
+  hostname: string;
+  serialNumber: string;
+  role: string;
+  networkSegment: string;
+}> = [
+  {
+    product: "MAGNETOM Family",
+    version: "VA10B",
+    ip: "10.60.0.11",
+    hostname: "mri-magnetom-01",
+    serialNumber: "MAGNETOM-VA10B-001",
+    role: "MRI Scanner Console",
+    networkSegment: "IMAGING-MRI",
+  },
+  {
+    product: "MAGNETOM Family",
+    version: "VA12S",
+    ip: "10.60.0.12",
+    hostname: "mri-magnetom-02",
+    serialNumber: "MAGNETOM-VA12S-001",
+    role: "MRI Scanner Console",
+    networkSegment: "IMAGING-MRI",
+  },
+  {
+    product: "syngo.via",
+    version: "VB50",
+    ip: "10.60.1.11",
+    hostname: "syngovia-01",
+    serialNumber: "SYNGOVIA-VB50-001",
+    role: "Imaging Workstation",
+    networkSegment: "IMAGING-PACS",
+  },
+  {
+    product: "syngo.via",
+    version: "VB50",
+    ip: "10.60.1.12",
+    hostname: "syngovia-02",
+    serialNumber: "SYNGOVIA-VB50-002",
+    role: "Imaging Workstation",
+    networkSegment: "IMAGING-PACS",
+  },
+  {
+    product: "syngo.via",
+    version: "VB50",
+    ip: "10.60.1.13",
+    hostname: "syngovia-03",
+    serialNumber: "SYNGOVIA-VB50-003",
+    role: "Imaging Workstation",
+    networkSegment: "IMAGING-PACS",
+  },
+  {
+    product: "syngo.via",
+    version: "VB60",
+    ip: "10.60.1.14",
+    hostname: "syngovia-04",
+    serialNumber: "SYNGOVIA-VB60-001",
+    role: "Imaging Workstation",
+    networkSegment: "IMAGING-PACS",
+  },
+  {
+    product: "syngo.via",
+    version: "VB60",
+    ip: "10.60.1.15",
+    hostname: "syngovia-05",
+    serialNumber: "SYNGOVIA-VB60-002",
+    role: "Imaging Workstation",
+    networkSegment: "IMAGING-PACS",
+  },
+  {
+    product: "Symbia Intevo",
+    version: "VB22",
+    ip: "10.60.2.11",
+    hostname: "symbia-intevo-01",
+    serialNumber: "SYMBIA-INTEVO-VB22-001",
+    role: "SPECT/CT Console",
+    networkSegment: "IMAGING-NUCMED",
+  },
+];
+
+async function upsertDeserializationMatching(spec: {
+  product: string;
+  version?: string;
+  versionRange?: string;
+}) {
+  const vendor = await upsertVendor(DESERIALIZATION_VENDOR);
+  const product = await upsertProduct(spec.product);
+  const version = spec.version ? await upsertVersion(spec.version) : null;
+
+  const where = {
+    vendorId: vendor.id,
+    productId: product.id,
+    versionId: version?.id ?? null,
+    versionRange: spec.versionRange ?? null,
+  };
+
+  return (
+    (await prisma.deviceGroupMatching.findFirst({ where })) ??
+    (await prisma.deviceGroupMatching.create({ data: where }))
+  );
+}
+
+async function upsertDeviceGroupForAsset(product: string, version: string) {
+  const vendor = await upsertVendor(DESERIALIZATION_VENDOR);
+  const productRec = await upsertProduct(product);
+  const versionRec = await upsertVersion(version);
+
+  const identity = {
+    vendorId: vendor.id,
+    productId: productRec.id,
+    versionId: versionRec.id,
+    versionStatus: VersionStatus.KNOWN,
+  };
+
+  return (
+    (await prisma.deviceGroup.findFirst({ where: identity })) ??
+    (await prisma.deviceGroup.create({ data: identity }))
+  );
+}
+
+async function seedDeserializationScenario(userId: string) {
+  console.log("\n🌱 Seeding Siemens deserialization scenario...");
+
+  // Sequential: several products share a canonical version (e.g. "VA30 SP5",
+  // "VB22"), and concurrent upserts of the same Version race on its unique key.
+  const matchings: Awaited<ReturnType<typeof upsertDeserializationMatching>>[] =
+    [];
+  for (const spec of DESERIALIZATION_MATCHINGS) {
+    matchings.push(await upsertDeserializationMatching(spec));
+  }
+
+  const vulnerability =
+    (await prisma.vulnerability.findFirst({
+      where: { cveId: "CVE-2022-29875" },
+    })) ??
+    (await prisma.vulnerability.create({
+      data: {
+        cveId: "CVE-2022-29875",
+        severity: Severity.Critical,
+        cvssScore: 9.8,
+        cvssVector:
+          "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/E:P/RL:O/RC:C",
+        description:
+          "The application deserialises untrusted data without sufficient validations, which could result in an arbitrary deserialization. This could allow an unauthenticated attacker to execute code in the affected system if ports 32912/tcp or 32914/tcp are reachable.",
+        narrative:
+          "An unauthenticated attacker who can reach ports 32912/tcp or 32914/tcp on an affected system can send a crafted serialized payload. Because the application deserializes untrusted data without validation (CWE-502), the payload is instantiated and can execute arbitrary code under the syngo platform's privileges.",
+        impact:
+          "Remote code execution on imaging systems (MRI, CT, PET/CT, SPECT/CT, mammography) and the syngo.via viewing/reporting platform, potentially disrupting diagnostic imaging workflows across radiology and nuclear medicine.",
+        userId,
+        sarif: {
+          version: "2.1.0",
+          runs: [
+            {
+              tool: { driver: { name: "Siemens Healthineers PSIRT" } },
+              results: [
+                {
+                  ruleId: "CVE-2022-29875",
+                  level: "error",
+                  message: {
+                    text: "Deserialization of untrusted data in Siemens Healthineers syngo platform (SSA-220609)",
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        deviceGroupMatchings: {
+          connect: matchings.map((m) => ({ id: m.id })),
+        },
+      },
+    }));
+
+  // Assets, keyed to their exact-version DeviceGroups. Sequential for the same
+  // reason as the matchings: multiple assets share a product/version DeviceGroup
+  // (3× syngo.via VB50, 2× VB60), whose canonical entities race under Promise.all.
+  const assets: Awaited<ReturnType<typeof prisma.asset.create>>[] = [];
+  for (const spec of DESERIALIZATION_ASSETS) {
+    const existing = await prisma.asset.findFirst({
+      where: { serialNumber: spec.serialNumber },
+    });
+    if (existing) {
+      assets.push(existing);
+      continue;
+    }
+    const deviceGroup = await upsertDeviceGroupForAsset(
+      spec.product,
+      spec.version,
+    );
+    const { product: _product, version: _version, ...assetFields } = spec;
+    assets.push(
+      await prisma.asset.create({
+        data: {
+          ...assetFields,
+          upstreamApi: "https://example.com/placeholder",
+          status: "Active" as AssetStatus,
+          deviceGroupId: deviceGroup.id,
+          userId,
+        },
+      }),
+    );
+  }
+
+  // NOT_AFFECTED issue on the Symbia Intevo asset — compensating control blocks
+  // the vulnerable ports so the deserialization path is unreachable.
+  const symbiaAsset = assets.find(
+    (_, i) => DESERIALIZATION_ASSETS[i].product === "Symbia Intevo",
+  );
+  if (symbiaAsset) {
+    await prisma.issue.upsert({
+      where: {
+        assetId_vulnerabilityId: {
+          assetId: symbiaAsset.id,
+          vulnerabilityId: vulnerability.id,
+        },
+      },
+      update: {
+        status: IssueStatus.NOT_AFFECTED,
+        notAffectedJustification:
+          NotAffectedJustification.HOSPITAL_COMPENSATING_CONTROL,
+        statusConfidence: ConfidenceLevel.Confirmed,
+        statusNotes:
+          "Ports 32912/tcp and 32914/tcp are blocked inbound at the IMAGING-NUCMED segment firewall for all but trusted service clients, so the deserialization RCE path is unreachable on this SPECT/CT console.",
+      },
+      create: {
+        assetId: symbiaAsset.id,
+        vulnerabilityId: vulnerability.id,
+        status: IssueStatus.NOT_AFFECTED,
+        notAffectedJustification:
+          NotAffectedJustification.HOSPITAL_COMPENSATING_CONTROL,
+        statusConfidence: ConfidenceLevel.Confirmed,
+        statusNotes:
+          "Ports 32912/tcp and 32914/tcp are blocked inbound at the IMAGING-NUCMED segment firewall for all but trusted service clients, so the deserialization RCE path is unreachable on this SPECT/CT console.",
+      },
+    });
+  }
+
+  const title =
+    "Siemens Healthineers — Deserialization Vulnerability in Healthcare Products (SSA-220609 / CVE-2022-29875)";
+
+  const existingNotification = await prisma.notification.findFirst({
+    where: { title },
+  });
+  if (existingNotification) {
+    console.log(`  ⏭️  Already exists: ${title}`);
+    return;
+  }
+
+  const notification = await prisma.notification.create({
+    data: {
+      title,
+      summary:
+        "Siemens Healthineers has disclosed a deserialization vulnerability (CVE-2022-29875, CVSS 9.8) in the syngo platform shared across many imaging products. An unauthenticated attacker who can reach ports 32912/tcp or 32914/tcp can execute arbitrary code. Fixes are available for all affected versions; port-blocking mitigations apply where fixes cannot yet be installed.",
+      type: NotificationType.Advisory,
+      priority: Priority.Critical,
+      tlp: Tlp.WHITE,
+      hospitalImpact:
+        "Affects imaging systems across radiology and nuclear medicine (MRI, CT, PET/CT, SPECT/CT, mammography) and syngo.via viewing/reporting workstations. Successful exploitation could disrupt diagnostic imaging and reporting workflows hospital-wide.",
+      priorityReasonWhy:
+        "Unauthenticated remote code execution (CVSS 9.8) on life-adjacent imaging infrastructure. Exploitability is gated on reachability of ports 32912/tcp and 32914/tcp — block them at the network boundary immediately and schedule the vendor fixes.",
+    },
+  });
+
+  await prisma.notificationSource.create({
+    data: {
+      notificationId: notification.id,
+      channel: NotificationChannel.Email,
+      sourceType: "Source",
+      raw: {
+        type: "email.received",
+        created_at: "2022-06-09T09:00:00.000Z",
+        data: {
+          email_id: "seed-ssa-220609",
+          created_at: "2022-06-09T09:00:00.000Z",
+          from: "psirt@siemens-healthineers.com",
+          to: ["security@hospital.org"],
+          cc: [],
+          bcc: [],
+          subject:
+            "SSA-220609: Deserialization Vulnerability in Healthcare Products",
+          attachments: [],
+        },
+      },
+      markdown: `# SSA-220609: Deserialization Vulnerability in Healthcare Products
+
+**Publication Date**: 2022-05-31 · **Last Update**: 2022-06-09 · **CVSS v3.1**: 9.8
+
+## Summary
+A deserialization vulnerability is present in syngo which could allow an unauthenticated attacker to perform remote code execution under certain circumstances. Multiple Siemens Healthineers products use this platform and are affected by varying degrees.
+
+## Vulnerability classification (CVE-2022-29875)
+The application deserialises untrusted data without sufficient validations that could result in an arbitrary deserialization. This could allow an unauthenticated attacker to execute code in the affected system if ports 32912/tcp or 32914/tcp are reachable.
+
+- CVSS v3.1 Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/E:P/RL:O/RC:C
+- CWE-502: Deserialization of Untrusted Data
+
+## Workarounds and mitigations
+- If possible, block ports 32912/tcp and 32914/tcp on an external firewall.
+- Product-specific fixes are available; contact your local Siemens Healthineers service representative.`,
+      receivedAt: new Date(),
+    },
+  });
+
+  await prisma.notificationVulnerabilityMapping.create({
+    data: {
+      notificationId: notification.id,
+      vulnerabilityId: vulnerability.id,
+      confidence: ConfidenceLevel.Confirmed,
+      reasonWhy: "CVE-2022-29875 explicitly named in the vendor advisory.",
+    },
+  });
+
+  await Promise.all(
+    matchings.map((matching) =>
+      prisma.notificationDeviceGroupMapping.create({
+        data: {
+          notificationId: notification.id,
+          deviceGroupMatchingId: matching.id,
+          confidence: ConfidenceLevel.Confirmed,
+          reasonWhy:
+            "Vendor, product, and affected version(s) matched from the advisory's affected-products table.",
+        },
+      }),
+    ),
+  );
+
+  console.log(`  ✅ Created: ${title}`);
+}
+
+// ---------------------------------------------------------------------------
 // Main seed function
 // ---------------------------------------------------------------------------
 
@@ -585,82 +705,12 @@ async function getSeedUser() {
   });
 }
 
-async function seedNotifications(
-  _userId: string,
-  deviceGroups: Array<{ deviceGroupMatchingId: string }>,
-) {
-  console.log("\n🌱 Seeding notifications...");
-
-  for (const seed of NOTIFICATIONS) {
-    const existing = await prisma.notification.findFirst({
-      where: { title: seed.title },
-    });
-
-    if (existing) {
-      console.log(`  ⏭️  Already exists: ${seed.title}`);
-      continue;
-    }
-
-    const notification = await prisma.notification.create({
-      data: {
-        title: seed.title,
-        summary: seed.summary,
-        type: seed.type,
-        priority: seed.priority,
-        tlp: seed.tlp,
-        hospitalImpact: seed.hospitalImpact,
-        priorityReasonWhy: seed.priorityReasonWhy,
-      },
-    });
-
-    // Create sources
-    for (const source of seed.sources) {
-      await prisma.notificationSource.create({
-        data: {
-          notificationId: notification.id,
-          channel: NotificationChannel.Email,
-          sourceType: "Source",
-          raw: {
-            from: source.from,
-            subject: source.subject,
-            to: "security@hospital.org",
-          },
-          receivedAt: new Date(
-            Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000),
-          ),
-        },
-      });
-    }
-
-    // Create device group mappings
-    for (const idx of seed.deviceGroupIndices) {
-      const dg = deviceGroups[idx];
-      if (!dg) continue;
-      await prisma.notificationDeviceGroupMapping.create({
-        data: {
-          notificationId: notification.id,
-          deviceGroupMatchingId: dg.deviceGroupMatchingId,
-          confidence:
-            Math.random() > 0.3
-              ? ConfidenceLevel.Confirmed
-              : ConfidenceLevel.Matched,
-          reasonWhy:
-            "Matched by vendor and product name from notification content.",
-        },
-      });
-    }
-
-    console.log(`  ✅ Created: ${seed.title}`);
-  }
-}
-
 async function main() {
   console.log("🚀 Seeding hospital notifications\n");
 
   const user = await getSeedUser();
-  const deviceGroups = await seedDeviceGroups(user.id);
-  await seedNotifications(user.id, deviceGroups);
   await seedSyngoPlazaVexScenario(user.id);
+  await seedDeserializationScenario(user.id);
 
   console.log("\n✨ Done.");
   await prisma.$disconnect();

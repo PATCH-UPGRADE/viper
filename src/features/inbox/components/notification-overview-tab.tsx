@@ -1,23 +1,41 @@
 "use client";
 
 import { format } from "date-fns";
-import { ExternalLinkIcon, HeartIcon, MailIcon } from "lucide-react";
+import { ExternalLinkIcon, HeartIcon, MailIcon, Unlink } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
+import { toast } from "sonner";
+import { TlpBadge } from "@/components/tlp-badge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
-import { TlpBadge } from "@/features/advisories/components/advisories";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { deviceGroupMatchingLabel } from "@/lib/markdown";
+import { displayName } from "@/lib/markdown/device-group";
+import { useMarkMatchIncorrect } from "../hooks/use-notifications";
 import type {
   NotificationDetailSource,
   NotificationDetailWithRelations,
   RawEmailPayload,
 } from "../types";
+
+type DeviceGroupMapping =
+  NotificationDetailWithRelations["deviceGroupsMatchings"][number];
 
 // ---------------------------------------------------------------------------
 // EmailSourceModal
@@ -32,7 +50,7 @@ function EmailSourceModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const raw = source.raw as RawEmailPayload;
+  const raw = source.raw as unknown as RawEmailPayload;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
@@ -45,8 +63,8 @@ function EmailSourceModal({
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
                 {(
                   [
-                    { label: "From", value: raw.from },
-                    { label: "Subject", value: raw.subject ?? "—" },
+                    { label: "From", value: raw.data?.from ?? "—" },
+                    { label: "Subject", value: raw.data?.subject ?? "—" },
                     {
                       label: "Date",
                       value: format(source.receivedAt, "PPP p"),
@@ -85,8 +103,10 @@ function EmailSourceModal({
 function SourceReference({ source }: { source: NotificationDetailSource }) {
   const [open, setOpen] = useState(false);
   const raw =
-    source.channel === "Email" ? (source.raw as RawEmailPayload) : null;
-  const label = raw?.subject ?? source.referenceUrl ?? source.channel;
+    source.channel === "Email"
+      ? (source.raw as unknown as RawEmailPayload)
+      : null;
+  const label = raw?.data?.subject ?? source.referenceUrl ?? source.channel;
 
   if (source.channel === "Email") {
     return (
@@ -128,6 +148,10 @@ export function NotificationOverviewTab({
   notification: NotificationDetailWithRelations;
   firstReceived: Date;
 }) {
+  const [rejecting, setRejecting] = useState<DeviceGroupMapping | null>(null);
+  const [comment, setComment] = useState("");
+  const markMatchIncorrect = useMarkMatchIncorrect();
+
   const detailRows: { label: string; content: ReactNode }[] = [
     {
       label: "TLP",
@@ -151,6 +175,47 @@ export function NotificationOverviewTab({
         ),
     },
   ];
+
+  const withAssets = notification.deviceGroupsMatchings.filter(
+    (m) => m.assetCount > 0,
+  );
+
+  // Group matchings by vendor (first-seen order) so the vendor cell can span
+  // all of that vendor's product rows in the table below.
+  const vendorGroups = withAssets.reduce<Map<string, DeviceGroupMapping[]>>(
+    (groups, m) => {
+      const vendor =
+        displayName(m.deviceGroupMatching.vendor) ?? "Unknown vendor";
+      const existing = groups.get(vendor);
+      if (existing) existing.push(m);
+      else groups.set(vendor, [m]);
+      return groups;
+    },
+    new Map(),
+  );
+
+  const closeDialog = () => {
+    setRejecting(null);
+    setComment("");
+  };
+
+  const confirmUnlink = async (commentToSave: string | undefined) => {
+    if (!rejecting) return;
+    const label = deviceGroupMatchingLabel(rejecting.deviceGroupMatching);
+    try {
+      await markMatchIncorrect.mutateAsync({
+        targetType: "NotificationDeviceGroupMapping",
+        targetId: rejecting.id,
+        notificationId: notification.id,
+        comment: commentToSave,
+      });
+      toast.success(`${label} unlinked from notification`);
+      closeDialog();
+    } catch {
+      // Failure toast is surfaced by useMarkMatchIncorrect's onError; keep the
+      // dialog open so the user can retry.
+    }
+  };
 
   return (
     <>
@@ -183,6 +248,69 @@ export function NotificationOverviewTab({
         </Card>
       )}
 
+      {/* Affected Products */}
+      <Card>
+        <CardHeader className="flex justify-between items-center">
+          <CardTitle>Affected Products</CardTitle>
+          <span className="text-muted-foreground text-sm">
+            {withAssets.length} of {notification.deviceGroupsMatchings.length}{" "}
+            listed
+          </span>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Vendor</TableHead>
+                <TableHead>Product</TableHead>
+                <TableHead>Affected Versions</TableHead>
+                <TableHead className="text-right">Affected Assets</TableHead>
+                <TableHead className="w-0" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[...vendorGroups.entries()].map(([vendor, matchings]) =>
+                matchings.map((m, index) => (
+                  <TableRow key={m.id}>
+                    {index === 0 && (
+                      <TableCell
+                        rowSpan={matchings.length}
+                        className="border-r align-top font-semibold"
+                      >
+                        {vendor}
+                      </TableCell>
+                    )}
+                    <TableCell className="font-medium">
+                      {displayName(m.deviceGroupMatching.product)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {displayName(m.deviceGroupMatching.version) ??
+                          m.deviceGroupMatching.versionRange}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-bold">
+                      {m.assetCount}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive"
+                        onClick={() => setRejecting(m)}
+                        aria-label="Unlink this device group"
+                      >
+                        <Unlink className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )),
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       {/* Details */}
       <Card>
         <CardHeader>
@@ -205,6 +333,50 @@ export function NotificationOverviewTab({
           </table>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={!!rejecting}
+        onOpenChange={(open) => !open && closeDialog()}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Unlink className="size-4 text-destructive" />
+              Unlink{" "}
+              {rejecting
+                ? deviceGroupMatchingLabel(rejecting.deviceGroupMatching)
+                : ""}
+              ?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {rejecting &&
+              "This product should not have been attached to this notification"}
+          </p>
+          <Textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Add a comment describing the error (optional)"
+            rows={3}
+          />
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={closeDialog}
+              disabled={markMatchIncorrect.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => confirmUnlink(comment.trim() || undefined)}
+              disabled={markMatchIncorrect.isPending}
+            >
+              Unlink
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

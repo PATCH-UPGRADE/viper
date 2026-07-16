@@ -1,24 +1,31 @@
 // Resend webhook -> our api -> this process-inbox-email Inngest function
-// Turns an email into a Notification, if relevant
+// Turns an email into a Notification or a Work Order ticket, if relevant
 
 import "server-only";
 import TurndownService from "turndown";
 import { searchCandidates } from "@/features/inbox/agent/candidate-search";
 import { classifyNotification } from "@/features/inbox/agent/classify";
+import { classifyEmailKind } from "@/features/inbox/agent/classify-kind";
 import { extractEntities } from "@/features/inbox/agent/extract";
+import { extractWorkOrder } from "@/features/inbox/agent/extract-work-order";
 import { matchAndLinkEntities } from "@/features/inbox/agent/match";
-import {
-  checkEmailRelevance,
-  stripHtml,
-} from "@/features/inbox/agent/relevance";
 import { triageNotification } from "@/features/inbox/agent/triage";
 import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
+import { fetchPdfAttachmentsFromResend } from "@/features/inbox/utils";
 import { Prisma } from "@/generated/prisma";
+import { getAutomationUser } from "@/lib/automation-user";
 import prisma from "@/lib/db";
 import { normalizeMd5, uploadBufferToS3 } from "@/lib/s3";
 import { inngest } from "../client";
 
 const turndown = new TurndownService();
+
+// Parse an LLM-provided date string, treating anything unparseable as absent.
+function parseScheduledAt(value: string | null): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 export const processInboxEmail = inngest.createFunction(
   { id: "process-inbox-email" },
@@ -39,24 +46,34 @@ export const processInboxEmail = inngest.createFunction(
       return data;
     });
 
-    // 2. Check relevance (first X words of plain text)
-    const WORD_COUNT = 1000;
-    const plainText = email.text ?? stripHtml(email.html ?? "");
-    const bodyPreview = plainText.split(/\s+/).slice(0, WORD_COUNT).join(" ");
+    // 2. Convert email HTML body to markdown (every downstream agent reads it)
+    const markdown = await step.run("html-to-markdown", async () => {
+      if (email.html) return turndown.turndown(email.html);
+      return email.text ?? null;
+    });
 
-    const { decision } = await step.run("check-relevance", () =>
-      checkEmailRelevance({
-        from: email.from,
-        subject: email.subject,
-        bodyPreview,
-      }),
-    );
+    // 3. Triage: is this relevant at all, and if so is it an informational
+    // Notification or an actionable Work Order?
+    const { kind } = await step.run("classify-email", async () => {
+      const pdfAttachments = await fetchPdfAttachmentsFromResend(
+        emailId,
+        email.attachments ?? [],
+      );
+      return classifyEmailKind(
+        {
+          from: email.from,
+          subject: email.subject,
+          markdown: markdown ?? "",
+        },
+        pdfAttachments,
+      );
+    });
 
-    if (decision === "not_relevant") {
+    if (kind === "not_relevant") {
       return { skipped: true, emailId };
     }
 
-    // 3. Upload attachments to S3
+    // 4. Upload attachments to S3
     const uploadedAttachments = await step.run(
       "upload-attachments",
       async () => {
@@ -123,12 +140,6 @@ export const processInboxEmail = inngest.createFunction(
       },
     );
 
-    // 4. Convert email HTML body to markdown
-    const markdown = await step.run("html-to-markdown", async () => {
-      if (email.html) return turndown.turndown(email.html);
-      return email.text ?? null;
-    });
-
     // 5. Persist NotificationSource + NotificationAttachment
     const sourceId = await step.run("save-source", async () => {
       // DEV: uncomment to reset duplicate so you can replay the same email webhook
@@ -176,7 +187,85 @@ export const processInboxEmail = inngest.createFunction(
 
     if (!sourceId) return { skipped: true, reason: "duplicate", emailId };
 
-    // 6. Classify email and upsert Notification
+    // 6w. Work-order path: extract fields, create the ticket linked to this
+    // email source, then tag matched device groups onto the ticket.
+    if (kind === "work_order") {
+      const wo = await step.run("extract-work-order", () =>
+        extractWorkOrder(sourceId, {
+          from: email.from,
+          subject: email.subject,
+          markdown: markdown ?? "",
+        }),
+      );
+
+      const workOrderTicketId = await step.run(
+        "create-work-order",
+        async () => {
+          const automation = await getAutomationUser();
+
+          // Match extracted department names to existing departments
+          // case-insensitively (the table is small; never auto-create).
+          const wanted = new Set(
+            wo.departmentNames.map((n) => n.trim().toLowerCase()),
+          );
+          const departmentIds = wanted.size
+            ? (
+                await prisma.department.findMany({
+                  select: { id: true, name: true },
+                })
+              )
+                .filter((d) => wanted.has(d.name.toLowerCase()))
+                .map((d) => d.id)
+            : [];
+
+          const ticket = await prisma.workOrderTicket.create({
+            data: {
+              summary: wo.summary,
+              body: markdown,
+              category: wo.category,
+              scheduledAt: parseScheduledAt(wo.scheduledAt),
+              suggestedAssignee: wo.suggestedAssignee,
+              sourceLabel: email.from,
+              creatorId: automation.id,
+              departments: {
+                connect: departmentIds.map((id) => ({ id })),
+              },
+              // Links the email NotificationSource to this ticket (sets its
+              // workOrderTicketId; notificationId stays null).
+              sources: { connect: { id: sourceId } },
+            },
+          });
+          return ticket.id;
+        },
+      );
+
+      const extracted = await step.run("extract-work-order-entities", () =>
+        extractEntities(sourceId, {
+          from: email.from,
+          subject: email.subject,
+          markdown: markdown ?? "",
+        }),
+      );
+
+      const linkSummary = await step.run(
+        "match-work-order-entities",
+        async () => {
+          if (Object.values(extracted).every((v) => v.length === 0)) {
+            return { linked: 0, updated: 0, created: 0, skipped: 0 };
+          }
+          const candidates = await searchCandidates(extracted);
+          return matchAndLinkEntities(
+            { workOrderTicketId },
+            extracted,
+            candidates,
+          );
+        },
+      );
+
+      return { workOrderTicketId, sourceId, emailId, linkSummary };
+    }
+
+    // 7. Classify email and upsert Notification
     const notificationId = await step.run("classify-notification", async () => {
       const result = await classifyNotification(sourceId, {
         from: email.from,
@@ -217,7 +306,7 @@ export const processInboxEmail = inngest.createFunction(
       return notification.id;
     });
 
-    // 7. Extract entities (device groups) referenced in the notification
+    // 8. Extract entities (device groups) referenced in the notification
     const extracted = await step.run("extract-entities", () =>
       extractEntities(sourceId, {
         from: email.from,
@@ -226,7 +315,7 @@ export const processInboxEmail = inngest.createFunction(
       }),
     );
 
-    // 8. Fuzzy-search the DB for matches and link/update/create them
+    // 9. Fuzzy-search the DB for matches and link/update/create them
     const linkSummary = await step.run("match-and-link-entities", async () => {
       if (
         !notificationId ||
@@ -235,10 +324,10 @@ export const processInboxEmail = inngest.createFunction(
         return { linked: 0, updated: 0, created: 0, skipped: 0 };
       }
       const candidates = await searchCandidates(extracted);
-      return matchAndLinkEntities(notificationId, extracted, candidates);
+      return matchAndLinkEntities({ notificationId }, extracted, candidates);
     });
 
-    // 9. VEX sort: if the notification has linked vulnerabilities, sort each
+    // 10. VEX sort: if the notification has linked vulnerabilities, sort each
     // baseline Issue into at-risk / possibly-at-risk / unaffected. Runs before
     // triage so priority/hospital-impact reasoning can reflect the results.
     const vexSummary = await step.run("sort-vulnerabilities", async () => {
@@ -250,7 +339,7 @@ export const processInboxEmail = inngest.createFunction(
       return sortNotificationVulnerabilities(notificationId);
     });
 
-    // 10. Triage: assign priority, reason, and hospital impact
+    // 11. Triage: assign priority, reason, and hospital impact
     if (notificationId) {
       await step.run("triage-notification", async () => {
         const result = await triageNotification(sourceId, notificationId);

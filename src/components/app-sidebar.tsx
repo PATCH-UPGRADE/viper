@@ -82,7 +82,7 @@ const mainItems = [
     url: "/advisories",
   },
   {
-    title: "Tracking",
+    title: "Work Orders",
     icon: ListChecksIcon,
     url: "/tracking",
   },

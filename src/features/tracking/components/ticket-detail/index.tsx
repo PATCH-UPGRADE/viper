@@ -9,14 +9,12 @@ import {
   SlashIcon,
   UserIcon,
 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   EntityContainer,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import { SeverityBadge } from "@/components/severity-badge";
 import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
@@ -27,6 +25,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
+import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
@@ -74,7 +73,7 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/tracking">Tracking</BreadcrumbLink>
+                <BreadcrumbLink href="/tracking">Work Orders</BreadcrumbLink>
               </BreadcrumbItem>
               {data.parent && (
                 <>
@@ -191,10 +190,14 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
             </MetadataRow>
           </div>
 
-          {data.descriptions.length > 0 && (
+          {(data.descriptions.length > 0 || data.body) && (
             <div className="rounded-lg border bg-background p-4">
               <Section title="Descriptions">
-                <Tabs defaultValue={data.descriptions[0].department.id}>
+                <Tabs
+                  defaultValue={
+                    data.descriptions[0]?.department.id ?? "original-email"
+                  }
+                >
                   <TabsList variant="line">
                     {data.descriptions.map((d) => (
                       <TabsTrigger key={d.id} value={d.department.id}>
@@ -206,6 +209,11 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
                         </Badge>
                       </TabsTrigger>
                     ))}
+                    {data.body && (
+                      <TabsTrigger value="original-email">
+                        <Badge variant="outline">Original Email</Badge>
+                      </TabsTrigger>
+                    )}
                   </TabsList>
                   {data.descriptions.map((d) => (
                     <TabsContent
@@ -213,9 +221,22 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
                       value={d.department.id}
                       className="mt-4"
                     >
-                      <p className="text-sm whitespace-pre-wrap">{d.body}</p>
+                      <div className="text-sm">
+                        <MarkdownWithTablesWrapper>
+                          {d.body}
+                        </MarkdownWithTablesWrapper>
+                      </div>
                     </TabsContent>
                   ))}
+                  {data.body && (
+                    <TabsContent value="original-email" className="mt-4">
+                      <div className="text-sm">
+                        <MarkdownWithTablesWrapper>
+                          {data.body}
+                        </MarkdownWithTablesWrapper>
+                      </div>
+                    </TabsContent>
+                  )}
                 </Tabs>
               </Section>
             </div>
@@ -251,24 +272,6 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
           </TabsContent>
         </Tabs>
       </div>
-
-      {data.advisories.length > 0 && (
-        <Section title="Advisories" count={data.advisories.length}>
-          <ul className="flex flex-col gap-2">
-            {data.advisories.map((a) => (
-              <li key={a.id}>
-                <Link
-                  href={`/advisories/${a.id}`}
-                  className="flex items-center justify-between gap-3 rounded-md border bg-background hover:bg-muted/50 transition px-3 py-2"
-                >
-                  <span className="text-sm">{a.title ?? a.id}</span>
-                  <SeverityBadge severity={a.severity} />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
 
       <ActivityTimeline
         ticketId={data.id}

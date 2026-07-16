@@ -135,7 +135,7 @@ describe("TrackingHeader", () => {
   it("renders the title and description", () => {
     render(<TrackingHeader />);
     expect(
-      screen.getByRole("heading", { name: /tracking/i }),
+      screen.getByRole("heading", { name: /work orders/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/work order tickets and approval gates/i),
@@ -163,7 +163,7 @@ describe("TrackingContainer", () => {
       </TrackingContainer>,
     );
     expect(
-      screen.getByRole("heading", { name: /tracking/i }),
+      screen.getByRole("heading", { name: /work orders/i }),
     ).toBeInTheDocument();
     expect(screen.getByTestId("child")).toHaveTextContent("payload");
   });
@@ -269,7 +269,6 @@ const sampleTicket = (overrides: Record<string, unknown> = {}) => ({
     issues: 0,
     vulnerabilities: 0,
     remediations: 0,
-    advisories: 0,
     assets: 0,
   },
   isWatching: false,
@@ -560,7 +559,6 @@ describe("TrackingList", () => {
               issues: 0,
               vulnerabilities: 0,
               remediations: 0,
-              advisories: 0,
               assets: 0,
             },
           }),
@@ -589,7 +587,6 @@ describe("TrackingList", () => {
               issues: 0,
               vulnerabilities: 0,
               remediations: 0,
-              advisories: 0,
               assets: 0,
             },
           }),

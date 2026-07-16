@@ -1,10 +1,3 @@
-// Assigns priority, priorityReasonWhy, and a structured hospitalImpact to a
-// Notification. Unlike the earlier version, the agent is given the resolved
-// hospital reality around the notification (linked vulns + VEX verdicts,
-// device groups → assets, the clinical workflows those assets sit in, device
-// utilization, and notes) via gatherTriageContext, so its impact assessment is
-// grounded in real data rather than the email text alone.
-
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
@@ -16,8 +9,6 @@ import { gatherTriageContext } from "./triage-context";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
-// Flat top-level object required by Anthropic tool input_schema; the nested
-// hospitalImpact object is fine (it is not a union/discriminatedUnion).
 const triageSchema = z.object({
   priority: z.enum(["Critical", "High", "Monitor", "Defer"]),
   priorityReasonWhy: z

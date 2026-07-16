@@ -139,8 +139,7 @@ export function NotificationOverviewTab({
   notification: NotificationDetailWithRelations;
   firstReceived: Date;
 }) {
-  // hospitalImpact is jsonb (default {}). Parse it; treat a failed parse or an
-  // empty object as "not triaged yet" and hide the card (note: {} is truthy).
+  // {} is truthy — treat an empty/invalid object as "not triaged yet".
   const impactParse = hospitalImpactSchema.safeParse(
     notification.hospitalImpact,
   );

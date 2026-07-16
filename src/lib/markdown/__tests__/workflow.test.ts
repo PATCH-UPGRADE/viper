@@ -3,8 +3,6 @@ import { workflowClinicalSummary } from "../workflow";
 
 type WorkflowArg = Parameters<typeof workflowClinicalSummary>[0][number];
 
-// Build a minimal workflow payload (only the fields serializeWorkflow +
-// workflowClinicalSummary read); cast past the full Prisma payload shape.
 function makeWorkflow(
   id: string,
   name: string,

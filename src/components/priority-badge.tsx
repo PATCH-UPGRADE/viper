@@ -4,9 +4,6 @@ import type React from "react";
 import type { Priority } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 
-// Filled (solid) badge styles so priority reads as a prominent status pill.
-// Darker shades keep white-on-color text legible (Monitor uses dark text on
-// yellow, which reads better than white).
 export const priorityConfig: Record<
   Priority,
   { label: string; className: string }

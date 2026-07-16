@@ -1,12 +1,3 @@
-// Workflow → markdown renderers.
-//
-// - generateWorkflowsMarkdown: full dump (name + description + serialized node/
-//   connection graph as JSON). Verbose; used by the recommendations-context
-//   tool, which runs on Opus.
-// - workflowClinicalSummary: compact, asset-filtered summary. Used by the inbox
-//   triage agent (Haiku), which only needs to know which clinical pathways the
-//   affected devices sit in — not the full graph.
-
 import { serializeWorkflow } from "@/features/workflows/utils";
 import type { Prisma } from "@/generated/prisma";
 import { shortId } from "./shared";
@@ -36,14 +27,6 @@ export function generateWorkflowsMarkdown(
     .join("\n\n");
 }
 
-/**
- * Compact summary of the clinical workflows that include one or more of the
- * given assets. For each matching workflow: its name, description, and the
- * asset-node steps that reference an affected asset.
- *
- * A workflow "includes" an asset when one of its ASSET nodes lists that asset
- * id in `node.data.assetIds` (see `src/features/asset-nodes`).
- */
 export function workflowClinicalSummary(
   workflows: WorkflowWithRelations[],
   affectedAssetIds: string[],

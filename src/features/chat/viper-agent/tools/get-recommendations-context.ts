@@ -69,10 +69,6 @@ function generateVulnAssetRemMap(
   return [header, divider, ...rows].join("\n");
 }
 
-// ─── Workflow markdown ────────────────────────────────────────────────────────
-
-// generateWorkflowsMarkdown now lives in @/lib/markdown/workflow (shared with
-// the inbox triage agent). The type below is still used by generateContextMarkdown.
 type WorkflowWithRelations = Prisma.WorkflowGetPayload<{
   include: { nodes: true; connections: true };
 }>;

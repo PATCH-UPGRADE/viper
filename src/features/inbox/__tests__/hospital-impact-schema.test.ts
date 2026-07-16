@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { hospitalImpactSchema } from "../types";
 
-// hospitalImpactSchema is the single source of truth for the triage agent's
-// structured output AND the overview-tab parse. These tests pin the contract
-// the UI guard relies on: a fully-populated object parses; the jsonb column's
-// default {} (and any partial) does NOT, which is what hides the card until the
-// notification has actually been triaged.
-
 describe("hospitalImpactSchema", () => {
   it("accepts a fully-populated golden sample", () => {
     const golden = {

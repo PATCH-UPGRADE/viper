@@ -110,13 +110,6 @@ export const notificationPayloadSchema = z.object({
 
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 
-// Structured hospital-impact output produced by the triage agent and stored on
-// Notification.hospitalImpact (jsonb). Single source of truth for both the
-// agent's structured output and the UI parse. All fields are plain strings —
-// `likelihood` is a free-text descriptor (e.g. "Unauthenticated network RCE ·
-// PoC exploit code exists"), not an enum; `careAreas` is prompt-grounded from
-// the affected assets' locations/roles/device groups (e.g. "Radiology — MRI,
-// CT, Reading Room").
 export const hospitalImpactSchema = z.object({
   byline: z.string(),
   impactStatement: z.string(),

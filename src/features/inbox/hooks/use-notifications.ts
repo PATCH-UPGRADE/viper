@@ -1,12 +1,15 @@
 "use client";
 
 import {
+  keepPreviousData,
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
+import type { AffectedAssetsSummary } from "../types";
 import { useNotificationsParams } from "./use-notifications-params";
 
 export const useSuspenseNotifications = () => {
@@ -18,6 +21,21 @@ export const useSuspenseNotifications = () => {
 export const useSuspenseNotification = (id: string) => {
   const trpc = useTRPC();
   return useSuspenseQuery(trpc.notifications.getOne.queryOptions({ id }));
+};
+
+/** Paginated asset rows for one (matching, bucket) on the affected-assets tab. */
+export const useAffectedAssetsPage = (args: {
+  notificationId: string;
+  matchingId: string;
+  bucket: keyof AffectedAssetsSummary;
+  page: number;
+  pageSize: number;
+}) => {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.notifications.getAffectedAssetsPage.queryOptions(args),
+    placeholderData: keepPreviousData,
+  });
 };
 
 export const useMarkNotificationRead = () => {

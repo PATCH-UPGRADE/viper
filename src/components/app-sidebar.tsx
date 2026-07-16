@@ -77,11 +77,6 @@ const mainItems = [
     url: "/vulnerabilities",
   },
   {
-    title: "Advisories",
-    icon: ShieldAlertIcon,
-    url: "/advisories",
-  },
-  {
     title: "Work Orders",
     icon: ListChecksIcon,
     url: "/tracking",

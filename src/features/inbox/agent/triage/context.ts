@@ -49,7 +49,14 @@ export async function gatherTriageContext(
               deviceGroupMatchings: {
                 include: { vendor: true, product: true, version: true },
               },
-              remediations: true,
+              remediations: {
+                include: {
+                  deviceGroupMatchings: {
+                    include: { vendor: true, product: true, version: true },
+                  },
+                  vulnerability: { select: { id: true, cveId: true } },
+                },
+              },
               issues: true,
             },
           },
@@ -77,7 +84,17 @@ export async function gatherTriageContext(
   const vulnerabilities = notification.vulnerabilities.map(
     (m) => m.vulnerability,
   );
-  const remediations = notification.remediations.map((m) => m.remediation);
+  const remediationsById = new Map<
+    string,
+    (typeof notification.remediations)[number]["remediation"]
+  >();
+  for (const m of notification.remediations) {
+    remediationsById.set(m.remediation.id, m.remediation);
+  }
+  for (const v of vulnerabilities) {
+    for (const r of v.remediations) remediationsById.set(r.id, r);
+  }
+  const remediations = [...remediationsById.values()];
 
   const matchingsById = new Map<
     string,

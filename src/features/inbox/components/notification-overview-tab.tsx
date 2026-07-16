@@ -148,6 +148,10 @@ export function NotificationOverviewTab({
   notification: NotificationDetailWithRelations;
   firstReceived: Date;
 }) {
+  const [rejecting, setRejecting] = useState<DeviceGroupMapping | null>(null);
+  const [comment, setComment] = useState("");
+  const markMatchIncorrect = useMarkMatchIncorrect();
+
   const detailRows: { label: string; content: ReactNode }[] = [
     {
       label: "TLP",
@@ -189,10 +193,6 @@ export function NotificationOverviewTab({
     },
     new Map(),
   );
-
-  const [rejecting, setRejecting] = useState<DeviceGroupMapping | null>(null);
-  const [comment, setComment] = useState("");
-  const markMatchIncorrect = useMarkMatchIncorrect();
 
   const closeDialog = () => {
     setRejecting(null);

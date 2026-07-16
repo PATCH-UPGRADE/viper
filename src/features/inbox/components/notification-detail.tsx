@@ -4,7 +4,6 @@ import { formatDistanceToNow } from "date-fns";
 import { useEffect } from "react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { PriorityBadge } from "@/components/priority-badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -73,10 +72,6 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
   const displayTitle =
     notification.title ?? notification.summary ?? notification.id;
 
-  const totalDeviceGroups = notification.deviceGroupsMatchings.length;
-  const deviceGroupsWithAssets = notification.deviceGroupsMatchings.filter(
-    (m) => m.assetCount > 0,
-  ).length;
   const firstReceived =
     notification.sources.length > 0
       ? new Date(

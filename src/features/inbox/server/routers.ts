@@ -236,18 +236,18 @@ export const notificationsRouter = createTRPCRouter({
         reason: z.string().optional(),
       }),
     )
-    .mutation(async ({input, ctx}) => {
+    .mutation(async ({ input, ctx }) => {
       const { id, reason, ...changes } = input;
       return prisma.$transaction(async (tx) => {
         const before = await tx.notification.findUniqueOrThrow({
-          where: {id},
-          select: { type: true, priority: true }
+          where: { id },
+          select: { type: true, priority: true },
         });
 
         const notification = await tx.notification.update({
-          where: {id},
+          where: { id },
           data: changes,
-          select: { id: true, type: true, priority: true }
+          select: { id: true, type: true, priority: true },
         });
 
         await recordFieldCorrections(tx, {
@@ -256,10 +256,10 @@ export const notificationsRouter = createTRPCRouter({
           userId: ctx.auth.user.id,
           reason,
           before,
-          after: changes
+          after: changes,
         });
 
         return notification;
-      })
-    })
+      });
+    }),
 });

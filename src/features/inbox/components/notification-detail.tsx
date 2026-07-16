@@ -94,11 +94,21 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
 
   const handleOnSaveTypeCorrection = async (reason: string | undefined) => {
     if (!pendingType) return;
+    await updateNotification.mutateAsync({
+      id: notification.id,
+      type: pendingType,
+      reason,
+    });
     setPendingType(null);
   };
 
   const handleOnSavePriorityCorrection = async (reason: string | undefined) => {
     if (!pendingPriority) return;
+    await updateNotification.mutateAsync({
+      id: notification.id,
+      priority: pendingPriority,
+      reason,
+    });
     setPendingPriority(null);
   };
 
@@ -171,7 +181,7 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
           />
         )}
       </div>
-      {/*  */}
+
       <CorrectionDialog
         open={pendingType !== null}
         title="Change Category"
@@ -195,22 +205,6 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
         onCancel={() => setPendingPriority(null)}
         onSave={handleOnSavePriorityCorrection}
       />
-      {/* Badge row */}
-      {/* <div className="flex items-center gap-2">
-        <NotificationTypeBadge type={notification.type} />
-        {notification.priorityReasonWhy ? (
-          <HoverCard openDelay={200}>
-            <HoverCardTrigger asChild>
-              <PriorityBadge priority={notification.priority} />
-            </HoverCardTrigger>
-            <HoverCardContent className="w-72 text-sm">
-              {notification.priorityReasonWhy}
-            </HoverCardContent>
-          </HoverCard>
-        ) : (
-          <PriorityBadge priority={notification.priority} />
-        )}
-      </div> */}
 
       {/* Title */}
       <h1 className="text-3xl font-semibold tracking-tight">{displayTitle}</h1>

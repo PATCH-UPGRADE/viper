@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRightIcon } from "lucide-react";
-import { ReactNode, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -54,30 +54,45 @@ export function CorrectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && closeDialog()}>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="gap-0 min-h-[20rem] overflow-hidden rounded-2xl p-0">
+        <DialogHeader className="border-b px-6 py-4">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <div className="flex items-center gap-2 text-sm">
-          {fromContent}
-          <ArrowRightIcon className="size-4 text-muted-foreground" />
-          {toContent}
+        <div className="flex flex-col gap-4 px-6 py-4">
+          <div className="flex items-center gap-2 text-sm">
+            {fromContent}
+            <ArrowRightIcon className="size-4 text-muted-foreground" />
+            {toContent}
+          </div>
+          <label className="text-sm font-bold" htmlFor="correction-reason">
+            {question}{" "}
+            <span className="text-muted-foreground font-normal">
+              {reasonRequired ? "" : "(optional)"}
+            </span>
+          </label>
+          <Textarea
+            id="correct-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Add context for the activity log"
+            className="min-h-26"
+          />
         </div>
-        <label className="text-sm font-medium" htmlFor="correction-reason">
-          {question} {reasonRequired ? "" : "(optional)"}
-        </label>
-        <Textarea
-          id="correct-reason"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="Add context for the activity log"
-          rows={3}
-        />
-        <DialogFooter>
-          <Button variant="ghost" onClick={closeDialog} disabled={saving}>
+
+        <DialogFooter className="border-t bg-muted/50 px-6 py-4">
+          <Button
+            className="rounded-lg"
+            variant="outline"
+            onClick={closeDialog}
+            disabled={saving}
+          >
             Cancel
           </Button>
-          <Button onClick={confirm} disabled={saving || reasonMissing}>
+          <Button
+            className="rounded-lg"
+            onClick={confirm}
+            disabled={saving || reasonMissing}
+          >
             Save change
           </Button>
         </DialogFooter>

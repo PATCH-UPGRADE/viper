@@ -1,3 +1,4 @@
+import type { EmailReceivedEvent } from "resend";
 import { z } from "zod";
 import {
   type AssetStatus,
@@ -52,6 +53,9 @@ export const notificationDetailInclude = {
       },
     },
   },
+  vulnerabilities: {
+    select: { vulnerabilityId: true },
+  },
   sources: {
     select: {
       id: true,
@@ -76,7 +80,32 @@ export type ResolvedDeviceGroupAsset = {
   ip: string;
   hostname: string | null;
   location: unknown;
+  version: string | null;
   status: AssetStatus | null;
+  statusNotes: string | null;
+};
+
+/** A device group matching with its resolved vendor/product/version labels. */
+export type MatchingWithLabels =
+  NotificationDetailBasePayload["deviceGroupsMatchings"][number]["deviceGroupMatching"];
+
+/**
+ * One device group matching in a triage bucket, with the number of assets that
+ * fall in that bucket.
+ */
+export type AffectedAssetGroupSummary = {
+  mappingId: string | null;
+  deviceGroupMatching: MatchingWithLabels;
+  assetCount: number;
+  notesByVuln: Record<string, string>;
+};
+
+/** Device group matchings grouped by triage status for the affected-assets tab. */
+export type AffectedAssetsSummary = {
+  needsAttention: AffectedAssetGroupSummary[];
+  needsInformation: AffectedAssetGroupSummary[];
+  lowConcern: AffectedAssetGroupSummary[];
+  unaffected: AffectedAssetGroupSummary[];
 };
 
 export type NotificationDetailWithRelations = Omit<
@@ -85,18 +114,17 @@ export type NotificationDetailWithRelations = Omit<
 > & {
   deviceGroupsMatchings: (NotificationDetailBasePayload["deviceGroupsMatchings"][number] & {
     assetCount: number;
-    assets: ResolvedDeviceGroupAsset[];
   })[];
+  affectedAssets: AffectedAssetsSummary;
 };
 
 export type NotificationDetailSource =
   NotificationDetailWithRelations["sources"][number];
 
-export type RawEmailPayload = {
-  from: string;
-  subject?: string;
-  to?: string;
-};
+/**
+ * The value stored in `NotificationSource.raw` for email sources
+ */
+export type RawEmailPayload = EmailReceivedEvent;
 
 // TODO: Get a discriminated union of what fields should actually live on Advisory|Recall|UpdateAvailable (see `details`)
 export const notificationPayloadSchema = z.object({

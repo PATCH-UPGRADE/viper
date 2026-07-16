@@ -48,7 +48,7 @@ export function BadgeSelect<T extends string>({
         ref={ref}
         size="sm"
         className={cn(
-          "h-auto w-fit gap-1 border-none bg-transparent px1 py-0.5 shadow-none hover:opacity-80 darl:bg-transparent",
+          "h-auto w-fit gap-1 border-none bg-transparent px-1 py-0.5 shadow-none hover:opacity-80 dark:bg-transparent",
           className,
         )}
         aria-label="Change value"

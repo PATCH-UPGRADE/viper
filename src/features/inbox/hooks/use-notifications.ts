@@ -76,3 +76,22 @@ export const useMarkMatchIncorrect = () => {
     }),
   );
 };
+
+export const useUpdateNotification = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.notifications.update.mutationOptions({
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries(trpc.notifications.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.notifications.getOne.queryFilter({ id: variables.id }),
+        );
+      },
+      onError: (error) => {
+        toast.error(`Failed to save change: ${error.message}`);
+      },
+    }),
+  );
+};

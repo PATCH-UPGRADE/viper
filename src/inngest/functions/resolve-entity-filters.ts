@@ -40,7 +40,10 @@ export const resolveAllEntityFilters = inngest.createFunction(
 );
 
 export const resolveEntityFilterFn = inngest.createFunction(
-  { id: "resolve-entity-filter" },
+  {
+    id: "resolve-entity-filter",
+    concurrency: { key: "event.data.entityFilterId", limit: 1 },
+  },
   { event: RESOLVE_EVENT },
   async ({ event, step, logger }) => {
     const { entityFilterId } = event.data as { entityFilterId: string };

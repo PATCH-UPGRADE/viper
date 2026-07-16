@@ -68,16 +68,16 @@ const booleanFilter = z.union([
   }),
 ]);
 
-// Dates are carried as ISO strings in JSON; Prisma accepts ISO strings for
-// DateTime filters.
+// Dates are carried as ISO-8601 datetime strings in JSON; validate the format
+// up front so malformed values fail here rather than at query time.
 const dateFilter = z.union([
-  z.string(),
+  z.iso.datetime(),
   z.strictObject({
-    equals: z.string().optional(),
-    lt: z.string().optional(),
-    lte: z.string().optional(),
-    gt: z.string().optional(),
-    gte: z.string().optional(),
+    equals: z.iso.datetime().optional(),
+    lt: z.iso.datetime().optional(),
+    lte: z.iso.datetime().optional(),
+    gt: z.iso.datetime().optional(),
+    gte: z.iso.datetime().optional(),
   }),
 ]);
 
@@ -243,8 +243,9 @@ export function validateEntityFilter(
 
 /**
  * Resolve a filter to the ids of the rows it matches. Throws EntityFilterError
- * if the filter is invalid or the query fails, so callers can skip a single bad
- * filter without aborting a batch.
+ * only when the filter is malformed, so callers can skip a single bad filter
+ * without aborting a batch. Database/query failures propagate unchanged so
+ * transient errors can be retried (e.g. by Inngest) rather than swallowed.
  */
 export async function resolveEntityFilter(
   targetModel: ScopeTargetModel,
@@ -257,14 +258,6 @@ export async function resolveEntityFilter(
     );
   }
 
-  try {
-    const rows = await TARGET_MODEL_REGISTRY[targetModel].query(
-      validation.data,
-    );
-    return rows.map((row) => row.id);
-  } catch (err) {
-    throw new EntityFilterError(`Query failed for ${targetModel}`, {
-      cause: err,
-    });
-  }
+  const rows = await TARGET_MODEL_REGISTRY[targetModel].query(validation.data);
+  return rows.map((row) => row.id);
 }

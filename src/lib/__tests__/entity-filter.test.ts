@@ -79,6 +79,28 @@ describe("validateEntityFilter", () => {
       expect(result.success).toBe(false);
     });
 
+    it("accepts a valid ISO datetime on a date field", () => {
+      expect(
+        validateEntityFilter("ASSET", {
+          createdAt: { gte: "2024-01-01T00:00:00.000Z" },
+        }).success,
+      ).toBe(true);
+      expect(
+        validateEntityFilter("ASSET", { createdAt: "2024-01-01T00:00:00Z" })
+          .success,
+      ).toBe(true);
+    });
+
+    it("rejects a malformed datetime on a date field", () => {
+      expect(
+        validateEntityFilter("ASSET", { createdAt: "2024-01-01" }).success,
+      ).toBe(false);
+      expect(
+        validateEntityFilter("ASSET", { createdAt: { gte: "not-a-date" } })
+          .success,
+      ).toBe(false);
+    });
+
     it("rejects Json columns that are intentionally not exposed", () => {
       // `location` is a Json column and is deliberately omitted from the
       // allowlist.

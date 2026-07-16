@@ -3,9 +3,9 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
 import { buildUserMessage } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
-import { hospitalImpactSchema } from "../types";
-import { fetchPdfAttachments } from "../utils";
-import { gatherTriageContext } from "./triage-context";
+import { hospitalImpactSchema } from "../../types";
+import { fetchPdfAttachments } from "../../utils";
+import { gatherTriageContext } from "./context";
 
 const MODEL = "claude-haiku-4-5-20251001";
 

@@ -2,9 +2,9 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { useEffect, useState } from "react";
-import { ErrorView, LoadingView } from "@/components/entity-components";
-import { CorrectionDialog } from "@/components/correction-modal";
 import { BadgeSelect } from "@/components/badge-select";
+import { CorrectionDialog } from "@/components/correction-dialog";
+import { ErrorView, LoadingView } from "@/components/entity-components";
 import { PriorityBadge } from "@/components/priority-badge";
 import {
   Breadcrumb,
@@ -20,6 +20,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { NotificationType, Priority } from "@/generated/prisma";
 import {
   useMarkNotificationRead,
   useSuspenseNotification,
@@ -29,7 +30,6 @@ import type { NotificationDetailSource } from "../types";
 import { NotificationAffectedAssetsTab } from "./notification-affected-assets-tab";
 import { NotificationOverviewTab } from "./notification-overview-tab";
 import { NotificationTypeBadge } from "./notification-type-badge";
-import type { NotificationType, Priority } from "@/generated/prisma";
 
 const NOTIFICATION_TYPE_OPTIONS: NotificationType[] = [
   "Advisory",

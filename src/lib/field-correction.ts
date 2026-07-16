@@ -1,7 +1,7 @@
 import "server-only";
-import type { TransactionClient } from "@/lib/db";
 import type { CorrectionTargetType } from "@/generated/prisma";
 import { Prisma } from "@/generated/prisma";
+import type { TransactionClient } from "@/lib/db";
 
 type Snapshot = Record<string, unknown>;
 

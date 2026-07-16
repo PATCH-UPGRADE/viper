@@ -28,6 +28,7 @@ describe("recordFieldCorrection", () => {
       targetType: "Notification",
       targetId: "notification_1",
       userId: "user_1",
+      reason: "it is a recall",
       before: { type: "Advisory", priority: "Critical" },
       after: { type: "Recall", priority: "High" },
     });

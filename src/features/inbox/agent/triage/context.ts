@@ -10,7 +10,6 @@ import {
   deviceGroupLabel,
   deviceGroupMatchingLabel,
   type NoteTargetLabels,
-  parseLocation,
   type RemediationForMarkdown,
   remediationToMarkdown,
   renderNoteTarget,
@@ -255,6 +254,18 @@ type RenderArgs = {
   workflowsMarkdown: string | null;
 };
 
+function careAreaLocation(raw: unknown): string {
+  if (!raw || typeof raw !== "object") return "";
+  const loc = raw as { facility?: string; building?: string; floor?: string };
+  return [
+    loc.facility,
+    loc.building,
+    loc.floor ? `Floor ${loc.floor}` : undefined,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+}
+
 function renderTriagePrompt(args: RenderArgs): string {
   const sections: string[] = [];
 
@@ -317,9 +328,11 @@ function renderTriagePrompt(args: RenderArgs): string {
     const careLines = [
       ...new Set(
         args.affectedAssets.map(({ asset, groupLabel }) => {
-          const loc = parseLocation(asset.location);
           const role = asset.role ?? "unknown role";
-          return `- ${groupLabel} — ${role} @ ${loc}`;
+          const area = careAreaLocation(asset.location);
+          return area
+            ? `- ${groupLabel} — ${role} @ ${area}`
+            : `- ${groupLabel} — ${role}`;
         }),
       ),
     ];

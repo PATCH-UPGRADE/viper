@@ -25,8 +25,9 @@ export const priorityConfig: Record<
     className: "bg-blue-600 text-white dark:bg-blue-600",
   },
   Unsorted: {
-    label: "Unsorted",
-    className: "bg-gray-300 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
+    label: "Unassigned",
+    className:
+      "bg-gray-50 text-gray-500 dark:bg-gray-900/40 dark:text-gray-400",
   },
 };
 

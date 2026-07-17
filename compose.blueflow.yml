@@ -110,7 +110,7 @@ services:
   blueflow:
     image: docker.io/virtalabsinc/blueflow:latest
     volumes:
-      - ./init:/blueflow-init:ro
+      - ./blueflow-init:/blueflow-init:ro
     depends_on:
       blueflow-postgres:
         condition: service_healthy
@@ -158,7 +158,7 @@ services:
     image: docker.io/virtalabsinc/tapirxl:demo-latest
     volumes:
       - ./pcap:/pcap:ro
-      - ./init:/blueflow-init:ro
+      - ./blueflow-init:/blueflow-init:ro
       - tapirxl-spool:/var/lib/vector/data
     depends_on:
       blueflow:

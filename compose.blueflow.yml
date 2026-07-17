@@ -9,7 +9,11 @@ services:
     build:
       context: .
       dockerfile: docker/db/Dockerfile
-    env_file: .db.env
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: viper
+      POSTGRES_NON_DEFAULT_DB: blueflow
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
@@ -27,11 +31,28 @@ services:
     build:
       context: .
       dockerfile: docker/viper/Dockerfile
-    env_file: .env
     environment:
-      - INNGEST_DEV=1
-      - INNGEST_BASE_URL=http://inngest:8288
-      - PRISMA_CLIENT_ENGINE_TYPE=binary
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/viper
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-not-for-production-change-me}
+      SMTP_FROM: ${SMTP_FROM:-Viper <noreply@viper-xi.app>}
+      SMTP_HOST: ${SMTP_HOST:-SMTP-host-not-set}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SECURE: ${SMTP_SECURE:-true}
+      SMTP_USER: ${SMTP_USER:-smtp-user}
+      SMTP_PASS: ${SMTP_PASS:-smtp-password}
+      RESEND_API_KEY: ${RESEND_API_KEY:-false}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-false}
+      DOMAIN_WHITELIST: ${DOMAIN_WHITELIST:-domains-not-set.fake-tld}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-fake-anthropic-key}
+      HELM_URL: ${HELM_URL:-helm-url}
+      HELM_TOKEN: ${HELM_TOKEN:-helm-token}
+      NETWORK_FLOW_URL: ${NETWORK_FLOW_URL:-network-flow-url}
+      NETWORK_FLOW_TOKEN: ${NETWORK_FLOW_TOKEN:-network-flow-token}
+      N8N_KEY: ${N8N_KEY:-n8n-key}
+      N8N_AI_SYNC_URL: ${N8N_AI_SYNC_URL:-n8n-ai-sync-url}
+      INNGEST_DEV: 1
+      INNGEST_BASE_URL: http://inngest:8288
+      PRISMA_CLIENT_ENGINE_TYPE: binary
     volumes:
       - viper-stamps:/srv/stamps
     ports:
@@ -47,9 +68,9 @@ services:
       context: .
       dockerfile: docker/inngest/Dockerfile
     environment:
-      - INNGEST_BOOTSTRAP_URL=http://viper:3000/api/inngest
-      - INNGEST_DEV=true
-      - INNGEST_PORT=8288
+      INNGEST_BOOTSTRAP_URL: http://viper:3000/api/inngest
+      INNGEST_DEV: true
+      INNGEST_PORT: 8288
     ports:
       - "8288:8288"
     entrypoint: ["/bin/sh", "-c"]
@@ -72,8 +93,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    ports:
-      - "5433:5433"
     networks:
       - viper_stack
 
@@ -101,7 +120,7 @@ services:
       blueflow-redis:
         condition: service_healthy
     environment:
-      DATABSE_URL: postgresql://blueflow:blueflow@blueflow-postgres:5433/blueflow
+      DATABASE_URL: postgresql://blueflow:blueflow@blueflow-postgres:5432/blueflow
       RESDIS_URL: resdis://blueflow-redis:6379/0
       CELERY_BROKER_URL: redis://blueflow-redis:6379/0
       DJANGO_SETTINGS_MODULE: project.settings.development
@@ -112,10 +131,11 @@ services:
       DEFAULT_PASSWORD: admin
       API_TOKEN: demo-tapirxl-token-not-for-production
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/').getcode() < 400 else 1)"]
-      interval: 10s
+      test: ['CMD-SHELL', '/app/.venv/bin/python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(\"http://127.0.0.1:8000/api/\").getcode() < 400 else 1)"']
+      start_period: 15s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 30
     ports: 
       - "8000:8000"
     networks:
@@ -127,7 +147,7 @@ services:
       blueflow:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://blueflow:demo@blueflow-psql:5433/blueflow
+      DATABASE_URL: postgresql://blueflow:blueflow@blueflow-postgres:5432/blueflow
       REDIS_URL: redis://blueflow-redis:6379/0
       CELERY_BROKER_URL: redis://blueflow-redis:6379/0
       DJANGO_SETTINGS_MODULE: project.settings.development
@@ -137,7 +157,7 @@ services:
       - viper_stack
     
   tapirxl:
-    image: docker.io/tapirxl:demo-0.3.3
+    image: docker.io/virtalabsinc/tapirxl:demo-latest
     volumes:
       - ./pcap:/pcap:ro
       - ./init:/blueflow-init:ro

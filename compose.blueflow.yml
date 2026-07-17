@@ -120,16 +120,16 @@ services:
       blueflow-redis:
         condition: service_healthy
     environment:
+      BASE_URL: http://blueflow:8000
       DATABASE_URL: postgresql://blueflow:blueflow@blueflow-postgres:5432/blueflow
       RESDIS_URL: resdis://blueflow-redis:6379/0
       CELERY_BROKER_URL: redis://blueflow-redis:6379/0
+      CELERY_TASK_ALWAYS_EAGER: true
       DJANGO_SETTINGS_MODULE: project.settings.development
-      DJANGO_ALLOWED_HOSTS: blueflow,localhost,127.0.0.1
-      SECRET_KEY: demo-only-not-for-production
-      RUN_MIGRATIONS: "1"
-      DEFAULT_USERNAME: admin
-      DEFAULT_PASSWORD: admin
-      API_TOKEN: demo-tapirxl-token-not-for-production
+      DJANGO_SECRET_KEY: not-for-production
+      DJANGO_ALLOWED_HOSTS: blueflow,localhost,127.0.0.1,*
+      VIPER_CALLBACK_ALLOWED_HOSTS: viper
+      VIPER_CALLBACK_TIMEOUT: 30
     healthcheck:
       test: ['CMD-SHELL', '/app/.venv/bin/python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(\"http://127.0.0.1:8000/api/\").getcode() < 400 else 1)"']
       start_period: 15s
@@ -150,14 +150,15 @@ services:
       DATABASE_URL: postgresql://blueflow:blueflow@blueflow-postgres:5432/blueflow
       REDIS_URL: redis://blueflow-redis:6379/0
       CELERY_BROKER_URL: redis://blueflow-redis:6379/0
+      CELERY_TASK_ALWAYS_EAGER: true
       DJANGO_SETTINGS_MODULE: project.settings.development
-      SECRET_KEY: demo-only-not-for-production
+      SECRET_KEY: not-for-production
     command:  ["uv", "run", "celery", "-A", "blueflow.celery", "worker", "-l", "info"]
     networks:
       - viper_stack
     
   tapirxl:
-    image: docker.io/virtalabsinc/tapirxl:latest
+    image: docker.io/virtalabsinc/tapirxl:demo-latest
     volumes:
       - ./pcap:/pcap:ro
       - ./init:/blueflow-init:ro

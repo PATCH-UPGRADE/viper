@@ -34,11 +34,23 @@ export async function getNotesForInstance(
 ): Promise<RelevantNote[]> {
   if (ids.length === 0) return [];
 
-  // TODO(EntityFilterMatch): VW-358 -- also include notes that match
-  // via EntityFilterMatch
-
+  // A note is relevant to one of these ids either directly (targetModel +
+  // instanceId) or because one of its EntityFilters resolved to a match on that
+  // id. Matches are materialized by the resolve-entity-filters Inngest job.
   return prisma.note.findMany({
-    where: { targetModel, instanceId: { in: ids } },
+    where: {
+      OR: [
+        { targetModel, instanceId: { in: ids } },
+        {
+          filters: {
+            some: {
+              targetModel,
+              matches: { some: { targetId: { in: ids } } },
+            },
+          },
+        },
+      ],
+    },
     select: NOTE_SELECT,
   });
 }

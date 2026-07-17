@@ -27,10 +27,7 @@ services:
       - viper_stack
 
   viper:
-    image: ghcr.io/patch-upgrade/viper:latest # Use the image if it is pre-pulled (to avoid long build times on AWS)
-    build:
-      context: .
-      dockerfile: docker/viper/Dockerfile
+    image: ghcr.io/patch-upgrade/viper:latest
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/viper
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-not-for-production-change-me}

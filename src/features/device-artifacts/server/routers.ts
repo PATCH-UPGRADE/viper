@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type Prisma, ResourceType } from "@/generated/prisma";
+import { requestArtifactNoteExtraction } from "@/inngest/functions/extract-artifact-notes";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
@@ -211,6 +212,10 @@ export const deviceArtifactsRouter = createTRPCRouter({
         });
       });
 
+      // Kick off note extraction from any uploaded PDF documentation. The job
+      // polls S3, so it tolerates hosted uploads that finish after this returns.
+      await requestArtifactNoteExtraction(result.id);
+
       return {
         deviceArtifact: transformArtifactWrapper(result),
         uploadInstructions: uploadInstructions,
@@ -267,6 +272,8 @@ export const deviceArtifactsRouter = createTRPCRouter({
               },
             };
           },
+          // Extract notes from any uploaded PDF docs on newly-synced artifacts.
+          onItemCreated: (id) => requestArtifactNoteExtraction(id),
         },
         input,
         userId,
@@ -343,6 +350,12 @@ export const deviceArtifactsRouter = createTRPCRouter({
         data,
         include: deviceArtifactInclude,
       });
+
+      // A CPE change re-scopes the artifact to different device group
+      // matching(s); re-run extraction so notes scope to the new matching(s).
+      if (cpe) {
+        await requestArtifactNoteExtraction(id);
+      }
 
       return transformArtifactWrapper(deviceArtifact);
     }),

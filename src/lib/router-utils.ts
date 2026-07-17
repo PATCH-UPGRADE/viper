@@ -705,6 +705,11 @@ interface SyncConfig<
 
   // Optional: Additional fields to include in create
   additionalCreateFields?: (userId: string) => Record<string, any>;
+
+  // Optional: fired once after a NEW item (and its artifacts) is created, not on
+  // re-sync updates. Used e.g. to kick off deviceArtifact note extraction.
+  // Hook failures are logged, not propagated, so they never fail the sync.
+  onItemCreated?: (itemId: string) => Promise<void>;
 }
 
 /**
@@ -815,6 +820,7 @@ export async function processIntegrationSync<
 
     // If no Item, we need to create the Item and ExternalItemMapping
     if (!foundItem) {
+      let createdItemId: string | null = null;
       try {
         const createdItem = await config.model.create({
           data: {
@@ -829,6 +835,7 @@ export async function processIntegrationSync<
             },
           },
         });
+        createdItemId = createdItem.id;
 
         // Remediation and DeviceArtifacts integrations contain artifacts that need processing
         if (
@@ -853,6 +860,13 @@ export async function processIntegrationSync<
       }
 
       response.createdItemsCount++;
+      if (createdItemId && config.onItemCreated) {
+        try {
+          await config.onItemCreated(createdItemId);
+        } catch (error) {
+          console.error("onItemCreated hook failed", error);
+        }
+      }
       continue;
     }
 

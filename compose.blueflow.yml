@@ -111,7 +111,7 @@ services:
       - viper_stack
 
   blueflow:
-    image: docker.io/virtalabsinc/blueflow:demo-0.3.5-rc8
+    image: docker.io/virtalabsinc/blueflow:latest
     volumes:
       - ./init:/blueflow-init:ro
     depends_on:
@@ -142,7 +142,7 @@ services:
       - viper_stack
 
   blueflow-worker:
-    image: docker.io/virtalabsinc/blueflow:demo-0.3.5-rc8
+    image: docker.io/virtalabsinc/blueflow:latest
     depends_on:
       blueflow:
         condition: service_healthy
@@ -157,7 +157,7 @@ services:
       - viper_stack
     
   tapirxl:
-    image: docker.io/virtalabsinc/tapirxl:demo-latest
+    image: docker.io/virtalabsinc/tapirxl:latest
     volumes:
       - ./pcap:/pcap:ro
       - ./init:/blueflow-init:ro

@@ -138,6 +138,15 @@ export const notificationPayloadSchema = z.object({
 
 export type NotificationPayload = z.infer<typeof notificationPayloadSchema>;
 
+export const hospitalImpactSchema = z.object({
+  byline: z.string(),
+  impactStatement: z.string(),
+  careAreas: z.string(),
+  likelihood: z.string(),
+});
+
+export type HospitalImpact = z.infer<typeof hospitalImpactSchema>;
+
 // The single triage decision for an inbound email: drop it, or route it to an
 // informational Notification or an actionable Work Order. Kept a flat object
 // (Anthropic tool-schema rule).

@@ -1,13 +1,15 @@
+import { AlertTriangleIcon, type LucideIcon } from "lucide-react";
 import type { NotificationType } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 
 const typeConfig: Record<
   NotificationType,
-  { label: string; className: string }
+  { label: string; className: string; Icon?: LucideIcon }
 > = {
   Advisory: {
     label: "Advisory",
     className: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+    Icon: AlertTriangleIcon,
   },
   Recall: {
     label: "Recall",
@@ -28,13 +30,15 @@ const typeConfig: Record<
 
 export const NotificationTypeBadge = ({ type }: { type: NotificationType }) => {
   const config = typeConfig[type];
+  const Icon = config.Icon;
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold",
+        "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold",
         config.className,
       )}
     >
+      {Icon && <Icon className="size-3" />}
       {config.label}
     </span>
   );

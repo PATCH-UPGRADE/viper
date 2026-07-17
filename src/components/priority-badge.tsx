@@ -10,22 +10,19 @@ export const priorityConfig: Record<
 > = {
   Critical: {
     label: "Critical",
-    className: "bg-red-50 text-red-600 dark:bg-red-950/25 dark:text-red-400",
+    className: "bg-red-600 text-white dark:bg-red-600",
   },
   High: {
     label: "High",
-    className:
-      "bg-orange-50 text-orange-600 dark:bg-orange-950/25 dark:text-orange-400",
+    className: "bg-orange-600 text-white dark:bg-orange-600",
   },
   Monitor: {
     label: "Monitor",
-    className:
-      "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/25 dark:text-yellow-300",
+    className: "bg-yellow-500 text-black dark:bg-yellow-500 dark:text-black",
   },
   Defer: {
     label: "Defer",
-    className:
-      "bg-blue-50 text-blue-600 dark:bg-blue-950/25 dark:text-blue-400",
+    className: "bg-blue-600 text-white dark:bg-blue-600",
   },
   Unsorted: {
     label: "Unassigned",

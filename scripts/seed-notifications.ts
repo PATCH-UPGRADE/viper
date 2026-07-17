@@ -1,3 +1,4 @@
+import type { HospitalImpact } from "@/features/inbox/types";
 import {
   type AssetStatus,
   ConfidenceLevel,
@@ -227,8 +228,15 @@ async function seedSyngoPlazaVexScenario(userId: string) {
       type: NotificationType.Advisory,
       priority: Priority.High,
       tlp: Tlp.WHITE,
-      hospitalImpact:
-        "Affects 2 syngo.plaza PACS workstations running pre-hotfix VB30E. If exploited, an attacker with access to stored credential material could recover passwords and gain unauthorized access to the PACS system.",
+      hospitalImpact: {
+        byline:
+          "Credential exposure on 2 PACS workstations could grant unauthorized access to imaging systems.",
+        impactStatement:
+          "Affects 2 syngo.plaza PACS workstations running pre-hotfix VB30E. If exploited, an attacker with access to stored credential material could recover passwords and gain unauthorized access to the PACS system.",
+        careAreas: "Radiology — PACS workstations",
+        likelihood:
+          "Requires access to stored credential material · no known active exploitation · hot fix HF07 available",
+      } satisfies HospitalImpact,
       priorityReasonWhy:
         "No known active exploitation and requires access to stored credential material, but affects PACS authentication broadly. Siemens has published hot fix HF07 — schedule during the next maintenance window.",
     },
@@ -622,8 +630,16 @@ async function seedDeserializationScenario(userId: string) {
       type: NotificationType.Advisory,
       priority: Priority.Critical,
       tlp: Tlp.WHITE,
-      hospitalImpact:
-        "Affects imaging systems across radiology and nuclear medicine (MRI, CT, PET/CT, SPECT/CT, mammography) and syngo.via viewing/reporting workstations. Successful exploitation could disrupt diagnostic imaging and reporting workflows hospital-wide.",
+      hospitalImpact: {
+        byline:
+          "Unauthenticated RCE across hospital-wide imaging infrastructure could halt diagnostic imaging and reporting.",
+        impactStatement:
+          "Affects imaging systems across radiology and nuclear medicine (MRI, CT, PET/CT, SPECT/CT, mammography) and syngo.via viewing/reporting workstations. Successful exploitation could disrupt diagnostic imaging and reporting workflows hospital-wide.",
+        careAreas:
+          "Radiology & Nuclear Medicine — MRI, CT, PET/CT, SPECT/CT, mammography, syngo.via reading/reporting",
+        likelihood:
+          "Unauthenticated network RCE (CVSS 9.8) · gated on reachability of ports 32912/tcp & 32914/tcp · vendor fixes available",
+      } satisfies HospitalImpact,
       priorityReasonWhy:
         "Unauthenticated remote code execution (CVSS 9.8) on life-adjacent imaging infrastructure. Exploitability is gated on reachability of ports 32912/tcp and 32914/tcp — block them at the network boundary immediately and schedule the vendor fixes.",
     },

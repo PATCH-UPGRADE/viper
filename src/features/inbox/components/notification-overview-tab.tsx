@@ -338,10 +338,10 @@ export function NotificationOverviewTab({
         open={!!rejecting}
         onOpenChange={(open) => !open && closeDialog()}
       >
-        <DialogContent>
+        <DialogContent className="w-full min-w-0 sm:w-fit sm:min-w-80 sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Unlink className="size-4 text-destructive" />
+            <DialogTitle className="flex items-center gap-2 wrap-anywhere">
+              <Unlink className="size-4 text-destructive shrink-0" />
               Unlink{" "}
               {rejecting
                 ? deviceGroupMatchingLabel(rejecting.deviceGroupMatching)

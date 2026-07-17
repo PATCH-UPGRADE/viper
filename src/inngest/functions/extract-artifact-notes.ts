@@ -21,11 +21,24 @@ const EXTRACT_EVENT = "device-artifact/notes.extract.requested" as const;
 const POLL_INTERVAL = "1m";
 const MAX_ATTEMPTS = 15;
 
-/** Ask the extractor to process one device artifact's documentation. */
+/**
+ * Ask the extractor to process one device artifact's documentation.
+ *
+ * Best-effort: note extraction is a background enhancement, so a failure to
+ * enqueue (e.g. the event bus being unreachable) is logged, never thrown — it
+ * must not fail the caller's artifact create/update mutation.
+ */
 export async function requestArtifactNoteExtraction(
   deviceArtifactId: string,
 ): Promise<void> {
-  await inngest.send({ name: EXTRACT_EVENT, data: { deviceArtifactId } });
+  try {
+    await inngest.send({ name: EXTRACT_EVENT, data: { deviceArtifactId } });
+  } catch (err) {
+    console.error(
+      `Failed to enqueue note extraction for device artifact ${deviceArtifactId}`,
+      err,
+    );
+  }
 }
 
 export const extractArtifactNotesFn = inngest.createFunction(

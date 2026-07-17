@@ -88,6 +88,7 @@ export async function gatherTriageContext(
     (typeof notification.remediations)[number]["remediation"]
   >();
   for (const m of notification.remediations) {
+    if (m.confidence === "Rejected") continue;
     remediationsById.set(m.remediation.id, m.remediation);
   }
   for (const v of vulnerabilities) {

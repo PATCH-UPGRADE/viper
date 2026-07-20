@@ -11,7 +11,10 @@ import { extractWorkOrder } from "@/features/inbox/agent/extract-work-order";
 import { matchAndLinkEntities } from "@/features/inbox/agent/match";
 import { triageNotification } from "@/features/inbox/agent/triage";
 import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
-import { fetchPdfAttachmentsFromResend } from "@/features/inbox/utils";
+import {
+  fetchPdfAttachmentsFromResend,
+  pdfsFitInlineBudget,
+} from "@/features/inbox/utils";
 import { Prisma } from "@/generated/prisma";
 import { getAutomationUser } from "@/lib/automation-user";
 import prisma from "@/lib/db";
@@ -54,20 +57,30 @@ export const processInboxEmail = inngest.createFunction(
 
     // 3. Triage: is this relevant at all, and if so is it an informational
     // Notification or an actionable Work Order?
-    const { kind } = await step.run("classify-email", async () => {
-      const pdfAttachments = await fetchPdfAttachmentsFromResend(
-        emailId,
-        email.attachments ?? [],
-      );
-      return classifyEmailKind(
-        {
-          from: email.from,
-          subject: email.subject,
-          markdown: markdown ?? "",
-        },
-        pdfAttachments,
-      );
-    });
+    //
+    // The PDFs downloaded here are carried forward to every later step when
+    // they fit the budget, so nothing below re-fetches them from S3.
+    const { kind, attachments: inlinedPdfs } = await step.run(
+      "classify-email",
+      async () => {
+        const { pdfs, complete } = await fetchPdfAttachmentsFromResend(
+          emailId,
+          email.attachments ?? [],
+        );
+        const result = await classifyEmailKind(
+          {
+            from: email.from,
+            subject: email.subject,
+            markdown: markdown ?? "",
+          },
+          pdfs,
+        );
+
+        const inlineable =
+          complete && pdfsFitInlineBudget(email.attachments ?? []);
+        return { ...result, attachments: inlineable ? pdfs : null };
+      },
+    );
 
     if (kind === "not_relevant") {
       return { skipped: true, emailId };
@@ -79,29 +92,41 @@ export const processInboxEmail = inngest.createFunction(
       async () => {
         if (!email.attachments?.length) return [];
 
+        const inlinedById = new Map(
+          (inlinedPdfs ?? []).map((a) => [a.id, a.base64]),
+        );
+
         const { Resend } = await import("resend");
         const resend = new Resend(process.env.RESEND_API_KEY);
 
+        const loadBuffer = async (att: { id: string }) => {
+          const inlined = inlinedById.get(att.id);
+          if (inlined) return Buffer.from(inlined, "base64");
+
+          // Get the time-limited download URL from Resend
+          const { data: attData, error } =
+            await resend.emails.receiving.attachments.get({
+              emailId,
+              id: att.id,
+            });
+          if (error || !attData?.download_url) {
+            console.warn(`Skipping attachment ${att.id}: ${error?.message}`);
+            return null;
+          }
+
+          const res = await fetch(attData.download_url);
+          if (!res.ok) {
+            console.warn(`Failed to download attachment ${att.id}`);
+            return null;
+          }
+          return Buffer.from(await res.arrayBuffer());
+        };
+
         return Promise.all(
           email.attachments.map(async (att) => {
-            // Get the time-limited download URL from Resend
-            const { data: attData, error } =
-              await resend.emails.receiving.attachments.get({
-                emailId,
-                id: att.id,
-              });
-            if (error || !attData?.download_url) {
-              console.warn(`Skipping attachment ${att.id}: ${error?.message}`);
-              return null;
-            }
+            const buffer = await loadBuffer(att);
+            if (!buffer) return null;
 
-            const res = await fetch(attData.download_url);
-            if (!res.ok) {
-              console.warn(`Failed to download attachment ${att.id}`);
-              return null;
-            }
-
-            const buffer = Buffer.from(await res.arrayBuffer());
             const { createHash } = await import("node:crypto");
             const hashHex = createHash("md5").update(buffer).digest("hex");
 
@@ -191,11 +216,15 @@ export const processInboxEmail = inngest.createFunction(
     // email source, then tag matched device groups onto the ticket.
     if (kind === "work_order") {
       const wo = await step.run("extract-work-order", () =>
-        extractWorkOrder(sourceId, {
-          from: email.from,
-          subject: email.subject,
-          markdown: markdown ?? "",
-        }),
+        extractWorkOrder(
+          sourceId,
+          {
+            from: email.from,
+            subject: email.subject,
+            markdown: markdown ?? "",
+          },
+          inlinedPdfs ?? undefined,
+        ),
       );
 
       const workOrderTicketId = await step.run(
@@ -240,11 +269,15 @@ export const processInboxEmail = inngest.createFunction(
       );
 
       const extracted = await step.run("extract-work-order-entities", () =>
-        extractEntities(sourceId, {
-          from: email.from,
-          subject: email.subject,
-          markdown: markdown ?? "",
-        }),
+        extractEntities(
+          sourceId,
+          {
+            from: email.from,
+            subject: email.subject,
+            markdown: markdown ?? "",
+          },
+          inlinedPdfs ?? undefined,
+        ),
       );
 
       const linkSummary = await step.run(
@@ -267,11 +300,15 @@ export const processInboxEmail = inngest.createFunction(
 
     // 7. Classify email and upsert Notification
     const notificationId = await step.run("classify-notification", async () => {
-      const result = await classifyNotification(sourceId, {
-        from: email.from,
-        subject: email.subject,
-        markdown: markdown ?? "",
-      });
+      const result = await classifyNotification(
+        sourceId,
+        {
+          from: email.from,
+          subject: email.subject,
+          markdown: markdown ?? "",
+        },
+        inlinedPdfs ?? undefined,
+      );
 
       if (result.action === "update") {
         await prisma.$transaction(async (tx) => {
@@ -308,11 +345,15 @@ export const processInboxEmail = inngest.createFunction(
 
     // 8. Extract entities (device groups) referenced in the notification
     const extracted = await step.run("extract-entities", () =>
-      extractEntities(sourceId, {
-        from: email.from,
-        subject: email.subject,
-        markdown: markdown ?? "",
-      }),
+      extractEntities(
+        sourceId,
+        {
+          from: email.from,
+          subject: email.subject,
+          markdown: markdown ?? "",
+        },
+        inlinedPdfs ?? undefined,
+      ),
     );
 
     // 9. Fuzzy-search the DB for matches and link/update/create them
@@ -342,7 +383,11 @@ export const processInboxEmail = inngest.createFunction(
     // 11. Triage: assign priority, reason, and hospital impact
     if (notificationId) {
       await step.run("triage-notification", async () => {
-        const result = await triageNotification(sourceId, notificationId);
+        const result = await triageNotification(
+          sourceId,
+          notificationId,
+          inlinedPdfs ?? undefined,
+        );
         await prisma.notification.update({
           where: { id: notificationId },
           data: {

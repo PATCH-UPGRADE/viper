@@ -1,4 +1,5 @@
 import "server-only";
+import type { PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { normalizeName } from "@/lib/router-utils";
 import { downloadBufferFromS3, keyFromDownloadUrl } from "@/lib/s3";
@@ -13,9 +14,50 @@ const isPdf = (a: {
   );
 
 /**
+ * Ceiling on the summed Resend-reported `size` of an email's PDFs for them to
+ * be carried through Inngest step state instead of re-fetched from S3.
+ *
+ * Resend does not document the unit, so we assume the worst case (decoded
+ * bytes). Base64 inflates ~4/3, and the encoded string is what rides in the
+ * step output, which Inngest caps at 4MiB — so 3MB here lands at ~4MB encoded.
+ */
+export const INLINE_ATTACHMENT_BUDGET = 3_000_000;
+
+type ResendAttachmentMeta = {
+  filename?: string | null;
+  content_type?: string | null;
+  size?: number | null;
+};
+
+/** A PDF carried through step state, keyed back to its Resend attachment. */
+export type InlinePdfAttachment = PdfAttachment & { id: string };
+
+/**
+ * Whether an email's PDFs are small enough to pass through step state. An
+ * attachment with no reported size is treated as too big — the S3 fallback is
+ * always correct, so unknowns resolve that way.
+ */
+export function pdfsFitInlineBudget(
+  attachments: ResendAttachmentMeta[],
+): boolean {
+  const pdfs = attachments.filter((a) =>
+    isPdf({ filename: a.filename, contentType: a.content_type }),
+  );
+  if (pdfs.length === 0) return true;
+  if (pdfs.some((a) => typeof a.size !== "number")) return false;
+
+  const total = pdfs.reduce((sum, a) => sum + (a.size ?? 0), 0);
+  return total <= INLINE_ATTACHMENT_BUDGET;
+}
+
+/**
  * Fetch an inbound email's PDF attachments straight from Resend, as base64
  * `document` blocks. Used by the triage gate, which runs before we upload to
  * S3 or write a NotificationSource and so cannot use `fetchPdfAttachments`
+ *
+ * `complete` is false when any PDF failed to download. Callers must not pass a
+ * partial set downstream — the missing PDF would be silently absent, where the
+ * S3 fallback might still have retrieved it.
  */
 export async function fetchPdfAttachmentsFromResend(
   emailId: string,
@@ -24,11 +66,11 @@ export async function fetchPdfAttachmentsFromResend(
     filename?: string | null;
     content_type?: string | null;
   }>,
-): Promise<Array<{ filename: string | null; base64: string }>> {
+): Promise<{ pdfs: InlinePdfAttachment[]; complete: boolean }> {
   const pdfs = attachments.filter((a) =>
     isPdf({ filename: a.filename, contentType: a.content_type }),
   );
-  if (pdfs.length === 0) return [];
+  if (pdfs.length === 0) return { pdfs: [], complete: true };
 
   const { Resend } = await import("resend");
   const resend = new Resend(process.env.RESEND_API_KEY);
@@ -47,6 +89,7 @@ export async function fetchPdfAttachmentsFromResend(
 
         const buffer = Buffer.from(await res.arrayBuffer());
         return {
+          id: a.id,
           filename: a.filename ?? null,
           base64: buffer.toString("base64"),
         };
@@ -57,7 +100,8 @@ export async function fetchPdfAttachmentsFromResend(
     }),
   );
 
-  return results.filter((a) => a !== null);
+  const downloaded = results.filter((a) => a !== null);
+  return { pdfs: downloaded, complete: downloaded.length === pdfs.length };
 }
 
 /**

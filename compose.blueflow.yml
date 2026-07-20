@@ -171,6 +171,8 @@ services:
       TAPIRXL_MODE: pcap
       TAPIRXL_PCAP_PATH: /pcap/synthetic_philips_demo.pcap
       TAPIRXL_INTERFACE: eth0
+    profiles:
+      - tapirxl
     networks:
       - viper_stack
 

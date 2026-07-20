@@ -8,6 +8,7 @@ import { deviceGroupsRouter } from "@/features/device-groups/server/routers";
 import { notificationsRouter } from "@/features/inbox/server/routers";
 import { integrationsRouter } from "@/features/integrations/server/routers";
 import { issuesRouter } from "@/features/issues/server/routers";
+import { mitigationRouter } from "@/features/mitigation/server/routers";
 import { networkRouter } from "@/features/network/server/router";
 import { remediationsRouter } from "@/features/remediations/server/routers";
 import { tagColorsRouter } from "@/features/tag-colors/server/routers";
@@ -27,6 +28,7 @@ export const appRouter = createTRPCRouter({
   deviceArtifacts: deviceArtifactsRouter,
   user: userRouter,
   issues: issuesRouter,
+  mitigation: mitigationRouter,
   integrations: integrationsRouter,
   deviceGroups: deviceGroupsRouter,
   webhooks: webhooksRouter,

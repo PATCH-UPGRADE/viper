@@ -1030,6 +1030,21 @@ enum TicketCategory {
   OTHER
 }
 
+// Closed set of mitigation-plan tags the createMitigationPlans agent chooses
+// from. Human labels are rendered client-side.
+enum PlanTagEnum {
+  NETWORK_SEGMENTATION
+  DEVICE_UPDATE
+  FIRMWARE_UPDATE
+  VENDOR_FIX
+  NEEDS_VENDOR
+  CONFIG_CHANGE
+  ACCESS_CONTROL
+  MONITORING
+  COMPENSATING_CONTROL
+  DECOMMISSION
+}
+
 model Department {
   id          String         @id @default(cuid())
   name        String         @unique
@@ -1067,6 +1082,10 @@ model WorkOrderTicket {
 
   body String? @db.Text
 
+  isDraft Boolean @default(false)
+  mitigationPlanId String?
+  mitigationPlan   MitigationPlan? @relation(fields: [mitigationPlanId], references: [id], onDelete: Cascade)
+
   suggestedAssignee String?
 
   departments Department[] @relation("WorkOrderTicketDepartments")
@@ -1103,6 +1122,7 @@ model WorkOrderTicket {
   @@index([assigneeId])
   @@index([creatorId])
   @@index([parentId])
+  @@index([mitigationPlanId])
   @@map("work_order_ticket")
 }
 
@@ -1241,12 +1261,37 @@ model Notification {
   vulnerabilities NotificationVulnerabilityMapping[]
   remediations    NotificationRemediationMapping[]
   matchFeedback   MatchFeedback[]
+  mitigationPlans MitigationPlan[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([type])
   @@map("notification")
+}
+
+model MitigationPlan {
+  id          String        @id @default(cuid())
+  title       String
+  summary     String        @db.Text
+  compareLine String?       @db.Text // short blurb comparing this plan to the others
+  tags        PlanTagEnum[]
+  cards       Json          @default("{}") // { effort, downtime, residual_risk, coverage, timeline }
+
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  isAccepted Boolean @default(false)
+  order      Int // 0-based; order 0 is the recommended plan
+
+  workOrders WorkOrderTicket[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([notificationId, order])
+  @@index([notificationId])
+  @@map("mitigation_plan")
 }
 
 model NotificationSource {

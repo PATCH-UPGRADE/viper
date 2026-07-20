@@ -9,6 +9,7 @@ import { classifyEmailKind } from "@/features/inbox/agent/classify-kind";
 import { extractEntities } from "@/features/inbox/agent/extract";
 import { extractWorkOrder } from "@/features/inbox/agent/extract-work-order";
 import { matchAndLinkEntities } from "@/features/inbox/agent/match";
+import { persistMitigationPlans } from "@/features/inbox/agent/mitigation/persist";
 import { triageNotification } from "@/features/inbox/agent/triage";
 import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
 import { fetchPdfAttachmentsFromResend } from "@/features/inbox/utils";
@@ -354,6 +355,22 @@ export const processInboxEmail = inngest.createFunction(
       });
     }
 
-    return { sourceId, notificationId, emailId, linkSummary, vexSummary };
+    // 12. Mitigation plans: if the notification has linked vulnerabilities,
+    // propose ordered remediation plans and materialize each as a plan plus its
+    // draft work orders (isDraft=true; accepting a plan promotes them).
+    const mitigationSummary = notificationId
+      ? await step.run("create-mitigation-plans", () =>
+          persistMitigationPlans(sourceId, notificationId),
+        )
+      : null;
+
+    return {
+      sourceId,
+      notificationId,
+      emailId,
+      linkSummary,
+      vexSummary,
+      mitigationSummary,
+    };
   },
 );

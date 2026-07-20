@@ -609,7 +609,7 @@ export const handlePrismaError = (e: unknown): string => {
   return "Internal Server Error";
 };
 
-export async function upsertSyncStatus(
+async function upsertSyncStatus(
   integrationId: string,
   response: IntegrationResponse,
   lastSynced: Date,

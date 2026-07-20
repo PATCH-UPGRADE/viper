@@ -76,8 +76,7 @@ export const processInboxEmail = inngest.createFunction(
           pdfs,
         );
 
-        const inlineable =
-          complete && pdfsFitInlineBudget(email.attachments ?? []);
+        const inlineable = complete && pdfsFitInlineBudget(pdfs);
         return { ...result, attachments: inlineable ? pdfs : null };
       },
     );

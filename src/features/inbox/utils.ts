@@ -14,39 +14,18 @@ const isPdf = (a: {
   );
 
 /**
- * Ceiling on the summed Resend-reported `size` of an email's PDFs for them to
- * be carried through Inngest step state instead of re-fetched from S3.
- *
- * Resend does not document the unit, so we assume the worst case (decoded
- * bytes). Base64 inflates ~4/3, and the encoded string is what rides in the
- * step output, which Inngest caps at 4MiB — so 3MB here lands at ~4MB encoded.
+ * Ceiling on the total base64 length of an email's PDFs for them to be carried
+ * through Inngest step state instead of re-fetched from S3. The encoded string
+ * is what rides in the step output, which Inngest caps at 4MiB (4,194,304) —
+ * the remainder is headroom for the rest of the step's JSON.
  */
-export const INLINE_ATTACHMENT_BUDGET = 3_000_000;
-
-type ResendAttachmentMeta = {
-  filename?: string | null;
-  content_type?: string | null;
-  size?: number | null;
-};
+export const INLINE_ATTACHMENT_BUDGET = 4_000_000;
 
 /** A PDF carried through step state, keyed back to its Resend attachment. */
 export type InlinePdfAttachment = PdfAttachment & { id: string };
 
-/**
- * Whether an email's PDFs are small enough to pass through step state. An
- * attachment with no reported size is treated as too big — the S3 fallback is
- * always correct, so unknowns resolve that way.
- */
-export function pdfsFitInlineBudget(
-  attachments: ResendAttachmentMeta[],
-): boolean {
-  const pdfs = attachments.filter((a) =>
-    isPdf({ filename: a.filename, contentType: a.content_type }),
-  );
-  if (pdfs.length === 0) return true;
-  if (pdfs.some((a) => typeof a.size !== "number")) return false;
-
-  const total = pdfs.reduce((sum, a) => sum + (a.size ?? 0), 0);
+export function pdfsFitInlineBudget(pdfs: PdfAttachment[]): boolean {
+  const total = pdfs.reduce((sum, pdf) => sum + pdf.base64.length, 0);
   return total <= INLINE_ATTACHMENT_BUDGET;
 }
 

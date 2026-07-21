@@ -68,6 +68,10 @@ export const extractArtifactNotesFn = inngest.createFunction(
     if (!artifact) return { skipped: true, reason: "artifact not found" };
     const matchingIds = artifact.deviceGroupMatchings.map((m) => m.id);
 
+    if (matchingIds.length === 0) {
+      return { skipped: true, reason: "no device group matchings" };
+    }
+
     // Poll until every processable PDF is downloadable, then extract in the same
     // step (the PDF text is chunked and consumed by the LLM here; only small ops
     // are returned, keeping step output within Inngest's size limit).

@@ -156,10 +156,9 @@ export const processInboxEmail = inngest.createFunction(
     // 5. Persist NotificationSource + NotificationAttachment
     const sourceId = await step.run("save-source", async () => {
       // DEV: uncomment to reset duplicate so you can replay the same email webhook
-      // TODO cassidy
-      await prisma.notificationSource.deleteMany({
-        where: { externalId: emailId },
-      });
+      // await prisma.notificationSource.deleteMany({
+      //  where: { externalId: emailId },
+      // });
 
       try {
         const source = await prisma.notificationSource.create({

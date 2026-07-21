@@ -506,16 +506,17 @@ async function upsertDeviceGroupForAsset(
   const productRec = await upsertProduct(product);
   const versionRec = version ? await upsertVersion(version) : null;
 
-  const identity = {
-    vendorId: vendor.id,
-    productId: productRec.id,
-    versionId: versionRec?.id ?? null,
-    versionStatus: VersionStatus,
-  };
+  const vendorId = vendor.id;
+  const productId = productRec.id;
+  const versionId = versionRec?.id ?? null;
 
   return (
-    (await prisma.deviceGroup.findFirst({ where: identity })) ??
-    (await prisma.deviceGroup.create({ data: identity }))
+    (await prisma.deviceGroup.findFirst({
+      where: { vendorId, productId, versionId, versionStatus },
+    })) ??
+    (await prisma.deviceGroup.create({
+      data: { vendorId, productId, versionId, versionStatus },
+    }))
   );
 }
 

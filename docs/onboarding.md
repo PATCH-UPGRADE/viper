@@ -101,15 +101,169 @@ How do I log in?
 What's our production environment?
 - See, "What's our staging environment?". This is a research project.
 
-## Using ngrok
+## Exposing your local app to the internet
 
-If you're testing with Resend or n8n, you'll likely need to use ngrok (or a similar tool, like localtunnel).
+If you're testing with Resend or n8n, an external service needs to reach your laptop, so you need a tunnel.
 
-Install ngrok (homebrew should work on mac). Run `ngrok 3000` to tunnel/forward localhost:3000 to the public internet. This should give you a url.
+**cloudflared** is the easiest — no account needed:
 
-Run VIPER with `NEXT_PUBLIC_APP_URL="https://<YOUR_URL_HERE>.ngrok-free.dev" npm run dev:all`
+```bash
+brew install cloudflared
+cloudflared tunnel --url http://localhost:3000
+```
 
-You should be able to view your app on the web at `https://<YOUR_URL_HERE>.ngrok-free.dev`.
+It prints a URL like `https://corps-issn-portrait-fighter.trycloudflare.com`. Keep the terminal open; **if the process dies the URL changes**, and you'll have to update anything pointing at it.
+
+**ngrok** works too, but needs a free account and `ngrok config add-authtoken <token>` first, then `ngrok http 3000`.
+
+Either way, run VIPER with the tunnel URL so links it generates are correct:
+
+```bash
+NEXT_PUBLIC_APP_URL="https://<YOUR_TUNNEL_URL>" npm run dev:all
+```
+
+## Setting up Resend (inbound email)
+
+VIPER turns inbound security emails into Notifications and Work Order tickets. This walks you from nothing to a real email being processed on your machine.
+
+You only need this if you're working on the inbox pipeline. Allow ~20 minutes.
+
+### 1. Sign up with a personal email
+
+**Use a personal email address, not your work one.**
+
+Our Google Workspace blocks outbound mail to `*.resend.app`, which is exactly where you'll be sending test emails. If your Resend account is tied to your work address you'll be stuck immediately. Sign up at [resend.com](https://resend.com) with a personal address and send your test emails from there.
+
+You get your own free sandbox — no need to share credentials with anyone.
+
+### 2. Sending vs receiving
+
+Two distinctions trip people up, and they're unrelated:
+
+**The product has two halves.** *Sending* is transactional email your app pushes out. *Receiving* (inbound) is Resend accepting mail on your behalf, parsing it, and calling a webhook. VIPER's inbox pipeline only uses **receiving**.
+
+**API keys have two permission levels.** New keys default to **Sending access**, which cannot read received email. The pipeline calls `emails.receiving.get()` and `attachments.get()`, so it needs **Full access** or it dies immediately with a 401.
+
+Create the key under **API Keys → Create API Key → Full access**, then add it to `.env`:
+
+```
+RESEND_API_KEY=re_xxxxxxxxxxxx
+```
+
+Verify before going further:
+
+```bash
+curl -s -H "Authorization: Bearer $RESEND_API_KEY" https://api.resend.com/emails/receiving
+```
+
+A `restricted_api_key` error means you made a sending-only key.
+
+> ⚠️ Secrets go in `.env`, **never `.env.ci`**. Despite `.gitignore` listing `.env*`, `.env.ci` is *tracked* — tracked files ignore that pattern — and it feeds a GitHub Actions workflow. A key committed there is a leaked key.
+
+### 3. Get your receiving address
+
+Resend gives you a working inbound address with **no domain and no DNS setup**:
+
+> **Emails → Receiving** tab → **⋯** → **Receiving address**
+
+You'll get something like `anything@ab12cd34.resend.app`. The part before the `@` is freeform, so `test@`, `advisories@` etc. all land in the same inbox.
+
+> 🚫 If the dashboard pushes you to "Add a domain", back out. Adding a company domain would reroute real company email into Resend. You do not need it.
+
+### 4. Point a webhook at your machine
+
+Start your tunnel (see the section above), then:
+
+> **Webhooks → Add Webhook**
+> - **Endpoint URL:** `https://<YOUR_TUNNEL_URL>/api/email`
+> - **Event:** `email.received` — that one only
+
+Copy the **signing secret** it shows you into `.env`:
+
+```
+RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
+```
+
+`/api/email` returns a 500 until *both* `RESEND_API_KEY` and `RESEND_WEBHOOK_SECRET` are set. Restart the dev server after editing `.env` — it's only read at boot.
+
+Sanity check — a 400 here is **correct**, it means the route is live and rejecting an unsigned payload:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+  https://<YOUR_TUNNEL_URL>/api/email -H 'content-type: application/json' -d '{}'
+```
+
+A 500 means a missing env var; a 404 means the tunnel is pointing at the wrong port.
+
+### 5. Set your Anthropic key
+
+The pipeline makes several Anthropic calls (relevance triage, classification, entity extraction, hospital-impact triage), so `ANTHROPIC_API_KEY` must be set in `.env` or the run fails partway through.
+
+### 6. Send a test email
+
+From your **personal** account, email your `@…resend.app` address. Attach a PDF if you want to exercise attachment handling.
+
+Write it like a genuine security advisory. The first agent in the chain decides whether the email is relevant at all, and drops marketing, newsletters and meeting invites as `not_relevant` before anything else runs — a "test test test" email will be correctly ignored.
+
+### 7. Watch the pipeline run
+
+Resend POSTs to `/api/email`, which enqueues an Inngest event; `processInboxEmail` does the rest.
+
+**Inngest dev UI — <http://localhost:8288>** → *Runs* → newest `process-inbox-email`. Every step and its output is visible, which makes this the best place to debug.
+
+Note the webhook payload is **metadata only** — no body, no attachment bytes. The pipeline calls Resend back for the email content and downloads each attachment separately. That's why a failure to reach Resend can leave you with a Notification that has no attachments.
+
+**MinIO console — <http://localhost:9001>** (login `minioadmin` / `minioadmin`) → the `viper` bucket → `inbox/<emailId>/`. Attachments are uploaded here, and this is the quickest way to confirm they actually made it.
+
+**Database** — a successful run leaves a `notification_source` row joined to a `notification` (with `type`, `priority` and a populated `hospitalImpact`) plus one `notification_attachment` per file.
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Notification created but **zero attachments**, log shows `Failed to download attachment` | Cisco Umbrella on company laptops sinkholes `cdn.resend.app` as malware. `api.resend.com` is *not* blocked, so everything else looks fine | See below |
+| Run dies at `fetch-email-content` with a 401 | Sending-only API key | Step 2 |
+| `/api/email` returns 500 | `RESEND_API_KEY` or `RESEND_WEBHOOK_SECRET` missing | Steps 2 & 4 |
+| Gmail bounces with "Message blocked" | Workspace blocks `*.resend.app` | Send from a personal account |
+| Run returns `{skipped: true, reason: "duplicate"}` | That email was already processed — `externalId` is unique | Send a new email |
+| Run returns `{skipped: true}` | Triage judged the email `not_relevant` | Write a realistic advisory |
+
+**The Umbrella block.** Check with `dig +short cdn.resend.app` — `146.112.61.x` means blocked, a `cloudfront.net` address means fine. Turning off the VPN won't help (the DNS module is separate from AnyConnect), a hotspot won't help (the agent is on the machine), and `/etc/hosts` needs `sudo`.
+
+Umbrella intercepts *name resolution*, not the connection, so the workaround is to have Node resolve that one hostname via public DNS. Save this outside the repo as `~/viper-dev/dns-public.cjs`:
+
+```js
+const dns = require("node:dns");
+const OVERRIDE = /(^|\.)resend\.app$/i;
+const resolver = new dns.Resolver();
+resolver.setServers(["1.1.1.1", "8.8.8.8"]);
+const originalLookup = dns.lookup;
+
+dns.lookup = function (hostname, options, callback) {
+  if (typeof options === "function") { callback = options; options = {}; }
+  const opts = typeof options === "number" ? { family: options } : options || {};
+  if (!OVERRIDE.test(hostname)) {
+    return originalLookup.call(dns, hostname, options, callback);
+  }
+  resolver.resolve4(hostname, (err, addresses) => {
+    if (err || !addresses?.length) {
+      return originalLookup.call(dns, hostname, options, callback);
+    }
+    if (opts.all) {
+      return callback(null, addresses.map((address) => ({ address, family: 4 })));
+    }
+    callback(null, addresses[0], 4);
+  });
+};
+```
+
+Then start the dev server with it preloaded:
+
+```bash
+NODE_OPTIONS="--require $HOME/viper-dev/dns-public.cjs" npm run dev:all
+```
+
+This is a local workaround. The real fix is IT allowlisting `*.resend.app` — worth asking, since it blocks every developer.
 
 ## Additional Resources
 

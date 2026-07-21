@@ -1,11 +1,11 @@
-// Reads vendor device documentation (PDF) and emits structured create/update
-// operations against Note records. The PDF rides along as a native Anthropic
-// `document` block (no text extraction / chunking) — see @/lib/agent-messages.
+// Reads a chunk of vendor device documentation (extracted PDF text) and emits
+// structured create/update operations against Note records. Large PDFs are
+// split into text chunks upstream (see ../server/artifact-notes) and fed here
+// sequentially so a fact spanning chunks isn't duplicated.
 
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
-import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -27,7 +27,7 @@ export type NoteOps = z.infer<typeof noteOpsSchema>;
 /** An existing note offered to the model as an update/dedupe candidate. */
 export type ExistingNote = { id: string; text: string };
 
-const SYSTEM_PROMPT = `You extract durable security facts about a medical device from its vendor documentation.
+const SYSTEM_PROMPT = `You extract durable security facts about a medical device from an excerpt of its vendor documentation.
 
 Focus ONLY on facts useful for vulnerability management and hardening, such as:
 - Device hardening guidance and secure-configuration options
@@ -40,10 +40,12 @@ Focus ONLY on facts useful for vulnerability management and hardening, such as:
 Rules:
 - Emit each fact as its own concise, self-contained note (one atomic fact per note). No preamble.
 - Ignore marketing copy, legal boilerplate, and clinical/usage instructions unrelated to security.
-- You are given a list of EXISTING NOTES already attached to this device. If a fact you find is
+- The text is ONE EXCERPT of a longer document. A list of facts already captured from earlier
+  excerpts is provided — do NOT restate any of them.
+- You are also given EXISTING NOTES already stored for this device. If a fact you find is
   already represented by one of them, emit an "update" op with that note's id and improved text
-  INSTEAD of creating a near-duplicate. Only "update" an id that appears in the list.
-- If you find nothing security-relevant, return an empty list.`;
+  INSTEAD of creating a near-duplicate. Only "update" an id that appears in that list.
+- If this excerpt has nothing security-relevant, return an empty list.`;
 
 function existingNotesBlock(existing: ExistingNote[]): string {
   if (existing.length === 0) return "EXISTING NOTES: (none)";
@@ -51,16 +53,24 @@ function existingNotesBlock(existing: ExistingNote[]): string {
   return `EXISTING NOTES (update these instead of duplicating):\n${lines}`;
 }
 
+function alreadyExtractedBlock(facts: string[]): string {
+  if (facts.length === 0)
+    return "ALREADY CAPTURED FROM EARLIER EXCERPTS: (none)";
+  const lines = facts.map((f) => `- ${f}`).join("\n");
+  return `ALREADY CAPTURED FROM EARLIER EXCERPTS (do NOT restate):\n${lines}`;
+}
+
 /**
- * Run the extraction agent over one device artifact's PDFs. Returns the raw
- * create/update ops; the caller is responsible for validating update ids and
- * persisting (see planNoteWrites in ../server/artifact-notes).
+ * Run the extraction agent over one text chunk. Returns the raw create/update
+ * ops; the caller validates update ids and persists (see planNoteWrites in
+ * ../server/artifact-notes).
  */
-export async function extractNotesFromArtifact(args: {
-  pdfs: PdfAttachment[];
+export async function extractNotesFromChunk(args: {
+  chunkText: string;
   existingNotes: ExistingNote[];
+  alreadyExtracted: string[];
 }): Promise<NoteOps> {
-  const { pdfs, existingNotes } = args;
+  const { chunkText, existingNotes, alreadyExtracted } = args;
 
   const model = new ChatAnthropic({
     model: MODEL,
@@ -68,12 +78,14 @@ export async function extractNotesFromArtifact(args: {
   }).withStructuredOutput(noteOpsSchema);
 
   const prompt = [
-    "Extract security-relevant notes from the attached device documentation.",
+    "Extract security-relevant notes from the following excerpt of device documentation.",
     existingNotesBlock(existingNotes),
+    alreadyExtractedBlock(alreadyExtracted),
+    `EXCERPT:\n${chunkText}`,
   ].join("\n\n");
 
   return model.invoke([
     { role: "system", content: SYSTEM_PROMPT },
-    buildUserMessage(prompt, pdfs),
+    { role: "user", content: prompt },
   ]);
 }

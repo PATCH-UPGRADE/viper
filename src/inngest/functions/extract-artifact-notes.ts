@@ -1,6 +1,7 @@
 import "server-only";
-import { extractNotesFromArtifact } from "@/features/notes/agent/extract-notes";
+import { extractNotesFromChunk } from "@/features/notes/agent/extract-notes";
 import {
+  chunkText,
   fetchArtifactPdfs,
   persistArtifactNotes,
   planNoteWrites,
@@ -68,8 +69,8 @@ export const extractArtifactNotesFn = inngest.createFunction(
     const matchingIds = artifact.deviceGroupMatchings.map((m) => m.id);
 
     // Poll until every processable PDF is downloadable, then extract in the same
-    // step (the base64 is consumed by the LLM here; only small ops are
-    // returned, keeping step output within Inngest's size limit).
+    // step (the PDF text is chunked and consumed by the LLM here; only small ops
+    // are returned, keeping step output within Inngest's size limit).
     let extraction: { ops: unknown[]; candidateIds: string[] } | null = null;
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -84,18 +85,36 @@ export const extractArtifactNotesFn = inngest.createFunction(
           };
         }
 
-        const existing = await getNotesForInstance(
-          "DEVICE_GROUP_MATCHING",
-          matchingIds,
-        );
-        const { notes } = await extractNotesFromArtifact({
-          pdfs,
-          existingNotes: existing.map((n) => ({ id: n.id, text: n.text })),
-        });
+        const existingNotes = (
+          await getNotesForInstance("DEVICE_GROUP_MATCHING", matchingIds)
+        ).map((n) => ({ id: n.id, text: n.text }));
+
+        // Large manuals exceed Haiku's window as one blob, so split each PDF's
+        // text into chunks and process them sequentially, threading the facts
+        // captured so far so the model doesn't restate across chunk boundaries.
+        const chunks = pdfs.flatMap((pdf) => chunkText(pdf.text));
+        const ops: {
+          action: "create" | "update";
+          noteId?: string | null;
+          text: string;
+        }[] = [];
+        const alreadyExtracted: string[] = [];
+        for (const chunk of chunks) {
+          const { notes } = await extractNotesFromChunk({
+            chunkText: chunk,
+            existingNotes,
+            alreadyExtracted,
+          });
+          ops.push(...notes);
+          for (const n of notes) {
+            if (n.action === "create") alreadyExtracted.push(n.text);
+          }
+        }
+
         return {
           status: "ok" as const,
-          ops: notes,
-          candidateIds: existing.map((n) => n.id),
+          ops,
+          candidateIds: existingNotes.map((n) => n.id),
         };
       });
 

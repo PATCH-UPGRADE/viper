@@ -351,12 +351,6 @@ export const deviceArtifactsRouter = createTRPCRouter({
         include: deviceArtifactInclude,
       });
 
-      // A CPE change re-scopes the artifact to different device group
-      // matching(s); re-run extraction so notes scope to the new matching(s).
-      if (cpe) {
-        await requestArtifactNoteExtraction(id);
-      }
-
       return transformArtifactWrapper(deviceArtifact);
     }),
 });

@@ -6,15 +6,14 @@ import { createMitigationPlans } from ".";
 import type { PlanWorkOrder } from "./schema";
 
 // Run the mitigation-planning agent for a notification and persist its output:
-// one MitigationPlan per plan (order 0 = recommended) plus its draft work orders
-// (isDraft=true). Each work order is wired to only the vulnerabilities,
-// remediations, and device groups the agent named for THAT work order, so an
-// accepted plan yields tickets that are actually scoped to their own work.
+// one MitigationPlan per plan
+// Skip if any mitigation plans have already been accepted
+// Otherwise delete un-accepted plans first
+// Return number of plans created + work order links that could not be created
 export async function persistMitigationPlans(
   sourceId: string,
   notificationId: string,
 ) {
-  // Never clobber a plan a human already accepted (its work orders are now real).
   const acceptedCount = await prisma.mitigationPlan.count({
     where: { notificationId, isAccepted: true },
   });
@@ -25,7 +24,6 @@ export async function persistMitigationPlans(
   });
   if (vulnCount === 0) return { skipped: "no-vulnerabilities" as const };
 
-  // Clear any stale, un-accepted plans first (cascades their draft work orders).
   await prisma.mitigationPlan.deleteMany({
     where: { notificationId, isAccepted: false },
   });

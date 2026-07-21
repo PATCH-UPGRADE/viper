@@ -2,8 +2,8 @@ import { z } from "zod";
 import type { LinkableIds } from "@/features/inbox/agent/triage/context";
 import { PlanTagEnum } from "@/generated/prisma";
 
-// At-a-glance metrics rendered as the plan's cards. Stored verbatim as JSON on
-// MitigationPlan.cards.
+// Stored in MitigationPlan.card
+// TODO: Consider making these strings optional if not enough info
 export const planCardsSchema = z.object({
   effort: z.string().describe("e.g. '2 tickets · ~14 hrs total'"),
   downtime: z.string().describe("expected downtime, e.g. 'None to contain'"),

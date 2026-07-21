@@ -1030,8 +1030,6 @@ enum TicketCategory {
   OTHER
 }
 
-// Closed set of mitigation-plan tags the createMitigationPlans agent chooses
-// from. Human labels are rendered client-side.
 enum PlanTagEnum {
   NETWORK_SEGMENTATION
   DEVICE_UPDATE

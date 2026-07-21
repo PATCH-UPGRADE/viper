@@ -79,7 +79,6 @@ function shouldHalt(messages: BaseMessage[]): boolean {
 }
 
 export function buildAgentGraph({
-  // biome-ignore lint/suspicious/noExplicitAny: bound chat model (post-bindTools) has a wide type
   model,
   tools,
   systemMessage,

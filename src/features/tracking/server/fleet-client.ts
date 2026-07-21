@@ -27,7 +27,7 @@ import {
   AuthType,
   type Integration,
   ResourceType,
-  TicketCategory,
+  type TicketCategory,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { parseAuthenticationJson } from "@/lib/utils";

@@ -119,7 +119,7 @@ const SAMPLE_DEVICE_GROUPS = [
     modelName: "Sigma Spectrum",
     version: "N/A",
   },
-  // ── Siemens Healthineers imaging — 
+  // ── Siemens Healthineers imaging —
   {
     cpe: "cpe:2.3:h:siemens:magnetom_sola:-:*:*:*:*:*:*:*",
     manufacturer: "Siemens Healthineers",
@@ -135,7 +135,7 @@ const SAMPLE_DEVICE_GROUPS = [
 ];
 
 // Used to simulate imaging device utilization throughout the week
-// Mainly for work order scheduling 
+// Mainly for work order scheduling
 const IMAGING_UTILIZATION = Array.from({ length: 7 }, (_, day) => {
   const weekend = day >= 5;
   const hours: Record<string, number> = {};

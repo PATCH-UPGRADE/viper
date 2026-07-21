@@ -55,7 +55,7 @@ export const processInboxEmail = inngest.createFunction(
 
     // 3. Triage: is this relevant at all, and if so is it an informational
     // Notification or an actionable Work Order?
-    const { kind } = await step.run("classify-email", async () => {
+    const { kind } = await step.run("classify-email-kind", async () => {
       const pdfAttachments = await fetchPdfAttachmentsFromResend(
         emailId,
         email.attachments ?? [],
@@ -78,6 +78,7 @@ export const processInboxEmail = inngest.createFunction(
     const uploadedAttachments = await step.run(
       "upload-attachments",
       async () => {
+        console.log("HEY", email)
         if (!email.attachments?.length) return [];
 
         const { Resend } = await import("resend");
@@ -98,7 +99,11 @@ export const processInboxEmail = inngest.createFunction(
 
             const res = await fetch(attData.download_url);
             if (!res.ok) {
+              const responseText = await res.text();
+              console.log('heyo', res.status, responseText)
               console.warn(`Failed to download attachment ${att.id}`);
+              // TODO: (HEY!) This should probably be blocking -- the attachment, in most cases
+              // I've seen, is where all of the information comes from
               return null;
             }
 
@@ -144,9 +149,10 @@ export const processInboxEmail = inngest.createFunction(
     // 5. Persist NotificationSource + NotificationAttachment
     const sourceId = await step.run("save-source", async () => {
       // DEV: uncomment to reset duplicate so you can replay the same email webhook
-      //await prisma.notificationSource.deleteMany({
-      //  where: { externalId: emailId },
-      //});
+      // TODO cassidy
+      await prisma.notificationSource.deleteMany({
+        where: { externalId: emailId },
+      });
 
       try {
         const source = await prisma.notificationSource.create({

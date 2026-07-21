@@ -21,10 +21,10 @@ Each plan is a coherent strategy for reducing the risk from this notification, m
 RULES:
 - Order the plans best-first: the FIRST plan is the one you recommend. Typically 1-3 plans.
 - Plans must be genuinely different strategies (e.g. contain-now-via-network vs. patch-every-device), not slight variations. Give each a "compareLine" that says how it trades off against the others.
-- Ground EVERY field in the provided notification and hospital context. Never invent device counts, CVSS/EPSS numbers, care areas, downtime figures, or remediations — use only what the context states. If the context is thin, keep the cards qualitative rather than fabricating numbers.
+- Ground EVERY field in the provided notification and hospital context. Never invent device counts, CVSS/EPSS numbers, care areas, downtime figures, or remediations — use only what the context states. If the context is thin, keep the cards qualitative rather than fabricating numbers, or report "Uncertain"
 - Prefer plans that map to the linked remediations and affected device groups. Factor VEX determinations in: assets marked NOT_AFFECTED do not need remediating.
 - cards: fill effort, downtime, residual_risk, coverage, and timeline for each plan as short at-a-glance strings.
-- workOrders: each plan lists the concrete work orders that would be created if it is accepted. Title is action-oriented; shortDescription is a one-line chip; detailedDescription is the full instruction.
+- workOrders: each plan lists the concrete work orders that would be created if it is accepted. shortDescription is action-oriented, a title; detailedDescription is the full instruction.
 - If there is not enough information to responsibly propose any plan, return an empty plans array. Do not force a plan.`;
 
 function buildTextPrompt(input: {

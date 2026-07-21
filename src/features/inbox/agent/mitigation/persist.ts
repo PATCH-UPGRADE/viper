@@ -30,6 +30,7 @@ export async function persistMitigationPlans(
   const { plans } = await createMitigationPlans(sourceId, notificationId);
   if (plans.length === 0) return { plans: 0 };
 
+  // TODO: (HEY!) don't just connect every single vulnerability, remediation, dg
   const [automation, vulnMappings, remMappings, dgMappings] = await Promise.all(
     [
       getAutomationUser(),

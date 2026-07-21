@@ -20,6 +20,7 @@ export const planWorkOrderSchema = z.object({
   detailedDescription: z
     .string()
     .describe("full description of the work to perform"),
+  // TODO: (HEY!) need a way to link device groups, assets, remediations, and vulnerabilities here
 });
 
 export const mitigationPlanItemSchema = z.object({

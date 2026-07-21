@@ -3,7 +3,6 @@ import {
   networkTopologySchema,
 } from "@/features/network/types";
 import { listFleetManagedAssets } from "@/features/tracking/server/fleet-client";
-import { serializeWorkflow } from "@/features/workflows/utils";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {

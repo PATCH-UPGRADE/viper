@@ -128,7 +128,6 @@ const deviceGroupWhere = buildWhereSchema({
   versionId: stringFilter,
   versionStatus: stringFilter,
   udi: stringFilter,
-  helmSbomId: stringFilter,
 });
 
 const assetFilterSchema = buildWhereSchema(
@@ -156,7 +155,6 @@ const vulnerabilityFilterSchema = buildWhereSchema({
   epss: numberFilter,
   inKEV: booleanFilter,
   priority: stringFilter,
-  alohaStatus: stringFilter,
   affectedComponents: stringListFilter,
   createdAt: dateFilter,
 });
@@ -164,7 +162,6 @@ const vulnerabilityFilterSchema = buildWhereSchema({
 const remediationFilterSchema = buildWhereSchema({
   id: stringFilter,
   vulnerabilityId: stringFilter,
-  alohaStatus: stringFilter,
   createdAt: dateFilter,
 });
 

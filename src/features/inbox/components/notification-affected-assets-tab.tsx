@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +27,12 @@ import type {
   NotificationDetailWithRelations,
   ResolvedDeviceGroupAsset,
 } from "../types";
+import DropdownCell from "./DropdownCell";
+import { displayName } from "@/lib/markdown/device-group";
+import {
+  useVersionForVendorProduct,
+  useAnswerAssetVersion,
+} from "../hooks/use-notifications";
 
 const PAGE_SIZE = 10;
 
@@ -48,6 +54,24 @@ function MatchingAssetTable({
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState<ResolvedDeviceGroupAsset[]>([]);
   const appendedPages = useRef(new Set<number>());
+
+  const matching = group.deviceGroupMatching;
+  const { data: knownVersions } = useVersionForVendorProduct({
+    vendorId: matching.vendorId,
+    productId: matching.productId ?? "",
+  });
+
+  const suggestedVersion =
+    displayName(matching.version) ?? matching.versionRange;
+
+  const options = useMemo(() => {
+    const names = (knownVersions ?? []).map((v) => v.canonicalDisplayName);
+    return suggestedVersion && !names.includes(suggestedVersion)
+      ? [suggestedVersion, ...names]
+      : names;
+  }, [knownVersions, suggestedVersion]);
+
+  const answerVersion = useAnswerAssetVersion();
 
   const { data, isLoading, isFetching, isError, refetch } =
     useAffectedAssetsPage({
@@ -95,7 +119,7 @@ function MatchingAssetTable({
               <TableHead>Asset ID</TableHead>
               <TableHead>IP Address</TableHead>
               <TableHead>Location</TableHead>
-              <TableHead>Version</TableHead>
+              <TableHead className="w-60">Version</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -117,7 +141,17 @@ function MatchingAssetTable({
                 </TableCell>
                 <TableCell>{asset.ip}</TableCell>
                 <TableCell>{parseLocation(asset.location)}</TableCell>
-                <TableCell>{asset.version ?? "—"}</TableCell>
+                <TableCell className="w-60">
+                  <DropdownCell
+                    value={asset.version}
+                    versionStatus={asset.versionStatus}
+                    options={options}
+                    onAnswer={(answer) =>
+                      answerVersion.mutateAsync({ id: asset.id, ...answer })
+                    }
+                    isPending={answerVersion.isPending}
+                  />
+                </TableCell>
                 <TableCell>{asset.status ?? "—"}</TableCell>
                 <TableCell>
                   <MoreVerticalDropdownMenu

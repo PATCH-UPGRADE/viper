@@ -374,7 +374,8 @@ const DESERIALIZATION_MATCHINGS: Array<{
 // Assets, each bucketed into a DeviceGroup keyed by exact version.
 const DESERIALIZATION_ASSETS: Array<{
   product: string;
-  version: string;
+  version?: string;
+  versionStatus?: "UNSURE";
   ip: string;
   hostname: string;
   serialNumber: string;
@@ -453,6 +454,23 @@ const DESERIALIZATION_ASSETS: Array<{
     role: "SPECT/CT Console",
     networkSegment: "IMAGING-NUCMED",
   },
+  {
+    product: "MAGNETOM Family",
+    ip: "10.60.0.13",
+    hostname: "mri-magnetom-03",
+    serialNumber: "MAGNETOM-UNKNOWN-001",
+    role: "MRI Scanner Console",
+    networkSegment: "IMAGING-MRI",
+  },
+  {
+    product: "MAGNETOM Family",
+    versionStatus: "UNSURE",
+    ip: "10.60.0.14",
+    hostname: "mri-magnetom-04",
+    serialNumber: "MAGNETOM-UNKNOWN-001",
+    role: "MRI Scanner Console",
+    networkSegment: "IMAGING-MRI",
+  },
 ];
 
 async function upsertDeserializationMatching(spec: {
@@ -477,16 +495,22 @@ async function upsertDeserializationMatching(spec: {
   );
 }
 
-async function upsertDeviceGroupForAsset(product: string, version: string) {
+async function upsertDeviceGroupForAsset(
+  product: string,
+  version?: string,
+  versionStatus: VersionStatus = version
+    ? VersionStatus.KNOWN
+    : VersionStatus.UNKNOWN,
+) {
   const vendor = await upsertVendor(DESERIALIZATION_VENDOR);
   const productRec = await upsertProduct(product);
-  const versionRec = await upsertVersion(version);
+  const versionRec = version ? await upsertVersion(version) : null;
 
   const identity = {
     vendorId: vendor.id,
     productId: productRec.id,
-    versionId: versionRec.id,
-    versionStatus: VersionStatus.KNOWN,
+    versionId: versionRec?.id ?? null,
+    versionStatus: VersionStatus,
   };
 
   return (
@@ -562,8 +586,14 @@ async function seedDeserializationScenario(userId: string) {
     const deviceGroup = await upsertDeviceGroupForAsset(
       spec.product,
       spec.version,
+      spec.versionStatus === "UNSURE" ? VersionStatus.UNSURE : undefined,
     );
-    const { product: _product, version: _version, ...assetFields } = spec;
+    const {
+      product: _product,
+      version: _version,
+      versionStatus: _versionStatus,
+      ...assetFields
+    } = spec;
     assets.push(
       await prisma.asset.create({
         data: {

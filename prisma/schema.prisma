@@ -1077,6 +1077,9 @@ model WorkOrderTicket {
   status      TicketStatus   @default(TO_DO)
   category    TicketCategory @default(OTHER)
 
+  priority          Priority @default(Unsorted)
+  priorityReasonWhy String?  @db.Text
+
   sourceLabel String?
   sources NotificationSource[]
 
@@ -1085,6 +1088,9 @@ model WorkOrderTicket {
   isDraft Boolean @default(false)
   mitigationPlanId String?
   mitigationPlan   MitigationPlan? @relation(fields: [mitigationPlanId], references: [id], onDelete: Cascade)
+
+  notificationId String?
+  notification   Notification? @relation(fields: [notificationId], references: [id], onDelete: SetNull)
 
   suggestedAssignee String?
 
@@ -1123,6 +1129,7 @@ model WorkOrderTicket {
   @@index([creatorId])
   @@index([parentId])
   @@index([mitigationPlanId])
+  @@index([notificationId])
   @@map("work_order_ticket")
 }
 
@@ -1262,6 +1269,7 @@ model Notification {
   remediations    NotificationRemediationMapping[]
   matchFeedback   MatchFeedback[]
   mitigationPlans MitigationPlan[]
+  workOrderTickets WorkOrderTicket[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

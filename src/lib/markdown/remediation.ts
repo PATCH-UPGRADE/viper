@@ -2,7 +2,7 @@
 // these fields is compatible.
 
 import { deviceGroupMatchingsSummary } from "./device-group";
-import { type CanonicalRef, shortId } from "./shared";
+import type { CanonicalRef } from "./shared";
 
 type DeviceGroupMatchingForMarkdown = {
   vendor?: CanonicalRef;
@@ -36,7 +36,7 @@ export interface RemediationForMarkdown {
 export function remediationToMarkdown(r: RemediationForMarkdown): string {
   const cveRef =
     r.vulnerability?.cveId ?? r.vulnerabilityId ?? "no linked vuln";
-  const lines = [`### Remediation rem-${shortId(r.id)} → ${cveRef}`];
+  const lines = [`### Remediation ${r.id} → ${cveRef}`];
 
   const remediationMatchings = r.deviceGroupMatchings ?? [];
   if (remediationMatchings.length > 0) {
@@ -55,7 +55,7 @@ export function remediationToMarkdown(r: RemediationForMarkdown): string {
       const label =
         ir.issue.asset.hostname ?? ir.issue.asset.ip ?? ir.issue.asset.id;
       lines.push(
-        `  - ${label} (${shortId(ir.issue.asset.id)}) — issue status: ${ir.issue.status}`,
+        `  - ${label} (${ir.issue.asset.id}) — issue status: ${ir.issue.status}`,
       );
     }
   }

@@ -12,7 +12,7 @@ import { matchAndLinkEntities } from "@/features/inbox/agent/match";
 import { persistMitigationPlans } from "@/features/inbox/agent/mitigation/persist";
 import { triageNotification } from "@/features/inbox/agent/triage";
 import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
-import { fetchPdfAttachmentsFromResend } from "@/features/inbox/utils";
+import { fetchPdfAttachmentsFromResend, isPdf } from "@/features/inbox/utils";
 import { Prisma } from "@/generated/prisma";
 import { getAutomationUser } from "@/lib/automation-user";
 import prisma from "@/lib/db";
@@ -78,7 +78,6 @@ export const processInboxEmail = inngest.createFunction(
     const uploadedAttachments = await step.run(
       "upload-attachments",
       async () => {
-        console.log("HEY", email)
         if (!email.attachments?.length) return [];
 
         const { Resend } = await import("resend");
@@ -99,11 +98,19 @@ export const processInboxEmail = inngest.createFunction(
 
             const res = await fetch(attData.download_url);
             if (!res.ok) {
-              const responseText = await res.text();
-              console.log('heyo', res.status, responseText)
-              console.warn(`Failed to download attachment ${att.id}`);
-              // TODO: (HEY!) This should probably be blocking -- the attachment, in most cases
-              // I've seen, is where all of the information comes from
+              const detail = `${res.status} ${await res.text()}`;
+              // If there's a pdf that we can't download, just throw an error
+              // Chances are all relevant context is there
+              if (
+                isPdf({ filename: att.filename, contentType: att.content_type })
+              ) {
+                throw new Error(
+                  `Failed to download PDF attachment ${att.id}: ${detail}`,
+                );
+              }
+              console.warn(
+                `Failed to download attachment ${att.id}: ${detail}`,
+              );
               return null;
             }
 

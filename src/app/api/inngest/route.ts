@@ -8,6 +8,10 @@ import { manageMemoriesFn } from "@/inngest/functions/manage-memories";
 import { processInboxEmail } from "@/inngest/functions/process-inbox-email";
 import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-user-tokens";
 import {
+  resolveAllEntityFilters,
+  resolveEntityFilterFn,
+} from "@/inngest/functions/resolve-entity-filters";
+import {
   syncAllIntegrations,
   syncIntegration,
 } from "@/inngest/functions/sync-integrations";
@@ -22,5 +26,7 @@ export const { GET, POST, PUT } = serve({
     manageMemoriesFn,
     purgeExpiredTokensFn,
     processInboxEmail,
+    resolveAllEntityFilters,
+    resolveEntityFilterFn,
   ],
 });

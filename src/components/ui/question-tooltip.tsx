@@ -20,7 +20,7 @@ export function QuestionTooltip({
           <CircleQuestionMark />
         </Button>
       </TooltipTrigger>
-      <TooltipContent className="pr-1.5">{children}</TooltipContent>
+      <TooltipContent className="pr-1.5 max-w-xs">{children}</TooltipContent>
     </Tooltip>
   );
 }

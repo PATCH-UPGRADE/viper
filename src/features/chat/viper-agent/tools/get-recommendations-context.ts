@@ -10,6 +10,7 @@ import {
   assetToMarkdown,
   deviceGroupLabel,
   generateMemoryMarkdown,
+  generateWorkflowsMarkdown,
   remediationToMarkdown,
   renderUtilization,
   shortId,
@@ -70,30 +71,9 @@ function generateVulnAssetRemMap(
   return [header, divider, ...rows].join("\n");
 }
 
-// ─── Workflow markdown ────────────────────────────────────────────────────────
-
 type WorkflowWithRelations = Prisma.WorkflowGetPayload<{
   include: { nodes: true; connections: true };
 }>;
-
-function generateWorkflowsMarkdown(workflows: WorkflowWithRelations[]): string {
-  if (workflows.length === 0) return "_No clinical workflows defined._";
-
-  return workflows
-    .map((wf) => {
-      const serialized = serializeWorkflow(wf);
-      const { edges: _edges, ...withoutEdges } = serialized;
-      const lines = [`### ${serialized.name} (${shortId(serialized.id)})`];
-      if (serialized.description) {
-        lines.push(`\n${serialized.description}`);
-      }
-      lines.push(
-        `\n\`\`\`json\n${JSON.stringify(withoutEdges, null, 2)}\n\`\`\``,
-      );
-      return lines.join("\n");
-    })
-    .join("\n\n");
-}
 
 // ─── Network flow ─────────────────────────────────────────────────────────────
 

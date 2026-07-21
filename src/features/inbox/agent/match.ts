@@ -67,6 +67,12 @@ const matchSchema = z.object({
 
 export type Decision = z.infer<typeof decisionSchema>;
 
+// A device-group mapping belongs to exactly one parent — a Notification or a
+// WorkOrderTicket. Callers pick which by passing the matching key.
+export type MatchOwner =
+  | { notificationId: string }
+  | { workOrderTicketId: string };
+
 export type MatchSummary = {
   linked: number;
   updated: number;
@@ -254,7 +260,7 @@ function cleanFields(fields: Decision["fields"]): {
 }
 
 export async function matchAndLinkEntities(
-  notificationId: string,
+  owner: MatchOwner,
   extracted: ExtractResult,
   candidates: Candidates,
 ): Promise<MatchSummary> {
@@ -272,20 +278,19 @@ export async function matchAndLinkEntities(
     { role: "user", content: renderCandidates(candidates) },
   ]);
 
-  return applyDecisions(notificationId, decisions, candidates);
+  return applyDecisions(owner, decisions, candidates);
 }
 
 /**
  * Deterministically apply a list of matching decisions to the database.
  * Separated from the LLM call so it can be unit-tested in isolation.
  *
- * Idempotent: mappings are upserted on (notificationId, deviceGroupId) and new
- * device groups are resolved to their canonical (vendor/product/version)
- * identity via resolveDeviceGroup, so replaying does not duplicate rows.
- * Also it does not resurrect a match a human already rejected
+ * Idempotent: mappings are upserted on (owner, deviceGroupId) and new device
+ * groups are resolved to their canonical (vendor/product/version) identity via
+ * resolveDeviceGroup, so replaying does not duplicate rows.
  */
 export async function applyDecisions(
-  notificationId: string,
+  owner: MatchOwner,
   decisions: Decision[],
   candidates: Candidates,
 ): Promise<MatchSummary> {
@@ -300,7 +305,7 @@ export async function applyDecisions(
   const rejectedDeviceGroupMatchingIds = new Set(
     (
       await prisma.notificationDeviceGroupMapping.findMany({
-        where: { notificationId, confidence: "Rejected" },
+        where: { ...owner, confidence: "Rejected" },
         select: { deviceGroupMatchingId: true },
       })
     ).map((m) => m.deviceGroupMatchingId),
@@ -333,22 +338,44 @@ export async function applyDecisions(
         decision.confidence === "Matched" ? "Matched" : "NeedsReview";
 
       if (decision.kind === "deviceGroupMatching") {
-        const upsertMapping = (deviceGroupMatchingId: string) =>
-          tx.notificationDeviceGroupMapping.upsert({
-            where: {
-              notificationId_deviceGroupMatchingId: {
-                notificationId,
+        // A device-group mapping is the only link kind a WorkOrderTicket can
+        // own; Notifications additionally own vulnerability/remediation/asset
+        // mappings (handled below). Pick the matching compound key from `owner`.
+        const upsertMapping = (deviceGroupMatchingId: string) => {
+          const isNotification = "notificationId" in owner;
+          const where = isNotification
+            ? {
+                notificationId_deviceGroupMatchingId: {
+                  notificationId: owner.notificationId,
+                  deviceGroupMatchingId,
+                },
+              }
+            : {
+                workOrderTicketId_deviceGroupMatchingId: {
+                  workOrderTicketId: owner.workOrderTicketId,
+                  deviceGroupMatchingId,
+                },
+              };
+          const create = isNotification
+            ? {
+                notificationId: owner.notificationId,
                 deviceGroupMatchingId,
-              },
-            },
-            create: {
-              notificationId,
-              deviceGroupMatchingId,
-              confidence,
-              reasonWhy: decision.reasonWhy,
-            },
-            update: { confidence, reasonWhy: decision.reasonWhy },
+                confidence,
+                reasonWhy: decision.reasonWhy,
+              }
+            : {
+                workOrderTicketId: owner.workOrderTicketId,
+                deviceGroupMatchingId,
+                confidence,
+                reasonWhy: decision.reasonWhy,
+              };
+          const update = { confidence, reasonWhy: decision.reasonWhy };
+          return tx.notificationDeviceGroupMapping.upsert({
+            where,
+            create,
+            update,
           });
+        };
 
         const enrichDeviceGroup = async (
           deviceGroupMatchingId: string,
@@ -454,6 +481,12 @@ export async function applyDecisions(
           summary.created++;
         }
       } else if (decision.kind === "vulnerability") {
+        // Vulnerability/remediation/asset mappings exist only for
+        // Notifications — a WorkOrderTicket owns device-group links only.
+        if (!("notificationId" in owner)) {
+          summary.skipped++;
+          continue;
+        }
         if (
           !decision.targetId ||
           !validIds.vulnerability.has(decision.targetId)
@@ -464,12 +497,12 @@ export async function applyDecisions(
         await tx.notificationVulnerabilityMapping.upsert({
           where: {
             notificationId_vulnerabilityId: {
-              notificationId,
+              notificationId: owner.notificationId,
               vulnerabilityId: decision.targetId,
             },
           },
           create: {
-            notificationId,
+            notificationId: owner.notificationId,
             vulnerabilityId: decision.targetId,
             confidence,
             reasonWhy: decision.reasonWhy,
@@ -493,6 +526,10 @@ export async function applyDecisions(
         if (decision.op === "update") summary.updated++;
         else summary.linked++;
       } else if (decision.kind === "remediation") {
+        if (!("notificationId" in owner)) {
+          summary.skipped++;
+          continue;
+        }
         if (
           !decision.targetId ||
           !validIds.remediation.has(decision.targetId)
@@ -503,12 +540,12 @@ export async function applyDecisions(
         await tx.notificationRemediationMapping.upsert({
           where: {
             notificationId_remediationId: {
-              notificationId,
+              notificationId: owner.notificationId,
               remediationId: decision.targetId,
             },
           },
           create: {
-            notificationId,
+            notificationId: owner.notificationId,
             remediationId: decision.targetId,
             confidence,
             reasonWhy: decision.reasonWhy,
@@ -528,6 +565,10 @@ export async function applyDecisions(
           summary.linked++;
         }
       } else if (decision.kind === "asset") {
+        if (!("notificationId" in owner)) {
+          summary.skipped++;
+          continue;
+        }
         if (!decision.targetId || !validIds.asset.has(decision.targetId)) {
           summary.skipped++;
           continue;
@@ -535,12 +576,12 @@ export async function applyDecisions(
         await tx.notificationAssetMapping.upsert({
           where: {
             notificationId_assetId: {
-              notificationId,
+              notificationId: owner.notificationId,
               assetId: decision.targetId,
             },
           },
           create: {
-            notificationId,
+            notificationId: owner.notificationId,
             assetId: decision.targetId,
             confidence,
             reasonWhy: decision.reasonWhy,

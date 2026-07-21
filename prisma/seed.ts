@@ -1281,14 +1281,6 @@ type GroupIdentity = {
   versionId: string | null;
 };
 
-// Local mirror of matchingAppliesToDeviceGroup's applicability test (id-based).
-function matchingMatchesGroup(m: GroupIdentity, dg: GroupIdentity): boolean {
-  if (!dg.vendorId || m.vendorId !== dg.vendorId) return false;
-  if (m.productId && m.productId !== dg.productId) return false;
-  if (m.versionId && m.versionId !== dg.versionId) return false;
-  return true;
-}
-
 async function seedDeviceGroups() {
   console.log("\n🌱 Seeding device groups...");
 

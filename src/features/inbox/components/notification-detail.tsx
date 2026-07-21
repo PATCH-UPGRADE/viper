@@ -1,10 +1,11 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { BadgeSelect } from "@/components/badge-select";
+import { CorrectionDialog } from "@/components/correction-dialog";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { PriorityBadge } from "@/components/priority-badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -19,14 +20,31 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { NotificationType, Priority } from "@/generated/prisma";
 import {
   useMarkNotificationRead,
   useSuspenseNotification,
+  useUpdateNotification,
 } from "../hooks/use-notifications";
 import type { NotificationDetailSource } from "../types";
 import { NotificationAffectedAssetsTab } from "./notification-affected-assets-tab";
 import { NotificationOverviewTab } from "./notification-overview-tab";
 import { NotificationTypeBadge } from "./notification-type-badge";
+
+const NOTIFICATION_TYPE_OPTIONS: NotificationType[] = [
+  "Advisory",
+  "Recall",
+  "UpdateAvailable",
+  "Other",
+];
+
+const PRIORITY_OPTIONS: Priority[] = [
+  "Critical",
+  "High",
+  "Defer",
+  "Monitor",
+  "Unsorted",
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -62,6 +80,9 @@ export const NotificationDetailError = () => (
 export const NotificationDetailPage = ({ id }: { id: string }) => {
   const { data: notification } = useSuspenseNotification(id);
   const markRead = useMarkNotificationRead();
+  const updateNotification = useUpdateNotification();
+  const [pendingType, setPendingType] = useState<NotificationType | null>(null);
+  const [pendingPriority, setPendingPriority] = useState<Priority | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: fire once on id change; markRead.mutate is stable
   useEffect(() => {
@@ -70,13 +91,29 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
     }
   }, [id]);
 
+  const handleOnSaveTypeCorrection = async (reason: string | undefined) => {
+    if (!pendingType) return;
+    await updateNotification.mutateAsync({
+      id: notification.id,
+      type: pendingType,
+      reason,
+    });
+    setPendingType(null);
+  };
+
+  const handleOnSavePriorityCorrection = async (reason: string | undefined) => {
+    if (!pendingPriority) return;
+    await updateNotification.mutateAsync({
+      id: notification.id,
+      priority: pendingPriority,
+      reason,
+    });
+    setPendingPriority(null);
+  };
+
   const displayTitle =
     notification.title ?? notification.summary ?? notification.id;
 
-  const totalDeviceGroups = notification.deviceGroupsMatchings.length;
-  const deviceGroupsWithAssets = notification.deviceGroupsMatchings.filter(
-    (m) => m.assetCount > 0,
-  ).length;
   const firstReceived =
     notification.sources.length > 0
       ? new Date(
@@ -105,22 +142,64 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
         </BreadcrumbList>
       </Breadcrumb>
 
-      {/* Badge row */}
+      {/* Badge select */}
       <div className="flex items-center gap-2">
-        <NotificationTypeBadge type={notification.type} />
+        <BadgeSelect
+          value={notification.type}
+          options={NOTIFICATION_TYPE_OPTIONS}
+          groupLabel={"SET CATEGORY"}
+          renderBadge={(nType) => <NotificationTypeBadge type={nType} />}
+          onPendingChanges={setPendingType}
+        />
         {notification.priorityReasonWhy ? (
           <HoverCard openDelay={200}>
             <HoverCardTrigger asChild>
-              <PriorityBadge priority={notification.priority} />
+              <BadgeSelect
+                value={notification.priority}
+                options={PRIORITY_OPTIONS}
+                groupLabel="SET PRIORITY"
+                renderBadge={(p) => <PriorityBadge priority={p} />}
+                onPendingChanges={setPendingPriority}
+              />
             </HoverCardTrigger>
             <HoverCardContent className="w-72 text-sm">
               {notification.priorityReasonWhy}
             </HoverCardContent>
           </HoverCard>
         ) : (
-          <PriorityBadge priority={notification.priority} />
+          <BadgeSelect
+            value={notification.priority}
+            options={PRIORITY_OPTIONS}
+            groupLabel="SET PRIORITY"
+            renderBadge={(p) => <PriorityBadge priority={p} />}
+            onPendingChanges={setPendingPriority}
+          />
         )}
       </div>
+
+      <CorrectionDialog
+        open={pendingType !== null}
+        title="Change Category"
+        question="Why are you changing the category?"
+        fromContent={<NotificationTypeBadge type={notification.type} />}
+        toContent={
+          pendingType ? <NotificationTypeBadge type={pendingType} /> : null
+        }
+        onCancel={() => setPendingType(null)}
+        onSave={handleOnSaveTypeCorrection}
+      />
+
+      <CorrectionDialog
+        open={pendingPriority !== null}
+        title="Change Priority"
+        question="Why are you changing this priority?"
+        fromContent={<PriorityBadge priority={notification.priority} />}
+        toContent={
+          pendingPriority ? <PriorityBadge priority={pendingPriority} /> : null
+        }
+        onCancel={() => setPendingPriority(null)}
+        onSave={handleOnSavePriorityCorrection}
+      />
 
       {/* Title */}
       <h1 className="text-3xl font-semibold tracking-tight">{displayTitle}</h1>
@@ -140,18 +219,6 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
           </>
         )}
       </p>
-
-      {/* Device group coverage alert */}
-      {totalDeviceGroups > deviceGroupsWithAssets && (
-        <Alert>
-          <AlertDescription>
-            <b>
-              This advisory applies to {deviceGroupsWithAssets} device groups.
-            </b>{" "}
-            The original notification listed {totalDeviceGroups} device groups.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Tabs */}
       <Tabs defaultValue="overview">
@@ -173,6 +240,7 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
         >
           <NotificationAffectedAssetsTab
             notificationId={notification.id}
+            affectedAssets={notification.affectedAssets}
             deviceGroupsMatchings={notification.deviceGroupsMatchings}
           />
         </TabsContent>

@@ -44,6 +44,14 @@ export const assetInputSchema = z.object({
   location: locationSchema.optional(),
   status: assetStatusSchema.nullish(),
   utilization: assetUtilizationSchema.nullish(),
+  version: z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .regex(/^[\w.\- +:|]+$/)
+    .optional(),
+  versionStatus: z.enum(["UNKNOWN", "UNSURE"]).optional(),
 });
 
 export const updateAssetSchema = assetInputSchema.partial().extend({

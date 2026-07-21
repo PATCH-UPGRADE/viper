@@ -48,9 +48,9 @@ function upsertVersion(name: string) {
     create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
   });
 }
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Siemens syngo.plaza VEX scenario (SSA-016040 / CVE-2024-52334)
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 //
 // Exercises the vex agent's asset-level override path: the device group as a
 // whole is affected by the CVE, but a Note on one specific asset gives the

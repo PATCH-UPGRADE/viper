@@ -8,10 +8,14 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     workOrderTicket: {
       count: vi.fn(),
       create: vi.fn(),
+      delete: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
+    },
+    externalWorkOrderMapping: {
+      create: vi.fn(),
     },
     user: {
       findUnique: vi.fn(),
@@ -1417,7 +1421,7 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     });
   });
 
-  it("files the work order on Fleet and maps the ticket to it", async () => {
+  it("claims the ticket, files on Fleet, then maps the ticket to it", async () => {
     const caller = setup();
 
     const result = await caller.createFleetWorkOrder(proposal);
@@ -1430,16 +1434,47 @@ describe("trackingRouter.createFleetWorkOrder", () => {
       failures: [],
     });
 
-    const data = mockPrisma.workOrderTicket.create.mock.calls[0][0].data;
-    expect(data.chatToolCallId).toBe("call_abc");
-    expect(data.sourceLabel).toBe("Siemens Healthineers Fleet");
-    expect(data.assets).toEqual({ connect: { id: MRI.assetId } });
-    // The mapping is what makes the next inbound sync update this ticket
-    // rather than duplicate it.
-    expect(data.externalMappings.create).toMatchObject({
-      integrationId: "int-fleet",
-      externalId: "US_400501937577",
+    // The claim ticket is created BEFORE the Fleet call, keyed by the proposal's
+    // tool-call id so a concurrent accept can't file a second order.
+    const claim = mockPrisma.workOrderTicket.create.mock.calls[0][0].data;
+    expect(claim.chatToolCallId).toBe("call_abc");
+    expect(claim.sourceLabel).toBe("Siemens Healthineers Fleet");
+    expect(claim.assets).toEqual({ connect: [{ id: MRI.assetId }] });
+
+    // The mapping is attached after Fleet accepts — this is what makes the next
+    // inbound sync update this ticket rather than duplicate it.
+    expect(mockPrisma.externalWorkOrderMapping.create).toHaveBeenCalledWith({
+      data: {
+        itemId: "t-new",
+        integrationId: "int-fleet",
+        externalId: "US_400501937577",
+        lastSynced: expect.any(Date),
+      },
     });
+  });
+
+  it("returns the winner without re-filing when the claim loses a race", async () => {
+    const caller = setup();
+    // Fast-path findUnique sees nothing, but the claim create loses the unique
+    // race to a concurrent accept (P2002); the second read finds the winner.
+    mockPrisma.workOrderTicket.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "t-winner",
+        externalMappings: [{ externalId: "US_400501937577" }],
+        children: [],
+      });
+    mockPrisma.workOrderTicket.create.mockRejectedValueOnce({ code: "P2002" });
+
+    const result = await caller.createFleetWorkOrder(proposal);
+
+    expect(result).toMatchObject({
+      ticketId: "t-winner",
+      externalIds: ["US_400501937577"],
+      alreadyAccepted: true,
+    });
+    // The race loser must not file its own Fleet order.
+    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
   });
 
   it("refuses an asset Siemens does not manage, before calling Fleet", async () => {
@@ -1501,7 +1536,7 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     ]);
   });
 
-  it("fails loudly when Fleet accepts nothing", async () => {
+  it("fails loudly and drops the claim when Fleet accepts nothing", async () => {
     const caller = setup();
     mockFleet.createFleetWorkOrder.mockRejectedValue(
       new Error("401 Forbidden"),
@@ -1510,6 +1545,11 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     await expect(caller.createFleetWorkOrder(proposal)).rejects.toThrow(
       /401 Forbidden/,
     );
-    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
+    // The claim was made, but with no Fleet order it must be dropped so a
+    // genuine retry can proceed — no orphaned ticket, no mapping.
+    expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({
+      where: { id: "t-new" },
+    });
+    expect(mockPrisma.externalWorkOrderMapping.create).not.toHaveBeenCalled();
   });
 });

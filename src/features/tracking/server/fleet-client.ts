@@ -418,11 +418,26 @@ export async function createFleetWorkOrder(
     );
   }
 
-  const raw = await response.json();
+  // A 2xx is Fleet accepting the order. Guard the body parse + id extraction so
+  // an accepted-but-unreadable response is still recorded as filed — otherwise
+  // the caller books a success as a failure and the user re-submits an order
+  // Fleet already holds. Fall back to our own reference (ownIncidentNumber /
+  // toolCallId) as a provisional external id; the inbound /activities sync
+  // reconciles the real Fleet key when the activity next appears.
+  let raw: unknown = null;
+  let externalId: string;
+  try {
+    raw = await response.json();
+    externalId = extractFleetTicketKey(raw);
+  } catch {
+    const reference = req.ownIncidentNumber ?? asset.assetId;
+    externalId = `pending:${reference}:${asset.equipmentKey}`;
+  }
+
   return {
     equipmentKey: asset.equipmentKey,
     assetId: asset.assetId,
-    externalId: extractFleetTicketKey(raw),
+    externalId,
     raw,
   };
 }

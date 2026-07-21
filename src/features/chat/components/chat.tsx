@@ -399,6 +399,36 @@ function AskUserQuestionsMessage({
   );
 }
 
+const SCHEDULE_MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/**
+ * Format a proposed service window from the wall-clock parts of its ISO string,
+ * with no timezone conversion. `Date#toLocaleString()` with no arguments uses
+ * the runtime's locale and timezone, which differ between the server render and
+ * the browser and produce a hydration mismatch; parsing the parts directly
+ * yields identical text on both, and preserves the local time the user approved.
+ */
+function formatScheduledWindow(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return iso;
+  const [, year, month, day, hour, minute] = m;
+  const monthName = SCHEDULE_MONTHS[Number(month) - 1] ?? month;
+  return `${monthName} ${Number(day)}, ${year}, ${hour}:${minute}`;
+}
+
 /**
  * Approval card for a Siemens Healthineers Fleet work order the agent proposed.
  * Nothing has been created upstream at this point — Accept is what files it.
@@ -417,8 +447,8 @@ function FleetWorkOrderProposalCard({
   const [dismissed, setDismissed] = useState(false);
 
   const accepted = Boolean(status);
-  const window = proposal.scheduledAt
-    ? new Date(proposal.scheduledAt).toLocaleString()
+  const scheduledLabel = proposal.scheduledAt
+    ? formatScheduledWindow(proposal.scheduledAt)
     : "Not specified";
 
   return (
@@ -448,7 +478,7 @@ function FleetWorkOrderProposalCard({
         </div>
         <div className="flex gap-2">
           <dt className="w-24 shrink-0 text-muted-foreground">Window</dt>
-          <dd>{window}</dd>
+          <dd>{scheduledLabel}</dd>
         </div>
       </dl>
 

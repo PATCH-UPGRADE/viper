@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -12,14 +12,17 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
-import { TicketCategory } from "@/generated/prisma";
+import { type Integration, TicketCategory } from "@/generated/prisma";
 import {
   buildFleetLongText,
+  createFleetWorkOrder,
   extractFleetTicketKey,
+  type FleetManagedAsset,
   type FleetSiteAddress,
   fleetWorkOrderUrl,
   formatCltDateTime,
   getFleetSiteAddress,
+  getFleetWorkOrderIntegration,
   listFleetManagedAssets,
   resolveFleetAssets,
   toFleetCreatePayload,
@@ -251,5 +254,116 @@ describe("resolveFleetAssets", () => {
 
     expect(error).toBeInstanceOf(UnmanagedAssetsError);
     expect(error.message).toMatch(/PUMP-SIGMA-001/);
+  });
+});
+
+describe("getFleetWorkOrderIntegration", () => {
+  it("prefers the WorkOrder-typed integration (the sync dedups against it)", async () => {
+    mockPrisma.integration.findMany.mockResolvedValue([
+      { id: "int-asset", resourceType: "Asset" },
+      { id: "int-wo", resourceType: "WorkOrder" },
+    ]);
+
+    const integration = await getFleetWorkOrderIntegration();
+    expect(integration.id).toBe("int-wo");
+  });
+
+  it("falls back to the first Fleet integration when none is WorkOrder-typed", async () => {
+    mockPrisma.integration.findMany.mockResolvedValue([
+      { id: "int-asset", resourceType: "Asset" },
+    ]);
+
+    const integration = await getFleetWorkOrderIntegration();
+    expect(integration.id).toBe("int-asset");
+  });
+
+  it("throws when no Fleet integration is configured", async () => {
+    mockPrisma.integration.findMany.mockResolvedValue([]);
+    await expect(getFleetWorkOrderIntegration()).rejects.toThrow(
+      /No Siemens Healthineers Fleet integration/,
+    );
+  });
+});
+
+describe("createFleetWorkOrder", () => {
+  const integration = { id: "int-fleet", authType: "None" } as Integration;
+  const asset: FleetManagedAsset = {
+    assetId: "rad-mri-001",
+    hostname: "MR-MAGNETOM-001",
+    ip: "10.40.1.60",
+    role: "MRI Scanner",
+    equipmentKey: "US_1064669350",
+  };
+  const req = {
+    summary: "Firmware update: MR-MAGNETOM-001",
+    description: "Apply the Siemens firmware update.",
+    category: TicketCategory.FIRMWARE_UPDATE,
+    scheduledAt: "2026-07-22T22:00:00-05:00",
+    contact: CONTACT,
+    ownIncidentNumber: "call_abc",
+  };
+
+  beforeEach(() => {
+    process.env.FLEET_WORK_ORDER_URL = "http://localhost:4010/workorders";
+    process.env.FLEET_SITE_ADDRESS = JSON.stringify(SITE_ADDRESS);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env.FLEET_SITE_ADDRESS;
+  });
+
+  it("POSTs the payload and returns Fleet's ticket key", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ticketKey: "US_400501937577" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await createFleetWorkOrder(integration, asset, req);
+
+    expect(result.externalId).toBe("US_400501937577");
+    expect(result.equipmentKey).toBe("US_1064669350");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://localhost:4010/workorders");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body).equipmentKey).toBe("US_1064669350");
+  });
+
+  it("throws with Fleet's status text on a non-2xx response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        statusText: "Forbidden",
+        text: async () => "not authorized",
+      }),
+    );
+
+    await expect(createFleetWorkOrder(integration, asset, req)).rejects.toThrow(
+      /403 Forbidden/,
+    );
+  });
+
+  it("keeps an accepted order when the 2xx body is unparsable, using our reference", async () => {
+    // Fleet accepted (2xx) but returned junk — the order exists upstream, so we
+    // must NOT surface a failure (which would make the user re-file it).
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => {
+          throw new Error("Unexpected token < in JSON");
+        },
+      }),
+    );
+
+    const result = await createFleetWorkOrder(integration, asset, req);
+
+    // Provisional id derived from ownIncidentNumber; the inbound sync reconciles
+    // the real key later.
+    expect(result.externalId).toBe("pending:call_abc:US_1064669350");
+    expect(result.raw).toBeNull();
   });
 });

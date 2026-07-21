@@ -1,5 +1,5 @@
 import semver from "semver";
-import type { Prisma } from "@/generated/prisma";
+import { VersionStatus, type Prisma } from "@/generated/prisma";
 
 // ============================================================================
 // VERS version-range support
@@ -174,6 +174,22 @@ export function deviceGroupWhereForMatching(
   return {
     vendorId: matching.vendorId,
     ...(matching.productId !== null ? { productId: matching.productId } : {}),
+  };
+}
+
+/**
+ * Prisma `where` selecting device groups whose reversion is still (UNKNOWN or UNSURE)
+ */
+export function unknownVersionDeviceGroupWhere(
+  matching: MatchingLike,
+): Prisma.DeviceGroupWhereInput | null {
+  if (matching.versionId === null && matching.versionRange === null)
+    return null;
+
+  return {
+    vendorId: matching.vendorId,
+    ...(matching.productId !== null ? { productId: matching.productId } : {}),
+    versionStatus: { in: [VersionStatus.UNKNOWN, VersionStatus.UNSURE] },
   };
 }
 

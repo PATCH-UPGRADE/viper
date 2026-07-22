@@ -11,6 +11,7 @@ import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
   matchingAppliesToDeviceGroup,
+  unknownVersionDeviceGroupWhere,
 } from "@/lib/device-matching";
 import { recordFieldCorrections } from "@/lib/field-correction";
 import {
@@ -91,6 +92,18 @@ async function resolvedDeviceGroupAssetCount(
   return candidates
     .filter((dg) => matchingAppliesToDeviceGroup(matching, dg))
     .reduce((sum, dg) => sum + dg._count.assets, 0);
+}
+
+async function unknownVersionAssetCount(
+  matching: MatchingIdentity,
+): Promise<number> {
+  const where = unknownVersionDeviceGroupWhere(matching);
+  if (!where) return 0;
+  const groups = await prisma.deviceGroup.findMany({
+    where,
+    select: { _count: { select: { assets: true } } },
+  });
+  return groups.reduce((sum, dg) => sum + dg._count.assets, 0);
 }
 
 /** Ids of the concrete device groups a matching resolves to (for paginated asset queries). */
@@ -364,11 +377,17 @@ export const notificationsRouter = createTRPCRouter({
 
       // One COUNT per display matching
       const countByMatchingId = new Map<string, number>();
+      const unknownCountByMatchingId = new Map<string, number>();
+
       await Promise.all(
         contexts.map(async (c) => {
           countByMatchingId.set(
             c.matchingId,
             await resolvedDeviceGroupAssetCount(c.deviceGroupMatching),
+          );
+          unknownCountByMatchingId.set(
+            c.matchingId,
+            await unknownVersionAssetCount(c.deviceGroupMatching),
           );
         }),
       );
@@ -383,6 +402,8 @@ export const notificationsRouter = createTRPCRouter({
           overrides: c.overrides,
           totalAssetCount: countByMatchingId.get(c.matchingId) ?? 0,
           isNotificationLinked: c.isNotificationLinked,
+          unknownVersionAssetCount:
+            unknownCountByMatchingId.get(c.matchingId) ?? 0,
         }),
       }));
       const affectedAssets = buildAffectedAssetsSummary(groups);
@@ -454,30 +475,60 @@ export const notificationsRouter = createTRPCRouter({
       const totalAssetCount = await resolvedDeviceGroupAssetCount(
         ctx.deviceGroupMatching,
       );
+
+      const unknownCount = await unknownVersionAssetCount(
+        ctx.deviceGroupMatching,
+      );
+
       const buckets = computeMatchingBuckets({
         matchingStatusByVuln: ctx.matchingStatusByVuln,
         overrides: ctx.overrides,
         totalAssetCount,
         isNotificationLinked: ctx.isNotificationLinked,
+        unknownVersionAssetCount: unknownCount,
       });
       const result = buckets[bucket];
       if (!result) {
         return createPaginatedResponse<ResolvedDeviceGroupAsset>([], emptyMeta);
       }
 
-      const deviceGroupIds = await resolveMatchedDeviceGroupIds(
+      const matchedIds = await resolveMatchedDeviceGroupIds(
         ctx.deviceGroupMatching,
       );
+      const unknowWhere = unknownVersionDeviceGroupWhere(
+        ctx.deviceGroupMatching,
+      );
+      const unknownIds = unknowWhere
+        ? (
+            await prisma.deviceGroup.findMany({
+              where: unknowWhere,
+              select: { id: true },
+            })
+          ).map((g) => g.id)
+        : [];
+
       const idFilter =
         result.filter.kind === "only"
           ? { in: result.filter.assetIds }
           : result.filter.excludedAssetIds.length > 0
             ? { notIn: result.filter.excludedAssetIds }
             : undefined;
-      const where = {
-        deviceGroupId: { in: deviceGroupIds },
-        ...(idFilter ? { id: idFilter } : {}),
-      };
+
+      const where =
+        bucket === "needsInformation" && unknownIds.length > 0
+          ? {
+              OR: [
+                {
+                  deviceGroupId: { in: matchedIds },
+                  ...(idFilter ? { id: idFilter } : {}),
+                },
+                { deviceGroupId: { in: unknownIds } },
+              ],
+            }
+          : {
+              deviceGroupId: { in: matchedIds },
+              ...(idFilter ? { id: idFilter } : {}),
+            };
 
       // Asset-level override notes for this matching, one joined string per asset.
       // Only keep notes whose vuln status maps to the bucket being paged, so an
@@ -513,7 +564,10 @@ export const notificationsRouter = createTRPCRouter({
           location: true,
           status: true,
           deviceGroup: {
-            select: { version: { select: { canonicalName: true } } },
+            select: {
+              versionStatus: true,
+              version: { select: { canonicalName: true } },
+            },
           },
         },
         orderBy: { id: "asc" },
@@ -526,6 +580,7 @@ export const notificationsRouter = createTRPCRouter({
         location: a.location,
         status: a.status,
         version: a.deviceGroup.version?.canonicalName ?? null,
+        versionStatus: a.deviceGroup.versionStatus,
         statusNotes: noteByAsset.get(a.id) ?? null,
       }));
       return createPaginatedResponse(items, meta);
@@ -611,6 +666,20 @@ export const notificationsRouter = createTRPCRouter({
         });
 
         return notification;
+      });
+    }),
+
+  getVersionForVendorProduct: protectedProcedure
+    .input(z.object({ vendorId: z.string(), productId: z.string() }))
+    .query(async ({ input }) => {
+      return prisma.version.findMany({
+        where: {
+          deviceGroups: {
+            some: { vendorId: input.vendorId, productId: input.productId },
+          },
+        },
+        select: { canonicalDisplayName: true },
+        orderBy: { canonicalDisplayName: "asc" },
       });
     }),
 });

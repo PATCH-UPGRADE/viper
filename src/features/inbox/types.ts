@@ -4,6 +4,7 @@ import {
   type AssetStatus,
   type Prisma,
   TicketCategory,
+  VersionStatus,
 } from "@/generated/prisma";
 
 export const notificationInclude = {
@@ -81,6 +82,7 @@ export type ResolvedDeviceGroupAsset = {
   hostname: string | null;
   location: unknown;
   version: string | null;
+  versionStatus: VersionStatus;
   status: AssetStatus | null;
   statusNotes: string | null;
 };

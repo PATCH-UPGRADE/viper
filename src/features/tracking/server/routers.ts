@@ -215,7 +215,7 @@ export const trackingRouter = createTRPCRouter({
           ...rowState,
           children: {
             include: { ...ticketBaseInclude, ...rowState },
-            where: childTabWhere,
+            where: { isDraft: false, ...childTabWhere },
             orderBy: { createdAt: "asc" },
           },
         },

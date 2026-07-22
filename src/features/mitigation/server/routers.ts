@@ -59,6 +59,13 @@ export const mitigationRouter = createTRPCRouter({
           data: { isAccepted: true },
         });
         await tx.workOrderTicket.updateMany({
+          where: {
+            notificationId: plan.notificationId,
+            mitigationPlanId: { not: plan.id },
+          },
+          data: { isDraft: true },
+        });
+        await tx.workOrderTicket.updateMany({
           where: { mitigationPlanId: plan.id },
           data: { isDraft: false },
         });

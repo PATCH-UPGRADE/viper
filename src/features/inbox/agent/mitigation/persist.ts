@@ -69,29 +69,31 @@ export async function persistMitigationPlans(
     };
   };
 
-  for (const [order, plan] of plans.entries()) {
-    await prisma.mitigationPlan.create({
-      data: {
-        notificationId,
-        order,
-        title: plan.title,
-        summary: plan.summary,
-        compareLine: plan.compareLine,
-        tags: plan.tags,
-        cards: plan.cards,
-        workOrders: {
-          create: plan.workOrders.map((w) => ({
-            summary: w.shortDescription,
-            body: w.detailedDescription,
-            isDraft: true,
-            creatorId: automation.id,
-            notificationId,
-            ...linksFor(w),
-          })),
+  await prisma.$transaction(
+    plans.map((plan, order) =>
+      prisma.mitigationPlan.create({
+        data: {
+          notificationId,
+          order,
+          title: plan.title,
+          summary: plan.summary,
+          compareLine: plan.compareLine,
+          tags: plan.tags,
+          cards: plan.cards,
+          workOrders: {
+            create: plan.workOrders.map((w) => ({
+              summary: w.shortDescription,
+              body: w.detailedDescription,
+              isDraft: true,
+              creatorId: automation.id,
+              notificationId,
+              ...linksFor(w),
+            })),
+          },
         },
-      },
-    });
-  }
+      }),
+    ),
+  );
 
   if (dropped > 0) {
     console.warn(

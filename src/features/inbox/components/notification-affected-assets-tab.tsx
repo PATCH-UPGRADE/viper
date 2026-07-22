@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,13 +20,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { deviceGroupMatchingLabel, parseLocation } from "@/lib/markdown";
-import { useAffectedAssetsPage } from "../hooks/use-notifications";
+import { displayName } from "@/lib/markdown/device-group";
+import {
+  useAffectedAssetsPage,
+  useAnswerAssetVersion,
+  useVersionForVendorProduct,
+} from "../hooks/use-notifications";
 import type {
   AffectedAssetGroupSummary,
   AffectedAssetsSummary,
   NotificationDetailWithRelations,
   ResolvedDeviceGroupAsset,
 } from "../types";
+import DropdownCell from "./DropdownCell";
 
 const PAGE_SIZE = 10;
 
@@ -48,6 +54,27 @@ function MatchingAssetTable({
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState<ResolvedDeviceGroupAsset[]>([]);
   const appendedPages = useRef(new Set<number>());
+
+  const matching = group.deviceGroupMatching;
+  // TODO: confrim if there are unnecessary api calls where DGM with same vendor/product
+  // appears in both AFFECTED and NOT_AFFECTED, or two DGM with same vendor/product both
+  // AFFECTED but with different version range. If so, make it more efficient by
+  // https://github.com/PATCH-UPGRADE/viper/pull/171#discussion_r3631431484
+  const { data: knownVersions } = useVersionForVendorProduct({
+    vendorId: matching.vendorId,
+    productId: matching.productId ?? "",
+  });
+
+  const suggestedVersion = displayName(matching.version);
+
+  const options = useMemo(() => {
+    const names = (knownVersions ?? []).map((v) => v.canonicalDisplayName);
+    return suggestedVersion && !names.includes(suggestedVersion)
+      ? [suggestedVersion, ...names]
+      : names;
+  }, [knownVersions, suggestedVersion]);
+
+  const answerVersion = useAnswerAssetVersion();
 
   const { data, isLoading, isFetching, isError, refetch } =
     useAffectedAssetsPage({
@@ -95,7 +122,7 @@ function MatchingAssetTable({
               <TableHead>Asset ID</TableHead>
               <TableHead>IP Address</TableHead>
               <TableHead>Location</TableHead>
-              <TableHead>Version</TableHead>
+              <TableHead className="w-60">Version</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -117,7 +144,17 @@ function MatchingAssetTable({
                 </TableCell>
                 <TableCell>{asset.ip}</TableCell>
                 <TableCell>{parseLocation(asset.location)}</TableCell>
-                <TableCell>{asset.version ?? "—"}</TableCell>
+                <TableCell className="w-60">
+                  <DropdownCell
+                    value={asset.version}
+                    versionStatus={asset.versionStatus}
+                    options={options}
+                    onAnswer={(answer) =>
+                      answerVersion.mutateAsync({ id: asset.id, ...answer })
+                    }
+                    isPending={answerVersion.isPending}
+                  />
+                </TableCell>
                 <TableCell>{asset.status ?? "—"}</TableCell>
                 <TableCell>
                   <MoreVerticalDropdownMenu

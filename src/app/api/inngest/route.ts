@@ -4,6 +4,7 @@ import {
   enrichAllVulnerabilities,
   enrichVulnerability,
 } from "@/inngest/functions/enrich-vulnerabilities";
+import { extractArtifactNotesFn } from "@/inngest/functions/extract-artifact-notes";
 import { manageMemoriesFn } from "@/inngest/functions/manage-memories";
 import { processInboxEmail } from "@/inngest/functions/process-inbox-email";
 import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-user-tokens";
@@ -28,5 +29,6 @@ export const { GET, POST, PUT } = serve({
     processInboxEmail,
     resolveAllEntityFilters,
     resolveEntityFilterFn,
+    extractArtifactNotesFn,
   ],
 });

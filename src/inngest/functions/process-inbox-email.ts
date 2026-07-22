@@ -9,10 +9,12 @@ import { classifyEmailKind } from "@/features/inbox/agent/classify-kind";
 import { extractEntities } from "@/features/inbox/agent/extract";
 import { extractWorkOrder } from "@/features/inbox/agent/extract-work-order";
 import { matchAndLinkEntities } from "@/features/inbox/agent/match";
+import { persistMitigationPlans } from "@/features/inbox/agent/mitigation/persist";
 import { triageNotification } from "@/features/inbox/agent/triage";
 import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
 import {
   fetchPdfAttachmentsFromResend,
+  isPdf,
   pdfsFitInlineBudget,
 } from "@/features/inbox/utils";
 import { Prisma } from "@/generated/prisma";
@@ -61,7 +63,7 @@ export const processInboxEmail = inngest.createFunction(
     // The PDFs downloaded here are carried forward to every later step when
     // they fit the budget, so nothing below re-fetches them from S3.
     const { kind, attachments: inlinedPdfs } = await step.run(
-      "classify-email",
+      "classify-email-kind",
       async () => {
         const { pdfs, complete } = await fetchPdfAttachmentsFromResend(
           emailId,
@@ -98,9 +100,27 @@ export const processInboxEmail = inngest.createFunction(
         const { Resend } = await import("resend");
         const resend = new Resend(process.env.RESEND_API_KEY);
 
-        const loadBuffer = async (att: { id: string }) => {
+        const loadBuffer = async (att: {
+          id: string;
+          filename?: string | null;
+          content_type?: string | null;
+        }) => {
           const inlined = inlinedById.get(att.id);
           if (inlined) return Buffer.from(inlined, "base64");
+
+          // If there's a pdf that we can't download, just throw an error.
+          // Chances are all relevant context is there, and every downstream
+          // agent that misses it would silently reason without it.
+          const fail = (detail: string) => {
+            if (
+              isPdf({ filename: att.filename, contentType: att.content_type })
+            )
+              throw new Error(
+                `Failed to download PDF attachment ${att.id}: ${detail}`,
+              );
+            console.warn(`Failed to download attachment ${att.id}: ${detail}`);
+            return null;
+          };
 
           // Get the time-limited download URL from Resend
           const { data: attData, error } =
@@ -109,15 +129,12 @@ export const processInboxEmail = inngest.createFunction(
               id: att.id,
             });
           if (error || !attData?.download_url) {
-            console.warn(`Skipping attachment ${att.id}: ${error?.message}`);
-            return null;
+            return fail(error?.message ?? "no download url");
           }
 
           const res = await fetch(attData.download_url);
-          if (!res.ok) {
-            console.warn(`Failed to download attachment ${att.id}`);
-            return null;
-          }
+          if (!res.ok) return fail(`${res.status} ${await res.text()}`);
+
           return Buffer.from(await res.arrayBuffer());
         };
 
@@ -167,9 +184,9 @@ export const processInboxEmail = inngest.createFunction(
     // 5. Persist NotificationSource + NotificationAttachment
     const sourceId = await step.run("save-source", async () => {
       // DEV: uncomment to reset duplicate so you can replay the same email webhook
-      //await prisma.notificationSource.deleteMany({
+      // await prisma.notificationSource.deleteMany({
       //  where: { externalId: emailId },
-      //});
+      // });
 
       try {
         const source = await prisma.notificationSource.create({
@@ -398,6 +415,26 @@ export const processInboxEmail = inngest.createFunction(
       });
     }
 
-    return { sourceId, notificationId, emailId, linkSummary, vexSummary };
+    // 12. Mitigation plans: if the notification has linked vulnerabilities,
+    // propose ordered remediation plans and materialize each as a plan plus its
+    // draft work orders (isDraft=true; accepting a plan promotes them).
+    const mitigationSummary = notificationId
+      ? await step.run("create-mitigation-plans", () =>
+          persistMitigationPlans(
+            sourceId,
+            notificationId,
+            inlinedPdfs ?? undefined,
+          ),
+        )
+      : null;
+
+    return {
+      sourceId,
+      notificationId,
+      emailId,
+      linkSummary,
+      vexSummary,
+      mitigationSummary,
+    };
   },
 );

@@ -83,6 +83,11 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   sourceLabel: null,
   body: null,
   suggestedAssignee: null,
+  priority: "Unsorted",
+  priorityReasonWhy: null,
+  isDraft: false,
+  mitigationPlanId: null,
+  notificationId: null,
   departments: [],
   descriptions: [],
   assignee: null,
@@ -415,8 +420,8 @@ describe("trackingRouter.getMany — my-department tab", () => {
     });
 
     const where = mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where;
-    // AND[0] is parentId filter, AND[1] is the tab filter, AND[2] is search
-    expect(where.AND[1]).toEqual({
+    // AND[0] parentId, AND[1] isDraft filter, AND[2] tab filter, AND[3] search
+    expect(where.AND[2]).toEqual({
       departments: { some: { id: "dept-A" } },
     });
   });
@@ -437,7 +442,7 @@ describe("trackingRouter.getMany — my-department tab", () => {
     });
 
     const where = mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where;
-    expect(where.AND[1]).toEqual({ id: "__no_department__" });
+    expect(where.AND[2]).toEqual({ id: "__no_department__" });
   });
 });
 
@@ -529,8 +534,8 @@ describe("trackingRouter.list", () => {
     expect(mockPrisma.workOrderTicket.count).toHaveBeenCalledTimes(1);
     expect(mockPrisma.workOrderTicket.findMany).toHaveBeenCalledTimes(1);
     const findManyArg = mockPrisma.workOrderTicket.findMany.mock.calls[0][0];
-    // Only the (empty) search filter ends up in the AND list
-    expect(findManyArg.where.AND).toEqual([{}]);
+    // The isDraft filter and the (empty) search filter end up in the AND list
+    expect(findManyArg.where.AND).toEqual([{ isDraft: false }, {}]);
   });
 
   it("filters by departmentIds via m2m `some` + `in`", async () => {
@@ -1112,6 +1117,7 @@ describe("trackingRouter.listAttachableChildren", () => {
     expect(arg.where).toEqual({
       id: { not: "p1" },
       children: { none: {} },
+      isDraft: false,
     });
     expect(arg.select.parent).toEqual({
       select: { id: true, summary: true },

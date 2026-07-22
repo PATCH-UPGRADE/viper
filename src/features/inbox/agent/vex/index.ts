@@ -6,7 +6,13 @@
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { tool } from "@langchain/core/tools";
-import { gatherVexContext, SYSTEM_PROMPT, type VexContext } from "./context";
+import { z } from "zod";
+import {
+  gatherVexContext,
+  SYSTEM_PROMPT,
+  VEX_TOOL_NAME,
+  type VexContext,
+} from "./context";
 import { applyVexDeterminations, type VexApplySummary } from "./process_output";
 import { buildVexSchema, type VexResult } from "./tools";
 
@@ -18,9 +24,8 @@ export async function sortVulnerabilities(
   const issueIds = context.issues.map((i) => i.issueId);
   const schema = buildVexSchema(issueIds);
 
-  const TOOL_NAME = "update_and_create_issues";
   const recordTool = tool(async () => "ok", {
-    name: TOOL_NAME,
+    name: VEX_TOOL_NAME,
     description:
       "Record the issue status determination for each issue, keyed by id. Omit issues that are unchanged.",
     schema,
@@ -39,11 +44,22 @@ export async function sortVulnerabilities(
     { role: "user", content: context.markdown },
   ]);
 
-  const call = res.tool_calls?.find((c) => c.name === TOOL_NAME);
-  if (!call) return {};
+  // Fail loud
+  const call = res.tool_calls?.find((c) => c.name === VEX_TOOL_NAME);
+  if (!call) {
+    throw new Error(
+      `VEX agent never called ${VEX_TOOL_NAME} for notification ${context.notificationId}`,
+    );
+  }
 
   const parsed = schema.safeParse(call.args);
-  return parsed.success ? (parsed.data as VexResult) : {};
+  if (!parsed.success) {
+    throw new Error(
+      `VEX agent returned invalid ${VEX_TOOL_NAME} args for notification ${context.notificationId}: ${z.prettifyError(parsed.error)}`,
+    );
+  }
+
+  return parsed.data as VexResult;
 }
 
 /**

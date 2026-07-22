@@ -19,10 +19,23 @@ import {
   workflowClinicalSummary,
 } from "@/lib/markdown";
 
+export type LinkableIds = {
+  vulnerabilityIds: string[];
+  remediationIds: string[];
+  deviceGroupMatchingIds: string[];
+};
+
 export type TriageContext = {
   notificationId: string;
   markdown: string;
   affectedAssetIds: string[];
+  linkableIds: LinkableIds;
+};
+
+const EMPTY_LINKABLE_IDS: LinkableIds = {
+  vulnerabilityIds: [],
+  remediationIds: [],
+  deviceGroupMatchingIds: [],
 };
 
 // Unlike the VEX agent's gatherVexContext, this unions notification- and
@@ -30,6 +43,7 @@ export type TriageContext = {
 // without linked vulns/assets still triage on a degraded context.
 export async function gatherTriageContext(
   notificationId: string,
+  opts: { includeIds?: boolean } = {},
 ): Promise<TriageContext> {
   const notification = await prisma.notification.findUnique({
     where: { id: notificationId },
@@ -77,7 +91,12 @@ export async function gatherTriageContext(
   });
 
   if (!notification) {
-    return { notificationId, markdown: "", affectedAssetIds: [] };
+    return {
+      notificationId,
+      markdown: "",
+      affectedAssetIds: [],
+      linkableIds: EMPTY_LINKABLE_IDS,
+    };
   }
 
   const vulnerabilities = notification.vulnerabilities.map(
@@ -193,21 +212,44 @@ export async function gatherTriageContext(
     })),
   );
 
+  // One line per matching (the entity an agent links against), with the device
+  // groups and assets it actually resolves to. Only rendered under includeIds.
+  const matchingSummaries: MatchingSummary[] = matchings.map((m) => {
+    const resolved = groups.filter((g) => matchingAppliesToDeviceGroup(m, g));
+    return {
+      id: m.id,
+      label: deviceGroupMatchingLabel(m),
+      groupCount: resolved.length,
+      assetCount: resolved.reduce((sum, g) => sum + g.assets.length, 0),
+    };
+  });
+
   const markdown = renderTriagePrompt({
     vulnerabilities: vulnInputs,
     vexIssues,
     remediations,
     groups,
+    matchingSummaries,
     affectedAssets,
     notes,
     noteLabels,
+    includeIds: opts.includeIds ?? false,
     workflowsMarkdown:
       affectedAssetIds.length > 0
         ? workflowClinicalSummary(workflows, affectedAssetIds)
         : null,
   });
 
-  return { notificationId, markdown, affectedAssetIds };
+  return {
+    notificationId,
+    markdown,
+    affectedAssetIds,
+    linkableIds: {
+      vulnerabilityIds: vulnerabilities.map((v) => v.id),
+      remediationIds: remediations.map((r) => r.id),
+      deviceGroupMatchingIds: matchings.map((m) => m.id),
+    },
+  };
 }
 
 type AffectedAsset = {
@@ -239,11 +281,20 @@ type GroupForRender = {
   assets: unknown[];
 };
 
+type MatchingSummary = {
+  id: string;
+  label: string;
+  groupCount: number;
+  assetCount: number;
+};
+
 type RenderArgs = {
   vulnerabilities: VulnerabilityForMarkdown[];
   vexIssues: VexIssue[];
   remediations: RemediationForMarkdown[];
   groups: GroupForRender[];
+  matchingSummaries: MatchingSummary[];
+  includeIds: boolean;
   affectedAssets: AffectedAsset[];
   notes: Array<{
     text: string;
@@ -278,6 +329,7 @@ function renderTriagePrompt(args: RenderArgs): string {
             vulnerabilityToMarkdown(v, {
               includeAssets: false,
               includeRemediations: false,
+              includeId: args.includeIds,
             }),
           )
           .join("\n\n"),
@@ -313,7 +365,19 @@ function renderTriagePrompt(args: RenderArgs): string {
     );
   }
 
-  if (args.groups.length > 0) {
+  // With ids on, list the device-group *matchings* — those are what an agent
+  // links against — rolled up to the groups and assets each one resolves to.
+  if (args.includeIds && args.matchingSummaries.length > 0) {
+    sections.push(
+      "## Affected device groups\n\n" +
+        args.matchingSummaries
+          .map(
+            (m) =>
+              `- **${m.label}** (id: ${m.id}) — ${m.groupCount} device group${m.groupCount === 1 ? "" : "s"}, ${m.assetCount} asset${m.assetCount === 1 ? "" : "s"}`,
+          )
+          .join("\n"),
+    );
+  } else if (args.groups.length > 0) {
     sections.push(
       "## Affected device groups\n\n" +
         args.groups

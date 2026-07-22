@@ -4,7 +4,7 @@ import prisma from "@/lib/db";
 import { normalizeName } from "@/lib/router-utils";
 import { downloadBufferFromS3, keyFromDownloadUrl } from "@/lib/s3";
 
-const isPdf = (a: {
+export const isPdf = (a: {
   filename?: string | null;
   contentType?: string | null;
 }): boolean =>
@@ -115,6 +115,29 @@ export async function fetchPdfAttachments(
   );
 
   return results.filter((a) => a !== null);
+}
+
+export function keepValidIds(
+  ids: string[],
+  valid: ReadonlySet<string>,
+): string[] {
+  return [...new Set(ids)].filter((id) => valid.has(id));
+}
+
+/** Ids of the given set that exist in the table, as a Set for membership tests. */
+export async function existingIds<T extends { id: string }>(
+  findMany: (args: {
+    where: { id: { in: string[] } };
+    select: { id: true };
+  }) => Promise<T[]>,
+  ids: string[],
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await findMany({
+    where: { id: { in: [...new Set(ids)] } },
+    select: { id: true },
+  });
+  return new Set(rows.map((r) => r.id));
 }
 
 // Similiar to resolveDeviceGroup except it doesn't create. From

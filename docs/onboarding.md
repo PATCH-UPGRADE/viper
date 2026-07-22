@@ -101,127 +101,37 @@ How do I log in?
 What's our production environment?
 - See, "What's our staging environment?". This is a research project.
 
-## Email Pipeline (Resend) Setup
+## Email Pipeline (Resend)
+The email pipeline is essential for testing anything in the inbox flow (e.g. Notifications, Work Orders). 
 
-VIPER turns inbound security emails into Notifications and Work Order tickets. Resend receives the mail, parses it, and calls a webhook on your machine; `processInboxEmail` (Inngest) does the rest.
+What do I need?
+- You need access to Resend. This is separate from the core-project access IT sets you up with on your first day, so you'll need your own Resend account. Reach out to the team for a project-dedicated email, or use your personal email if you don't have one.
 
-This walks you from nothing to a real email being processed locally. You only need it if you're working on the inbox pipeline. Allow ~20 minutes.
+Where do I get Resend API keys and Secrets?
+- You need two values in your `.env`: `RESEND_API_KEY` and `RESEND_WEBHOOK_SECRET`. The `/api/email` route checks for both on every request and returns a 500 if either is missing, so the pipeline does nothing until you have both.
+- The API key: once you're in the Resend dashboard, three sections in the side nav matter — Emails, API keys, and Webhooks. Signing up automatically creates an "Onboarding" API key. Go to API keys, find that key, click the ellipsis (...) at the end of the row, hit Edit, and change its permission to "Full Access". By default it's sending-only, which can't read inbound email, and the pipeline reads inbound email — so a sending-only key fails. Copy the key into `.env` as `RESEND_API_KEY`.
+- The webhook secret comes from the webhook step below, not here.
 
-### 1. Sign up with a personal email
+How to set up the webhook?
+- First make your local server reachable from the internet with ngrok or cloudflared (more info **[here](./email-pipeline-setup.md)**). That gives you a public URL like `https://something.trycloudflare.com`; your webhook target is that URL plus `/api/email`.
+- In Resend's Webhooks section, create a webhook pointing at `https://<your-tunnel>/api/email` and subscribe to the "email.received" event.
+- Creating the webhook gives you a signing secret (it looks like `whsec_...`). Copy it into `.env` as `RESEND_WEBHOOK_SECRET`. The route verifies every incoming webhook against this secret, so if it's missing or wrong you'll get a 400 and the email never reaches Inngest — with no obvious error on the Resend side. This is the second of the two values from the section above.
 
-**Use a personal email address, not your work one.**
+How to trigger an "email.received" event?
+- To replicate the event, go to the Email section in the side nav and open the "Receiving" tab. It shows the Resend test address to send to. Send a test email to that address from your own inbox.
 
-Our Google Workspace blocks outbound mail to `*.resend.app`, which is exactly where you'll be sending test emails. If your Resend account is tied to your work address you'll be stuck immediately. Sign up at [resend.com](https://resend.com) with a personal address, and send your test emails from that account.
+TIPS: 
+- If you don't see the test address, it's probably because you've already received an email. Use the address in the "To" column, or click the ellipsis (...) at the top right and choose "Receiving Address" to see it.
+- Give the email a real subject, like "Hospital Equipment Details". Don't just put "testing": Google may flag it, and if you fire off a lot of test emails back-to-back (which happens when you're testing), Google can block you from sending more, thinking you're a spammer.
 
-The free tier is plenty, and you get your own sandbox — no shared credentials.
+How to know if it works?
+- Have the Inngest dev server running first (`npm run dev:all` runs everything, or `npm run inngest:dev` on its own). Its UI is at http://localhost:8288.
+- If it worked, the Inngest UI shows a new run for the `process-inbox-email` function — that's the event landing and the pipeline kicking off. Open the run to watch each step (classify, extract, match) and see the Notification or Work Order it creates.
+- If nothing shows up, the usual causes are: a sending-only API key, a missing or mismatched `RESEND_WEBHOOK_SECRET`, or a dead tunnel (if the ngrok/cloudflared process restarts, the URL changes and the old webhook points nowhere — update the webhook URL in Resend).
 
-### 2. Sending vs receiving, and API key permissions
 
-Two distinctions trip people up, and they're unrelated:
-
-**The product has two halves.** *Sending* is transactional email your app pushes out. *Receiving* (inbound) is Resend accepting mail on your behalf, parsing it, and calling a webhook. The inbox pipeline only uses **receiving**.
-
-**API keys have two permission levels.** New keys default to **Sending access**, which cannot read received email. The pipeline calls `emails.receiving.get()` and `attachments.get()`, so it needs **Full access** or it dies immediately with a 401.
-
-Create the key under **API Keys → Create API Key → Full access**, then add it to `.env`:
-
-```
-RESEND_API_KEY=re_xxxxxxxxxxxx
-```
-
-Verify before going further — a `restricted_api_key` error means you made a sending-only key:
-
-```bash
-curl -s -H "Authorization: Bearer $RESEND_API_KEY" https://api.resend.com/emails/receiving
-```
-
-> ⚠️ Secrets go in `.env`, **never `.env.ci`**. Despite `.gitignore` listing `.env*`, `.env.ci` is *tracked* — tracked files ignore that pattern — and it feeds a GitHub Actions workflow. A key committed there is a leaked key.
-
-### 3. Get your receiving address
-
-Resend gives you a working inbound address with **no domain and no DNS setup**:
-
-> **Emails → Receiving** tab → **⋯** → **Receiving address**
-
-You'll get something like `anything@ab12cd34.resend.app`. The part before the `@` is freeform, so `test@`, `advisories@` etc. all land in the same inbox.
-
-> 🚫 If the dashboard pushes you to "Add a domain", back out. Adding a company domain would reroute real company email into Resend. You do not need it.
-
-### 4. Expose your local app to the internet
-
-Resend has to reach your laptop, so you need a tunnel. (Same applies if you're testing with n8n.)
-
-**cloudflared** is easiest — no account needed:
-
-```bash
-brew install cloudflared
-cloudflared tunnel --url http://localhost:3000
-```
-
-It prints a URL like `https://corps-issn-portrait-fighter.trycloudflare.com`. Keep the terminal open; **if the process dies the URL changes** and you'll have to update the webhook.
-
-**ngrok** works too, but needs a free account and `ngrok config add-authtoken <token>` first, then `ngrok http 3000`.
-
-Run VIPER with the tunnel URL so the links it generates are correct:
-
-```bash
-NEXT_PUBLIC_APP_URL="https://<YOUR_TUNNEL_URL>" npm run dev:all
-```
-
-### 5. Point a webhook at your machine
-
-> **Webhooks → Add Webhook**
-> - **Endpoint URL:** `https://<YOUR_TUNNEL_URL>/api/email`
-> - **Event:** `email.received` — that one only
-
-Copy the **signing secret** it shows you into `.env`:
-
-```
-RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
-```
-
-`/api/email` returns a 500 until *both* `RESEND_API_KEY` and `RESEND_WEBHOOK_SECRET` are set. Restart the dev server after editing `.env` — it's only read at boot.
-
-Sanity check — a **400 is correct** here, it means the route is live and rejecting an unsigned payload. A 500 means a missing env var; a 404 means the tunnel is pointing at the wrong port.
-
-```bash
-curl -s -o /dev/null -w "%{http_code}\n" -X POST \
-  https://<YOUR_TUNNEL_URL>/api/email -H 'content-type: application/json' -d '{}'
-```
-
-### 6. Set your Anthropic key
-
-The pipeline makes several Anthropic calls (relevance triage, classification, entity extraction, hospital-impact triage), so `ANTHROPIC_API_KEY` must be set in `.env` or the run fails partway through.
-
-### 7. Send a test email
-
-From your **personal** account, email your `@…resend.app` address. Attach a PDF if you want to exercise attachment handling.
-
-Write it like a genuine security advisory. The first agent in the chain decides whether the email is relevant at all, and drops marketing, newsletters and meeting invites as `not_relevant` before anything else runs — a "test test test" email will be correctly ignored.
-
-### 8. Watch it run
-
-Resend POSTs to `/api/email`, which enqueues an Inngest event.
-
-**Inngest dev UI — <http://localhost:8288>** → *Runs* → newest `process-inbox-email`. Every step and its output is visible, which makes this the best place to debug.
-
-Note the webhook payload is **metadata only** — no body, no attachment bytes. The pipeline calls Resend back for the email content and downloads each attachment separately.
-
-**MinIO console — <http://localhost:9001>** (login `minioadmin` / `minioadmin`) → the `viper` bucket → `inbox/<emailId>/`. Attachments are uploaded here, and it's the quickest way to confirm they made it.
-
-**Database** — a successful run leaves a `notification_source` row joined to a `notification` (with `type`, `priority` and a populated `hospitalImpact`), plus one `notification_attachment` per file.
-
-### Troubleshooting
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| Run dies at `fetch-email-content` with a 401 | Sending-only API key | Step 2 |
-| `/api/email` returns 500 | `RESEND_API_KEY` or `RESEND_WEBHOOK_SECRET` missing from `.env` | Steps 2 & 5 |
-| `/api/email` returns 404 | Tunnel pointing at the wrong port | Step 4 |
-| Webhook never arrives | Tunnel died, so its URL changed | Restart it, update the webhook URL |
-| Gmail bounces with "Message blocked" | Workspace blocks `*.resend.app` | Send from a personal account (step 1) |
-| Run returns `{skipped: true, reason: "duplicate"}` | That email was already processed — `externalId` is unique | Send a new email |
-| Run returns `{skipped: true}` | Triage judged the email `not_relevant` | Write a realistic advisory (step 7) |
+Full walkthrough (agentic) — API key, tunnel, webhook, sending a test email, and where to
+watch it land: **[Email Pipeline (Resend) Setup](./email-pipeline-setup.md)**.
 
 
 ## Additional Resources

@@ -1,7 +1,7 @@
 import prisma from "@/lib/db";
 import {
   grabSessionCookie,
-  SessionLoginConfig,
+  type SessionLoginConfig,
 } from "./teamplay-fleet/capture";
 
 const REAUTH_TIMEOUT = 30_000;

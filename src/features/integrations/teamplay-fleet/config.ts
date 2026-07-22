@@ -1,5 +1,5 @@
 import { IntegrationSessionClient } from "../integration-session-client";
-import { SessionLoginConfig } from "./capture";
+import type { SessionLoginConfig } from "./capture";
 
 export const FLEET_LOGIN_CONFIG: SessionLoginConfig = {
   welcomeUrl: "https://fleet.siemens-healthineers.com/welcome", // landing page url

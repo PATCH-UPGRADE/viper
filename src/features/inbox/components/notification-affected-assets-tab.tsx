@@ -56,13 +56,16 @@ function MatchingAssetTable({
   const appendedPages = useRef(new Set<number>());
 
   const matching = group.deviceGroupMatching;
+  // TODO: confrim if there are unnecessary api calls where DGM with same vendor/product
+  // appears in both AFFECTED and NOT_AFFECTED, or two DGM with same vendor/product both
+  // AFFECTED but with different version range. If so, make it more efficient by 
+  // https://github.com/PATCH-UPGRADE/viper/pull/171#discussion_r3631431484
   const { data: knownVersions } = useVersionForVendorProduct({
     vendorId: matching.vendorId,
     productId: matching.productId ?? "",
   });
 
-  const suggestedVersion =
-    displayName(matching.version) ?? matching.versionRange;
+  const suggestedVersion = displayName(matching.version);
 
   const options = useMemo(() => {
     const names = (knownVersions ?? []).map((v) => v.canonicalDisplayName);

@@ -57,18 +57,15 @@ const DropdownCell = ({
         <SelectValue>{currentDisplayLabel}</SelectValue>
       </SelectTrigger>
       <SelectContent>
+        <SelectItem value={UNSURE_VALUE} className="text-muted-foreground">
+          Not sure
+        </SelectItem>
+        <SelectSeparator />
         {options.map((o) => (
           <SelectItem key={o} value={o}>
             {o}
           </SelectItem>
         ))}
-        <SelectSeparator />
-        <SelectItem value={UNKNOWN_VALUE} className="text-muted-foreground">
-          Unknown
-        </SelectItem>
-        <SelectItem value={UNSURE_VALUE} className="text-muted-foreground">
-          Not sure
-        </SelectItem>
       </SelectContent>
     </Select>
   );

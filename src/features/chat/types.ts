@@ -42,13 +42,21 @@ export type FleetWorkOrderProposal = z.infer<
 export function parseFleetProposal(
   output: unknown,
 ): FleetWorkOrderProposal | null {
-  if (typeof output !== "string") return null;
-  try {
-    const parsed = fleetWorkOrderProposalSchema.safeParse(JSON.parse(output));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null; // rejection strings and partial streams land here
+  if (output == null) return null;
+  // The tool returns a JSON string, but the stream bridge parses tool output
+  // into an object before it reaches the UI (normalizeToolOutput), so `output`
+  // is usually an object here — accept both. A rejection string ("REJECTED: …")
+  // fails JSON.parse and the schema, so it correctly yields null (no card).
+  let candidate: unknown = output;
+  if (typeof output === "string") {
+    try {
+      candidate = JSON.parse(output);
+    } catch {
+      return null; // rejection strings and partial streams land here
+    }
   }
+  const parsed = fleetWorkOrderProposalSchema.safeParse(candidate);
+  return parsed.success ? parsed.data : null;
 }
 
 export const fetchThreadsSchema = z.object({

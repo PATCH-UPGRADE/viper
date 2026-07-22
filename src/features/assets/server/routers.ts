@@ -610,10 +610,6 @@ export const assetsRouter = createTRPCRouter({
 
       const { id, cpe, utilization, version, versionStatus, ...updateData } =
         input;
-      let deviceGroupId: string | undefined;
-      if (cpe) {
-        deviceGroupId = (await cpeToDeviceGroup(cpe)).id;
-      } else if (version || versionStatus) {
         const current = await prisma.asset.findUniqueOrThrow({
           where: { id },
           select: {
@@ -625,6 +621,12 @@ export const assetsRouter = createTRPCRouter({
             },
           },
         });
+
+      let deviceGroupId: string | undefined;
+      if (cpe) {
+        deviceGroupId = (await cpeToDeviceGroup(cpe)).id;
+      } else if (version || versionStatus) {
+
 
         if (current.deviceGroup.vendor && current.deviceGroup.product) {
           const target = await resolveDeviceGroup({

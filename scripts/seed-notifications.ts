@@ -467,7 +467,7 @@ const DESERIALIZATION_ASSETS: Array<{
     versionStatus: "UNSURE",
     ip: "10.60.0.14",
     hostname: "mri-magnetom-04",
-    serialNumber: "MAGNETOM-UNKNOWN-001",
+    serialNumber: "MAGNETOM-UNSURE-001",
     role: "MRI Scanner Console",
     networkSegment: "IMAGING-MRI",
   },

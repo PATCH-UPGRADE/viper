@@ -195,10 +195,10 @@ model Connection {
 }
 
 enum VersionStatus {
-  UNKNOWN
+  UNKNOWN             // No answer exists, nobody has looked at this device's version
   NOT_APPLICABLE
   KNOWN
-  UNSURE
+  UNSURE              // A user looked and explicitly couldn't determine the version
 }
 
 // VERS version-range schemes (https://github.com/package-url/vers-spec)

@@ -1,5 +1,5 @@
 import semver from "semver";
-import { VersionStatus, type Prisma } from "@/generated/prisma";
+import { type Prisma, VersionStatus } from "@/generated/prisma";
 
 // ============================================================================
 // VERS version-range support

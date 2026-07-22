@@ -8,10 +8,10 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { getAssetRoleLabel } from "@/features/assets/utils";
 import { useTRPC } from "@/trpc/client";
 import type { AffectedAssetsSummary } from "../types";
 import { useNotificationsParams } from "./use-notifications-params";
-import { getAssetRoleLabel } from "@/features/assets/utils";
 
 export const useSuspenseNotifications = () => {
   const trpc = useTRPC();

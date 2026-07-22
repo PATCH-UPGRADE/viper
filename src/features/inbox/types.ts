@@ -4,7 +4,7 @@ import {
   type AssetStatus,
   type Prisma,
   TicketCategory,
-  VersionStatus,
+  type VersionStatus,
 } from "@/generated/prisma";
 
 export const notificationInclude = {

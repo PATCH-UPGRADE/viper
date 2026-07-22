@@ -3,7 +3,7 @@
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
-import { buildUserMessage } from "@/lib/agent-messages";
+import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import { fetchPdfAttachments } from "../utils";
 import { emailPromptText, type InboundEmail } from "./prompt";
 
@@ -102,8 +102,9 @@ RULES:
 export async function extractEntities(
   sourceId: string,
   email: InboundEmail,
+  inlinedPdfs?: PdfAttachment[],
 ): Promise<ExtractResult> {
-  const pdfAttachments = await fetchPdfAttachments(sourceId);
+  const pdfAttachments = inlinedPdfs ?? (await fetchPdfAttachments(sourceId));
 
   const model = new ChatAnthropic({
     model: MODEL,

@@ -4,7 +4,7 @@
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
-import { buildUserMessage } from "@/lib/agent-messages";
+import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { notificationPayloadSchema } from "../types";
 import { fetchPdfAttachments } from "../utils";
@@ -85,9 +85,10 @@ ${existing}`;
 export async function classifyNotification(
   sourceId: string,
   email: InboundEmail,
+  inlinedPdfs?: PdfAttachment[],
 ): Promise<ClassifyResult> {
   const [pdfAttachments, existingNotifications] = await Promise.all([
-    fetchPdfAttachments(sourceId),
+    inlinedPdfs ?? fetchPdfAttachments(sourceId),
     prisma.notification.findMany({
       select: { id: true, type: true, title: true, summary: true },
       orderBy: { createdAt: "desc" },

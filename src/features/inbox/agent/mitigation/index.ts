@@ -6,7 +6,7 @@ import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { buildUserMessage } from "@/lib/agent-messages";
+import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { fetchPdfAttachments } from "../../utils";
 import { gatherTriageContext, type LinkableIds } from "../triage/context";
@@ -58,6 +58,7 @@ ${input.contextMarkdown}`;
 export async function createMitigationPlans(
   sourceId: string,
   notificationId: string,
+  inlinedPdfs?: PdfAttachment[],
 ): Promise<MitigationPlansResult & { linkableIds: LinkableIds }> {
   const [source, notification, pdfAttachments, context] = await Promise.all([
     prisma.notificationSource.findUnique({
@@ -68,7 +69,7 @@ export async function createMitigationPlans(
       where: { id: notificationId },
       select: { type: true, title: true, summary: true },
     }),
-    fetchPdfAttachments(sourceId),
+    inlinedPdfs ?? fetchPdfAttachments(sourceId),
     gatherTriageContext(notificationId, { includeIds: true }),
   ]);
 

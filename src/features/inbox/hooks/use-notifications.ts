@@ -8,6 +8,7 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { getAssetRoleLabel } from "@/features/assets/utils";
 import { useTRPC } from "@/trpc/client";
 import type { AffectedAssetsSummary } from "../types";
 import { useNotificationsParams } from "./use-notifications-params";
@@ -91,6 +92,53 @@ export const useUpdateNotification = () => {
       },
       onError: (error) => {
         toast.error(`Failed to save change: ${error.message}`);
+      },
+    }),
+  );
+};
+
+export const useVersionForVendorProduct = (args: {
+  vendorId: string;
+  productId: string;
+}) => {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.notifications.getVersionForVendorProduct.queryOptions(args),
+  );
+};
+
+export const useAnswerAssetVersion = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.assets.update.mutationOptions({
+      onSuccess: (data, variables) => {
+        const label = getAssetRoleLabel(data);
+        if ("version" in variables && variables.version) {
+          toast.success(`${label} set to version ${variables.version}`);
+        } else if (
+          "versionStatus" in variables &&
+          variables.versionStatus === "UNKNOWN"
+        ) {
+          toast.success(`${label} marked version unknown`);
+        } else if (
+          "versionStatus" in variables &&
+          variables.versionStatus === "UNSURE"
+        ) {
+          toast.success(`${label} marked version not sure`);
+        } else {
+          toast.success(`${label} updated`);
+        }
+        queryClient.invalidateQueries({
+          queryKey: [["notifications", "getOne"]],
+        });
+        queryClient.invalidateQueries({
+          queryKey: [["notifications", "getAffectedAssetsPage"]],
+        });
+      },
+      onError: (error) => {
+        toast.error(`Failed to update version: ${error.message}`);
       },
     }),
   );

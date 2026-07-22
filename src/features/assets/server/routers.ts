@@ -18,6 +18,7 @@ import {
   findVulnerabilitiesMatchingDeviceGroups,
   processIntegrationSync,
   processIntegrationToken,
+  resolveDeviceGroup,
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
 import {
@@ -607,18 +608,48 @@ export const assetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await requireOwnership(input.id, ctx.auth.user.id, "asset");
 
-      const { id, cpe, utilization, ...updateData } = input;
-      const deviceGroupUpdate = cpe
-        ? { deviceGroupId: (await cpeToDeviceGroup(cpe)).id }
-        : {};
-      return prisma.asset.update({
+      const { id, cpe, utilization, version, versionStatus, ...updateData } =
+        input;
+      const current = await prisma.asset.findUniqueOrThrow({
+        where: { id },
+        select: {
+          deviceGroup: {
+            select: {
+              vendor: { select: { canonicalName: true } },
+              product: { select: { canonicalName: true } },
+            },
+          },
+        },
+      });
+
+      let deviceGroupId: string | undefined;
+      if (cpe) {
+        deviceGroupId = (await cpeToDeviceGroup(cpe)).id;
+      } else if (version || versionStatus) {
+        if (current.deviceGroup.vendor && current.deviceGroup.product) {
+          const target = await resolveDeviceGroup({
+            vendor: current.deviceGroup.vendor.canonicalName,
+            product: current.deviceGroup.product.canonicalName,
+            version: version ?? null,
+            versionStatus: version ? "KNOWN" : (versionStatus ?? "UNKNOWN"),
+          });
+          deviceGroupId = target.id;
+        }
+      }
+      const updated = await prisma.asset.update({
         where: { id },
         data: {
-          ...deviceGroupUpdate,
+          ...(deviceGroupId ? { deviceGroupId } : {}),
           ...updateData,
           utilization: utilization as Prisma.InputJsonValue | undefined,
         },
         include: assetInclude,
       });
+      if (deviceGroupId) {
+        await prisma.deviceGroupHistory.create({
+          data: { deviceGroupId, assetId: id },
+        });
+      }
+      return updated;
     }),
 });

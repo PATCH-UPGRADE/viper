@@ -4,7 +4,7 @@
 
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { buildUserMessage } from "@/lib/agent-messages";
+import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { type WorkOrderPayload, workOrderPayloadSchema } from "../types";
 import { fetchPdfAttachments } from "../utils";
@@ -26,9 +26,10 @@ Only include values you are reasonably confident about. Do not invent dates or a
 export async function extractWorkOrder(
   sourceId: string,
   email: InboundEmail,
+  inlinedPdfs?: PdfAttachment[],
 ): Promise<WorkOrderPayload> {
   const [pdfAttachments, departments] = await Promise.all([
-    fetchPdfAttachments(sourceId),
+    inlinedPdfs ?? fetchPdfAttachments(sourceId),
     prisma.department.findMany({
       select: { name: true },
       orderBy: { name: "asc" },

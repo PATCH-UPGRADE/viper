@@ -1,4 +1,5 @@
 import "server-only";
+import type { PdfAttachment } from "@/lib/agent-messages";
 import { getAutomationUser } from "@/lib/automation-user";
 import prisma from "@/lib/db";
 import { existingIds, keepValidIds } from "../../utils";
@@ -13,6 +14,7 @@ import type { PlanWorkOrder } from "./schema";
 export async function persistMitigationPlans(
   sourceId: string,
   notificationId: string,
+  inlinedPdfs?: PdfAttachment[],
 ) {
   const acceptedCount = await prisma.mitigationPlan.count({
     where: { notificationId, isAccepted: true },
@@ -28,7 +30,11 @@ export async function persistMitigationPlans(
     where: { notificationId, isAccepted: false },
   });
 
-  const { plans } = await createMitigationPlans(sourceId, notificationId);
+  const { plans } = await createMitigationPlans(
+    sourceId,
+    notificationId,
+    inlinedPdfs,
+  );
   if (plans.length === 0) return { plans: 0 };
 
   const [automation, valid] = await Promise.all([

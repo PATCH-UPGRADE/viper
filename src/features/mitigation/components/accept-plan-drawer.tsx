@@ -143,14 +143,14 @@ export function AcceptPlanDrawer({
           </DrawerDescription>
         </DrawerHeader>
 
-        <ScrollArea className="min-h-0 flex-1">
+        <ScrollArea className="min-h-0 flex-1 bg-muted">
           <div className="flex flex-col gap-4 p-4">
             {edits.map((edit, index) => {
               const workOrder = plan.workOrders[index];
               return (
                 <div
                   key={edit.id}
-                  className="flex flex-col gap-4 rounded-lg border p-4"
+                  className="flex flex-col gap-4 rounded-lg border p-4 bg-background"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex flex-col">

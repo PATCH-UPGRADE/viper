@@ -6,6 +6,7 @@ import {
   NotificationDetailPage,
 } from "@/features/inbox/components/notification-detail";
 import { prefetchNotification } from "@/features/inbox/server/prefetch";
+import { prefetchMitigationPlans } from "@/features/mitigation/server/prefetch";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
 
@@ -16,7 +17,7 @@ interface PageProps {
 const Page = async ({ params }: PageProps) => {
   await requireAuth();
   const { id } = await params;
-  await prefetchNotification(id);
+  await Promise.all([prefetchNotification(id), prefetchMitigationPlans(id)]);
 
   return (
     <HydrateClient>

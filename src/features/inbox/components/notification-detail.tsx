@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { BadgeSelect } from "@/components/badge-select";
 import { CorrectionDialog } from "@/components/correction-dialog";
 import { ErrorView, LoadingView } from "@/components/entity-components";
@@ -28,7 +28,8 @@ import {
 } from "../hooks/use-notifications";
 import type { NotificationDetailSource } from "../types";
 import { NotificationAffectedAssetsTab } from "./notification-affected-assets-tab";
-import { NotificationOverviewTab } from "./notification-overview-tab";
+import { NotificationDetailsTab } from "./notification-details-tab";
+import { NotificationRespondTab } from "./notification-respond-tab";
 import { NotificationTypeBadge } from "./notification-type-badge";
 
 const NOTIFICATION_TYPE_OPTIONS: NotificationType[] = [
@@ -221,14 +222,23 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
       </p>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue="respond">
         <TabsList variant="line">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="respond">Respond</TabsTrigger>
+          <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="affected-assets">Affected Assets</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="flex flex-col gap-4 mt-4">
-          <NotificationOverviewTab
+        <TabsContent value="respond" className="flex flex-col gap-4 mt-4">
+          <Suspense
+            fallback={<LoadingView message="Loading response plans..." />}
+          >
+            <NotificationRespondTab notification={notification} />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="details" className="flex flex-col gap-4 mt-4">
+          <NotificationDetailsTab
             notification={notification}
             firstReceived={firstReceived}
           />

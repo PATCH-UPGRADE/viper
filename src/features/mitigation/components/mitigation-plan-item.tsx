@@ -42,6 +42,26 @@ export function MitigationPlanItem({
   // Another plan won — this one can no longer be accepted.
   const isLockedOut = hasAcceptedPlan && !plan.isAccepted;
 
+  const banner = plan.isAccepted ? (
+    <>
+      <CheckIcon className="size-3.5" />
+      <span>Accepted</span>
+      <span>&bull;</span>
+      <Link
+        href="/tracking"
+        className="flex items-center gap-1 normal-case hover:underline"
+      >
+        View work orders
+        <ExternalLinkIcon className="size-3.5" />
+      </Link>
+    </>
+  ) : isRecommended ? (
+    <>
+      <StarIcon className="size-3.5" />
+      Recommended
+    </>
+  ) : null;
+
   return (
     <Card
       className={cn(
@@ -51,26 +71,10 @@ export function MitigationPlanItem({
         isLockedOut && "opacity-70",
       )}
     >
-      {plan.isAccepted ? (
+      {banner && (
         <div className="flex items-center gap-2 border-b bg-primary/10 px-6 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
-          <CheckIcon className="size-3.5" />
-          <span>Accepted</span>
-          <span>&bull;</span>
-          <Link
-            href="/tracking"
-            className="flex items-center gap-1 normal-case hover:underline"
-          >
-            View work orders
-            <ExternalLinkIcon className="size-3.5" />
-          </Link>
+          {banner}
         </div>
-      ) : (
-        isRecommended && (
-          <div className="flex items-center gap-2 border-b bg-primary/10 px-6 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
-            <StarIcon className="size-3.5" />
-            Recommended
-          </div>
-        )
       )}
 
       <AccordionItem value={plan.id} className="border-b-0">

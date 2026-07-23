@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { Suspense, useEffect, useState } from "react";
+import { type ReactNode, Suspense, useEffect, useState } from "react";
 import { BadgeSelect } from "@/components/badge-select";
 import { CorrectionDialog } from "@/components/correction-dialog";
 import { ErrorView, LoadingView } from "@/components/entity-components";
@@ -21,8 +21,8 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { NotificationType, Priority } from "@/generated/prisma";
 import { useSuspenseMitigationPlans } from "@/features/mitigation/hooks/use-mitigation";
+import type { NotificationType, Priority } from "@/generated/prisma";
 import {
   useMarkNotificationRead,
   useSuspenseNotification,
@@ -136,6 +136,55 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
         )
       : notification.createdAt;
 
+  type TabDef = { value: string; trigger: ReactNode; content: ReactNode };
+
+  const tabs = (
+    [
+      hasPlans && {
+        value: "respond",
+        trigger: "Respond",
+        content: (
+          <Suspense
+            fallback={<LoadingView message="Loading response plans..." />}
+          >
+            <NotificationRespondTab notification={notification} />
+          </Suspense>
+        ),
+      },
+      {
+        value: "details",
+        trigger: "Details",
+        content: (
+          <NotificationDetailsTab
+            notification={notification}
+            firstReceived={firstReceived}
+          />
+        ),
+      },
+      {
+        value: "affected-assets",
+        trigger: (
+          <>
+            Affected Assets
+            {needAttentionCount > 0 && (
+              <Badge variant="destructive">
+                {needAttentionCount} need{needAttentionCount === 1 ? "s" : ""}{" "}
+                attention
+              </Badge>
+            )}
+          </>
+        ),
+        content: (
+          <NotificationAffectedAssetsTab
+            notificationId={notification.id}
+            affectedAssets={notification.affectedAssets}
+            deviceGroupsMatchings={notification.deviceGroupsMatchings}
+          />
+        ),
+      },
+    ] as (TabDef | false)[]
+  ).filter((t): t is TabDef => Boolean(t));
+
   return (
     <div className="flex flex-col gap-6 p-8 w-full max-w-7xl">
       {/* Breadcrumb */}
@@ -235,47 +284,23 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
       <Tabs defaultValue={hasPlans ? "respond" : "details"}>
         <div className="sticky top-0 z-20 -mx-8 border-b bg-muted px-8">
           <TabsList variant="line-primary">
-            {hasPlans && <TabsTrigger value="respond">Respond</TabsTrigger>}
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="affected-assets">
-              Affected Assets
-              {needAttentionCount > 0 && (
-                <Badge variant="destructive">
-                  {needAttentionCount} need{needAttentionCount === 1 ? "s" : ""}{" "}
-                  attention
-                </Badge>
-              )}
-            </TabsTrigger>
+            {tabs.map((t) => (
+              <TabsTrigger key={t.value} value={t.value}>
+                {t.trigger}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </div>
 
-        {hasPlans && (
-          <TabsContent value="respond" className="flex flex-col gap-4 mt-4">
-            <Suspense
-              fallback={<LoadingView message="Loading response plans..." />}
-            >
-              <NotificationRespondTab notification={notification} />
-            </Suspense>
+        {tabs.map((t) => (
+          <TabsContent
+            key={t.value}
+            value={t.value}
+            className="flex flex-col gap-4 mt-4"
+          >
+            {t.content}
           </TabsContent>
-        )}
-
-        <TabsContent value="details" className="flex flex-col gap-4 mt-4">
-          <NotificationDetailsTab
-            notification={notification}
-            firstReceived={firstReceived}
-          />
-        </TabsContent>
-
-        <TabsContent
-          value="affected-assets"
-          className="flex flex-col gap-4 mt-4"
-        >
-          <NotificationAffectedAssetsTab
-            notificationId={notification.id}
-            affectedAssets={notification.affectedAssets}
-            deviceGroupsMatchings={notification.deviceGroupsMatchings}
-          />
-        </TabsContent>
+        ))}
       </Tabs>
     </div>
   );

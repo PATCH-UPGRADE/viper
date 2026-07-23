@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Bot } from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -40,7 +41,6 @@ import type {
   ResolvedDeviceGroupAsset,
 } from "../types";
 import DropdownCell from "./DropdownCell";
-import { Bot } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
@@ -98,6 +98,14 @@ export function firstNonEmptyBucket(
  * tab's narrow left column — asset, location, and the still-editable version.
  */
 export type AssetTableVariant = "full" | "compact";
+
+type AssetColumn = {
+  head: string;
+  cell: (asset: ResolvedDeviceGroupAsset) => ReactNode;
+  fullOnly: boolean;
+  cellClassName?: string;
+  headClassName?: string;
+};
 
 export function MatchingAssetTable({
   notificationId,
@@ -158,63 +166,89 @@ export function MatchingAssetTable({
   }, [data]);
 
   const isFull = variant === "full";
+
+  const columns: AssetColumn[] = [
+    {
+      head: "Asset",
+      fullOnly: false,
+      cellClassName: "font-mono text-xs",
+      cell: (asset) => (
+        <span className="inline-flex items-center gap-1">
+          {asset.hostname ?? asset.id}
+          {asset.statusNotes && (
+            <QuestionTooltip>
+              <span className="whitespace-pre-line">{asset.statusNotes}</span>
+            </QuestionTooltip>
+          )}
+        </span>
+      ),
+    },
+    { head: "IP Address", fullOnly: true, cell: (asset) => asset.ip },
+    {
+      head: "Location",
+      fullOnly: false,
+      cell: (asset) => parseLocation(asset.location),
+    },
+    {
+      head: "Version",
+      fullOnly: false,
+      headClassName: "w-60",
+      cellClassName: "w-60",
+      cell: (asset) => (
+        <DropdownCell
+          value={asset.version}
+          versionStatus={asset.versionStatus}
+          options={options}
+          onAnswer={(answer) =>
+            answerVersion.mutateAsync({ id: asset.id, ...answer })
+          }
+          isPending={answerVersion.isPending}
+        />
+      ),
+    },
+    { head: "Status", fullOnly: true, cell: (asset) => asset.status ?? "—" },
+    {
+      head: "",
+      fullOnly: true,
+      headClassName: "w-10",
+      cell: (asset) => (
+        <MoreVerticalDropdownMenu
+          items={[{ label: "View asset detail", href: `/assets/${asset.id}` }]}
+        />
+      ),
+    },
+  ];
+
+  const visibleColumns = columns.filter((c) => isFull || !c.fullOnly);
   // Keep the header, the body, and the loading/error colSpan in step.
-  const columnCount = isFull ? 6 : 3;
+  const columnCount = visibleColumns.length;
 
   return (
     <>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Asset</TableHead>
-            {isFull && <TableHead>IP Address</TableHead>}
-            <TableHead>Location</TableHead>
-            <TableHead className="w-60">Version</TableHead>
-            {isFull && <TableHead>Status</TableHead>}
-            {isFull && <TableHead className="w-10" />}
+            {visibleColumns.map((col, i) => (
+              <TableHead
+                key={col.head || `col-${i}`}
+                className={col.headClassName}
+              >
+                {col.head}
+              </TableHead>
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
           {rows.map((asset) => (
             <TableRow key={asset.id}>
-              <TableCell className="font-mono text-xs">
-                <span className="inline-flex items-center gap-1">
-                  {asset.hostname ?? asset.id}
-                  {asset.statusNotes && (
-                    <QuestionTooltip>
-                      <span className="whitespace-pre-line">
-                        {asset.statusNotes}
-                      </span>
-                    </QuestionTooltip>
-                  )}
-                </span>
-              </TableCell>
-              {isFull && <TableCell>{asset.ip}</TableCell>}
-              <TableCell>{parseLocation(asset.location)}</TableCell>
-              <TableCell className="w-60">
-                <DropdownCell
-                  value={asset.version}
-                  versionStatus={asset.versionStatus}
-                  options={options}
-                  onAnswer={(answer) =>
-                    answerVersion.mutateAsync({ id: asset.id, ...answer })
-                  }
-                  isPending={answerVersion.isPending}
-                />
-              </TableCell>
-              {isFull && <TableCell>{asset.status ?? "—"}</TableCell>}
-              {isFull && (
-                <TableCell>
-                  <MoreVerticalDropdownMenu
-                    items={[
-                      {
-                        label: "View asset detail",
-                        href: `/assets/${asset.id}`,
-                      },
-                    ]}
-                  />
+              {visibleColumns.map((col, i) => (
+                <TableCell
+                  key={col.head || `col-${i}`}
+                  className={col.cellClassName}
+                >
+                  {col.cell(asset)}
                 </TableCell>
-              )}
+              ))}
             </TableRow>
           ))}
           {isLoading && rows.length === 0 && (

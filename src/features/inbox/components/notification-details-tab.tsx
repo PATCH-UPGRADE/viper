@@ -235,10 +235,6 @@ export function NotificationDetailsTab({
       <CollapsibleCard defaultOpen>
         <CollapsibleCardTrigger>
           Affected Products
-          <span className="ml-auto font-normal text-muted-foreground text-sm">
-            {withAssets.length} of {notification.deviceGroupsMatchings.length}{" "}
-            listed
-          </span>
         </CollapsibleCardTrigger>
         <CollapsibleCardContent>
           <Table>

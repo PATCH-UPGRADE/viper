@@ -30,7 +30,7 @@ const RESPOND_BUCKETS = [
 ] as const satisfies readonly Bucket[];
 
 const COLUMN_HEADING =
-  "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
+  "font-semibold uppercase tracking-wide text-sm";
 
 export function NotificationRespondTab({
   notification,
@@ -48,9 +48,10 @@ export function NotificationRespondTab({
       <HospitalImpactCard notification={notification} />
       <NotificationSummaryCard notification={notification} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] pt-2">
         {/* What's affected */}
-        <section className="flex flex-col gap-3">
+        <section>
+        <div className="flex flex-col gap-3 sticky top-0">
           <h3 className={COLUMN_HEADING}>What&apos;s affected</h3>
 
           {hasAnyGroup ? (
@@ -80,6 +81,7 @@ export function NotificationRespondTab({
           )}
 
           <NotInInventoryCard deviceGroupsMatchings={deviceGroupsMatchings} />
+        </div>
         </section>
 
         {/* Choose a response plan */}

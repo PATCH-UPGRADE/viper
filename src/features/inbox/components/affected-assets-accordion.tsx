@@ -40,6 +40,7 @@ import type {
   ResolvedDeviceGroupAsset,
 } from "../types";
 import DropdownCell from "./DropdownCell";
+import { Bot } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
@@ -56,22 +57,22 @@ export const BUCKET_META: Record<
   AFFECTED: {
     title: "Needs Attention",
     description: "Assets affected by a vulnerability.",
-    accent: "border-l-red-500",
+    accent: "red-500",
   },
   UNDER_INVESTIGATION: {
     title: "Needs Information",
     description: "Assets under investigation for a vulnerability.",
-    accent: "border-l-yellow-500",
+    accent: "yellow-500",
   },
   NOT_AFFECTED: {
     title: "Needs Confirmation",
     description: "Assets assessed as not affected.",
-    accent: "border-l-green-500",
+    accent: "green-500",
   },
   NO_ISSUES: {
     title: "Not Yet Triaged",
     description: "Assets with no triage decision yet.",
-    accent: "border-l-muted-foreground",
+    accent: "muted-foreground",
   },
 };
 
@@ -292,7 +293,7 @@ export function BucketAccordion({
   const totalAssets = groups.reduce((sum, g) => sum + g.assetCount, 0);
 
   return (
-    <Card className={cn("border-l-4 py-0 gap-0 overflow-clip", accent)}>
+    <Card className={cn("border-l-4 py-0 gap-0 overflow-clip", `border-l-${accent}`)}>
       <AccordionItem value={bucket} className="border-b-0">
         <AccordionTrigger className="items-center px-4">
           <div className="flex w-full items-center justify-between gap-4">
@@ -319,7 +320,7 @@ export function BucketAccordion({
             }
             className="flex flex-col"
           >
-            {groups.map((group, index) => {
+            {groups.map((group) => {
               const matching = group.deviceGroupMatching;
               const notes = Object.entries(group.notesByVuln);
               return (
@@ -327,7 +328,7 @@ export function BucketAccordion({
                   key={`${notificationId}-${bucket}-${matching.id}`}
                   value={matching.id}
                 >
-                  <AccordionTrigger className={cn("items-center px-4", index % 2 === 0 ? "bg-muted" : "")}>
+                  <AccordionTrigger className="items-center bg-muted px-4">
                     <div className="flex w-full items-center justify-between gap-4">
                       <div className="flex min-w-0 flex-col gap-0.5 text-left">
                         <span className="font-semibold">
@@ -350,11 +351,17 @@ export function BucketAccordion({
                   </AccordionTrigger>
                   <AccordionContent className="px-4">
                     {notes.length > 0 && (
-                      <ul className="mb-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                      <div className="flex gap-2 items-start my-2">
+                       <Bot
+            className="mt-0.5 size-4 shrink-0"
+            aria-label="CDST rationale"
+          />
+                      <ul className={cn("space-y-1 text-sm text-muted-foreground italic", notes.length > 1 ? "list-disc pl-5" : "")}>
                         {notes.map(([vulnId, note]) => (
                           <li key={vulnId}>{note}</li>
                         ))}
                       </ul>
+                      </div>
                     )}
                     <MatchingAssetTable
                       notificationId={notificationId}

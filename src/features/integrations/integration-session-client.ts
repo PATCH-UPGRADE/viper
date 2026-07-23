@@ -1,7 +1,7 @@
 import prisma from "@/lib/db";
 import {
   grabSessionCookie,
-  SessionLoginConfig,
+  type SessionLoginConfig,
 } from "./teamplay-fleet/capture";
 
 const REAUTH_TIMEOUT = 30_000;
@@ -24,15 +24,25 @@ export class IntegrationSessionClient {
     this.loginConfig = loginConfig;
   }
 
-  async fetchWithSession(url: string): Promise<Response> {
+  async fetchWithSession(
+    url: string,
+    init: RequestInit = {},
+  ): Promise<Response> {
+    // Caller-supplied headers (e.g. Content-Type for a POST body) are preserved;
+    // the session header is layered on top.
+    const baseHeaders: Record<string, string> = {
+      ...(init.headers as Record<string, string> | undefined),
+    };
+
     const cached = await prisma.integrationSession.findUnique({
       where: { host: this.host },
     });
-    const headers: Record<string, string> = {};
 
-    if (cached) headers[cached.header] = cached.value;
+    const firstHeaders = { ...baseHeaders };
+    if (cached) firstHeaders[cached.header] = cached.value;
     const res = await fetch(url, {
-      headers,
+      ...init,
+      headers: firstHeaders,
       signal: AbortSignal.timeout(REAUTH_TIMEOUT),
     });
 
@@ -41,7 +51,8 @@ export class IntegrationSessionClient {
     const session = await this.reauth();
 
     return fetch(url, {
-      headers: { [session.header]: session.value },
+      ...init,
+      headers: { ...baseHeaders, [session.header]: session.value },
       signal: AbortSignal.timeout(REAUTH_TIMEOUT),
     });
   }

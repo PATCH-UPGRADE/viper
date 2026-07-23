@@ -10,10 +10,15 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import type { FleetWorkOrderProposal } from "@/features/chat/types";
 import {
+  FLEET_OPERATIONAL_STATUSES,
+  FLEET_PATIENT_DANGERS,
+  FLEET_SUPPORT_TYPES,
+} from "@/features/integrations/teamplay-fleet/constants";
+import {
   listFleetManagedAssets,
   resolveFleetAssets,
   UnmanagedAssetsError,
-} from "@/features/tracking/server/fleet-client";
+} from "@/features/integrations/teamplay-fleet/work-orders";
 import { TicketCategory } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import { TOOL_REJECTED_PREFIX } from "./build-graph";
@@ -151,6 +156,10 @@ const proposeFleetWorkOrder = tool(
     summary,
     description,
     category,
+    supportType,
+    operationalStatus,
+    dangerForPatient,
+    overtimeAuthorized,
     scheduledAt,
     rationale,
   }) => {
@@ -166,6 +175,10 @@ const proposeFleetWorkOrder = tool(
         summary,
         description,
         category,
+        supportType,
+        operationalStatus,
+        dangerForPatient,
+        overtimeAuthorized,
         scheduledAt: scheduledAt ?? null,
         rationale: rationale ?? null,
       };
@@ -206,6 +219,30 @@ Use this when the remediation is service work Siemens would perform — a firmwa
         .enum(TicketCategory)
         .describe(
           "FIRMWARE_UPDATE for software/firmware service, MAINTENANCE for preventive or corrective maintenance.",
+        ),
+      supportType: z
+        .enum(FLEET_SUPPORT_TYPES)
+        .default("technical")
+        .describe(
+          "Which Siemens support queue: 'technical' for device/hardware/firmware service (the usual case), 'application' for the imaging application/software layer.",
+        ),
+      operationalStatus: z
+        .enum(FLEET_OPERATIONAL_STATUSES)
+        .default("partially_operational")
+        .describe(
+          "The device's CURRENT operational status, sent to Siemens as the ticket severity. Fleet has only two: 'partially_operational' for a device that is working or degraded but still in use (the usual case for a preventive/security update), 'not_operational' only when the device is actually down. Do NOT use 'not_operational' for a working device.",
+        ),
+      dangerForPatient: z
+        .enum(FLEET_PATIENT_DANGERS)
+        .default("unknown")
+        .describe(
+          "Patient-safety risk of the underlying issue: 'yes' if the device could malfunction during care, 'no' when there is clearly no direct risk, 'unknown' when you can't determine it. NOTE: a 'yes' cannot be filed online — Siemens requires a phone call — so the user will be told to call rather than accept. Only use 'yes' for a genuine direct risk.",
+        ),
+      overtimeAuthorized: z
+        .boolean()
+        .default(false)
+        .describe(
+          "True if the hospital authorizes after-hours (overtime) service at additional cost. Default false; only set true when the urgency justifies it.",
         ),
       scheduledAt: z
         .string()

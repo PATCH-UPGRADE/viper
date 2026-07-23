@@ -2,6 +2,21 @@ import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
+  FLEET_OPERATIONAL_STATUSES,
+  FLEET_PATIENT_DANGERS,
+  FLEET_SUPPORT_TYPES,
+} from "@/features/integrations/teamplay-fleet/constants";
+import {
+  createFleetWorkOrder,
+  FLEET_SOURCE_LABEL,
+  type FleetContact,
+  type FleetManagedAsset,
+  type FleetWorkOrderResult,
+  getFleetWorkOrderIntegration,
+  resolveFleetAssets,
+  UnmanagedAssetsError,
+} from "@/features/integrations/teamplay-fleet/work-orders";
+import {
   type Prisma,
   ResourceType,
   TicketCategory,
@@ -43,16 +58,6 @@ import {
   recordUpdateActivities,
   snapshotBeforeUpdate,
 } from "./activities";
-import {
-  createFleetWorkOrder,
-  FLEET_SOURCE_LABEL,
-  type FleetContact,
-  type FleetManagedAsset,
-  type FleetWorkOrderResult,
-  getFleetWorkOrderIntegration,
-  resolveFleetAssets,
-  UnmanagedAssetsError,
-} from "./fleet-client";
 
 /**
  * Siemens calls whoever approved the work order, so the contact is the accepting
@@ -894,12 +899,30 @@ export const trackingRouter = createTRPCRouter({
         summary: z.string().min(1),
         description: z.string().default(""),
         category: z.enum(TicketCategory),
+        // Operational flags the approver saw on the card, forwarded to Fleet.
+        supportType: z.enum(FLEET_SUPPORT_TYPES).default("technical"),
+        operationalStatus: z
+          .enum(FLEET_OPERATIONAL_STATUSES)
+          .default("partially_operational"),
+        dangerForPatient: z.enum(FLEET_PATIENT_DANGERS).default("unknown"),
+        overtimeAuthorized: z.boolean().default(false),
         scheduledAt: z.string().nullish(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.auth.user.id;
       type Failure = { asset: string; message: string };
+
+      // Fleet won't accept an online ticket for a patient-safety issue — it
+      // requires a phone call — so never POST one. The card shows the same
+      // guidance; this is the server-side guard (client is untrusted).
+      if (input.dangerForPatient === "yes") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "A patient-safety issue can't be filed as an online work order — Siemens Healthineers requires you to report it by phone.",
+        });
+      }
 
       // Read whatever's already persisted for this proposal into the response
       // shape. Used by both the fast path and the lost-claim race path — the
@@ -991,10 +1014,14 @@ export const trackingRouter = createTRPCRouter({
 
       for (const asset of assets) {
         try {
-          const result = await createFleetWorkOrder(integration, asset, {
+          const result = await createFleetWorkOrder(asset, {
             summary: input.summary,
             description: input.description,
             category: input.category,
+            supportType: input.supportType,
+            operationalStatus: input.operationalStatus,
+            dangerForPatient: input.dangerForPatient,
+            overtimeAuthorized: input.overtimeAuthorized,
             scheduledAt: input.scheduledAt ?? null,
             contact,
             // Our reference on the Fleet ticket, so an order can be traced back

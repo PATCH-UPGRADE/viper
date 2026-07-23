@@ -10,33 +10,40 @@
  * proposed service window is carried as a "System available date (CLT)" line
  * inside `longText`, exactly as the form does it.
  *
+ * Auth is delegated to the shared session client (FLEET, config.ts) that Perry
+ * built for the advisory sync — cookie session with Playwright re-auth on 401/403.
+ *
  * Deployment config:
  * - FLEET_WORK_ORDER_URL — the create endpoint (the integration URI points at
  *   the /activities READ collection, which is not where tickets are created).
  * - FLEET_SITE_ADDRESS — the Fleet address record Siemens dispatches to, as JSON.
  * - FLEET_CONTACT_PHONE — callback number for the accepting user.
  *
- * SPEC GAP: we have not seen Fleet's create RESPONSE. `extractFleetTicketKey`
- * accepts the field names it plausibly uses and throws with the raw body when it
- * recognizes none — pin it down there once a real response is in hand.
+ * Create response (confirmed): `{ ticketKey: "US_…", ticketNumber: "…",
+ * attachmentsValidated: bool }`. `ticketKey` is the id we track — same US_…
+ * format the inbound /activities sync dedups on, so a re-sync updates this
+ * ticket rather than duplicating it.
  */
 import "server-only";
 import { z } from "zod";
 import {
   type Asset,
-  AuthType,
   type Integration,
   ResourceType,
   type TicketCategory,
 } from "@/generated/prisma";
+import { MONTHS_SHORT } from "@/lib/date-utils";
 import prisma from "@/lib/db";
-import { parseAuthenticationJson } from "@/lib/utils";
+import { FLEET } from "./config";
+import type {
+  FleetOperationalStatus,
+  FleetPatientDanger,
+  FleetSupportType,
+} from "./constants";
 
 /** Fleet's host — the authoritative identity of the upstream, as in REST_MAPPERS. */
 export const FLEET_HOST = "fleet.siemens-healthineers.com";
 export const FLEET_SOURCE_LABEL = "Siemens Healthineers Fleet";
-
-const FLEET_TIMEOUT_MS = 30_000;
 
 // ─── Integration lookup ──────────────────────────────────────────────────────
 
@@ -173,18 +180,32 @@ export async function resolveFleetAssets(
 // ─── The write contract ──────────────────────────────────────────────────────
 
 /**
- * Ticket type. "11" is what Fleet's own ticket form submits; we have no legend
- * for the other codes, so every VIPER-raised order uses it.
+ * Fleet support-ticket type (typeID). Confirmed legend: 11 = Technical Support,
+ * 12 = Application Support. Model-set and shown on the approval card.
  */
-const FLEET_TYPE_ID = "11";
+const FLEET_TYPE_ID: Record<FleetSupportType, string> = {
+  technical: "11",
+  application: "12",
+};
 
 /**
- * Siemens' severity and patient-danger flags are deliberately NOT model-settable
- * — an LLM must not be able to escalate a vendor dispatch. These match what the
- * Fleet form sends for a routine request.
+ * Operational status → Fleet problemSeverityID. Model-set and surfaced on the
+ * card, so the approver sees exactly what will be sent. Fleet's only two codes
+ * (LOWER is worse): "1" = System Not Operational, "2" = System Partially
+ * Operational. There is no "fully operational" code — a working device needing a
+ * preventive/security update is filed as partially_operational.
  */
-const FLEET_PROBLEM_SEVERITY_ID = "1";
-const FLEET_DANGER_FOR_PATIENT = "N";
+const FLEET_SEVERITY_ID: Record<FleetOperationalStatus, string> = {
+  partially_operational: "2",
+  not_operational: "1",
+};
+
+/** Fleet's three-state dangerForPatient. Y/N/U all observed in real payloads. */
+const FLEET_DANGER_CODE: Record<FleetPatientDanger, string> = {
+  yes: "Y",
+  no: "N",
+  unknown: "U",
+};
 
 /** Who Siemens contacts about the order — the VIPER user who accepted it. */
 export interface FleetContact {
@@ -236,25 +257,18 @@ export interface FleetWorkOrderRequest {
   category: TicketCategory;
   /** ISO-8601 with offset; the local wall-clock time is what Fleet displays. */
   scheduledAt?: string | null;
+  /** Fleet support type (Technical/Application) → typeID; shown on the card. */
+  supportType: FleetSupportType;
+  /** Device operational status → Fleet severity; shown on the approval card. */
+  operationalStatus: FleetOperationalStatus;
+  /** Patient-safety risk → Fleet's three-state dangerForPatient; on the card. */
+  dangerForPatient: FleetPatientDanger;
+  /** Hospital authorizes after-hours (overtime) service; shown on the card. */
+  overtimeAuthorized: boolean;
   contact: FleetContact;
   /** Our own reference, echoed back on the Fleet ticket for correlation. */
   ownIncidentNumber?: string;
 }
-
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
 
 /**
  * Customer-local time as Fleet writes it: "13-Jul-2026, 09:35".
@@ -267,15 +281,21 @@ export function formatCltDateTime(iso: string): string | null {
   const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   if (!match) return null;
   const [, year, month, day, hour, minute] = match;
-  const monthName = MONTHS[Number(month) - 1];
+  const monthName = MONTHS_SHORT[Number(month) - 1];
   if (!monthName) return null;
   return `${day}-${monthName}-${year}, ${hour}:${minute}`;
 }
 
 /**
- * The create payload carries no schedule fields — Fleet's own form encodes the
- * requested window as a "System available date (CLT)" line inside longText, so
- * that is where the proposed service window has to go.
+ * The create payload has no schedule/overtime fields — Fleet's own form stores
+ * them as lines inside longText, joined by ".." (literal double-dots, NOT
+ * newlines), and auto-appends:
+ *   - "System available date (CLT): …" when a service window is set
+ *   - "Overtime authorization: Yes" when overtime is authorized (line omitted
+ *     otherwise)
+ * Both confirmed against real Fleet create payloads. Urgency and patient-danger
+ * are NOT restated here — they ride the structured problemSeverityID /
+ * dangerForPatient fields and are shown to the approver on the card.
  */
 export function buildFleetLongText(req: FleetWorkOrderRequest): string {
   const parts = [req.description, `Category: ${req.category}`];
@@ -285,8 +305,12 @@ export function buildFleetLongText(req: FleetWorkOrderRequest): string {
     parts.push(`System available date (CLT): ${available}`);
   }
 
+  if (req.overtimeAuthorized) {
+    parts.push("Overtime authorization: Yes");
+  }
+
   parts.push("Raised from VIPER after review by hospital staff.");
-  return parts.join("\n");
+  return parts.join("..");
 }
 
 /** Pure: request + configured site → Fleet create-ticket payload. */
@@ -299,13 +323,13 @@ export function toFleetCreatePayload(
     attachments: [],
     details: {
       teamplayApplication: "",
-      typeID: FLEET_TYPE_ID,
+      typeID: FLEET_TYPE_ID[req.supportType],
       description: req.summary,
-      problemSeverityID: FLEET_PROBLEM_SEVERITY_ID,
+      problemSeverityID: FLEET_SEVERITY_ID[req.operationalStatus],
       longText: buildFleetLongText(req),
       protectedCareHours: "",
       componentID: null,
-      dangerForPatient: FLEET_DANGER_FOR_PATIENT,
+      dangerForPatient: FLEET_DANGER_CODE[req.dangerForPatient],
     },
     contact: {
       contactEmail: req.contact.email,
@@ -327,11 +351,9 @@ export function toFleetCreatePayload(
 }
 
 /**
- * Fleet's create response is the one part of the contract we still haven't seen.
- * We only need whichever field carries the new ticket's stable id — the same id
- * /activities later reports as `ticketKey`, so the inbound sync updates this
- * ticket instead of duplicating it. Numbers are coerced: SAP ids come back both
- * ways.
+ * Fleet's create response: `ticketKey` is the id we track (confirmed); the rest
+ * are defensive fallbacks in case a variant response omits it. Numbers are
+ * coerced: SAP ids come back both as strings and numbers.
  */
 const fleetCreateResponseSchema = z.object({
   ticketKey: z.coerce.string().nullish(),
@@ -386,28 +408,22 @@ export interface FleetWorkOrderResult {
 
 /** POST one work order to Fleet. Throws on a non-2xx or an unusable response. */
 export async function createFleetWorkOrder(
-  integration: Integration,
   asset: FleetManagedAsset,
   req: Omit<FleetWorkOrderRequest, "equipmentKey">,
 ): Promise<FleetWorkOrderResult> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  };
-  if (integration.authType !== AuthType.None) {
-    const { header, value } = parseAuthenticationJson(integration);
-    headers[header] = value;
-  }
-
   const payload = toFleetCreatePayload(
     { ...req, equipmentKey: asset.equipmentKey },
     getFleetSiteAddress(),
   );
 
-  const response = await fetch(fleetWorkOrderUrl(), {
+  // Auth (cookie session + Playwright re-auth on 401/403) is handled by the
+  // shared FLEET session client; it layers the session header over ours.
+  const response = await FLEET.fetchWithSession(fleetWorkOrderUrl(), {
     method: "POST",
-    headers,
-    signal: AbortSignal.timeout(FLEET_TIMEOUT_MS),
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
     body: JSON.stringify(payload),
   });
 

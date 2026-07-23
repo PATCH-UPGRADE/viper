@@ -1,8 +1,8 @@
+import { listFleetManagedAssets } from "@/features/integrations/teamplay-fleet/work-orders";
 import {
   type NetworkTopology,
   networkTopologySchema,
 } from "@/features/network/types";
-import { listFleetManagedAssets } from "@/features/tracking/server/fleet-client";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
@@ -266,10 +266,8 @@ function generateContextMarkdown(
           .map((a) => {
             const markdown = assetToMarkdown(a, { includeIssues: true });
             const equipmentKey = fleetManaged.get(a.id);
-            // The full id (assetToMarkdown prints only an 8-char shortId) is what
-            // propose_fleet_work_order needs back from the model.
             return equipmentKey
-              ? `${markdown}\n- **Siemens Healthineers Fleet**: managed (equipment ${equipmentKey}, asset id \`${a.id}\`) — eligible for propose_fleet_work_order`
+              ? `${markdown}\n- **Siemens Healthineers Fleet**: managed (equipment ${equipmentKey}) — eligible for propose_fleet_work_order`
               : markdown;
           })
           .join("\n\n");

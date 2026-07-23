@@ -74,6 +74,7 @@ import {
   useFleetProposalStatus,
 } from "@/features/tracking/hooks/use-tracking";
 import { authClient } from "@/lib/auth-client";
+import { MONTHS_SHORT } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 
 interface AIChatProps {
@@ -399,21 +400,6 @@ function AskUserQuestionsMessage({
   );
 }
 
-const SCHEDULE_MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
 /**
  * Format a proposed service window from the wall-clock parts of its ISO string,
  * with no timezone conversion. `Date#toLocaleString()` with no arguments uses
@@ -425,7 +411,7 @@ function formatScheduledWindow(iso: string): string {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   if (!m) return iso;
   const [, year, month, day, hour, minute] = m;
-  const monthName = SCHEDULE_MONTHS[Number(month) - 1] ?? month;
+  const monthName = MONTHS_SHORT[Number(month) - 1] ?? month;
   return `${monthName} ${Number(day)}, ${year}, ${hour}:${minute}`;
 }
 
@@ -477,6 +463,46 @@ function FleetWorkOrderProposalCard({
           <dd>{proposal.category.replace(/_/g, " ").toLowerCase()}</dd>
         </div>
         <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">Support</dt>
+          <dd className="capitalize">{proposal.supportType} support</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">System</dt>
+          <dd
+            className={
+              proposal.operationalStatus === "not_operational"
+                ? "font-medium text-destructive"
+                : ""
+            }
+          >
+            {proposal.operationalStatus === "not_operational"
+              ? "Not operational"
+              : "Partially operational"}
+          </dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">Patient risk</dt>
+          <dd
+            className={
+              proposal.dangerForPatient === "yes"
+                ? "font-medium text-destructive"
+                : ""
+            }
+          >
+            {proposal.dangerForPatient === "yes"
+              ? "Yes — patient-safety risk"
+              : proposal.dangerForPatient === "unknown"
+                ? "Unknown"
+                : "No"}
+          </dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">Overtime</dt>
+          <dd>
+            {proposal.overtimeAuthorized ? "Authorized" : "Not authorized"}
+          </dd>
+        </div>
+        <div className="flex gap-2">
           <dt className="w-24 shrink-0 text-muted-foreground">Window</dt>
           <dd>{scheduledLabel}</dd>
         </div>
@@ -484,12 +510,29 @@ function FleetWorkOrderProposalCard({
 
       <p className="text-xs whitespace-pre-wrap">{proposal.description}</p>
       {proposal.rationale && (
-        <p className="text-xs italic text-muted-foreground">
-          {proposal.rationale}
-        </p>
+        <div className="flex items-start gap-1.5 text-xs italic text-muted-foreground">
+          <Bot
+            className="mt-0.5 size-3.5 shrink-0"
+            aria-label="CDST rationale"
+          />
+          <p>{proposal.rationale}</p>
+        </div>
       )}
 
-      {accepted ? (
+      {proposal.dangerForPatient === "yes" && !accepted ? (
+        // Fleet requires patient-safety issues to be phoned in, not filed
+        // online — so there's no Accept here (see the mutation's matching guard).
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs">
+          <p className="font-medium text-destructive">
+            Patient-safety risk — call Siemens
+          </p>
+          <p className="text-muted-foreground">
+            teamplay Fleet doesn't accept online tickets for patient-safety
+            issues. Contact Siemens Healthineers by phone to report this — it
+            can't be filed from here.
+          </p>
+        </div>
+      ) : accepted ? (
         <p className="text-xs font-medium text-muted-foreground">
           Accepted · Fleet {status?.externalIds.join(", ")}
         </p>
@@ -509,6 +552,10 @@ function FleetWorkOrderProposalCard({
                 summary: proposal.summary,
                 description: proposal.description,
                 category: proposal.category,
+                supportType: proposal.supportType,
+                operationalStatus: proposal.operationalStatus,
+                dangerForPatient: proposal.dangerForPatient,
+                overtimeAuthorized: proposal.overtimeAuthorized,
                 scheduledAt: proposal.scheduledAt,
               })
             }

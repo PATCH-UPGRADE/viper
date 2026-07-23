@@ -1,5 +1,10 @@
 import { z } from "zod";
 import type { AssetWithIssueRelations } from "@/features/assets/types";
+import {
+  FLEET_OPERATIONAL_STATUSES,
+  FLEET_PATIENT_DANGERS,
+  FLEET_SUPPORT_TYPES,
+} from "@/features/integrations/teamplay-fleet/constants";
 import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
 import { type Prisma, TicketCategory } from "@/generated/prisma";
 
@@ -30,6 +35,14 @@ export const fleetWorkOrderProposalSchema = z.object({
   summary: z.string(),
   description: z.string(),
   category: z.enum(TicketCategory),
+  // Model-set operational flags, surfaced on the approval card. Defaulted so a
+  // proposal persisted before these existed still renders as a card.
+  supportType: z.enum(FLEET_SUPPORT_TYPES).default("technical"),
+  operationalStatus: z
+    .enum(FLEET_OPERATIONAL_STATUSES)
+    .default("partially_operational"),
+  dangerForPatient: z.enum(FLEET_PATIENT_DANGERS).default("unknown"),
+  overtimeAuthorized: z.boolean().default(false),
   scheduledAt: z.string().nullable(),
   rationale: z.string().nullable(),
 });

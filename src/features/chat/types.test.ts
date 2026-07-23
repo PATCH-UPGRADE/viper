@@ -15,6 +15,10 @@ const PROPOSAL = {
   summary: "Firmware update: MRI-001 (vendor-recommended maintenance)",
   description: "Vendor-recommended firmware update for the MAGNETOM scanner.",
   category: "FIRMWARE_UPDATE",
+  supportType: "application",
+  operationalStatus: "partially_operational",
+  dangerForPatient: "no",
+  overtimeAuthorized: false,
   scheduledAt: null,
   rationale: "Schedule during the lowest utilization window.",
 };
@@ -30,6 +34,27 @@ describe("parseFleetProposal", () => {
   it("accepts a JSON string too", () => {
     const parsed = parseFleetProposal(JSON.stringify(PROPOSAL));
     expect(parsed?.summary).toContain("Firmware update");
+  });
+
+  it("preserves the operational flags, defaulting ones a legacy proposal lacks", () => {
+    expect(parseFleetProposal(PROPOSAL)?.operationalStatus).toBe(
+      "partially_operational",
+    );
+    // A proposal persisted before these fields existed still renders as a card.
+    const legacy = {
+      type: PROPOSAL.type,
+      assets: PROPOSAL.assets,
+      summary: PROPOSAL.summary,
+      description: PROPOSAL.description,
+      category: PROPOSAL.category,
+      scheduledAt: PROPOSAL.scheduledAt,
+      rationale: PROPOSAL.rationale,
+    };
+    const parsed = parseFleetProposal(legacy);
+    expect(parsed?.supportType).toBe("technical");
+    expect(parsed?.operationalStatus).toBe("partially_operational");
+    expect(parsed?.dangerForPatient).toBe("unknown");
+    expect(parsed?.overtimeAuthorized).toBe(false);
   });
 
   it("returns null for a rejection string so no card renders", () => {

@@ -65,9 +65,9 @@ vi.mock("@/lib/auth-utils", () => ({
   verifyApiKey: vi.fn(),
 }));
 
-// The Fleet client is exercised directly in fleet-client.test.ts; here we stub
-// its network + lookup surface and keep the real UnmanagedAssetsError so the
-// router's rejection path is the one that actually runs.
+// The Fleet client is exercised directly in teamplay-fleet/work-orders.test.ts;
+// here we stub its network + lookup surface and keep the real
+// UnmanagedAssetsError so the router's rejection path is the one that runs.
 const { mockFleet } = vi.hoisted(() => ({
   mockFleet: {
     resolveFleetAssets: vi.fn(),
@@ -76,13 +76,18 @@ const { mockFleet } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("./fleet-client", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./fleet-client")>()),
-  ...mockFleet,
-}));
+vi.mock(
+  "@/features/integrations/teamplay-fleet/work-orders",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("@/features/integrations/teamplay-fleet/work-orders")
+    >()),
+    ...mockFleet,
+  }),
+);
 
+import { UnmanagedAssetsError } from "@/features/integrations/teamplay-fleet/work-orders";
 import { createCallerFactory } from "@/trpc/init";
-import { UnmanagedAssetsError } from "./fleet-client";
 import { trackingRouter } from "./routers";
 
 const createCaller = createCallerFactory(trackingRouter);
@@ -1475,6 +1480,17 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     });
     // The race loser must not file its own Fleet order.
     expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
+  });
+
+  it("refuses to file a patient-safety issue online (Fleet requires a phone call)", async () => {
+    const caller = setup();
+
+    await expect(
+      caller.createFleetWorkOrder({ ...proposal, dangerForPatient: "yes" }),
+    ).rejects.toThrow(/phone/i);
+
+    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
+    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
   });
 
   it("refuses an asset Siemens does not manage, before calling Fleet", async () => {

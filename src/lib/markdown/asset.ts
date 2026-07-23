@@ -1,6 +1,6 @@
 import { assetUtilizationSchema } from "@/features/assets/types";
 import { deviceGroupCpeList, deviceGroupLabel } from "./device-group";
-import { type CanonicalRef, shortId } from "./shared";
+import type { CanonicalRef } from "./shared";
 
 // ─── Utilization rendering ────────────────────────────────────────────────────
 
@@ -124,7 +124,9 @@ export function assetToMarkdown(
 ): string {
   const label = a.hostname ?? a.ip ?? a.id;
   const lines = [
-    `### ${label} (${shortId(a.id)})`,
+    // Full id (not shortId) so the agent can feed it straight into tools like
+    // propose_fleet_work_order without needing it printed elsewhere.
+    `### ${label} (${a.id})`,
     `- **IP**: ${a.ip ?? "N/A"}`,
     `- **MAC Address**: ${a.macAddress ?? "N/A"}`,
     `- **Role**: ${a.role ?? "Unknown"}`,

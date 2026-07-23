@@ -12,7 +12,15 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
-import { type Integration, TicketCategory } from "@/generated/prisma";
+// Auth is delegated to the shared FLEET session client; stub it so the tests
+// don't pull in Playwright/chromium and can assert the outbound request.
+const { mockFleetSession } = vi.hoisted(() => ({
+  mockFleetSession: { fetchWithSession: vi.fn() },
+}));
+
+vi.mock("./config", () => ({ FLEET: mockFleetSession }));
+
+import { TicketCategory } from "@/generated/prisma";
 import {
   buildFleetLongText,
   createFleetWorkOrder,
@@ -27,7 +35,7 @@ import {
   resolveFleetAssets,
   toFleetCreatePayload,
   UnmanagedAssetsError,
-} from "./fleet-client";
+} from "./work-orders";
 
 const FLEET_INTEGRATION = {
   id: "int-fleet",
@@ -76,6 +84,10 @@ const request = {
   summary: "Firmware update: MR-MAGNETOM-001",
   description: "Apply the Siemens firmware update.",
   category: TicketCategory.FIRMWARE_UPDATE,
+  supportType: "application" as const,
+  operationalStatus: "not_operational" as const,
+  dangerForPatient: "no" as const,
+  overtimeAuthorized: true,
   scheduledAt: "2026-07-13T09:35:00-05:00",
   contact: CONTACT,
   ownIncidentNumber: "call_abc",
@@ -99,10 +111,37 @@ describe("toFleetCreatePayload", () => {
     });
   });
 
-  it("pins severity and patient-danger to fixed values the model cannot raise", () => {
-    expect(payload.details.typeID).toBe("11");
+  it("maps the model-set support type, status and patient-danger into the payload", () => {
+    // supportType "application" → typeID "12"; not_operational → severity "1";
+    // dangerForPatient "no" → "N".
+    expect(payload.details.typeID).toBe("12");
     expect(payload.details.problemSeverityID).toBe("1");
     expect(payload.details.dangerForPatient).toBe("N");
+  });
+
+  it("maps operational status to Fleet's two severity codes (lower is worse)", () => {
+    const sev = (s: "partially_operational" | "not_operational") =>
+      toFleetCreatePayload({ ...request, operationalStatus: s }, SITE_ADDRESS)
+        .details.problemSeverityID;
+    expect(sev("not_operational")).toBe("1");
+    expect(sev("partially_operational")).toBe("2");
+  });
+
+  it("maps support type to Fleet's typeID", () => {
+    const type = (t: "technical" | "application") =>
+      toFleetCreatePayload({ ...request, supportType: t }, SITE_ADDRESS).details
+        .typeID;
+    expect(type("technical")).toBe("11");
+    expect(type("application")).toBe("12");
+  });
+
+  it("maps the three patient-danger states to Fleet's Y/N/U", () => {
+    const code = (d: "yes" | "no" | "unknown") =>
+      toFleetCreatePayload({ ...request, dangerForPatient: d }, SITE_ADDRESS)
+        .details.dangerForPatient;
+    expect(code("yes")).toBe("Y");
+    expect(code("no")).toBe("N");
+    expect(code("unknown")).toBe("U");
   });
 
   it("carries our proposal id as the customer's own incident number", () => {
@@ -125,6 +164,27 @@ describe("buildFleetLongText", () => {
     expect(longText).toContain(
       "System available date (CLT): 13-Jul-2026, 09:35",
     );
+  });
+
+  it("joins segments with Fleet's `..` separator, not newlines", () => {
+    const longText = buildFleetLongText(request);
+    expect(longText).toContain("..");
+    expect(longText).not.toContain("\n");
+  });
+
+  it("appends Fleet's overtime line only when authorized, using Fleet's label", () => {
+    expect(buildFleetLongText(request)).toContain(
+      "Overtime authorization: Yes",
+    );
+    expect(
+      buildFleetLongText({ ...request, overtimeAuthorized: false }),
+    ).not.toContain("Overtime authorization");
+  });
+
+  it("does not restate urgency/patient-danger — those ride the structured fields", () => {
+    const longText = buildFleetLongText(request);
+    expect(longText).not.toContain("Operational urgency");
+    expect(longText).not.toContain("Patient-safety risk");
   });
 
   it("omits the window line when no window was proposed", () => {
@@ -286,7 +346,6 @@ describe("getFleetWorkOrderIntegration", () => {
 });
 
 describe("createFleetWorkOrder", () => {
-  const integration = { id: "int-fleet", authType: "None" } as Integration;
   const asset: FleetManagedAsset = {
     assetId: "rad-mri-001",
     hostname: "MR-MAGNETOM-001",
@@ -298,6 +357,10 @@ describe("createFleetWorkOrder", () => {
     summary: "Firmware update: MR-MAGNETOM-001",
     description: "Apply the Siemens firmware update.",
     category: TicketCategory.FIRMWARE_UPDATE,
+    supportType: "technical" as const,
+    operationalStatus: "partially_operational" as const,
+    dangerForPatient: "no" as const,
+    overtimeAuthorized: false,
     scheduledAt: "2026-07-22T22:00:00-05:00",
     contact: CONTACT,
     ownIncidentNumber: "call_abc",
@@ -309,39 +372,35 @@ describe("createFleetWorkOrder", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
     delete process.env.FLEET_SITE_ADDRESS;
   });
 
-  it("POSTs the payload and returns Fleet's ticket key", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
+  it("POSTs the payload through the shared session client and returns the ticket key", async () => {
+    mockFleetSession.fetchWithSession.mockResolvedValue({
       ok: true,
       json: async () => ({ ticketKey: "US_400501937577" }),
     });
-    vi.stubGlobal("fetch", fetchMock);
 
-    const result = await createFleetWorkOrder(integration, asset, req);
+    const result = await createFleetWorkOrder(asset, req);
 
     expect(result.externalId).toBe("US_400501937577");
     expect(result.equipmentKey).toBe("US_1064669350");
-    const [url, init] = fetchMock.mock.calls[0];
+    // Auth goes through FLEET.fetchWithSession, not a bare fetch.
+    const [url, init] = mockFleetSession.fetchWithSession.mock.calls[0];
     expect(url).toBe("http://localhost:4010/workorders");
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body).equipmentKey).toBe("US_1064669350");
   });
 
   it("throws with Fleet's status text on a non-2xx response", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 403,
-        statusText: "Forbidden",
-        text: async () => "not authorized",
-      }),
-    );
+    mockFleetSession.fetchWithSession.mockResolvedValue({
+      ok: false,
+      status: 403,
+      statusText: "Forbidden",
+      text: async () => "not authorized",
+    });
 
-    await expect(createFleetWorkOrder(integration, asset, req)).rejects.toThrow(
+    await expect(createFleetWorkOrder(asset, req)).rejects.toThrow(
       /403 Forbidden/,
     );
   });
@@ -349,17 +408,14 @@ describe("createFleetWorkOrder", () => {
   it("keeps an accepted order when the 2xx body is unparsable, using our reference", async () => {
     // Fleet accepted (2xx) but returned junk — the order exists upstream, so we
     // must NOT surface a failure (which would make the user re-file it).
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => {
-          throw new Error("Unexpected token < in JSON");
-        },
-      }),
-    );
+    mockFleetSession.fetchWithSession.mockResolvedValue({
+      ok: true,
+      json: async () => {
+        throw new Error("Unexpected token < in JSON");
+      },
+    });
 
-    const result = await createFleetWorkOrder(integration, asset, req);
+    const result = await createFleetWorkOrder(asset, req);
 
     // Provisional id derived from ownIncidentNumber; the inbound sync reconciles
     // the real key later.

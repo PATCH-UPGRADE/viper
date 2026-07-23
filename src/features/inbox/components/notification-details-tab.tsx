@@ -7,7 +7,12 @@ import { toast } from "sonner";
 import { TlpBadge } from "@/components/tlp-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  CollapsibleCard,
+  CollapsibleCardContent,
+  CollapsibleCardTrigger,
+} from "@/components/ui/collapsible-card";
 import {
   Dialog,
   DialogContent,
@@ -227,15 +232,15 @@ export function NotificationDetailsTab({
       <NotificationSummaryCard notification={notification} />
 
       {/* Affected Products */}
-      <Card>
-        <CardHeader className="flex justify-between items-center">
-          <CardTitle>Affected Products</CardTitle>
-          <span className="text-muted-foreground text-sm">
+      <CollapsibleCard defaultOpen>
+        <CollapsibleCardTrigger>
+          Affected Products
+          <span className="ml-auto font-normal text-muted-foreground text-sm">
             {withAssets.length} of {notification.deviceGroupsMatchings.length}{" "}
             listed
           </span>
-        </CardHeader>
-        <CardContent>
+        </CollapsibleCardTrigger>
+        <CollapsibleCardContent>
           <Table>
             <TableHeader>
               <TableRow>
@@ -286,15 +291,13 @@ export function NotificationDetailsTab({
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </CollapsibleCardContent>
+      </CollapsibleCard>
 
       {/* Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Details</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <CollapsibleCard defaultOpen>
+        <CollapsibleCardTrigger>Details</CollapsibleCardTrigger>
+        <CollapsibleCardContent>
           <table className="w-full text-sm">
             <tbody>
               {detailRows.map((row) => (
@@ -309,8 +312,8 @@ export function NotificationDetailsTab({
               ))}
             </tbody>
           </table>
-        </CardContent>
-      </Card>
+        </CollapsibleCardContent>
+      </CollapsibleCard>
 
       <Dialog
         open={!!rejecting}

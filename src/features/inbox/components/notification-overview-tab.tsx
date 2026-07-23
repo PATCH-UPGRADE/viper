@@ -1,13 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import {
-  ChevronDownIcon,
-  ExternalLinkIcon,
-  HeartIcon,
-  MailIcon,
-  Unlink,
-} from "lucide-react";
+import { ExternalLinkIcon, HeartIcon, MailIcon, Unlink } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { TlpBadge } from "@/components/tlp-badge";
@@ -15,10 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  CollapsibleCard,
+  CollapsibleCardContent,
+  CollapsibleCardTrigger,
+} from "@/components/ui/collapsible-card";
 import {
   Dialog,
   DialogContent,
@@ -241,45 +235,42 @@ export function NotificationOverviewTab({
     <>
       {/* Hospital Impact */}
       {hasImpact && impact && (
-        <Card>
-          <Collapsible defaultOpen>
-            <CollapsibleTrigger className="group flex w-full items-center gap-2 px-6 text-left">
-              <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=closed]:-rotate-90" />
-              <HeartIcon className="size-4" />
-              <span className="font-semibold">Hospital Impact</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="px-6 pt-4">
-              <div className="flex flex-col gap-4">
-                {impact.byline && (
-                  <p className="font-semibold leading-snug">{impact.byline}</p>
-                )}
-                {impact.impactStatement && (
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {impact.impactStatement}
+        <CollapsibleCard defaultOpen>
+          <CollapsibleCardTrigger>
+            <HeartIcon className="size-4" />
+            Hospital Impact
+          </CollapsibleCardTrigger>
+          <CollapsibleCardContent>
+            <div className="flex flex-col gap-4">
+              {impact.byline && (
+                <p className="font-semibold leading-snug">{impact.byline}</p>
+              )}
+              {impact.impactStatement && (
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {impact.impactStatement}
+                </p>
+              )}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Care Areas
                   </p>
-                )}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Care Areas
-                    </p>
-                    <p className="mt-1 text-sm font-medium">
-                      {impact.careAreas || "—"}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Likelihood
-                    </p>
-                    <p className="mt-1 text-sm font-medium">
-                      {impact.likelihood || "—"}
-                    </p>
-                  </div>
+                  <p className="mt-1 text-sm font-medium">
+                    {impact.careAreas || "—"}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Likelihood
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {impact.likelihood || "—"}
+                  </p>
                 </div>
               </div>
-            </CollapsibleContent>
-          </Collapsible>
-        </Card>
+            </div>
+          </CollapsibleCardContent>
+        </CollapsibleCard>
       )}
 
       {/* Summary */}

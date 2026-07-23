@@ -53,6 +53,7 @@ model User {
   ticketSeen             TicketSeen[]
   ticketActivities       TicketActivity[]
   notes                  Note[]
+  answeredQuestions Question[]
 
   @@unique([email])
   @@index([departmentId])
@@ -657,6 +658,7 @@ model Issue {
   issueRemediations  IssueRemediation[]
   workOrderTickets      WorkOrderTicket[]     @relation("WorkOrderTicketIssues")
   filters           EntityFilter[]
+  questions Question[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -693,6 +695,7 @@ model Note {
 
   targetModel ScopeTargetModel?
   instanceId  String? // weak reference — app validates this id exists in targetModel's table
+  answeredQuestion Question?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1269,6 +1272,7 @@ model Notification {
   matchFeedback   MatchFeedback[]
   mitigationPlans MitigationPlan[]
   workOrderTickets WorkOrderTicket[]
+  questions Question[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1468,7 +1472,7 @@ enum CorrectionTargetType {
 }
 
 model FieldCorrection {  
-  id  String @id @default(uuid())
+  id  String @id @default(cuid())
   targetType CorrectionTargetType
   targetId  String
   field   String
@@ -1485,4 +1489,43 @@ model FieldCorrection {
   @@index([userId])
   @@index([field, createdAt])
   @@map("field_correction")
+}
+
+// ─── Question ────────────────────────────────────────────────────────────
+
+enum QuestionStatus {
+  PENDING   // default, not answered by User
+  ANSWERED
+  DISMISSED
+  UNSURE
+}
+
+model Question {
+  id  String @id @default(cuid())
+  issueId String
+  issue  Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  notificationId String
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  title String
+  reasonWhy String @db.Text
+  suggestedAnswers String[] @default([])
+  
+  status QuestionStatus @default(PENDING)
+  answer String?  @db.Text
+  answeredByUserId  String?
+  answeredBy  User? @relation(fields: [answeredByUserId], references: [id], onDelete: SetNull)
+  answeredAt DateTime?
+
+  resultingNoteId String? @unique   // create note after user answer
+  resultingNote Note? @relation(fields: [resultingNoteId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([issueId])
+  @@index([notificationId])
+  @@index([status])
+  @@map("question")
 }

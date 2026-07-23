@@ -60,15 +60,17 @@ export function getFleetIntegrations(): Promise<Integration[]> {
 }
 
 /**
- * The integration that owns work-order mappings. Prefer the WorkOrder-typed row
- * (the one the inbound /activities sync dedups against) so a ticket we file
- * here is *updated* — not duplicated — when it comes back on the next poll.
+ * The integration that owns work-order mappings — the WorkOrder-typed row (the
+ * one the inbound /activities sync dedups against) so a ticket we file here is
+ * *updated*, not duplicated, when it comes back on the next poll. There is no
+ * fallback to another resourceType: attaching the mapping to, say, the Asset
+ * (equipment-sync) integration would break that dedup contract.
  */
 export async function getFleetWorkOrderIntegration(): Promise<Integration> {
   const integrations = await getFleetIntegrations();
-  const integration =
-    integrations.find((i) => i.resourceType === ResourceType.WorkOrder) ??
-    integrations[0];
+  const integration = integrations.find(
+    (i) => i.resourceType === ResourceType.WorkOrder,
+  );
 
   if (!integration) {
     throw new Error(

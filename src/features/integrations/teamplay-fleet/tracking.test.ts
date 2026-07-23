@@ -328,13 +328,16 @@ describe("getFleetWorkOrderIntegration", () => {
     expect(integration.id).toBe("int-wo");
   });
 
-  it("falls back to the first Fleet integration when none is WorkOrder-typed", async () => {
+  it("throws when a Fleet integration exists but none is WorkOrder-typed", async () => {
+    // A non-WorkOrder Fleet integration (e.g. the Asset/equipment sync) must not
+    // be used to file work orders — that would break the /activities dedup.
     mockPrisma.integration.findMany.mockResolvedValue([
       { id: "int-asset", resourceType: "Asset" },
     ]);
 
-    const integration = await getFleetWorkOrderIntegration();
-    expect(integration.id).toBe("int-asset");
+    await expect(getFleetWorkOrderIntegration()).rejects.toThrow(
+      /No Siemens Healthineers Fleet integration/,
+    );
   });
 
   it("throws when no Fleet integration is configured", async () => {

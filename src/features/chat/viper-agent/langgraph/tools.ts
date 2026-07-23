@@ -165,6 +165,12 @@ const proposeFleetWorkOrder = tool(
   }) => {
     try {
       const assets = await resolveFleetAssets(assetIds);
+      if (dangerForPatient === "yes") {
+        // Fleet won't accept a patient-safety issue online — it must be phoned
+        // in. Reject (not halt) so the model explains that to the user instead
+        // of leaving a work-order card that can't be accepted.
+        return `${TOOL_REJECTED_PREFIX} This is a patient-safety issue (dangerForPatient=yes). Siemens Healthineers requires these to be reported by phone, not filed as an online work order — tell the user to call Siemens rather than proposing a work order.`;
+      }
       const proposal: FleetWorkOrderProposal = {
         type: "fleet_work_order_proposal",
         assets: assets.map((a) => ({

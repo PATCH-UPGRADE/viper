@@ -1,12 +1,6 @@
 "use client";
 
 import { Accordion } from "@/components/ui/accordion";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { MitigationPlanItem } from "@/features/mitigation/components/mitigation-plan-item";
 import { useSuspenseMitigationPlans } from "@/features/mitigation/hooks/use-mitigation";
 import type { NotificationDetailWithRelations } from "../types";
@@ -87,32 +81,23 @@ export function NotificationRespondTab({
         <section className="flex flex-col gap-3">
           <h3 className={COLUMN_HEADING}>Choose a response plan</h3>
 
-          {plans.length === 0 ? (
-            <Empty className="border border-dashed">
-              <EmptyHeader>
-                <EmptyTitle>No response plans yet</EmptyTitle>
-                <EmptyDescription>
-                  No mitigation plans have been proposed for this notification.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <Accordion
-              type="single"
-              collapsible
-              defaultValue={acceptedPlan?.id ?? plans[0].id}
-              className="flex flex-col gap-4"
-            >
-              {plans.map((plan) => (
-                <MitigationPlanItem
-                  key={plan.id}
-                  plan={plan}
-                  notificationId={notification.id}
-                  hasAcceptedPlan={acceptedPlan !== undefined}
-                />
-              ))}
-            </Accordion>
-          )}
+          {/* The Respond tab is only rendered when plans exist, so `plans` is
+              always non-empty here. */}
+          <Accordion
+            type="single"
+            collapsible
+            defaultValue={acceptedPlan?.id ?? plans[0].id}
+            className="flex flex-col gap-4"
+          >
+            {plans.map((plan) => (
+              <MitigationPlanItem
+                key={plan.id}
+                plan={plan}
+                notificationId={notification.id}
+                hasAcceptedPlan={acceptedPlan !== undefined}
+              />
+            ))}
+          </Accordion>
         </section>
       </div>
     </>

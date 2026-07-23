@@ -82,13 +82,10 @@ export const ConnectorsLayout = ({
       <ConnectorsHeader title={headerText} />
 
       <Tabs value={activeTab} className="w-full flex flex-row! justify-between">
-        <TabsList variant="line">
+        <TabsList variant="line-primary">
           {tabs.map((tab) => (
             <TabsTrigger value={tab.value} key={tab.value} asChild>
-              <Link
-                href={tab.href}
-                className="font-semibold data-[state=active]:text-primary!  [&[data-state=active]]:after:bg-primary!"
-              >
+              <Link href={tab.href}>
                 {tab.icon}
                 {tab.name}
               </Link>

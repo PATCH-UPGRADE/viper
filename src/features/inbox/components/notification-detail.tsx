@@ -6,6 +6,7 @@ import { BadgeSelect } from "@/components/badge-select";
 import { CorrectionDialog } from "@/components/correction-dialog";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { PriorityBadge } from "@/components/priority-badge";
+import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { NotificationType, Priority } from "@/generated/prisma";
+import { useSuspenseMitigationPlans } from "@/features/mitigation/hooks/use-mitigation";
 import {
   useMarkNotificationRead,
   useSuspenseNotification,
@@ -80,6 +82,7 @@ export const NotificationDetailError = () => (
 
 export const NotificationDetailPage = ({ id }: { id: string }) => {
   const { data: notification } = useSuspenseNotification(id);
+  const { data: plans } = useSuspenseMitigationPlans(id);
   const markRead = useMarkNotificationRead();
   const updateNotification = useUpdateNotification();
   const [pendingType, setPendingType] = useState<NotificationType | null>(null);
@@ -114,6 +117,15 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
 
   const displayTitle =
     notification.title ?? notification.summary ?? notification.id;
+
+  const hasPlans = plans.length > 0;
+
+  // Assets in the "Needs Attention" (AFFECTED) triage bucket — surfaced as a
+  // badge on the Affected Assets tab.
+  const needAttentionCount = notification.affectedAssets.AFFECTED.reduce(
+    (sum, group) => sum + group.assetCount,
+    0,
+  );
 
   const firstReceived =
     notification.sources.length > 0
@@ -222,20 +234,34 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
       </p>
 
       {/* Tabs */}
-      <Tabs defaultValue="respond">
-        <TabsList variant="line">
-          <TabsTrigger value="respond">Respond</TabsTrigger>
-          <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="affected-assets">Affected Assets</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue={hasPlans ? "respond" : "details"}>
+        {/* Sticky, full-width bordered bar; the list stays w-fit so the tabs
+            hug the left instead of stretching across the row. */}
+        <div className="sticky top-0 z-20 -mx-8 border-b bg-muted px-8">
+          <TabsList variant="line-primary">
+            {hasPlans && <TabsTrigger value="respond">Respond</TabsTrigger>}
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="affected-assets">
+              Affected Assets
+              {needAttentionCount > 0 && (
+                <Badge variant="destructive">
+                  {needAttentionCount} need{needAttentionCount === 1 ? "s" : ""}{" "}
+                  attention
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="respond" className="flex flex-col gap-4 mt-4">
-          <Suspense
-            fallback={<LoadingView message="Loading response plans..." />}
-          >
-            <NotificationRespondTab notification={notification} />
-          </Suspense>
-        </TabsContent>
+        {hasPlans && (
+          <TabsContent value="respond" className="flex flex-col gap-4 mt-4">
+            <Suspense
+              fallback={<LoadingView message="Loading response plans..." />}
+            >
+              <NotificationRespondTab notification={notification} />
+            </Suspense>
+          </TabsContent>
+        )}
 
         <TabsContent value="details" className="flex flex-col gap-4 mt-4">
           <NotificationDetailsTab

@@ -74,15 +74,10 @@ export const SettingsLayout = ({ children }: { children: React.ReactNode }) => {
       >
         <h1 className={cn(headerClass, "text-2xl! font-bold")}>Settings</h1>
         <Tabs value={activeTab} className="w-full">
-          <TabsList variant="line" className="gap-4">
+          <TabsList variant="line-primary" className="gap-4">
             {tabs.map(([path, name]) => (
               <TabsTrigger value={path} key={path} asChild>
-                <Link
-                  href={`/settings/${path}`}
-                  className="data-[state=active]:text-primary!  [&[data-state=active]]:after:bg-primary! font-semibold"
-                >
-                  {name}
-                </Link>
+                <Link href={`/settings/${path}`}>{name}</Link>
               </TabsTrigger>
             ))}
           </TabsList>

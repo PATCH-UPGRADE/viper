@@ -414,8 +414,8 @@ export const processInboxEmail = inngest.createFunction(
         });
         return {
           priority: result.priority,
-          priorityReasonWhy: result.priorityReasonWhy
-        }
+          priorityReasonWhy: result.priorityReasonWhy,
+        };
       });
     }
 

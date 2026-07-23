@@ -10,19 +10,22 @@ import type { AffectedAssetsSummary, MatchingWithLabels } from "../types";
 // Since we have fewer issues than assets, fetch `Issue` rows, and fetch assets
 // later per (matching, bucket) via `getAffectedAssetsPage`
 
+// Buckets are keyed by the `IssueStatus` that lands a matching in them, so the
+// keys stay honest about what's being bucketed. `NO_ISSUES` is the one that
+// isn't a status: a notification-linked matching with no Issue rows at all.
 export const AFFECTED_BUCKETS = [
-  "needsAttention",
-  "needsInformation",
-  "lowConcern",
-  "unaffected",
+  "AFFECTED",
+  "UNDER_INVESTIGATION",
+  "NOT_AFFECTED",
+  "NO_ISSUES",
 ] as const;
 
 export type AffectedBucket = (typeof AFFECTED_BUCKETS)[number];
 
 const TRIAGE_BUCKETS = [
-  "needsAttention",
-  "needsInformation",
-  "lowConcern",
+  "AFFECTED",
+  "UNDER_INVESTIGATION",
+  "NOT_AFFECTED",
 ] as const;
 
 type TriageBucket = (typeof TRIAGE_BUCKETS)[number];
@@ -54,11 +57,11 @@ export type ComputeMatchingBucketsInput = {
 function triageBucketsFor(statuses: Iterable<IssueStatus>): Set<TriageBucket> {
   const set = new Set<IssueStatus>(statuses);
   const out = new Set<TriageBucket>();
-  if (set.has(IssueStatus.AFFECTED)) out.add("needsAttention");
-  if (set.has(IssueStatus.UNDER_INVESTIGATION)) out.add("needsInformation");
-  // Low concern only when NOT_AFFECTED and not also AFFECTED for another vuln.
+  if (set.has(IssueStatus.AFFECTED)) out.add("AFFECTED");
+  if (set.has(IssueStatus.UNDER_INVESTIGATION)) out.add("UNDER_INVESTIGATION");
+  // Not affected only when NOT_AFFECTED and not also AFFECTED for another vuln.
   if (set.has(IssueStatus.NOT_AFFECTED) && !set.has(IssueStatus.AFFECTED)) {
-    out.add("lowConcern");
+    out.add("NOT_AFFECTED");
   }
   return out;
 }
@@ -88,7 +91,7 @@ export function computeMatchingBuckets(
   if (!hasAnyIssue) {
     if (isNotificationLinked && totalAssetCount > 0) {
       return {
-        unaffected: {
+        NO_ISSUES: {
           count: totalAssetCount,
           filter: { kind: "allExcept", excludedAssetIds: [] },
         },
@@ -136,8 +139,8 @@ export function computeMatchingBuckets(
   }
 
   if (unknownVersionAssetCount > 0) {
-    const existing = result.needsInformation;
-    result.needsInformation = {
+    const existing = result.UNDER_INVESTIGATION;
+    result.UNDER_INVESTIGATION = {
       count: (existing?.count ?? 0) + unknownVersionAssetCount,
       filter: existing?.filter ?? { kind: "only", assetIds: [] },
     };
@@ -158,11 +161,11 @@ export type MatchingBucketGroup = {
 export function bucketForStatus(status: IssueStatus): TriageBucket | null {
   switch (status) {
     case IssueStatus.AFFECTED:
-      return "needsAttention";
+      return "AFFECTED";
     case IssueStatus.UNDER_INVESTIGATION:
-      return "needsInformation";
+      return "UNDER_INVESTIGATION";
     case IssueStatus.NOT_AFFECTED:
-      return "lowConcern";
+      return "NOT_AFFECTED";
     default:
       return null;
   }
@@ -176,10 +179,10 @@ export function buildAffectedAssetsSummary(
   groups: MatchingBucketGroup[],
 ): AffectedAssetsSummary {
   const summary: AffectedAssetsSummary = {
-    needsAttention: [],
-    needsInformation: [],
-    lowConcern: [],
-    unaffected: [],
+    AFFECTED: [],
+    UNDER_INVESTIGATION: [],
+    NOT_AFFECTED: [],
+    NO_ISSUES: [],
   };
   for (const group of groups) {
     for (const bucket of AFFECTED_BUCKETS) {

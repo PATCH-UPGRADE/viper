@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
-
 function CollapsibleCard({
   className,
   ...props

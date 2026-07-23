@@ -292,9 +292,9 @@ export function BucketAccordion({
   const totalAssets = groups.reduce((sum, g) => sum + g.assetCount, 0);
 
   return (
-    <Card className={cn("border-l-4 py-0 gap-0", accent)}>
-      <AccordionItem value={bucket} className="border-b-0 px-4">
-        <AccordionTrigger className="items-center">
+    <Card className={cn("border-l-4 py-0 gap-0 overflow-clip", accent)}>
+      <AccordionItem value={bucket} className="border-b-0">
+        <AccordionTrigger className="items-center px-4">
           <div className="flex w-full items-center justify-between gap-4">
             <div className="flex flex-col gap-0.5 text-left">
               <span className="font-semibold">{title}</span>
@@ -309,7 +309,7 @@ export function BucketAccordion({
           </div>
         </AccordionTrigger>
 
-        <AccordionContent className="pb-4">
+        <AccordionContent className="pb-0">
           <Accordion
             type="multiple"
             defaultValue={
@@ -319,7 +319,7 @@ export function BucketAccordion({
             }
             className="flex flex-col"
           >
-            {groups.map((group) => {
+            {groups.map((group, index) => {
               const matching = group.deviceGroupMatching;
               const notes = Object.entries(group.notesByVuln);
               return (
@@ -327,16 +327,15 @@ export function BucketAccordion({
                   key={`${notificationId}-${bucket}-${matching.id}`}
                   value={matching.id}
                 >
-                  <AccordionTrigger className="items-center">
+                  <AccordionTrigger className={cn("items-center px-4", index % 2 === 0 ? "bg-muted" : "")}>
                     <div className="flex w-full items-center justify-between gap-4">
                       <div className="flex min-w-0 flex-col gap-0.5 text-left">
                         <span className="font-semibold">
-                          {deviceGroupMatchingLabel(matching)}
+                          {displayName(matching.product)}
                         </span>
                         <span className="text-xs font-normal text-muted-foreground">
                           {[
                             displayName(matching.vendor),
-                            displayName(matching.product),
                             displayName(matching.version) ??
                               matching.versionRange,
                           ]
@@ -349,7 +348,7 @@ export function BucketAccordion({
                       </Badge>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent>
+                  <AccordionContent className="px-4">
                     {notes.length > 0 && (
                       <ul className="mb-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
                         {notes.map(([vulnId, note]) => (

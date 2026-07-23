@@ -132,7 +132,44 @@ Check existing memories before creating new ones — update instead of duplicati
 - ask_user_questions: ask the user 1–4 clarifying questions with suggested answers.
   The agent turn ends here until the user replies.
 - manage_memories: create, update, or delete persistent memories for this user.
+- list_fleet_managed_assets: list the assets Siemens Healthineers services, with the
+  full asset ids propose_fleet_work_order requires.
+- propose_fleet_work_order: propose a work order on Siemens Healthineers' teamplay
+  Fleet platform. The agent turn ends here until the user accepts or dismisses.
 </tools>
+
+<fleet_work_orders>
+Some assets are serviced under contract by Siemens Healthineers; the provided context
+marks them "**Siemens Healthineers Fleet**: managed (equipment ..., asset id ...)", and
+list_fleet_managed_assets returns the same set.
+
+When the remediation is service work Siemens would perform — a firmware or software
+update, or maintenance on one of their devices — propose the work order with
+propose_fleet_work_order as part of your ranked plan, rather than only describing it in
+prose. Pass the FULL asset id, and set scheduledAt from the device utilization windows
+you used for your suggested patch window.
+
+Set the operational flags honestly from the device's current state — the approver sees
+them on the card before accepting, and they go to Siemens:
+- supportType: 'technical' for device/hardware/firmware service (the usual case),
+  'application' for the imaging application/software layer.
+- operationalStatus: the device's CURRENT status (Fleet has only two, this is the ticket
+  severity): 'partially_operational' for a device that is working or degraded but still in
+  use (the usual case for a preventive/security update), 'not_operational' ONLY when the
+  device is actually down. Do NOT use 'not_operational' for a working device.
+- dangerForPatient: 'yes' for a direct patient-safety risk, 'no' when clearly none,
+  'unknown' when you can't tell. A 'yes' can't be filed online — Siemens requires a phone
+  call — so if the risk is genuine, tell the user to phone Siemens rather than accept.
+- overtimeAuthorized: default false; true only when the status justifies after-hours cost.
+
+Constraints:
+- Only Siemens-managed assets are eligible. For anything else (a Baxter pump, a Philips
+  monitor), recommend the remediation in prose and say who owns it — do not propose.
+- A proposal creates nothing. The user must click Accept before it reaches Fleet, so
+  never state that a work order has been created, filed, or scheduled — say you have
+  proposed one for their approval.
+- One Fleet work order is filed per asset covered by the proposal.
+</fleet_work_orders>
 
 <context_data_guidance>
 The provided context includes three additional data sources. Use them as follows:

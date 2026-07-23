@@ -2,6 +2,21 @@ import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
+  FLEET_OPERATIONAL_STATUSES,
+  FLEET_PATIENT_DANGERS,
+  FLEET_SUPPORT_TYPES,
+} from "@/features/integrations/teamplay-fleet/constants";
+import {
+  createFleetWorkOrder,
+  FLEET_SOURCE_LABEL,
+  type FleetContact,
+  type FleetManagedAsset,
+  type FleetWorkOrderResult,
+  getFleetWorkOrderIntegration,
+  resolveFleetAssets,
+  UnmanagedAssetsError,
+} from "@/features/integrations/teamplay-fleet/tracking";
+import {
   type Prisma,
   ResourceType,
   TicketCategory,
@@ -43,6 +58,37 @@ import {
   recordUpdateActivities,
   snapshotBeforeUpdate,
 } from "./activities";
+
+/**
+ * Siemens calls whoever approved the work order, so the contact is the accepting
+ * user. Their phone isn't in the user record; FLEET_CONTACT_PHONE is the
+ * hospital's callback number for VIPER-raised orders.
+ */
+function fleetContactFor(user: {
+  name?: string | null;
+  email?: string | null;
+}): FleetContact {
+  const [firstName, ...rest] = (user.name ?? "").trim().split(/\s+/);
+  return {
+    email: user.email ?? "",
+    firstName: firstName || "VIPER",
+    lastName: rest.join(" ") || "User",
+    phone: process.env.FLEET_CONTACT_PHONE ?? "",
+  };
+}
+
+// A lost create-race (or a retry) surfaces as a P2002 unique violation. Duck-typed
+// on `code` rather than `instanceof`: across Next.js module boundaries the thrown
+// error can be a different copy of PrismaClientKnownRequestError, so `instanceof`
+// is unreliable.
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
 
 const trackingInputSchema = paginationInputSchema.extend({
   tab: z.enum(TRACKING_TABS).default("suggested"),
@@ -810,6 +856,253 @@ export const trackingRouter = createTRPCRouter({
         });
         return comment;
       });
+    }),
+
+  // ─── Siemens Healthineers Fleet work orders (proposed in chat) ─────────────
+
+  /**
+   * Has this chat proposal already been accepted? Chat history rehydrates stored
+   * tool parts on reload, so without this the card would offer a live Accept
+   * button again for a work order that has already been filed.
+   */
+  getFleetProposalStatus: protectedProcedure
+    .input(z.object({ toolCallId: z.string() }))
+    .query(async ({ input }) => {
+      const ticket = await prisma.workOrderTicket.findUnique({
+        where: { chatToolCallId: input.toolCallId },
+        select: {
+          id: true,
+          externalMappings: { select: { externalId: true } },
+          children: {
+            select: { externalMappings: { select: { externalId: true } } },
+          },
+        },
+      });
+      if (!ticket) return null;
+
+      return {
+        ticketId: ticket.id,
+        externalIds: [
+          ...ticket.externalMappings.map((m) => m.externalId),
+          ...ticket.children.flatMap((c) =>
+            c.externalMappings.map((m) => m.externalId),
+          ),
+        ],
+      };
+    }),
+
+  /**
+   * Accept an agent's work-order proposal: file it on teamplay Fleet, then
+   * record it in VIPER. Fleet models activities per equipment, so a proposal
+   * covering N assets files N work orders; when N > 1 they become children of a
+   * parent ticket that carries the proposal's toolCallId.
+   */
+  createFleetWorkOrder: protectedProcedure
+    .input(
+      z.object({
+        /** The chat tool call this proposal came from — the idempotency key. */
+        toolCallId: z.string(),
+        assetIds: z.array(z.string()).min(1),
+        summary: z.string().min(1),
+        description: z.string().default(""),
+        category: z.enum(TicketCategory),
+        // Operational flags the approver saw on the card, forwarded to Fleet.
+        supportType: z.enum(FLEET_SUPPORT_TYPES).default("technical"),
+        operationalStatus: z
+          .enum(FLEET_OPERATIONAL_STATUSES)
+          .default("partially_operational"),
+        dangerForPatient: z.enum(FLEET_PATIENT_DANGERS).default("unknown"),
+        overtimeAuthorized: z.boolean().default(false),
+        scheduledAt: z.string().nullish(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.auth.user.id;
+      type Failure = { asset: string; message: string };
+
+      // Fleet won't accept an online ticket for a patient-safety issue — it
+      // requires a phone call — so never POST one. The card shows the same
+      // guidance; this is the server-side guard (client is untrusted).
+      if (input.dangerForPatient === "yes") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "A patient-safety issue can't be filed as an online work order — Siemens Healthineers requires you to report it by phone.",
+        });
+      }
+
+      // Read whatever's already persisted for this proposal into the response
+      // shape. Used by both the fast path and the lost-claim race path — the
+      // unique chatToolCallId is the idempotency key.
+      const readAccepted = async () => {
+        const t = await prisma.workOrderTicket.findUnique({
+          where: { chatToolCallId: input.toolCallId },
+          select: {
+            id: true,
+            externalMappings: { select: { externalId: true } },
+            children: {
+              select: { externalMappings: { select: { externalId: true } } },
+            },
+          },
+        });
+        if (!t) return null;
+        return {
+          ticketId: t.id,
+          externalIds: [
+            ...t.externalMappings.map((m) => m.externalId),
+            ...t.children.flatMap((c) =>
+              c.externalMappings.map((m) => m.externalId),
+            ),
+          ],
+          alreadyAccepted: true as const,
+          failures: [] as Failure[],
+        };
+      };
+
+      // Fast path: this proposal was already accepted (double-click / retry).
+      const already = await readAccepted();
+      if (already) return already;
+
+      // Re-check the Siemens-managed scope server-side. The tool already checked
+      // it, but the model and the client are both untrusted inputs here.
+      let assets: FleetManagedAsset[];
+      try {
+        assets = await resolveFleetAssets(input.assetIds);
+      } catch (error) {
+        if (error instanceof UnmanagedAssetsError) {
+          throw new TRPCError({ code: "FORBIDDEN", message: error.message });
+        }
+        throw error;
+      }
+
+      const scheduledAt = input.scheduledAt
+        ? new Date(input.scheduledAt)
+        : null;
+
+      // Claim the idempotency row BEFORE any Fleet call. The unique
+      // chatToolCallId means a concurrent request loses this create race (P2002)
+      // and returns the winner instead of filing a second set of Fleet orders.
+      // This root ticket is the single ticket (one asset) or the parent (many).
+      let root: { id: string };
+      try {
+        root = await prisma.workOrderTicket.create({
+          data: {
+            summary: input.summary,
+            body: input.description,
+            category: input.category,
+            status: TicketStatus.TO_DO,
+            scheduledAt,
+            sourceLabel: FLEET_SOURCE_LABEL,
+            chatToolCallId: input.toolCallId,
+            creator: { connect: { id: userId } },
+            assets: { connect: assets.map((a) => ({ id: a.assetId })) },
+          },
+          select: { id: true },
+        });
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          const winner = await readAccepted();
+          if (winner) return winner;
+        }
+        throw error;
+      }
+
+      const integration = await getFleetWorkOrderIntegration();
+      const contact = fleetContactFor(ctx.auth.user);
+
+      // Now that we hold the claim, file on Fleet. Failures are collected per
+      // asset rather than aborting: an order Fleet did accept must still be
+      // tracked here.
+      const filed: {
+        asset: FleetManagedAsset;
+        result: FleetWorkOrderResult;
+      }[] = [];
+      const failures: Failure[] = [];
+
+      for (const asset of assets) {
+        try {
+          const result = await createFleetWorkOrder(asset, {
+            summary: input.summary,
+            description: input.description,
+            category: input.category,
+            supportType: input.supportType,
+            operationalStatus: input.operationalStatus,
+            dangerForPatient: input.dangerForPatient,
+            overtimeAuthorized: input.overtimeAuthorized,
+            scheduledAt: input.scheduledAt ?? null,
+            contact,
+            // Our reference on the Fleet ticket, so an order can be traced back
+            // to the proposal it came from.
+            ownIncidentNumber: input.toolCallId,
+          });
+          filed.push({ asset, result });
+        } catch (error) {
+          failures.push({
+            asset: asset.hostname ?? asset.ip,
+            message: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+
+      // Nothing filed → drop the claim so a genuine retry can proceed, then fail.
+      if (filed.length === 0) {
+        await prisma.workOrderTicket.delete({ where: { id: root.id } });
+        throw new TRPCError({
+          code: "BAD_GATEWAY",
+          message: `Fleet did not accept the work order: ${failures.map((f) => f.message).join("; ")}`,
+        });
+      }
+
+      const isMulti = filed.length > 1;
+
+      // Attach the Fleet results. The external mapping (integrationId,
+      // externalId) is what makes the next inbound /activities poll UPDATE the
+      // ticket instead of duplicating it. Single asset: the root ticket carries
+      // the mapping. Many: the root is the parent and each filed asset becomes a
+      // child carrying its own order + mapping.
+      await prisma.$transaction(async (tx) => {
+        if (!isMulti) {
+          await tx.externalWorkOrderMapping.create({
+            data: {
+              itemId: root.id,
+              integrationId: integration.id,
+              externalId: filed[0].result.externalId,
+              lastSynced: new Date(),
+            },
+          });
+          return;
+        }
+
+        for (const { asset, result } of filed) {
+          await tx.workOrderTicket.create({
+            data: {
+              summary: `${input.summary} — ${asset.hostname ?? asset.ip}`,
+              body: input.description,
+              category: input.category,
+              status: TicketStatus.TO_DO,
+              scheduledAt,
+              sourceLabel: FLEET_SOURCE_LABEL,
+              creator: { connect: { id: userId } },
+              assets: { connect: { id: asset.assetId } },
+              parent: { connect: { id: root.id } },
+              externalMappings: {
+                create: {
+                  integrationId: integration.id,
+                  externalId: result.externalId,
+                  lastSynced: new Date(),
+                },
+              },
+            },
+          });
+        }
+      });
+
+      return {
+        ticketId: root.id,
+        externalIds: filed.map(({ result }) => result.externalId),
+        alreadyAccepted: false,
+        failures,
+      };
     }),
 
   processIntegrationCreate: baseProcedure

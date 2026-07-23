@@ -6,6 +6,18 @@ import {
 
 const REAUTH_TIMEOUT = 30_000;
 
+/**
+ * Normalize any HeadersInit (plain object, Headers instance, or [key, value][]
+ * tuples) into a plain record, so caller-supplied headers survive being merged
+ * with the session header. `new Headers` accepts all three forms; its entries
+ * lowercase the keys, which is fine since HTTP headers are case-insensitive.
+ */
+function normalizeHeaders(
+  headers: HeadersInit | undefined,
+): Record<string, string> {
+  return headers ? Object.fromEntries(new Headers(headers)) : {};
+}
+
 export class IntegrationSessionClient {
   readonly host: string;
   private readonly usernameEnvVar: string;
@@ -24,15 +36,23 @@ export class IntegrationSessionClient {
     this.loginConfig = loginConfig;
   }
 
-  async fetchWithSession(url: string): Promise<Response> {
+  async fetchWithSession(
+    url: string,
+    init: RequestInit = {},
+  ): Promise<Response> {
+    // Caller-supplied headers (e.g. Content-Type for a POST body) are preserved;
+    // the session header is layered on top.
+    const baseHeaders = normalizeHeaders(init.headers);
+
     const cached = await prisma.integrationSession.findUnique({
       where: { host: this.host },
     });
-    const headers: Record<string, string> = {};
 
-    if (cached) headers[cached.header] = cached.value;
+    const firstHeaders = { ...baseHeaders };
+    if (cached) firstHeaders[cached.header] = cached.value;
     const res = await fetch(url, {
-      headers,
+      ...init,
+      headers: firstHeaders,
       signal: AbortSignal.timeout(REAUTH_TIMEOUT),
     });
 
@@ -41,7 +61,8 @@ export class IntegrationSessionClient {
     const session = await this.reauth();
 
     return fetch(url, {
-      headers: { [session.header]: session.value },
+      ...init,
+      headers: { ...baseHeaders, [session.header]: session.value },
       signal: AbortSignal.timeout(REAUTH_TIMEOUT),
     });
   }

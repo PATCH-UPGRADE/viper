@@ -40,6 +40,52 @@ export const useUpdateTicket = (ticketId: string) => {
   );
 };
 
+/** Whether a chat work-order proposal has already been accepted (survives reload). */
+export const useFleetProposalStatus = (toolCallId: string) => {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.tracking.getFleetProposalStatus.queryOptions({ toolCallId }),
+  );
+};
+
+/** Accept a proposal: files the work order on teamplay Fleet and tracks it here. */
+export const useAcceptFleetWorkOrder = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.tracking.createFleetWorkOrder.mutationOptions({
+      onSuccess: (data, variables) => {
+        const count = data.externalIds.length;
+        if (data.alreadyAccepted) {
+          toast.info(
+            "This work order was already sent to Siemens Healthineers",
+          );
+        } else if (data.failures.length > 0) {
+          // Partial success: some orders exist on Fleet, some don't. Say which.
+          toast.warning(
+            `Sent ${count} work order(s) to Fleet; ${data.failures.length} failed: ${data.failures
+              .map((f) => `${f.asset} (${f.message})`)
+              .join("; ")}`,
+          );
+        } else {
+          toast.success(
+            `Sent ${count} work order(s) to Siemens Healthineers Fleet`,
+          );
+        }
+        queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.tracking.getFleetProposalStatus.queryFilter({
+            toolCallId: variables.toolCallId,
+          }),
+        );
+      },
+      onError: (error) => {
+        toast.error(`Could not open the Fleet work order: ${error.message}`);
+      },
+    }),
+  );
+};
+
 export const useAssignableUsers = () => {
   const trpc = useTRPC();
   return useQuery(trpc.user.listAssignable.queryOptions());

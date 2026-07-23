@@ -7,10 +7,15 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
   const prisma = {
     workOrderTicket: {
       count: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
+    },
+    externalWorkOrderMapping: {
+      create: vi.fn(),
     },
     user: {
       findUnique: vi.fn(),
@@ -60,6 +65,28 @@ vi.mock("@/lib/auth-utils", () => ({
   verifyApiKey: vi.fn(),
 }));
 
+// The Fleet client is exercised directly in teamplay-fleet/tracking.test.ts;
+// here we stub its network + lookup surface and keep the real
+// UnmanagedAssetsError so the router's rejection path is the one that runs.
+const { mockFleet } = vi.hoisted(() => ({
+  mockFleet: {
+    resolveFleetAssets: vi.fn(),
+    createFleetWorkOrder: vi.fn(),
+    getFleetWorkOrderIntegration: vi.fn(),
+  },
+}));
+
+vi.mock(
+  "@/features/integrations/teamplay-fleet/tracking",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("@/features/integrations/teamplay-fleet/tracking")
+    >()),
+    ...mockFleet,
+  }),
+);
+
+import { UnmanagedAssetsError } from "@/features/integrations/teamplay-fleet/tracking";
 import { createCallerFactory } from "@/trpc/init";
 import { trackingRouter } from "./routers";
 
@@ -83,6 +110,7 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   sourceLabel: null,
   body: null,
   suggestedAssignee: null,
+  chatToolCallId: null,
   priority: "Unsorted",
   priorityReasonWhy: null,
   isDraft: false,
@@ -1367,5 +1395,183 @@ describe("activity writes", () => {
         data: { assetId: "a1", assetLabel: "10.0.0.42" },
       },
     });
+  });
+});
+
+describe("trackingRouter.createFleetWorkOrder", () => {
+  const MRI = {
+    assetId: "rad-mri-001",
+    hostname: "MR-MAGNETOM-001",
+    ip: "10.40.1.60",
+    role: "MRI Scanner",
+    equipmentKey: "US_1064669350",
+  };
+
+  const INTEGRATION = { id: "int-fleet", authType: "None" };
+
+  const proposal = {
+    toolCallId: "call_abc",
+    assetIds: [MRI.assetId],
+    summary: "Firmware update: MR-MAGNETOM-001",
+    description: "Apply the Siemens firmware update.",
+    category: "FIRMWARE_UPDATE" as const,
+    scheduledAt: "2026-07-22T22:00:00-05:00",
+  };
+
+  beforeEach(() => {
+    // No prior acceptance of this proposal, unless a test says otherwise.
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(null);
+    mockPrisma.workOrderTicket.create.mockResolvedValue({ id: "t-new" });
+    mockFleet.getFleetWorkOrderIntegration.mockResolvedValue(INTEGRATION);
+    mockFleet.resolveFleetAssets.mockResolvedValue([MRI]);
+    mockFleet.createFleetWorkOrder.mockResolvedValue({
+      equipmentKey: MRI.equipmentKey,
+      assetId: MRI.assetId,
+      externalId: "US_400501937577",
+      raw: {},
+    });
+  });
+
+  it("claims the ticket, files on Fleet, then maps the ticket to it", async () => {
+    const caller = setup();
+
+    const result = await caller.createFleetWorkOrder(proposal);
+
+    expect(mockFleet.createFleetWorkOrder).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      ticketId: "t-new",
+      externalIds: ["US_400501937577"],
+      alreadyAccepted: false,
+      failures: [],
+    });
+
+    // The claim ticket is created BEFORE the Fleet call, keyed by the proposal's
+    // tool-call id so a concurrent accept can't file a second order.
+    const claim = mockPrisma.workOrderTicket.create.mock.calls[0][0].data;
+    expect(claim.chatToolCallId).toBe("call_abc");
+    expect(claim.sourceLabel).toBe("Siemens Healthineers Fleet");
+    expect(claim.assets).toEqual({ connect: [{ id: MRI.assetId }] });
+
+    // The mapping is attached after Fleet accepts — this is what makes the next
+    // inbound sync update this ticket rather than duplicate it.
+    expect(mockPrisma.externalWorkOrderMapping.create).toHaveBeenCalledWith({
+      data: {
+        itemId: "t-new",
+        integrationId: "int-fleet",
+        externalId: "US_400501937577",
+        lastSynced: expect.any(Date),
+      },
+    });
+  });
+
+  it("returns the winner without re-filing when the claim loses a race", async () => {
+    const caller = setup();
+    // Fast-path findUnique sees nothing, but the claim create loses the unique
+    // race to a concurrent accept (P2002); the second read finds the winner.
+    mockPrisma.workOrderTicket.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "t-winner",
+        externalMappings: [{ externalId: "US_400501937577" }],
+        children: [],
+      });
+    mockPrisma.workOrderTicket.create.mockRejectedValueOnce({ code: "P2002" });
+
+    const result = await caller.createFleetWorkOrder(proposal);
+
+    expect(result).toMatchObject({
+      ticketId: "t-winner",
+      externalIds: ["US_400501937577"],
+      alreadyAccepted: true,
+    });
+    // The race loser must not file its own Fleet order.
+    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
+  });
+
+  it("refuses to file a patient-safety issue online (Fleet requires a phone call)", async () => {
+    const caller = setup();
+
+    await expect(
+      caller.createFleetWorkOrder({ ...proposal, dangerForPatient: "yes" }),
+    ).rejects.toThrow(/phone/i);
+
+    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
+    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses an asset Siemens does not manage, before calling Fleet", async () => {
+    const caller = setup();
+    mockFleet.resolveFleetAssets.mockRejectedValue(
+      new UnmanagedAssetsError(["PUMP-SIGMA-001"]),
+    );
+
+    await expect(
+      caller.createFleetWorkOrder({ ...proposal, assetIds: ["rad-pump-001"] }),
+    ).rejects.toThrow(/PUMP-SIGMA-001/);
+
+    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
+    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
+  });
+
+  it("is idempotent — re-accepting the same proposal files nothing new", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t-existing",
+      externalMappings: [{ externalId: "US_400501937577" }],
+      children: [],
+    });
+
+    const result = await caller.createFleetWorkOrder(proposal);
+
+    expect(result).toMatchObject({
+      ticketId: "t-existing",
+      externalIds: ["US_400501937577"],
+      alreadyAccepted: true,
+    });
+    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
+    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
+  });
+
+  it("still tracks the orders Fleet accepted when one of them fails", async () => {
+    const caller = setup();
+    const CT = { ...MRI, assetId: "rad-ct-002", hostname: "CT-SOMATOM-001" };
+    mockFleet.resolveFleetAssets.mockResolvedValue([MRI, CT]);
+    mockFleet.createFleetWorkOrder
+      .mockResolvedValueOnce({
+        equipmentKey: MRI.equipmentKey,
+        assetId: MRI.assetId,
+        externalId: "US_400501937577",
+        raw: {},
+      })
+      .mockRejectedValueOnce(new Error("503 Service Unavailable"));
+
+    const result = await caller.createFleetWorkOrder({
+      ...proposal,
+      assetIds: [MRI.assetId, CT.assetId],
+    });
+
+    // One order exists upstream, so it must exist here too — and the caller is
+    // told which asset failed rather than the failure being swallowed.
+    expect(result.externalIds).toEqual(["US_400501937577"]);
+    expect(result.failures).toEqual([
+      { asset: "CT-SOMATOM-001", message: "503 Service Unavailable" },
+    ]);
+  });
+
+  it("fails loudly and drops the claim when Fleet accepts nothing", async () => {
+    const caller = setup();
+    mockFleet.createFleetWorkOrder.mockRejectedValue(
+      new Error("401 Forbidden"),
+    );
+
+    await expect(caller.createFleetWorkOrder(proposal)).rejects.toThrow(
+      /401 Forbidden/,
+    );
+    // The claim was made, but with no Fleet order it must be dropped so a
+    // genuine retry can proceed — no orphaned ticket, no mapping.
+    expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({
+      where: { id: "t-new" },
+    });
+    expect(mockPrisma.externalWorkOrderMapping.create).not.toHaveBeenCalled();
   });
 });

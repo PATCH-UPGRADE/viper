@@ -29,8 +29,7 @@ const RESPOND_BUCKETS = [
   "NOT_AFFECTED",
 ] as const satisfies readonly Bucket[];
 
-const COLUMN_HEADING =
-  "font-semibold uppercase tracking-wide text-sm";
+const COLUMN_HEADING = "font-semibold uppercase tracking-wide text-sm";
 
 export function NotificationRespondTab({
   notification,
@@ -51,37 +50,37 @@ export function NotificationRespondTab({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] pt-2">
         {/* What's affected */}
         <section>
-        <div className="flex flex-col gap-3 sticky top-0">
-          <h3 className={COLUMN_HEADING}>What&apos;s affected</h3>
+          <div className="flex flex-col gap-3 sticky top-0">
+            <h3 className={COLUMN_HEADING}>What&apos;s affected</h3>
 
-          {hasAnyGroup ? (
-            <Accordion
-              type="single"
-              collapsible
-              defaultValue={firstNonEmptyBucket(
-                affectedAssets,
-                RESPOND_BUCKETS,
-              )}
-              className="flex flex-col gap-3"
-            >
-              {RESPOND_BUCKETS.map((bucket) => (
-                <BucketAccordion
-                  key={bucket}
-                  bucket={bucket}
-                  notificationId={notification.id}
-                  groups={affectedAssets[bucket]}
-                  variant="compact"
-                />
-              ))}
-            </Accordion>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No triaged assets for this notification.
-            </p>
-          )}
+            {hasAnyGroup ? (
+              <Accordion
+                type="single"
+                collapsible
+                defaultValue={firstNonEmptyBucket(
+                  affectedAssets,
+                  RESPOND_BUCKETS,
+                )}
+                className="flex flex-col gap-3"
+              >
+                {RESPOND_BUCKETS.map((bucket) => (
+                  <BucketAccordion
+                    key={bucket}
+                    bucket={bucket}
+                    notificationId={notification.id}
+                    groups={affectedAssets[bucket]}
+                    variant="compact"
+                  />
+                ))}
+              </Accordion>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No triaged assets for this notification.
+              </p>
+            )}
 
-          <NotInInventoryCard deviceGroupsMatchings={deviceGroupsMatchings} />
-        </div>
+            <NotInInventoryCard deviceGroupsMatchings={deviceGroupsMatchings} />
+          </div>
         </section>
 
         {/* Choose a response plan */}

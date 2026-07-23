@@ -233,9 +233,7 @@ export function NotificationDetailsTab({
 
       {/* Affected Products */}
       <CollapsibleCard defaultOpen>
-        <CollapsibleCardTrigger>
-          Affected Products
-        </CollapsibleCardTrigger>
+        <CollapsibleCardTrigger>Affected Products</CollapsibleCardTrigger>
         <CollapsibleCardContent>
           <Table>
             <TableHeader>

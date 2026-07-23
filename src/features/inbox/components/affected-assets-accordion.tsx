@@ -293,7 +293,12 @@ export function BucketAccordion({
   const totalAssets = groups.reduce((sum, g) => sum + g.assetCount, 0);
 
   return (
-    <Card className={cn("border-l-4 py-0 gap-0 overflow-clip", `border-l-${accent}`)}>
+    <Card
+      className={cn(
+        "border-l-4 py-0 gap-0 overflow-clip",
+        `border-l-${accent}`,
+      )}
+    >
       <AccordionItem value={bucket} className="border-b-0">
         <AccordionTrigger className="items-center px-4">
           <div className="flex w-full items-center justify-between gap-4">
@@ -352,15 +357,20 @@ export function BucketAccordion({
                   <AccordionContent className="px-4">
                     {notes.length > 0 && (
                       <div className="flex gap-2 items-start my-2">
-                       <Bot
-            className="mt-0.5 size-4 shrink-0"
-            aria-label="CDST rationale"
-          />
-                      <ul className={cn("space-y-1 text-sm text-muted-foreground italic", notes.length > 1 ? "list-disc pl-5" : "")}>
-                        {notes.map(([vulnId, note]) => (
-                          <li key={vulnId}>{note}</li>
-                        ))}
-                      </ul>
+                        <Bot
+                          className="mt-0.5 size-4 shrink-0"
+                          aria-label="CDST rationale"
+                        />
+                        <ul
+                          className={cn(
+                            "space-y-1 text-sm text-muted-foreground italic",
+                            notes.length > 1 ? "list-disc pl-5" : "",
+                          )}
+                        >
+                          {notes.map(([vulnId, note]) => (
+                            <li key={vulnId}>{note}</li>
+                          ))}
+                        </ul>
                       </div>
                     )}
                     <MatchingAssetTable

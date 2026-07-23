@@ -65,12 +65,12 @@ export function MitigationPlanItem({
         )
       )}
 
-      <AccordionItem value={plan.id} className="border-b-0 px-6">
-        <AccordionTrigger className="items-center">
-          <div className="flex items-center gap-3">
+      <AccordionItem value={plan.id} className="border-b-0">
+        <AccordionTrigger className="items-center bg-muted px-6">
+          <div className="flex items-start gap-3">
             <Badge
               variant={isRecommended ? "default" : "secondary"}
-              className="size-6 justify-center rounded-md p-0 text-sm"
+              className="size-6 justify-center rounded-md mt-1 text-sm"
             >
               {plan.order + 1}
             </Badge>
@@ -85,7 +85,7 @@ export function MitigationPlanItem({
           </div>
         </AccordionTrigger>
 
-        <AccordionContent className="flex flex-col gap-4 pb-6">
+        <AccordionContent className="flex flex-col gap-4 pb-6 px-6 pt-4">
           {/* Tags */}
           {plan.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -107,7 +107,7 @@ export function MitigationPlanItem({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {planCardFields.map(([field, label]) => (
                 <div key={field} className="rounded-lg border p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {label}
                   </p>
                   <p className="mt-1 text-sm font-medium">
@@ -119,7 +119,7 @@ export function MitigationPlanItem({
           )}
 
           {/* Work orders */}
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
             {plan.isAccepted
               ? `This plan created ${workOrderCount} work item${workOrderCount === 1 ? "" : "s"}`
               : `Accepting this plan creates ${workOrderCount} work item${workOrderCount === 1 ? "" : "s"}`}

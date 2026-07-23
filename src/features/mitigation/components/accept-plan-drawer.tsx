@@ -110,19 +110,23 @@ export function AcceptPlanDrawer({
 
   const handleCreate = async () => {
     if (edits.some((e) => e.summary.trim().length === 0)) return;
-    await accept.mutateAsync({
-      planId: plan.id,
-      edits: edits.map((e) => ({
-        id: e.id,
-        summary: e.summary.trim(),
-        body: e.body.trim() ? e.body : null,
-        category: e.category,
-        priority: e.priority,
-        departmentIds: e.departmentIds,
-        assigneeId: e.assigneeId === UNASSIGNED ? null : e.assigneeId,
-      })),
-    });
-    onOpenChange(false);
+    try {
+      await accept.mutateAsync({
+        planId: plan.id,
+        edits: edits.map((e) => ({
+          id: e.id,
+          summary: e.summary.trim(),
+          body: e.body.trim() ? e.body : null,
+          category: e.category,
+          priority: e.priority,
+          departmentIds: e.departmentIds,
+          assigneeId: e.assigneeId === UNASSIGNED ? null : e.assigneeId,
+        })),
+      });
+      onOpenChange(false);
+    } catch {
+      // surfaced via the mutation's onError toast
+    }
   };
 
   return (

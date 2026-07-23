@@ -6,7 +6,7 @@
  *
  *   curl -N https://<deployment>.vercel.app/api/stream-test
  *
- * 
+ *
  * - Lines print one-per-300ms  -> Vercel IS streaming; the bug is in the chat
  *   route's own timing (something delays the first real token).
  * - Nothing prints for ~15s then all lines dump at once -> Vercel/runtime is

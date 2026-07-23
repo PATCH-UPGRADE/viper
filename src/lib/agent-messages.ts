@@ -14,12 +14,12 @@ export type PdfAttachment = {
  * which ride along as Anthropic `document` blocks so the model reads them
  * beside the text rather than in a separate call.
  */
+// https://github.com/anthropics/skills/blob/main/skills/claude-api/SKILL.md#document--file-input-quick-reference
 export function buildUserMessage(
   text: string,
   pdfAttachments: PdfAttachment[] = [],
 ): HumanMessage {
   const content = [
-    { type: "text" as const, text },
     ...pdfAttachments.map((pdf) => ({
       type: "document",
       source: {
@@ -29,6 +29,7 @@ export function buildUserMessage(
       },
       title: pdf.filename ?? "attachment.pdf",
     })),
+    { type: "text" as const, text },
   ];
 
   // biome-ignore lint/suspicious/noExplicitAny: LangChain's content type doesn't model Anthropic document blocks

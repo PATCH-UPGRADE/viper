@@ -47,6 +47,7 @@ export type ComputeMatchingBucketsInput = {
   totalAssetCount: number;
   /** Whether the matching is linked to the notification via NotificationDeviceGroupMapping. */
   isNotificationLinked: boolean;
+  unknownVersionAssetCount?: number;
 };
 
 /** The triage buckets a set of effective statuses places an asset into. */
@@ -75,9 +76,12 @@ export function computeMatchingBuckets(
     overrides,
     totalAssetCount,
     isNotificationLinked,
+    unknownVersionAssetCount = 0,
   } = input;
   const defaultStatuses = Object.values(matchingStatusByVuln);
   const hasAnyIssue = defaultStatuses.length > 0 || overrides.length > 0;
+
+  let result: Partial<Record<AffectedBucket, MatchingBucketResult>>;
 
   // No issues at all: a notification-linked matching renders as a plain card;
   // an issue-referenced-only matching with no issues here contributes nothing.
@@ -91,46 +95,54 @@ export function computeMatchingBuckets(
       };
     }
     return {};
-  }
+  } else {
+    const defaultBuckets = triageBucketsFor(defaultStatuses);
 
-  const defaultBuckets = triageBucketsFor(defaultStatuses);
-
-  // Each override asset's effective status set = override merged over the
-  // matching defaults, so a partial override still inherits the other vulns.
-  const overrideBuckets = overrides.map((o) => ({
-    assetId: o.assetId,
-    buckets: triageBucketsFor(
-      Object.values({ ...matchingStatusByVuln, ...o.statusByVuln }),
-    ),
-  }));
-
-  const result: Partial<Record<AffectedBucket, MatchingBucketResult>> = {};
-  for (const bucket of TRIAGE_BUCKETS) {
-    if (defaultBuckets.has(bucket)) {
-      // Every non-override asset is in this bucket; drop overrides that aren't.
-      const excludedAssetIds = overrideBuckets
-        .filter((o) => !o.buckets.has(bucket))
-        .map((o) => o.assetId);
-      const count = totalAssetCount - excludedAssetIds.length;
-      if (count > 0) {
-        result[bucket] = {
-          count,
-          filter: { kind: "allExcept", excludedAssetIds },
-        };
-      }
-    } else {
-      // Only override assets that individually land in this bucket.
-      const assetIds = overrideBuckets
-        .filter((o) => o.buckets.has(bucket))
-        .map((o) => o.assetId);
-      if (assetIds.length > 0) {
-        result[bucket] = {
-          count: assetIds.length,
-          filter: { kind: "only", assetIds },
-        };
+    // Each override asset's effective status set = override merged over the
+    // matching defaults, so a partial override still inherits the other vulns.
+    const overrideBuckets = overrides.map((o) => ({
+      assetId: o.assetId,
+      buckets: triageBucketsFor(
+        Object.values({ ...matchingStatusByVuln, ...o.statusByVuln }),
+      ),
+    }));
+    result = {};
+    for (const bucket of TRIAGE_BUCKETS) {
+      if (defaultBuckets.has(bucket)) {
+        // Every non-override asset is in this bucket; drop overrides that aren't.
+        const excludedAssetIds = overrideBuckets
+          .filter((o) => !o.buckets.has(bucket))
+          .map((o) => o.assetId);
+        const count = totalAssetCount - excludedAssetIds.length;
+        if (count > 0) {
+          result[bucket] = {
+            count,
+            filter: { kind: "allExcept", excludedAssetIds },
+          };
+        }
+      } else {
+        // Only override assets that individually land in this bucket.
+        const assetIds = overrideBuckets
+          .filter((o) => o.buckets.has(bucket))
+          .map((o) => o.assetId);
+        if (assetIds.length > 0) {
+          result[bucket] = {
+            count: assetIds.length,
+            filter: { kind: "only", assetIds },
+          };
+        }
       }
     }
   }
+
+  if (unknownVersionAssetCount > 0) {
+    const existing = result.needsInformation;
+    result.needsInformation = {
+      count: (existing?.count ?? 0) + unknownVersionAssetCount,
+      filter: existing?.filter ?? { kind: "only", assetIds: [] },
+    };
+  }
+
   return result;
 }
 

@@ -33,6 +33,9 @@ Run mprocs:
 mprocs
 ```
 
+Alternatively, use docker: `docker compose -f compose.dev.yml up`
+* Note: I had to increase my Docker Desktop memory limit to get ts to compile
+
 ## Database Seeding
 
 The project includes a seed script to populate the database with sample data for development and testing.

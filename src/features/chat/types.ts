@@ -36,7 +36,8 @@ export const fleetWorkOrderProposalSchema = z.object({
   description: z.string(),
   category: z.enum(TicketCategory),
   // Model-set operational flags, surfaced on the approval card. Defaulted so a
-  // proposal persisted before these existed still renders as a card.
+  // proposal that omits one still parses and renders as a card, rather than
+  // falling back to the raw-JSON accordion.
   supportType: z.enum(FLEET_SUPPORT_TYPES).default("technical"),
   operationalStatus: z
     .enum(FLEET_OPERATIONAL_STATUSES)

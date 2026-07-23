@@ -10,8 +10,8 @@
  * proposed service window is carried as a "System available date (CLT)" line
  * inside `longText`, exactly as the form does it.
  *
- * Auth is delegated to the shared session client (FLEET, config.ts) that Perry
- * built for the advisory sync — cookie session with Playwright re-auth on 401/403.
+ * Auth is delegated to the shared session client (FLEET, config.ts) also used by
+ * the advisory sync — cookie session with Playwright re-auth on 401/403.
  *
  * Deployment config:
  * - FLEET_WORK_ORDER_URL — the create endpoint (the integration URI points at

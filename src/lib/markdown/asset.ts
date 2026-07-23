@@ -1,6 +1,6 @@
 import { assetUtilizationSchema } from "@/features/assets/types";
 import { deviceGroupCpeList, deviceGroupLabel } from "./device-group";
-import { type CanonicalRef, shortId } from "./shared";
+import type { CanonicalRef } from "./shared";
 
 // ─── Utilization rendering ────────────────────────────────────────────────────
 
@@ -124,7 +124,7 @@ export function assetToMarkdown(
 ): string {
   const label = a.hostname ?? a.ip ?? a.id;
   const lines = [
-    `### ${label} (${shortId(a.id)})`,
+    `### ${label} (${a.id})`,
     `- **IP**: ${a.ip ?? "N/A"}`,
     `- **MAC Address**: ${a.macAddress ?? "N/A"}`,
     `- **Role**: ${a.role ?? "Unknown"}`,

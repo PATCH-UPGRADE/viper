@@ -1093,6 +1093,10 @@ model WorkOrderTicket {
 
   suggestedAssignee String?
 
+  // Unique so a double-click / retry of the same proposal can't file a
+  // second work order on the external platform.
+  chatToolCallId String? @unique
+
   departments Department[] @relation("WorkOrderTicketDepartments")
 
   parentId  String?

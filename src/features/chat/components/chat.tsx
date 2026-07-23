@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Fullscreen,
   Loader2,
   MessageSquarePlus,
@@ -62,9 +63,18 @@ import {
   useViperChat,
   type ViperChat,
 } from "@/features/chat/hooks/use-viper-chat";
-import type { UseChatAgentConfig } from "@/features/chat/types";
+import {
+  type FleetWorkOrderProposal,
+  parseFleetProposal,
+  type UseChatAgentConfig,
+} from "@/features/chat/types";
 import { USER_ROLES, type UserRole } from "@/features/chat/utils";
+import {
+  useAcceptFleetWorkOrder,
+  useFleetProposalStatus,
+} from "@/features/tracking/hooks/use-tracking";
 import { authClient } from "@/lib/auth-client";
+import { MONTHS_SHORT } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 
 interface AIChatProps {
@@ -390,6 +400,193 @@ function AskUserQuestionsMessage({
   );
 }
 
+/**
+ * Format a proposed service window from the wall-clock parts of its ISO string,
+ * with no timezone conversion. `Date#toLocaleString()` with no arguments uses
+ * the runtime's locale and timezone, which differ between the server render and
+ * the browser and produce a hydration mismatch; parsing the parts directly
+ * yields identical text on both, and preserves the local time the user approved.
+ */
+function formatScheduledWindow(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return iso;
+  const [, year, month, day, hour, minute] = m;
+  const monthName = MONTHS_SHORT[Number(month) - 1] ?? month;
+  return `${monthName} ${Number(day)}, ${year}, ${hour}:${minute}`;
+}
+
+/**
+ * Approval card for a Siemens Healthineers Fleet work order the agent proposed.
+ * Nothing has been created upstream at this point — Accept is what files it.
+ * Rendered from the tool's OUTPUT (not its input) so a card can only appear for
+ * a proposal that passed the Siemens-managed check server-side.
+ */
+function FleetWorkOrderProposalCard({
+  proposal,
+  toolCallId,
+}: {
+  proposal: FleetWorkOrderProposal;
+  toolCallId: string;
+}) {
+  const { data: status, isLoading } = useFleetProposalStatus(toolCallId);
+  const accept = useAcceptFleetWorkOrder();
+  const [dismissed, setDismissed] = useState(false);
+
+  const accepted = Boolean(status);
+  const scheduledLabel = proposal.scheduledAt
+    ? formatScheduledWindow(proposal.scheduledAt)
+    : "Not specified";
+
+  return (
+    <div className="mt-2 space-y-3 rounded-lg border bg-background p-3">
+      <div className="flex items-start gap-2">
+        <ClipboardCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <div className="space-y-0.5">
+          <p className="text-sm font-medium">{proposal.summary}</p>
+          <p className="text-xs text-muted-foreground">
+            Proposed work order · Siemens Healthineers teamplay Fleet
+          </p>
+        </div>
+      </div>
+
+      <dl className="space-y-1 text-xs">
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">Assets</dt>
+          <dd>
+            {proposal.assets
+              .map((a) => `${a.hostname ?? a.assetId} (${a.equipmentKey})`)
+              .join(", ")}
+          </dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">Category</dt>
+          <dd>{proposal.category.replace(/_/g, " ").toLowerCase()}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">Support</dt>
+          <dd className="capitalize">{proposal.supportType} support</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">System</dt>
+          <dd
+            className={
+              proposal.operationalStatus === "not_operational"
+                ? "font-medium text-destructive"
+                : ""
+            }
+          >
+            {proposal.operationalStatus === "not_operational"
+              ? "Not operational"
+              : "Partially operational"}
+          </dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">Patient risk</dt>
+          <dd
+            className={
+              proposal.dangerForPatient === "yes"
+                ? "font-medium text-destructive"
+                : ""
+            }
+          >
+            {proposal.dangerForPatient === "yes"
+              ? "Yes — patient-safety risk"
+              : proposal.dangerForPatient === "unknown"
+                ? "Unknown"
+                : "No"}
+          </dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">Overtime</dt>
+          <dd>
+            {proposal.overtimeAuthorized ? "Authorized" : "Not authorized"}
+          </dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="w-24 shrink-0 text-muted-foreground">Window</dt>
+          <dd>{scheduledLabel}</dd>
+        </div>
+      </dl>
+
+      <p className="text-xs whitespace-pre-wrap">{proposal.description}</p>
+      {proposal.rationale && (
+        <div className="flex items-start gap-1.5 text-xs italic text-muted-foreground">
+          <Bot
+            className="mt-0.5 size-3.5 shrink-0"
+            aria-label="CDST rationale"
+          />
+          <p>{proposal.rationale}</p>
+        </div>
+      )}
+
+      {proposal.dangerForPatient === "yes" && !accepted ? (
+        // Fleet requires patient-safety issues to be phoned in, not filed
+        // online — so there's no Accept here (see the mutation's matching guard).
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs">
+          <p className="font-medium text-destructive">
+            Patient-safety risk — call Siemens
+          </p>
+          <p className="text-muted-foreground">
+            teamplay Fleet doesn't accept online tickets for patient-safety
+            issues. Contact Siemens Healthineers by phone to report this — it
+            can't be filed from here.
+          </p>
+        </div>
+      ) : accepted ? (
+        <p className="text-xs font-medium text-muted-foreground">
+          Accepted · Fleet {status?.externalIds.join(", ")}
+        </p>
+      ) : dismissed ? (
+        <p className="text-xs text-muted-foreground">
+          Dismissed — no work order was created.
+        </p>
+      ) : (
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            disabled={accept.isPending || isLoading}
+            onClick={() =>
+              accept.mutate({
+                toolCallId,
+                assetIds: proposal.assets.map((a) => a.assetId),
+                summary: proposal.summary,
+                description: proposal.description,
+                category: proposal.category,
+                supportType: proposal.supportType,
+                operationalStatus: proposal.operationalStatus,
+                dangerForPatient: proposal.dangerForPatient,
+                overtimeAuthorized: proposal.overtimeAuthorized,
+                scheduledAt: proposal.scheduledAt,
+              })
+            }
+          >
+            {accept.isPending ? (
+              <>
+                <Loader2 className="size-3 animate-spin" /> Sending…
+              </>
+            ) : (
+              "Accept"
+            )}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={accept.isPending}
+            onClick={() => setDismissed(true)}
+          >
+            Dismiss
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {proposal.assets.length > 1
+              ? `Files ${proposal.assets.length} work orders on Fleet`
+              : "Files a work order on Fleet"}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AnswerSummary({
   answers,
 }: {
@@ -490,6 +687,20 @@ function ChatMessage({
                   onAnswer={onAnswer}
                 />
               );
+            }
+            if (toolName(part) === "propose_fleet_work_order") {
+              // Only a validated proposal parses; a refusal (or a still-streaming
+              // call) falls through to the accordion, which shows the reason.
+              const proposal = parseFleetProposal(part.output);
+              if (proposal) {
+                return (
+                  <FleetWorkOrderProposalCard
+                    key={part.toolCallId}
+                    proposal={proposal}
+                    toolCallId={part.toolCallId}
+                  />
+                );
+              }
             }
             return <ToolCallAccordion key={part.toolCallId} part={part} />;
           }

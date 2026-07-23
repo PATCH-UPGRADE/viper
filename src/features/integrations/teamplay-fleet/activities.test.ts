@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TicketCategory, TicketStatus } from "@/generated/prisma";
-import { deriveOffsetFromUrl, mapFleetActivities } from "./fleet-mapper";
+import { deriveOffsetFromUrl, mapFleetActivities } from "./activities";
 
 // Representative records from a real Fleet /activities response.
 const SAMPLE = [

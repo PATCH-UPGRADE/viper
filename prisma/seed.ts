@@ -2,8 +2,11 @@ import { hashPassword } from "better-auth/crypto";
 import {
   type ArtifactType,
   type AssetStatus,
+  AuthType,
+  IntegrationType,
   NotificationChannel,
   Priority,
+  ResourceType,
   Severity,
   TicketCategory,
   TicketStatus,
@@ -116,7 +119,33 @@ const SAMPLE_DEVICE_GROUPS = [
     modelName: "Sigma Spectrum",
     version: "N/A",
   },
+  // ── Siemens Healthineers imaging —
+  {
+    cpe: "cpe:2.3:h:siemens:magnetom_sola:-:*:*:*:*:*:*:*",
+    manufacturer: "Siemens Healthineers",
+    modelName: "MAGNETOM Sola",
+    version: "N/A",
+  },
+  {
+    cpe: "cpe:2.3:h:siemens:somatom_go.top:-:*:*:*:*:*:*:*",
+    manufacturer: "Siemens Healthineers",
+    modelName: "SOMATOM go.Top",
+    version: "N/A",
+  },
 ];
+
+// Used to simulate imaging device utilization throughout the week
+// Mainly for work order scheduling
+const IMAGING_UTILIZATION = Array.from({ length: 7 }, (_, day) => {
+  const weekend = day >= 5;
+  const hours: Record<string, number> = {};
+  for (let hour = 0; hour < 24; hour++) {
+    if (hour >= 7 && hour <= 17) hours[String(hour)] = weekend ? 25 : 85;
+    else if (hour === 6 || hour === 18) hours[String(hour)] = weekend ? 5 : 40;
+    else hours[String(hour)] = 0;
+  }
+  return hours;
+});
 
 // Individual hospital assets
 const SAMPLE_ASSETS = [
@@ -497,6 +526,49 @@ const SAMPLE_ASSETS = [
     },
     status: "Active",
   })),
+  // ── Siemens Healthineers imaging (IMAGING-VLAN-40) ──────────────────────────
+  {
+    id: "rad-mri-001",
+    ip: "10.40.1.60",
+    cpe: "cpe:2.3:h:siemens:magnetom_sola:-:*:*:*:*:*:*:*",
+    role: "MRI Scanner",
+    upstreamApi: "https://www.siemens-healthineers.com/support",
+    networkSegment: "IMAGING-VLAN-40",
+    hostname: "MR-MAGNETOM-001",
+    macAddress: "00:1A:2B:3C:50:60",
+    serialNumber: "SH-MAG-2021-001",
+    location: {
+      building: "Imaging Department",
+      room: "MRI Suite",
+    },
+    status: "Active",
+    utilization: IMAGING_UTILIZATION,
+  },
+  {
+    id: "rad-ct-002",
+    ip: "10.40.1.61",
+    cpe: "cpe:2.3:h:siemens:somatom_go.top:-:*:*:*:*:*:*:*",
+    role: "CT Scanner",
+    upstreamApi: "https://www.siemens-healthineers.com/support",
+    networkSegment: "IMAGING-VLAN-40",
+    hostname: "CT-SOMATOM-001",
+    macAddress: "00:1A:2B:3C:50:61",
+    serialNumber: "SH-SOM-2022-001",
+    location: {
+      building: "Imaging Department",
+      room: "CT Suite 2",
+    },
+    status: "Active",
+    utilization: IMAGING_UTILIZATION,
+  },
+];
+
+// teamplay Fleet equipment ↔ VIPER asset, keyed by serial number — exactly what
+// the Fleet /equipment sync (syncFleetEquipmentMappings) produces at runtime.
+// equipmentKey format mirrors real Fleet records (e.g. "US_1064669350").
+const SEED_FLEET_EQUIPMENT = [
+  { serialNumber: "SH-MAG-2021-001", equipmentKey: "US_1064669350" },
+  { serialNumber: "SH-SOM-2022-001", equipmentKey: "US_1012141299" },
 ];
 
 // Vulnerabilities — cpes is an array to support multi-device-group linking
@@ -1305,6 +1377,87 @@ async function seedAssets(userId: string) {
   return successfulAssets;
 }
 
+/**
+ * The Siemens Healthineers teamplay Fleet integration, plus the equipment
+ * mappings that mark assets as Siemens-serviced.
+ *
+ * An ExternalAssetMapping to this integration is the ONLY thing that makes an
+ * asset eligible for a Fleet work order (see fleet-client.ts). In production the
+ * mappings come from the Fleet /equipment sync; here we seed the same rows so
+ * the flow is demoable without Fleet credentials.
+ */
+async function seedFleetIntegration(userId: string) {
+  console.log("\n🌱 Seeding Siemens Healthineers Fleet integration...");
+
+  const existing = await prisma.integration.findFirst({
+    where: { integrationUri: { contains: "fleet.siemens-healthineers.com" } },
+  });
+
+  // Integrations own a service user — the creator of the tickets they ingest.
+  const integrationUser =
+    (await prisma.user.findFirst({
+      where: { email: "fleet-integration@viper.local" },
+    })) ??
+    (await prisma.user.create({
+      data: {
+        id: crypto.randomUUID(),
+        email: "fleet-integration@viper.local",
+        name: "teamplay Fleet Integration",
+        emailVerified: true,
+      },
+    }));
+
+  const integration =
+    existing ??
+    (await prisma.integration.create({
+      data: {
+        name: "Siemens Healthineers teamplay Fleet",
+        platform: "teamplay Fleet",
+        integrationUri:
+          "https://fleet.siemens-healthineers.com/rest/v1/activities?tz=-05:00",
+        integrationType: IntegrationType.REST,
+        authType: AuthType.None,
+        resourceType: ResourceType.WorkOrder,
+        syncEvery: 3600,
+        userId,
+        integrationUserId: integrationUser.id,
+      },
+    }));
+
+  let linked = 0;
+  for (const equipment of SEED_FLEET_EQUIPMENT) {
+    const asset = await prisma.asset.findFirst({
+      where: { serialNumber: equipment.serialNumber },
+    });
+    if (!asset) {
+      console.warn(
+        `⚠️  No asset with serial ${equipment.serialNumber} — skipping Fleet mapping`,
+      );
+      continue;
+    }
+
+    await prisma.externalAssetMapping.upsert({
+      where: {
+        external_asset_mappings_item_integration_key: {
+          itemId: asset.id,
+          integrationId: integration.id,
+        },
+      },
+      create: {
+        itemId: asset.id,
+        integrationId: integration.id,
+        externalId: equipment.equipmentKey,
+        lastSynced: new Date(),
+      },
+      update: { externalId: equipment.equipmentKey, lastSynced: new Date() },
+    });
+    linked++;
+  }
+
+  console.log(`✅ Seeded Fleet integration with ${linked} managed asset(s)`);
+  return integration;
+}
+
 // Find-or-create a shared DeviceGroupMatching for a device-group identity.
 async function matchingForGroup(dg: GroupIdentity): Promise<string | null> {
   if (!dg.vendorId) return null;
@@ -2026,6 +2179,7 @@ async function main() {
     await seedCategoryColors();
     await seedDeviceGroups();
     await seedAssets(user.id);
+    await seedFleetIntegration(user.id);
     await seedVulnerabilities(user.id);
     await seedDeviceArtifacts(user.id);
     await seedRemediations(user.id);

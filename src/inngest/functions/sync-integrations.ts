@@ -3,12 +3,12 @@ import { z } from "zod";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
 import { integrationAssetInputSchema } from "@/features/assets/types";
 import { integrationDeviceArtifactInputSchema } from "@/features/device-artifacts/types";
-import type { IntegrationWithStringDates } from "@/features/integrations/types";
-import { integrationRemediationInputSchema } from "@/features/remediations/types";
 import {
   deriveOffsetFromUrl,
   mapFleetActivities,
-} from "@/features/tracking/server/fleet-mapper";
+} from "@/features/integrations/teamplay-fleet/activities";
+import type { IntegrationWithStringDates } from "@/features/integrations/types";
+import { integrationRemediationInputSchema } from "@/features/remediations/types";
 import { integrationWorkOrderInputSchema } from "@/features/tracking/types";
 import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/types";
 import {

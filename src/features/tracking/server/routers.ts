@@ -15,7 +15,7 @@ import {
   getFleetWorkOrderIntegration,
   resolveFleetAssets,
   UnmanagedAssetsError,
-} from "@/features/integrations/teamplay-fleet/work-orders";
+} from "@/features/integrations/teamplay-fleet/tracking";
 import {
   type Prisma,
   ResourceType,

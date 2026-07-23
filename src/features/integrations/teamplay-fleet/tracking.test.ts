@@ -35,7 +35,7 @@ import {
   resolveFleetAssets,
   toFleetCreatePayload,
   UnmanagedAssetsError,
-} from "./work-orders";
+} from "./tracking";
 
 const FLEET_INTEGRATION = {
   id: "int-fleet",

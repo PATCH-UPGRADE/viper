@@ -18,7 +18,7 @@ import {
   listFleetManagedAssets,
   resolveFleetAssets,
   UnmanagedAssetsError,
-} from "@/features/integrations/teamplay-fleet/work-orders";
+} from "@/features/integrations/teamplay-fleet/tracking";
 import { TicketCategory } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import { TOOL_REJECTED_PREFIX } from "./build-graph";

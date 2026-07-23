@@ -65,7 +65,7 @@ vi.mock("@/lib/auth-utils", () => ({
   verifyApiKey: vi.fn(),
 }));
 
-// The Fleet client is exercised directly in teamplay-fleet/work-orders.test.ts;
+// The Fleet client is exercised directly in teamplay-fleet/tracking.test.ts;
 // here we stub its network + lookup surface and keep the real
 // UnmanagedAssetsError so the router's rejection path is the one that runs.
 const { mockFleet } = vi.hoisted(() => ({
@@ -77,16 +77,16 @@ const { mockFleet } = vi.hoisted(() => ({
 }));
 
 vi.mock(
-  "@/features/integrations/teamplay-fleet/work-orders",
+  "@/features/integrations/teamplay-fleet/tracking",
   async (importOriginal) => ({
     ...(await importOriginal<
-      typeof import("@/features/integrations/teamplay-fleet/work-orders")
+      typeof import("@/features/integrations/teamplay-fleet/tracking")
     >()),
     ...mockFleet,
   }),
 );
 
-import { UnmanagedAssetsError } from "@/features/integrations/teamplay-fleet/work-orders";
+import { UnmanagedAssetsError } from "@/features/integrations/teamplay-fleet/tracking";
 import { createCallerFactory } from "@/trpc/init";
 import { trackingRouter } from "./routers";
 

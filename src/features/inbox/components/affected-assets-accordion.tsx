@@ -46,10 +46,7 @@ const PAGE_SIZE = 10;
 
 export type Bucket = keyof AffectedAssetsSummary;
 
-/**
- * Buckets are keyed by the `IssueStatus` that lands a matching in them; the
- * visible titles are deliberately independent of those keys.
- */
+// Key buckets by IssueStatu  s
 export const BUCKET_META: Record<
   Bucket,
   { title: string; description: string; accent: string }
@@ -280,11 +277,6 @@ export function BucketAccordion({
   notificationId: string;
   groups: AffectedAssetGroupSummary[];
   variant?: AssetTableVariant;
-  /**
-   * Open every device group by default. The narrow Respond column keeps them
-   * collapsed (the bucket header is the summary); the full-width tab opens
-   * them so the asset tables are visible straight away.
-   */
   expandGroups?: boolean;
 }) {
   if (groups.length === 0) return null;

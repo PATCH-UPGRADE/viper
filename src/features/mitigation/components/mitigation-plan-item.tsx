@@ -54,10 +54,11 @@ export function MitigationPlanItem({
       {plan.isAccepted ? (
         <div className="flex items-center gap-2 border-b bg-primary/10 px-6 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
           <CheckIcon className="size-3.5" />
-          Accepted
+          <span>Accepted</span>
+          <span>&bull;</span>
           <Link
             href="/tracking"
-            className="ml-auto flex items-center gap-1 normal-case hover:underline"
+            className="flex items-center gap-1 normal-case hover:underline"
           >
             View work orders
             <ExternalLinkIcon className="size-3.5" />

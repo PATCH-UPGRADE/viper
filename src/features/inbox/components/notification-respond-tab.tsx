@@ -15,8 +15,6 @@ import {
   NotificationSummaryCard,
 } from "./notification-impact-cards";
 
-// NO_ISSUES (never-triaged matchings) is noise while deciding a response —
-// it stays on the Affected Assets tab.
 const RESPOND_BUCKETS = [
   "AFFECTED",
   "UNDER_INVESTIGATION",
@@ -32,6 +30,7 @@ export function NotificationRespondTab({
 }) {
   const { data: plans } = useSuspenseMitigationPlans(notification.id);
   const acceptedPlan = plans.find((p) => p.isAccepted);
+  // assert plans is nonempty, this tab only renders if so
 
   const { affectedAssets, deviceGroupsMatchings } = notification;
   const hasAnyGroup = RESPOND_BUCKETS.some((b) => affectedAssets[b].length > 0);
@@ -81,8 +80,6 @@ export function NotificationRespondTab({
         <section className="flex flex-col gap-3">
           <h3 className={COLUMN_HEADING}>Choose a response plan</h3>
 
-          {/* The Respond tab is only rendered when plans exist, so `plans` is
-              always non-empty here. */}
           <Accordion
             type="single"
             collapsible

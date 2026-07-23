@@ -120,8 +120,6 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
 
   const hasPlans = plans.length > 0;
 
-  // Assets in the "Needs Attention" (AFFECTED) triage bucket — surfaced as a
-  // badge on the Affected Assets tab.
   const needAttentionCount = notification.affectedAssets.AFFECTED.reduce(
     (sum, group) => sum + group.assetCount,
     0,
@@ -235,8 +233,6 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
 
       {/* Tabs */}
       <Tabs defaultValue={hasPlans ? "respond" : "details"}>
-        {/* Sticky, full-width bordered bar; the list stays w-fit so the tabs
-            hug the left instead of stretching across the row. */}
         <div className="sticky top-0 z-20 -mx-8 border-b bg-muted px-8">
           <TabsList variant="line-primary">
             {hasPlans && <TabsTrigger value="respond">Respond</TabsTrigger>}

@@ -1,3 +1,5 @@
+// Shared cards for notification detail tabs
+
 "use client";
 
 import { HeartIcon } from "lucide-react";
@@ -10,11 +12,6 @@ import {
   hospitalImpactSchema,
   type NotificationDetailWithRelations,
 } from "../types";
-
-/**
- * Hospital impact + summary render on both the Respond and Details tabs, so
- * they live here rather than inside either tab.
- */
 
 export function HospitalImpactCard({
   notification,

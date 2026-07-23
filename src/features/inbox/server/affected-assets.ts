@@ -10,9 +10,6 @@ import type { AffectedAssetsSummary, MatchingWithLabels } from "../types";
 // Since we have fewer issues than assets, fetch `Issue` rows, and fetch assets
 // later per (matching, bucket) via `getAffectedAssetsPage`
 
-// Buckets are keyed by the `IssueStatus` that lands a matching in them, so the
-// keys stay honest about what's being bucketed. `NO_ISSUES` is the one that
-// isn't a status: a notification-linked matching with no Issue rows at all.
 export const AFFECTED_BUCKETS = [
   "AFFECTED",
   "UNDER_INVESTIGATION",

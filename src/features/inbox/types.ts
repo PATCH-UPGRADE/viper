@@ -102,11 +102,7 @@ export type AffectedAssetGroupSummary = {
   notesByVuln: Record<string, string>;
 };
 
-/**
- * Device group matchings grouped by triage status. Keyed by the `IssueStatus`
- * that puts a matching in the bucket; `NO_ISSUES` is the exception — those are
- * notification-linked matchings with no Issue rows at all.
- */
+/** Device group matchings grouped by triage status for the affected-assets tab. */
 export type AffectedAssetsSummary = {
   AFFECTED: AffectedAssetGroupSummary[];
   UNDER_INVESTIGATION: AffectedAssetGroupSummary[];

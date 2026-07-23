@@ -10,9 +10,9 @@ import { extractEntities } from "@/features/inbox/agent/extract";
 import { extractWorkOrder } from "@/features/inbox/agent/extract-work-order";
 import { matchAndLinkEntities } from "@/features/inbox/agent/match";
 import { persistMitigationPlans } from "@/features/inbox/agent/mitigation/persist";
+import { generateQuestionForNotification } from "@/features/inbox/agent/question";
 import { triageNotification } from "@/features/inbox/agent/triage";
 import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
-import { generateQuestionForNotification } from "@/features/inbox/agent/question";
 import {
   fetchPdfAttachmentsFromResend,
   isPdf,

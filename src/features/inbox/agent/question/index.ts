@@ -2,8 +2,8 @@ import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import {
   gatherQuestionContext,
-  SYSTEM_PROMPT,
   type QuestionContext,
+  SYSTEM_PROMPT,
 } from "./context";
 import {
   applyQuestionWrites,

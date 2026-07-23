@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { QuestionContext } from "../context";
 import { planQuestionWrites } from "../process_output";
 import type { QuestionResult } from "../schema";
-import prisma from "@/lib/db";
-import { generateQuestionForNotification } from "..";
 
 const context: QuestionContext = {
   notificationId: "notif_1",

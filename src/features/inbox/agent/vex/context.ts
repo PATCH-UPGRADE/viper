@@ -345,6 +345,8 @@ function renderVexPrompt(args: {
 
 // ─── System prompt ───────────────────────────────────────────────────────────
 
+export const VEX_TOOL_NAME = "update_and_create_issues";
+
 export const SYSTEM_PROMPT = `You are an issue triage analyst for a hospital cybersecurity platform. A security notification references one or more vulnerabilities, and the platform has already opened one baseline Issue per (vulnerability × affected device group). Your job is to sort each issue into the correct exploitability status using ONLY the evidence provided.
 
 Statuses:
@@ -361,4 +363,4 @@ Rules:
 - If only one asset is an exception (e.g. one asset is not network-reachable) and the rest of the group is still affected, OMIT the group-level "status" so the device-group issue is left unchanged, and put the exception in "assets". Set the group "status" only when your determination applies to the whole group.
 - Ground every decision in the provided sources, vulnerability descriptions, remediations, and notes. Never invent facts or numbers.
 - Set confidence to Matched only with strong evidence; otherwise NeedsReview.
-- Call the record_vex_determinations tool exactly once with your determinations. Omit issues you are not changing.`;
+- Call the ${VEX_TOOL_NAME} tool exactly once with your determinations. Omit issues you are not changing; pass {} if nothing changes. You must always call it — never answer in prose.`;

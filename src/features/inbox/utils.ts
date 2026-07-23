@@ -1,9 +1,10 @@
 import "server-only";
+import type { PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { normalizeName } from "@/lib/router-utils";
 import { downloadBufferFromS3, keyFromDownloadUrl } from "@/lib/s3";
 
-const isPdf = (a: {
+export const isPdf = (a: {
   filename?: string | null;
   contentType?: string | null;
 }): boolean =>
@@ -13,9 +14,29 @@ const isPdf = (a: {
   );
 
 /**
+ * Ceiling on the total base64 length of an email's PDFs for them to be carried
+ * through Inngest step state instead of re-fetched from S3. The encoded string
+ * is what rides in the step output, which Inngest caps at 4MiB (4,194,304) —
+ * the remainder is headroom for the rest of the step's JSON.
+ */
+export const INLINE_ATTACHMENT_BUDGET = 4_000_000;
+
+/** A PDF carried through step state, keyed back to its Resend attachment. */
+export type InlinePdfAttachment = PdfAttachment & { id: string };
+
+export function pdfsFitInlineBudget(pdfs: PdfAttachment[]): boolean {
+  const total = pdfs.reduce((sum, pdf) => sum + pdf.base64.length, 0);
+  return total <= INLINE_ATTACHMENT_BUDGET;
+}
+
+/**
  * Fetch an inbound email's PDF attachments straight from Resend, as base64
  * `document` blocks. Used by the triage gate, which runs before we upload to
  * S3 or write a NotificationSource and so cannot use `fetchPdfAttachments`
+ *
+ * `complete` is false when any PDF failed to download. Callers must not pass a
+ * partial set downstream — the missing PDF would be silently absent, where the
+ * S3 fallback might still have retrieved it.
  */
 export async function fetchPdfAttachmentsFromResend(
   emailId: string,
@@ -24,11 +45,11 @@ export async function fetchPdfAttachmentsFromResend(
     filename?: string | null;
     content_type?: string | null;
   }>,
-): Promise<Array<{ filename: string | null; base64: string }>> {
+): Promise<{ pdfs: InlinePdfAttachment[]; complete: boolean }> {
   const pdfs = attachments.filter((a) =>
     isPdf({ filename: a.filename, contentType: a.content_type }),
   );
-  if (pdfs.length === 0) return [];
+  if (pdfs.length === 0) return { pdfs: [], complete: true };
 
   const { Resend } = await import("resend");
   const resend = new Resend(process.env.RESEND_API_KEY);
@@ -47,6 +68,7 @@ export async function fetchPdfAttachmentsFromResend(
 
         const buffer = Buffer.from(await res.arrayBuffer());
         return {
+          id: a.id,
           filename: a.filename ?? null,
           base64: buffer.toString("base64"),
         };
@@ -57,7 +79,8 @@ export async function fetchPdfAttachmentsFromResend(
     }),
   );
 
-  return results.filter((a) => a !== null);
+  const downloaded = results.filter((a) => a !== null);
+  return { pdfs: downloaded, complete: downloaded.length === pdfs.length };
 }
 
 /**
@@ -92,6 +115,29 @@ export async function fetchPdfAttachments(
   );
 
   return results.filter((a) => a !== null);
+}
+
+export function keepValidIds(
+  ids: string[],
+  valid: ReadonlySet<string>,
+): string[] {
+  return [...new Set(ids)].filter((id) => valid.has(id));
+}
+
+/** Ids of the given set that exist in the table, as a Set for membership tests. */
+export async function existingIds<T extends { id: string }>(
+  findMany: (args: {
+    where: { id: { in: string[] } };
+    select: { id: true };
+  }) => Promise<T[]>,
+  ids: string[],
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await findMany({
+    where: { id: { in: [...new Set(ids)] } },
+    select: { id: true },
+  });
+  return new Set(rows.map((r) => r.id));
 }
 
 // Similiar to resolveDeviceGroup except it doesn't create. From

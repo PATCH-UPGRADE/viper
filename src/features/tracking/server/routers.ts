@@ -240,7 +240,12 @@ export const trackingRouter = createTRPCRouter({
       }
 
       const where: Prisma.WorkOrderTicketWhereInput = {
-        AND: [{ parentId: null }, parentTabWhere, createSearchFilter(search)],
+        AND: [
+          { parentId: null },
+          { isDraft: false },
+          parentTabWhere,
+          createSearchFilter(search),
+        ],
       };
 
       const totalCount = await prisma.workOrderTicket.count({ where });
@@ -256,7 +261,7 @@ export const trackingRouter = createTRPCRouter({
           ...rowState,
           children: {
             include: { ...ticketBaseInclude, ...rowState },
-            where: childTabWhere,
+            where: { isDraft: false, ...childTabWhere },
             orderBy: { createdAt: "asc" },
           },
         },
@@ -360,6 +365,7 @@ export const trackingRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const { search, departmentIds, assigneeIds } = input;
       const filters: Prisma.WorkOrderTicketWhereInput[] = [
+        { isDraft: false },
         createSearchFilter(search),
       ];
 
@@ -620,6 +626,7 @@ export const trackingRouter = createTRPCRouter({
         where: {
           id: { not: input.parentId },
           children: { none: {} },
+          isDraft: false,
         },
         select: {
           id: true,

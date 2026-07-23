@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   IssueStatus,
   NotificationChannel,
+  Priority,
   type Prisma,
   Severity,
   TicketActivityType,
@@ -423,6 +424,11 @@ export const workOrderDetailResponseSchema = z.object({
   suggestedAssignee: z.string().nullable(),
   // Set when the ticket came from accepting an agent's Fleet work-order proposal.
   chatToolCallId: z.string().nullable(),
+  priority: z.enum(Priority),
+  priorityReasonWhy: z.string().nullable(),
+  isDraft: z.boolean(),
+  mitigationPlanId: z.string().nullable(),
+  notificationId: z.string().nullable(),
   departments: z.array(departmentItemSchema),
   descriptions: z.array(ticketDescriptionSchema),
   assignee: assigneeItemSchema.nullable(),

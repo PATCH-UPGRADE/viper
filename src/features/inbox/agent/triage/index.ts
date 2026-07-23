@@ -1,7 +1,7 @@
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { z } from "zod";
-import { buildUserMessage } from "@/lib/agent-messages";
+import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { hospitalImpactSchema } from "../../types";
 import { fetchPdfAttachments } from "../../utils";
@@ -62,6 +62,7 @@ ${input.contextMarkdown}`;
 export async function triageNotification(
   sourceId: string,
   notificationId: string,
+  inlinedPdfs?: PdfAttachment[],
 ): Promise<TriageResult> {
   const [source, notification, pdfAttachments, context] = await Promise.all([
     prisma.notificationSource.findUnique({
@@ -72,7 +73,7 @@ export async function triageNotification(
       where: { id: notificationId },
       select: { type: true, title: true, summary: true },
     }),
-    fetchPdfAttachments(sourceId),
+    inlinedPdfs ?? fetchPdfAttachments(sourceId),
     gatherTriageContext(notificationId),
   ]);
 

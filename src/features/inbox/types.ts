@@ -104,10 +104,10 @@ export type AffectedAssetGroupSummary = {
 
 /** Device group matchings grouped by triage status for the affected-assets tab. */
 export type AffectedAssetsSummary = {
-  needsAttention: AffectedAssetGroupSummary[];
-  needsInformation: AffectedAssetGroupSummary[];
-  lowConcern: AffectedAssetGroupSummary[];
-  unaffected: AffectedAssetGroupSummary[];
+  AFFECTED: AffectedAssetGroupSummary[];
+  UNDER_INVESTIGATION: AffectedAssetGroupSummary[];
+  NOT_AFFECTED: AffectedAssetGroupSummary[];
+  NO_ISSUES: AffectedAssetGroupSummary[];
 };
 
 export type NotificationDetailWithRelations = Omit<

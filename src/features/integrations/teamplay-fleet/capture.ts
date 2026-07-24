@@ -1,6 +1,3 @@
-import sparticuzChromium from "@sparticuz/chromium";
-import { chromium } from "playwright-core";
-
 export interface SessionLoginConfig {
   welcomeUrl: string;
   cookieBannerAcceptSelector?: string; // there is a cookie setting overlay on the very first login
@@ -20,8 +17,11 @@ export interface CapturedSession {
 }
 
 async function launchBrowser() {
-  // production use. Tt is a known issue that playwright-core doesn't work with vercel in deployed environment.
+  const { chromium } = await import("playwright-core");
+
+  // production use. It is a known issue that playwright-core doesn't work with vercel in deployed environment.
   if (process.env.VERCEL) {
+    const { default: sparticuzChromium } = await import("@sparticuz/chromium");
     return chromium.launch({
       executablePath: await sparticuzChromium.executablePath(),
       args: sparticuzChromium.args,

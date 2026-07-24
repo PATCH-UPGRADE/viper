@@ -1,11 +1,12 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { useEffect, useState } from "react";
+import { type ReactNode, Suspense, useEffect, useState } from "react";
 import { BadgeSelect } from "@/components/badge-select";
 import { CorrectionDialog } from "@/components/correction-dialog";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { PriorityBadge } from "@/components/priority-badge";
+import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -20,6 +21,8 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSuspenseMitigationPlans } from "@/features/mitigation/hooks/use-mitigation";
+import { CategoryColorProvider } from "@/features/tag-colors/context";
 import type { NotificationType, Priority } from "@/generated/prisma";
 import {
   useMarkNotificationRead,
@@ -28,7 +31,8 @@ import {
 } from "../hooks/use-notifications";
 import type { NotificationDetailSource } from "../types";
 import { NotificationAffectedAssetsTab } from "./notification-affected-assets-tab";
-import { NotificationOverviewTab } from "./notification-overview-tab";
+import { NotificationDetailsTab } from "./notification-details-tab";
+import { NotificationRespondTab } from "./notification-respond-tab";
 import { NotificationTypeBadge } from "./notification-type-badge";
 
 const NOTIFICATION_TYPE_OPTIONS: NotificationType[] = [
@@ -79,6 +83,7 @@ export const NotificationDetailError = () => (
 
 export const NotificationDetailPage = ({ id }: { id: string }) => {
   const { data: notification } = useSuspenseNotification(id);
+  const { data: plans } = useSuspenseMitigationPlans(id);
   const markRead = useMarkNotificationRead();
   const updateNotification = useUpdateNotification();
   const [pendingType, setPendingType] = useState<NotificationType | null>(null);
@@ -114,6 +119,13 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
   const displayTitle =
     notification.title ?? notification.summary ?? notification.id;
 
+  const hasPlans = plans.length > 0;
+
+  const needAttentionCount = notification.affectedAssets.AFFECTED.reduce(
+    (sum, group) => sum + group.assetCount,
+    0,
+  );
+
   const firstReceived =
     notification.sources.length > 0
       ? new Date(
@@ -125,8 +137,59 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
         )
       : notification.createdAt;
 
+  type TabDef = { value: string; trigger: ReactNode; content: ReactNode };
+
+  const tabs = (
+    [
+      hasPlans && {
+        value: "respond",
+        trigger: "Respond",
+        content: (
+          <Suspense
+            fallback={<LoadingView message="Loading response plans..." />}
+          >
+            <CategoryColorProvider>
+              <NotificationRespondTab notification={notification} />
+            </CategoryColorProvider>
+          </Suspense>
+        ),
+      },
+      {
+        value: "details",
+        trigger: "Details",
+        content: (
+          <NotificationDetailsTab
+            notification={notification}
+            firstReceived={firstReceived}
+          />
+        ),
+      },
+      {
+        value: "affected-assets",
+        trigger: (
+          <>
+            Affected Assets
+            {needAttentionCount > 0 && (
+              <Badge variant="destructive">
+                {needAttentionCount} need{needAttentionCount === 1 ? "s" : ""}{" "}
+                attention
+              </Badge>
+            )}
+          </>
+        ),
+        content: (
+          <NotificationAffectedAssetsTab
+            notificationId={notification.id}
+            affectedAssets={notification.affectedAssets}
+            deviceGroupsMatchings={notification.deviceGroupsMatchings}
+          />
+        ),
+      },
+    ] as (TabDef | false)[]
+  ).filter((t): t is TabDef => Boolean(t));
+
   return (
-    <div className="flex flex-col gap-6 p-8 w-full max-w-5xl">
+    <div className="flex flex-col gap-6 p-8 w-full max-w-7xl">
       {/* Breadcrumb */}
       <Breadcrumb>
         <BreadcrumbList>
@@ -221,29 +284,26 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
       </p>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview">
-        <TabsList variant="line">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="affected-assets">Affected Assets</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue={hasPlans ? "respond" : "details"}>
+        <div className="sticky top-0 z-20 -mx-8 border-b bg-muted px-8">
+          <TabsList variant="line-primary">
+            {tabs.map((t) => (
+              <TabsTrigger key={t.value} value={t.value}>
+                {t.trigger}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
-        <TabsContent value="overview" className="flex flex-col gap-4 mt-4">
-          <NotificationOverviewTab
-            notification={notification}
-            firstReceived={firstReceived}
-          />
-        </TabsContent>
-
-        <TabsContent
-          value="affected-assets"
-          className="flex flex-col gap-4 mt-4"
-        >
-          <NotificationAffectedAssetsTab
-            notificationId={notification.id}
-            affectedAssets={notification.affectedAssets}
-            deviceGroupsMatchings={notification.deviceGroupsMatchings}
-          />
-        </TabsContent>
+        {tabs.map((t) => (
+          <TabsContent
+            key={t.value}
+            value={t.value}
+            className="flex flex-col gap-4 mt-4"
+          >
+            {t.content}
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
   );

@@ -1,13 +1,13 @@
 "use client";
 
 import { format } from "date-fns";
-import { ExternalLinkIcon, HeartIcon, MailIcon, Unlink } from "lucide-react";
+import { ExternalLinkIcon, MailIcon, Unlink } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { TlpBadge } from "@/components/tlp-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   CollapsibleCard,
   CollapsibleCardContent,
@@ -33,12 +33,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
 import { displayName } from "@/lib/markdown/device-group";
 import { useMarkMatchIncorrect } from "../hooks/use-notifications";
-import {
-  hospitalImpactSchema,
-  type NotificationDetailSource,
-  type NotificationDetailWithRelations,
-  type RawEmailPayload,
+import type {
+  NotificationDetailSource,
+  NotificationDetailWithRelations,
+  RawEmailPayload,
 } from "../types";
+import {
+  HospitalImpactCard,
+  NotificationSummaryCard,
+} from "./notification-impact-cards";
 
 type DeviceGroupMapping =
   NotificationDetailWithRelations["deviceGroupsMatchings"][number];
@@ -144,24 +147,16 @@ function SourceReference({ source }: { source: NotificationDetailSource }) {
 }
 
 // ---------------------------------------------------------------------------
-// Overview tab
+// Details tab
 // ---------------------------------------------------------------------------
 
-export function NotificationOverviewTab({
+export function NotificationDetailsTab({
   notification,
   firstReceived,
 }: {
   notification: NotificationDetailWithRelations;
   firstReceived: Date;
 }) {
-  // {} is truthy — treat an empty/invalid object as "not triaged yet".
-  const impactParse = hospitalImpactSchema.safeParse(
-    notification.hospitalImpact,
-  );
-  const impact = impactParse.success ? impactParse.data : null;
-  const hasImpact =
-    impact !== null &&
-    (impact.byline.trim() !== "" || impact.impactStatement.trim() !== "");
   const [rejecting, setRejecting] = useState<DeviceGroupMapping | null>(null);
   const [comment, setComment] = useState("");
   const markMatchIncorrect = useMarkMatchIncorrect();
@@ -233,68 +228,13 @@ export function NotificationOverviewTab({
 
   return (
     <>
-      {/* Hospital Impact */}
-      {hasImpact && impact && (
-        <CollapsibleCard defaultOpen>
-          <CollapsibleCardTrigger>
-            <HeartIcon className="size-4" />
-            Hospital Impact
-          </CollapsibleCardTrigger>
-          <CollapsibleCardContent>
-            <div className="flex flex-col gap-4">
-              {impact.byline && (
-                <p className="font-semibold leading-snug">{impact.byline}</p>
-              )}
-              {impact.impactStatement && (
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {impact.impactStatement}
-                </p>
-              )}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Care Areas
-                  </p>
-                  <p className="mt-1 text-sm font-medium">
-                    {impact.careAreas || "—"}
-                  </p>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Likelihood
-                  </p>
-                  <p className="mt-1 text-sm font-medium">
-                    {impact.likelihood || "—"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CollapsibleCardContent>
-        </CollapsibleCard>
-      )}
-
-      {/* Summary */}
-      {notification.summary && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-relaxed">{notification.summary}</p>
-          </CardContent>
-        </Card>
-      )}
+      <HospitalImpactCard notification={notification} />
+      <NotificationSummaryCard notification={notification} />
 
       {/* Affected Products */}
-      <Card>
-        <CardHeader className="flex justify-between items-center">
-          <CardTitle>Affected Products</CardTitle>
-          <span className="text-muted-foreground text-sm">
-            {withAssets.length} of {notification.deviceGroupsMatchings.length}{" "}
-            listed
-          </span>
-        </CardHeader>
-        <CardContent>
+      <CollapsibleCard defaultOpen>
+        <CollapsibleCardTrigger>Affected Products</CollapsibleCardTrigger>
+        <CollapsibleCardContent>
           <Table>
             <TableHeader>
               <TableRow>
@@ -345,15 +285,13 @@ export function NotificationOverviewTab({
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </CollapsibleCardContent>
+      </CollapsibleCard>
 
       {/* Details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Details</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <CollapsibleCard defaultOpen>
+        <CollapsibleCardTrigger>Details</CollapsibleCardTrigger>
+        <CollapsibleCardContent>
           <table className="w-full text-sm">
             <tbody>
               {detailRows.map((row) => (
@@ -368,8 +306,8 @@ export function NotificationOverviewTab({
               ))}
             </tbody>
           </table>
-        </CardContent>
-      </Card>
+        </CollapsibleCardContent>
+      </CollapsibleCard>
 
       <Dialog
         open={!!rejecting}

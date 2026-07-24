@@ -26,8 +26,8 @@ import {
   notificationInclude,
   type ResolvedDeviceGroupAsset,
 } from "../types";
-import type { AffectedBucket } from "./affected-assets";
 import {
+  AFFECTED_BUCKETS,
   bucketForStatus,
   buildAffectedAssetsSummary,
   computeMatchingBuckets,
@@ -421,17 +421,11 @@ export const notificationsRouter = createTRPCRouter({
       paginationInputSchema.extend({
         notificationId: z.string(),
         matchingId: z.string(),
-        bucket: z.enum([
-          "needsAttention",
-          "needsInformation",
-          "lowConcern",
-          "unaffected",
-        ]),
+        bucket: z.enum(AFFECTED_BUCKETS),
       }),
     )
     .query(async ({ input }) => {
-      const { notificationId, matchingId } = input;
-      const bucket = input.bucket as AffectedBucket;
+      const { notificationId, matchingId, bucket } = input;
 
       const notification = await prisma.notification.findUnique({
         where: { id: notificationId },
@@ -515,7 +509,7 @@ export const notificationsRouter = createTRPCRouter({
             : undefined;
 
       const where =
-        bucket === "needsInformation" && unknownIds.length > 0
+        bucket === "UNDER_INVESTIGATION" && unknownIds.length > 0
           ? {
               OR: [
                 {

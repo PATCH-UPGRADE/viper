@@ -17,9 +17,11 @@ import { userRouter } from "@/features/user/server/routers";
 import { vulnerabilitiesRouter } from "@/features/vulnerabilities/server/routers";
 import { webhooksRouter } from "@/features/webhooks/server/routers";
 import { workflowsRouter } from "@/features/workflows/server/routers";
+import { questionsRouter } from "@/features/questions/server/routers";
 import { createTRPCRouter } from "../init";
 
 export const appRouter = createTRPCRouter({
+  questions: questionsRouter,
   notifications: notificationsRouter,
   workflows: workflowsRouter,
   assets: assetsRouter,

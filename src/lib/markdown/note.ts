@@ -31,3 +31,8 @@ export function renderNoteTarget(
       return "Unknown target";
   }
 }
+
+// build the question and answer text stored in a note
+export function renderQnA(title: string, answer: string | null): string {
+  return `Q: ${title}\nA: ${answer ?? "(no answer)"}`;
+}

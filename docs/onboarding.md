@@ -134,6 +134,37 @@ Full walkthrough (agentic) — API key, tunnel, webhook, sending a test email, a
 watch it land: **[Email Pipeline (Resend) Setup](./email-pipeline-setup.md)**.
 
 
+## Frequently Asked Questions
+
+What does Viper actually do — and what does it not do?
+- It's a visualization, communication, and prioritization layer. It sits on top of the systems a hospital already runs; it doesn't detect vulnerabilities or generate data of its own, and it doesn't pipe in new feeds — it takes what external systems produce and organizes it so someone can act on it quickly, providing the visibility and communication to solve vulnerabilities as fast as possible since hospital systems are slow and fractured.
+
+Are vulnerabilities and email triage the same system?
+- No — they're two separate, independent systems that happen to sit next to each other. Vulnerabilities come from the outside: external tools and TA3 team detect them and push them in through integrations and a REST API (POST), and a nightly job enriches them; a vulnerability is a tracked finding measured against your inventory. Email triage is its own inbound pipeline — a message lands in the inbox, gets classified, and becomes a notification or a work order.
+
+How do vulnerabilities and assets get populated from emails?
+- When an email lands, Resend fires a webhook and Viper kicks off a background pipeline (the `processInboxEmail` job). It first classifies the email — work order, notification, or not relevant — and then an LLM reads the body and attachments and extracts any device groups, vulnerabilities, remediations, and assets it can find.
+
+Does Viper have its own ticketing?
+- Not yet. Right now it integrates with whatever ticketing system a customer already runs. Native ticketing, for hospitals without one, is on the roadmap but not built.
+
+What's the difference between a Device Group and an Asset?
+- A Device Group is an identity: manufacturer + product + version. An Asset is a physical device on the hospital floor. Many assets roll up under one Device Group — every infusion pump of the same make, model, and version is its own asset, all pointing at the same group.
+
+What is Device Group Matching?
+- It's how impact gets flagged without hand-tagging every physical device — a query, or pre-filter, over that manufacturer/product/version identity. Flag versions 1, 2, and 3 of a product as vulnerable and every asset on those versions is caught automatically; assets on v4 or v5 fall outside the match and stay clear, and anything new that appears later sorts itself the same way.
+
+What are the differences between DeviceGroup and DeviceGroupMatching?
+- As explained above, one is a group-of-devices model and the other is just a pattern-matching model.
+
+What are Entity Filters for?
+- They do the same trick as DeviceGroupMatching for notes: instead of pinning a note to thousands of individual assets, the filter describes the set — say, "all infusion pumps in the ICU" — and resolves to the assets that match.
+- Note: an Entity Filter's output is treated as trustworthy and verified through Chat. We don't second-guess whether it caught the right set.
+
+How does sync work between Viper and other systems?
+- As the Sync Inngest worker runs: An operation fires an outbound request, but the downstream system needs time to work, so a callback comes back roughly 30 to 60 seconds later to confirm the sync landed. Build for that gap rather than expecting an answer on the first hop.
+
+
 ## Additional Resources
 
 - [CLAUDE.md](/CLAUDE.md) - Additional project background, including code patterns

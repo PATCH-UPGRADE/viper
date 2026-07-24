@@ -29,7 +29,7 @@ export async function draftQuestion(
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: context.markdown },
   ]);
-};
+}
 
 export async function generateQuestionForNotification(
   notificationId: string,
@@ -42,4 +42,4 @@ export async function generateQuestionForNotification(
   const summary = await applyQuestionWrites(context, result);
 
   return { ...summary, issues: context.issues.length };
-};
+}

@@ -21,14 +21,14 @@ describe("computeMatchingBuckets", () => {
       isNotificationLinked: true,
     });
     expect(res).toEqual({
-      needsAttention: {
+      AFFECTED: {
         count: 1,
         filter: { kind: "allExcept", excludedAssetIds: [] },
       },
     });
   });
 
-  it("DG2 — NOT_AFFECTED + AFFECTED suppresses Low Concern", () => {
+  it("DG2 — NOT_AFFECTED + AFFECTED suppresses the NOT_AFFECTED bucket", () => {
     // Vuln1/DG2 NOT_AFFECTED, Vuln2/DG2 AFFECTED; assets 2.1, 2.2; no overrides.
     const res = computeMatchingBuckets({
       matchingStatusByVuln: { v1: NOT_AFFECTED, v2: AFFECTED },
@@ -36,12 +36,12 @@ describe("computeMatchingBuckets", () => {
       totalAssetCount: 2,
       isNotificationLinked: true,
     });
-    expect(res.needsAttention).toEqual({
+    expect(res.AFFECTED).toEqual({
       count: 2,
       filter: { kind: "allExcept", excludedAssetIds: [] },
     });
-    expect(res.lowConcern).toBeUndefined();
-    expect(res.needsInformation).toBeUndefined();
+    expect(res.NOT_AFFECTED).toBeUndefined();
+    expect(res.UNDER_INVESTIGATION).toBeUndefined();
   });
 
   it("DG3 — asset-level override splits buckets", () => {
@@ -53,24 +53,24 @@ describe("computeMatchingBuckets", () => {
       totalAssetCount: 3,
       isNotificationLinked: true,
     });
-    // Needs Attention: 3.2, 3.3 (3.1 excluded).
-    expect(res.needsAttention).toEqual({
+    // AFFECTED: 3.2, 3.3 (3.1 excluded).
+    expect(res.AFFECTED).toEqual({
       count: 2,
       filter: { kind: "allExcept", excludedAssetIds: ["3.1"] },
     });
-    // Needs Information: all three (3.1 still UNDER_INVESTIGATION via vuln2).
-    expect(res.needsInformation).toEqual({
+    // UNDER_INVESTIGATION: all three (3.1 still under investigation via vuln2).
+    expect(res.UNDER_INVESTIGATION).toEqual({
       count: 3,
       filter: { kind: "allExcept", excludedAssetIds: [] },
     });
-    // Low Concern: only 3.1 (NOT_AFFECTED and not AFFECTED for it).
-    expect(res.lowConcern).toEqual({
+    // NOT_AFFECTED: only 3.1 (not affected and not AFFECTED for it).
+    expect(res.NOT_AFFECTED).toEqual({
       count: 1,
       filter: { kind: "only", assetIds: ["3.1"] },
     });
   });
 
-  it("notification-linked matching with no issues → Unaffected", () => {
+  it("notification-linked matching with no issues → NO_ISSUES", () => {
     const res = computeMatchingBuckets({
       matchingStatusByVuln: {},
       overrides: [],
@@ -78,7 +78,7 @@ describe("computeMatchingBuckets", () => {
       isNotificationLinked: true,
     });
     expect(res).toEqual({
-      unaffected: {
+      NO_ISSUES: {
         count: 5,
         filter: { kind: "allExcept", excludedAssetIds: [] },
       },
@@ -152,10 +152,10 @@ describe("buildAffectedAssetsSummary", () => {
       },
     ]);
 
-    // dg3's note is for v1 (AFFECTED) → shows only on the Needs Attention card,
-    // not on the Needs Information / Low Concern cards it reaches via v2 / override.
+    // dg3's note is for v1 (AFFECTED) → shows only on the AFFECTED card, not on
+    // the UNDER_INVESTIGATION / NOT_AFFECTED cards it reaches via v2 / override.
     const dg3Notes = { v1: "under review by clinical team" };
-    expect(summary.needsAttention).toEqual([
+    expect(summary.AFFECTED).toEqual([
       {
         mappingId: "m1",
         deviceGroupMatching: dg1,
@@ -175,7 +175,7 @@ describe("buildAffectedAssetsSummary", () => {
         notesByVuln: dg3Notes,
       },
     ]);
-    expect(summary.needsInformation).toEqual([
+    expect(summary.UNDER_INVESTIGATION).toEqual([
       {
         mappingId: "m3",
         deviceGroupMatching: dg3,
@@ -183,7 +183,7 @@ describe("buildAffectedAssetsSummary", () => {
         notesByVuln: {},
       },
     ]);
-    expect(summary.lowConcern).toEqual([
+    expect(summary.NOT_AFFECTED).toEqual([
       {
         mappingId: "m3",
         deviceGroupMatching: dg3,
@@ -191,6 +191,6 @@ describe("buildAffectedAssetsSummary", () => {
         notesByVuln: {},
       },
     ]);
-    expect(summary.unaffected).toEqual([]);
+    expect(summary.NO_ISSUES).toEqual([]);
   });
 });

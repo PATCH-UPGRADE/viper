@@ -412,6 +412,10 @@ export const processInboxEmail = inngest.createFunction(
             hospitalImpact: result.hospitalImpact,
           },
         });
+        return {
+          priority: result.priority,
+          priorityReasonWhy: result.priorityReasonWhy,
+        };
       });
     }
 

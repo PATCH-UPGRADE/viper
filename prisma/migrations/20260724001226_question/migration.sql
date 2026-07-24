@@ -42,4 +42,4 @@ ALTER TABLE "question" ADD CONSTRAINT "question_notificationId_fkey" FOREIGN KEY
 ALTER TABLE "question" ADD CONSTRAINT "question_answeredByUserId_fkey" FOREIGN KEY ("answeredByUserId") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "question" ADD CONSTRAINT "question_resultingNoteId_fkey" FOREIGN KEY ("resultingNoteId") REFERENCES "note"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "question" ADD CONSTRAINT "question_resultingNoteId_fkey" FOREIGN KEY ("resultingNoteId") REFERENCES "note"("id") ON DELETE SET NULL ON UPDATE CASCADE;

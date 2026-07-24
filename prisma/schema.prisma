@@ -1519,7 +1519,7 @@ model Question {
   answeredAt DateTime?
 
   resultingNoteId String? @unique   // create note after user answer
-  resultingNote Note? @relation(fields: [resultingNoteId], references: [id], onDelete: Cascade)
+  resultingNote Note? @relation(fields: [resultingNoteId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

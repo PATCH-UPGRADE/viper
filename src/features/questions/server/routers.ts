@@ -87,7 +87,7 @@ export const questionsRouter = createTRPCRouter({
             userId: ctx.auth.user.id,
           },
         });
-        await tx.question.update({
+        const updated = await tx.question.updateMany({
           where: { id: input.questionId },
           data: {
             status,
@@ -97,6 +97,9 @@ export const questionsRouter = createTRPCRouter({
             resultingNoteId: note.id,
           },
         });
+         if (updated.count === 0) {
+          throw new Error(`Question is already resolved`);
+        }
       });
 
       await inngest.send({

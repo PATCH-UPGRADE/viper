@@ -8,6 +8,7 @@ import { extractArtifactNotesFn } from "@/inngest/functions/extract-artifact-not
 import { manageMemoriesFn } from "@/inngest/functions/manage-memories";
 import { processInboxEmail } from "@/inngest/functions/process-inbox-email";
 import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-user-tokens";
+import { reevaluateIssueOnAnswer } from "@/inngest/functions/reevaluate-issue-on-answer";
 import {
   resolveAllEntityFilters,
   resolveEntityFilterFn,
@@ -30,5 +31,6 @@ export const { GET, POST, PUT } = serve({
     resolveAllEntityFilters,
     resolveEntityFilterFn,
     extractArtifactNotesFn,
+    reevaluateIssueOnAnswer
   ],
 });

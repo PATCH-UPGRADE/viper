@@ -7,6 +7,7 @@ import {
   matchingAppliesToDeviceGroup,
 } from "@/lib/device-matching";
 import { deviceGroupMatchingLabel, type NoteRow } from "@/lib/markdown";
+import { renderQnA } from "@/lib/markdown/note";
 
 export type QuestionIssueContext = { issueId: string; vulnerabilityId: string };
 
@@ -201,3 +202,62 @@ export async function gatherQuestionContext(
 export const SYSTEM_PROMPT = `You are drafting clarifying questions for a hospital security engineer, for vulnerability issues a triage agent already marked "under investigation" because it lacked enough information to decide if the vulnerability is exploitable.
 For each issue, use the stated reason it's under investigation to write ONE specific, answerable question - never a vague "please provide more information." Include 2-6 short suggested answers a user could pick instead of typing. Ground every question in the evidence given; never invent facts about the device or vulnerability.
 Omit any issue you don't have a good, specific question for.`;
+
+export async function gatherQuestionContextForIssue(
+  issueId: string,
+  notificationId: string,
+  priorQnA: { title: string; answer: string | null}[],
+): Promise<QuestionContext | null> {
+  const issue = await prisma.issue.findUnique({
+    where: { id: issueId },
+    include: { vulnerability: true },
+  });
+
+  if(!issue || !issue.deviceGroupMatchingId) return null;
+
+  const matching = await prisma.deviceGroupMatching.findUnique({
+    where: { id: issue.deviceGroupMatchingId },
+    include: {
+      vendor: { select: { canonicalDisplayName: true }},
+      product: { select: { canonicalDisplayName: true}},
+      version: { select: { canonicalDisplayName: true }},
+    },
+  });
+
+  if(!matching) return null;
+
+  const candidateGroups = await prisma.deviceGroup.findMany({
+    where: deviceGroupWhereForMatching(matching),
+    select: { id: true, assets: { select: {id: true}}}
+  });
+
+  const groups = candidateGroups.filter((g) => matchingAppliesToDeviceGroup(matching, g));
+  const assetIds = [...new Set(groups.flatMap((g) => g.assets.map((a)=> a.id)))];
+
+  const notes = await getRelevantNotes({
+    vulnerabilityIds: [issue.vulnerabilityId],
+    deviceGroupMatchingIds: [matching.id],
+    assetIds
+  });
+
+  const priorQnAText = priorQnA.map((q) => renderQnA(q.title, q.answer)).join("\n\n");
+
+  const markdown = renderQuestionPrompt({
+    vulnerabilities:[issue.vulnerability],
+    issueRenders:[{
+      issueId: issue.id,
+      cve: issue.vulnerability.cveId ?? issue.vulnerability.id,
+      matching,
+      assetCount: groups.reduce((n, g) => n + g.assets.length, 0),
+      statusNotes: issue.statusNotes
+    }],
+    notes,
+  }) + "\n\n## Already asked and answered - do not repeat this, ask something more specific\n\n" + priorQnAText;
+
+  return {
+    notificationId,
+    markdown,
+    issues: [{ issueId: issue.id, vulnerabilityId: issue.vulnerability.id}]
+  }
+
+}

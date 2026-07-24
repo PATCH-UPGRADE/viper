@@ -343,6 +343,127 @@ function renderVexPrompt(args: {
   return sections.join("\n\n");
 }
 
+export async function gatherVexContextForIssue(
+  issueId: string,
+  notificationId: string,
+  answeredQuestion?: { title: string; reasonWhy: string; answer: string },
+): Promise<VexContext | null> {
+  const issue = await prisma.issue.findUnique({
+    where: { id: issueId },
+    include: { vulnerability: true },
+  });
+
+  if (!issue || !issue.deviceGroupMatchingId) return null;
+
+  const matching = await prisma.deviceGroupMatching.findUnique({
+    where: { id: issue.deviceGroupMatchingId },
+    include: {
+      vendor: { select: { canonicalDisplayName: true } },
+      product: { select: { canonicalDisplayName: true } },
+      version: { select: { canonicalDisplayName: true } },
+    },
+  });
+
+  if (!matching) return null;
+
+  const candiateGroups = await prisma.deviceGroup.findMany({
+    where: deviceGroupWhereForMatching(matching),
+    select: {
+      id: true,
+      cpe: true,
+      vendor: { select: { canonicalDisplayName: true } },
+      product: { select: { canonicalDisplayName: true } },
+      version: { select: { canonicalName: true, canonicalDisplayName: true } },
+      assets: { select: { id: true, hostname: true, ip: true } },
+    },
+  });
+
+  const groups = candiateGroups.filter((g) =>
+    matchingAppliesToDeviceGroup(matching, g),
+  );
+  const assetIds = [
+    ...new Set(groups.flatMap((g) => g.assets.map((a) => a.id))),
+  ];
+
+  const remediations = await prisma.remediation.findMany({
+    where: { vulnerabilityId: issue.vulnerabilityId },
+  });
+
+  const notes = await getRelevantNotes({
+    vulnerabilityIds: [issue.vulnerabilityId],
+    remediationIds: remediations.map((r) => r.id),
+    deviceGroupMatchingIds: [matching.id],
+    assetIds,
+  });
+
+  const assetLabel = new Map<string, string>();
+  for (const g of groups) {
+    for (const a of g.assets) assetLabel.set(a.id, a.hostname ?? a.ip ?? a.id);
+  }
+  const groupLabel = new Map(groups.map((g) => [g.id, deviceGroupLabel(g)]));
+  const matchingLabel = new Map([
+    [matching.id, deviceGroupMatchingLabel(matching)],
+  ]);
+  const cveById = new Map([
+    [
+      issue.vulnerability.id,
+      issue.vulnerability.cveId ?? issue.vulnerability.id,
+    ],
+  ]);
+
+  let markdown = renderVexPrompt({
+    sources: [],
+    vulnerabilities: [issue.vulnerability],
+    remediations,
+    candidateGroups: groups,
+    issueRenders: [
+      {
+        issueId: issue.id,
+        cve: issue.vulnerability.cveId ?? issue.vulnerability.id,
+        matching,
+        groups,
+        assetIds,
+        status: issue.status,
+      },
+    ],
+    notes,
+    labels: { assetLabel, groupLabel, matchingLabel, cveById },
+  });
+
+  if (answeredQuestion) {
+    markdown +=
+      "\n\n" +
+      renderAnswerContext({
+        statusNotes: issue.statusNotes,
+        title: answeredQuestion.title,
+        reasonWhy: answeredQuestion.reasonWhy,
+        answer: answeredQuestion.answer,
+      });
+  }
+
+  return {
+    notificationId,
+    markdown,
+    issues: [
+      { issueId: issue.id, vulnerabilityId: issue.vulnerabilityId, assetIds },
+    ],
+  };
+}
+
+function renderAnswerContext(params: {
+  statusNotes: string | null;
+  title: string;
+  reasonWhy: string;
+  answer: string;
+}): string {
+  return (
+    "## Direct answer just received \n\n" +
+    `You previously flagged this as under investigation because: ${params.statusNotes} ?? "(no reason recorded)"\n\n` +
+    `You asked: "${params.title} \n\n` +
+    `The user's direct answer: "${params.answer}"`
+  );
+}
+
 // ─── System prompt ───────────────────────────────────────────────────────────
 
 export const VEX_TOOL_NAME = "update_and_create_issues";

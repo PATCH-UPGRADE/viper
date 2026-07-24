@@ -10,6 +10,7 @@ import { extractEntities } from "@/features/inbox/agent/extract";
 import { extractWorkOrder } from "@/features/inbox/agent/extract-work-order";
 import { matchAndLinkEntities } from "@/features/inbox/agent/match";
 import { persistMitigationPlans } from "@/features/inbox/agent/mitigation/persist";
+import { generateQuestionForNotification } from "@/features/inbox/agent/question";
 import { triageNotification } from "@/features/inbox/agent/triage";
 import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
 import {
@@ -396,7 +397,16 @@ export const processInboxEmail = inngest.createFunction(
       return sortNotificationVulnerabilities(notificationId);
     });
 
-    // 11. Triage: assign priority, reason, and hospital impact
+    // 11. Generte questions for any Issue VEX just left UNDER_INVESTIGATION
+    const questionSummary = await step.run("generate-questions", async () => {
+      if (!notificationId || !vexSummary)
+        return { questionSkipped: true as const };
+      if ("vexSkipped" in vexSummary && vexSummary.vexSkipped)
+        return { questionSkipped: true as const };
+      return generateQuestionForNotification(notificationId);
+    });
+
+    // 12. Triage: assign priority, reason, and hospital impact
     if (notificationId) {
       await step.run("triage-notification", async () => {
         const result = await triageNotification(
@@ -439,6 +449,7 @@ export const processInboxEmail = inngest.createFunction(
       linkSummary,
       vexSummary,
       mitigationSummary,
+      questionSummary,
     };
   },
 );

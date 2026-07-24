@@ -208,6 +208,27 @@ async function seedSyngoPlazaVexScenario(userId: string) {
       status: IssueStatus.UNDER_INVESTIGATION,
     },
   });
+  // for baseline devieGroupMatchingId set issues
+  await prisma.issue.upsert({
+    where: {
+      deviceGroupMatchingId_vulnerabilityId: {
+        deviceGroupMatchingId: matching.id,
+        vulnerabilityId: vulnerability.id,
+      },
+    },
+    update: {
+      status: IssueStatus.UNDER_INVESTIGATION,
+      statusNotes:
+        "Unable to confirm from the advisory whether remote password recover requires physical console access or is exploitable over the network.",
+    },
+    create: {
+      deviceGroupMatchingId: matching.id,
+      vulnerabilityId: vulnerability.id,
+      status: IssueStatus.UNDER_INVESTIGATION,
+      statusNotes:
+        "Unable to confirm from the advisory whether remote password recover requires physical console access or is exploitable over the network.",
+    },
+  });
 
   const title =
     "Siemens Healthineers syngo.plaza VB30E — Insecure Password Encryption (SSA-016040 / CVE-2024-52334)";

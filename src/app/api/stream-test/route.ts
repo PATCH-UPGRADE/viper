@@ -1,29 +1,39 @@
 /**
  * THROWAWAY streaming isolation probe. Delete once the streaming bug is fixed.
  *
- * Unauthenticated. Emits one SSE chunk every 300ms for 15s, using the SAME
- * headers the AI SDK's chat route uses. Deploy, then:
+ * Unauthenticated. Fires a large priming chunk immediately, then one padded
+ * chunk every 300ms for ~15s. The padding defeats byte-threshold buffers
+ * (WebKit's 1KB, edge-compression windows) so a "dump at once" result can only
+ * mean the platform is genuinely buffering the whole response.
  *
- *   curl -N https://<deployment>.vercel.app/api/stream-test
+ *   curl -N -i https://<deployment>.vercel.app/api/stream-test
  *
+ * -i also prints response headers — check for `content-encoding` (edge
+ * compression) and `transfer-encoding: chunked`.
  *
- * - Lines print one-per-300ms  -> Vercel IS streaming; the bug is in the chat
- *   route's own timing (something delays the first real token).
- * - Nothing prints for ~15s then all lines dump at once -> Vercel/runtime is
- *   buffering the whole response; the fix is platform-level, not app code.
+ * - Priming chunk appears instantly, then a line every ~300ms -> Vercel streams;
+ *   the original tiny probe just never crossed a flush threshold.
+ * - ~15s of silence, then everything at once -> platform/runtime buffers the
+ *   whole response even at ~60KB. Fix is at the Vercel/Sentry layer.
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
+// ~4KB of padding per line as an SSE comment (`:` prefixed lines are ignored by
+// SSE parsers but still count as bytes on the wire).
+const PAD = ":".padEnd(4096, " ");
+
 export async function GET() {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      // Prime: ~8KB up front to blow past any first-byte buffer immediately.
+      controller.enqueue(encoder.encode(`${PAD}\n${PAD}\n\n`));
+
       for (let i = 0; i < 15; i++) {
-        const ts = i * 300;
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ i, ts })}\n\n`),
+          encoder.encode(`${PAD}\ndata: ${JSON.stringify({ i })}\n\n`),
         );
         await new Promise((r) => setTimeout(r, 300));
       }

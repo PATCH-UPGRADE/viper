@@ -57,7 +57,7 @@ function renderQuestionPrompt(args: {
   }
   sections.push(
     "## Issues that need a question \n\n" +
-      "Each of these is currently UNDER INVESTIGATION. Draf a specific, answerable " +
+      "Each of these is currently UNDER INVESTIGATION. Draft a specific, answerable " +
       " question for any you can meaningfully clarify. Omit an id to skip it. \n\n" +
       args.issueRenders
         .map((r) =>
@@ -200,5 +200,4 @@ export async function gatherQuestionContext(
 
 export const SYSTEM_PROMPT = `You are drafting clarifying questions for a hospital security engineer, for vulnerability issues a triage agent already marked "under investigation" because it lacked enough information to decide if the vulnerability is exploitable.
 For each issue, use the stated reason it's under investigation to write ONE specific, answerable question - never a vague "please provide more information." Include 2-6 short suggested answers a user could pick instead of typing. Ground every question in the evidence given; never invent facts about the device or vulnerability.
-Respond with ONLY a single JSON object - no prose, no markdown code fences, nothing before or after it. One key per issue id you're providing a question for, using the exact issue ids given. Omit any issue you don't have a good, specific question for. Each value must have exactly these fields: "title" (string), "reasonWhy" (string), "suggestedAnswers" (array of 2-6 short strings)
-Example shape: {"<issueId>": {"title":"..., "reasonWhy": "...", "suggestedAnswers":["...","..."]}}`;
+Omit any issue you don't have a good, specific question for.`;

@@ -11,12 +11,7 @@ import {
 } from "./process_output";
 import { buildQuestionSchema, type QuestionResult } from "./schema";
 
-const MODEL = "claude-sonnet-4-6";
-
-function extractJsonBlock(text: string): string {
-  const jsonBlkText = text.match(/```(?:json)?\s([\s\S]*?)```/);
-  return jsonBlkText ? jsonBlkText[1] : text;
-}
+const MODEL = "claude-haiku-4-5-20251001";
 
 export async function draftQuestion(
   context: QuestionContext,
@@ -28,23 +23,13 @@ export async function draftQuestion(
     model: MODEL,
     maxTokens: 4000,
     thinking: { type: "enabled", budget_tokens: 2000 },
-  });
+  }).withStructuredOutput(schema);
 
-  const res = await model.invoke([
+  return model.invoke([
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: context.markdown },
   ]);
-
-  let raw: unknown;
-  try {
-    raw = JSON.parse(extractJsonBlock(res.text));
-  } catch (e) {
-    return {};
-  }
-  const parsed = schema.safeParse(raw);
-
-  return parsed.success ? parsed.data : {};
-}
+};
 
 export async function generateQuestionForNotification(
   notificationId: string,
@@ -57,4 +42,4 @@ export async function generateQuestionForNotification(
   const summary = await applyQuestionWrites(context, result);
 
   return { ...summary, issues: context.issues.length };
-}
+};

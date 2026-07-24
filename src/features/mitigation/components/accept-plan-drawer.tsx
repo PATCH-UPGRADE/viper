@@ -24,7 +24,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { DepartmentMultiSelect } from "@/features/tracking/components/ticket-detail/department-multi-select";
-import { categoryLabels } from "@/features/tracking/components/ticket-detail/shared";
+import {
+  CategoryChip,
+  categoryLabels,
+} from "@/features/tracking/components/ticket-detail/shared";
 import {
   useAssignableUsers,
   useDepartments,
@@ -212,7 +215,7 @@ export function AcceptPlanDrawer({
                             Object.keys(categoryLabels) as TicketCategory[]
                           ).map((c) => (
                             <SelectItem key={c} value={c}>
-                              {categoryLabels[c]}
+                              <CategoryChip category={c} />
                             </SelectItem>
                           ))}
                         </SelectContent>

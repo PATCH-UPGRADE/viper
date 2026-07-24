@@ -183,12 +183,6 @@ export function MatchingAssetTable({
         </span>
       ),
     },
-    { head: "IP Address", fullOnly: true, cell: (asset) => asset.ip },
-    {
-      head: "Location",
-      fullOnly: false,
-      cell: (asset) => parseLocation(asset.location),
-    },
     {
       head: "Version",
       fullOnly: false,
@@ -205,6 +199,12 @@ export function MatchingAssetTable({
           isPending={answerVersion.isPending}
         />
       ),
+    },
+    { head: "IP Address", fullOnly: true, cell: (asset) => asset.ip },
+    {
+      head: "Location",
+      fullOnly: false,
+      cell: (asset) => parseLocation(asset.location),
     },
     { head: "Status", fullOnly: true, cell: (asset) => asset.status ?? "—" },
     {

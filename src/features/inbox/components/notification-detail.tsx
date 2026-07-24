@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSuspenseMitigationPlans } from "@/features/mitigation/hooks/use-mitigation";
+import { CategoryColorProvider } from "@/features/tag-colors/context";
 import type { NotificationType, Priority } from "@/generated/prisma";
 import {
   useMarkNotificationRead,
@@ -147,7 +148,9 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
           <Suspense
             fallback={<LoadingView message="Loading response plans..." />}
           >
-            <NotificationRespondTab notification={notification} />
+            <CategoryColorProvider>
+              <NotificationRespondTab notification={notification} />
+            </CategoryColorProvider>
           </Suspense>
         ),
       },

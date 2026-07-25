@@ -371,6 +371,9 @@ export async function gatherVexContextForIssue(
     select: {
       id: true,
       cpe: true,
+      vendorId: true,
+      productId: true,
+      versionId: true,
       vendor: { select: { canonicalDisplayName: true } },
       product: { select: { canonicalDisplayName: true } },
       version: { select: { canonicalName: true, canonicalDisplayName: true } },

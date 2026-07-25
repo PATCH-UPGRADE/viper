@@ -231,7 +231,14 @@ export async function gatherQuestionContextForIssue(
 
   const candidateGroups = await prisma.deviceGroup.findMany({
     where: deviceGroupWhereForMatching(matching),
-    select: { id: true, assets: { select: { id: true } } },
+    select: {
+      id: true,
+      vendorId: true,
+      productId: true,
+      versionId: true,
+      version: { select: { canonicalName: true } },
+      assets: { select: { id: true } },
+    },
   });
 
   const groups = candidateGroups.filter((g) =>

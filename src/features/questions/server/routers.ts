@@ -3,7 +3,7 @@ import { z } from "zod";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { renderQnA } from "@/lib/markdown/note";
-import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
+import { createTRPCRouter,  protectedProcedure } from "@/trpc/init";
 
 export const questionsRouter = createTRPCRouter({
   getManyByNotificationId: protectedProcedure

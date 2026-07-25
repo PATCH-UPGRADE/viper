@@ -1,10 +1,10 @@
 import "server-only";
-import prisma from "@/lib/db";
 import { generateFollowUpQuestion } from "@/features/inbox/agent/question";
+import { triageNotification } from "@/features/inbox/agent/triage";
+import { sortVulnerabilities } from "@/features/inbox/agent/vex";
 import { gatherVexContextForIssue } from "@/features/inbox/agent/vex/context";
 import { applyVexDeterminations } from "@/features/inbox/agent/vex/process_output";
-import { sortVulnerabilities } from "@/features/inbox/agent/vex";
-import { triageNotification } from "@/features/inbox/agent/triage";
+import prisma from "@/lib/db";
 import { inngest } from "../client";
 
 const MAX_FOLLOWUP_ROUNDS = 2;

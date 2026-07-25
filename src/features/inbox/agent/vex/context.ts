@@ -400,15 +400,16 @@ export async function gatherVexContextForIssue(
   for (const g of groups) {
     for (const a of g.assets) assetLabel.set(a.id, a.hostname ?? a.ip ?? a.id);
   }
-  const groupLabel = new Map(
-    groups.map((g) => [g.id, deviceGroupLabel(g)]),
-  );
+  const groupLabel = new Map(groups.map((g) => [g.id, deviceGroupLabel(g)]));
   const matchingLabel = new Map<string, string>();
   matchingLabel.set(matching.id, deviceGroupMatchingLabel(matching));
 
   const cveById = new Map<string, string>();
-  cveById.set(issue.vulnerability.id, issue.vulnerability.cveId ?? issue.vulnerability.id);
- 
+  cveById.set(
+    issue.vulnerability.id,
+    issue.vulnerability.cveId ?? issue.vulnerability.id,
+  );
+
   let markdown = renderVexPrompt({
     sources: [],
     vulnerabilities: [issue.vulnerability],

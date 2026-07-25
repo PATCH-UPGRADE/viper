@@ -1,17 +1,17 @@
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
+import prisma from "@/lib/db";
 import {
   gatherQuestionContext,
+  gatherQuestionContextForIssue,
   type QuestionContext,
   SYSTEM_PROMPT,
-  gatherQuestionContextForIssue
 } from "./context";
 import {
   applyQuestionWrites,
   type QuestionApplySummary,
 } from "./process_output";
 import { buildQuestionSchema, type QuestionResult } from "./schema";
-import prisma from "@/lib/db";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -24,7 +24,6 @@ export async function draftQuestion(
   const model = new ChatAnthropic({
     model: MODEL,
     maxTokens: 4000,
-    thinking: { type: "enabled", budget_tokens: 2000 },
   }).withStructuredOutput(schema);
 
   return model.invoke([
@@ -37,32 +36,31 @@ export async function generateQuestionForNotification(
   notificationId: string,
 ): Promise<(QuestionApplySummary & { issues: number }) | null> {
   const context = await gatherQuestionContext(notificationId);
-
+  console.log("context ", context);
   if (!context) return null;
   const result = await draftQuestion(context);
-
+  console.log("result ", result);
   const summary = await applyQuestionWrites(context, result);
-
+  console.log("summary ", summary);
   return { ...summary, issues: context.issues.length };
-};
+}
 
 export async function generateFollowUpQuestion(
   issueId: string,
 ): Promise<(QuestionApplySummary & { issues: number }) | null> {
   const priorQuestions = await prisma.question.findMany({
-    where:{ issueId },
-    orderBy: { createdAt: "asc" }
+    where: { issueId },
+    orderBy: { createdAt: "asc" },
   });
-  if(priorQuestions.length === 0) return null;
+  if (priorQuestions.length === 0) return null;
   const context = await gatherQuestionContextForIssue(
     issueId,
     priorQuestions[0].notificationId,
     priorQuestions.map((q) => ({ title: q.title, answer: q.answer })),
   );
-  if(!context) return null;
+  if (!context) return null;
 
   const result = await draftQuestion(context);
   const summary = await applyQuestionWrites(context, result);
-  return { ...summary, issues: context.issues.length}
-
+  return { ...summary, issues: context.issues.length };
 }

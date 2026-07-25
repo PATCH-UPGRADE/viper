@@ -1,9 +1,7 @@
 import "server-only";
 import prisma from "@/lib/db";
 import { generateFollowUpQuestion } from "@/features/inbox/agent/question";
-import {
-  gatherVexContextForIssue,
-} from "@/features/inbox/agent/vex/context";
+import { gatherVexContextForIssue } from "@/features/inbox/agent/vex/context";
 import { applyVexDeterminations } from "@/features/inbox/agent/vex/process_output";
 import { sortVulnerabilities } from "@/features/inbox/agent/vex";
 import { triageNotification } from "@/features/inbox/agent/triage";
@@ -23,11 +21,15 @@ export const reevaluateIssueOnAnswer = inngest.createFunction(
     );
 
     await step.run("resort", async () => {
-      const context = await gatherVexContextForIssue(issueId, question.notificationId, {
-        title: question.title,
-        reasonWhy: question.reasonWhy,
-        answer: question.answer!,
-      });
+      const context = await gatherVexContextForIssue(
+        issueId,
+        question.notificationId,
+        {
+          title: question.title,
+          reasonWhy: question.reasonWhy,
+          answer: question.answer!,
+        },
+      );
       if (!context) return;
       const result = await sortVulnerabilities(context);
       await applyVexDeterminations(context, result);

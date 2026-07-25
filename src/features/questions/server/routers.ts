@@ -2,8 +2,8 @@ import "server-only";
 import { z } from "zod";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
-import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { renderQnA } from "@/lib/markdown/note";
+import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 
 export const questionsRouter = createTRPCRouter({
   getManyByNotificationId: protectedProcedure
@@ -97,7 +97,7 @@ export const questionsRouter = createTRPCRouter({
             resultingNoteId: note.id,
           },
         });
-         if (updated.count === 0) {
+        if (updated.count === 0) {
           throw new Error(`Question is already resolved`);
         }
       });

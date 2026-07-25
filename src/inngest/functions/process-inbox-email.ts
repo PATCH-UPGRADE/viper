@@ -398,7 +398,7 @@ export const processInboxEmail = inngest.createFunction(
     });
 
     // run question and mitigation steps in parallel
-    const [ questionSummary, , mitigationSummary] = await Promise.all([
+    const [questionSummary, , mitigationSummary] = await Promise.all([
       // 11. Generte questions for any Issue VEX just left UNDER_INVESTIGATION
       step.run("generate-questions", async () => {
         if (!notificationId || !vexSummary)
@@ -406,40 +406,40 @@ export const processInboxEmail = inngest.createFunction(
         if ("vexSkipped" in vexSummary && vexSummary.vexSkipped)
           return { questionSkipped: true as const };
         return generateQuestionForNotification(notificationId);
-      }), 
+      }),
       // 11. Triage: assign priority, reason, and hospital impact
       step.run("triage-notification", async () => {
-        if(!notificationId) return { skipped: true as const };
-        
+        if (!notificationId) return { skipped: true as const };
+
         const result = await triageNotification(
-            sourceId,
-            notificationId,
-            inlinedPdfs ?? undefined,
-          );
-          await prisma.notification.update({
-            where: { id: notificationId },
-            data: {
-              priority: result.priority,
-              priorityReasonWhy: result.priorityReasonWhy,
-              hospitalImpact: result.hospitalImpact,
-            },
-          });
-          return {
+          sourceId,
+          notificationId,
+          inlinedPdfs ?? undefined,
+        );
+        await prisma.notification.update({
+          where: { id: notificationId },
+          data: {
             priority: result.priority,
             priorityReasonWhy: result.priorityReasonWhy,
-          };
+            hospitalImpact: result.hospitalImpact,
+          },
+        });
+        return {
+          priority: result.priority,
+          priorityReasonWhy: result.priorityReasonWhy,
+        };
       }),
       // 11. Mitigation plans: if the notification has linked vulnerabilities,
       // propose ordered remediation plans and materialize each as a plan plus its
       // draft work orders (isDraft=true; accepting a plan promotes them).
       step.run("create-mitigation-plans", async () => {
-        if(!notificationId) return null;
+        if (!notificationId) return null;
         return persistMitigationPlans(
-            sourceId,
-            notificationId,
-            inlinedPdfs ?? undefined,
-          )
-      })
+          sourceId,
+          notificationId,
+          inlinedPdfs ?? undefined,
+        );
+      }),
     ]);
 
     return {

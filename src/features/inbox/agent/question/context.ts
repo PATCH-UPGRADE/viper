@@ -105,13 +105,13 @@ export async function gatherQuestionContext(
       },
     },
   });
-
+  console.log("gatherQuestionContext notification ", notification);
   if (!notification) return null;
 
   const vulnerabilities = notification.vulnerabilities.map(
     (m) => m.vulnerability,
   );
-
+  console.log("gatherQuestionContext vulnerabilities ", vulnerabilities);
   if (vulnerabilities.length === 0) return null;
 
   const matchingsById = new Map<string, MatchingWithRefs>();
@@ -119,7 +119,7 @@ export async function gatherQuestionContext(
     for (const dgm of v.deviceGroupMatchings) matchingsById.set(dgm.id, dgm);
   }
   const matchings = [...matchingsById.values()];
-
+  console.log("gatherQuestionContext matchings ", matchings);
   const candidateGroups =
     matchings.length > 0
       ? await prisma.deviceGroup.findMany({
@@ -154,9 +154,11 @@ export async function gatherQuestionContext(
     statusNotes: string | null;
   };
   const issueRenders: IssueRender[] = [];
-
+  console.log("gatherQuestionContext-----------------------------");
   for (const v of vulnerabilities) {
+    console.log("gatherQuestionContext v ", v);
     for (const issue of v.issues) {
+      console.log("gatherQuestionContext issue ", issue);
       if (!issue.deviceGroupMatchingId) continue;
       const matching = matchingsById.get(issue.deviceGroupMatchingId);
 
@@ -177,7 +179,7 @@ export async function gatherQuestionContext(
       });
     }
   }
-
+  console.log("gatherQuestionContext issues ", issues);
   if (issues.length === 0) return null;
 
   const assetIds = [
@@ -188,12 +190,13 @@ export async function gatherQuestionContext(
     deviceGroupMatchingIds: matchings.map((m) => m.id),
     assetIds,
   });
-
+  console.log("gatherQuestionContext notes ", notes);
   const markdown = renderQuestionPrompt({
     vulnerabilities,
     issueRenders,
     notes,
   });
+  console.log("gatherQuestionContext markdown ", markdown);
   return { notificationId, markdown, issues };
 }
 
@@ -206,58 +209,68 @@ Omit any issue you don't have a good, specific question for.`;
 export async function gatherQuestionContextForIssue(
   issueId: string,
   notificationId: string,
-  priorQnA: { title: string; answer: string | null}[],
+  priorQnA: { title: string; answer: string | null }[],
 ): Promise<QuestionContext | null> {
   const issue = await prisma.issue.findUnique({
     where: { id: issueId },
     include: { vulnerability: true },
   });
 
-  if(!issue || !issue.deviceGroupMatchingId) return null;
+  if (!issue || !issue.deviceGroupMatchingId) return null;
 
   const matching = await prisma.deviceGroupMatching.findUnique({
     where: { id: issue.deviceGroupMatchingId },
     include: {
-      vendor: { select: { canonicalDisplayName: true }},
-      product: { select: { canonicalDisplayName: true}},
-      version: { select: { canonicalDisplayName: true }},
+      vendor: { select: { canonicalDisplayName: true } },
+      product: { select: { canonicalDisplayName: true } },
+      version: { select: { canonicalDisplayName: true } },
     },
   });
 
-  if(!matching) return null;
+  if (!matching) return null;
 
   const candidateGroups = await prisma.deviceGroup.findMany({
     where: deviceGroupWhereForMatching(matching),
-    select: { id: true, assets: { select: {id: true}}}
+    select: { id: true, assets: { select: { id: true } } },
   });
 
-  const groups = candidateGroups.filter((g) => matchingAppliesToDeviceGroup(matching, g));
-  const assetIds = [...new Set(groups.flatMap((g) => g.assets.map((a)=> a.id)))];
+  const groups = candidateGroups.filter((g) =>
+    matchingAppliesToDeviceGroup(matching, g),
+  );
+  const assetIds = [
+    ...new Set(groups.flatMap((g) => g.assets.map((a) => a.id))),
+  ];
 
   const notes = await getRelevantNotes({
     vulnerabilityIds: [issue.vulnerabilityId],
     deviceGroupMatchingIds: [matching.id],
-    assetIds
+    assetIds,
   });
 
-  const priorQnAText = priorQnA.map((q) => renderQnA(q.title, q.answer)).join("\n\n");
+  const priorQnAText = priorQnA
+    .map((q) => renderQnA(q.title, q.answer))
+    .join("\n\n");
 
-  const markdown = renderQuestionPrompt({
-    vulnerabilities:[issue.vulnerability],
-    issueRenders:[{
-      issueId: issue.id,
-      cve: issue.vulnerability.cveId ?? issue.vulnerability.id,
-      matching,
-      assetCount: groups.reduce((n, g) => n + g.assets.length, 0),
-      statusNotes: issue.statusNotes
-    }],
-    notes,
-  }) + "\n\n## Already asked and answered - do not repeat this, ask something more specific\n\n" + priorQnAText;
+  const markdown =
+    renderQuestionPrompt({
+      vulnerabilities: [issue.vulnerability],
+      issueRenders: [
+        {
+          issueId: issue.id,
+          cve: issue.vulnerability.cveId ?? issue.vulnerability.id,
+          matching,
+          assetCount: groups.reduce((n, g) => n + g.assets.length, 0),
+          statusNotes: issue.statusNotes,
+        },
+      ],
+      notes,
+    }) +
+    "\n\n## Already asked and answered - do not repeat this, ask something more specific\n\n" +
+    priorQnAText;
 
   return {
     notificationId,
     markdown,
-    issues: [{ issueId: issue.id, vulnerabilityId: issue.vulnerability.id}]
-  }
-
+    issues: [{ issueId: issue.id, vulnerabilityId: issue.vulnerability.id }],
+  };
 }

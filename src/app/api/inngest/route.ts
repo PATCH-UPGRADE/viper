@@ -31,6 +31,6 @@ export const { GET, POST, PUT } = serve({
     resolveAllEntityFilters,
     resolveEntityFilterFn,
     extractArtifactNotesFn,
-    reevaluateIssueOnAnswer
+    reevaluateIssueOnAnswer,
   ],
 });

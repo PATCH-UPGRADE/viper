@@ -61,7 +61,7 @@ export const questionsRouter = createTRPCRouter({
         input.action !== "dismiss" && !!input.answer?.trim();
       if (!hasAnswerText) {
         const updated = await prisma.question.updateMany({
-          where: { id: input.questionId },
+          where: { id: input.questionId, status: "PENDING" },
           data: {
             status,
             answeredByUserId: ctx.auth.user.id,
@@ -88,7 +88,7 @@ export const questionsRouter = createTRPCRouter({
           },
         });
         const updated = await tx.question.updateMany({
-          where: { id: input.questionId },
+          where: { id: input.questionId, status: "PENDING" },
           data: {
             status,
             answer: input.answer,

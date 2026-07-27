@@ -461,7 +461,8 @@ function renderAnswerContext(params: {
   return (
     "## Direct answer just received \n\n" +
     `You previously flagged this as under investigation because: ${params.statusNotes} ?? "(no reason recorded)"\n\n` +
-    `You asked: "${params.title} \n\n` +
+    `You asked: "${params.title}" \n\n` +
+    `Why it was asked: ${params.reasonWhy}\n\n`+
     `The user's direct answer: "${params.answer}"`
   );
 }

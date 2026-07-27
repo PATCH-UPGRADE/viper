@@ -36,12 +36,12 @@ export async function generateQuestionForNotification(
   notificationId: string,
 ): Promise<(QuestionApplySummary & { issues: number }) | null> {
   const context = await gatherQuestionContext(notificationId);
-  console.log("context ", context);
+
   if (!context) return null;
   const result = await draftQuestion(context);
-  console.log("result ", result);
+
   const summary = await applyQuestionWrites(context, result);
-  console.log("summary ", summary);
+
   return { ...summary, issues: context.issues.length };
 }
 

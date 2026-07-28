@@ -11,7 +11,7 @@ import { createAgentCaller } from "@/trpc/agent-caller";
 // TODO: VW-409 -- Considering a progressive disclosure API endpoint to show
 // which issues affect which assets
 //
-// TODO: VW-XXX -- Considering a progressive disclosure API endpoint to show
+// TODO: VW-410 -- Considering a progressive disclosure API endpoint to show
 // which clinical workflows affect which assets
 export const PLATFORM_QUERY_PROCEDURES = [
   "assets.getMany",

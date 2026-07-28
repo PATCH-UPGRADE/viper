@@ -738,7 +738,6 @@ const SAMPLE_VULNERABILITIES = [
   },
 ];
 
-// Hospital-wide PERSISTENT notes — always injected into the agents' context.
 const SAMPLE_NOTES = [
   {
     text: "The hospital is a rural, critical access hospital with 12 inpatient beds.",
@@ -1190,7 +1189,6 @@ async function clearDatabase() {
   await prisma.asset.deleteMany();
   await prisma.deviceGroup.deleteMany();
   await prisma.integration.deleteMany();
-  // Note cascades to EntityFilter/EntityFilterMatch; Question.resultingNoteId is SetNull.
   await prisma.note.deleteMany();
   await prisma.categoryColor.deleteMany();
   await prisma.department.deleteMany();

@@ -10,6 +10,7 @@ import { integrationsRouter } from "@/features/integrations/server/routers";
 import { issuesRouter } from "@/features/issues/server/routers";
 import { mitigationRouter } from "@/features/mitigation/server/routers";
 import { networkRouter } from "@/features/network/server/router";
+import { questionsRouter } from "@/features/questions/server/routers";
 import { remediationsRouter } from "@/features/remediations/server/routers";
 import { tagColorsRouter } from "@/features/tag-colors/server/routers";
 import { trackingRouter } from "@/features/tracking/server/routers";
@@ -20,6 +21,7 @@ import { workflowsRouter } from "@/features/workflows/server/routers";
 import { createTRPCRouter } from "../init";
 
 export const appRouter = createTRPCRouter({
+  questions: questionsRouter,
   notifications: notificationsRouter,
   workflows: workflowsRouter,
   assets: assetsRouter,

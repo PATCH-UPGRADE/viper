@@ -1525,6 +1525,10 @@ model Question {
   resultingNoteId String? @unique   // create note after user answer
   resultingNote Note? @relation(fields: [resultingNoteId], references: [id], onDelete: SetNull)
 
+  parentQuestionId String? @unique
+  parentQuestion  Question? @relation("QuestionChain", fields:[parentQuestionId], references: [id], onDelete: SetNull)
+  followupQuestion Question? @relation("QuestionChain")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

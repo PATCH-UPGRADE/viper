@@ -234,7 +234,9 @@ export type RemediationForContext = Prisma.RemediationGetPayload<{
 
 // ─── Context generator ────────────────────────────────────────────────────────
 
-function generateContextMarkdown(
+// TODO: Should this be removed? Unused currently
+// Leaving intact for now (2026-07-28) if we switch model prompting strategies...
+function _generateContextMarkdown(
   assets: AssetForContext[],
   vulnerabilities: VulnerabilityForContext[],
   remediations: RemediationForContext[],
@@ -323,44 +325,4 @@ function generateContextMarkdown(
   sections.push(`## Device Utilization Windows\n\n${utilizationSection}`);
 
   return sections.join("\n\n---\n\n");
-}
-
-/**
- * Loads the full environment context (assets + vulns + remediations + workflows
- * + network flow + utilization) as markdown. No longer wired into the
- * recommendations graph (which fetches data on demand via query_platform_data);
- * retained for the print-recommendations-context debug script.
- */
-export async function loadRecommendationsContextMarkdown(
-  userRole?: string,
-): Promise<string> {
-  const [
-    assets,
-    vulnerabilities,
-    remediations,
-    workflows,
-    networkTopology,
-    fleetAssets,
-  ] = await Promise.all([
-    prisma.asset.findMany({ include: assetContextInclude }),
-    prisma.vulnerability.findMany({ include: vulnerabilityContextInclude }),
-    prisma.remediation.findMany({ include: remediationContextInclude }),
-    prisma.workflow.findMany({ include: { nodes: true, connections: true } }),
-    fetchNetworkTopologyForContext(),
-    listFleetManagedAssets(),
-  ]);
-
-  const fleetManaged = new Map(
-    fleetAssets.map((a) => [a.assetId, a.equipmentKey]),
-  );
-
-  return generateContextMarkdown(
-    assets,
-    vulnerabilities,
-    remediations,
-    workflows,
-    networkTopology,
-    fleetManaged,
-    userRole,
-  );
 }

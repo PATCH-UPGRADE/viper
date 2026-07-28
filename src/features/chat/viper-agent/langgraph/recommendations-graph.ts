@@ -180,7 +180,7 @@ to you through any tool. When your reasoning needs them:
   user about shift patterns and maintenance windows.
 </context_data_guidance>`;
 
-function buildSystemPrompt(
+export function buildSystemPrompt(
   role: UserRole,
   assetData?: AssetWithIssueRelations,
   vulnerabilityData?: VulnerabilityWithRelations,

@@ -11,8 +11,10 @@ import { createAgentCaller } from "@/trpc/agent-caller";
 export const PLATFORM_QUERY_PROCEDURES = [
   "assets.getMany",
   "assets.getOne",
+  "assets.getManyByDeviceGroup",
   "vulnerabilities.getMany",
   "vulnerabilities.getOne",
+  "vulnerabilities.getManyByDeviceGroup",
   "remediations.getMany",
   "remediations.getOne",
   "deviceGroups.getMany",
@@ -20,16 +22,74 @@ export const PLATFORM_QUERY_PROCEDURES = [
 ] as const;
 
 /** Condensed, prompt-injectable catalog of the allowlisted read procedures. */
-// TODO: Model needs access to vulnerabilities.getManyByDeviceGroup (same with remediations.getMany...)
 export const PLATFORM_CATALOG = `Available read-only procedures for query_platform_data:
 - assets.getMany — list/search hospital device assets. input: { search?, page?, pageSize? }
 - assets.getOne — one asset by id. input: { id }
+- assets.getManyByDeviceGroup — assets in a device group. input: { deviceGroupId, search?, page?, pageSize? }
 - vulnerabilities.getMany — list/search vulnerabilities (CVEs). input: { search?, page?, pageSize? }
 - vulnerabilities.getOne — one vulnerability by id. input: { id }
+- vulnerabilities.getManyByDeviceGroup — vulnerabilities affecting a device group. input: { deviceGroupId, search?, page?, pageSize? }
 - remediations.getMany — list/search remediations. input: { search?, page?, pageSize? }
 - remediations.getOne — one remediation by id. input: { id }
 - deviceGroups.getMany — list/search device groups (make/model classes). input: { search?, page?, pageSize? }
-- deviceGroups.getOne — one device group by id. input: { id }`;
+- deviceGroups.getOne — one device group by id. input: { id }
+
+Some returned objects include a "_links" map — each entry is a follow-up call you can make.
+To follow one, call query_platform_data again with that entry's "procedure" and "input"
+verbatim. Use only ids that appear in retrieved data (e.g. an asset's deviceGroup.id); never
+invent them.`;
+
+/**
+ * see src/lib/prisma-client-extensions.ts
+ * Device Groups embed HATOAS-style links to other endpoints
+ * They are HTTP hrefs the agent cannot call, so we strip them and replace
+ * them with tRPC call hints.
+ * Goal: Make "progressive disclosure" obvious to LLM
+ */
+const DEVICE_GROUP_URL_KEYS = [
+  "url",
+  "sbomUrl",
+  "vulnerabilitiesUrl",
+  "assetsUrl",
+  "deviceArtifactsUrl",
+] as const;
+
+// biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
+function linkifyDeviceGroup(dg: Record<string, any>): void {
+  const id = dg.id;
+  for (const key of DEVICE_GROUP_URL_KEYS) delete dg[key];
+  if (typeof id !== "string") return;
+  dg._links = {
+    assets: {
+      procedure: "assets.getManyByDeviceGroup",
+      input: { deviceGroupId: id },
+    },
+    vulnerabilities: {
+      procedure: "vulnerabilities.getManyByDeviceGroup",
+      input: { deviceGroupId: id },
+    },
+  };
+}
+
+/**
+ * Deep-walk a tRPC result and turn every device group's HATEOAS URLs into tRPC
+ * "_links" navigation hints
+ */
+function addNavigationLinks(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    for (const item of value) addNavigationLinks(item);
+    return value;
+  }
+  if (value !== null && typeof value === "object") {
+    // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
+    const obj = value as Record<string, any>;
+    for (const key of Object.keys(obj)) addNavigationLinks(obj[key]);
+    if ("assetsUrl" in obj || "vulnerabilitiesUrl" in obj)
+      linkifyDeviceGroup(obj);
+    return obj;
+  }
+  return value;
+}
 
 /**
  * Look up platform data on demand via the in-process authenticated tRPC caller.
@@ -47,7 +107,7 @@ export function makeQueryPlatformDataTool(userId: string) {
           return `Unknown procedure: ${procedure}`;
         }
         const result = await fn(input ?? {});
-        return JSON.stringify(result, null, 2);
+        return JSON.stringify(addNavigationLinks(result), null, 2);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return `Error calling ${procedure}: ${message}`;
@@ -55,7 +115,7 @@ export function makeQueryPlatformDataTool(userId: string) {
     },
     {
       name: "query_platform_data",
-      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device groups) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here.
+      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device groups) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here. Returned objects may carry a "_links" map of follow-up calls — call this tool again with a link's procedure and input to navigate (e.g. from an asset's device group to all its assets or vulnerabilities).
 
 ${PLATFORM_CATALOG}`,
       schema: z.object({

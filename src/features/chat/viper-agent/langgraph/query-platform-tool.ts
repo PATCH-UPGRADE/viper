@@ -75,15 +75,17 @@ function linkifyDeviceGroup(dg: Record<string, any>): void {
 }
 
 /**
- * Strip an asset's raw hourly utilization blob (high token cost, low value) and
- * replace it with a "_links.utilization" hint the model can follow on demand to
- * get the rendered schedule summary (assets.getUtilization).
+ * Strip an asset's raw hourly utilization blob (high token cost, low value) and,
+ * only when the asset actually has utilization data, replace it with a
+ * "_links.utilization" hint the model can follow on demand to get the rendered
+ * schedule summary (assets.getUtilization). Assets with no data get no link.
  */
 // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
 function linkifyAsset(asset: Record<string, any>): void {
   const id = asset.id;
+  const hasUtilization = asset.utilization != null;
   delete asset.utilization;
-  if (typeof id !== "string") return;
+  if (typeof id !== "string" || !hasUtilization) return;
   asset._links = {
     ...(asset._links ?? {}),
     utilization: {

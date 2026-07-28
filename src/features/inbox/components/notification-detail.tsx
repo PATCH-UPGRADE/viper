@@ -34,6 +34,9 @@ import { NotificationAffectedAssetsTab } from "./notification-affected-assets-ta
 import { NotificationDetailsTab } from "./notification-details-tab";
 import { NotificationRespondTab } from "./notification-respond-tab";
 import { NotificationTypeBadge } from "./notification-type-badge";
+import { NotificationQuestionTab } from "./notification-questions-tab";
+import { useSuspenseQuestionsByNotificationId } from "@/features/questions/hooks/use-questions";
+import { questionsRouter } from "@/features/questions/server/routers";
 
 const NOTIFICATION_TYPE_OPTIONS: NotificationType[] = [
   "Advisory",
@@ -139,6 +142,13 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
 
   type TabDef = { value: string; trigger: ReactNode; content: ReactNode };
 
+  const { data: questions } = useSuspenseQuestionsByNotificationId(
+    notification.id,
+  );
+  const pendingQuestionCount = questions.filter(
+    (q) => q.status === "PENDING",
+  ).length;
+
   const tabs = (
     [
       hasPlans && {
@@ -184,6 +194,23 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
             deviceGroupsMatchings={notification.deviceGroupsMatchings}
           />
         ),
+      },
+      {
+        value: "questions",
+        trigger: (
+          <>
+            Questions{" "}
+            {pendingQuestionCount > 0 && (
+              <Badge
+                variant="destructive"
+                className="rounded-full border-orange-200/80 bg-orange-50/80 dark:border-orange-900/70 dark:bg-orange-950/40"
+              >
+                {pendingQuestionCount}
+              </Badge>
+            )}
+          </>
+        ),
+        content: <NotificationQuestionTab notificationId={notification.id} />,
       },
     ] as (TabDef | false)[]
   ).filter((t): t is TabDef => Boolean(t));

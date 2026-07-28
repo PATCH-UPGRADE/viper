@@ -39,7 +39,7 @@ Run mprocs:
 mprocs
 ```
 
-Alternatively, use docker for everything (app included): `docker compose -f compose.dev.yml up`
+Alternatively, use docker: `docker compose -f compose.dev.yml up`
 * Note: I had to increase my Docker Desktop memory limit to get ts to compile
 
 ## Database Seeding

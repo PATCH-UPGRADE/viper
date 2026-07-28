@@ -15,6 +15,12 @@ Check out the documentation under the `docs` folder and also `CLAUDE.md`.
 
 Follow the guide in `.env.example` to create a `.env` file.
 
+Start Postgres (needed before running migrations/seeding, or `mprocs`):
+
+```
+docker compose -f compose.dev.yml up -d postgres
+```
+
 Install `mprocs` to run the multiple services:
 
 ```
@@ -33,7 +39,7 @@ Run mprocs:
 mprocs
 ```
 
-Alternatively, use docker: `docker compose -f compose.dev.yml up`
+Alternatively, use docker for everything (app included): `docker compose -f compose.dev.yml up`
 * Note: I had to increase my Docker Desktop memory limit to get ts to compile
 
 ## Database Seeding

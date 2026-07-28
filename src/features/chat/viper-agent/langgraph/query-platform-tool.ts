@@ -8,6 +8,11 @@ import { createAgentCaller } from "@/trpc/agent-caller";
  * query procedures, mutations are not representable — the agent cannot write.
  * Keep PLATFORM_CATALOG (below) in sync with this list.
  */
+// TODO: VW-409 -- Considering a progressive disclosure API endpoint to show
+// which issues affect which assets
+//
+// TODO: VW-XXX -- Considering a progressive disclosure API endpoint to show
+// which clinical workflows affect which assets
 export const PLATFORM_QUERY_PROCEDURES = [
   "assets.getMany",
   "assets.getOne",
@@ -15,7 +20,7 @@ export const PLATFORM_QUERY_PROCEDURES = [
   "assets.getUtilization",
   "vulnerabilities.getMany",
   "vulnerabilities.getOne",
-  "vulnerabilities.getManyByDeviceGroup",
+  "vulnerabilities.getManyByDeviceGroup", // TODO: VW-409
   "remediations.getMany",
   "remediations.getOne",
   "deviceGroups.getMany",
@@ -83,9 +88,10 @@ function linkifyDeviceGroup(dg: Record<string, any>): void {
 // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
 function linkifyAsset(asset: Record<string, any>): void {
   const id = asset.id;
+  if (typeof id !== "string") return;
   const hasUtilization = asset.utilization != null;
   delete asset.utilization;
-  if (typeof id !== "string" || !hasUtilization) return;
+  if (!hasUtilization) return;
   asset._links = {
     ...(asset._links ?? {}),
     utilization: {

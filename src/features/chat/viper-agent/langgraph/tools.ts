@@ -1,8 +1,4 @@
 /**
- * Persistent hospital-wide notes are preloaded deterministically by the graph's
- * preload node — there is no note-reading tool. Other platform data is fetched
- * on demand via query_platform_data.
- *
  * Tools are built per-request via a factory so they close over the userId
  * instead of threading it through LangGraph config.
  */

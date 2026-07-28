@@ -46,11 +46,10 @@ export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
 export const baseProcedure = t.procedure;
 
+// Be careful of these lines, this is where we handle auth for trpc endpoints
 export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
   // Trusted in-process caller: the context already carries an authenticated
-  // user. Only server-side callers (createAgentCaller) set ctx.auth — the HTTP
-  // and OpenAPI context factories never do — so external requests still fall
-  // through to session / API-key verification below.
+  // user. Only server-side callers (createAgentCaller) set ctx.auth
   if (ctx.auth?.user?.id) {
     return next({ ctx: { ...ctx, auth: ctx.auth } });
   }

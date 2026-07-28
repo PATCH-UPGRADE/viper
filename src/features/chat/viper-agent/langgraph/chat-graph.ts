@@ -48,8 +48,9 @@ case) and 'not_operational' ONLY when it's actually down. If dangerForPatient is
 tell the user to phone Siemens — those can't be filed online.
 
 ## Notes
-Persistent hospital-wide notes are provided below as context — you do not need to
-fetch them. Treat them as authoritative standing facts about this hospital.`;
+Persistent hospital-wide notes are provided below as context. Treat them as authoritative
+standing facts about this hospital.`;
+// TODO: VW-393: Add new tool for note management
 
 function buildSystemPrompt(role: UserRole): string {
   return [
@@ -65,7 +66,6 @@ export function buildChatGraph({
 }: {
   userId: string;
   userRole?: UserRole;
-  /** Overridable for tests / DB-less verification. */
   loadNotes?: () => Promise<string>;
 }) {
   const tools = buildChatTools(userId);

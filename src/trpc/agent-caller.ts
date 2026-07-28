@@ -8,12 +8,10 @@ const createCaller = createCallerFactory(appRouter);
  * An in-process, authenticated tRPC caller for the chat agent's data-access
  * tool. It injects the agent's userId as a trusted `auth` context so
  * protectedProcedure short-circuits without a session cookie or API key (see
- * src/trpc/init.ts). No HTTP hop — procedures run directly against the DB.
+ * src/trpc/init.ts).
  */
 export function createAgentCaller(userId: string) {
   return createCaller({
-    // req is unused: protectedProcedure short-circuits on the injected auth
-    // before it ever reads the request.
     // biome-ignore lint/suspicious/noExplicitAny: no real request in-process
     req: undefined as any,
     auth: { user: { id: userId } },

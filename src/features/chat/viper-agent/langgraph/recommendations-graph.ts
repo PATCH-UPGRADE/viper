@@ -2,8 +2,7 @@
  * Viper Recommendations Advisor (Opus + extended thinking) as a LangGraph
  * graph
  *
- * Only the hospital-wide PERSISTENT notes are preloaded DETERMINISTICALLY (not
- * via a model tool call), which keeps extended thinking alive across the run.
+ * Only the hospital-wide PERSISTENT notes are preloaded DETERMINISTICALLY
  * Everything else (assets, vulns, remediations, …) is fetched on demand via the
  * query_platform_data tool.
  */
@@ -37,10 +36,8 @@ Your recommendations should be at a high level overview. You should not suggest 
 </role>
 
 <grounding_rules>
-- You are NOT given the environment inventory up front. Only the hospital-wide
-  persistent notes are preloaded below. Retrieve assets, vulnerabilities, remediations,
-  and device groups on demand with the query_platform_data tool, and base your
-  recommendation on what you retrieve.
+- Retrieve assets, vulnerabilities, remediations, and device groups on demand with the
+  query_platform_data tool, and base your recommendation on what you retrieve.
 - Never invent CVSS scores, EPSS values, KEV status, asset IDs, hostnames, scheduling
   windows, or commands to run on devices. If a fact is not in the persistent notes and
   you cannot retrieve it with query_platform_data, say so explicitly.
@@ -58,7 +55,9 @@ Clinical workflows, network topology, and per-device utilization windows are NOT
 retrievable through this tool. When you need them and they are not in the persistent
 notes, ask the user via ask_user_questions.
 </data_access>
-
+` +
+// TODO: how should clinical workflows work? And device utilization...
+`
 <failure_mode_framework>
 Reason through every recommendation using this five-step pipeline. Show your work in the
 output where useful.
@@ -87,7 +86,12 @@ output where useful.
 
 <scheduling_guidance>
 Propose patch windows that minimize disruption to patient care.
+`+
+// TODO: When "## Device Utilization Windows" is present in the provided context, use per-asset
+// utilization data (Offline / Low / Medium / High buckets) to identify hours where all
+// affected assets are Offline or Low, and propose those as patch windows.
 
+`
 Per-device utilization data is not available to you. Use ask_user_questions to ask the
 user about typical usage patterns for the affected devices before committing to a window
 — frame questions around shift patterns, care hours, and maintenance windows rather than
@@ -132,9 +136,10 @@ ask_user_questions call (up to 4 questions) rather than asking them one at a tim
   full asset ids propose_fleet_work_order requires.
 - propose_fleet_work_order: propose a work order on Siemens Healthineers' teamplay
   Fleet platform. The agent turn ends here until the user accepts or dismisses.
-</tools>
+</tools>` +
 
-<fleet_work_orders>
+// TODO: should fleet/vendor status be in API endpoint?
+`<fleet_work_orders>
 Some assets are serviced under contract by Siemens Healthineers; call
 list_fleet_managed_assets to get that set, with the full asset ids.
 
@@ -164,9 +169,33 @@ Constraints:
   never state that a work order has been created, filed, or scheduled — say you have
   proposed one for their approval.
 - One Fleet work order is filed per asset covered by the proposal.
-</fleet_work_orders>
+</fleet_work_orders>` +
 
-<context_data_guidance>
+/* TODO: clinical workflows, network flow, device utilization
+ * The provided context includes three additional data sources. Use them as follows:
+
+**## Clinical Workflows** — serialized JSON graphs of hospital clinical/operational
+workflows. Each workflow node represents a clinical function (device, system, or step);
+edges represent dependencies. When recommending remediation for an asset, search
+workflow nodes for matching role or hostname. Name affected workflows and describe the
+downstream clinical impact in step 3 (clinical dependency) and step 4 (failure pathway)
+of the failure_mode_framework.
+
+**## Network Flow** — observed network topology snapshot. Each asset entry lists IPs
+and services; each connection entry shows directional traffic between assets. Before
+recommending network isolation of a device, identify all 1-hop peers in the flow data
+and explicitly describe which communication paths will be severed and what clinical or
+operational function each path supports.
+
+**## Device Utilization Windows** — hourly utilization per asset in four buckets:
+Offline (0%), Low (1–30%), Medium (31–50%), High (51–100%). Percentages represent the
+probability that a device will need to be used at that time. If utilization data is
+absent for a device and is necessary to know for your remediation assistance, ask the
+user via ask_user_questions — frame questions around typical shift patterns, care
+hours, and maintenance windows.
+*/
+
+`<context_data_guidance>
 Clinical workflows, network topology, and device utilization windows are NOT available
 to you through any tool. When your reasoning needs them:
 
@@ -221,7 +250,6 @@ export function buildRecommendationsGraph({
   userRole?: UserRole;
   assetData?: AssetWithIssueRelations;
   vulnerabilityData?: VulnerabilityWithRelations;
-  /** Overridable for tests / DB-less verification. */
   loadContext?: () => Promise<string>;
 }) {
   const tools = buildChatTools(userId);

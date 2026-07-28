@@ -20,6 +20,7 @@ export const PLATFORM_QUERY_PROCEDURES = [
 ] as const;
 
 /** Condensed, prompt-injectable catalog of the allowlisted read procedures. */
+// TODO: Model needs access to vulnerabilities.getManyByDeviceGroup (same with remediations.getMany...)
 export const PLATFORM_CATALOG = `Available read-only procedures for query_platform_data:
 - assets.getMany — list/search hospital device assets. input: { search?, page?, pageSize? }
 - assets.getOne — one asset by id. input: { id }
@@ -32,8 +33,6 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 
 /**
  * Look up platform data on demand via the in-process authenticated tRPC caller.
- * The agent is not given the full inventory up front — it uses this to fetch the
- * specific records it needs.
  */
 export function makeQueryPlatformDataTool(userId: string) {
   return tool(
@@ -56,7 +55,7 @@ export function makeQueryPlatformDataTool(userId: string) {
     },
     {
       name: "query_platform_data",
-      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device groups) on demand. You are NOT given the full inventory up front — call this to fetch the specific records you need. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here.
+      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device groups) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here.
 
 ${PLATFORM_CATALOG}`,
       schema: z.object({

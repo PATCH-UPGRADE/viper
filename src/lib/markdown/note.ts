@@ -16,7 +16,7 @@ export function renderNoteTarget(
   note: NoteRow,
   labels: NoteTargetLabels,
 ): string {
-  if (note.status === "PERSISTENT") return "Persistent (hospital-wide)";
+  if (note.status === "PERSISTENT") return "";
   const id = note.instanceId ?? "";
   switch (note.targetModel) {
     case "ASSET":

@@ -248,14 +248,15 @@ function renderVexPrompt(args: {
   };
 }): string {
   const sections: string[] = [];
+  const sourceTexts = args.sources
+    .map((s) => s.markdown?.trim())
+    .filter(Boolean);
 
-  sections.push(
-    "## Notification sources\n\n" +
-      (args.sources
-        .map((s) => s.markdown?.trim())
-        .filter(Boolean)
-        .join("\n\n---\n\n") || "_No source text._"),
-  );
+  if (sourceTexts.length > 0) {
+    sections.push(
+      "## Notification sources\n\n" + sourceTexts.join("\n\n---\n\n"),
+    );
+  }
 
   sections.push(
     "## Linked vulnerabilities\n\n" +
@@ -392,6 +393,11 @@ export async function gatherVexContextForIssue(
     where: { vulnerabilityId: issue.vulnerabilityId },
   });
 
+  const sources = await prisma.notificationSource.findMany({
+    where: { notificationId },
+    select: { markdown: true, channel: true },
+  });
+
   const notes = await getRelevantNotes({
     vulnerabilityIds: [issue.vulnerabilityId],
     remediationIds: remediations.map((r) => r.id),
@@ -414,7 +420,7 @@ export async function gatherVexContextForIssue(
   );
 
   let markdown = renderVexPrompt({
-    sources: [],
+    sources,
     vulnerabilities: [issue.vulnerability],
     remediations,
     candidateGroups: groups,

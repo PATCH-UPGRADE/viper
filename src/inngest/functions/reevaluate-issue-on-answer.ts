@@ -21,13 +21,14 @@ export const reevaluateIssueOnAnswer = inngest.createFunction(
     );
 
     await step.run("resort", async () => {
+      if (!question.answer) return { skipped: "no-answer" as const };
       const context = await gatherVexContextForIssue(
         issueId,
         question.notificationId,
         {
           title: question.title,
           reasonWhy: question.reasonWhy,
-          answer: question.answer!,
+          answer: question.answer,
         },
       );
       if (!context) return;

@@ -1,6 +1,7 @@
 /**
- * `read_memories` is NOT a model tool here — memories are preloaded
- * deterministically by the graph's loadMemories node
+ * Persistent hospital-wide notes are preloaded deterministically by the graph's
+ * preload node — there is no note-reading tool. Other platform data is fetched
+ * on demand via query_platform_data.
  *
  * Tools are built per-request via a factory so they close over the userId
  * instead of threading it through LangGraph config.
@@ -20,8 +21,8 @@ import {
   UnmanagedAssetsError,
 } from "@/features/integrations/teamplay-fleet/tracking";
 import { TicketCategory } from "@/generated/prisma";
-import { inngest } from "@/inngest/client";
 import { TOOL_REJECTED_PREFIX } from "./build-graph";
+import { makeQueryPlatformDataTool } from "./query-platform-tool";
 
 /** ```viper-ask-user ...``` block the chat UI parses to render question chips. */
 const askUserQuestions = tool(
@@ -62,72 +63,13 @@ const askUserQuestions = tool(
   },
 );
 
-/** Schedule memory create/update/delete via the manageMemoriesFn Inngest function. */
-function makeManageMemoriesTool(userId: string) {
-  return tool(
-    async ({ creations, updates, deletions }) => {
-      const operations = [
-        ...(creations ?? []).map((content) => ({ content })),
-        ...(updates ?? []).map(({ id, statement }) => ({
-          id,
-          content: statement,
-        })),
-        ...(deletions ?? []).map(({ id }) => ({ id, delete: true as const })),
-      ];
-
-      if (operations.length === 0) return "No operations to perform.";
-
-      // Publish the event; the manageMemoriesFn Inngest function persists the
-      // memory operations.
-      await inngest.send({
-        name: "app/memories.manage",
-        data: { userId, operations },
-      });
-
-      return `Scheduled ${operations.length} memory operation(s).`;
-    },
-    {
-      name: "manage_memories",
-      description: `Create, update, and/or delete memories in a single atomic operation.
-Use this to persist meaningful facts about the user (role, hospital context, recurring concerns, technical focus areas).
-Avoid duplicates — use update if a similar memory already exists.
-Do not save one-time queries or transient requests.`,
-      schema: z.object({
-        creations: z
-          .array(z.string())
-          .optional()
-          .describe("New statements to save as memories."),
-        updates: z
-          .array(
-            z.object({
-              id: z.string().describe("ID of the memory to update."),
-              statement: z
-                .string()
-                .describe("The corrected information to save."),
-            }),
-          )
-          .optional()
-          .describe("Memories to update."),
-        deletions: z
-          .array(
-            z.object({
-              id: z.string().describe("ID of the memory to delete."),
-            }),
-          )
-          .optional()
-          .describe("Memories to delete."),
-      }),
-    },
-  );
-}
-
 // ─── Siemens Healthineers Fleet work orders ──────────────────────────────────
 
 /**
  * The inventory the agent is allowed to file Fleet work orders against. Needed
- * as a tool (not just context) because the chat graph preloads memories only —
- * it has no asset context at all — and because it hands the model the FULL
- * asset ids that propose_fleet_work_order expects.
+ * as a tool (not just context) because the chat graph preloads persistent notes
+ * only — it has no asset context at all — and because it hands the model the
+ * FULL asset ids that propose_fleet_work_order expects.
  */
 const listFleetManagedAssetsTool = tool(
   async () => {
@@ -269,7 +211,7 @@ Use this when the remediation is service work Siemens would perform — a firmwa
 /** All model-facing tools for the Chat agent, bound to a user. */
 export function buildChatTools(userId: string) {
   return [
-    makeManageMemoriesTool(userId),
+    makeQueryPlatformDataTool(userId),
     askUserQuestions,
     listFleetManagedAssetsTool,
     proposeFleetWorkOrder,

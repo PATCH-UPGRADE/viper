@@ -7,12 +7,7 @@ import prisma from "@/lib/db";
 
 async function main() {
   try {
-    const user = await prisma.user.findFirstOrThrow({
-      where: { email: "user@example.com" },
-    });
-
     const result = await loadRecommendationsContextMarkdown(
-      user.id,
       "hospital administration",
     );
 

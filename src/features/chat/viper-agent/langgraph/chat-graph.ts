@@ -5,9 +5,9 @@ import {
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
 } from "@/features/chat/utils";
-import prisma from "@/lib/db";
-import { generateMemoryMarkdown } from "@/lib/markdown";
 import { buildAgentGraph } from "./build-graph";
+import { loadPersistentNotesMarkdown } from "./notes-preload";
+import { PLATFORM_CATALOG } from "./query-platform-tool";
 import { buildChatTools } from "./tools";
 
 const CHAT_MODEL = "claude-haiku-4-5-20251001";
@@ -20,11 +20,21 @@ Be concise, accurate, and prioritize patient safety in your recommendations.
 <tools>
 - ask_user_questions: ask the user 1–4 clarifying questions with suggested answers.
   The agent turn ends here until the user replies.
-- manage_memories: create, update, or delete persistent memories for this user.
+- query_platform_data: read-only lookup of assets, vulnerabilities, remediations,
+  and device groups on demand. You are NOT given the inventory up front — call
+  this to fetch the specific records you need.
 - list_fleet_managed_assets: list the assets Siemens Healthineers services.
 - propose_fleet_work_order: propose a work order on Siemens Healthineers'
   teamplay Fleet platform. Your turn ends here until the user accepts or dismisses.
 </tools>
+
+## Data access
+You are NOT given the full asset/vulnerability/remediation inventory in your
+context. When a question needs specific records, fetch them with
+query_platform_data and answer from what you retrieve — never invent ids, CVSS
+scores, versions, or hostnames.
+
+${PLATFORM_CATALOG}
 
 ## Siemens Healthineers Fleet work orders
 Only assets returned by list_fleet_managed_assets are eligible — check first, and if
@@ -37,12 +47,9 @@ operationalStatus use 'partially_operational' for a working/degraded device (the
 case) and 'not_operational' ONLY when it's actually down. If dangerForPatient is 'yes',
 tell the user to phone Siemens — those can't be filed online.
 
-## Memory
-Your saved memories about this user are provided below as context — you do not
-need to fetch them. Save new persistent facts (role, hospital context, recurring
-concerns, technical focus, preferences) with manage_memories. Do NOT save
-one-time queries or transient requests. Avoid duplicates — update existing
-memories (by id) rather than creating near-identical ones; delete stale ones.`;
+## Notes
+Persistent hospital-wide notes are provided below as context — you do not need to
+fetch them. Treat them as authoritative standing facts about this hospital.`;
 
 function buildSystemPrompt(role: UserRole): string {
   return [
@@ -51,25 +58,15 @@ function buildSystemPrompt(role: UserRole): string {
   ].join("\n\n");
 }
 
-type MemoryRow = { id: string; content: string | null };
-
-/** Default memory source — overridable for tests / DB-less verification. */
-function prismaMemoryLoader(userId: string): () => Promise<MemoryRow[]> {
-  return () =>
-    prisma.memory.findMany({
-      where: { userId },
-      orderBy: { createdAt: "asc" },
-    });
-}
-
 export function buildChatGraph({
   userId,
   userRole = "hospital administration",
-  loadMemories = prismaMemoryLoader(userId),
+  loadNotes = loadPersistentNotesMarkdown,
 }: {
   userId: string;
   userRole?: UserRole;
-  loadMemories?: () => Promise<MemoryRow[]>;
+  /** Overridable for tests / DB-less verification. */
+  loadNotes?: () => Promise<string>;
 }) {
   const tools = buildChatTools(userId);
   const model = new ChatAnthropic({
@@ -82,6 +79,6 @@ export function buildChatGraph({
     model,
     tools,
     systemMessage: new SystemMessage(buildSystemPrompt(userRole)),
-    preload: async () => generateMemoryMarkdown(await loadMemories()),
+    preload: loadNotes,
   });
 }

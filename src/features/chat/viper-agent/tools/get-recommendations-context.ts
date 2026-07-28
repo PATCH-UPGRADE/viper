@@ -8,7 +8,6 @@ import prisma from "@/lib/db";
 import {
   assetToMarkdown,
   deviceGroupLabel,
-  generateMemoryMarkdown,
   generateWorkflowsMarkdown,
   remediationToMarkdown,
   renderUtilization,
@@ -327,17 +326,15 @@ function generateContextMarkdown(
 }
 
 /**
- * Loads the full recommendations context (memories + assets + vulns +
- * remediations + workflows + network flow + utilization) as markdown.
- * The recommendations graph preloads this deterministically (not as a model
- * tool call).
+ * Loads the full environment context (assets + vulns + remediations + workflows
+ * + network flow + utilization) as markdown. No longer wired into the
+ * recommendations graph (which fetches data on demand via query_platform_data);
+ * retained for the print-recommendations-context debug script.
  */
 export async function loadRecommendationsContextMarkdown(
-  userId: string,
   userRole?: string,
 ): Promise<string> {
   const [
-    memories,
     assets,
     vulnerabilities,
     remediations,
@@ -345,10 +342,6 @@ export async function loadRecommendationsContextMarkdown(
     networkTopology,
     fleetAssets,
   ] = await Promise.all([
-    prisma.memory.findMany({
-      where: { userId },
-      orderBy: { createdAt: "asc" },
-    }),
     prisma.asset.findMany({ include: assetContextInclude }),
     prisma.vulnerability.findMany({ include: vulnerabilityContextInclude }),
     prisma.remediation.findMany({ include: remediationContextInclude }),
@@ -361,5 +354,13 @@ export async function loadRecommendationsContextMarkdown(
     fleetAssets.map((a) => [a.assetId, a.equipmentKey]),
   );
 
-  return `${generateMemoryMarkdown(memories)}\n\n---\n\n${generateContextMarkdown(assets, vulnerabilities, remediations, workflows, networkTopology, fleetManaged, userRole)}`;
+  return generateContextMarkdown(
+    assets,
+    vulnerabilities,
+    remediations,
+    workflows,
+    networkTopology,
+    fleetManaged,
+    userRole,
+  );
 }

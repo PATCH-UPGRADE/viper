@@ -3,10 +3,10 @@
  *
  *   preload (deterministic context) -> agent <-> tools
  *
- * - preload: loads mandatory context (memories, or full recommendations
- *   context) and injects it as a user-role message. Deterministic — NOT a
- *   forced model tool call — so extended thinking survives
- *   and the context is guaranteed loaded once per run.
+ * - preload: loads mandatory context (the hospital-wide persistent notes) and
+ *   injects it as a user-role message. Deterministic — NOT a forced model tool
+ *   call — so extended thinking survives and the context is guaranteed loaded
+ *   once per run.
  * - agent: the model (with tools bound), prepended with the system message.
  * - tools: ToolNode; if a HALT_TOOL was called, END so the user can act on it
  *   (human-in-the-loop): answer the questions, or accept/dismiss the proposed

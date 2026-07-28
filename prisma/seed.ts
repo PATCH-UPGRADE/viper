@@ -4,6 +4,7 @@ import {
   type AssetStatus,
   AuthType,
   IntegrationType,
+  NoteStatus,
   NotificationChannel,
   Priority,
   ResourceType,
@@ -737,14 +738,13 @@ const SAMPLE_VULNERABILITIES = [
   },
 ];
 
-const SAMPLE_MEMORIES = [
+// Hospital-wide PERSISTENT notes — always injected into the agents' context.
+const SAMPLE_NOTES = [
   {
-    content:
-      "The hospital is a rural, critical access hospital with 12 inpatient beds.",
+    text: "The hospital is a rural, critical access hospital with 12 inpatient beds.",
   },
   {
-    content:
-      "If applying a patch to an OT device, unless it has already been tested by the vendor, the device should be validated after patching to ensure that its essential clinical functionality hasn't been compromised. This process can often be time intensive and should be accounted for as applicable in remediation recommendations.",
+    text: "If applying a patch to an OT device, unless it has already been tested by the vendor, the device should be validated after patching to ensure that its essential clinical functionality hasn't been compromised. This process can often be time intensive and should be accounted for as applicable in remediation recommendations.",
   },
 ];
 
@@ -1190,7 +1190,8 @@ async function clearDatabase() {
   await prisma.asset.deleteMany();
   await prisma.deviceGroup.deleteMany();
   await prisma.integration.deleteMany();
-  await prisma.memory.deleteMany();
+  // Note cascades to EntityFilter/EntityFilterMatch; Question.resultingNoteId is SetNull.
+  await prisma.note.deleteMany();
   await prisma.categoryColor.deleteMany();
   await prisma.department.deleteMany();
 
@@ -1696,22 +1697,23 @@ async function seedRemediations(userId: string) {
   return successfulRemediations;
 }
 
-async function seedMemories(userId: string) {
-  console.log("\n🌱 Seeding memories...");
+async function seedNotes(userId: string) {
+  console.log("\n🌱 Seeding notes...");
 
-  const memories = await Promise.all(
-    SAMPLE_MEMORIES.map((memory) =>
-      prisma.memory.create({
+  const notes = await Promise.all(
+    SAMPLE_NOTES.map((note) =>
+      prisma.note.create({
         data: {
-          content: memory.content,
+          text: note.text,
+          status: NoteStatus.PERSISTENT,
           userId,
         },
       }),
     ),
   );
 
-  console.log(`✅ Seeded ${memories.length} memories`);
-  return memories;
+  console.log(`✅ Seeded ${notes.length} notes`);
+  return notes;
 }
 
 async function seedWorkflows(userId: string) {
@@ -2184,7 +2186,7 @@ async function main() {
     await seedDeviceArtifacts(user.id);
     await seedRemediations(user.id);
     await seedWorkflows(user.id);
-    await seedMemories(user.id);
+    await seedNotes(user.id);
     await seedWorkOrderTickets(user.id);
 
     console.log("\n✅ Database seeding completed successfully!");

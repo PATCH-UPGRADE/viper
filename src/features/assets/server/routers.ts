@@ -7,6 +7,7 @@ import {
   Severity,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { renderUtilization } from "@/lib/markdown";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
@@ -409,6 +410,19 @@ export const assetsRouter = createTRPCRouter({
         include: assetInclude,
       });
       return requireExistence(asset, "Asset");
+    }),
+
+  // Internal: a single asset's utilization schedule rendered as a readable summary.
+  // Used by the chat agent's query_platform_data tool for progressive disclosure
+  getUtilization: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const asset = await prisma.asset.findUnique({
+        where: { id: input.id },
+        select: { utilization: true },
+      });
+      const found = requireExistence(asset, "Asset");
+      return { utilization: renderUtilization(found.utilization) };
     }),
 
   // POST /api/assets - Create asset

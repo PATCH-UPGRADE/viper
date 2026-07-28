@@ -12,6 +12,7 @@ export const PLATFORM_QUERY_PROCEDURES = [
   "assets.getMany",
   "assets.getOne",
   "assets.getManyByDeviceGroup",
+  "assets.getUtilization",
   "vulnerabilities.getMany",
   "vulnerabilities.getOne",
   "vulnerabilities.getManyByDeviceGroup",
@@ -26,6 +27,7 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - assets.getMany — list/search hospital device assets. input: { search?, page?, pageSize? }
 - assets.getOne — one asset by id. input: { id }
 - assets.getManyByDeviceGroup — assets in a device group. input: { deviceGroupId, search?, page?, pageSize? }
+- assets.getUtilization — one asset's utilization schedule, as a readable summary. input: { id }
 - vulnerabilities.getMany — list/search vulnerabilities (CVEs). input: { search?, page?, pageSize? }
 - vulnerabilities.getOne — one vulnerability by id. input: { id }
 - vulnerabilities.getManyByDeviceGroup — vulnerabilities affecting a device group. input: { deviceGroupId, search?, page?, pageSize? }
@@ -37,7 +39,8 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 Some returned objects include a "_links" map — each entry is a follow-up call you can make.
 To follow one, call query_platform_data again with that entry's "procedure" and "input"
 verbatim. Use only ids that appear in retrieved data (e.g. an asset's deviceGroup.id); never
-invent them.`;
+invent them. When a patch/service window matters, follow the asset's "_links.utilization"
+to get a readable schedule summary.`;
 
 /**
  * see src/lib/prisma-client-extensions.ts
@@ -72,6 +75,25 @@ function linkifyDeviceGroup(dg: Record<string, any>): void {
 }
 
 /**
+ * Strip an asset's raw hourly utilization blob (high token cost, low value) and
+ * replace it with a "_links.utilization" hint the model can follow on demand to
+ * get the rendered schedule summary (assets.getUtilization).
+ */
+// biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
+function linkifyAsset(asset: Record<string, any>): void {
+  const id = asset.id;
+  delete asset.utilization;
+  if (typeof id !== "string") return;
+  asset._links = {
+    ...(asset._links ?? {}),
+    utilization: {
+      procedure: "assets.getUtilization",
+      input: { id },
+    },
+  };
+}
+
+/**
  * Deep-walk a tRPC result and turn every device group's HATEOAS URLs into tRPC
  * "_links" navigation hints
  */
@@ -86,6 +108,7 @@ function addNavigationLinks(value: unknown): unknown {
     for (const key of Object.keys(obj)) addNavigationLinks(obj[key]);
     if ("assetsUrl" in obj || "vulnerabilitiesUrl" in obj)
       linkifyDeviceGroup(obj);
+    if ("utilization" in obj) linkifyAsset(obj);
     return obj;
   }
   return value;

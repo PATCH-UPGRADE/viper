@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
+import { getScopedNotesByInstance } from "@/features/notes/server/get-relevant-notes";
 import {
   IssueStatus,
   type Prisma,
@@ -84,10 +85,23 @@ export const assetsRouter = createTRPCRouter({
 
       const where = createSearchFilter(search);
 
-      return fetchPaginated(prisma.asset, input, {
+      const result = await fetchPaginated(prisma.asset, input, {
         where: where,
         include: assetInclude,
       });
+
+      const notesByAsset = await getScopedNotesByInstance(
+        "ASSET",
+        result.items.map((a) => a.id),
+      );
+
+      return {
+        ...result,
+        items: result.items.map((a) => ({
+          ...a,
+          notes: notesByAsset.get(a.id) ?? [],
+        })),
+      };
     }),
 
   // GET /api/deviceGroups/{deviceGroupId}/assets - List assets for a device group
@@ -409,7 +423,9 @@ export const assetsRouter = createTRPCRouter({
         where: { id: input.id },
         include: assetInclude,
       });
-      return requireExistence(asset, "Asset");
+      const found = requireExistence(asset, "Asset");
+      const notesByAsset = await getScopedNotesByInstance("ASSET", [found.id]);
+      return { ...found, notes: notesByAsset.get(found.id) ?? [] };
     }),
 
   // Internal: a single asset's utilization schedule rendered as a readable summary.

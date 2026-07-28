@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getScopedNotesByInstance } from "@/features/notes/server/get-relevant-notes";
 import { type AlohaStatus, Priority, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
@@ -94,7 +95,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
           })
         : [];
 
-      return fetchPaginated(prisma.vulnerability, input, {
+      const result = await fetchPaginated(prisma.vulnerability, input, {
         where: searchFilter,
         include: vulnerabilityInclude,
         orderBy:
@@ -102,6 +103,19 @@ export const vulnerabilitiesRouter = createTRPCRouter({
             ? [...sortClauses, { updatedAt: "desc" }]
             : { updatedAt: "desc" },
       });
+
+      const notesByVuln = await getScopedNotesByInstance(
+        "VULNERABILITY",
+        result.items.map((v) => v.id),
+      );
+
+      return {
+        ...result,
+        items: result.items.map((v) => ({
+          ...v,
+          notes: notesByVuln.get(v.id) ?? [],
+        })),
+      };
     }),
 
   // GET /api/deviceGroups/{deviceGroupId}/vulnerabilities - List vulnerabilities for a device group
@@ -170,7 +184,11 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         where: { id: input.id },
         include: vulnerabilityInclude,
       });
-      return requireExistence(vuln, "Vulnerability");
+      const found = requireExistence(vuln, "Vulnerability");
+      const notesByVuln = await getScopedNotesByInstance("VULNERABILITY", [
+        found.id,
+      ]);
+      return { ...found, notes: notesByVuln.get(found.id) ?? [] };
     }),
 
   // POST /api/vulnerabilities - Create vulnerability

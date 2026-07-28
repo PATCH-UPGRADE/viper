@@ -41,6 +41,11 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - deviceGroups.getMany — list/search device groups (make/model classes). input: { search?, page?, pageSize? }
 - deviceGroups.getOne — one device group by id. input: { id }
 
+Assets, vulnerabilities, and remediations each include a "notes" array of resolved,
+entity-specific notes ({ id, text }) — device/vuln/remediation caveats a human recorded
+(e.g. "this asset moved its password store to SSO"). Read them; they are authoritative and
+may change your recommendation. (Hospital-wide persistent notes are provided separately.)
+
 Some returned objects include a "_links" map — each entry is a follow-up call you can make.
 To follow one, call query_platform_data again with that entry's "procedure" and "input"
 verbatim. Use only ids that appear in retrieved data (e.g. an asset's deviceGroup.id); never

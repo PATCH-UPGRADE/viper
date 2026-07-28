@@ -2,7 +2,6 @@ import "server-only";
 import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
 import { type NoteTargetLabels, renderNoteTarget } from "@/lib/markdown/note";
 
-
 /**
  * Example:
  *
@@ -16,9 +15,6 @@ export async function loadPersistentNotesMarkdown(): Promise<string> {
     return "## Notes (hospital-wide)\n\n_No persistent notes saved yet._";
   }
   return (
-    "## Notes (hospital-wide)\n\n" +
-    notes
-      .map((n) => `- ${n.text}`)
-      .join("\n")
+    "## Notes (hospital-wide)\n\n" + notes.map((n) => `- ${n.text}`).join("\n")
   );
 }

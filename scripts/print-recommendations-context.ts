@@ -2,7 +2,7 @@
 
 // Debug script: prints the prompt the recommendations agent receives before its
 // first turn — the system message plus the deterministically preloaded context
-// message — largely just for token counting. 
+// message — largely just for token counting.
 
 import Module from "node:module";
 import { fileURLToPath } from "node:url";

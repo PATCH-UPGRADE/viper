@@ -1,6 +1,10 @@
 import "server-only";
+import { persistMitigationPlans } from "@/features/inbox/agent/mitigation/persist";
+import { triageNotification } from "@/features/inbox/agent/triage";
+import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
 import { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { inngest } from "../client";
 
 export type PreparedRemediation =
   | { skipped: "no-vulnerability" }
@@ -95,3 +99,48 @@ export async function prepareRemediationNotification(
     throw e;
   }
 }
+
+export const analyzeRemediation = inngest.createFunction(
+  { id: "analyze-remediation" },
+  { event: "remediation/analysis.requested" },
+  async ({ event, step }) => {
+    const { remediationId } = event.data as { remediationId: string };
+
+    const prepared = await step.run("prepare-notification", () =>
+      prepareRemediationNotification(remediationId),
+    );
+    if ("skipped" in prepared) {
+      return { skipped: prepared.skipped, remediationId };
+    }
+    const { notificationId, sourceId } = prepared;
+
+    const vexSummary = await step.run("sort-vulnerabilities", () =>
+      sortNotificationVulnerabilities(notificationId),
+    );
+
+    await step.run("triage-notification", async () => {
+      const result = await triageNotification(sourceId, notificationId);
+      await prisma.notification.update({
+        where: { id: notificationId },
+        data: {
+          priority: result.priority,
+          priorityReasonWhy: result.priorityReasonWhy,
+          hospitalImpact: result.hospitalImpact,
+        },
+      });
+      return { priority: result.priority };
+    });
+
+    const mitigationSummary = await step.run("create-mitigation-plans", () =>
+      persistMitigationPlans(sourceId, notificationId),
+    );
+
+    return {
+      remediationId,
+      notificationId,
+      sourceId,
+      vexSummary,
+      mitigationSummary,
+    };
+  },
+);

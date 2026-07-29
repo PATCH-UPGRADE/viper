@@ -98,13 +98,29 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
 
 The pipeline makes several Anthropic calls (relevance triage, classification, entity extraction, hospital-impact triage), so `ANTHROPIC_API_KEY` must be set in `.env` or the run fails partway through.
 
-## 7. Send a test email
+## 7. Prepare the hospital environment (optional)
+
+To exercise the VEX, triage and mitigation agents, the platform needs assets, device groups and vulnerabilities the incoming advisory can actually link to. `scripts/seed-advisory-environment.ts` sets that up for two real Siemens Healthineers advisories:
+
+```bash
+npx tsx scripts/seed-advisory-environment.ts
+```
+
+It **deletes every notification** and both advisory vulnerabilities, then rebuilds the substrate: device groups, assets, remediations, and notes that give the VEX agent grounds to mark some assets `NOT_AFFECTED` while their siblings stay `AFFECTED`. It never creates a notification — that has to come from the pipeline, which is the point.
+
+The script prints a summary and exits non-zero if the environment came out unusable. It requires `npm run db:seed` to have run first (it needs `user@example.com`) and refuses to run against a non-local `DATABASE_URL`.
+
+Don't run it alongside `scripts/seed-notifications.ts` — that script creates notifications for the same two advisories, which is exactly the state this one clears.
+
+## 8. Send a test email
 
 From your **personal** account, email your `@…resend.app` address. Attach a PDF if you want to exercise attachment handling.
 
+If you seeded the environment in step 7, send one of the two advisories it covers — Siemens Healthineers **SSA-016040** (syngo.plaza VB30E, CVE-2024-52334) or the **syngo deserialization** advisory (CVE-2022-29875). Anything else will still create a notification, but it will have nothing to link to and the VEX step will be skipped.
+
 Write it like a genuine security advisory. The first agent in the chain decides whether the email is relevant at all, and drops marketing, newsletters and meeting invites as `not_relevant` before anything else runs — a "test test test" email will be correctly ignored.
 
-## 8. Watch it run
+## 9. Watch it run
 
 Resend POSTs to `/api/email`, which enqueues an Inngest event.
 
@@ -126,4 +142,5 @@ Note the webhook payload is **metadata only** — no body, no attachment bytes. 
 | Webhook never arrives | Tunnel died, so its URL changed | Restart it, update the webhook URL |
 | Gmail bounces with "Message blocked" | Workspace blocks `*.resend.app` | Send from a personal account (step 1) |
 | Run returns `{skipped: true, reason: "duplicate"}` | That email was already processed — `externalId` is unique | Send a new email |
-| Run returns `{skipped: true}` | Triage judged the email `not_relevant` | Write a realistic advisory (step 7) |
+| Run returns `{skipped: true}` | Triage judged the email `not_relevant` | Write a realistic advisory (step 8) |
+| `sort-vulnerabilities` returns `{vexSkipped: true}` | The notification linked no vulnerability, so there is nothing to sort | Seed the environment and send a matching advisory (step 7) |

@@ -155,7 +155,15 @@ function assertLocalDatabase() {
 }
 
 async function getSeedUser() {
-  return prisma.user.findUniqueOrThrow({ where: { email: SEED_USER_EMAIL } });
+  const user = await prisma.user.findUnique({
+    where: { email: SEED_USER_EMAIL },
+  });
+  if (!user) {
+    throw new Error(
+      `No ${SEED_USER_EMAIL} in this database — run "npm run db:seed" first, then re-run this script.`,
+    );
+  }
+  return user;
 }
 
 function seededSerials() {

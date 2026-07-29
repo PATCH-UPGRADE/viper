@@ -54,17 +54,17 @@ export const BUCKET_META: Record<
   AFFECTED: {
     title: "Needs Attention",
     description: "Assets affected by a vulnerability.",
-    accent: "red-500",
+    accent: "border-l-red-500",
   },
   UNDER_INVESTIGATION: {
     title: "Needs Information",
     description: "Assets under investigation for a vulnerability.",
-    accent: "yellow-500",
+    accent: "border-l-yellow-500",
   },
   NOT_AFFECTED: {
     title: "Needs Confirmation",
     description: "Assets assessed as not affected.",
-    accent: "green-500",
+    accent: "border-l-green-500",
   },
   NO_ISSUES: {
     title: "Not Yet Triaged",
@@ -319,12 +319,7 @@ export function BucketAccordion({
   const totalAssets = groups.reduce((sum, g) => sum + g.assetCount, 0);
 
   return (
-    <Card
-      className={cn(
-        "border-l-4 py-0 gap-0 overflow-clip",
-        `border-l-${accent}`,
-      )}
-    >
+    <Card className={cn("border-l-4 py-0 gap-0 overflow-clip", `${accent}`)}>
       <AccordionItem value={bucket} className="border-b-0">
         <AccordionTrigger className="items-center px-4">
           <div className="flex w-full items-center justify-between gap-4">

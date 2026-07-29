@@ -283,35 +283,47 @@ describe("Remediations Endpoint (/remediations)", () => {
       .set(authHeader)
       .send(payloadWithVuln);
 
+    expect(createRes.status).toBe(200);
+    const remediationId = createRes.body.remediation.id;
+
+    // Creating a remediation fires remediation/analysis.requested
+    // (fire-and-forget). Delete the remediation now so that job's prepare step
+    // finds it gone and no-ops — otherwise it runs the LLM enrichment and leaves
+    // a Notification subtree behind. Assertions below read the in-memory
+    // response, so the DB delete does not affect them.
+    await prisma.remediation
+      .delete({ where: { id: remediationId } })
+      .catch(() => {});
+
     onTestFinished(async () => {
-      await prisma.vulnerability
-        .delete({
-          where: { id: vulnerabilityId },
-        })
-        .catch(() => {
-          /* already deleted */
-        });
-      await prisma.deviceGroup
-        .deleteMany({
+      // If the analysis job won the race and built a notification anyway, remove
+      // it (deleting the notification cascades its source, mappings, mitigation
+      // plans, and draft work orders).
+      const src = await prisma.notificationSource
+        .findUnique({
           where: {
-            cpe: {
-              has: newCpe,
+            channel_externalId: {
+              channel: "PolledApi",
+              externalId: remediationId,
             },
           },
+          select: { notificationId: true },
         })
-        .catch(() => {});
-    });
-
-    expect(createRes.status).toBe(200);
-
-    onTestFinished(async () => {
+        .catch(() => null);
+      if (src?.notificationId) {
+        await prisma.notification
+          .delete({ where: { id: src.notificationId } })
+          .catch(() => {});
+      }
       await prisma.remediation
-        .delete({
-          where: { id: createRes.body.id },
-        })
-        .catch(() => {
-          /* already deleted */
-        });
+        .delete({ where: { id: remediationId } })
+        .catch(() => {});
+      await prisma.vulnerability
+        .delete({ where: { id: vulnerabilityId } })
+        .catch(() => {});
+      await prisma.deviceGroup
+        .deleteMany({ where: { cpe: { has: newCpe } } })
+        .catch(() => {});
     });
 
     // TODO: Remediation POST now returns { remediation, uploadInstructions }

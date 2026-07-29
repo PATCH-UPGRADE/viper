@@ -29,12 +29,7 @@ export async function prepareRemediationNotification(
 ): Promise<PreparedRemediation> {
   const remediation = await prisma.remediation.findUnique({
     where: { id: remediationId },
-    select: {
-      id: true,
-      description: true,
-      narrative: true,
-      vulnerabilityId: true,
-    },
+    select: { description: true, narrative: true, vulnerabilityId: true },
   });
   if (!remediation?.vulnerabilityId) return { skipped: "no-vulnerability" };
   const vulnerabilityId = remediation.vulnerabilityId;
@@ -50,8 +45,10 @@ export async function prepareRemediationNotification(
   });
 
   const title = `Update available for ${vuln?.cveId ?? "a tracked vulnerability"}`;
-  const summary = remediation.description ?? remediation.narrative ?? null;
-  const markdown = remediation.narrative ?? remediation.description ?? null;
+  // `||` not `??`: the input schema allows description/narrative to be "",
+  // which should fall through to the next source rather than blank the field.
+  const summary = remediation.description || remediation.narrative || null;
+  const markdown = remediation.narrative || remediation.description || null;
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -71,7 +68,7 @@ export async function prepareRemediationNotification(
         data: {
           notificationId: notification.id,
           vulnerabilityId,
-          confidence: "Confirmed",
+          confidence: "Matched",
           reasonWhy: "Vulnerability declared by the TA4 remediation.",
         },
       });
@@ -79,7 +76,7 @@ export async function prepareRemediationNotification(
         data: {
           notificationId: notification.id,
           remediationId,
-          confidence: "Confirmed",
+          confidence: "Matched",
           reasonWhy: "Source remediation for this update.",
         },
       });

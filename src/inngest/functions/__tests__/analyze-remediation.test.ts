@@ -22,6 +22,7 @@ const { mockPrisma } = vi.hoisted(() => {
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
+import { Prisma } from "@/generated/prisma";
 import { prepareRemediationNotification } from "../analyze-remediation";
 
 const REMEDIATION_ID = "rem-1";
@@ -84,6 +85,7 @@ describe("prepareRemediationNotification", () => {
       data: expect.objectContaining({
         notificationId: "notif-1",
         vulnerabilityId: "vuln-1",
+        confidence: "Matched",
       }),
     });
     expect(
@@ -92,6 +94,7 @@ describe("prepareRemediationNotification", () => {
       data: expect.objectContaining({
         notificationId: "notif-1",
         remediationId: REMEDIATION_ID,
+        confidence: "Matched",
       }),
     });
   });
@@ -115,6 +118,34 @@ describe("prepareRemediationNotification", () => {
 
     expect(result).toEqual({ notificationId: "notif-1", sourceId: "src-1" });
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.notification.create).not.toHaveBeenCalled();
+  });
+
+  it("recovers from a P2002 race by reusing the concurrently-created source", async () => {
+    mockPrisma.remediation.findUnique.mockResolvedValue({
+      id: REMEDIATION_ID,
+      description: "d",
+      narrative: "n",
+      vulnerabilityId: "vuln-1",
+    });
+    mockPrisma.vulnerability.findUnique.mockResolvedValue({
+      cveId: "CVE-2024-9999",
+    });
+    // Pre-transaction check finds nothing; the catch-branch recheck finds the
+    // row a concurrent run committed between the check and our insert.
+    mockPrisma.notificationSource.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "src-1", notificationId: "notif-1" });
+    mockPrisma.$transaction.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "test",
+      }),
+    );
+
+    const result = await prepareRemediationNotification(REMEDIATION_ID);
+
+    expect(result).toEqual({ notificationId: "notif-1", sourceId: "src-1" });
     expect(mockPrisma.notification.create).not.toHaveBeenCalled();
   });
 });

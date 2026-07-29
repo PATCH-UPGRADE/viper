@@ -12,8 +12,6 @@ const SYNGO_PLAZA_CVE = "CVE-2024-52334";
 const DESERIALIZATION_CVE = "CVE-2022-29875";
 const ADVISORY_CVES = [SYNGO_PLAZA_CVE, DESERIALIZATION_CVE];
 
-// The two assets VEX is expected to except. Everything else must stay AFFECTED,
-// so these are the only seeded assets allowed to carry a note.
 const SYNGO_PLAZA_EXCEPTION_SERIAL = "SYNGO-PLZ-VB30E-003";
 const DESERIALIZATION_EXCEPTION_SERIAL = "MAGNETOM-VA30A-001";
 const EXCEPTION_SERIALS = [
@@ -32,8 +30,6 @@ type AssetSpec = {
   location: { facility: string; building: string; floor: string; room: string };
 };
 
-// Duplicated from scripts/seed-notifications.ts rather than imported: that module
-// calls main() at import time, so importing anything from it would run the other seed.
 function upsertVendor(name: string) {
   const canonicalName = name.trim().toLowerCase();
   return prisma.vendor.upsert({
@@ -110,9 +106,6 @@ async function upsertAsset(
     where: { serialNumber: spec.serialNumber },
   });
 
-  // Serial is the identity; everything else is reconciled to the spec. Without
-  // this, editing a version or hostname here leaves the existing row untouched —
-  // silently stranding the asset in its old device group or old name.
   if (existing) {
     return prisma.asset.update({
       where: { id: existing.id },
@@ -179,9 +172,6 @@ async function seededAssetIds() {
   return assets.map((asset) => asset.id);
 }
 
-// Deleting the two vulnerabilities is what clears their Issues (Issue.vulnerabilityId
-// is onDelete: Cascade). Without it, a previous run's VEX determinations survive and
-// the next run measures them instead of its own.
 async function resetInboxEnvironment() {
   const notifications = await prisma.notification.deleteMany({});
   const orphanSources = await prisma.notificationSource.deleteMany({
@@ -190,18 +180,12 @@ async function resetInboxEnvironment() {
   const draftTickets = await prisma.workOrderTicket.deleteMany({
     where: { isDraft: true },
   });
-  // Before the vulnerabilities, not after: Remediation.vulnerabilityId is SetNull,
-  // so deleting the vulnerability first would strand these as orphans that
-  // searchRemediation still offers the match agent as candidates.
   const remediations = await prisma.remediation.deleteMany({
     where: { vulnerability: { cveId: { in: ADVISORY_CVES } } },
   });
   const vulnerabilities = await prisma.vulnerability.deleteMany({
     where: { cveId: { in: ADVISORY_CVES } },
   });
-  // Any note on a seeded asset reaches VEX through getRelevantNotes({ assetIds }).
-  // seed-notifications.ts leaves one on pacs-syngo-02, and answering a Question
-  // leaves one too — either would except an asset this scenario needs AFFECTED.
   const notes = await prisma.note.deleteMany({
     where: {
       targetModel: ScopeTargetModel.ASSET,
@@ -310,8 +294,7 @@ async function seedSyngoPlazaEnvironment(userId: string) {
           },
         ],
       },
-      // Inline connect is required: the vulnerabilityExtension opens one baseline
-      // Issue per matching linked at create time. Linking later creates none.
+      // Must be inline: the extension opens baseline Issues only for matchings linked in this create.
       deviceGroupMatchings: { connect: { id: matching.id } },
     },
   });
@@ -359,8 +342,7 @@ const DESERIALIZATION_MATCHINGS: Array<{
   },
   { product: "MAMMOMAT Revelation", version: "VC20" },
   { product: "NAEOTOM Alpha", version: "VA40" },
-  // "All versions < VA30 SP5 or VA40 SP2" — SP5 and SP2 are the fixes, so the
-  // affected set is the builds below them on each track, not the fix itself.
+  // VA30 SP5 / VA40 SP2 are the fixes, so the affected set is the builds below them.
   ...SOMATOM_PRODUCTS.map((product) => ({
     product,
     versionRange: SOMATOM_AFFECTED_RANGE,
@@ -552,8 +534,7 @@ const DESERIALIZATION_EXCEPTION_NOTE =
 async function seedDeserializationEnvironment(userId: string) {
   console.log("\n🌱 syngo deserialization environment (SSA-220609)...");
 
-  // Sequential: several products share a canonical version ("VA30 SP5", "VB22"),
-  // and concurrent upserts of the same Version race on its unique key.
+  // Sequential, not Promise.all: products share canonical versions and race on the unique key.
   const matchings = [];
   for (const spec of DESERIALIZATION_MATCHINGS) {
     matchings.push(await upsertMatching(spec));
@@ -671,8 +652,6 @@ async function printEnvironmentSummary() {
     }
   }
 
-  // The exception notes are the whole mechanism: exactly these assets carry one,
-  // and no other seeded asset does, or VEX excepts a host meant to stay AFFECTED.
   const notedAssets = await prisma.asset.findMany({
     where: { serialNumber: { in: seededSerials() } },
     select: { id: true, hostname: true, serialNumber: true },

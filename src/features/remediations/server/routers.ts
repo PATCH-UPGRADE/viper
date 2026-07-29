@@ -4,6 +4,7 @@ import {
   type Prisma,
   ResourceType,
 } from "@/generated/prisma";
+import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
@@ -166,6 +167,15 @@ export const remediationsRouter = createTRPCRouter({
           include: remediationInclude,
         });
       });
+
+      inngest
+        .send({
+          name: "remediation/analysis.requested",
+          data: { remediationId: result.id },
+        })
+        .catch((err) => {
+          console.error("Failed to dispatch remediation analysis event:", err);
+        });
 
       return {
         remediation: transformArtifactWrapper(result),

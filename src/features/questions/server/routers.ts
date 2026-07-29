@@ -4,6 +4,7 @@ import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { renderQnA } from "@/lib/markdown/note";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { questionInclude } from "../types";
 
 export const questionsRouter = createTRPCRouter({
   getManyByNotificationId: protectedProcedure
@@ -12,15 +13,7 @@ export const questionsRouter = createTRPCRouter({
       prisma.question.findMany({
         where: { notificationId: input.notificationId },
         orderBy: { createdAt: "asc" },
-        include: {
-          issue: {
-            include: {
-              vulnerability: true,
-              deviceGroupMatching: true,
-              asset: true,
-            },
-          },
-        },
+        include: questionInclude,
       }),
     ),
   getManyByIssueId: protectedProcedure
@@ -29,6 +22,7 @@ export const questionsRouter = createTRPCRouter({
       prisma.question.findMany({
         where: { issueId: input.issueId },
         orderBy: { createdAt: "asc" },
+        include: questionInclude,
       }),
     ),
 
@@ -71,6 +65,16 @@ export const questionsRouter = createTRPCRouter({
         if (updated.count === 0) {
           throw new Error(`Question is already resolved`);
         }
+        if (input.action !== "dismiss") {
+          await inngest.send({
+            name: "issue/question.answered",
+            data: {
+              issueId: question.issueId,
+              questionId: input.questionId,
+              action: input.action,
+            },
+          });
+        }
         return { status };
       }
 
@@ -104,7 +108,11 @@ export const questionsRouter = createTRPCRouter({
 
       await inngest.send({
         name: "issue/question.answered",
-        data: { issueId: question.issueId, questionId: input.questionId },
+        data: {
+          issueId: question.issueId,
+          questionId: input.questionId,
+          action: input.action,
+        },
       });
 
       return { status };

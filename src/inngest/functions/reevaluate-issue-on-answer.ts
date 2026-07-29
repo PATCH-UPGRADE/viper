@@ -21,13 +21,15 @@ export const reevaluateIssueOnAnswer = inngest.createFunction(
     );
 
     await step.run("resort", async () => {
+      if (question.status === "UNSURE" || !question.answer)
+        return { skipped: "user-unsure" as const };
       const context = await gatherVexContextForIssue(
         issueId,
         question.notificationId,
         {
           title: question.title,
           reasonWhy: question.reasonWhy,
-          answer: question.answer!,
+          answer: question.answer,
         },
       );
       if (!context) return;
@@ -62,8 +64,8 @@ export const reevaluateIssueOnAnswer = inngest.createFunction(
     } else {
       const roundCount = await prisma.question.count({ where: { issueId } });
       if (roundCount < MAX_FOLLOWUP_ROUNDS) {
-        await step.run("generate-follow-up", () =>
-          generateFollowUpQuestion(issueId),
+        await step.run("generate-followup", () =>
+          generateFollowUpQuestion(issueId, questionId),
         );
       }
     }

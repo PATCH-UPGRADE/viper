@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSuspenseMitigationPlans } from "@/features/mitigation/hooks/use-mitigation";
+import { useSuspenseQuestionsByNotificationId } from "@/features/questions/hooks/use-questions";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
 import type { NotificationType, Priority } from "@/generated/prisma";
 import {
@@ -32,6 +33,7 @@ import {
 import type { NotificationDetailSource } from "../types";
 import { NotificationAffectedAssetsTab } from "./notification-affected-assets-tab";
 import { NotificationDetailsTab } from "./notification-details-tab";
+import { NotificationQuestionTab } from "./notification-questions-tab";
 import { NotificationRespondTab } from "./notification-respond-tab";
 import { NotificationTypeBadge } from "./notification-type-badge";
 
@@ -139,6 +141,13 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
 
   type TabDef = { value: string; trigger: ReactNode; content: ReactNode };
 
+  const { data: questions } = useSuspenseQuestionsByNotificationId(
+    notification.id,
+  );
+  const pendingQuestionCount = questions.filter(
+    (q) => q.status === "PENDING",
+  ).length;
+
   const tabs = (
     [
       hasPlans && {
@@ -184,6 +193,23 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
             deviceGroupsMatchings={notification.deviceGroupsMatchings}
           />
         ),
+      },
+      {
+        value: "questions",
+        trigger: (
+          <>
+            Questions{" "}
+            {pendingQuestionCount > 0 && (
+              <Badge
+                variant="destructive"
+                className="rounded-full border-orange-200/80 bg-orange-50/80 dark:border-orange-900/70 dark:bg-orange-950/40"
+              >
+                {pendingQuestionCount}
+              </Badge>
+            )}
+          </>
+        ),
+        content: <NotificationQuestionTab notificationId={notification.id} />,
       },
     ] as (TabDef | false)[]
   ).filter((t): t is TabDef => Boolean(t));

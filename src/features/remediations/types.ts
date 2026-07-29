@@ -15,6 +15,7 @@ import {
   artifactWrapperSelect,
   artifactWrapperWithUrlsSchema,
 } from "../artifacts/types";
+import { scopedNoteSchema } from "../notes/schemas";
 
 const canonicalRefInclude = {
   select: { canonicalName: true, canonicalDisplayName: true },
@@ -71,6 +72,7 @@ export const remediationResponseSchema = z.object({
   artifacts: z.array(artifactWrapperWithUrlsSchema),
   createdAt: z.date(),
   updatedAt: z.date(),
+  notes: z.array(scopedNoteSchema).optional(),
 });
 export type RemediationResponse = z.infer<typeof remediationResponseSchema>;
 

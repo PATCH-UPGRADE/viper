@@ -63,7 +63,7 @@ function renderQuestionPrompt(args: {
       args.issueRenders
         .map((r) =>
           [
-            `- Issue \ ${r.issueId}\ - ${r.cve}`,
+            `- Issue  ${r.issueId} - ${r.cve}`,
             `- Device: ${deviceGroupMatchingLabel(r.matching)}`,
             ` - Assets affected: ${r.assetCount}`,
             ` - Why this is under investigation: ${r.statusNotes ?? "(no reason recorded)"}`,

@@ -39,7 +39,6 @@ model User {
   webhooks                  Webhook[]
   userTokens UserToken[]
   threads    ChatThread[]
-  memories   Memory[]
   notificationReads         NotificationRead[]
   matchFeedback             MatchFeedback[]
   fieldCorrections          FieldCorrection[]
@@ -1001,17 +1000,6 @@ model ChatMessage {
   checksum  String?
 
   @@index([threadId, createdAt])
-}
-
-model Memory {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  content   String?  @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
 }
 
 enum TicketStatus {

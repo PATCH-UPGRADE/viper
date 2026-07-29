@@ -15,7 +15,6 @@ export {
   deviceGroupToMarkdown,
   deviceIdentityInline,
 } from "./device-group";
-export { generateMemoryMarkdown } from "./memory";
 export {
   type NoteRow,
   type NoteTargetLabels,

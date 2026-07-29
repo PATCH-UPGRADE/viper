@@ -26,7 +26,36 @@ export function QuestionCard({ question }: { question: QuestionWithIssue }) {
 
   const isFollowUp = !!question.parentQuestionId;
 
-  if (question.status === "DISMISSED") return null;
+  const handleSuggestionClick = (suggestion: string) => {
+    setAnswerText(suggestion);
+    setNotSure(false);
+  };
+
+  const handleSkip = () => {
+    respond.mutate({
+      questionId: question.id,
+      action: "dismiss",
+    });
+  };
+
+  const handleNotSure = () => {
+    setNotSure(true);
+    respond.mutate({
+      questionId: question.id,
+      action: "unsure",
+    });
+  };
+
+  const handleSubmit = () => {
+    respond.mutate({
+      questionId: question.id,
+      action: notSure ? "unsure" : "answer",
+      answer: answerText.trim(),
+    });
+  };
+
+  if (question.status === "DISMISSED" || question.status === "UNSURE")
+    return null;
 
   return (
     <Card>
@@ -70,10 +99,7 @@ export function QuestionCard({ question }: { question: QuestionWithIssue }) {
                   !notSure &&
                   "border-primary text-foreground",
               )}
-              onClick={() => {
-                setAnswerText(suggestion);
-                setNotSure(false);
-              }}
+              onClick={() => handleSuggestionClick(suggestion)}
             >
               {suggestion}
             </Button>
@@ -86,10 +112,7 @@ export function QuestionCard({ question }: { question: QuestionWithIssue }) {
               "font-bold text-muted-foreground",
               notSure && "border-primary text-foreground",
             )}
-            onClick={() => {
-              setAnswerText(`${NOT_SURE}`);
-              setNotSure(true);
-            }}
+            onClick={handleNotSure}
           >
             Not sure - needs a manual check
           </Button>
@@ -107,27 +130,15 @@ export function QuestionCard({ question }: { question: QuestionWithIssue }) {
           <Button
             variant="outline"
             disabled={respond.isPending}
-            onClick={() =>
-              respond.mutate({
-                questionId: question.id,
-                action: "dismiss",
-                answer: answerText.trim() || undefined,
-              })
-            }
+            onClick={handleSkip}
           >
             Skip
           </Button>
           <Button
             variant="outline"
-            disabled={respond.isPending || !answerText.trim()}
+            disabled={respond.isPending || (!notSure && !answerText.trim())}
             className="disabled:bg-gray-300 disabled:text-white disabled:opacity-100 disabled:hover:bg-gray-300 disabled:pointer-events-auto disabled:cursor-not-allowed"
-            onClick={() =>
-              respond.mutate({
-                questionId: question.id,
-                action: notSure ? "unsure" : "answer",
-                answer: answerText.trim(),
-              })
-            }
+            onClick={handleSubmit}
           >
             Submit answer
           </Button>

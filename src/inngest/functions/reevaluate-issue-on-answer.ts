@@ -13,30 +13,16 @@ export const reevaluateIssueOnAnswer = inngest.createFunction(
   { id: "reevaluate-issue-on-answer" },
   { event: "issue/question.answered" },
   async ({ event, step }) => {
-    const { issueId, questionId, action } = event.data;
+    const { issueId, questionId } = event.data;
     const question = await step.run("load-question", () =>
       prisma.question.findUniqueOrThrow({
         where: { id: questionId },
       }),
     );
-    if (action === "unsure") {
-      const roundCount = await step.run("count-question-rounds", async () => {
-        const rows = await prisma.question.findMany({
-          where: { issueId },
-          select: { id: true },
-        });
-        return rows.length;
-      });
-
-      if (roundCount < MAX_FOLLOWUP_ROUNDS) {
-        await step.run("generate-followup", () =>
-          generateFollowUpQuestion(issueId, questionId),
-        );
-      }
-    }
 
     await step.run("resort", async () => {
-      if (!question.answer) return { skipped: "no-answer" as const };
+      if (question.status == "UNSURE" || !question.answer)
+        return { skipped: "user-unsure" as const };
       const context = await gatherVexContextForIssue(
         issueId,
         question.notificationId,

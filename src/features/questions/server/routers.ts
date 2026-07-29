@@ -65,6 +65,16 @@ export const questionsRouter = createTRPCRouter({
         if (updated.count === 0) {
           throw new Error(`Question is already resolved`);
         }
+        if (input.action !== "dismiss") {
+          await inngest.send({
+            name: "issue/question.answered",
+            data: {
+              issueId: question.issueId,
+              questionId: input.questionId,
+              action: input.action,
+            },
+          });
+        }
         return { status };
       }
 

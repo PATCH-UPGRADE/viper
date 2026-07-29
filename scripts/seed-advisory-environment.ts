@@ -4,6 +4,10 @@ import {
   Severity,
   VersionStatus,
 } from "@/generated/prisma";
+import {
+  deviceGroupWhereForMatching,
+  matchingAppliesToDeviceGroup,
+} from "@/lib/device-matching";
 import prisma from "../src/lib/db";
 
 const SEED_USER_EMAIL = "user@example.com";
@@ -18,6 +22,10 @@ const EXCEPTION_SERIALS = [
   SYNGO_PLAZA_EXCEPTION_SERIAL,
   DESERIALIZATION_EXCEPTION_SERIAL,
 ];
+
+// Hosts on a fixed/newer build: the advisory must not reach them at all, so the
+// affected-asset list is a real subset of the fleet rather than everything we own.
+const OUT_OF_SCOPE_SERIALS = ["SYNGO-PLZ-VB30E-HF07-001", "SYNGOVIA-VB70-001"];
 
 const VENDOR = "Siemens Healthineers";
 
@@ -180,6 +188,38 @@ async function seededAssetIds() {
   return assets.map((asset) => asset.id);
 }
 
+type MatchingRow = {
+  vendorId: string;
+  productId: string | null;
+  versionId: string | null;
+  versionRange: string | null;
+};
+
+async function assetsInScopeOf(matchings: MatchingRow[]) {
+  const byId = new Map<
+    string,
+    { hostname: string | null; serialNumber: string | null }
+  >();
+
+  for (const matching of matchings) {
+    const groups = await prisma.deviceGroup.findMany({
+      where: deviceGroupWhereForMatching(matching),
+      include: {
+        version: true,
+        assets: { select: { id: true, hostname: true, serialNumber: true } },
+      },
+    });
+    for (const group of groups) {
+      if (!matchingAppliesToDeviceGroup(matching, group)) continue;
+      for (const asset of group.assets) byId.set(asset.id, asset);
+    }
+  }
+
+  return [...byId.values()].sort((a, b) =>
+    (a.hostname ?? "").localeCompare(b.hostname ?? ""),
+  );
+}
+
 async function resetInboxEnvironment() {
   const notifications = await prisma.notification.deleteMany({});
   const orphanSources = await prisma.notificationSource.deleteMany({
@@ -209,8 +249,9 @@ async function resetInboxEnvironment() {
 const SYNGO_PLAZA_PRODUCT = "syngo.plaza";
 const SYNGO_PLAZA_VERSION = "VB30E";
 
-const SYNGO_PLAZA_ASSETS: AssetSpec[] = [
+const SYNGO_PLAZA_ASSETS: Array<AssetSpec & { version: string }> = [
   {
+    version: SYNGO_PLAZA_VERSION,
     ip: "10.50.0.11",
     hostname: "pacs-syngo-01",
     serialNumber: "SYNGO-PLZ-VB30E-001",
@@ -224,6 +265,7 @@ const SYNGO_PLAZA_ASSETS: AssetSpec[] = [
     },
   },
   {
+    version: SYNGO_PLAZA_VERSION,
     ip: "10.50.0.12",
     hostname: "pacs-syngo-02",
     serialNumber: "SYNGO-PLZ-VB30E-002",
@@ -237,6 +279,7 @@ const SYNGO_PLAZA_ASSETS: AssetSpec[] = [
     },
   },
   {
+    version: SYNGO_PLAZA_VERSION,
     ip: "10.50.0.13",
     hostname: "pacs-syngo-03",
     serialNumber: "SYNGO-PLZ-VB30E-003",
@@ -247,6 +290,20 @@ const SYNGO_PLAZA_ASSETS: AssetSpec[] = [
       building: "Diagnostic Pavilion",
       floor: "2",
       room: "Mammography Reading",
+    },
+  },
+  {
+    version: "VB30E_HF07",
+    ip: "10.50.0.14",
+    hostname: "pacs-syngo-04",
+    serialNumber: "SYNGO-PLZ-VB30E-HF07-001",
+    role: "PACS Workstation",
+    networkSegment: "RADIOLOGY-PACS",
+    location: {
+      facility: "Main Hospital",
+      building: "Diagnostic Pavilion",
+      floor: "3",
+      room: "Reading Room C",
     },
   },
 ];
@@ -262,14 +319,11 @@ async function seedSyngoPlazaEnvironment(userId: string) {
     version: SYNGO_PLAZA_VERSION,
   });
 
-  const deviceGroup = await upsertDeviceGroup(
-    SYNGO_PLAZA_PRODUCT,
-    SYNGO_PLAZA_VERSION,
-  );
-
   const assets = [];
   for (const spec of SYNGO_PLAZA_ASSETS) {
-    assets.push(await upsertAsset(spec, deviceGroup.id, userId));
+    const { version, ...assetFields } = spec;
+    const deviceGroup = await upsertDeviceGroup(SYNGO_PLAZA_PRODUCT, version);
+    assets.push(await upsertAsset(assetFields, deviceGroup.id, userId));
   }
 
   const vulnerability = await prisma.vulnerability.create({
@@ -324,42 +378,16 @@ async function seedSyngoPlazaEnvironment(userId: string) {
   console.log(`  ✅ ${assets.length} assets, 1 matching, 1 vulnerability`);
 }
 
-const SOMATOM_PRODUCTS = [
-  "SOMATOM go.All",
-  "SOMATOM go.Now",
-  "SOMATOM go.Open Pro",
-  "SOMATOM go.Sim",
-  "SOMATOM go.Top",
-  "SOMATOM go.Up",
-  "SOMATOM X.cite",
-  "SOMATOM X.creed",
-];
-
-const SOMATOM_AFFECTED_RANGE =
-  "vers:generic/VA20|VA30|VA30 SP1|VA30 SP2|VA30 SP3|VA30 SP4|VA40|VA40 SP1";
-
+// The advisory lists 18 products; these are the ones this hospital owns.
 const DESERIALIZATION_MATCHINGS: Array<{
   product: string;
   version?: string;
   versionRange?: string;
 }> = [
-  { product: "Biograph Horizon PET/CT Systems", version: "VJ30" },
   {
     product: "MAGNETOM Family",
     versionRange: "vers:generic/VA10B|VA12M|VA12S|VA20A|VA30A|VA31A",
   },
-  { product: "MAMMOMAT Revelation", version: "VC20" },
-  { product: "NAEOTOM Alpha", version: "VA40" },
-  // VA30 SP5 / VA40 SP2 are the fixes, so the affected set is the builds below them.
-  ...SOMATOM_PRODUCTS.map((product) => ({
-    product,
-    versionRange: SOMATOM_AFFECTED_RANGE,
-  })),
-  { product: "Symbia E/S", version: "VB22" },
-  { product: "Symbia Evo", version: "VB22" },
-  { product: "Symbia Intevo", version: "VB22" },
-  { product: "Symbia T", version: "VB22" },
-  { product: "Symbia.net", version: "VB22" },
   {
     product: "syngo.via",
     versionRange: "vers:generic/VB10|VB20|VB30|VB40|VB50|VB60",
@@ -431,10 +459,10 @@ const DESERIALIZATION_ASSETS: Array<
   },
   {
     product: "syngo.via",
-    version: "VB60",
+    version: "VB70",
     ip: "10.60.1.12",
-    hostname: "syngovia-04",
-    serialNumber: "SYNGOVIA-VB60-001",
+    hostname: "syngovia-07",
+    serialNumber: "SYNGOVIA-VB70-001",
     role: "Imaging Workstation",
     networkSegment: "IMAGING-PACS",
     location: {
@@ -442,96 +470,6 @@ const DESERIALIZATION_ASSETS: Array<
       building: "Diagnostic Pavilion",
       floor: "2",
       room: "Reading Room D",
-    },
-  },
-  {
-    product: "Symbia Intevo",
-    version: "VB22",
-    ip: "10.60.2.11",
-    hostname: "symbia-intevo-01",
-    serialNumber: "SYMBIA-INTEVO-VB22-001",
-    role: "SPECT/CT Console",
-    networkSegment: "IMAGING-NUCMED",
-    location: {
-      facility: "Main Hospital",
-      building: "Imaging Pavilion",
-      floor: "B1",
-      room: "Nuclear Medicine 1",
-    },
-  },
-  {
-    product: "Symbia E/S",
-    version: "VB22",
-    ip: "10.60.2.12",
-    hostname: "symbia-es-01",
-    serialNumber: "SYMBIA-ES-VB22-001",
-    role: "SPECT Console",
-    networkSegment: "IMAGING-NUCMED",
-    location: {
-      facility: "Main Hospital",
-      building: "Imaging Pavilion",
-      floor: "B1",
-      room: "Nuclear Medicine 2",
-    },
-  },
-  {
-    product: "SOMATOM go.Top",
-    version: "VA30 SP3",
-    ip: "10.60.3.11",
-    hostname: "ct-somatom-gotop-01",
-    serialNumber: "SOMATOM-GOTOP-VA30-001",
-    role: "CT Scanner Console",
-    networkSegment: "IMAGING-CT",
-    location: {
-      facility: "Main Hospital",
-      building: "Imaging Pavilion",
-      floor: "1",
-      room: "CT Suite 1",
-    },
-  },
-  {
-    product: "NAEOTOM Alpha",
-    version: "VA40",
-    ip: "10.60.3.12",
-    hostname: "ct-naeotom-01",
-    serialNumber: "NAEOTOM-VA40-001",
-    role: "Photon-Counting CT Console",
-    networkSegment: "IMAGING-CT",
-    location: {
-      facility: "Main Hospital",
-      building: "Imaging Pavilion",
-      floor: "1",
-      room: "CT Suite 2",
-    },
-  },
-  {
-    product: "Biograph Horizon PET/CT Systems",
-    version: "VJ30",
-    ip: "10.60.4.11",
-    hostname: "pet-biograph-01",
-    serialNumber: "BIOGRAPH-VJ30-001",
-    role: "PET/CT Console",
-    networkSegment: "IMAGING-NUCMED",
-    location: {
-      facility: "Main Hospital",
-      building: "Imaging Pavilion",
-      floor: "B1",
-      room: "PET/CT Suite",
-    },
-  },
-  {
-    product: "MAMMOMAT Revelation",
-    version: "VC20",
-    ip: "10.60.5.11",
-    hostname: "mammo-revelation-01",
-    serialNumber: "MAMMOMAT-VC20-001",
-    role: "Mammography System",
-    networkSegment: "IMAGING-MAMMO",
-    location: {
-      facility: "Women's Health Center",
-      building: "Main",
-      floor: "1",
-      room: "Mammography 1",
     },
   },
 ];
@@ -643,10 +581,29 @@ async function printEnvironmentSummary() {
       (issue) => issue.assetId !== null,
     ).length;
 
+    const inScope = await assetsInScopeOf(vulnerability.deviceGroupMatchings);
+
     console.log(`\n  ${cveId}`);
     console.log(`    device group matchings      ${matchings}`);
     console.log(`    baseline issues             ${baseline}`);
     console.log(`    asset-level issues          ${assetLevel}`);
+    console.log(
+      `    assets in scope             ${inScope.length}  (${inScope.map((a) => a.hostname).join(", ")})`,
+    );
+
+    for (const asset of inScope) {
+      if (OUT_OF_SCOPE_SERIALS.includes(asset.serialNumber ?? "")) {
+        failures.push(
+          `${cveId}: ${asset.hostname} runs a fixed build but the advisory still matches it — nothing is left unaffected`,
+        );
+      }
+    }
+
+    if (inScope.length === 0) {
+      failures.push(
+        `${cveId}: no assets in scope — the advisory would arrive with nothing to link to`,
+      );
+    }
 
     if (baseline !== matchings) {
       failures.push(
@@ -673,6 +630,13 @@ async function printEnvironmentSummary() {
   });
   const notedIds = new Set(notesByAsset.map((note) => note.instanceId));
 
+  const allMatchings = await prisma.deviceGroupMatching.findMany({
+    where: { vulnerabilities: { some: { cveId: { in: ADVISORY_CVES } } } },
+  });
+  const reachable = new Set(
+    (await assetsInScopeOf(allMatchings)).map((a) => a.serialNumber),
+  );
+
   console.log("\n  exception notes");
   for (const serial of EXCEPTION_SERIALS) {
     const asset = notedAssets.find((a) => a.serialNumber === serial);
@@ -680,6 +644,11 @@ async function printEnvironmentSummary() {
     console.log(`    ${asset?.hostname ?? serial}${has ? "" : "   MISSING"}`);
     if (!has) {
       failures.push(`${serial}: expected an asset-scoped note, found none`);
+    }
+    if (!reachable.has(serial)) {
+      failures.push(
+        `${serial}: carries the exception note but no advisory matching reaches it — VEX would never see it`,
+      );
     }
   }
 

@@ -21,7 +21,7 @@ export const reevaluateIssueOnAnswer = inngest.createFunction(
     );
 
     await step.run("resort", async () => {
-      if (question.status == "UNSURE" || !question.answer)
+      if (question.status === "UNSURE" || !question.answer)
         return { skipped: "user-unsure" as const };
       const context = await gatherVexContextForIssue(
         issueId,

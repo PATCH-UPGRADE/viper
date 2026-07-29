@@ -12,6 +12,15 @@ const SYNGO_PLAZA_CVE = "CVE-2024-52334";
 const DESERIALIZATION_CVE = "CVE-2022-29875";
 const ADVISORY_CVES = [SYNGO_PLAZA_CVE, DESERIALIZATION_CVE];
 
+// The two assets VEX is expected to except. Everything else must stay AFFECTED,
+// so these are the only seeded assets allowed to carry a note.
+const SYNGO_PLAZA_EXCEPTION_SERIAL = "SYNGO-PLZ-VB30E-003";
+const DESERIALIZATION_EXCEPTION_SERIAL = "MAGNETOM-VA30A-001";
+const EXCEPTION_SERIALS = [
+  SYNGO_PLAZA_EXCEPTION_SERIAL,
+  DESERIALIZATION_EXCEPTION_SERIAL,
+];
+
 const VENDOR = "Siemens Healthineers";
 
 type AssetSpec = {
@@ -74,22 +83,16 @@ async function upsertMatching(spec: {
   );
 }
 
-async function upsertDeviceGroup(
-  product: string,
-  version: string | null,
-  versionStatus: VersionStatus = version
-    ? VersionStatus.KNOWN
-    : VersionStatus.UNKNOWN,
-) {
+async function upsertDeviceGroup(product: string, version: string) {
   const vendor = await upsertVendor(VENDOR);
   const productRec = await upsertProduct(product);
-  const versionRec = version ? await upsertVersion(version) : null;
+  const versionRec = await upsertVersion(version);
 
   const identity = {
     vendorId: vendor.id,
     productId: productRec.id,
-    versionId: versionRec?.id ?? null,
-    versionStatus,
+    versionId: versionRec.id,
+    versionStatus: VersionStatus.KNOWN,
   };
 
   return (
@@ -106,7 +109,16 @@ async function upsertAsset(
   const existing = await prisma.asset.findFirst({
     where: { serialNumber: spec.serialNumber },
   });
-  if (existing) return existing;
+
+  // Serial is the identity; everything else is reconciled to the spec. Without
+  // this, editing a version or hostname here leaves the existing row untouched —
+  // silently stranding the asset in its old device group or old name.
+  if (existing) {
+    return prisma.asset.update({
+      where: { id: existing.id },
+      data: { ...spec, deviceGroupId },
+    });
+  }
 
   return prisma.asset.create({
     data: {
@@ -119,12 +131,15 @@ async function upsertAsset(
   });
 }
 
-async function upsertAssetNote(userId: string, assetId: string, text: string) {
-  const existing = await prisma.note.findFirst({
-    where: { targetModel: ScopeTargetModel.ASSET, instanceId: assetId },
-  });
-  if (existing) return existing;
+async function assetBySerial(serialNumber: string) {
+  const asset = await prisma.asset.findFirst({ where: { serialNumber } });
+  if (!asset) {
+    throw new Error(`Expected ${serialNumber} to exist after seeding.`);
+  }
+  return asset;
+}
 
+function createAssetNote(userId: string, assetId: string, text: string) {
   return prisma.note.create({
     data: {
       userId,
@@ -150,6 +165,20 @@ async function getSeedUser() {
   return prisma.user.findUniqueOrThrow({ where: { email: SEED_USER_EMAIL } });
 }
 
+function seededSerials() {
+  return [...SYNGO_PLAZA_ASSETS, ...DESERIALIZATION_ASSETS].map(
+    (spec) => spec.serialNumber,
+  );
+}
+
+async function seededAssetIds() {
+  const assets = await prisma.asset.findMany({
+    where: { serialNumber: { in: seededSerials() } },
+    select: { id: true },
+  });
+  return assets.map((asset) => asset.id);
+}
+
 // Deleting the two vulnerabilities is what clears their Issues (Issue.vulnerabilityId
 // is onDelete: Cascade). Without it, a previous run's VEX determinations survive and
 // the next run measures them instead of its own.
@@ -170,9 +199,18 @@ async function resetInboxEnvironment() {
   const vulnerabilities = await prisma.vulnerability.deleteMany({
     where: { cveId: { in: ADVISORY_CVES } },
   });
+  // Any note on a seeded asset reaches VEX through getRelevantNotes({ assetIds }).
+  // seed-notifications.ts leaves one on pacs-syngo-02, and answering a Question
+  // leaves one too — either would except an asset this scenario needs AFFECTED.
+  const notes = await prisma.note.deleteMany({
+    where: {
+      targetModel: ScopeTargetModel.ASSET,
+      instanceId: { in: await seededAssetIds() },
+    },
+  });
 
   console.log(
-    `  🧹 removed ${notifications.count} notification(s), ${orphanSources.count} orphan source(s), ${draftTickets.count} draft ticket(s), ${remediations.count} remediation(s), ${vulnerabilities.count} vulnerability(ies)`,
+    `  🧹 removed ${notifications.count} notification(s), ${orphanSources.count} orphan source(s), ${draftTickets.count} draft ticket(s), ${remediations.count} remediation(s), ${vulnerabilities.count} vulnerability(ies), ${notes.count} asset note(s)`,
   );
 }
 
@@ -289,10 +327,25 @@ async function seedSyngoPlazaEnvironment(userId: string) {
     },
   });
 
-  await upsertAssetNote(userId, assets[2].id, SYNGO_PLAZA_EXCEPTION_NOTE);
+  const exceptionAsset = await assetBySerial(SYNGO_PLAZA_EXCEPTION_SERIAL);
+  await createAssetNote(userId, exceptionAsset.id, SYNGO_PLAZA_EXCEPTION_NOTE);
 
   console.log(`  ✅ ${assets.length} assets, 1 matching, 1 vulnerability`);
 }
+
+const SOMATOM_PRODUCTS = [
+  "SOMATOM go.All",
+  "SOMATOM go.Now",
+  "SOMATOM go.Open Pro",
+  "SOMATOM go.Sim",
+  "SOMATOM go.Top",
+  "SOMATOM go.Up",
+  "SOMATOM X.cite",
+  "SOMATOM X.creed",
+];
+
+const SOMATOM_AFFECTED_RANGE =
+  "vers:generic/VA20|VA30|VA30 SP1|VA30 SP2|VA30 SP3|VA30 SP4|VA40|VA40 SP1";
 
 const DESERIALIZATION_MATCHINGS: Array<{
   product: string;
@@ -306,14 +359,12 @@ const DESERIALIZATION_MATCHINGS: Array<{
   },
   { product: "MAMMOMAT Revelation", version: "VC20" },
   { product: "NAEOTOM Alpha", version: "VA40" },
-  { product: "SOMATOM go.All", version: "VA30 SP5" },
-  { product: "SOMATOM go.Now", version: "VA30 SP5" },
-  { product: "SOMATOM go.Open Pro", version: "VA30 SP5" },
-  { product: "SOMATOM go.Sim", version: "VA30 SP5" },
-  { product: "SOMATOM go.Top", version: "VA30 SP5" },
-  { product: "SOMATOM go.Up", version: "VA30 SP5" },
-  { product: "SOMATOM X.cite", version: "VA30 SP5" },
-  { product: "SOMATOM X.creed", version: "VA30 SP5" },
+  // "All versions < VA30 SP5 or VA40 SP2" — SP5 and SP2 are the fixes, so the
+  // affected set is the builds below them on each track, not the fix itself.
+  ...SOMATOM_PRODUCTS.map((product) => ({
+    product,
+    versionRange: SOMATOM_AFFECTED_RANGE,
+  })),
   { product: "Symbia E/S", version: "VB22" },
   { product: "Symbia Evo", version: "VB22" },
   { product: "Symbia Intevo", version: "VB22" },
@@ -362,7 +413,7 @@ const DESERIALIZATION_ASSETS: Array<
     product: "MAGNETOM Family",
     version: "VA30A",
     ip: "10.60.0.13",
-    hostname: "mri-magnetom-03",
+    hostname: "mri-magnetom-05",
     serialNumber: "MAGNETOM-VA30A-001",
     role: "MRI Scanner Console",
     networkSegment: "IMAGING-MRI-ISOLATED",
@@ -392,7 +443,7 @@ const DESERIALIZATION_ASSETS: Array<
     product: "syngo.via",
     version: "VB60",
     ip: "10.60.1.12",
-    hostname: "syngovia-02",
+    hostname: "syngovia-04",
     serialNumber: "SYNGOVIA-VB60-001",
     role: "Imaging Workstation",
     networkSegment: "IMAGING-PACS",
@@ -435,7 +486,7 @@ const DESERIALIZATION_ASSETS: Array<
   },
   {
     product: "SOMATOM go.Top",
-    version: "VA30 SP5",
+    version: "VA30 SP3",
     ip: "10.60.3.11",
     hostname: "ct-somatom-gotop-01",
     serialNumber: "SOMATOM-GOTOP-VA30-001",
@@ -496,7 +547,7 @@ const DESERIALIZATION_ASSETS: Array<
 ];
 
 const DESERIALIZATION_EXCEPTION_NOTE =
-  "mri-magnetom-03 is deployed in Siemens 'workstation mode' — the syngo client and server run on the same host, and ports 32912/tcp and 32914/tcp are closed for all inbound traffic on the host Windows firewall. The IMAGING-MRI-ISOLATED segment additionally blocks both ports at the boundary firewall, permitting only the service VPN jump host. Verified during the 2026-Q1 segmentation audit.";
+  "mri-magnetom-05 is deployed in Siemens 'workstation mode' — the syngo client and server run on the same host, and ports 32912/tcp and 32914/tcp are closed for all inbound traffic on the host Windows firewall. The IMAGING-MRI-ISOLATED segment additionally blocks both ports at the boundary firewall, permitting only the service VPN jump host. Verified during the 2026-Q1 segmentation audit.";
 
 async function seedDeserializationEnvironment(userId: string) {
   console.log("\n🌱 syngo deserialization environment (SSA-220609)...");
@@ -561,13 +612,8 @@ async function seedDeserializationEnvironment(userId: string) {
     },
   });
 
-  const exceptionAsset = assets.find(
-    (a) => a.serialNumber === "MAGNETOM-VA30A-001",
-  );
-  if (!exceptionAsset) {
-    throw new Error("Expected MAGNETOM-VA30A-001 to exist after seeding.");
-  }
-  await upsertAssetNote(
+  const exceptionAsset = await assetBySerial(DESERIALIZATION_EXCEPTION_SERIAL);
+  await createAssetNote(
     userId,
     exceptionAsset.id,
     DESERIALIZATION_EXCEPTION_NOTE,
@@ -623,6 +669,42 @@ async function printEnvironmentSummary() {
         `${cveId}: ${assetLevel} asset-level issue(s) present — those are the VEX agent's output and must not be seeded`,
       );
     }
+  }
+
+  // The exception notes are the whole mechanism: exactly these assets carry one,
+  // and no other seeded asset does, or VEX excepts a host meant to stay AFFECTED.
+  const notedAssets = await prisma.asset.findMany({
+    where: { serialNumber: { in: seededSerials() } },
+    select: { id: true, hostname: true, serialNumber: true },
+  });
+  const notesByAsset = await prisma.note.findMany({
+    where: {
+      targetModel: ScopeTargetModel.ASSET,
+      instanceId: { in: notedAssets.map((asset) => asset.id) },
+    },
+    select: { instanceId: true },
+  });
+  const notedIds = new Set(notesByAsset.map((note) => note.instanceId));
+
+  console.log("\n  exception notes");
+  for (const serial of EXCEPTION_SERIALS) {
+    const asset = notedAssets.find((a) => a.serialNumber === serial);
+    const has = asset ? notedIds.has(asset.id) : false;
+    console.log(`    ${asset?.hostname ?? serial}${has ? "" : "   MISSING"}`);
+    if (!has) {
+      failures.push(`${serial}: expected an asset-scoped note, found none`);
+    }
+  }
+
+  const unexpected = notedAssets.filter(
+    (asset) =>
+      notedIds.has(asset.id) &&
+      !EXCEPTION_SERIALS.includes(asset.serialNumber ?? ""),
+  );
+  for (const asset of unexpected) {
+    failures.push(
+      `${asset.hostname ?? asset.serialNumber}: carries a note but is meant to stay AFFECTED — VEX would except it`,
+    );
   }
 
   if (failures.length > 0) {

@@ -405,7 +405,11 @@ export const processInboxEmail = inngest.createFunction(
           return { questionSkipped: true as const };
         if ("vexSkipped" in vexSummary && vexSummary.vexSkipped)
           return { questionSkipped: true as const };
-        return generateQuestionForNotification(notificationId);
+        return generateQuestionForNotification(
+          sourceId,
+          notificationId,
+          inlinedPdfs ?? undefined,
+        );
       }),
       // 11. Triage: assign priority, reason, and hospital impact
       step.run("triage-notification", async () => {

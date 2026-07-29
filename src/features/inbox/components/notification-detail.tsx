@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSuspenseMitigationPlans } from "@/features/mitigation/hooks/use-mitigation";
+import { useSuspenseQuestionsByNotificationId } from "@/features/questions/hooks/use-questions";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
 import type { NotificationType, Priority } from "@/generated/prisma";
 import {
@@ -32,11 +33,9 @@ import {
 import type { NotificationDetailSource } from "../types";
 import { NotificationAffectedAssetsTab } from "./notification-affected-assets-tab";
 import { NotificationDetailsTab } from "./notification-details-tab";
+import { NotificationQuestionTab } from "./notification-questions-tab";
 import { NotificationRespondTab } from "./notification-respond-tab";
 import { NotificationTypeBadge } from "./notification-type-badge";
-import { NotificationQuestionTab } from "./notification-questions-tab";
-import { useSuspenseQuestionsByNotificationId } from "@/features/questions/hooks/use-questions";
-import { questionsRouter } from "@/features/questions/server/routers";
 
 const NOTIFICATION_TYPE_OPTIONS: NotificationType[] = [
   "Advisory",

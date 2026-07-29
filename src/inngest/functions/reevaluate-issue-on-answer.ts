@@ -13,12 +13,27 @@ export const reevaluateIssueOnAnswer = inngest.createFunction(
   { id: "reevaluate-issue-on-answer" },
   { event: "issue/question.answered" },
   async ({ event, step }) => {
-    const { issueId, questionId } = event.data;
+    const { issueId, questionId, action } = event.data;
     const question = await step.run("load-question", () =>
       prisma.question.findUniqueOrThrow({
         where: { id: questionId },
       }),
     );
+    if (action === "unsure") {
+      const roundCount = await step.run("count-question-rounds", async () => {
+        const rows = await prisma.question.findMany({
+          where: { issueId },
+          select: { id: true },
+        });
+        return rows.length;
+      });
+
+      if (roundCount < MAX_FOLLOWUP_ROUNDS) {
+        await step.run("generate-followup", () =>
+          generateFollowUpQuestion(issueId, questionId),
+        );
+      }
+    }
 
     await step.run("resort", async () => {
       if (!question.answer) return { skipped: "no-answer" as const };
@@ -63,8 +78,8 @@ export const reevaluateIssueOnAnswer = inngest.createFunction(
     } else {
       const roundCount = await prisma.question.count({ where: { issueId } });
       if (roundCount < MAX_FOLLOWUP_ROUNDS) {
-        await step.run("generate-follow-up", () =>
-          generateFollowUpQuestion(issueId),
+        await step.run("generate-followup", () =>
+          generateFollowUpQuestion(issueId, questionId),
         );
       }
     }

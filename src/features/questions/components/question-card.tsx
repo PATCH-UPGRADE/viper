@@ -1,15 +1,14 @@
 "use client";
 import { Info, MessageSquare } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-
 import { Textarea } from "@/components/ui/textarea";
-import { useRespondToQuestion } from "../hooks/use-questions";
-import type { QuestionWithIssue } from "../types";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
+import { useRespondToQuestion } from "../hooks/use-questions";
+import type { QuestionWithIssue } from "../types";
 
 const NOT_SURE = "Not sure-needs a manual check";
 

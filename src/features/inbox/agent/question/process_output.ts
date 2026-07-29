@@ -3,7 +3,10 @@ import prisma from "@/lib/db";
 import type { QuestionContext } from "./context";
 import type { QuestionResult, QuestionValue } from "./schema";
 
-export type QuestionApplySummary = { created: number };
+export type QuestionApplySummary = {
+  created: number;
+  questions: { id: string; issueId: string }[];
+};
 type QuestionCreateOp = {
   issueId: string;
   notificationId: string;
@@ -30,7 +33,7 @@ export async function applyQuestionWrites(
 ): Promise<QuestionApplySummary> {
   const ops = planQuestionWrites(context, result);
 
-  await prisma.$transaction(
+  const created = await prisma.$transaction(
     ops.map((op) =>
       prisma.question.create({
         data: {
@@ -39,9 +42,11 @@ export async function applyQuestionWrites(
           title: op.title,
           reasonWhy: op.reasonWhy,
           suggestedAnswers: op.suggestedAnswers,
+          status: "PENDING",
         },
+        select: { id: true, issueId: true },
       }),
     ),
   );
-  return { created: ops.length };
+  return { created: ops.length, questions: created };
 }

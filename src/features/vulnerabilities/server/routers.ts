@@ -159,10 +159,23 @@ export const vulnerabilitiesRouter = createTRPCRouter({
 
       const idFilter = { id: { in: matchedIds } };
       const whereFilter = search ? { AND: [searchFilter, idFilter] } : idFilter;
-      return fetchPaginated(prisma.vulnerability, input, {
+      const result = await fetchPaginated(prisma.vulnerability, input, {
         where: whereFilter,
         include: vulnerabilityInclude,
       });
+
+      const notesByVuln = await getScopedNotesByInstance(
+        "VULNERABILITY",
+        result.items.map((v) => v.id),
+      );
+
+      return {
+        ...result,
+        items: result.items.map((v) => ({
+          ...v,
+          notes: notesByVuln.get(v.id) ?? [],
+        })),
+      };
     }),
 
   // GET /api/vulnerabilities/{id} - Get single vulnerability (any authenticated user can access)

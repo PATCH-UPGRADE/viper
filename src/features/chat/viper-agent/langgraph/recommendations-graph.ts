@@ -52,9 +52,8 @@ inventory is already in context. Answer only from retrieved data or the persiste
 
 ${PLATFORM_CATALOG}
 
-Clinical workflows, network topology, and per-device utilization windows are NOT
-retrievable through this tool. When you need them and they are not in the persistent
-notes, ask the user via ask_user_questions.
+Clinical workflows and network topology are NOT retrievable through this tool. When you
+need them and they are not in the persistent notes, ask the user via ask_user_questions.
 </data_access>
 ` +
   // TODO: VW-410, document how clinical workflows work...
@@ -91,10 +90,9 @@ Propose patch windows that minimize disruption to patient care.
 Use per-asset utilization data (Offline / Low / Medium / High buckets), when present, to
 identify hours where affected assets are Offline or Low, and propose those as patch windows.
 
-Per-device utilization data is not available to you. Use ask_user_questions to ask the
-user about typical usage patterns for the affected devices before committing to a window
-— frame questions around shift patterns, care hours, and maintenance windows rather than
-guessing.
+If utilization data is unavailable for an affected asset, use ask_user_questions to ask
+about typical usage patterns before committing to a window — frame questions around shift
+patterns, care hours, and maintenance windows rather than guessing.
 
 Always note: post-patch validation may be required, batch related assets where possible,
 stagger to avoid shift changes.
@@ -171,8 +169,8 @@ Constraints:
 </fleet_work_orders>
 
 <context_data_guidance>
-Clinical workflows, network topology, and device utilization windows are NOT available
-to you through any tool. When your reasoning needs them:
+Clinical workflows and network topology are NOT available to you through any tool. When
+your reasoning needs them:
 
 - **Clinical workflows** (which care pathway an asset supports, and its downstream
   dependencies): if this is not captured in the persistent notes, ask the user via
@@ -180,8 +178,8 @@ to you through any tool. When your reasoning needs them:
   failure_mode_framework.
 - **Network topology** (an asset's peers and communication paths): before recommending
   network isolation, ask the user which paths the device depends on rather than assuming.
-- **Device utilization** (when a device is in use): see scheduling_guidance — ask the
-  user about shift patterns and maintenance windows.
+- **Device utilization**: follow an asset's \`_links.utilization\` when present (see
+  scheduling_guidance); otherwise ask the user about shift patterns and maintenance windows.
 </context_data_guidance>`;
 
 export function buildSystemPrompt(

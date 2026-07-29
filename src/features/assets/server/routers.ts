@@ -141,10 +141,23 @@ export const assetsRouter = createTRPCRouter({
               id: deviceGroupId,
             },
           };
-      return fetchPaginated(prisma.asset, input, {
+      const result = await fetchPaginated(prisma.asset, input, {
         where: whereFilter,
         include: assetInclude,
       });
+
+      const notesByAsset = await getScopedNotesByInstance(
+        "ASSET",
+        result.items.map((a) => a.id),
+      );
+
+      return {
+        ...result,
+        items: result.items.map((a) => ({
+          ...a,
+          notes: notesByAsset.get(a.id) ?? [],
+        })),
+      };
     }),
 
   // not exposed on OpenAPI

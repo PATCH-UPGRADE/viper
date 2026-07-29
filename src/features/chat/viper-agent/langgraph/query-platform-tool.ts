@@ -1,5 +1,6 @@
 import "server-only";
 import { tool } from "@langchain/core/tools";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createAgentCaller } from "@/trpc/agent-caller";
 
@@ -145,7 +146,10 @@ export function makeQueryPlatformDataTool(userId: string) {
         const result = await fn(input ?? {});
         return JSON.stringify(addNavigationLinks(result), null, 2);
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message =
+          error instanceof TRPCError
+            ? error.message
+            : "an unexpected error occurred";
         return `Error calling ${procedure}: ${message}`;
       }
     },

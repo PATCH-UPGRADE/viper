@@ -161,12 +161,18 @@ async function resetInboxEnvironment() {
   const draftTickets = await prisma.workOrderTicket.deleteMany({
     where: { isDraft: true },
   });
+  // Before the vulnerabilities, not after: Remediation.vulnerabilityId is SetNull,
+  // so deleting the vulnerability first would strand these as orphans that
+  // searchRemediation still offers the match agent as candidates.
+  const remediations = await prisma.remediation.deleteMany({
+    where: { vulnerability: { cveId: { in: ADVISORY_CVES } } },
+  });
   const vulnerabilities = await prisma.vulnerability.deleteMany({
     where: { cveId: { in: ADVISORY_CVES } },
   });
 
   console.log(
-    `  🧹 removed ${notifications.count} notification(s), ${orphanSources.count} orphan source(s), ${draftTickets.count} draft ticket(s), ${vulnerabilities.count} vulnerability(ies)`,
+    `  🧹 removed ${notifications.count} notification(s), ${orphanSources.count} orphan source(s), ${draftTickets.count} draft ticket(s), ${remediations.count} remediation(s), ${vulnerabilities.count} vulnerability(ies)`,
   );
 }
 

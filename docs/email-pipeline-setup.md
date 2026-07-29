@@ -100,23 +100,17 @@ The pipeline makes several Anthropic calls (relevance triage, classification, en
 
 ## 7. Prepare the hospital environment (optional)
 
-To exercise the VEX, triage and mitigation agents, the platform needs assets, device groups and vulnerabilities the incoming advisory can actually link to. `scripts/seed-advisory-environment.ts` sets that up for two real Siemens Healthineers advisories:
-
 ```bash
 npx tsx scripts/seed-advisory-environment.ts
 ```
 
-It **deletes every notification** and both advisory vulnerabilities, then rebuilds the substrate: device groups, assets, remediations, and notes that give the VEX agent grounds to mark some assets `NOT_AFFECTED` while their siblings stay `AFFECTED`. It never creates a notification — that has to come from the pipeline, which is the point.
-
-The script prints a summary and exits non-zero if the environment came out unusable. It requires `npm run db:seed` to have run first (it needs `user@example.com`) and refuses to run against a non-local `DATABASE_URL`.
-
-Don't run it alongside `scripts/seed-notifications.ts` — that script creates notifications for the same two advisories, which is exactly the state this one clears.
+Seeds the assets, device groups and vulnerabilities for two Siemens Healthineers advisories so the VEX, triage and mitigation agents have something real to link to. **Wipes all notifications** — it's local-only and creates no notification itself.
 
 ## 8. Send a test email
 
 From your **personal** account, email your `@…resend.app` address. Attach a PDF if you want to exercise attachment handling.
 
-If you seeded the environment in step 7, send one of the two advisories it covers — Siemens Healthineers **SSA-016040** (syngo.plaza VB30E, CVE-2024-52334) or the **syngo deserialization** advisory (CVE-2022-29875). Anything else will still create a notification, but it will have nothing to link to and the VEX step will be skipped.
+If you ran step 7, send one of the advisories it covers — Siemens **SSA-016040** (CVE-2024-52334) or the **syngo deserialization** advisory (CVE-2022-29875) — otherwise there is nothing to link to and the VEX step is skipped.
 
 Write it like a genuine security advisory. The first agent in the chain decides whether the email is relevant at all, and drops marketing, newsletters and meeting invites as `not_relevant` before anything else runs — a "test test test" email will be correctly ignored.
 

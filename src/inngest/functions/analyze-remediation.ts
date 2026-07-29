@@ -6,7 +6,7 @@ import { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
 
-export type PreparedRemediation =
+type PreparedRemediation =
   | { skipped: "no-vulnerability" }
   | { notificationId: string; sourceId: string };
 
@@ -24,7 +24,7 @@ async function findExistingSource(remediationId: string) {
   });
 }
 
-export async function prepareRemediationNotification(
+async function prepareRemediationNotification(
   remediationId: string,
 ): Promise<PreparedRemediation> {
   const remediation = await prisma.remediation.findUnique({

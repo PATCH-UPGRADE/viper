@@ -59,6 +59,7 @@ export async function generateFollowUpQuestion(
     orderBy: { createdAt: "asc" },
   });
   if (priorQuestions.length === 0) return null;
+
   const context = await gatherQuestionContextForIssue(
     issueId,
     priorQuestions[0].notificationId,
@@ -74,17 +75,9 @@ export async function generateFollowUpQuestion(
   const pdfAttachments = source ? await fetchPdfAttachments(source.id) : [];
 
   const result = await draftQuestion(context, pdfAttachments);
-  const summary = await applyQuestionWrites(context, result);
+  const summary = await applyQuestionWrites(context, result, {
+    parentQuestionId: answeredQuestionId,
+  });
 
-  const created = summary.questions.find((q) => q.issueId === issueId);
-
-  if (created) {
-    await prisma.question.update({
-      where: { id: created.id },
-      data: {
-        parentQuestionId: answeredQuestionId,
-      },
-    });
-  }
   return { ...summary, issues: context.issues.length };
 }

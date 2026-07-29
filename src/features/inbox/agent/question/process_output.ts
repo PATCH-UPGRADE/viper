@@ -30,6 +30,7 @@ export function planQuestionWrites(
 export async function applyQuestionWrites(
   context: QuestionContext,
   result: QuestionResult,
+  opts?: { parentQuestionId?: string },
 ): Promise<QuestionApplySummary> {
   const ops = planQuestionWrites(context, result);
 
@@ -43,10 +44,11 @@ export async function applyQuestionWrites(
           reasonWhy: op.reasonWhy,
           suggestedAnswers: op.suggestedAnswers,
           status: "PENDING",
+          parentQuestionId: opts?.parentQuestionId,
         },
         select: { id: true, issueId: true },
       }),
     ),
   );
-  return { created: ops.length, questions: created };
+  return { created: created.length, questions: created };
 }

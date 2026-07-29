@@ -43,7 +43,7 @@ export function NotificationQuestionTab({
               sharpen this assessment.
             </span>{" "}
             <span className="text-sm text-muted-foreground">
-              Answer what you know, or send a clarification requst to the
+              Answer what you know, or send a clarification request to the
               vendor. Each answer moves assets between risk tiers.
             </span>
           </p>

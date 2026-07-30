@@ -168,7 +168,7 @@ export const remediationsRouter = createTRPCRouter({
         });
       });
 
-      inngest
+      await inngest
         .send({
           name: "remediation/analysis.requested",
           data: { remediationId: result.id },

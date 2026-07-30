@@ -303,7 +303,7 @@ describe("Remediations Endpoint (/remediations)", () => {
         .findUnique({
           where: {
             channel_externalId: {
-              channel: "PolledApi",
+              channel: "TA4",
               externalId: remediationId,
             },
           },

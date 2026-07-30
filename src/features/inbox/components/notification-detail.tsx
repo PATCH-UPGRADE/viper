@@ -62,6 +62,8 @@ function formatSourceChannel(source: NotificationDetailSource): string {
       return "polled api";
     case "Crawl":
       return "crawl";
+    case "TA4":
+      return "TA4";
   }
 }
 

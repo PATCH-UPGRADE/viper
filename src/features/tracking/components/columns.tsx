@@ -30,6 +30,7 @@ const channelIcons: Record<NotificationChannel, LucideIcon> = {
   Email: MailIcon,
   PolledApi: BoxIcon,
   Crawl: BoxIcon,
+  TA4: BoxIcon,
 };
 
 const formatScheduled = (date: Date | string | null | undefined) => {

@@ -10,7 +10,7 @@ type PreparedRemediation =
   | { skipped: "no-vulnerability" }
   | { notificationId: string; sourceId: string };
 
-const REMEDIATION_SOURCE_CHANNEL = "PolledApi" as const;
+const REMEDIATION_SOURCE_CHANNEL = "TA4" as const;
 
 async function findExistingSource(remediationId: string) {
   return prisma.notificationSource.findUnique({
@@ -45,8 +45,6 @@ async function prepareRemediationNotification(
   });
 
   const title = `Update available for ${vuln?.cveId ?? "a tracked vulnerability"}`;
-  // `||` not `??`: the input schema allows description/narrative to be "",
-  // which should fall through to the next source rather than blank the field.
   const summary = remediation.description || remediation.narrative || null;
   const markdown = remediation.narrative || remediation.description || null;
 

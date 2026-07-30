@@ -25,10 +25,10 @@ const canonicalRefInclude = {
   select: { canonicalName: true, canonicalDisplayName: true },
 } as const;
 
-/** Include for a DeviceGroupMatching with its canonical vendor/product/version. */
+/** Include for a DeviceGroupMatching with its canonical manufacturer/product/version. */
 export const deviceGroupMatchingInclude = {
   include: {
-    vendor: canonicalRefInclude,
+    manufacturer: canonicalRefInclude,
     product: canonicalRefInclude,
     version: canonicalRefInclude,
   },

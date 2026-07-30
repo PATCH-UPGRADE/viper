@@ -219,8 +219,8 @@ enum VersScheme {
   CONAN
 }
 
-// Canonical vendor registry. `nameMappings` are aliases that resolve to this row.
-model Vendor {
+// Canonical manufacturer registry. `nameMappings` are aliases that resolve to this row.
+model Manufacturer {
   id                   String                @id @default(cuid())
   canonicalName        String                @unique
   canonicalDisplayName String
@@ -232,7 +232,7 @@ model Vendor {
   updatedAt            DateTime              @updatedAt
 
   @@index([canonicalName])
-  @@map("vendor")
+  @@map("manufacturer")
 }
 
 model Product {
@@ -267,10 +267,10 @@ model Version {
 model DeviceGroup {
   id String @id @default(cuid())
 
-  vendorId      String?
-  vendor        Vendor?       @relation(fields: [vendorId], references: [id], onDelete: SetNull)
-  productId     String?
-  product       Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  manufacturerId String?
+  manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
+  productId      String?
+  product        Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
   versionId     String?
   version       Version?      @relation(fields: [versionId], references: [id], onDelete: SetNull)
   versionStatus VersionStatus @default(UNKNOWN)
@@ -284,18 +284,19 @@ model DeviceGroup {
   deviceGroupHistories DeviceGroupHistory[]
   assets               Asset[]
 
-  @@unique([vendorId, productId, versionId, versionStatus], name: "device_group_identity")
-  @@index([vendorId, productId])
+  // Explicit map: the generated name would be 65 chars and Postgres truncates at 63.
+  @@unique([manufacturerId, productId, versionId, versionStatus], name: "device_group_identity", map: "device_group_identity_key")
+  @@index([manufacturerId, productId])
   @@map("device_group")
 }
 
 model DeviceGroupMatching {
   id String @id @default(cuid())
 
-  vendorId  String
-  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  productId String? // null => wildcard (all products of the vendor)
-  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  manufacturerId String
+  manufacturer   Manufacturer @relation(fields: [manufacturerId], references: [id], onDelete: Cascade)
+  productId      String? // null => wildcard (all products of the manufacturer)
+  product        Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
   versionId String? // exact version when set
   version   Version? @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
@@ -311,7 +312,7 @@ model DeviceGroupMatching {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([vendorId, productId])
+  @@index([manufacturerId, productId])
   @@map("device_group_matching")
 }
 

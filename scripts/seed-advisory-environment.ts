@@ -27,7 +27,7 @@ const EXCEPTION_SERIALS = [
 // affected-asset list is a real subset of the fleet rather than everything we own.
 const OUT_OF_SCOPE_SERIALS = ["SYNGO-PLZ-VB30E-HF07-001", "SYNGOVIA-VB70-001"];
 
-const VENDOR = "Siemens Healthineers";
+const MANUFACTURER = "Siemens Healthineers";
 
 type AssetSpec = {
   ip: string;
@@ -38,9 +38,9 @@ type AssetSpec = {
   location: { facility: string; building: string; floor: string; room: string };
 };
 
-function upsertVendor(name: string) {
+function upsertManufacturer(name: string) {
   const canonicalName = name.trim().toLowerCase();
-  return prisma.vendor.upsert({
+  return prisma.manufacturer.upsert({
     where: { canonicalName },
     update: {},
     create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
@@ -70,12 +70,12 @@ async function upsertMatching(spec: {
   version?: string;
   versionRange?: string;
 }) {
-  const vendor = await upsertVendor(VENDOR);
+  const manufacturer = await upsertManufacturer(MANUFACTURER);
   const product = await upsertProduct(spec.product);
   const version = spec.version ? await upsertVersion(spec.version) : null;
 
   const identity = {
-    vendorId: vendor.id,
+    manufacturerId: manufacturer.id,
     productId: product.id,
     versionId: version?.id ?? null,
     versionRange: spec.versionRange ?? null,
@@ -88,12 +88,12 @@ async function upsertMatching(spec: {
 }
 
 async function upsertDeviceGroup(product: string, version: string) {
-  const vendor = await upsertVendor(VENDOR);
+  const manufacturer = await upsertManufacturer(MANUFACTURER);
   const productRec = await upsertProduct(product);
   const versionRec = await upsertVersion(version);
 
   const identity = {
-    vendorId: vendor.id,
+    manufacturerId: manufacturer.id,
     productId: productRec.id,
     versionId: versionRec.id,
     versionStatus: VersionStatus.KNOWN,
@@ -189,7 +189,7 @@ async function seededAssetIds() {
 }
 
 type MatchingRow = {
-  vendorId: string;
+  manufacturerId: string;
   productId: string | null;
   versionId: string | null;
   versionRange: string | null;

@@ -19,7 +19,7 @@ export const questionInclude = {
       vulnerability: true,
       deviceGroupMatching: {
         include: {
-          vendor: { select: { canonicalDisplayName: true } },
+          manufacturer: { select: { canonicalDisplayName: true } },
           product: { select: { canonicalDisplayName: true } },
           version: { select: { canonicalDisplayName: true } },
         },

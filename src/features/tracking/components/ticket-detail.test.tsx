@@ -82,7 +82,7 @@ const {
           ip: "10.0.0.1",
           role: "Workstation",
           deviceGroup: {
-            vendor: { canonicalDisplayName: "Acme" },
+            manufacturer: { canonicalDisplayName: "Acme" },
             product: { canonicalDisplayName: "X100" },
           },
         },
@@ -621,10 +621,10 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   deviceGroupId: "dg-1",
   deviceGroup: {
     id: "dg-1",
-    vendorId: "vendor-icu",
+    manufacturerId: "manufacturer-icu",
     productId: "product-plum",
     versionId: null,
-    vendor: { canonicalDisplayName: "ICU Medical" },
+    manufacturer: { canonicalDisplayName: "ICU Medical" },
     product: { canonicalDisplayName: "Plum 360" },
     version: null,
   },
@@ -685,7 +685,7 @@ describe("LinkedAssetsTable", () => {
               description: "Apply firmware patch v2.3",
               deviceGroupMatchings: [
                 {
-                  vendorId: "vendor-icu",
+                  manufacturerId: "manufacturer-icu",
                   productId: "product-plum",
                   versionId: null,
                   versionRange: null,
@@ -711,7 +711,7 @@ describe("LinkedAssetsTable", () => {
               description: "Different group only",
               deviceGroupMatchings: [
                 {
-                  vendorId: "vendor-other",
+                  manufacturerId: "manufacturer-other",
                   productId: null,
                   versionId: null,
                   versionRange: null,

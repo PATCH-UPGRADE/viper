@@ -12,7 +12,7 @@ export const notificationInclude = {
     include: {
       deviceGroupMatching: {
         include: {
-          vendor: true,
+          manufacturer: true,
           product: true,
           version: true,
         },
@@ -47,7 +47,7 @@ export const notificationDetailInclude = {
     include: {
       deviceGroupMatching: {
         include: {
-          vendor: true,
+          manufacturer: true,
           product: true,
           version: true,
         },
@@ -87,7 +87,7 @@ export type ResolvedDeviceGroupAsset = {
   statusNotes: string | null;
 };
 
-/** A device group matching with its resolved vendor/product/version labels. */
+/** A device group matching with its resolved manufacturer/product/version labels. */
 export type MatchingWithLabels =
   NotificationDetailBasePayload["deviceGroupsMatchings"][number]["deviceGroupMatching"];
 

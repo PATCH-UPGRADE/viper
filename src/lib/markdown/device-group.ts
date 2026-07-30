@@ -6,7 +6,7 @@ export const displayName = (ref: CanonicalRef): string | undefined =>
     : undefined;
 
 type DeviceGroupDisplay = {
-  vendor?: CanonicalRef;
+  manufacturer?: CanonicalRef;
   product?: CanonicalRef;
   version?: CanonicalRef;
   cpe?: string[];
@@ -14,10 +14,10 @@ type DeviceGroupDisplay = {
 
 /**
  * Human-readable label for a device group, e.g. "Acme InfusionPump".
- * Falls back to "Unknown device" when vendor/product are unknown.
+ * Falls back to "Unknown device" when manufacturer/product are unknown.
  */
 export function deviceGroupLabel(dg: DeviceGroupDisplay): string {
-  const parts = [displayName(dg.vendor), displayName(dg.product)].filter(
+  const parts = [displayName(dg.manufacturer), displayName(dg.product)].filter(
     Boolean,
   );
   return parts.length > 0 ? parts.join(" ") : "Unknown device";
@@ -65,7 +65,7 @@ export function deviceIdentityInline(fields: DeviceIdentity): string {
 }
 
 type DeviceGroupMatchingDisplay = {
-  vendor?: CanonicalRef;
+  manufacturer?: CanonicalRef;
   product?: CanonicalRef;
   version?: CanonicalRef;
   versionRange?: string | null;
@@ -84,7 +84,7 @@ export function deviceGroupMatchingLabel(
   opts?: DeviceGroupMatchingLabelOpts,
 ): string {
   const parts = [
-    displayName(m.vendor),
+    displayName(m.manufacturer),
     displayName(m.product),
     !opts?.hideVersion ? (displayName(m.version) ?? m.versionRange) : undefined,
   ].filter(Boolean);

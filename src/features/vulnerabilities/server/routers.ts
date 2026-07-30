@@ -45,7 +45,7 @@ const createSearchFilter = (search: string) => {
             deviceGroupMatchings: {
               some: {
                 OR: [
-                  { vendor: { is: { canonicalName: insensitive } } },
+                  { manufacturer: { is: { canonicalName: insensitive } } },
                   { product: { is: { canonicalName: insensitive } } },
                 ],
               },
@@ -141,7 +141,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         where: { id: deviceGroupId },
         select: {
           id: true,
-          vendorId: true,
+          manufacturerId: true,
           productId: true,
           versionId: true,
           version: { select: { canonicalName: true } },

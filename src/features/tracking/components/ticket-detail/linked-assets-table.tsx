@@ -31,7 +31,7 @@ export const LinkedAssetsTable = ({
   detachPending?: boolean;
 }) => {
   // Remediations no longer link device groups directly; each carries
-  // vendor/product/version matching rules. Resolve the first remediation whose
+  // manufacturer/product/version matching rules. Resolve the first remediation whose
   // rules apply to a given asset's device group.
   const remediationForAsset = (a: DetailAsset): DetailRemediation | undefined =>
     remediations.find((r) =>
@@ -58,7 +58,7 @@ export const LinkedAssetsTable = ({
           const remediation = remediationForAsset(a);
           const model = a.deviceGroup
             ? [
-                a.deviceGroup.vendor?.canonicalDisplayName,
+                a.deviceGroup.manufacturer?.canonicalDisplayName,
                 a.deviceGroup.product?.canonicalDisplayName,
               ]
                 .filter(Boolean)

@@ -55,7 +55,7 @@ export async function gatherTriageContext(
       deviceGroupsMatchings: {
         include: {
           deviceGroupMatching: {
-            include: { vendor: true, product: true, version: true },
+            include: { manufacturer: true, product: true, version: true },
           },
         },
       },
@@ -64,12 +64,16 @@ export async function gatherTriageContext(
           vulnerability: {
             include: {
               deviceGroupMatchings: {
-                include: { vendor: true, product: true, version: true },
+                include: { manufacturer: true, product: true, version: true },
               },
               remediations: {
                 include: {
                   deviceGroupMatchings: {
-                    include: { vendor: true, product: true, version: true },
+                    include: {
+                      manufacturer: true,
+                      product: true,
+                      version: true,
+                    },
                   },
                   vulnerability: { select: { id: true, cveId: true } },
                 },
@@ -84,7 +88,7 @@ export async function gatherTriageContext(
           remediation: {
             include: {
               deviceGroupMatchings: {
-                include: { vendor: true, product: true, version: true },
+                include: { manufacturer: true, product: true, version: true },
               },
               vulnerability: { select: { id: true, cveId: true } },
             },
@@ -137,7 +141,7 @@ export async function gatherTriageContext(
       ? await prisma.deviceGroup.findMany({
           where: { OR: matchings.map(deviceGroupWhereForMatching) },
           include: {
-            vendor: true,
+            manufacturer: true,
             product: true,
             version: true,
             assets: true,
@@ -289,7 +293,7 @@ type VexIssue = {
 };
 
 type GroupForRender = {
-  vendor?: { canonicalDisplayName: string } | null;
+  manufacturer?: { canonicalDisplayName: string } | null;
   product?: { canonicalDisplayName: string } | null;
   version?: { canonicalDisplayName: string } | null;
   cpe?: string[];

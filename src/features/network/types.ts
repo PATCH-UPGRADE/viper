@@ -68,7 +68,7 @@ export const viperAssetDataSchema = z.object({
   hostname: z.string().nullable(),
   status: z.enum(["Active", "Decommissioned", "Maintenance"]).nullable(),
   deviceGroup: z.object({
-    vendor: canonicalRefSchema.nullable(),
+    manufacturer: canonicalRefSchema.nullable(),
     product: canonicalRefSchema.nullable(),
     version: canonicalRefSchema.nullable(),
     cpe: z.array(z.string()),

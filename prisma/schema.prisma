@@ -165,8 +165,6 @@ model Node {
   position Json
   data     Json @default("{}")
 
-  // Direct links to the assets / device-group matchings an ASSET node represents.
-  // Replaces the loose `data.assetIds` / `data.cpes` JSON that used to encode these.
   assets               Asset[]
   deviceGroupMatchings DeviceGroupMatching[]
 

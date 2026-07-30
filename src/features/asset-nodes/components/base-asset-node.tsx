@@ -1,6 +1,5 @@
 "use client";
 
-import { createId } from "@paralleldrive/cuid2";
 import { type NodeProps, Position, useReactFlow } from "@xyflow/react";
 import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
@@ -12,7 +11,6 @@ import {
   NodeStatusIndicator,
 } from "@/components/react-flow/node-status-indicator";
 import { WorkflowNode } from "@/components/workflow-node";
-import { NodeType } from "@/generated/prisma";
 
 interface BaseAssetNodeProps extends NodeProps {
   icon: LucideIcon | string;
@@ -37,18 +35,7 @@ export const BaseAssetNode = memo(
   }: BaseAssetNodeProps) => {
     const { setNodes, setEdges } = useReactFlow();
     const handleDelete = () => {
-      setNodes((currentNodes) => {
-        const updatedNodes = currentNodes.filter((node) => node.id !== id);
-        if (updatedNodes.length === 0) {
-          updatedNodes.push({
-            type: NodeType.INITIAL,
-            position: { x: 0, y: 0 },
-            id: createId(),
-            data: {},
-          });
-        }
-        return updatedNodes;
-      });
+      setNodes((currentNodes) => currentNodes.filter((node) => node.id !== id));
 
       setEdges((currentEdges) => {
         const updatedEdges = currentEdges.filter(

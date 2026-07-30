@@ -1,7 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { generateSlug } from "random-word-slugs";
 import { z } from "zod";
-import { NodeType } from "@/generated/prisma";
+import type { NodeType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   buildPaginationMeta,
@@ -20,13 +20,6 @@ export const workflowsRouter = createTRPCRouter({
         name: generateSlug(3),
         description: null,
         userId: ctx.auth.user.id,
-        nodes: {
-          create: {
-            type: NodeType.INITIAL,
-            position: { x: 0, y: 0 },
-            name: NodeType.INITIAL,
-          },
-        },
       },
     });
   }),

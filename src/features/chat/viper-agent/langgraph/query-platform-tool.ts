@@ -11,13 +11,11 @@ import { createAgentCaller } from "@/trpc/agent-caller";
  */
 // TODO: VW-409 -- Considering a progressive disclosure API endpoint to show
 // which issues affect which assets
-//
-// TODO: VW-410 -- Considering a progressive disclosure API endpoint to show
-// which clinical workflows affect which assets
 export const PLATFORM_QUERY_PROCEDURES = [
   "assets.getMany",
   "assets.getOne",
   "assets.getManyByDeviceGroup",
+  "assets.getManyByWorkflow",
   "assets.getUtilization",
   "vulnerabilities.getMany",
   "vulnerabilities.getOne",
@@ -26,6 +24,7 @@ export const PLATFORM_QUERY_PROCEDURES = [
   "remediations.getOne",
   "deviceGroups.getMany",
   "deviceGroups.getOne",
+  "workflows.getManyByAsset",
 ] as const;
 
 /** Condensed, prompt-injectable catalog of the allowlisted read procedures. */
@@ -33,6 +32,7 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - assets.getMany — list/search hospital device assets. input: { search?, page?, pageSize? }
 - assets.getOne — one asset by id. input: { id }
 - assets.getManyByDeviceGroup — assets in a device group. input: { deviceGroupId, search?, page?, pageSize? }
+- assets.getManyByWorkflow — assets used in a clinical workflow (linked directly or via a device-group matching). input: { id } (workflow id)
 - assets.getUtilization — one asset's utilization schedule, as a readable summary. input: { id }
 - vulnerabilities.getMany — list/search vulnerabilities (CVEs). input: { search?, page?, pageSize? }
 - vulnerabilities.getOne — one vulnerability by id. input: { id }
@@ -41,6 +41,7 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - remediations.getOne — one remediation by id. input: { id }
 - deviceGroups.getMany — list/search device groups (make/model classes). input: { search?, page?, pageSize? }
 - deviceGroups.getOne — one device group by id. input: { id }
+- workflows.getManyByAsset — clinical workflows that use an asset (linked directly or via a device-group matching). input: { id } (asset id)
 
 Assets, vulnerabilities, and remediations each include a "notes" array of resolved,
 entity-specific notes ({ id, text }) — device/vuln/remediation caveats a human recorded
@@ -97,11 +98,36 @@ function linkifyAsset(asset: Record<string, any>): void {
   if (typeof id !== "string") return;
   const hasUtilization = asset.utilization != null;
   delete asset.utilization;
-  if (!hasUtilization) return;
   asset._links = {
     ...(asset._links ?? {}),
-    utilization: {
-      procedure: "assets.getUtilization",
+    workflows: {
+      procedure: "workflows.getManyByAsset",
+      input: { id },
+    },
+    ...(hasUtilization
+      ? {
+          utilization: {
+            procedure: "assets.getUtilization",
+            input: { id },
+          },
+        }
+      : {}),
+  };
+}
+
+/**
+ * Serialized workflows (from workflows.getManyByAsset) carry a node list but no
+ * asset detail. Add a "_links.assets" hint so the model can pull the assets a
+ * workflow touches on demand (assets.getManyByWorkflow).
+ */
+// biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
+function linkifyWorkflow(workflow: Record<string, any>): void {
+  const id = workflow.id;
+  if (typeof id !== "string") return;
+  workflow._links = {
+    ...(workflow._links ?? {}),
+    assets: {
+      procedure: "assets.getManyByWorkflow",
       input: { id },
     },
   };
@@ -123,6 +149,14 @@ function addNavigationLinks(value: unknown): unknown {
     if ("assetsUrl" in obj || "vulnerabilitiesUrl" in obj)
       linkifyDeviceGroup(obj);
     if ("utilization" in obj) linkifyAsset(obj);
+    // Serialized workflow: has an id + node list but is not itself a node (nodes
+    // carry a "type"). Matches workflows.getManyByAsset results.
+    if (
+      typeof obj.id === "string" &&
+      Array.isArray(obj.nodes) &&
+      !("type" in obj)
+    )
+      linkifyWorkflow(obj);
     return obj;
   }
   return value;
@@ -155,7 +189,7 @@ export function makeQueryPlatformDataTool(userId: string) {
     },
     {
       name: "query_platform_data",
-      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device groups) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here. Returned objects may carry a "_links" map of follow-up calls — call this tool again with a link's procedure and input to navigate (e.g. from an asset's device group to all its assets or vulnerabilities).
+      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device groups, clinical workflows) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here. Returned objects may carry a "_links" map of follow-up calls — call this tool again with a link's procedure and input to navigate (e.g. from an asset's device group to all its assets or vulnerabilities).
 
 ${PLATFORM_CATALOG}`,
       schema: z.object({

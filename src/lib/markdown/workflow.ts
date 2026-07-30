@@ -1,9 +1,12 @@
-import { serializeWorkflow } from "@/features/workflows/utils";
+import {
+  serializeWorkflow,
+  type workflowSerializeInclude,
+} from "@/features/workflows/utils";
 import type { Prisma } from "@/generated/prisma";
 import { shortId } from "./shared";
 
 type WorkflowWithRelations = Prisma.WorkflowGetPayload<{
-  include: { nodes: true; connections: true };
+  include: typeof workflowSerializeInclude;
 }>;
 
 export function generateWorkflowsMarkdown(
@@ -14,13 +17,12 @@ export function generateWorkflowsMarkdown(
   return workflows
     .map((wf) => {
       const serialized = serializeWorkflow(wf);
-      const { edges: _edges, ...withoutEdges } = serialized;
       const lines = [`### ${serialized.name} (${shortId(serialized.id)})`];
       if (serialized.description) {
         lines.push(`\n${serialized.description}`);
       }
       lines.push(
-        `\n\`\`\`json\n${JSON.stringify(withoutEdges, null, 2)}\n\`\`\``,
+        `\n\`\`\`json\n${JSON.stringify(serialized, null, 2)}\n\`\`\``,
       );
       return lines.join("\n");
     })
@@ -30,21 +32,32 @@ export function generateWorkflowsMarkdown(
 export function workflowClinicalSummary(
   workflows: WorkflowWithRelations[],
   affectedAssetIds: string[],
+  affectedMatchingIds: string[] = [],
 ): string {
-  const affected = new Set(affectedAssetIds);
-  if (affected.size === 0) {
+  const affectedAssets = new Set(affectedAssetIds);
+  const affectedMatchings = new Set(affectedMatchingIds);
+  if (affectedAssets.size === 0 && affectedMatchings.size === 0) {
     return "_No affected assets to map to clinical workflows._";
   }
+
+  const hasId = (value: unknown, set: Set<string>) =>
+    Array.isArray(value) &&
+    value.some((id) => typeof id === "string" && set.has(id));
 
   const blocks: string[] = [];
   for (const wf of workflows) {
     const serialized = serializeWorkflow(wf);
     const hitNodes = serialized.nodes.filter((node) => {
       if (node.type !== "ASSET") return false;
-      const ids = (node.data as { assetIds?: unknown }).assetIds;
+      // serializeWorkflow surfaces the node's linked asset / device-group-
+      // matching ids into data; a node is affected if either intersects.
+      const data = node.data as {
+        assetIds?: unknown;
+        deviceGroupMatchingIds?: unknown;
+      };
       return (
-        Array.isArray(ids) &&
-        ids.some((id) => typeof id === "string" && affected.has(id))
+        hasId(data.assetIds, affectedAssets) ||
+        hasId(data.deviceGroupMatchingIds, affectedMatchings)
       );
     });
     if (hitNodes.length === 0) continue;

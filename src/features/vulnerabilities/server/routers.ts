@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { getScopedNotesByInstance } from "@/features/notes/server/get-relevant-notes";
+import {
+  attachNote,
+  attachNotes,
+} from "@/features/notes/server/get-relevant-notes";
 import { type AlohaStatus, Priority, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
@@ -104,17 +107,9 @@ export const vulnerabilitiesRouter = createTRPCRouter({
             : { updatedAt: "desc" },
       });
 
-      const notesByVuln = await getScopedNotesByInstance(
-        "VULNERABILITY",
-        result.items.map((v) => v.id),
-      );
-
       return {
         ...result,
-        items: result.items.map((v) => ({
-          ...v,
-          notes: notesByVuln.get(v.id) ?? [],
-        })),
+        items: await attachNotes("VULNERABILITY", result.items),
       };
     }),
 
@@ -164,17 +159,9 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         include: vulnerabilityInclude,
       });
 
-      const notesByVuln = await getScopedNotesByInstance(
-        "VULNERABILITY",
-        result.items.map((v) => v.id),
-      );
-
       return {
         ...result,
-        items: result.items.map((v) => ({
-          ...v,
-          notes: notesByVuln.get(v.id) ?? [],
-        })),
+        items: await attachNotes("VULNERABILITY", result.items),
       };
     }),
 
@@ -198,10 +185,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         include: vulnerabilityInclude,
       });
       const found = requireExistence(vuln, "Vulnerability");
-      const notesByVuln = await getScopedNotesByInstance("VULNERABILITY", [
-        found.id,
-      ]);
-      return { ...found, notes: notesByVuln.get(found.id) ?? [] };
+      return attachNote("VULNERABILITY", found);
     }),
 
   // POST /api/vulnerabilities - Create vulnerability

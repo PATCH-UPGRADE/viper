@@ -1714,10 +1714,35 @@ async function seedNotes(userId: string) {
   return notes;
 }
 
+// Resolve CPE strings to shared DeviceGroupMatching ids (via their device group)
+// so workflow ASSET nodes can link a device class relationally instead of by CPE.
+async function matchingIdsForCpes(cpes: string[]): Promise<string[]> {
+  const ids: string[] = [];
+  for (const cpe of cpes) {
+    const dg = await prisma.deviceGroup.findFirst({
+      where: { cpe: { has: cpe } },
+      select: { id: true, vendorId: true, productId: true, versionId: true },
+    });
+    if (!dg) {
+      console.warn(`⚠️  No device group for CPE ${cpe}; skipping matching link`);
+      continue;
+    }
+    const matchingId = await matchingForGroup(dg);
+    if (matchingId) ids.push(matchingId);
+  }
+  return [...new Set(ids)];
+}
+
 async function seedWorkflows(userId: string) {
   console.log("\n🌱 Seeding workflows...");
 
   const STEP_POS = 100;
+
+  // Device-class matchings for the ASSET nodes that match by device class
+  // rather than a specific asset id (resolved from their former CPE patterns).
+  const ctScannerMatchingIds = await matchingIdsForCpes([
+    "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
+  ]);
 
   // ── Workflow 1: Emergency CT — Acute Stroke / Trauma Protocol ───────────────
   const workflow1 = await prisma.workflow.create({
@@ -1767,9 +1792,9 @@ async function seedWorkflows(userId: string) {
           label: "GE BrightSpeed Elite Select",
           description:
             "GE BrightSpeed Elite Select acquires axial and helical CT studies. Completed images are sent to the CT acquisition workstation via DICOM.",
-          cpes: [
-            "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
-          ],
+        },
+        deviceGroupMatchings: {
+          connect: ctScannerMatchingIds.map((id) => ({ id })),
         },
       },
     }),
@@ -1784,8 +1809,8 @@ async function seedWorkflows(userId: string) {
           label: "CT Acquisition Workstation",
           description:
             "GE Advantage Workstation 4.6 processes raw CT data, reconstructs images, and pushes the completed study to PACS.",
-          assetIds: ["rad-ws-001"],
         },
+        assets: { connect: [{ id: "rad-ws-001" }] },
       },
     }),
     prisma.node.create({
@@ -1799,8 +1824,8 @@ async function seedWorkflows(userId: string) {
           label: "PACS Server",
           description:
             "Centricity PACS-IW v5.0 stores and routes DICOM studies to radiology workstations and the ED image viewer.",
-          assetIds: ["rad-pacs-001"],
         },
+        assets: { connect: [{ id: "rad-pacs-001" }] },
       },
     }),
     prisma.node.create({
@@ -1814,8 +1839,8 @@ async function seedWorkflows(userId: string) {
           label: "Radiology Diagnostic Workstations",
           description:
             "Radiologist interprets the CT study on a diagnostic-grade display, dictates findings, and signs the final report.",
-          assetIds: ["rad-rws-001", "rad-rws-002"],
         },
+        assets: { connect: [{ id: "rad-rws-001" }, { id: "rad-rws-002" }] },
       },
     }),
     prisma.node.create({
@@ -1829,8 +1854,8 @@ async function seedWorkflows(userId: string) {
           label: "ED Image Viewer",
           description:
             "ED team reviews the imaging study and the signed radiology report to guide treatment and disposition decisions.",
-          assetIds: ["rad-ed-001"],
         },
+        assets: { connect: [{ id: "rad-ed-001" }] },
       },
     }),
     prisma.node.create({
@@ -1872,6 +1897,11 @@ async function seedWorkflows(userId: string) {
     },
   });
 
+  const imagingDeviceMatchingIds = await matchingIdsForCpes([
+    "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
+    "cpe:2.3:h:gehealthcare:optima_xr200amx:-:*:*:*:*:*:*:*",
+  ]);
+
   const w2nodes = await Promise.all([
     prisma.node.create({
       data: {
@@ -1897,10 +1927,9 @@ async function seedWorkflows(userId: string) {
           label: "Portable Ultrasound / X-Ray",
           description:
             "GE LOGIQ e R7 portable ultrasound or Optima XR200amx DR system acquires bedside or mobile studies for inpatients.",
-          cpes: [
-            "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
-            "cpe:2.3:h:gehealthcare:optima_xr200amx:-:*:*:*:*:*:*:*",
-          ],
+        },
+        deviceGroupMatchings: {
+          connect: imagingDeviceMatchingIds.map((id) => ({ id })),
         },
       },
     }),
@@ -1915,8 +1944,8 @@ async function seedWorkflows(userId: string) {
           label: "PACS Server",
           description:
             "Centricity PACS-IW v5.0 stores the study and routes it to the remote radiologist via the VPN gateway.",
-          assetIds: ["rad-pacs-001"],
         },
+        assets: { connect: [{ id: "rad-pacs-001" }] },
       },
     }),
     prisma.node.create({
@@ -1930,8 +1959,8 @@ async function seedWorkflows(userId: string) {
           label: "Remote Radiology VPN Gateway",
           description:
             "Cisco ASA 5505 VPN gateway provides secure encrypted connectivity for remote radiologist access to the hospital PACS.",
-          assetIds: ["rad-vpn-001"],
         },
+        assets: { connect: [{ id: "rad-vpn-001" }] },
       },
     }),
     prisma.node.create({

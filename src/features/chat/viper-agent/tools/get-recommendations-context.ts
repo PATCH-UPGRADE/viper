@@ -3,6 +3,7 @@ import {
   type NetworkTopology,
   networkTopologySchema,
 } from "@/features/network/types";
+import type { workflowSerializeInclude } from "@/features/workflows/utils";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
@@ -70,7 +71,7 @@ function generateVulnAssetRemMap(
 }
 
 type WorkflowWithRelations = Prisma.WorkflowGetPayload<{
-  include: { nodes: true; connections: true };
+  include: typeof workflowSerializeInclude;
 }>;
 
 // ─── Network flow ─────────────────────────────────────────────────────────────

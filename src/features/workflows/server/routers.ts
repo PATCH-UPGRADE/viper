@@ -4,13 +4,17 @@ import { z } from "zod";
 import type { NodeType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
+  matchingAppliesToDeviceGroup,
+  matchingWhereForDeviceGroup,
+} from "@/lib/device-matching";
+import {
   buildPaginationMeta,
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
-import { serializeWorkflow } from "../utils";
+import { serializeWorkflow, workflowSerializeInclude } from "../utils";
 import { workflowToMermaidJSON } from "./mermaid";
 
 export const workflowsRouter = createTRPCRouter({
@@ -63,6 +67,14 @@ export const workflowsRouter = createTRPCRouter({
 
       const workflow = requireExistence(workflowOrNull, "Workflow");
 
+      // Read a node's transient relation-id list out of its data blob.
+      const readIds = (data: unknown, key: string): string[] => {
+        const value = (data as Record<string, unknown> | undefined)?.[key];
+        return Array.isArray(value)
+          ? value.filter((x): x is string => typeof x === "string")
+          : [];
+      };
+
       // Transaction to ensure consistency
       return await prisma.$transaction(async (tx) => {
         // Delete existing nodes and connections (cascade deletes connections)
@@ -70,17 +82,78 @@ export const workflowsRouter = createTRPCRouter({
           where: { workflowId: id },
         });
 
-        // Create nodes
-        await tx.node.createMany({
-          data: nodes.map((node) => ({
-            id: node.id,
-            workflowId: id,
-            name: node.type || "unknown",
-            type: node.type as NodeType,
-            position: node.position,
-            data: node.data || {},
-          })),
-        });
+        // Connect only relation ids that actually exist, so a mistyped id in the
+        // editor doesn't fail the whole save (matching the old data-blob leniency).
+        const referencedAssetIds = [
+          ...new Set(nodes.flatMap((n) => readIds(n.data, "assetIds"))),
+        ];
+        const referencedDgmIds = [
+          ...new Set(
+            nodes.flatMap((n) => readIds(n.data, "deviceGroupMatchingIds")),
+          ),
+        ];
+        const existingAssetIds = new Set(
+          referencedAssetIds.length
+            ? (
+                await tx.asset.findMany({
+                  where: { id: { in: referencedAssetIds } },
+                  select: { id: true },
+                })
+              ).map((a) => a.id)
+            : [],
+        );
+        const existingDgmIds = new Set(
+          referencedDgmIds.length
+            ? (
+                await tx.deviceGroupMatching.findMany({
+                  where: { id: { in: referencedDgmIds } },
+                  select: { id: true },
+                })
+              ).map((m) => m.id)
+            : [],
+        );
+
+        // createMany can't write m-n join rows, so create nodes individually and
+        // connect their assets / device-group matchings. The relation ids are
+        // stripped from the stored data blob (they live in relations now).
+        for (const node of nodes) {
+          const data = { ...((node.data as Record<string, unknown>) || {}) };
+          delete data.assetIds;
+          delete data.deviceGroupMatchingIds;
+
+          const assetConnect = readIds(node.data, "assetIds").filter((aid) =>
+            existingAssetIds.has(aid),
+          );
+          const dgmConnect = readIds(
+            node.data,
+            "deviceGroupMatchingIds",
+          ).filter((mid) => existingDgmIds.has(mid));
+
+          await tx.node.create({
+            data: {
+              id: node.id,
+              workflowId: id,
+              name: node.type || "unknown",
+              type: node.type as NodeType,
+              position: node.position,
+              data,
+              ...(assetConnect.length
+                ? {
+                    assets: {
+                      connect: assetConnect.map((aid) => ({ id: aid })),
+                    },
+                  }
+                : {}),
+              ...(dgmConnect.length
+                ? {
+                    deviceGroupMatchings: {
+                      connect: dgmConnect.map((mid) => ({ id: mid })),
+                    },
+                  }
+                : {}),
+            },
+          });
+        }
 
         // Create connections
         await tx.connection.createMany({
@@ -125,17 +198,25 @@ export const workflowsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const workflowOrNull = await prisma.workflow.findUnique({
         where: { id: input.id },
-        include: { nodes: true, connections: true },
+        include: workflowSerializeInclude,
       });
 
       const workflow = requireExistence(workflowOrNull, "Workflow");
 
-      // Transform server nodes to react-flow compatible nodes
+      // Transform server nodes to react-flow compatible nodes. Linked asset /
+      // device-group-matching ids live in relations, not data, so surface them
+      // into node.data (the shape the editor reads and writes back on save).
       const nodes: Node[] = workflow.nodes.map((node) => ({
         id: node.id,
         type: node.type,
         position: node.position as { x: number; y: number },
-        data: (node.data as Record<string, unknown>) || {},
+        data: {
+          ...((node.data as Record<string, unknown>) || {}),
+          assetIds: node.assets.map((asset) => asset.id),
+          deviceGroupMatchingIds: node.deviceGroupMatchings.map(
+            (matching) => matching.id,
+          ),
+        },
       }));
 
       // Transform server connections to react-flow compatible edges
@@ -182,6 +263,80 @@ export const workflowsRouter = createTRPCRouter({
       return createPaginatedResponse(items, meta);
     }),
 
+  // Clinical workflows that use an asset — either the asset is linked directly to
+  // one of their nodes, or a node links a device-group matching that applies to
+  // the asset's device group. Progressive-disclosure companion to
+  // assets.getManyByWorkflow. Returns node-focused serialized workflows.
+  getManyByAsset: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const { id: assetId } = input;
+
+      const asset = await prisma.asset.findUnique({
+        where: { id: assetId },
+        select: {
+          deviceGroup: {
+            select: {
+              id: true,
+              vendorId: true,
+              productId: true,
+              versionId: true,
+              version: { select: { canonicalName: true } },
+            },
+          },
+        },
+      });
+      requireExistence(asset, "Asset");
+
+      // Device-group matchings that apply to this asset's device group.
+      const dg = asset?.deviceGroup;
+      let applicableMatchingIds: string[] = [];
+      if (dg?.vendorId) {
+        const candidateMatchings = await prisma.deviceGroupMatching.findMany({
+          where: matchingWhereForDeviceGroup({
+            vendorId: dg.vendorId,
+            productId: dg.productId,
+          }),
+          select: {
+            id: true,
+            vendorId: true,
+            productId: true,
+            versionId: true,
+            versionRange: true,
+          },
+        });
+        applicableMatchingIds = candidateMatchings
+          .filter((m) => matchingAppliesToDeviceGroup(m, dg))
+          .map((m) => m.id);
+      }
+
+      // One OR query dedupes direct-link and device-class workflows by id.
+      const workflows = await prisma.workflow.findMany({
+        where: {
+          OR: [
+            { nodes: { some: { assets: { some: { id: assetId } } } } },
+            ...(applicableMatchingIds.length
+              ? [
+                  {
+                    nodes: {
+                      some: {
+                        deviceGroupMatchings: {
+                          some: { id: { in: applicableMatchingIds } },
+                        },
+                      },
+                    },
+                  },
+                ]
+              : []),
+          ],
+        },
+        include: workflowSerializeInclude,
+        orderBy: { updatedAt: "desc" },
+      });
+
+      return workflows.map(serializeWorkflow);
+    }),
+
   exportMermaid: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {
@@ -214,11 +369,19 @@ export const workflowsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const workflowOrNull = await prisma.workflow.findUnique({
         where: { id: input.id },
-        include: { nodes: true, connections: true },
+        include: workflowSerializeInclude,
       });
       const workflow = requireExistence(workflowOrNull, "Workflow");
       const serialized = serializeWorkflow(workflow);
-      const mermaid = workflowToMermaidJSON(serialized.nodes, serialized.edges);
+      // serializeWorkflow omits edges; Mermaid needs them, so build from connections.
+      const edges: Edge[] = workflow.connections.map((connection) => ({
+        id: connection.id,
+        source: connection.fromNodeId,
+        target: connection.toNodeId,
+        sourceHandle: connection.fromOutput,
+        targetHandle: connection.toInput,
+      }));
+      const mermaid = workflowToMermaidJSON(serialized.nodes, edges);
       return { workflow: serialized, mermaid };
     }),
 });

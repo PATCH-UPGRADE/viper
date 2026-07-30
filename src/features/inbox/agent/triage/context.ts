@@ -1,5 +1,6 @@
 import "server-only";
 import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
+import { workflowSerializeInclude } from "@/features/workflows/utils";
 import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
@@ -164,10 +165,41 @@ export async function gatherTriageContext(
     assetIds: affectedAssetIds,
   });
 
+  // Only workflows relevant to this notification: a node links an affected
+  // asset directly, or links one of the advisory's device-group matchings.
+  const affectedMatchingIds = matchings.map((m) => m.id);
   const workflows =
-    affectedAssetIds.length > 0
+    affectedAssetIds.length > 0 || affectedMatchingIds.length > 0
       ? await prisma.workflow.findMany({
-          include: { nodes: true, connections: true },
+          where: {
+            OR: [
+              ...(affectedAssetIds.length > 0
+                ? [
+                    {
+                      nodes: {
+                        some: {
+                          assets: { some: { id: { in: affectedAssetIds } } },
+                        },
+                      },
+                    },
+                  ]
+                : []),
+              ...(affectedMatchingIds.length > 0
+                ? [
+                    {
+                      nodes: {
+                        some: {
+                          deviceGroupMatchings: {
+                            some: { id: { in: affectedMatchingIds } },
+                          },
+                        },
+                      },
+                    },
+                  ]
+                : []),
+            ],
+          },
+          include: workflowSerializeInclude,
         })
       : [];
 
@@ -235,8 +267,12 @@ export async function gatherTriageContext(
     noteLabels,
     includeIds: opts.includeIds ?? false,
     workflowsMarkdown:
-      affectedAssetIds.length > 0
-        ? workflowClinicalSummary(workflows, affectedAssetIds)
+      affectedAssetIds.length > 0 || affectedMatchingIds.length > 0
+        ? workflowClinicalSummary(
+            workflows,
+            affectedAssetIds,
+            affectedMatchingIds,
+          )
         : null,
   });
 

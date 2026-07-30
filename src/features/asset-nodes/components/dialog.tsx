@@ -36,7 +36,6 @@ import { getAssetRoleLabel } from "@/features/assets/utils";
 import type { Vulnerability } from "@/generated/prisma";
 import type { AssetWithDeviceGroup } from "@/lib/db";
 import { deviceGroupLabel } from "@/lib/markdown";
-import { cpeSchema } from "@/lib/schemas";
 import { DeviceIconType, getIconByType } from "../types";
 import type { AssetNodeData } from "./node";
 
@@ -44,8 +43,8 @@ const formSchema = z.object({
   icon: z.string(),
   label: z.string(),
   description: z.string().optional(),
-  cpes: z
-    .array(z.object({ value: cpeSchema }))
+  deviceGroupMatchingIds: z
+    .array(z.object({ value: z.string() }))
     .default([])
     .optional(),
   assetIds: z
@@ -78,7 +77,9 @@ export const AssetDialog = ({
       icon: defaultValues.icon ?? "",
       label: defaultValues.label ?? "",
       description: defaultValues.description ?? "",
-      cpes: defaultValues.cpes?.map((cpe) => ({ value: cpe })) ?? [],
+      deviceGroupMatchingIds:
+        defaultValues.deviceGroupMatchingIds?.map((id) => ({ value: id })) ??
+        [],
       assetIds: defaultValues.assetIds?.map((id) => ({ value: id })) ?? [],
     },
   });
@@ -90,18 +91,20 @@ export const AssetDialog = ({
         icon: defaultValues.icon ?? "",
         label: defaultValues.label ?? "",
         description: defaultValues.description ?? "",
-        cpes: defaultValues.cpes?.map((cpe) => ({ value: cpe })) ?? [],
+        deviceGroupMatchingIds:
+          defaultValues.deviceGroupMatchingIds?.map((id) => ({ value: id })) ??
+          [],
         assetIds: defaultValues.assetIds?.map((id) => ({ value: id })) ?? [],
       });
     }
   }, [open, defaultValues, form]);
 
   const {
-    fields: cpeFields,
-    append: cpeAppend,
-    remove: cpeRemove,
+    fields: dgmFields,
+    append: dgmAppend,
+    remove: dgmRemove,
   } = useFieldArray({
-    name: "cpes",
+    name: "deviceGroupMatchingIds",
     control: form.control,
   });
 
@@ -197,39 +200,42 @@ export const AssetDialog = ({
               <div>
                 <h2 className="font-semibold">Devices</h2>
                 <p className="text-sm text-muted-foreground">
-                  Match devices based on cpes, or manually specify them.
+                  Match devices by device-group matching, or manually specify
+                  individual assets.
                 </p>
                 <div className="mt-4">
-                  <h3 className="text-sm font-medium">CPEs</h3>
+                  <h3 className="text-sm font-medium">
+                    Device group matchings
+                  </h3>
 
-                  {cpeFields.length === 0 && (
+                  {dgmFields.length === 0 && (
                     <p className="text-sm text-muted-foreground">
-                      Add a CPE pattern to match assets to
+                      Add a device-group matching id to match a class of devices
                     </p>
                   )}
 
                   <div className="space-y-2 mt-2">
-                    {cpeFields.map((field, index) => (
+                    {dgmFields.map((field, index) => (
                       <div key={field.id} className="flex gap-2 items-start">
                         <Button
                           type="button"
                           variant="destructive"
-                          onClick={() => cpeRemove(index)}
-                          aria-label={`Remove CPE ${index + 1}`}
+                          onClick={() => dgmRemove(index)}
+                          aria-label={`Remove device group matching ${index + 1}`}
                         >
                           <CircleX />
                         </Button>
                         <FormField
                           control={form.control}
-                          name={`cpes.${index}.value`}
+                          name={`deviceGroupMatchingIds.${index}.value`}
                           render={({ field }) => (
                             <FormItem className="flex-1">
                               <FormLabel className="sr-only">
-                                CPE {index + 1}
+                                Device group matching {index + 1}
                               </FormLabel>
                               <FormControl>
                                 <Input
-                                  placeholder="cpe:2.3:*:*:*:*:*:*:*:*:*:*:*"
+                                  placeholder="cmirwmn1f000713yojcsy2ok4"
                                   {...field}
                                 />
                               </FormControl>
@@ -242,9 +248,9 @@ export const AssetDialog = ({
                     <Button
                       type="button"
                       size="sm"
-                      onClick={() => cpeAppend({ value: "" })}
+                      onClick={() => dgmAppend({ value: "" })}
                     >
-                      Add CPE
+                      Add device group matching
                     </Button>
                   </div>
                 </div>

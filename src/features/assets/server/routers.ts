@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
-import { getScopedNotesByInstance } from "@/features/notes/server/get-relevant-notes";
+import {
+  attachNote,
+  attachNotes,
+} from "@/features/notes/server/get-relevant-notes";
 import {
   IssueStatus,
   type Prisma,
@@ -8,6 +11,10 @@ import {
   Severity,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import {
+  deviceGroupWhereForMatching,
+  matchingAppliesToDeviceGroup,
+} from "@/lib/device-matching";
 import { renderUtilization } from "@/lib/markdown";
 import {
   buildPaginationMeta,
@@ -65,6 +72,37 @@ const createSearchFilter = (search: string) => {
     : {};
 };
 
+/**
+ * Resolve a set of device-group matchings to the concrete device-group ids they
+ * apply to. Mirrors the triage resolver: a coarse vendor/product DB filter, then
+ * the in-memory VERS-range check (matchingAppliesToDeviceGroup).
+ */
+const deviceGroupIdsForMatchings = async (
+  matchings: {
+    vendorId: string;
+    productId: string | null;
+    versionId: string | null;
+    versionRange: string | null;
+  }[],
+): Promise<string[]> => {
+  if (matchings.length === 0) return [];
+  const candidateGroups = await prisma.deviceGroup.findMany({
+    where: { OR: matchings.map(deviceGroupWhereForMatching) },
+    select: {
+      id: true,
+      vendorId: true,
+      productId: true,
+      versionId: true,
+      version: { select: { canonicalName: true } },
+    },
+  });
+  return candidateGroups
+    .filter((group) =>
+      matchings.some((m) => matchingAppliesToDeviceGroup(m, group)),
+    )
+    .map((group) => group.id);
+};
+
 export const assetsRouter = createTRPCRouter({
   // GET /api/assets - List all assets (any authenticated user can see all)
   getMany: protectedProcedure
@@ -90,17 +128,9 @@ export const assetsRouter = createTRPCRouter({
         include: assetInclude,
       });
 
-      const notesByAsset = await getScopedNotesByInstance(
-        "ASSET",
-        result.items.map((a) => a.id),
-      );
-
       return {
         ...result,
-        items: result.items.map((a) => ({
-          ...a,
-          notes: notesByAsset.get(a.id) ?? [],
-        })),
+        items: await attachNotes("ASSET", result.items),
       };
     }),
 
@@ -146,18 +176,47 @@ export const assetsRouter = createTRPCRouter({
         include: assetInclude,
       });
 
-      const notesByAsset = await getScopedNotesByInstance(
-        "ASSET",
-        result.items.map((a) => a.id),
-      );
-
       return {
         ...result,
-        items: result.items.map((a) => ({
-          ...a,
-          notes: notesByAsset.get(a.id) ?? [],
-        })),
+        items: await attachNotes("ASSET", result.items),
       };
+    }),
+
+  // Assets used in a clinical workflow — either linked directly to one of its
+  // nodes, or belonging to a device group matched by a node's device-group
+  // matching. Progressive-disclosure companion to workflows.getManyByAsset.
+  getManyByWorkflow: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .output(assetArrayResponseSchema)
+    .query(async ({ input }) => {
+      const { id: workflowId } = input;
+
+      const matchings = await prisma.deviceGroupMatching.findMany({
+        where: { nodes: { some: { workflowId } } },
+        select: {
+          vendorId: true,
+          productId: true,
+          versionId: true,
+          versionRange: true,
+        },
+      });
+      const matchedGroupIds = await deviceGroupIdsForMatchings(matchings);
+
+      // One OR query dedupes the direct-link and device-class assets by id.
+      const assets = await prisma.asset.findMany({
+        where: {
+          OR: [
+            { nodes: { some: { workflowId } } },
+            ...(matchedGroupIds.length
+              ? [{ deviceGroupId: { in: matchedGroupIds } }]
+              : []),
+          ],
+        },
+        include: assetInclude,
+        orderBy: { updatedAt: "desc" },
+      });
+
+      return attachNotes("ASSET", assets);
     }),
 
   // not exposed on OpenAPI
@@ -360,13 +419,30 @@ export const assetsRouter = createTRPCRouter({
   getManyWithVulns: protectedProcedure
     .input(assetsVulnsInputSchema)
     .query(async ({ input }) => {
-      const { cpes, assetIds } = input;
+      const { deviceGroupMatchingIds, assetIds } = input;
 
-      // Return empty results if no filters provided
-      if (
-        (!assetIds || assetIds.length === 0) &&
-        (!cpes || cpes.length === 0)
-      ) {
+      // Assets are matched directly by id and/or via the device-group matchings
+      // the node links (each matching resolves to the device groups, and thus
+      // assets, it applies to).
+      const orConditions: Prisma.AssetWhereInput[] = [];
+      if (assetIds?.length) orConditions.push({ id: { in: assetIds } });
+      if (deviceGroupMatchingIds?.length) {
+        const matchings = await prisma.deviceGroupMatching.findMany({
+          where: { id: { in: deviceGroupMatchingIds } },
+          select: {
+            vendorId: true,
+            productId: true,
+            versionId: true,
+            versionRange: true,
+          },
+        });
+        const matchedGroupIds = await deviceGroupIdsForMatchings(matchings);
+        if (matchedGroupIds.length)
+          orConditions.push({ deviceGroupId: { in: matchedGroupIds } });
+      }
+
+      // No resolvable filters => nothing matches.
+      if (orConditions.length === 0) {
         return {
           assets: [],
           assetsCount: 0,
@@ -375,14 +451,7 @@ export const assetsRouter = createTRPCRouter({
         };
       }
 
-      const where = {
-        OR: [
-          ...(assetIds?.length ? [{ id: { in: assetIds } }] : []),
-          ...(cpes?.length
-            ? [{ deviceGroup: { is: { cpe: { hasSome: cpes } } } }]
-            : []),
-        ],
-      };
+      const where = { OR: orConditions };
       const assetsCount = await prisma.asset.count({ where: where });
 
       const assetItems = await prisma.asset.findMany({
@@ -437,8 +506,7 @@ export const assetsRouter = createTRPCRouter({
         include: assetInclude,
       });
       const found = requireExistence(asset, "Asset");
-      const notesByAsset = await getScopedNotesByInstance("ASSET", [found.id]);
-      return { ...found, notes: notesByAsset.get(found.id) ?? [] };
+      return attachNote("ASSET", found);
     }),
 
   // Internal: a single asset's utilization schedule rendered as a readable summary.

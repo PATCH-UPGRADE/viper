@@ -16,7 +16,7 @@ export type NoteActionOp = {
   action: "create" | "update" | "delete";
   noteId?: string | null;
   text?: string | null;
-  reason: string;
+  reason?: string;
 };
 
 export type NoteActionResult = { ops: NoteActionOp[] };

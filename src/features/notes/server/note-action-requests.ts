@@ -40,7 +40,7 @@ async function resolveMatchingFeedbackTarget(
   if (!mapping) return null;
   return {
     targetModel: "DEVICE_GROUP_MATCHING",
-    instanceId: "mapping.deviceGroupMatchingId",
+    instanceId: mapping.deviceGroupMatchingId,
     label: deviceGroupMatchingLabel(mapping.deviceGroupMatching),
   };
 }

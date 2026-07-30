@@ -6,6 +6,7 @@
 import "server-only";
 import type { NoteStatus, ScopeTargetModel } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import type { ScopedNote } from "../schemas";
 
 /** The projection of a Note returned by the note helpers. */
 export type RelevantNote = {
@@ -53,6 +54,77 @@ export async function getNotesForInstance(
     },
     select: NOTE_SELECT,
   });
+}
+
+/**
+ * SCOPED notes matching a batch of entity ids of one targetModel, grouped by the
+ * entity id each note resolves to — directly (Note.instanceId) AND via
+ * EntityFilterMatch.targetId. Excludes PERSISTENT notes. A note that matches an
+ * entity both ways appears once for that entity.
+ */
+export async function getScopedNotesByInstance(
+  targetModel: ScopeTargetModel,
+  ids: string[],
+): Promise<Map<string, ScopedNote[]>> {
+  const byEntity = new Map<string, ScopedNote[]>();
+  if (ids.length === 0) return byEntity;
+
+  const idSet = new Set(ids);
+  const notes = await prisma.note.findMany({
+    where: {
+      status: "SCOPED",
+      OR: [
+        { targetModel, instanceId: { in: ids } },
+        {
+          filters: {
+            some: {
+              targetModel,
+              matches: { some: { targetId: { in: ids } } },
+            },
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      text: true,
+      instanceId: true,
+      filters: {
+        where: { targetModel },
+        select: {
+          matches: {
+            where: { targetId: { in: ids } },
+            select: { targetId: true },
+          },
+        },
+      },
+    },
+  });
+
+  const attach = (entityId: string, note: ScopedNote) => {
+    const existing = byEntity.get(entityId);
+    if (!existing) {
+      byEntity.set(entityId, [note]);
+    } else if (!existing.some((n) => n.id === note.id)) {
+      existing.push(note);
+    }
+  };
+
+  for (const note of notes) {
+    const payload: ScopedNote = { id: note.id, text: note.text };
+    // Direct match: instanceId is one of the requested ids.
+    if (note.instanceId && idSet.has(note.instanceId)) {
+      attach(note.instanceId, payload);
+    }
+    // Filter-resolved matches: each match's targetId is one of the requested ids.
+    for (const filter of note.filters) {
+      for (const match of filter.matches) {
+        attach(match.targetId, payload);
+      }
+    }
+  }
+
+  return byEntity;
 }
 
 /**

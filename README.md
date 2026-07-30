@@ -15,6 +15,12 @@ Check out the documentation under the `docs` folder and also `CLAUDE.md`.
 
 Follow the guide in `.env.example` to create a `.env` file.
 
+Start Postgres (needed before running migrations/seeding, or `mprocs`):
+
+```
+docker compose -f compose.dev.yml up -d postgres
+```
+
 Install `mprocs` to run the multiple services:
 
 ```

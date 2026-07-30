@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getScopedNotesByInstance } from "@/features/notes/server/get-relevant-notes";
 import {
   type AlohaStatus,
   type Prisma,
@@ -78,9 +79,17 @@ export const remediationsRouter = createTRPCRouter({
         include: remediationInclude,
       });
 
+      const notesByRemediation = await getScopedNotesByInstance(
+        "REMEDIATION",
+        result.items.map((r) => r.id),
+      );
+
       return {
         ...result,
-        items: result.items.map(transformArtifactWrapper),
+        items: result.items.map((r) => ({
+          ...transformArtifactWrapper(r),
+          notes: notesByRemediation.get(r.id) ?? [],
+        })),
       };
     }),
 
@@ -103,7 +112,13 @@ export const remediationsRouter = createTRPCRouter({
         where: { id: input.id },
         include: remediationInclude,
       });
-      return transformArtifactWrapper(requireExistence(rem, "Remediation"));
+      const found = transformArtifactWrapper(
+        requireExistence(rem, "Remediation"),
+      );
+      const notesByRemediation = await getScopedNotesByInstance("REMEDIATION", [
+        found.id,
+      ]);
+      return { ...found, notes: notesByRemediation.get(found.id) ?? [] };
     }),
 
   // POST /api/remediations - Create remediation

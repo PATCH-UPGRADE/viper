@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
+import { getScopedNotesByInstance } from "@/features/notes/server/get-relevant-notes";
 import {
   IssueStatus,
   type Prisma,
@@ -7,6 +8,7 @@ import {
   Severity,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { renderUtilization } from "@/lib/markdown";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
@@ -83,10 +85,23 @@ export const assetsRouter = createTRPCRouter({
 
       const where = createSearchFilter(search);
 
-      return fetchPaginated(prisma.asset, input, {
+      const result = await fetchPaginated(prisma.asset, input, {
         where: where,
         include: assetInclude,
       });
+
+      const notesByAsset = await getScopedNotesByInstance(
+        "ASSET",
+        result.items.map((a) => a.id),
+      );
+
+      return {
+        ...result,
+        items: result.items.map((a) => ({
+          ...a,
+          notes: notesByAsset.get(a.id) ?? [],
+        })),
+      };
     }),
 
   // GET /api/deviceGroups/{deviceGroupId}/assets - List assets for a device group
@@ -126,10 +141,23 @@ export const assetsRouter = createTRPCRouter({
               id: deviceGroupId,
             },
           };
-      return fetchPaginated(prisma.asset, input, {
+      const result = await fetchPaginated(prisma.asset, input, {
         where: whereFilter,
         include: assetInclude,
       });
+
+      const notesByAsset = await getScopedNotesByInstance(
+        "ASSET",
+        result.items.map((a) => a.id),
+      );
+
+      return {
+        ...result,
+        items: result.items.map((a) => ({
+          ...a,
+          notes: notesByAsset.get(a.id) ?? [],
+        })),
+      };
     }),
 
   // not exposed on OpenAPI
@@ -408,7 +436,22 @@ export const assetsRouter = createTRPCRouter({
         where: { id: input.id },
         include: assetInclude,
       });
-      return requireExistence(asset, "Asset");
+      const found = requireExistence(asset, "Asset");
+      const notesByAsset = await getScopedNotesByInstance("ASSET", [found.id]);
+      return { ...found, notes: notesByAsset.get(found.id) ?? [] };
+    }),
+
+  // Internal: a single asset's utilization schedule rendered as a readable summary.
+  // Used by the chat agent's query_platform_data tool for progressive disclosure
+  getUtilization: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const asset = await prisma.asset.findUnique({
+        where: { id: input.id },
+        select: { utilization: true },
+      });
+      const found = requireExistence(asset, "Asset");
+      return { utilization: renderUtilization(found.utilization) };
     }),
 
   // POST /api/assets - Create asset

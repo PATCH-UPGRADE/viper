@@ -12,7 +12,16 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   return { req: opts.req };
 };
 
-export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
+export type Context = Awaited<ReturnType<typeof createTRPCContext>> & {
+  /**
+   * Set ONLY by trusted in-process callers (e.g. the chat agent's
+   * createAgentCaller). HTTP and OpenAPI context factories never populate this,
+   * so external requests still authenticate via session/API key as usual.
+   * Shaped like the session user (name/email optional) so downstream procedures
+   * that read them keep working.
+   */
+  auth?: { user: { id: string; name?: string | null; email?: string | null } };
+};
 
 export const createOpenApiContext = async ({
   req,
@@ -37,7 +46,14 @@ export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
 export const baseProcedure = t.procedure;
 
+// Be careful of these lines, this is where we handle auth for trpc endpoints
 export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
+  // Trusted in-process caller: the context already carries an authenticated
+  // user. Only server-side callers (createAgentCaller) set ctx.auth
+  if (ctx.auth?.user?.id) {
+    return next({ ctx: { ...ctx, auth: ctx.auth } });
+  }
+
   const session = await getSession();
   if (session) {
     return next({ ctx: { ...ctx, auth: { ...session, key: undefined } } });

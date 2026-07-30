@@ -1182,6 +1182,11 @@ async function clearDatabase() {
   await prisma.externalVulnerabilityMapping.deleteMany();
   await prisma.artifact.deleteMany();
   await prisma.artifactWrapper.deleteMany();
+  // ContractAsset references Asset, so it must go before the asset delete below.
+  await prisma.contractAsset.deleteMany();
+  await prisma.contract.deleteMany();
+  await prisma.vendorContact.deleteMany();
+  await prisma.vendor.deleteMany();
   await prisma.remediation.deleteMany();
   await prisma.vulnerability.deleteMany();
   await prisma.deviceArtifact.deleteMany();
@@ -2196,6 +2201,71 @@ async function seedWorkOrderTickets(userId: string) {
   );
 }
 
+async function seedVendors() {
+  console.log("\n🌱 Seeding vendors...");
+
+  const manufacturer = await upsertManufacturer("Siemens Healthineers");
+
+  const vendor = await prisma.vendor.upsert({
+    where: { canonicalName: "siemens healthineers" },
+    update: { manufacturerId: manufacturer.id },
+    create: {
+      canonicalName: "siemens healthineers",
+      canonicalDisplayName: "Siemens Healthineers",
+      overview: "Manages imaging fleet across radiology and cardiology.",
+      partnerSince: new Date("2019-04-01"),
+      manufacturerId: manufacturer.id,
+    },
+  });
+
+  await prisma.vendorContact.createMany({
+    data: [
+      {
+        vendorId: vendor.id,
+        name: "Dana Whitfield",
+        title: "Hospital Biomed Lead",
+        email: "dana.whitfield@example-siemens.test",
+        phone: "+1-555-0142",
+        notes: "Usually responds the fastest.",
+      },
+      {
+        vendorId: vendor.id,
+        name: "Marcus Feld",
+        title: "Field Service Engineer",
+        email: "marcus.feld@example-siemens.test",
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  const assets = await prisma.asset.findMany({
+    where: { deviceGroup: { manufacturerId: manufacturer.id } },
+    select: { id: true },
+  });
+
+  const contract = await prisma.contract.create({
+    data: {
+      vendorId: vendor.id,
+      title: "Imaging Fleet Managed Service Agreement",
+      effectiveFrom: new Date("2024-01-01"),
+      effectiveTo: new Date("2027-12-31"),
+      coverageSummary: `Managed security and maintenance across imaging (${assets.length} assets)`,
+    },
+  });
+
+  await prisma.contractAsset.createMany({
+    data: assets.map((asset) => ({
+      contractId: contract.id,
+      assetId: asset.id,
+    })),
+    skipDuplicates: true,
+  });
+
+  console.log(
+    `✅ Seeded vendor ${vendor.canonicalDisplayName} with 1 contract covering ${assets.length} assets`,
+  );
+}
+
 async function main() {
   console.log("🌱 Starting database seed...\n");
 
@@ -2211,6 +2281,7 @@ async function main() {
     await seedCategoryColors();
     await seedDeviceGroups();
     await seedAssets(user.id);
+    await seedVendors();
     await seedFleetIntegration(user.id);
     await seedVulnerabilities(user.id);
     await seedDeviceArtifacts(user.id);

@@ -228,11 +228,89 @@ model Manufacturer {
   nameMappings         String[]              @default([])
   deviceGroups         DeviceGroup[]
   matchings            DeviceGroupMatching[]
+  vendors              Vendor[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
   @@index([canonicalName])
   @@map("manufacturer")
+}
+
+// A company the hospital contracts with to manage equipment. Distinct from
+// Manufacturer, which is the canonical registry of who *built* a device.
+model Vendor {
+  id                   String    @id @default(cuid())
+  canonicalName        String    @unique
+  canonicalDisplayName String
+  overview             String?
+  partnerSince         DateTime?
+
+  manufacturerId String?
+  manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
+
+  contracts Contract[]
+  contacts  VendorContact[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([canonicalName])
+  @@index([manufacturerId])
+  @@map("vendor")
+}
+
+model VendorContact {
+  id    String  @id @default(cuid())
+  name  String
+  title String?
+  phone String?
+  email String?
+  notes String? @db.Text
+
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vendorId])
+  @@map("vendor_contact")
+}
+
+model Contract {
+  id              String    @id @default(cuid())
+  title           String?
+  effectiveFrom   DateTime?
+  effectiveTo     DateTime?
+  coverageSummary String?
+
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  files  ArtifactWrapper[]
+  covers ContractAsset[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vendorId])
+  @@map("contract")
+}
+
+model ContractAsset {
+  id String @id @default(cuid())
+
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  assetId    String
+  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([contractId, assetId])
+  @@index([contractId])
+  @@index([assetId])
+  @@map("contract_asset")
 }
 
 model Product {
@@ -359,6 +437,7 @@ model Asset {
   issues               Issue[]
   deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
+  contractAssets       ContractAsset[]
   workOrderTickets     WorkOrderTicket[]          @relation("WorkOrderTicketAssets")
   notificationMappings NotificationAssetMapping[]
   nodes                Node[]
@@ -467,6 +546,8 @@ model ArtifactWrapper {
   deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: Cascade)
   remediationId    String?
   remediation      Remediation?    @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+  contractId       String?
+  contract         Contract?       @relation(fields: [contractId], references: [id], onDelete: Cascade)
 
   latestArtifactId String?   @unique
   latestArtifact   Artifact? @relation("LatestArtifact", fields: [latestArtifactId], references: [id], onDelete: SetNull)
@@ -481,6 +562,7 @@ model ArtifactWrapper {
 
   @@index([remediationId])
   @@index([deviceArtifactId])
+  @@index([contractId])
   @@index([userId])
   @@index([latestArtifactId])
   @@map("artifact_wrapper")

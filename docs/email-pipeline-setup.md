@@ -98,13 +98,23 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
 
 The pipeline makes several Anthropic calls (relevance triage, classification, entity extraction, hospital-impact triage), so `ANTHROPIC_API_KEY` must be set in `.env` or the run fails partway through.
 
-## 7. Send a test email
+## 7. Prepare the hospital environment (optional)
+
+```bash
+npx tsx scripts/seed-advisory-environment.ts
+```
+
+Seeds the assets, device groups and vulnerabilities for two Siemens Healthineers advisories so the VEX, triage and mitigation agents have something real to link to. **Wipes all notifications** — it's local-only and creates no notification itself.
+
+## 8. Send a test email
 
 From your **personal** account, email your `@…resend.app` address. Attach a PDF if you want to exercise attachment handling.
 
+If you ran step 7, send one of the advisories it covers — Siemens **SSA-016040** (CVE-2024-52334) or the **syngo deserialization** advisory (CVE-2022-29875) — otherwise there is nothing to link to and the VEX step is skipped.
+
 Write it like a genuine security advisory. The first agent in the chain decides whether the email is relevant at all, and drops marketing, newsletters and meeting invites as `not_relevant` before anything else runs — a "test test test" email will be correctly ignored.
 
-## 8. Watch it run
+## 9. Watch it run
 
 Resend POSTs to `/api/email`, which enqueues an Inngest event.
 
@@ -126,4 +136,5 @@ Note the webhook payload is **metadata only** — no body, no attachment bytes. 
 | Webhook never arrives | Tunnel died, so its URL changed | Restart it, update the webhook URL |
 | Gmail bounces with "Message blocked" | Workspace blocks `*.resend.app` | Send from a personal account (step 1) |
 | Run returns `{skipped: true, reason: "duplicate"}` | That email was already processed — `externalId` is unique | Send a new email |
-| Run returns `{skipped: true}` | Triage judged the email `not_relevant` | Write a realistic advisory (step 7) |
+| Run returns `{skipped: true}` | Triage judged the email `not_relevant` | Write a realistic advisory (step 8) |
+| `sort-vulnerabilities` returns `{vexSkipped: true}` | The notification linked no vulnerability, so there is nothing to sort | Seed the environment and send a matching advisory (step 7) |

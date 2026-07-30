@@ -1227,6 +1227,7 @@ enum NotificationChannel {
   Email
   PolledApi
   Crawl
+  TA4
 }
 
 enum ConfidenceLevel {

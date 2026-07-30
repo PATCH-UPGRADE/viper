@@ -1,5 +1,6 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/inngest/client";
+import { analyzeRemediation } from "@/inngest/functions/analyze-remediation";
 import {
   enrichAllVulnerabilities,
   enrichVulnerability,
@@ -26,6 +27,7 @@ export const { GET, POST, PUT } = serve({
     enrichAllVulnerabilities,
     purgeExpiredTokensFn,
     processInboxEmail,
+    analyzeRemediation,
     resolveAllEntityFilters,
     resolveEntityFilterFn,
     extractArtifactNotesFn,

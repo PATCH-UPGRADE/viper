@@ -164,28 +164,10 @@ export const useUpdateWorkflow = () => {
 };
 
 /**
- * Hook to execute a workflow
- */
-export const useExecuteWorkflow = () => {
-  const trpc = useTRPC();
-
-  return useMutation(
-    trpc.workflows.execute.mutationOptions({
-      onSuccess: (data) => {
-        toast.success(`Workflow "${data.name}" executed`);
-      },
-      onError: (error) => {
-        toast.error(`Failed to execute workflow: ${error.message}`);
-      },
-    }),
-  );
-};
-
-/**
  * Imperative export workflow as Mermaid JSON
  */
 
-export const useExportWorkflowMermaid = () => {
+const useExportWorkflowMermaid = () => {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   return {
@@ -197,7 +179,7 @@ export const useExportWorkflowMermaid = () => {
 /**
  * Imperative export serialized workflow payload (workflow + Mermaid)
  */
-export const useExportWorkflowSerialized = () => {
+const useExportWorkflowSerialized = () => {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   return {

@@ -22,7 +22,7 @@ import {
 } from "@/features/workflows/hooks/use-workflows";
 import { editorAtom } from "../store/atoms";
 
-export const EditorSaveButton = ({ workflowId }: { workflowId: string }) => {
+const EditorSaveButton = ({ workflowId }: { workflowId: string }) => {
   const editor = useAtomValue(editorAtom);
   const saveWorkflow = useUpdateWorkflow();
 
@@ -51,7 +51,7 @@ export const EditorSaveButton = ({ workflowId }: { workflowId: string }) => {
   );
 };
 
-export const EditorNameInput = ({ workflowId }: { workflowId: string }) => {
+const EditorNameInput = ({ workflowId }: { workflowId: string }) => {
   const { data: workflow } = useSuspenseWorkflow(workflowId);
   const updateWorkflow = useUpdateWorkflowName();
 
@@ -130,11 +130,7 @@ export const EditorNameInput = ({ workflowId }: { workflowId: string }) => {
   );
 };
 
-export const EditorDescriptionInput = ({
-  workflowId,
-}: {
-  workflowId: string;
-}) => {
+const EditorDescriptionInput = ({ workflowId }: { workflowId: string }) => {
   const { data: workflow } = useSuspenseWorkflow(workflowId);
   const updateDescription = useUpdateWorkflowDescription();
 
@@ -215,7 +211,7 @@ export const EditorDescriptionInput = ({
   );
 };
 
-export const EditorBreadcrumbs = ({ workflowId }: { workflowId: string }) => {
+const EditorBreadcrumbs = ({ workflowId }: { workflowId: string }) => {
   return (
     <Breadcrumb>
       <BreadcrumbList>

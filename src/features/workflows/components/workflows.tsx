@@ -25,7 +25,7 @@ import {
 } from "../hooks/use-workflows";
 import { useWorkflowsParams } from "../hooks/use-workflows-params";
 
-export const WorkflowsSearch = () => {
+const WorkflowsSearch = () => {
   const [params, setParams] = useWorkflowsParams();
   const { searchValue, onSearchChange } = useEntitySearch({
     params,
@@ -54,7 +54,7 @@ export const WorkflowsList = () => {
   );
 };
 
-export const WorkflowsHeader = ({ disabled }: { disabled?: boolean }) => {
+const WorkflowsHeader = ({ disabled }: { disabled?: boolean }) => {
   const router = useRouter();
   const createWorkflow = useCreateWorkflow();
 
@@ -81,7 +81,7 @@ export const WorkflowsHeader = ({ disabled }: { disabled?: boolean }) => {
   );
 };
 
-export const WorkflowsPagination = () => {
+const WorkflowsPagination = () => {
   const workflows = useSuspenseWorkflows();
   const [params, setParams] = useWorkflowsParams();
 
@@ -119,7 +119,7 @@ export const WorkflowsError = () => {
   return <ErrorView message="Error loading workflows" />;
 };
 
-export const WorkflowsEmpty = () => {
+const WorkflowsEmpty = () => {
   const router = useRouter();
   const createWorkflow = useCreateWorkflow();
 
@@ -142,7 +142,7 @@ export const WorkflowsEmpty = () => {
   );
 };
 
-export const WorkflowItem = ({ data }: { data: Workflow }) => {
+const WorkflowItem = ({ data }: { data: Workflow }) => {
   const removeWorkflow = useRemoveWorkflow();
   const exportWorkflowSerializedDownload =
     useExportWorkflowSerializedDownload();

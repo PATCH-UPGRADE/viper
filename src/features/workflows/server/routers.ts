@@ -1,8 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { generateSlug } from "random-word-slugs";
 import { z } from "zod";
-import { NodeType } from "@/generated/prisma";
-import { inngest } from "@/inngest/client";
+import type { NodeType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   buildPaginationMeta,
@@ -15,34 +14,12 @@ import { serializeWorkflow } from "../utils";
 import { workflowToMermaidJSON } from "./mermaid";
 
 export const workflowsRouter = createTRPCRouter({
-  // TODO: we probably don't need this code here
-  execute: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const workflowOrNull = await prisma.workflow.findUnique({
-        where: { id: input.id, userId: ctx.auth.user.id },
-      });
-      const workflow = requireExistence(workflowOrNull, "Workflow");
-      await inngest.send({
-        name: "workflows/execute.workflow",
-        data: { workflowId: input.id },
-      });
-      return workflow;
-    }),
-
   create: protectedProcedure.mutation(({ ctx }) => {
     return prisma.workflow.create({
       data: {
         name: generateSlug(3),
         description: null,
         userId: ctx.auth.user.id,
-        nodes: {
-          create: {
-            type: NodeType.INITIAL,
-            position: { x: 0, y: 0 },
-            name: NodeType.INITIAL,
-          },
-        },
       },
     });
   }),

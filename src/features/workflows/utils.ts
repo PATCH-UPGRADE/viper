@@ -7,8 +7,6 @@ type WorkflowWithRelations = Prisma.WorkflowGetPayload<{
   include: { nodes: true; connections: true };
 }>;
 
-export type SerializedWorkflow = ReturnType<typeof serializeWorkflow>;
-
 export function serializeWorkflow(workflow: WorkflowWithRelations) {
   const nodes: SerializedNode[] = workflow.nodes.map((node) => ({
     id: node.id,

@@ -32,7 +32,7 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - assets.getMany — list/search hospital device assets. input: { search?, page?, pageSize? }
 - assets.getOne — one asset by id. input: { id }
 - assets.getManyByDeviceGroup — assets in a device group. input: { deviceGroupId, search?, page?, pageSize? }
-- assets.getManyByWorkflow — assets used in a clinical workflow (linked directly or via a device-group matching). input: { id } (workflow id)
+- assets.getManyByWorkflow — assets used in a clinical workflow. input: { id } (workflow id)
 - assets.getUtilization — one asset's utilization schedule, as a readable summary. input: { id }
 - vulnerabilities.getMany — list/search vulnerabilities (CVEs). input: { search?, page?, pageSize? }
 - vulnerabilities.getOne — one vulnerability by id. input: { id }
@@ -41,7 +41,7 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - remediations.getOne — one remediation by id. input: { id }
 - deviceGroups.getMany — list/search device groups (make/model classes). input: { search?, page?, pageSize? }
 - deviceGroups.getOne — one device group by id. input: { id }
-- workflows.getManyByAsset — clinical workflows that use an asset (linked directly or via a device-group matching). input: { id } (asset id)
+- workflows.getManyByAsset — clinical workflows that use an asset. input: { id } (asset id)
 
 Assets, vulnerabilities, and remediations each include a "notes" array of resolved,
 entity-specific notes ({ id, text }) — device/vuln/remediation caveats a human recorded

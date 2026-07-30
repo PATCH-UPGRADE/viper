@@ -184,7 +184,7 @@ export const assetsRouter = createTRPCRouter({
 
   // Assets used in a clinical workflow — either linked directly to one of its
   // nodes, or belonging to a device group matched by a node's device-group
-  // matching. Progressive-disclosure companion to workflows.getManyByAsset.
+  // matching.
   getManyByWorkflow: protectedProcedure
     .input(z.object({ id: z.string() }))
     .output(assetArrayResponseSchema)
@@ -202,7 +202,8 @@ export const assetsRouter = createTRPCRouter({
       });
       const matchedGroupIds = await deviceGroupIdsForMatchings(matchings);
 
-      // One OR query dedupes the direct-link and device-class assets by id.
+      // Find assets that are directly linked by a node
+      // and assets that are indirectly linked via a node's device group
       const assets = await prisma.asset.findMany({
         where: {
           OR: [
@@ -416,6 +417,7 @@ export const assetsRouter = createTRPCRouter({
   }),
 
   // Internal API for asset vulnerability matching
+  // Used only on workflow node detail
   getManyWithVulns: protectedProcedure
     .input(assetsVulnsInputSchema)
     .query(async ({ input }) => {

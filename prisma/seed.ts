@@ -1738,8 +1738,6 @@ async function seedWorkflows(userId: string) {
 
   const STEP_POS = 100;
 
-  // Device-class matchings for the ASSET nodes that match by device class
-  // rather than a specific asset id (resolved from their former CPE patterns).
   const ctScannerMatchingIds = await matchingIdsForCpes([
     "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
   ]);

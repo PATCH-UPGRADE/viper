@@ -908,13 +908,8 @@ describe("trackingRouter.getManyByAssetId", () => {
     });
     const ticket = {
       summary: "Ticket",
-      status: "TO_DO",
-      category: "OTHER",
-      scheduledAt: null,
-      departments: [],
       assets: [],
       deviceGroups: [],
-      _count: { comments: 0 },
     };
     const matching = {
       deviceGroupMatching: {

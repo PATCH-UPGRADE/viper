@@ -93,12 +93,16 @@ describe("workflowClinicalSummary", () => {
 
   it("reports when no workflow includes the affected assets", () => {
     const md = workflowClinicalSummary([imaging, pharmacy], ["asset_unknown"]);
-    expect(md).toBe("_No clinical workflows include the affected assets._");
+    expect(md).toBe(
+      "_No clinical workflows include the affected assets or device groups._",
+    );
   });
 
   it("degrades gracefully when there are no affected assets", () => {
     const md = workflowClinicalSummary([imaging, pharmacy], []);
-    expect(md).toBe("_No affected assets to map to clinical workflows._");
+    expect(md).toBe(
+      "_No affected assets or device groups to map to clinical workflows._",
+    );
   });
 
   it("ignores STEP nodes when matching assets", () => {
@@ -107,6 +111,8 @@ describe("workflowClinicalSummary", () => {
       { id: "s1", type: "STEP", assetIds: ["asset_ct"] },
     ]);
     const md = workflowClinicalSummary([stepOnly], ["asset_ct"]);
-    expect(md).toBe("_No clinical workflows include the affected assets._");
+    expect(md).toBe(
+      "_No clinical workflows include the affected assets or device groups._",
+    );
   });
 });

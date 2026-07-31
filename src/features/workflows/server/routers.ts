@@ -197,7 +197,9 @@ export const workflowsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const workflowOrNull = await prisma.workflow.findUnique({
         where: { id: input.id },
-        include: workflowSerializeInclude,
+        // getOne renders react-flow edges, so it needs connections on top of the
+        // node-focused serialize include (which no longer loads them).
+        include: { ...workflowSerializeInclude, connections: true },
       });
 
       const workflow = requireExistence(workflowOrNull, "Workflow");

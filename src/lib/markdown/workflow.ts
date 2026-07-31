@@ -41,7 +41,7 @@ export function workflowClinicalSummary(
   const affectedAssets = new Set(affectedAssetIds);
   const affectedMatchings = new Set(affectedMatchingIds);
   if (affectedAssets.size === 0 && affectedMatchings.size === 0) {
-    return "_No affected assets to map to clinical workflows._";
+    return "_No affected assets or device groups to map to clinical workflows._";
   }
 
   const hasId = (value: unknown, set: Set<string>) =>
@@ -81,5 +81,5 @@ export function workflowClinicalSummary(
 
   return blocks.length > 0
     ? blocks.join("\n\n")
-    : "_No clinical workflows include the affected assets._";
+    : "_No clinical workflows include the affected assets or device groups._";
 }

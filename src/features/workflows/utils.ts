@@ -13,7 +13,6 @@ export const workflowSerializeInclude = {
       deviceGroupMatchings: { select: { id: true } },
     },
   },
-  connections: true,
 } satisfies Prisma.WorkflowInclude;
 
 type WorkflowWithRelations = Prisma.WorkflowGetPayload<{

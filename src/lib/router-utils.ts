@@ -515,9 +515,7 @@ export async function findDeviceGroupIdsForMatchings(
     },
   });
   return candidateGroups
-    .filter((group) =>
-      matchings.some((m) => matchingAppliesToDeviceGroup(m, group)),
-    )
+    .filter((group) => matchings.some((m) => identityAppliesToGroup(m, group)))
     .map((group) => group.id);
 }
 

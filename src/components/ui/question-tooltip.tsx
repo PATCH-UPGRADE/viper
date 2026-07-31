@@ -8,7 +8,12 @@ export function QuestionTooltip({
   className,
   children,
   onClick,
-}: PropsWithChildren<{ className?: string; onClick?: () => void }>) {
+  accessibleLabel = "More information",
+}: PropsWithChildren<{
+  className?: string;
+  onClick?: () => void;
+  accessibleLabel?: string;
+}>) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -16,7 +21,7 @@ export function QuestionTooltip({
           variant="ghost"
           size="icon-sm"
           className={cn(onClick ? "cursor-pointer" : "cursor-help", className)}
-          aria-label="More information"
+          aria-label={accessibleLabel}
           onClick={onClick}
         >
           <CircleQuestionMark />

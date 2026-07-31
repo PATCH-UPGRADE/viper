@@ -197,7 +197,10 @@ const EditorDescriptionInput = ({ workflowId }: { workflowId: string }) => {
   }
 
   return (
-    <QuestionTooltip onClick={() => setIsEditing(true)}>
+    <QuestionTooltip
+      accessibleLabel="Edit workflow description"
+      onClick={() => setIsEditing(true)}
+    >
       <span className="italic">
         {workflow.description || "Add workflow description"}
       </span>

@@ -2,11 +2,11 @@
 
 import { CheckCircle2, MessageSquareText } from "lucide-react";
 import { QuestionCard } from "@/features/questions/components/question-card";
+import { SuggestedEmailCard } from "@/features/questions/components/suggested-vendor-email-card";
 import {
   useSuspenseQuestionsByNotificationId,
   useSuspenseSuggestedEmailsByNotificationId,
 } from "@/features/questions/hooks/use-questions";
-import { SuggestedEmailCard } from "@/features/questions/components/suggested-vendor-email-card";
 
 export function NotificationQuestionTab({
   notificationId,

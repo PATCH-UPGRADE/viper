@@ -5,8 +5,6 @@ import prisma from "@/lib/db";
 import { renderQnA } from "@/lib/markdown/note";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { questionInclude, type SuggestedVendorEmail } from "../types";
-import { SuggestedEmailCard } from "../components/suggested-vendor-email-card";
-import { SuggestedQuestionsProvider } from "@/features/chat/context/suggested-questions-context";
 
 // TODO for testing only, wire with real DB later with dummy body text
 const MOCK_EMAIL: SuggestedVendorEmail[] = [
@@ -140,5 +138,5 @@ export const questionsRouter = createTRPCRouter({
 
   getSuggestedEmailByNotificationId: protectedProcedure
     .input(z.object({ notificationId: z.string() }))
-    .query((): SuggestedVendorEmail[] => MOCK_EMAIL)
+    .query((): SuggestedVendorEmail[] => MOCK_EMAIL),
 });

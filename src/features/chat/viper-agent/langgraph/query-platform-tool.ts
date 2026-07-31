@@ -56,7 +56,7 @@ to get a readable schedule summary.`;
 
 /**
  * see src/lib/prisma-client-extensions.ts
- * Device Groups embed HATOAS-style links to other endpoints
+ * Device Groups embed HATEOAS-style links to other endpoints
  * They are HTTP hrefs the agent cannot call, so we strip them and replace
  * them with tRPC call hints.
  * Goal: Make "progressive disclosure" obvious to LLM
@@ -116,9 +116,8 @@ function linkifyAsset(asset: Record<string, any>): void {
 }
 
 /**
- * Serialized workflows (from workflows.getManyByAsset) carry a node list but no
- * asset detail. Add a "_links.assets" hint so the model can pull the assets a
- * workflow touches on demand (assets.getManyByWorkflow).
+ * Add a hint for model to get assets in a workflow by inserting a HATEOAS-style
+ * `_links` object
  */
 // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
 function linkifyWorkflow(workflow: Record<string, any>): void {
@@ -149,8 +148,6 @@ function addNavigationLinks(value: unknown): unknown {
     if ("assetsUrl" in obj || "vulnerabilitiesUrl" in obj)
       linkifyDeviceGroup(obj);
     if ("utilization" in obj) linkifyAsset(obj);
-    // Serialized workflow: has an id + node list but is not itself a node (nodes
-    // carry a "type"). Matches workflows.getManyByAsset results.
     if (
       typeof obj.id === "string" &&
       Array.isArray(obj.nodes) &&

@@ -83,7 +83,7 @@ export const workflowsRouter = createTRPCRouter({
         });
 
         // Connect only relation ids that actually exist, so a mistyped id in the
-        // editor doesn't fail the whole save (matching the old data-blob leniency).
+        // editor doesn't fail the whole save.
         const referencedAssetIds = [
           ...new Set(nodes.flatMap((n) => readIds(n.data, "assetIds"))),
         ];
@@ -113,9 +113,8 @@ export const workflowsRouter = createTRPCRouter({
             : [],
         );
 
-        // createMany can't write m-n join rows, so create nodes individually and
-        // connect their assets / device-group matchings. The relation ids are
-        // stripped from the stored data blob (they live in relations now).
+        // so create nodes individually and connect their assets / device-group
+        // matchings. The relation ids are stripped from the stored data blob
         for (const node of nodes) {
           const data = { ...((node.data as Record<string, unknown>) || {}) };
           delete data.assetIds;
@@ -265,8 +264,7 @@ export const workflowsRouter = createTRPCRouter({
 
   // Clinical workflows that use an asset — either the asset is linked directly to
   // one of their nodes, or a node links a device-group matching that applies to
-  // the asset's device group. Progressive-disclosure companion to
-  // assets.getManyByWorkflow. Returns node-focused serialized workflows.
+  // the asset's device group.
   getManyByAsset: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input }) => {

@@ -27,8 +27,7 @@ const NOTE_SELECT = {
 
 /**
  * Attach each entity's SCOPED notes onto a batch of entities, keyed by id.
- * Returns new objects with a `notes` array (empty when an entity has none). This
- * is the shared shape asset/vulnerability/remediation list+get endpoints return.
+ * Used in paginated routers to add notes to returned items 
  */
 export async function attachNotes<T extends { id: string }>(
   targetModel: ScopeTargetModel,

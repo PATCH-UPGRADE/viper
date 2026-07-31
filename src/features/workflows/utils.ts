@@ -4,9 +4,7 @@ import type { Prisma } from "@/generated/prisma";
 type SerializedNode = Omit<Node, "position">;
 
 /**
- * The include a workflow must be loaded with to serialize it: each node's linked
- * asset ids and device-group-matching ids (surfaced into node.data), plus its
- * connections.
+ * The include a workflow must be loaded with to serialize it
  */
 export const workflowSerializeInclude = {
   nodes: {
@@ -49,10 +47,7 @@ export function workflowsUsingAssetsOrMatchings(
 }
 
 // Node-focused serialization for LLM/markdown consumers. Each node's linked
-// asset / device-group-matching ids are folded into node.data (the same shape
-// the editor uses). Edges are intentionally omitted — topology is conveyed via
-// the Mermaid diagram, and the raw edge list is noise in the JSON the agent
-// reads. Callers that need edges build them from workflow.connections directly.
+// asset / device-group-matching ids are folded into node.data
 export function serializeWorkflow(workflow: WorkflowWithRelations) {
   const nodes: SerializedNode[] = workflow.nodes.map((node) => ({
     id: node.id,

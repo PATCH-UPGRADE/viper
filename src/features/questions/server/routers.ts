@@ -4,7 +4,27 @@ import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { renderQnA } from "@/lib/markdown/note";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { questionInclude } from "../types";
+import { questionInclude, type SuggestedVendorEmail } from "../types";
+import { SuggestedEmailCard } from "../components/suggested-vendor-email-card";
+import { SuggestedQuestionsProvider } from "@/features/chat/context/suggested-questions-context";
+
+// TODO for testing only, wire with real DB later with dummy body text
+const MOCK_EMAIL: SuggestedVendorEmail[] = [
+  {
+    id: "email-1",
+    questionId: "qustion-1",
+    audience: "MANUFACTURER",
+    companyName: "Siemens Healthineers",
+    productName: "SOMATOM go.All",
+    reasonWhy:
+      "The advisory doesn't help Viper confirm the running version on the go.All. A written confirmation from Siemens (or an SRS query) would let Viper move this asset out of 'potentially at risk' with confidence.",
+    toEmail: "productcert@siemens-healthineers.com",
+    subject:
+      "Version confirmation - SOMATOM go.All exposure to SSA-220609 (CVE-2022-29875)",
+    body: `Hello Siemens Healthineers ProductCERT,\n\n We are scoping remediation for....\n\n\ We operate... `,
+    status: "DRAFT",
+  },
+];
 
 export const questionsRouter = createTRPCRouter({
   getManyByNotificationId: protectedProcedure
@@ -117,4 +137,8 @@ export const questionsRouter = createTRPCRouter({
 
       return { status };
     }),
+
+  getSuggestedEmailByNotificationId: protectedProcedure
+    .input(z.object({ notificationId: z.string() }))
+    .query((): SuggestedVendorEmail[] => MOCK_EMAIL)
 });

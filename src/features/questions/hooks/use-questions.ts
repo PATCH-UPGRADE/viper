@@ -47,3 +47,14 @@ export function useRespondToQuestion() {
     }),
   );
 }
+
+export function useSuspenseSuggestedEmailsByNotificationId(
+  notificationId: string,
+) {
+  const trpc = useTRPC();
+  return useSuspenseQuery(
+    trpc.questions.getSuggestedEmailByNotificationId.queryOptions({
+      notificationId,
+    }),
+  );
+}

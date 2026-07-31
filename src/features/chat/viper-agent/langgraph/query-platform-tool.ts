@@ -25,6 +25,7 @@ export const PLATFORM_QUERY_PROCEDURES = [
   "deviceGroups.getMany",
   "deviceGroups.getOne",
   "workflows.getManyByAsset",
+  "workflows.getManyForLlm",
 ] as const;
 
 /** Condensed, prompt-injectable catalog of the allowlisted read procedures. */
@@ -42,6 +43,9 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - deviceGroups.getMany — list/search device groups (make/model classes). input: { search?, page?, pageSize? }
 - deviceGroups.getOne — one device group by id. input: { id }
 - workflows.getManyByAsset — clinical workflows that use an asset. input: { id } (asset id)
+- workflows.getManyForLlm — list/search all clinical workflows. input: { search?, page?, pageSize? }
+
+'Workflows' represent how devices are used in clinical contexts/for patient care.
 
 Assets, vulnerabilities, and remediations each include a "notes" array of resolved,
 entity-specific notes ({ id, text }) — device/vuln/remediation caveats a human recorded

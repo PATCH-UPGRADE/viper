@@ -262,6 +262,34 @@ export const workflowsRouter = createTRPCRouter({
       return createPaginatedResponse(items, meta);
     }),
 
+  // Like getMany, but paginated results are serialized into the node-focused
+  // shape (serializeWorkflow) that LLM/markdown consumers read.
+  getManyForLlm: protectedProcedure
+    .input(paginationInputSchema)
+    .query(async ({ input }) => {
+      const { search } = input;
+
+      const whereFilter = {
+        name: {
+          contains: search,
+          mode: "insensitive" as const,
+        },
+      };
+
+      const totalCount = await prisma.workflow.count({ where: whereFilter });
+      const meta = buildPaginationMeta(input, totalCount);
+
+      const items = await prisma.workflow.findMany({
+        skip: meta.skip,
+        take: meta.take,
+        where: whereFilter,
+        include: workflowSerializeInclude,
+        orderBy: { updatedAt: "desc" },
+      });
+
+      return createPaginatedResponse(items.map(serializeWorkflow), meta);
+    }),
+
   // Clinical workflows that use an asset — either the asset is linked directly to
   // one of their nodes, or a node links a device-group matching that applies to
   // the asset's device group.

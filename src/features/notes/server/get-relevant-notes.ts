@@ -27,7 +27,7 @@ const NOTE_SELECT = {
 
 /**
  * Attach each entity's SCOPED notes onto a batch of entities, keyed by id.
- * Used in paginated routers to add notes to returned items 
+ * Used in paginated routers to add notes to returned items
  */
 export async function attachNotes<T extends { id: string }>(
   targetModel: ScopeTargetModel,

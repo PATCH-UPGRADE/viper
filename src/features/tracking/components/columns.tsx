@@ -23,19 +23,18 @@ import { type NotificationChannel, TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { useSetWatching } from "../hooks/use-tracking";
 import type { TrackingTicketChildRow } from "../types";
-import { CategoryChip, statusHue, statusLabels } from "./ticket-detail/shared";
+import {
+  CategoryChip,
+  formatScheduledCompact,
+  statusHue,
+  statusLabels,
+} from "./ticket-detail/shared";
 
 // Icon shown in the Source column for each ingested-source channel.
 const channelIcons: Record<NotificationChannel, LucideIcon> = {
   Email: MailIcon,
   PolledApi: BoxIcon,
   Crawl: BoxIcon,
-};
-
-const formatScheduled = (date: Date | string | null | undefined) => {
-  if (!date) return "—";
-  const d = date instanceof Date ? date : new Date(date);
-  return format(d, "MMM d, h:mm a");
 };
 
 const formatShortDate = (date: Date | string | null | undefined) => {
@@ -219,7 +218,7 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
     header: ({ column }) => (
       <SortableHeader header="Scheduled" column={column} />
     ),
-    cell: ({ row }) => formatScheduled(row.original.scheduledAt),
+    cell: ({ row }) => formatScheduledCompact(row.original.scheduledAt),
   },
   {
     id: "linked",

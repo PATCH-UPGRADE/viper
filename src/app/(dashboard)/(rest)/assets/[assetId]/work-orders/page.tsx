@@ -2,14 +2,13 @@ import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import {
   AssetContainer,
-  AssetDetailPage,
   AssetError,
   AssetLoading,
 } from "@/features/assets/components/asset";
 import { AssetLayout } from "@/features/assets/components/asset-layout";
 import { prefetchAsset } from "@/features/assets/server/prefetch";
-import { prefetchIssuesByAssetId } from "@/features/issues/server/prefetch";
-import { IssueStatus } from "@/generated/prisma";
+import { AssetWorkOrders } from "@/features/tracking/components/asset-work-orders";
+import { prefetchAssetWorkOrders } from "@/features/tracking/server/prefetch";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
 
@@ -25,9 +24,7 @@ const Page = async ({ params }: PageProps) => {
   const { assetId } = await params;
 
   prefetchAsset(assetId);
-  for (const issueStatus of Object.values(IssueStatus)) {
-    prefetchIssuesByAssetId({ assetId: assetId, issueStatus });
-  }
+  prefetchAssetWorkOrders(assetId);
 
   return (
     <AssetContainer>
@@ -35,7 +32,9 @@ const Page = async ({ params }: PageProps) => {
         <AssetLayout>
           <ErrorBoundary fallback={<AssetError />}>
             <Suspense fallback={<AssetLoading />}>
-              <AssetDetailPage assetId={assetId} />
+              <div className="px-4">
+                <AssetWorkOrders assetId={assetId} />
+              </div>
             </Suspense>
           </ErrorBoundary>
         </AssetLayout>

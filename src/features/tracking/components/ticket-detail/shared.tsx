@@ -47,6 +47,15 @@ export const formatScheduled = (date: Date | string | null | undefined) => {
   return format(d, "MMM d, yyyy 'at' h:mm a");
 };
 
+// Compact form (no year, no "at") for dense table cells.
+export const formatScheduledCompact = (
+  date: Date | string | null | undefined,
+) => {
+  if (!date) return "—";
+  const d = date instanceof Date ? date : new Date(date);
+  return format(d, "MMM d, h:mm a");
+};
+
 export const MetadataRow = ({
   label,
   children,

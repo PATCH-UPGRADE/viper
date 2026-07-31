@@ -24,6 +24,10 @@ import {
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
+  matchingAppliesToDeviceGroup,
+  matchingWhereForDeviceGroup,
+} from "@/lib/device-matching";
+import {
   buildPaginationMeta,
   createPaginatedResponse,
   paginationInputSchema,
@@ -323,6 +327,108 @@ export const trackingRouter = createTRPCRouter({
       });
 
       return createPaginatedResponse(items, meta);
+    }),
+
+  // Open work orders for a single asset's Work Orders tab: tickets directly
+  // linked to the asset, plus tickets whose device-group matching resolves to
+  // this asset (vendor/product/version, including wildcards + version
+  // ranges). The latter is a per-asset check, not a group-wide fan-out — we
+  // only ever ask "does THIS asset satisfy the ticket's matching," never
+  // "which other assets does this matching cover."
+  getManyByAssetId: protectedProcedure
+    .input(z.object({ assetId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const asset = requireExistence(
+        await prisma.asset.findUnique({
+          where: { id: input.assetId },
+          select: {
+            deviceGroup: {
+              select: {
+                id: true,
+                vendorId: true,
+                productId: true,
+                versionId: true,
+                version: { select: { canonicalName: true } },
+              },
+            },
+          },
+        }),
+        "Asset",
+      );
+
+      const openWhere: Prisma.WorkOrderTicketWhereInput = {
+        parentId: null,
+        isDraft: false,
+        status: { not: TicketStatus.DONE },
+      };
+
+      const rowState = rowStateFor(ctx.auth.user.id);
+      // Both queries share this include (even though only the device-group
+      // query needs `deviceGroups`) so their results are the same TS shape
+      // and can be merged into one array below.
+      const include = {
+        ...ticketBaseInclude,
+        ...rowState,
+        children: {
+          include: { ...ticketBaseInclude, ...rowState },
+          where: { isDraft: false },
+          orderBy: { createdAt: "asc" as const },
+        },
+        deviceGroups: { include: { deviceGroupMatching: true } },
+      } satisfies Prisma.WorkOrderTicketInclude;
+
+      const directTickets = await prisma.workOrderTicket.findMany({
+        where: { ...openWhere, assets: { some: { id: input.assetId } } },
+        include,
+      });
+
+      let deviceGroupTickets: typeof directTickets = [];
+      if (asset.deviceGroup.vendorId) {
+        const candidates = await prisma.workOrderTicket.findMany({
+          where: {
+            ...openWhere,
+            deviceGroups: {
+              some: {
+                deviceGroupMatching: matchingWhereForDeviceGroup({
+                  vendorId: asset.deviceGroup.vendorId,
+                  productId: asset.deviceGroup.productId,
+                }),
+              },
+            },
+          },
+          include,
+        });
+
+        // Coarse SQL filter above only narrows by vendor/product; confirm the
+        // match here (exact version / version-range / wildcard handling).
+        deviceGroupTickets = candidates.filter((ticket) =>
+          ticket.deviceGroups.some((mapping) =>
+            matchingAppliesToDeviceGroup(
+              mapping.deviceGroupMatching,
+              asset.deviceGroup,
+            ),
+          ),
+        );
+      }
+
+      // Dedupe by id — a ticket could in principle satisfy both checks.
+      const merged = new Map<string, (typeof directTickets)[number]>();
+      for (const ticket of [...directTickets, ...deviceGroupTickets]) {
+        merged.set(ticket.id, ticket);
+      }
+
+      return [...merged.values()].map((ticket) => {
+        const children = ticket.children.map((child) =>
+          withRowFlags(
+            { ...child, commentCount: child._count.comments },
+            child.lastCommentAt,
+          ),
+        );
+        return withRowFlags(
+          { ...ticket, children, commentCount: ticket._count.comments },
+          ticket.lastCommentAt,
+        );
+      });
     }),
 
   getOne: protectedProcedure

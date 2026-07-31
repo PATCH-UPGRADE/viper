@@ -176,6 +176,77 @@ const setup = () => {
   return createCaller({ req: {} as any });
 };
 
+// Minimal DeviceGroup identity shape returned by the asset lookup in
+// getManyByAssetId (asset.deviceGroup).
+// biome-ignore lint/suspicious/noExplicitAny: test fixture
+const makeAssetDeviceGroup = (overrides: Record<string, any> = {}): any => ({
+  id: "dg-1",
+  vendorId: "v-acme",
+  productId: "p-monitor",
+  versionId: "ver-1",
+  version: { canonicalName: "1.0.0" },
+  ...overrides,
+});
+
+// A NotificationDeviceGroupMapping row (WorkOrderTicket.deviceGroups element),
+// carrying a nested DeviceGroupMatching. `confidence` lives on the mapping
+// itself, never on the matching.
+const makeDeviceGroupMapping = (
+  // biome-ignore lint/suspicious/noExplicitAny: test fixture
+  matchingOverrides: Record<string, any> = {},
+  // biome-ignore lint/suspicious/noExplicitAny: test fixture
+  mappingOverrides: Record<string, any> = {},
+  // biome-ignore lint/suspicious/noExplicitAny: test fixture
+): any => ({
+  id: "map-1",
+  workOrderTicketId: "t1",
+  notificationId: null,
+  confidence: null,
+  reasonWhy: null,
+  deviceGroupMatching: {
+    id: "match-1",
+    vendorId: "v-acme",
+    productId: null,
+    versionId: null,
+    versionRange: null,
+    ...matchingOverrides,
+  },
+  ...mappingOverrides,
+});
+
+// A ticket row shaped like getManyByAssetId's Prisma include (ticketBaseInclude
+// + rowState + children + deviceGroups). Only the fields that code path
+// actually reads are populated by default.
+// biome-ignore lint/suspicious/noExplicitAny: test fixture
+const makeAssetTicket = (overrides: Record<string, any> = {}): any => ({
+  id: "t1",
+  summary: "Ticket",
+  status: "TO_DO",
+  category: "PATCH",
+  scheduledAt: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  lastCommentAt: null,
+  departments: [],
+  assignee: null,
+  creator: { id: "u1", name: "Creator", image: null },
+  vulnerabilities: [],
+  assets: [],
+  sources: [],
+  watchers: [],
+  seenBy: [],
+  _count: {
+    comments: 0,
+    issues: 0,
+    vulnerabilities: 0,
+    remediations: 0,
+    assets: 0,
+  },
+  children: [],
+  deviceGroups: [],
+  ...overrides,
+});
+
 // Minimal "before" shape for snapshotBeforeUpdate. Tests that exercise
 // specific diffs override this in-place.
 // biome-ignore lint/suspicious/noExplicitAny: test fixture
@@ -891,6 +962,285 @@ describe("trackingRouter.getMany", () => {
       id: "read",
       hasUnreadComments: false,
     });
+  });
+});
+
+describe("trackingRouter.getManyByAssetId", () => {
+  // biome-ignore lint/suspicious/noExplicitAny: test fixture
+  const assetWithDeviceGroup = (overrides: Record<string, any> = {}) => ({
+    deviceGroup: makeAssetDeviceGroup(overrides),
+  });
+
+  it("includes a ticket linked directly to the asset (assets relation)", async () => {
+    const caller = setup();
+    // No vendorId => the device-group branch is skipped entirely.
+    mockPrisma.asset.findUnique.mockResolvedValue(
+      assetWithDeviceGroup({ vendorId: null }),
+    );
+    mockPrisma.workOrderTicket.findMany.mockResolvedValueOnce([
+      makeAssetTicket({ id: "direct-1" }),
+    ]);
+
+    const result = await caller.getManyByAssetId({ assetId: "a1" });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: "direct-1" });
+    expect(mockPrisma.workOrderTicket.findMany).toHaveBeenCalledTimes(1);
+    const where = mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where;
+    expect(where.assets).toEqual({ some: { id: "a1" } });
+  });
+
+  it("includes a ticket linked only via a wildcard-product, wildcard-version device-group matching", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue(assetWithDeviceGroup());
+    mockPrisma.workOrderTicket.findMany
+      .mockResolvedValueOnce([]) // direct
+      .mockResolvedValueOnce([
+        makeAssetTicket({
+          id: "dg-ticket",
+          deviceGroups: [
+            makeDeviceGroupMapping({
+              productId: null,
+              versionId: null,
+              versionRange: null,
+            }),
+          ],
+        }),
+      ]);
+
+    const result = await caller.getManyByAssetId({ assetId: "a1" });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: "dg-ticket" });
+  });
+
+  it("includes a ticket via a VERS version-range device-group matching", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue(
+      assetWithDeviceGroup({ version: { canonicalName: "2.1.3" } }),
+    );
+    mockPrisma.workOrderTicket.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        makeAssetTicket({
+          id: "range-ticket",
+          deviceGroups: [
+            makeDeviceGroupMapping({
+              productId: "p-monitor",
+              versionId: null,
+              versionRange: "vers:semver/>=2.0.0|<3.0.0",
+            }),
+          ],
+        }),
+      ]);
+
+    const result = await caller.getManyByAssetId({ assetId: "a1" });
+
+    expect(result.map((t) => t.id)).toEqual(["range-ticket"]);
+  });
+
+  it("filters out a device-group candidate whose version doesn't match", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue(assetWithDeviceGroup());
+    mockPrisma.workOrderTicket.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        makeAssetTicket({
+          id: "wrong-version",
+          deviceGroups: [
+            makeDeviceGroupMapping({
+              productId: "p-monitor",
+              versionId: "ver-OTHER",
+            }),
+          ],
+        }),
+      ]);
+
+    const result = await caller.getManyByAssetId({ assetId: "a1" });
+    expect(result).toEqual([]);
+  });
+
+  it("shows a ticket regardless of NotificationDeviceGroupMapping.confidence (no filtering)", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue(assetWithDeviceGroup());
+    mockPrisma.workOrderTicket.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        makeAssetTicket({
+          id: "low-confidence-ticket",
+          deviceGroups: [
+            makeDeviceGroupMapping(
+              { productId: null, versionId: null, versionRange: null },
+              { confidence: "NeedsReview" },
+            ),
+          ],
+        }),
+      ]);
+
+    const result = await caller.getManyByAssetId({ assetId: "a1" });
+
+    expect(result.map((t) => t.id)).toContain("low-confidence-ticket");
+    // The candidate query itself must never filter on confidence.
+    const deviceGroupWhere =
+      mockPrisma.workOrderTicket.findMany.mock.calls[1][0].where;
+    expect(JSON.stringify(deviceGroupWhere)).not.toContain("confidence");
+  });
+
+  it("excludes DONE and draft tickets via the shared openWhere", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue(
+      assetWithDeviceGroup({ vendorId: null }),
+    );
+    mockPrisma.workOrderTicket.findMany.mockResolvedValueOnce([]);
+
+    await caller.getManyByAssetId({ assetId: "a1" });
+
+    const where = mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({
+      parentId: null,
+      isDraft: false,
+      status: { not: "DONE" },
+    });
+  });
+
+  it("dedupes a ticket satisfying both the direct and device-group paths", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue(assetWithDeviceGroup());
+    const shared = makeAssetTicket({
+      id: "both-paths",
+      deviceGroups: [
+        makeDeviceGroupMapping({
+          productId: null,
+          versionId: null,
+          versionRange: null,
+        }),
+      ],
+    });
+    mockPrisma.workOrderTicket.findMany
+      .mockResolvedValueOnce([shared]) // direct
+      .mockResolvedValueOnce([shared]); // also resolves via device-group
+
+    const result = await caller.getManyByAssetId({ assetId: "a1" });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: "both-paths" });
+  });
+
+  it("rolls sub-tickets up as nested children, not as separate top-level rows", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue(
+      assetWithDeviceGroup({ vendorId: null }),
+    );
+    mockPrisma.workOrderTicket.findMany.mockResolvedValueOnce([
+      makeAssetTicket({
+        id: "parent-1",
+        children: [
+          makeAssetTicket({
+            id: "child-1",
+            _count: {
+              comments: 2,
+              issues: 0,
+              vulnerabilities: 0,
+              remediations: 0,
+              assets: 0,
+            },
+          }),
+        ],
+      }),
+    ]);
+
+    const result = await caller.getManyByAssetId({ assetId: "a1" });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("parent-1");
+    expect(result[0].children).toHaveLength(1);
+    expect(result[0].children[0]).toMatchObject({
+      id: "child-1",
+      commentCount: 2,
+    });
+  });
+
+  it("returns an empty array when nothing matches (empty state)", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue(
+      assetWithDeviceGroup({ vendorId: null }),
+    );
+    mockPrisma.workOrderTicket.findMany.mockResolvedValueOnce([]);
+
+    const result = await caller.getManyByAssetId({ assetId: "a1" });
+    expect(result).toEqual([]);
+  });
+
+  it("throws NOT_FOUND for a missing asset", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue(null);
+
+    await expect(
+      caller.getManyByAssetId({ assetId: "missing" }),
+    ).rejects.toThrow(/not found/i);
+  });
+
+  it("throws UNAUTHORIZED when not authenticated", async () => {
+    mockGetSession.mockResolvedValue(null);
+    // biome-ignore lint/suspicious/noExplicitAny: stub req
+    const caller = createCaller({ req: {} as any });
+
+    await expect(caller.getManyByAssetId({ assetId: "a1" })).rejects.toThrow();
+    expect(mockPrisma.workOrderTicket.findMany).not.toHaveBeenCalled();
+  });
+
+  it("a device-group-matched ticket is the same row across every asset it resolves to, and completing it clears it everywhere", async () => {
+    const caller = setup();
+    const ticket = makeAssetTicket({
+      id: "shared-ticket",
+      deviceGroups: [
+        makeDeviceGroupMapping({
+          productId: null,
+          versionId: null,
+          versionRange: null,
+        }),
+      ],
+    });
+
+    // Asset A and asset B share the same vendor, so the same ticket (not a
+    // per-asset copy) satisfies both — this is the "one ticket, one button"
+    // case the UI relies on.
+    mockPrisma.asset.findUnique.mockResolvedValueOnce(assetWithDeviceGroup());
+    mockPrisma.workOrderTicket.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([ticket]);
+    const resultA = await caller.getManyByAssetId({ assetId: "asset-A" });
+    expect(resultA.map((t) => t.id)).toEqual(["shared-ticket"]);
+
+    mockPrisma.asset.findUnique.mockResolvedValueOnce(assetWithDeviceGroup());
+    mockPrisma.workOrderTicket.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([ticket]);
+    const resultB = await caller.getManyByAssetId({ assetId: "asset-B" });
+    expect(resultB.map((t) => t.id)).toEqual(["shared-ticket"]);
+
+    // Marking it complete acts on the ticket id alone — no per-asset scoping,
+    // matching the locked-in "one button completes the whole ticket" decision.
+    mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
+    await caller.update({ id: "shared-ticket", status: "DONE" });
+    expect(mockPrisma.workOrderTicket.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "shared-ticket" } }),
+    );
+
+    // `status != DONE` is baked into openWhere for every asset's query, so a
+    // subsequent fetch from either asset's tab excludes it — it disappears
+    // everywhere at once, not just from the tab that completed it.
+    mockPrisma.asset.findUnique.mockResolvedValueOnce(assetWithDeviceGroup());
+    mockPrisma.workOrderTicket.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    expect(await caller.getManyByAssetId({ assetId: "asset-A" })).toEqual([]);
+
+    mockPrisma.asset.findUnique.mockResolvedValueOnce(assetWithDeviceGroup());
+    mockPrisma.workOrderTicket.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    expect(await caller.getManyByAssetId({ assetId: "asset-B" })).toEqual([]);
   });
 });
 

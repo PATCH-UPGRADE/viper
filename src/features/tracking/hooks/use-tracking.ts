@@ -21,6 +21,33 @@ export const useSuspenseTrackingTicket = (id: string) => {
   return useSuspenseQuery(trpc.tracking.getOne.queryOptions({ id }));
 };
 
+export const useSuspenseAssetWorkOrders = (assetId: string) => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(
+    trpc.tracking.getManyByAssetId.queryOptions({ assetId }),
+  );
+};
+
+/** Marks a ticket DONE from the asset Work Orders tab; the row then drops out
+ * of the (open-only) getManyByAssetId list for this asset. */
+export const useMarkWorkOrderComplete = (assetId: string) => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.tracking.update.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(
+          trpc.tracking.getManyByAssetId.queryFilter({ assetId }),
+        );
+        toast.success("Marked as complete");
+      },
+      onError: (error) => {
+        toast.error(`Failed to mark ticket complete: ${error.message}`);
+      },
+    }),
+  );
+};
+
 export const useUpdateTicket = (ticketId: string) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

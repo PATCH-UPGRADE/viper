@@ -1,3 +1,4 @@
+import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 import {
   IssueStatus,
@@ -11,6 +12,7 @@ import {
 } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import { createIntegrationInputSchema } from "@/lib/schemas";
+import type { trpc } from "@/trpc/server";
 
 export const ticketBaseInclude = {
   departments: {
@@ -204,6 +206,11 @@ export const workOrderListInclude = {
 export type WorkOrderListItem = Prisma.WorkOrderTicketGetPayload<{
   include: typeof workOrderListInclude;
 }>;
+
+// A row from the asset detail page's Work Orders tab (`getManyByAssetId`).
+export type AssetWorkOrder = inferOutput<
+  typeof trpc.tracking.getManyByAssetId
+>[number];
 
 // --- Integration ingestion -------------------------------------------------
 

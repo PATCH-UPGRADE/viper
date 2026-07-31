@@ -1,6 +1,9 @@
 import "server-only";
 import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
-import { workflowSerializeInclude } from "@/features/workflows/utils";
+import {
+  workflowSerializeInclude,
+  workflowsUsingAssetsOrMatchings,
+} from "@/features/workflows/utils";
 import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
@@ -171,34 +174,10 @@ export async function gatherTriageContext(
   const workflows =
     affectedAssetIds.length > 0 || affectedMatchingIds.length > 0
       ? await prisma.workflow.findMany({
-          where: {
-            OR: [
-              ...(affectedAssetIds.length > 0
-                ? [
-                    {
-                      nodes: {
-                        some: {
-                          assets: { some: { id: { in: affectedAssetIds } } },
-                        },
-                      },
-                    },
-                  ]
-                : []),
-              ...(affectedMatchingIds.length > 0
-                ? [
-                    {
-                      nodes: {
-                        some: {
-                          deviceGroupMatchings: {
-                            some: { id: { in: affectedMatchingIds } },
-                          },
-                        },
-                      },
-                    },
-                  ]
-                : []),
-            ],
-          },
+          where: workflowsUsingAssetsOrMatchings(
+            affectedAssetIds,
+            affectedMatchingIds,
+          ),
           include: workflowSerializeInclude,
         })
       : [];

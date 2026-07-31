@@ -22,6 +22,32 @@ type WorkflowWithRelations = Prisma.WorkflowGetPayload<{
   include: typeof workflowSerializeInclude;
 }>;
 
+/**
+ * `where` selecting workflows a set of assets/matchings participate in: a node
+ * links one of the assets directly, or links one of the device-group matchings.
+ * Callers guard the all-empty case (this returns `{ OR: [] }`, which matches
+ * nothing).
+ */
+export function workflowsUsingAssetsOrMatchings(
+  assetIds: string[],
+  matchingIds: string[],
+): Prisma.WorkflowWhereInput {
+  const or: Prisma.WorkflowWhereInput[] = [];
+  if (assetIds.length > 0) {
+    or.push({
+      nodes: { some: { assets: { some: { id: { in: assetIds } } } } },
+    });
+  }
+  if (matchingIds.length > 0) {
+    or.push({
+      nodes: {
+        some: { deviceGroupMatchings: { some: { id: { in: matchingIds } } } },
+      },
+    });
+  }
+  return { OR: or };
+}
+
 // Node-focused serialization for LLM/markdown consumers. Each node's linked
 // asset / device-group-matching ids are folded into node.data (the same shape
 // the editor uses). Edges are intentionally omitted — topology is conveyed via

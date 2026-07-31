@@ -4,17 +4,18 @@ import { z } from "zod";
 import type { NodeType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
-  matchingAppliesToDeviceGroup,
-  matchingWhereForDeviceGroup,
-} from "@/lib/device-matching";
-import {
   buildPaginationMeta,
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
+import { findMatchingIdsForDeviceGroup } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
-import { serializeWorkflow, workflowSerializeInclude } from "../utils";
+import {
+  serializeWorkflow,
+  workflowSerializeInclude,
+  workflowsUsingAssetsOrMatchings,
+} from "../utils";
 
 export const workflowsRouter = createTRPCRouter({
   create: protectedProcedure.mutation(({ ctx }) => {
@@ -283,50 +284,19 @@ export const workflowsRouter = createTRPCRouter({
           },
         },
       });
-      requireExistence(asset, "Asset");
+      const found = requireExistence(asset, "Asset");
 
-      // Device-group matchings that apply to this asset's device group.
-      const dg = asset?.deviceGroup;
-      let applicableMatchingIds: string[] = [];
-      if (dg?.vendorId) {
-        const candidateMatchings = await prisma.deviceGroupMatching.findMany({
-          where: matchingWhereForDeviceGroup({
-            vendorId: dg.vendorId,
-            productId: dg.productId,
-          }),
-          select: {
-            id: true,
-            vendorId: true,
-            productId: true,
-            versionId: true,
-            versionRange: true,
-          },
-        });
-        applicableMatchingIds = candidateMatchings
-          .filter((m) => matchingAppliesToDeviceGroup(m, dg))
-          .map((m) => m.id);
-      }
-
-      // One OR query dedupes direct-link and device-class workflows by id.
+      // Device-group matchings that apply to this asset's device group, then
+      // workflows whose nodes link the asset directly or one of those matchings
+      // (one OR query dedupes by workflow id).
+      const applicableMatchingIds = await findMatchingIdsForDeviceGroup(
+        found.deviceGroup,
+      );
       const workflows = await prisma.workflow.findMany({
-        where: {
-          OR: [
-            { nodes: { some: { assets: { some: { id: assetId } } } } },
-            ...(applicableMatchingIds.length
-              ? [
-                  {
-                    nodes: {
-                      some: {
-                        deviceGroupMatchings: {
-                          some: { id: { in: applicableMatchingIds } },
-                        },
-                      },
-                    },
-                  },
-                ]
-              : []),
-          ],
-        },
+        where: workflowsUsingAssetsOrMatchings(
+          [assetId],
+          applicableMatchingIds,
+        ),
         include: workflowSerializeInclude,
         orderBy: { updatedAt: "desc" },
       });

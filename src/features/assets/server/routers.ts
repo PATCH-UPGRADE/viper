@@ -11,10 +11,6 @@ import {
   Severity,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import {
-  deviceGroupWhereForMatching,
-  matchingAppliesToDeviceGroup,
-} from "@/lib/device-matching";
 import { renderUtilization } from "@/lib/markdown";
 import {
   buildPaginationMeta,
@@ -24,6 +20,7 @@ import {
 import {
   cpeToDeviceGroup,
   fetchPaginated,
+  findDeviceGroupIdsForMatchings,
   findVulnerabilitiesMatchingDeviceGroups,
   processIntegrationSync,
   processIntegrationToken,
@@ -70,37 +67,6 @@ const createSearchFilter = (search: string) => {
         ],
       }
     : {};
-};
-
-/**
- * Resolve a set of device-group matchings to the concrete device-group ids they
- * apply to. Mirrors the triage resolver: a coarse vendor/product DB filter, then
- * the in-memory VERS-range check (matchingAppliesToDeviceGroup).
- */
-const deviceGroupIdsForMatchings = async (
-  matchings: {
-    vendorId: string;
-    productId: string | null;
-    versionId: string | null;
-    versionRange: string | null;
-  }[],
-): Promise<string[]> => {
-  if (matchings.length === 0) return [];
-  const candidateGroups = await prisma.deviceGroup.findMany({
-    where: { OR: matchings.map(deviceGroupWhereForMatching) },
-    select: {
-      id: true,
-      vendorId: true,
-      productId: true,
-      versionId: true,
-      version: { select: { canonicalName: true } },
-    },
-  });
-  return candidateGroups
-    .filter((group) =>
-      matchings.some((m) => matchingAppliesToDeviceGroup(m, group)),
-    )
-    .map((group) => group.id);
 };
 
 export const assetsRouter = createTRPCRouter({
@@ -200,7 +166,7 @@ export const assetsRouter = createTRPCRouter({
           versionRange: true,
         },
       });
-      const matchedGroupIds = await deviceGroupIdsForMatchings(matchings);
+      const matchedGroupIds = await findDeviceGroupIdsForMatchings(matchings);
 
       // Find assets that are directly linked by a node
       // and assets that are indirectly linked via a node's device group
@@ -438,7 +404,7 @@ export const assetsRouter = createTRPCRouter({
             versionRange: true,
           },
         });
-        const matchedGroupIds = await deviceGroupIdsForMatchings(matchings);
+        const matchedGroupIds = await findDeviceGroupIdsForMatchings(matchings);
         if (matchedGroupIds.length)
           orConditions.push({ deviceGroupId: { in: matchedGroupIds } });
       }

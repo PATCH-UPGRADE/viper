@@ -6,6 +6,7 @@ import {
   enrichVulnerability,
 } from "@/inngest/functions/enrich-vulnerabilities";
 import { extractArtifactNotesFn } from "@/inngest/functions/extract-artifact-notes";
+import { actionNotesFn } from "@/inngest/functions/notes-action";
 import { processInboxEmail } from "@/inngest/functions/process-inbox-email";
 import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-user-tokens";
 import { reevaluateIssueOnAnswer } from "@/inngest/functions/reevaluate-issue-on-answer";
@@ -32,5 +33,6 @@ export const { GET, POST, PUT } = serve({
     resolveEntityFilterFn,
     extractArtifactNotesFn,
     reevaluateIssueOnAnswer,
+    actionNotesFn,
   ],
 });

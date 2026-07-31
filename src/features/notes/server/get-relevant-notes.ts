@@ -40,6 +40,7 @@ export async function getNotesForInstance(
   // id. Matches are materialized by the resolve-entity-filters Inngest job.
   return prisma.note.findMany({
     where: {
+      deletedAt: null,
       OR: [
         { targetModel, instanceId: { in: ids } },
         {
@@ -73,6 +74,7 @@ export async function getScopedNotesByInstance(
   const notes = await prisma.note.findMany({
     where: {
       status: "SCOPED",
+      deletedAt: null,
       OR: [
         { targetModel, instanceId: { in: ids } },
         {
@@ -174,7 +176,7 @@ export async function getRelevantNotes(
   const [persistent, vulnerabilities, remediations, matchings, assets] =
     await Promise.all([
       prisma.note.findMany({
-        where: { status: "PERSISTENT" },
+        where: { status: "PERSISTENT", deletedAt: null },
         select: NOTE_SELECT,
       }),
       getNotesForInstance("VULNERABILITY", scope.vulnerabilityIds ?? []),

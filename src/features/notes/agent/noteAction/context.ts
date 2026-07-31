@@ -41,7 +41,7 @@ function renderNoteActionPrompt(args: {
   sections.push(
     candidates.length === 0
       ? "## Existing notes\n\n(none)"
-      : "## Existing notes (update or delete these instead of duplicating\n\n)" +
+      : "## Existing notes (update or delete these instead of duplicating)\n\n" +
           candidates.map((n) => `- [${n.id} ${n.text}`).join("\n"),
   );
 

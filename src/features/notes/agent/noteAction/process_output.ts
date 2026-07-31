@@ -63,6 +63,7 @@ export async function applyNoteAction(
   result: NoteActionResult,
 ): Promise<NoteActionSummary> {
   const writes = planNoteActions(context, result);
+  console.log("writes, ", writes);
   const { target, userId } = context.request;
 
   const summary: NoteActionSummary = {

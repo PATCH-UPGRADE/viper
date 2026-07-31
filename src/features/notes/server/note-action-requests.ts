@@ -19,12 +19,13 @@ type ResolvedTarget = {
 async function resolveMatchingFeedbackTarget(
   targetType: MatchFeedbackTargetType,
   targetId: string,
+  notificationId: string,
 ): Promise<ResolvedTarget | null> {
   // if we need to target to different type later, remove this check and potentially update this function to a swtich(targetType)
   if (targetType !== "NotificationDeviceGroupMapping") return null;
 
-  const mapping = await prisma.notificationDeviceGroupMapping.findUnique({
-    where: { id: targetId },
+  const mapping = await prisma.notificationDeviceGroupMapping.findFirst({
+    where: { id: targetId, notificationId },
     select: {
       deviceGroupMatchingId: true,
       deviceGroupMatching: {
@@ -55,14 +56,17 @@ async function resolveMatchFeedbackRequest(
       targetType: true,
       targetId: true,
       userId: true,
+      notificationId: true,
       notification: { select: { title: true } },
     },
   });
 
   if (!feedback?.comment?.trim()) return null;
+  if (!feedback.notificationId) return null;
   const target = await resolveMatchingFeedbackTarget(
     feedback.targetType,
     feedback.targetId,
+    feedback.notificationId,
   );
   if (!target) return null;
 

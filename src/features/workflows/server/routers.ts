@@ -15,7 +15,6 @@ import {
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 import { serializeWorkflow, workflowSerializeInclude } from "../utils";
-import { workflowToMermaidJSON } from "./mermaid";
 
 export const workflowsRouter = createTRPCRouter({
   create: protectedProcedure.mutation(({ ctx }) => {
@@ -333,53 +332,5 @@ export const workflowsRouter = createTRPCRouter({
       });
 
       return workflows.map(serializeWorkflow);
-    }),
-
-  exportMermaid: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
-      const workflowOrNull = await prisma.workflow.findUnique({
-        where: { id: input.id },
-        include: { nodes: true, connections: true },
-      });
-      const workflow = requireExistence(workflowOrNull, "Workflow");
-      // Transform to react-flow compatible nodes/edges
-      const nodes: Node[] = workflow.nodes.map((node) => ({
-        id: node.id,
-        type: node.type,
-        position: node.position as { x: number; y: number },
-        data: { ...(node.data as Record<string, unknown>), name: node.name },
-      }));
-      const edges: Edge[] = workflow.connections.map((connection) => ({
-        id: connection.id,
-        source: connection.fromNodeId,
-        target: connection.toNodeId,
-        sourceHandle: connection.fromOutput,
-        targetHandle: connection.toInput,
-      }));
-
-      const mermaid = workflowToMermaidJSON(nodes, edges);
-      return { mermaid };
-    }),
-
-  serialize: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
-      const workflowOrNull = await prisma.workflow.findUnique({
-        where: { id: input.id },
-        include: workflowSerializeInclude,
-      });
-      const workflow = requireExistence(workflowOrNull, "Workflow");
-      const serialized = serializeWorkflow(workflow);
-      // serializeWorkflow omits edges; Mermaid needs them, so build from connections.
-      const edges: Edge[] = workflow.connections.map((connection) => ({
-        id: connection.id,
-        source: connection.fromNodeId,
-        target: connection.toNodeId,
-        sourceHandle: connection.fromOutput,
-        targetHandle: connection.toInput,
-      }));
-      const mermaid = workflowToMermaidJSON(serialized.nodes, edges);
-      return { workflow: serialized, mermaid };
     }),
 });

@@ -2,7 +2,6 @@
 
 import {
   AlertTriangleIcon,
-  DownloadIcon,
   Loader2Icon,
   PackageOpenIcon,
   PlusIcon,
@@ -269,8 +268,6 @@ interface EntityItemProps {
   image?: React.ReactNode;
   actions?: React.ReactNode;
   onRemove?: () => void | Promise<void>;
-  onExportJSON?: () => void | Promise<void>;
-  onExportMermaid?: () => void | Promise<void>;
   isRemoving?: boolean;
   className?: string;
 }
@@ -282,8 +279,6 @@ export const EntityItem = ({
   image,
   actions,
   onRemove,
-  onExportJSON,
-  onExportMermaid,
   isRemoving,
   className,
 }: EntityItemProps) => {
@@ -297,24 +292,6 @@ export const EntityItem = ({
 
     if (onRemove) {
       await onRemove();
-    }
-  };
-
-  const handleExportMermaid = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (onExportMermaid) {
-      await onExportMermaid();
-    }
-  };
-
-  const handleExportJSON = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (onExportJSON) {
-      await onExportJSON();
     }
   };
 
@@ -337,28 +314,18 @@ export const EntityItem = ({
             )}
           </div>
         </div>
-        {(actions || onRemove || onExportJSON || onExportMermaid) && (
+        {(actions || onRemove) && (
           <div className="flex gap-x-4 items-center">
             {actions}
-            {(onRemove || onExportJSON || onExportMermaid) && (
+            {onRemove && (
               <MoreVerticalDropdownMenu
                 items={[
-                  onRemove && {
+                  {
                     label: isRemoving ? "Removing..." : "Remove",
                     icon: <TrashIcon className="mr-2 size-4" />,
                     onClick: handleRemove,
                     disabled: isRemoving,
                     variant: "destructive",
-                  },
-                  onExportMermaid && {
-                    label: "Export as Mermaid",
-                    icon: <DownloadIcon className="mr-2 size-4" />,
-                    onClick: handleExportMermaid,
-                  },
-                  onExportJSON && {
-                    label: "Export as JSON",
-                    icon: <DownloadIcon className="mr-2 size-4" />,
-                    onClick: handleExportJSON,
                   },
                 ]}
               />

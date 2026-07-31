@@ -26,7 +26,9 @@ function planOneAction(
 
   const noteId = op.noteId;
   if (!noteId || !candidateIds.has(noteId)) {
-    throw new Error(`Note: "${op.action}" op referenced unknown note id ${noteId ?? "missing"}`);
+    throw new Error(
+      `Note: "${op.action}" op referenced unknown note id ${noteId ?? "missing"}`,
+    );
   }
 
   if (op.action === "update") {

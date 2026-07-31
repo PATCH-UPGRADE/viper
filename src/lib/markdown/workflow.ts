@@ -29,6 +29,10 @@ export function generateWorkflowsMarkdown(
     .join("\n\n");
 }
 
+// TODO: This only shows which steps are affected in a workflow, not the
+// entire workflow, which may be more useful to the model for getting the
+// hospital impact. If a specific step is disrupted, what are the downstream
+// impacts on patient care?
 export function workflowClinicalSummary(
   workflows: WorkflowWithRelations[],
   affectedAssetIds: string[],

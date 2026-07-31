@@ -3,7 +3,7 @@ import type { ScopedNote } from "@/features/notes/schemas";
 import { getScopedNotesByInstance } from "@/features/notes/server/get-relevant-notes";
 import type { ScopeTargetModel } from "@/generated/prisma";
 
-// current and future create Note Source
+// current and future create/edit Note Source
 export type NoteActionSource =
   | "MATCH_FEEDBACK"
   | "QUESTION_ANSWER"

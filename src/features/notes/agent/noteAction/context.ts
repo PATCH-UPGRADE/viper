@@ -66,6 +66,8 @@ export async function gatherNoteActionContext(
   return { request, markdown, candidates };
 }
 
+// TODO: Agent should have a choice to omit notes, best decision would come from seeing user behavior, VW-393 will have another agent using a tool to record notes
+// https://github.com/PATCH-UPGRADE/viper/pull/194#discussion_r3691510350
 export const SYSTEM_PROMPT = `You maintain a hospital vulnerability-management team's notes about their medice devices, assets, vulnerabilities, and remediations. Notes are the team's durable memory: they can fed back into every later AI run and shown to staff on the asset, vulnerability, and remediation pages. A user has just taken an action and left a comment.
 
 Your job is to record what they told us, do not judge whether a comment is "important enough" and emit note operations. Any claim about a device, vulnerability, or remediation must come from "what the user said". Never invent a technical or clinical claim the user did not make.

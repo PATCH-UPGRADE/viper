@@ -25,7 +25,9 @@ function planOneAction(
   }
 
   const noteId = op.noteId;
-  if (!noteId || !candidateIds.has(noteId)) return null;
+  if (!noteId || !candidateIds.has(noteId)) {
+    throw new Error(`Note: "${op.action}" op referenced unknown note id ${noteId ?? "missing"}`);
+  }
 
   if (op.action === "update") {
     return text ? { action: "update", noteId, text } : null;
@@ -63,7 +65,7 @@ export async function applyNoteAction(
   result: NoteActionResult,
 ): Promise<NoteActionSummary> {
   const writes = planNoteActions(context, result);
-  console.log("writes, ", writes);
+
   const { target, userId } = context.request;
 
   const summary: NoteActionSummary = {

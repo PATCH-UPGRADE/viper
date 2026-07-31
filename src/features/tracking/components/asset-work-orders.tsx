@@ -1,12 +1,28 @@
 "use client";
 
+import { CheckIcon, MessageSquareIcon } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { CategoryColorProvider } from "@/features/tag-colors/context";
 import { TicketStatus } from "@/generated/prisma";
 import {
   useSuspenseAssetWorkOrders,
   useUpdateTicket,
 } from "../hooks/use-tracking";
+import {
+  CategoryChip,
+  DepartmentChips,
+  formatScheduled,
+  StatusChip,
+} from "./ticket-detail/shared";
 
 const MarkCompleteButton = ({ ticketId }: { ticketId: string }) => {
   const update = useUpdateTicket(ticketId);
@@ -18,6 +34,7 @@ const MarkCompleteButton = ({ ticketId }: { ticketId: string }) => {
       disabled={update.isPending}
       onClick={() => update.mutate({ id: ticketId, status: TicketStatus.DONE })}
     >
+      <CheckIcon className="size-3.5" />
       Mark as complete
     </Button>
   );
@@ -35,21 +52,59 @@ export const AssetWorkOrders = ({ assetId }: { assetId: string }) => {
   }
 
   return (
-    <ul className="divide-y rounded-md border">
-      {tickets.map((ticket) => (
-        <li
-          key={ticket.id}
-          className="flex items-center justify-between gap-4 p-3"
-        >
-          <Link
-            href={`/tracking/${ticket.id}`}
-            className="font-medium hover:underline"
-          >
-            {ticket.summary}
-          </Link>
-          <MarkCompleteButton ticketId={ticket.id} />
-        </li>
-      ))}
-    </ul>
+    <CategoryColorProvider>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Summary</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>
+              <span className="sr-only">Actions</span>
+            </TableHead>
+            <TableHead>Dept</TableHead>
+            <TableHead>Scheduled</TableHead>
+            <TableHead>
+              <MessageSquareIcon className="size-3.5" aria-hidden="true" />
+              <span className="sr-only">Comments</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tickets.map((ticket) => (
+            <TableRow key={ticket.id} className="hover:bg-muted/40">
+              <TableCell className="max-w-96">
+                <div className="flex flex-col gap-1">
+                  <Link
+                    href={`/tracking/${ticket.id}`}
+                    className="font-medium hover:underline"
+                  >
+                    {ticket.summary}
+                  </Link>
+                  <CategoryChip category={ticket.category} />
+                </div>
+              </TableCell>
+              <TableCell>
+                <StatusChip status={ticket.status} />
+              </TableCell>
+              <TableCell>
+                <MarkCompleteButton ticketId={ticket.id} />
+              </TableCell>
+              <TableCell>
+                <DepartmentChips departments={ticket.departments} />
+              </TableCell>
+              <TableCell className="text-sm">
+                {formatScheduled(ticket.scheduledAt) ?? "—"}
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <MessageSquareIcon className="size-3.5" />
+                  <span>{ticket.commentCount}</span>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </CategoryColorProvider>
   );
 };

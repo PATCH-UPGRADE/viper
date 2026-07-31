@@ -375,6 +375,13 @@ export const trackingRouter = createTRPCRouter({
         select: {
           id: true,
           summary: true,
+          status: true,
+          category: true,
+          scheduledAt: true,
+          departments: {
+            select: { id: true, name: true, color: true },
+            orderBy: { name: "asc" },
+          },
           assets: {
             where: { id: input.assetId },
             select: { id: true },
@@ -382,6 +389,7 @@ export const trackingRouter = createTRPCRouter({
           deviceGroups: {
             select: { deviceGroupMatching: true },
           },
+          _count: { select: { comments: true } },
         },
         orderBy: { updatedAt: "desc" },
       });
@@ -400,6 +408,11 @@ export const trackingRouter = createTRPCRouter({
         .map((ticket) => ({
           id: ticket.id,
           summary: ticket.summary,
+          status: ticket.status,
+          category: ticket.category,
+          scheduledAt: ticket.scheduledAt,
+          departments: ticket.departments,
+          commentCount: ticket._count.comments,
         }));
     }),
 

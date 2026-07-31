@@ -22,6 +22,12 @@ export const statusHue: Record<TicketStatus, string> = {
   DONE: "green",
 };
 
+export const StatusChip = ({ status }: { status: TicketStatus }) => (
+  <Badge variant="outline" className={getChipClass(statusHue[status])}>
+    {statusLabels[status]}
+  </Badge>
+);
+
 export const categoryLabels: Record<TicketCategory, string> = {
   PATCH: "Patch",
   CONFIG_CHANGE: "Config Change",
@@ -68,6 +74,30 @@ export const CategoryChip = ({ category }: { category: TicketCategory }) => {
     <Badge variant="outline" className={getChipClass(color)}>
       {categoryLabels[category]}
     </Badge>
+  );
+};
+
+export const DepartmentChips = ({
+  departments,
+}: {
+  departments: { id: string; name: string; color: string | null }[];
+}) => {
+  if (departments.length === 0) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {departments.map((department) => (
+        <Badge
+          key={department.id}
+          variant="outline"
+          className={getChipClass(department.color)}
+        >
+          {department.name}
+        </Badge>
+      ))}
+    </div>
   );
 };
 

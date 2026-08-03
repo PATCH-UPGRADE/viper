@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockMutate, mockUseSuspenseAssetWorkOrders } = vi.hoisted(() => ({
   mockMutate: vi.fn(),
@@ -17,6 +17,7 @@ import { SuggestedWorkOrderModal } from "./suggested-work-order-modal";
 beforeEach(() => {
   vi.clearAllMocks();
 });
+afterEach(() => vi.useRealTimers());
 
 const HOUR_MS = 60 * 60 * 1000;
 const hoursFromNow = (hours: number) => new Date(Date.now() + hours * HOUR_MS);
@@ -42,6 +43,17 @@ const renderModal = (tickets: Ticket[]) => {
 };
 
 describe("SuggestedWorkOrderModal", () => {
+  it.each([-48, 48])(
+    "includes a ticket scheduled exactly %i hours from now",
+    (hours) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-08-03T12:00:00Z"));
+      renderModal([makeTicket({ scheduledAt: hoursFromNow(hours) })]);
+
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+    },
+  );
+
   it("ignores unscheduled tickets and tickets outside the 2-day window", () => {
     renderModal([
       makeTicket({ scheduledAt: null }),

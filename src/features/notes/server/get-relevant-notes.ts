@@ -26,6 +26,30 @@ const NOTE_SELECT = {
 } as const;
 
 /**
+ * Attach each entity's SCOPED notes onto a batch of entities, keyed by id.
+ * Used in paginated routers to add notes to returned items
+ */
+export async function attachNotes<T extends { id: string }>(
+  targetModel: ScopeTargetModel,
+  items: T[],
+): Promise<(T & { notes: ScopedNote[] })[]> {
+  const byEntity = await getScopedNotesByInstance(
+    targetModel,
+    items.map((item) => item.id),
+  );
+  return items.map((item) => ({ ...item, notes: byEntity.get(item.id) ?? [] }));
+}
+
+/** Single-entity convenience wrapper around {@link attachNotes}. */
+export async function attachNote<T extends { id: string }>(
+  targetModel: ScopeTargetModel,
+  item: T,
+): Promise<T & { notes: ScopedNote[] }> {
+  const [withNotes] = await attachNotes(targetModel, [item]);
+  return withNotes;
+}
+
+/**
  * Notes matching one or more objects of a single targetModel, by id. Does not
  * include PERSISTENT notes (see getRelevantNotes for that).
  */

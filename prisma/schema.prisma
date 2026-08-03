@@ -165,6 +165,9 @@ model Node {
   position Json
   data     Json @default("{}")
 
+  assets               Asset[]
+  deviceGroupMatchings DeviceGroupMatching[]
+
   outputConnections Connection[] @relation("FromNode")
   inputConnections  Connection[] @relation("ToNode")
 
@@ -303,6 +306,7 @@ model DeviceGroupMatching {
   deviceArtifacts      DeviceArtifact[]                 @relation("DeviceArtifactMatchings")
   issues               Issue[]
   notificationMappings NotificationDeviceGroupMapping[]
+  nodes                Node[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -356,6 +360,7 @@ model Asset {
   externalMappings     ExternalAssetMapping[]
   workOrderTickets     WorkOrderTicket[]          @relation("WorkOrderTicketAssets")
   notificationMappings NotificationAssetMapping[]
+  nodes                Node[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1512,8 +1517,8 @@ model Question {
   resultingNoteId String? @unique // create note after user answer
   resultingNote   Note?   @relation(fields: [resultingNoteId], references: [id], onDelete: SetNull)
 
-  parentQuestionId String? @unique
-  parentQuestion  Question? @relation("QuestionChain", fields:[parentQuestionId], references: [id], onDelete: SetNull)
+  parentQuestionId String?   @unique
+  parentQuestion   Question? @relation("QuestionChain", fields: [parentQuestionId], references: [id], onDelete: SetNull)
   followupQuestion Question? @relation("QuestionChain")
 
   createdAt DateTime @default(now())

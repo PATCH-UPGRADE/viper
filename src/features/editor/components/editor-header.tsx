@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   useSuspenseWorkflow,
@@ -196,18 +197,14 @@ const EditorDescriptionInput = ({ workflowId }: { workflowId: string }) => {
   }
 
   return (
-    <BreadcrumbItem
+    <QuestionTooltip
+      accessibleLabel="Edit workflow description"
       onClick={() => setIsEditing(true)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          setIsEditing(true);
-        }
-      }}
-      className="text-sm text-muted-foreground italic cursor-pointer hover:text-foreground transition-colors"
     >
-      {workflow.description || "Add workflow description"}
-    </BreadcrumbItem>
+      <span className="italic">
+        {workflow.description || "Add workflow description"}
+      </span>
+    </QuestionTooltip>
   );
 };
 

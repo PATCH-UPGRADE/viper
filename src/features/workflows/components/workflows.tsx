@@ -18,8 +18,6 @@ import type { Workflow } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import {
   useCreateWorkflow,
-  useExportWorkflowMermaidDownload,
-  useExportWorkflowSerializedDownload,
   useRemoveWorkflow,
   useSuspenseWorkflows,
 } from "../hooks/use-workflows";
@@ -144,20 +142,9 @@ const WorkflowsEmpty = () => {
 
 const WorkflowItem = ({ data }: { data: Workflow }) => {
   const removeWorkflow = useRemoveWorkflow();
-  const exportWorkflowSerializedDownload =
-    useExportWorkflowSerializedDownload();
-  const exportWorkflowMermaidDownload = useExportWorkflowMermaidDownload();
 
   const handleRemove = () => {
     removeWorkflow.mutate({ id: data.id });
-  };
-
-  const handleExportSerialized = async () => {
-    await exportWorkflowSerializedDownload(data.id, data.name);
-  };
-
-  const handleExportMermaid = async () => {
-    await exportWorkflowMermaidDownload(data.id, data.name);
   };
 
   return (
@@ -184,8 +171,6 @@ const WorkflowItem = ({ data }: { data: Workflow }) => {
         </div>
       }
       onRemove={handleRemove}
-      onExportJSON={handleExportSerialized}
-      onExportMermaid={handleExportMermaid}
       isRemoving={removeWorkflow.isPending}
     />
   );

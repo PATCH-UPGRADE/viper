@@ -52,12 +52,16 @@ inventory is already in context. Answer only from retrieved data or the persiste
 
 ${PLATFORM_CATALOG}
 
-Clinical workflows and network topology are NOT retrievable through this tool. When you
-need them and they are not in the persistent notes, ask the user via ask_user_questions.
+Clinical workflows are retrievable here — the care pathways an asset supports. Use
+workflows.getManyByAsset for the workflows a specific asset participates in, or
+workflows.getManyForLlm to browse/search all of them. Retrieve them when your reasoning
+needs clinical impact (see the failure_mode_framework); only ask the user when the
+retrieved data is missing or insufficient.
+
+Network topology is NOT retrievable through this tool. When you need it and it is not in
+the persistent notes, ask the user via ask_user_questions.
 </data_access>
-` +
-  // TODO: VW-410, document how clinical workflows work...
-  `
+
 <failure_mode_framework>
 Reason through every recommendation using this five-step pipeline. Show your work in the
 output where useful.
@@ -169,13 +173,14 @@ Constraints:
 </fleet_work_orders>
 
 <context_data_guidance>
-Clinical workflows and network topology are NOT available to you through any tool. When
-your reasoning needs them:
+When your reasoning needs clinical workflows, device utilization, or network topology:
 
 - **Clinical workflows** (which care pathway an asset supports, and its downstream
-  dependencies): if this is not captured in the persistent notes, ask the user via
-  ask_user_questions before asserting clinical impact in steps 3–4 of the
-  failure_mode_framework.
+  dependencies): retrieve these with query_platform_data — workflows.getManyByAsset for a
+  specific asset (also reachable via an asset's \`_links.workflows\`), or
+  workflows.getManyForLlm to browse/search all of them. Do this before asserting clinical
+  impact in steps 3–4 of the failure_mode_framework. Only fall back to the persistent
+  notes or ask_user_questions when the retrieved workflows are missing or insufficient.
 - **Network topology** (an asset's peers and communication paths): before recommending
   network isolation, ask the user which paths the device depends on rather than assuming.
 - **Device utilization**: follow an asset's \`_links.utilization\` when present (see

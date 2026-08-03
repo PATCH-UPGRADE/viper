@@ -14,7 +14,7 @@ export type AssetNodeData = {
   icon?: string;
   label?: string;
   description?: string;
-  cpes?: string[];
+  deviceGroupMatchingIds?: string[];
   assetIds?: string[];
 };
 
@@ -36,7 +36,9 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
               ...node.data,
               ...values,
               // Transform data from objects (for useFieldArray to work) into array
-              cpes: values.cpes?.map((cpe) => cpe.value),
+              deviceGroupMatchingIds: values.deviceGroupMatchingIds?.map(
+                (m) => m.value,
+              ),
               assetIds: values.assetIds?.map((id) => id.value),
             },
           };
@@ -50,7 +52,7 @@ export const AssetNode = memo((props: NodeProps<AssetNodeType>) => {
 
   const assetsWithVulns = useSuspenseAssetsVulns({
     assetIds: nodeData.assetIds ?? [],
-    cpes: nodeData.cpes ?? [],
+    deviceGroupMatchingIds: nodeData.deviceGroupMatchingIds ?? [],
   });
   const numVulns = assetsWithVulns.data.vulnerabilitiesCount;
   const numAssets = assetsWithVulns.data.assetsCount;

@@ -7,15 +7,22 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 export function QuestionTooltip({
   className,
   children,
-}: PropsWithChildren<{ className?: string }>) {
+  onClick,
+  accessibleLabel = "More information",
+}: PropsWithChildren<{
+  className?: string;
+  onClick?: () => void;
+  accessibleLabel?: string;
+}>) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
           variant="ghost"
           size="icon-sm"
-          className={cn(className, "cursor-help")}
-          aria-label="More information"
+          className={cn(onClick ? "cursor-pointer" : "cursor-help", className)}
+          aria-label={accessibleLabel}
+          onClick={onClick}
         >
           <CircleQuestionMark />
         </Button>

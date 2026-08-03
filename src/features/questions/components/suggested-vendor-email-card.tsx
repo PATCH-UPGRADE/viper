@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { handleCopy } from "@/lib/copy";
 import type { SuggestedVendorEmail } from "../types";
 
 export const SuggestedEmailCard = ({
@@ -17,9 +18,8 @@ export const SuggestedEmailCard = ({
   onDismiss: () => void;
   isSending: boolean;
 }) => {
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(`${email.subject}\n\n&{email.body}`);
-    toast.success("Email text copied");
+  const onhandleClickCopy = async () => {
+    await handleCopy(`${email.body}`, () => toast.success("Email text copied"));
   };
 
   return (
@@ -74,7 +74,7 @@ export const SuggestedEmailCard = ({
           <Button
             className="rounded"
             variant="outline"
-            onClick={handleCopy}
+            onClick={onhandleClickCopy}
             disabled={isSending}
           >
             <Copy className="size-4" />

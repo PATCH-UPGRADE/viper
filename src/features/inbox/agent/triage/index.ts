@@ -31,16 +31,16 @@ Step 1 — Start from the exploitation evidence:
 - Not on KEV, EPSS < 0.088 (8.8%) -> Defer
 - If EPSS or CVSS is absent, pick the closest row from the strongest evidence the context does state (public exploit code, reports of active exploitation, vendor severity rating).
 
-Step 2 — Raise the result by one tier, at most, if EITHER holds for assets that are still exposed: (a) the devices perform a life-safety or direct patient-care function — life support, medication delivery, or diagnostics clinicians act on, which includes imaging review, PACS, and laboratory systems; or (b) the context states that working exploit code is publicly available.
+Step 2 — Raise the result by one tier, at most, if EITHER holds for assets that are still exposed: (a) the devices perform a life-safety or direct patient-care function — life support, medication delivery, or diagnostics clinicians act on, which includes imaging review, PACS, and laboratory systems — and the flaw could disrupt how those devices function or how patients are treated; a flaw that only exposes information does not qualify on this ground; or (b) the context states that working exploit code is publicly available and you did not already rely on that fact in Step 1.
 
-Step 3 — Lower the result by one tier, at most, only if every affected asset is confirmed unaffected or already remediated.
+Step 3 — Lower the result by one tier, at most, only if every asset in scope has been confirmed unaffected or already remediated.
 
-Step 4 — The tier you hold after Steps 1-3 is your answer. State it exactly. Never adjust it for tone, audience, or how the impact reads.
+Step 4 — The tier you hold after Steps 1-3 is your answer. Steps 1-3 already account for a KEV listing and for how severe the flaw sounds, so do not raise the tier again on those grounds, and never move more than one tier from the Step 1 row. State it exactly. Never adjust it for tone, audience, or how the impact reads.
 
 TIER MEANINGS (labels for the result above):
 - Critical: Immediate patient safety risk or active exploitation in the wild. Requires same-day action.
 - High: Significant vulnerability or recall with real exploitation potential. Requires patching or mitigation within days.
-- Monitor: Notable issue but low immediate risk; no active exploitation known. Track and plan remediation in the next maintenance cycle.
+- Monitor: Low immediate risk to this hospital — little is exposed here, even if the flaw is being exploited elsewhere. Track and plan remediation in the next maintenance cycle.
 - Defer: Informational or low-severity. No current risk; review at a scheduled interval.
 
 HOSPITAL IMPACT — return a JSON object with exactly these fields:
@@ -54,7 +54,7 @@ RULES:
 - You MUST pick exactly one priority tier — never leave it ambiguous.
 - Base every field on the notification content and the provided hospital context. Never invent device counts, CVSS/EPSS numbers, care areas, or exploitation facts — use only what the context states.
 - Factor VEX determinations into the impact you describe: assets confirmed unaffected reduce the real exposure, assets still affected or under investigation carry it. Their effect on the tier is already covered above — do not apply it twice.
-- priorityReasonWhy: 1-2 sentences naming the factor that decided the tier. Hospital staff read this too, so give the reason, never a walkthrough of the procedure: write the reason a hospital administrator would give, never a record of how you calculated it — no step numbers, no scores-then-adjustment narration, no naming of the tiers you passed through. Good: "Two of the three imaging workstations are still unpatched, and clinicians rely on this system to read diagnostic images." Bad: "CVSS 5.3 with EPSS 0.27% starts low, but the clinical role raises it one tier."`;
+- priorityReasonWhy: 1-2 sentences naming the factor that decided the tier. Hospital staff read this too, so write the reason a hospital administrator would give, never a record of how you calculated it — no step numbers, no scores-then-adjustment narration, no naming of the tiers you passed through, no internal vocabulary ("VEX", NOT_AFFECTED, UNDER_INVESTIGATION) and no database ids. Good: "Two of the three imaging workstations are still unpatched, and clinicians rely on this system to read diagnostic images." Bad: "CVSS 5.3 with EPSS 0.27% starts low, but the clinical role raises it one tier."`;
 
 function buildTextPrompt(input: {
   notificationType: string;

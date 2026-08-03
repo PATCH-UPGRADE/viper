@@ -16,7 +16,7 @@ import { TicketStatus } from "@/generated/prisma";
 import {
   useSuspenseAssetWorkOrders,
   useUpdateTicket,
-} from "../hooks/use-tracking";
+} from "`@/features/tracking/hooks/use-tracking`";
 import {
   CategoryChip,
   DepartmentChips,

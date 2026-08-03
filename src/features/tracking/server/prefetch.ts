@@ -12,3 +12,8 @@ export const prefetchTrackingTicket = (id: string) => {
   prefetch(trpc.tagColors.getCategoryColors.queryOptions());
   return prefetch(trpc.tracking.getOne.queryOptions({ id }));
 };
+
+export const prefetchAssetWorkOrders = (assetId: string) => {
+  prefetch(trpc.tagColors.getCategoryColors.queryOptions());
+  return prefetch(trpc.tracking.getManyByAssetId.queryOptions({ assetId }));
+};

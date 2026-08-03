@@ -18,12 +18,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
-import { getChipClass } from "@/features/tag-colors/palette";
 import { type NotificationChannel, TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { useSetWatching } from "../hooks/use-tracking";
 import type { TrackingTicketChildRow } from "../types";
-import { CategoryChip, statusHue, statusLabels } from "./ticket-detail/shared";
+import {
+  CategoryChip,
+  DepartmentChips,
+  StatusChip,
+} from "./ticket-detail/shared";
 
 // Icon shown in the Source column for each ingested-source channel.
 const channelIcons: Record<NotificationChannel, LucideIcon> = {
@@ -171,14 +174,7 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
     id: "status",
     accessorKey: "status",
     header: "Status",
-    cell: ({ row }) => (
-      <Badge
-        variant="outline"
-        className={getChipClass(statusHue[row.original.status])}
-      >
-        {statusLabels[row.original.status]}
-      </Badge>
-    ),
+    cell: ({ row }) => <StatusChip status={row.original.status} />,
   },
   {
     id: "category",
@@ -189,24 +185,9 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
   {
     id: "dept",
     header: "Dept",
-    cell: ({ row }) => {
-      const depts = row.original.departments;
-      if (!depts || depts.length === 0)
-        return <span className="text-muted-foreground">—</span>;
-      return (
-        <div className="flex flex-wrap gap-1">
-          {depts.map((d) => (
-            <Badge
-              key={d.id}
-              variant="outline"
-              className={getChipClass(d.color)}
-            >
-              {d.name}
-            </Badge>
-          ))}
-        </div>
-      );
-    },
+    cell: ({ row }) => (
+      <DepartmentChips departments={row.original.departments} />
+    ),
   },
   {
     id: "assignee",

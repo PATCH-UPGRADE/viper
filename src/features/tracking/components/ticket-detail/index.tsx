@@ -39,6 +39,7 @@ import { TicketEditForm } from "./edit-form";
 import { LinkedAssetsTabContent } from "./linked-assets";
 import {
   CategoryChip,
+  DepartmentChips,
   formatDate,
   formatScheduled,
   MetadataRow,
@@ -149,21 +150,7 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
               </div>
             </MetadataRow>
             <MetadataRow label="Departments">
-              {data.departments.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {data.departments.map((d) => (
-                    <Badge
-                      key={d.id}
-                      variant="outline"
-                      className={getChipClass(d.color)}
-                    >
-                      {d.name}
-                    </Badge>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-sm text-muted-foreground">—</span>
-              )}
+              <DepartmentChips departments={data.departments} />
             </MetadataRow>
             <MetadataRow label="Scheduled for">
               <div className="flex items-center gap-1.5 text-sm">

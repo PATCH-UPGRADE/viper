@@ -12,11 +12,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
-import { TicketStatus } from "@/generated/prisma";
 import {
   useSuspenseAssetWorkOrders,
   useUpdateTicket,
-} from "`@/features/tracking/hooks/use-tracking`";
+} from "@/features/tracking/hooks/use-tracking";
+import { TicketStatus } from "@/generated/prisma";
 import {
   CategoryChip,
   DepartmentChips,

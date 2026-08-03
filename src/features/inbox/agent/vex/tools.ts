@@ -60,7 +60,11 @@ const assetOverrideSchema = z.object({
       "Asset id — must be one of the asset ids listed under this issue. Only emit an override when this single asset differs from the rest of its device group.",
     ),
   status: statusSchema,
-  reasonWhy: z.string().describe("Concise justification for this asset."),
+  reasonWhy: z
+    .string()
+    .describe(
+      'Concise justification for this asset. Hospital staff read this text, so write it in plain words: name the asset by its hostname, and use no internal vocabulary (no "VEX", no status codes) and no database ids.',
+    ),
 });
 
 const issueValueSchema = z.object({
@@ -72,7 +76,9 @@ const issueValueSchema = z.object({
   reasonWhy: z
     .string()
     .nullish()
-    .describe("Concise reasoning for the group-level status, if you set one."),
+    .describe(
+      'Concise reasoning for the group-level status, if you set one. Hospital staff read this text, so write it in plain words: name devices by vendor, product and hostname, and use no internal vocabulary (no "VEX", no status codes such as NOT_AFFECTED) and no database ids.',
+    ),
   confidence: z
     .enum(["NeedsReview", "Matched"])
     .nullish()

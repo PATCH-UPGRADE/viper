@@ -119,7 +119,7 @@ export const SubTicketsSection = ({
             >
               <Link
                 href={`/tracking/${child.id}`}
-                className="flex min-w-0 flex-1 items-center gap-3 transition-[padding] group-hover:pr-8"
+                className="flex min-w-0 flex-1 items-center gap-3 transition-[padding] group-hover:pr-8 group-focus-within:pr-8"
               >
                 <SquareCheckBigIcon className="size-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium group-hover:underline">
@@ -135,7 +135,7 @@ export const SubTicketsSection = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute right-0 top-1/2 size-7 -translate-y-1/2 opacity-0 transition group-hover:opacity-100"
+                className="absolute right-0 top-1/2 size-7 -translate-y-1/2 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
                 onClick={() => detach.mutate({ ticketId: child.id })}
                 disabled={detach.isPending}
                 aria-label={`Detach ${child.summary}`}

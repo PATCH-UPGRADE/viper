@@ -8,13 +8,6 @@ import {
 } from "@/components/ui/collapsible-card";
 import { cn } from "@/lib/utils";
 
-/**
- * A collapsible section card for the Details tab. The Description, Sub-tickets,
- * Additional details, and Activity sections use it. The trigger opens and
- * closes the card. The optional `action` stays outside the trigger, on the
- * right of the header. The user can click the action without opening or closing
- * the card.
- */
 export const CollapsibleSectionCard = ({
   title,
   meta,

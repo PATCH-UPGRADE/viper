@@ -63,7 +63,7 @@ const STUB_QUESTIONS: StubQuestion[] = [
 ];
 
 export const AdditionalDetailsCard = () => (
-  <CollapsibleSectionCard title="Additional details">
+  <CollapsibleSectionCard title="Additional Details">
     <Accordion type="single" collapsible className="w-full">
       {STUB_QUESTIONS.map(({ id, icon: Icon, question, answer }) => (
         <AccordionItem key={id} value={id}>

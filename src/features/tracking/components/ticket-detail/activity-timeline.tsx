@@ -83,9 +83,18 @@ const WorkOrderCreatedBody = ({ activity }: { activity: Activity }) => {
     advisoryTitle?: string | null;
     cveId?: string | null;
     externalRecordId?: string | null;
-    category?: TicketCategory | null;
-    priority?: Priority | null;
+    category?: string | null;
+    priority?: string | null;
   };
+
+  const categoryLabel =
+    data.category && data.category in categoryLabels
+      ? categoryLabels[data.category as TicketCategory]
+      : null;
+  const priorityLabel =
+    data.priority && data.priority in priorityConfig
+      ? priorityConfig[data.priority as Priority].label
+      : null;
 
   const generatedParts: string[] = [];
   if (data.advisoryTitle) {
@@ -109,15 +118,8 @@ const WorkOrderCreatedBody = ({ activity }: { activity: Activity }) => {
           Generated from {generatedParts.join(" · ")}
         </span>
       )}
-      {data.category && (
-        <SetField label="Category" value={categoryLabels[data.category]} />
-      )}
-      {data.priority && (
-        <SetField
-          label="Priority"
-          value={priorityConfig[data.priority].label}
-        />
-      )}
+      {categoryLabel && <SetField label="Category" value={categoryLabel} />}
+      {priorityLabel && <SetField label="Priority" value={priorityLabel} />}
     </div>
   );
 };

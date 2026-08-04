@@ -546,6 +546,49 @@ describe("TicketEditForm", () => {
     const [payload] = mockMutate.mock.calls[0];
     expect(payload.assigneeId).toBe("u2");
   });
+
+  it("falls back to a remaining description tab when the active department is removed", async () => {
+    const user = userEvent.setup();
+    render(
+      <TicketEditForm
+        data={makeTicket({
+          departments: [
+            { id: "d-radio", name: "Radiology", color: "blue" },
+            { id: "d-it", name: "IT", color: "purple" },
+          ],
+          descriptions: [
+            {
+              id: "desc-radio",
+              ticketId: "ticket-1",
+              departmentId: "d-radio",
+              body: "Radiology body",
+              createdAt: new Date("2026-05-01T00:00:00Z"),
+              updatedAt: new Date("2026-05-01T00:00:00Z"),
+              department: { id: "d-radio", name: "Radiology", color: "blue" },
+            },
+            {
+              id: "desc-it",
+              ticketId: "ticket-1",
+              departmentId: "d-it",
+              body: "IT body",
+              createdAt: new Date("2026-05-01T00:00:00Z"),
+              updatedAt: new Date("2026-05-01T00:00:00Z"),
+              department: { id: "d-it", name: "IT", color: "purple" },
+            },
+          ],
+        })}
+        onCancel={() => {}}
+      />,
+    );
+
+    // Radiology is the active tab, so its textarea is visible.
+    expect(screen.getByDisplayValue("Radiology body")).toBeInTheDocument();
+
+    // Remove the active department; the tab must fall back to IT.
+    await user.click(screen.getByRole("button", { name: /remove radiology/i }));
+
+    expect(screen.getByDisplayValue("IT body")).toBeInTheDocument();
+  });
 });
 
 describe("AddCommentForm", () => {
@@ -994,6 +1037,34 @@ describe("TicketDetailContent — view mode", () => {
   it("shows 'No activity yet' when there are no comments or activities", () => {
     renderDetail();
     expect(screen.getByText(/no activity yet/i)).toBeInTheDocument();
+  });
+
+  it("omits an unknown priority in a WORK_ORDER_CREATED entry without crashing", () => {
+    renderDetail({
+      activities: [
+        {
+          id: "wc1",
+          ticketId: "ticket-1",
+          userId: "u1",
+          type: "WORK_ORDER_CREATED",
+          data: {
+            source: "Fleet",
+            category: "PATCH",
+            priority: "NOT_A_PRIORITY",
+          },
+          createdAt: new Date("2026-05-15T12:00:00Z"),
+          user: { id: "u1", name: "Alice", image: null, integrationUser: null },
+        },
+      ],
+    });
+
+    const entry = screen.getByLabelText("Activity: WORK_ORDER_CREATED");
+    expect(
+      within(entry).getByText(/created this work order/i),
+    ).toBeInTheDocument();
+    // Known category still renders; the unknown priority is omitted (no crash).
+    expect(within(entry).getByText("Category")).toBeInTheDocument();
+    expect(within(entry).queryByText("Priority")).not.toBeInTheDocument();
   });
 });
 

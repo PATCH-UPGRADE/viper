@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { priorityConfig } from "@/components/priority-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,6 +121,21 @@ export const TicketEditForm = ({
     .filter((d): d is { id: string; name: string; color: string | null } =>
       Boolean(d),
     );
+
+  // Control the description tabs so removing the active department falls back
+  // to a remaining one — an uncontrolled Tabs keeps the stale removed value and
+  // renders a blank panel.
+  const [activeDeptTab, setActiveDeptTab] = useState(
+    selectedDepartments[0]?.id,
+  );
+  useEffect(() => {
+    if (
+      selectedDepartments.length > 0 &&
+      !selectedDepartments.some((d) => d.id === activeDeptTab)
+    ) {
+      setActiveDeptTab(selectedDepartments[0].id);
+    }
+  }, [selectedDepartments, activeDeptTab]);
 
   const handleCancel = () => {
     if (
@@ -307,7 +322,7 @@ export const TicketEditForm = ({
               Add a department above to write a department-specific description.
             </p>
           ) : (
-            <Tabs defaultValue={selectedDepartments[0].id}>
+            <Tabs value={activeDeptTab} onValueChange={setActiveDeptTab}>
               <TabsList variant="line">
                 {selectedDepartments.map((d) => (
                   <TabsTrigger key={d.id} value={d.id}>

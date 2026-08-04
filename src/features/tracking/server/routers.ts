@@ -495,9 +495,9 @@ export const trackingRouter = createTRPCRouter({
         id: z.string(),
         summary: z.string().trim().min(1).max(255).optional(),
         body: z.string().max(50_000).nullish(),
-        status: z.nativeEnum(TicketStatus).optional(),
-        category: z.nativeEnum(TicketCategory).optional(),
-        priority: z.nativeEnum(Priority).optional(),
+        status: z.enum(TicketStatus).optional(),
+        category: z.enum(TicketCategory).optional(),
+        priority: z.enum(Priority).optional(),
         departmentIds: z.array(z.string()).optional(),
         descriptions: z
           .array(

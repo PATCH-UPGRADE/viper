@@ -14,14 +14,23 @@ import { FLEET_HOST } from "./constants";
  * never a data migration.
  */
 export function fleetWorkOrderDetailUrl(externalId: string): string {
-  return `https://${FLEET_HOST}/activities/${externalId}/overview`;
+  return `https://${FLEET_HOST}/activities/${encodeURIComponent(externalId)}/overview`;
 }
 
-/** Returns true when an integration URI points at Fleet. */
+/**
+ * Returns true when an integration URI points at Fleet. Parses the URI and
+ * compares its hostname exactly, so an unrelated host that merely contains the
+ * Fleet host as a substring (or a null/invalid URI) does not match.
+ */
 export function isFleetIntegrationUri(
   integrationUri: string | null | undefined,
 ): boolean {
-  return !!integrationUri && integrationUri.toLowerCase().includes(FLEET_HOST);
+  if (!integrationUri) return false;
+  try {
+    return new URL(integrationUri).hostname.toLowerCase() === FLEET_HOST;
+  } catch {
+    return false;
+  }
 }
 
 /**

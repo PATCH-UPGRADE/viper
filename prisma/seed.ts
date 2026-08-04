@@ -2218,6 +2218,11 @@ async function seedVendors() {
     },
   });
 
+  // Rebuilt rather than upserted: neither model has a natural unique key, so a
+  // re-seed without SEED_CLEAR_DB would otherwise stack duplicates every run.
+  await prisma.contract.deleteMany({ where: { vendorId: vendor.id } });
+  await prisma.vendorContact.deleteMany({ where: { vendorId: vendor.id } });
+
   await prisma.vendorContact.createMany({
     data: [
       {
@@ -2235,7 +2240,6 @@ async function seedVendors() {
         email: "marcus.feld@example-siemens.test",
       },
     ],
-    skipDuplicates: true,
   });
 
   const assets = await prisma.asset.findMany({

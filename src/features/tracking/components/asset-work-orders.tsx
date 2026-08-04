@@ -17,10 +17,10 @@ import {
   useUpdateTicket,
 } from "@/features/tracking/hooks/use-tracking";
 import { TicketStatus } from "@/generated/prisma";
+import { formatScheduled } from "@/lib/date-utils";
 import {
   CategoryChip,
   DepartmentChips,
-  formatScheduled,
   StatusChip,
 } from "./ticket-detail/shared";
 

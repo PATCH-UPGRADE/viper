@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { priorityConfig } from "@/components/priority-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { getChipClass } from "@/features/tag-colors/palette";
-import type { TicketCategory, TicketStatus } from "@/generated/prisma";
+import type {
+  Priority,
+  TicketCategory,
+  TicketStatus,
+} from "@/generated/prisma";
 import { useBeforeUnload } from "@/hooks/use-before-unload";
 import {
   useAssignableUsers,
@@ -37,8 +42,10 @@ const toDateTimeLocal = (date: Date | string | null | undefined) => {
 
 type EditState = {
   summary: string;
+  body: string;
   status: TicketStatus;
   category: TicketCategory;
+  priority: Priority;
   departmentIds: string[];
   // Keyed by departmentId so a department with no description yet still has a
   // tab to type into.
@@ -49,8 +56,10 @@ type EditState = {
 
 const buildEditState = (data: TicketDetail): EditState => ({
   summary: data.summary,
+  body: data.body ?? "",
   status: data.status,
   category: data.category,
+  priority: data.priority,
   departmentIds: data.departments.map((d) => d.id),
   descriptionsByDept: Object.fromEntries(
     data.descriptions.map((d) => [d.departmentId, d.body]),
@@ -113,6 +122,21 @@ export const TicketEditForm = ({
       Boolean(d),
     );
 
+  // Control the description tabs so removing the active department falls back
+  // to a remaining one — an uncontrolled Tabs keeps the stale removed value and
+  // renders a blank panel.
+  const [activeDeptTab, setActiveDeptTab] = useState(
+    selectedDepartments[0]?.id,
+  );
+  useEffect(() => {
+    if (
+      selectedDepartments.length > 0 &&
+      !selectedDepartments.some((d) => d.id === activeDeptTab)
+    ) {
+      setActiveDeptTab(selectedDepartments[0].id);
+    }
+  }, [selectedDepartments, activeDeptTab]);
+
   const handleCancel = () => {
     if (
       isDirty &&
@@ -136,8 +160,10 @@ export const TicketEditForm = ({
       {
         id: data.id,
         summary: trimmedSummary,
+        body: form.body.trim() || null,
         status: form.status,
         category: form.category,
+        priority: form.priority,
         departmentIds: form.departmentIds,
         descriptions,
         assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
@@ -170,6 +196,27 @@ export const TicketEditForm = ({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ticket-priority">Priority</Label>
+            <Select
+              value={form.priority}
+              onValueChange={(v) =>
+                setForm((f) => ({ ...f, priority: v as Priority }))
+              }
+            >
+              <SelectTrigger id="ticket-priority">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(priorityConfig) as Priority[]).map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {priorityConfig[p].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="flex flex-col gap-2">
             <Label htmlFor="ticket-assignee">Assignee</Label>
             <Select
@@ -255,51 +302,65 @@ export const TicketEditForm = ({
         </div>
       </div>
 
-      <div className="rounded-lg border bg-background p-4 flex flex-col gap-2">
-        <Label>Descriptions</Label>
-        {selectedDepartments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Add a department above to write a description.
-          </p>
-        ) : (
-          <Tabs defaultValue={selectedDepartments[0].id}>
-            <TabsList variant="line">
-              {selectedDepartments.map((d) => (
-                <TabsTrigger key={d.id} value={d.id}>
-                  <Badge variant="outline" className={getChipClass(d.color)}>
-                    {d.name}
-                  </Badge>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {selectedDepartments.map((d) => {
-              const inputId = `ticket-description-${d.id}`;
-              return (
-                <TabsContent key={d.id} value={d.id} className="mt-3">
-                  <Label htmlFor={inputId} className="sr-only">
-                    {d.name} description
-                  </Label>
-                  <Textarea
-                    id={inputId}
-                    value={form.descriptionsByDept[d.id] ?? ""}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        descriptionsByDept: {
-                          ...f.descriptionsByDept,
-                          [d.id]: e.target.value,
-                        },
-                      }))
-                    }
-                    rows={6}
-                    maxLength={10_000}
-                    placeholder={`What does ${d.name} need to know about this ticket?`}
-                  />
-                </TabsContent>
-              );
-            })}
-          </Tabs>
-        )}
+      <div className="rounded-lg border bg-background p-4 flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="ticket-body">Description</Label>
+          <Textarea
+            id="ticket-body"
+            value={form.body}
+            onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+            rows={6}
+            maxLength={50_000}
+            placeholder="General description of this work order"
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label>Department descriptions</Label>
+          {selectedDepartments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Add a department above to write a department-specific description.
+            </p>
+          ) : (
+            <Tabs value={activeDeptTab} onValueChange={setActiveDeptTab}>
+              <TabsList variant="line">
+                {selectedDepartments.map((d) => (
+                  <TabsTrigger key={d.id} value={d.id}>
+                    <Badge variant="outline" className={getChipClass(d.color)}>
+                      {d.name}
+                    </Badge>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {selectedDepartments.map((d) => {
+                const inputId = `ticket-description-${d.id}`;
+                return (
+                  <TabsContent key={d.id} value={d.id} className="mt-3">
+                    <Label htmlFor={inputId} className="sr-only">
+                      {d.name} description
+                    </Label>
+                    <Textarea
+                      id={inputId}
+                      value={form.descriptionsByDept[d.id] ?? ""}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          descriptionsByDept: {
+                            ...f.descriptionsByDept,
+                            [d.id]: e.target.value,
+                          },
+                        }))
+                      }
+                      rows={6}
+                      maxLength={10_000}
+                      placeholder={`What does ${d.name} need to know about this ticket?`}
+                    />
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

@@ -130,6 +130,9 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   comments: [],
   watchers: [],
   activities: [],
+  sources: [],
+  externalMappings: [],
+  notification: null,
   ...overrides,
 });
 
@@ -1521,7 +1524,7 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     // tool-call id so a concurrent accept can't file a second order.
     const claim = mockPrisma.workOrderTicket.create.mock.calls[0][0].data;
     expect(claim.chatToolCallId).toBe("call_abc");
-    expect(claim.sourceLabel).toBe("Siemens Healthineers Fleet");
+    expect(claim.sourceLabel).toBe("Siemens Healthineers teamplay Fleet");
     expect(claim.assets).toEqual({ connect: [{ id: MRI.assetId }] });
 
     // The mapping is attached after Fleet accepts — this is what makes the next

@@ -7,12 +7,13 @@ import {
   CpuIcon,
   ExternalLink,
   HeartIcon,
+  HomeIcon,
   InboxIcon,
+  LayoutGridIcon,
   ListChecksIcon,
   type LucideIcon,
   PlugIcon,
   SettingsIcon,
-  ShieldAlertIcon,
   Sparkles,
   WorkflowIcon,
 } from "lucide-react";
@@ -32,6 +33,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -49,12 +51,31 @@ import { ResourceType } from "@/generated/prisma";
 import { NavUser } from "./nav-user";
 import { Separator } from "./ui/separator";
 
-const mainItems = [
+type NavItem = {
+  title: string;
+  icon: LucideIcon;
+  url: string;
+};
+
+const homeItems: NavItem[] = [
+  {
+    title: "Overview",
+    icon: LayoutGridIcon,
+    url: "/overview",
+  },
   {
     title: "Inbox",
     icon: InboxIcon,
     url: "/inbox",
   },
+  {
+    title: "Work Orders",
+    icon: ListChecksIcon,
+    url: "/tracking",
+  },
+];
+
+const mainItems: NavItem[] = [
   {
     title: "Workflows",
     icon: WorkflowIcon,
@@ -77,16 +98,32 @@ const mainItems = [
     url: "/vulnerabilities",
   },
   {
-    title: "Work Orders",
-    icon: ListChecksIcon,
-    url: "/tracking",
-  },
-  {
     title: "Settings",
     icon: SettingsIcon,
     url: "/settings",
   },
 ];
+
+const SidebarNavItem = ({ item }: { item: NavItem }) => {
+  const pathname = usePathname();
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        tooltip={item.title}
+        isActive={
+          item.url === "/" ? pathname === "/" : pathname.startsWith(item.url)
+        }
+        asChild
+        className="gap-x-4 h-10 px-4"
+      >
+        <Link href={item.url} prefetch>
+          <item.icon className="size-4" aria-hidden="true" />
+          <span>{item.title}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+};
 
 interface ConnectorSidebarEntry {
   title: string;
@@ -161,26 +198,23 @@ export const AppSidebar = () => {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
+          <SidebarGroupContent className="rounded-lg border bg-sidebar-accent/40 p-1">
+            <SidebarGroupLabel className="gap-x-2 px-3">
+              <HomeIcon className="size-4" aria-hidden="true" />
+              <span>Home</span>
+            </SidebarGroupLabel>
+            <SidebarMenu>
+              {homeItems.map((item) => (
+                <SidebarNavItem key={item.title} item={item} />
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    tooltip={item.title}
-                    isActive={
-                      item.url === "/"
-                        ? pathname === "/"
-                        : pathname.startsWith(item.url)
-                    }
-                    asChild
-                    className="gap-x-4 h-10 px-4"
-                  >
-                    <Link href={item.url} prefetch>
-                      <item.icon className="size-4" aria-hidden="true" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <SidebarNavItem key={item.title} item={item} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>

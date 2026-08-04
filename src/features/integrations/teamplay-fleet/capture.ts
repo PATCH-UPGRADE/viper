@@ -1,3 +1,5 @@
+import { launchHeadlessBrowser } from "@/lib/headless-browser";
+
 export interface SessionLoginConfig {
   welcomeUrl: string;
   cookieBannerAcceptSelector?: string; // there is a cookie setting overlay on the very first login
@@ -16,21 +18,6 @@ export interface CapturedSession {
   expiresAt: Date | null;
 }
 
-async function launchBrowser() {
-  const { chromium } = await import("playwright-core");
-
-  // production use. It is a known issue that playwright-core doesn't work with vercel in deployed environment.
-  if (process.env.VERCEL) {
-    const { default: sparticuzChromium } = await import("@sparticuz/chromium");
-    return chromium.launch({
-      executablePath: await sparticuzChromium.executablePath(),
-      args: sparticuzChromium.args,
-      headless: true,
-    });
-  }
-  return chromium.launch({ headless: true }); // playwright-core
-}
-
 export async function grabSessionCookie(
   config: SessionLoginConfig,
   userName: string,
@@ -40,7 +27,7 @@ export async function grabSessionCookie(
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxAttempt; attempt++) {
-    const browser = await launchBrowser();
+    const browser = await launchHeadlessBrowser();
 
     try {
       const context = await browser.newContext();

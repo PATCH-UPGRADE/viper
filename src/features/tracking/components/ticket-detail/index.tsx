@@ -1,14 +1,7 @@
 "use client";
 
-import {
-  CalendarIcon,
-  ClockIcon,
-  EyeIcon,
-  EyeOffIcon,
-  PencilIcon,
-  SlashIcon,
-  UserIcon,
-} from "lucide-react";
+import { EyeIcon, EyeOffIcon, PencilIcon, SlashIcon } from "lucide-react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { useEffect, useState } from "react";
 import {
   EntityContainer,
@@ -25,27 +18,20 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
-import { getChipClass } from "@/features/tag-colors/palette";
 import {
   useMarkTicketSeen,
   useSetWatching,
   useSuspenseTrackingTicket,
 } from "../../hooks/use-tracking";
 import { ActivityTimeline } from "./activity-timeline";
+import { AdditionalDetailsCard } from "./additional-details-card";
+import { DescriptionCard } from "./description-card";
 import { TicketEditForm } from "./edit-form";
 import { LinkedAssetsTabContent } from "./linked-assets";
-import {
-  CategoryChip,
-  formatDate,
-  formatScheduled,
-  MetadataRow,
-  Section,
-  statusHue,
-  statusLabels,
-} from "./shared";
+import { OverviewCard } from "./overview-card";
+import { RawJsonListCard } from "./raw-json-list-card";
 import { SubTicketsSection } from "./sub-tickets";
 
 // Re-exports so existing import sites (`./ticket-detail`) keep working.
@@ -54,11 +40,31 @@ export { DepartmentMultiSelect } from "./department-multi-select";
 export { TicketEditForm } from "./edit-form";
 export { LinkedAssetsTable } from "./linked-assets-table";
 
+const TAB_VALUES = [
+  "details",
+  "assets",
+  "remediations",
+  "vulnerabilities",
+] as const;
+
+const TabCount = ({ n }: { n: number }) => (
+  <Badge
+    variant="secondary"
+    className="ml-1.5 h-5 min-w-5 justify-center rounded-full px-1.5 text-xs font-semibold"
+  >
+    {n}
+  </Badge>
+);
+
 export const TicketDetailContent = ({ id }: { id: string }) => {
   const { data } = useSuspenseTrackingTicket(id);
   const [isEditing, setIsEditing] = useState(false);
   const setWatching = useSetWatching();
   const { mutate: markSeen } = useMarkTicketSeen();
+  const [tab, setTab] = useQueryState(
+    "tab",
+    parseAsStringLiteral(TAB_VALUES).withDefault("details"),
+  );
 
   // Viewing a ticket marks its comments as seen for the current user, clearing
   // the unread-comments indicator. Upserts on (userId, ticketId) per mount.
@@ -99,14 +105,19 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
           </Breadcrumb>
 
           <div className="flex items-start gap-3">
-            <h1 className="text-xl md:text-2xl font-semibold flex-1 min-w-0">
+            <h1 className="min-w-0 flex-1 text-xl font-semibold md:text-2xl">
               {data.summary}
             </h1>
             {!isEditing && (
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
-                  variant={data.isWatching ? "secondary" : "outline"}
+                  variant="outline"
+                  className={
+                    data.isWatching
+                      ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-400 dark:hover:bg-amber-950/60"
+                      : undefined
+                  }
                   disabled={setWatching.isPending}
                   aria-pressed={data.isWatching}
                   onClick={() =>
@@ -140,124 +151,41 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
       {isEditing ? (
         <TicketEditForm data={data} onCancel={() => setIsEditing(false)} />
       ) : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 rounded-lg border bg-background p-4">
-            <MetadataRow label="Assignee">
-              <div className="flex items-center gap-1.5 text-sm">
-                <UserIcon className="size-3.5 text-muted-foreground" />
-                {data.assignee?.name ?? "Unassigned"}
-              </div>
-            </MetadataRow>
-            <MetadataRow label="Departments">
-              {data.departments.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {data.departments.map((d) => (
-                    <Badge
-                      key={d.id}
-                      variant="outline"
-                      className={getChipClass(d.color)}
-                    >
-                      {d.name}
-                    </Badge>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-sm text-muted-foreground">—</span>
-              )}
-            </MetadataRow>
-            <MetadataRow label="Scheduled for">
-              <div className="flex items-center gap-1.5 text-sm">
-                <CalendarIcon className="size-3.5 text-muted-foreground" />
-                {formatScheduled(data.scheduledAt) ?? "—"}
-              </div>
-            </MetadataRow>
-            <MetadataRow label="Created">
-              <div className="flex items-center gap-1.5 text-sm">
-                <ClockIcon className="size-3.5 text-muted-foreground" />
-                {formatDate(data.createdAt)}
-              </div>
-            </MetadataRow>
-            <MetadataRow label="Category">
-              <CategoryChip category={data.category} />
-            </MetadataRow>
-            <MetadataRow label="Status">
-              <Badge
-                variant="outline"
-                className={getChipClass(statusHue[data.status])}
-              >
-                {statusLabels[data.status]}
-              </Badge>
-            </MetadataRow>
-          </div>
-
-          {(data.descriptions.length > 0 || data.body) && (
-            <div className="rounded-lg border bg-background p-4">
-              <Section title="Descriptions">
-                <Tabs
-                  defaultValue={
-                    data.descriptions[0]?.department.id ?? "original-email"
-                  }
-                >
-                  <TabsList variant="line">
-                    {data.descriptions.map((d) => (
-                      <TabsTrigger key={d.id} value={d.department.id}>
-                        <Badge
-                          variant="outline"
-                          className={getChipClass(d.department.color)}
-                        >
-                          {d.department.name}
-                        </Badge>
-                      </TabsTrigger>
-                    ))}
-                    {data.body && (
-                      <TabsTrigger value="original-email">
-                        <Badge variant="outline">Original Email</Badge>
-                      </TabsTrigger>
-                    )}
-                  </TabsList>
-                  {data.descriptions.map((d) => (
-                    <TabsContent
-                      key={d.id}
-                      value={d.department.id}
-                      className="mt-4"
-                    >
-                      <div className="text-sm">
-                        <MarkdownWithTablesWrapper>
-                          {d.body}
-                        </MarkdownWithTablesWrapper>
-                      </div>
-                    </TabsContent>
-                  ))}
-                  {data.body && (
-                    <TabsContent value="original-email" className="mt-4">
-                      <div className="text-sm">
-                        <MarkdownWithTablesWrapper>
-                          {data.body}
-                        </MarkdownWithTablesWrapper>
-                      </div>
-                    </TabsContent>
-                  )}
-                </Tabs>
-              </Section>
-            </div>
-          )}
-        </>
-      )}
-
-      <SubTicketsSection parentId={data.id} childTickets={data.children} />
-
-      <div className="rounded-lg border bg-background p-4">
-        <Tabs defaultValue="assets">
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as (typeof TAB_VALUES)[number])}
+        >
           <TabsList variant="line">
+            <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="assets">
-              <span className="font-semibold">
-                Linked Assets ({data.assets.length})
-              </span>
+              Assets
+              <TabCount n={data.assets.length} />
             </TabsTrigger>
-            <TabsTrigger value="files">
-              <span className="font-semibold">Linked Files (0)</span>
+            <TabsTrigger value="remediations">
+              Remediations
+              <TabCount n={data.remediations.length} />
+            </TabsTrigger>
+            <TabsTrigger value="vulnerabilities">
+              Vulnerabilities
+              <TabCount n={data.vulnerabilities.length} />
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="details" className="mt-4 flex flex-col gap-4">
+            <OverviewCard data={data} />
+            <DescriptionCard data={data} />
+            <SubTicketsSection
+              parentId={data.id}
+              childTickets={data.children}
+            />
+            <AdditionalDetailsCard />
+            <ActivityTimeline
+              ticketId={data.id}
+              comments={data.comments}
+              activities={data.activities}
+            />
+          </TabsContent>
+
           <TabsContent value="assets" className="mt-4">
             <LinkedAssetsTabContent
               ticketId={data.id}
@@ -265,19 +193,22 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
               remediations={data.remediations}
             />
           </TabsContent>
-          <TabsContent value="files" className="mt-4">
-            <p className="text-sm text-muted-foreground">
-              No files linked to this ticket.
-            </p>
+
+          <TabsContent value="remediations" className="mt-4">
+            <RawJsonListCard
+              items={data.remediations}
+              emptyMessage="No remediations linked to this work order."
+            />
+          </TabsContent>
+
+          <TabsContent value="vulnerabilities" className="mt-4">
+            <RawJsonListCard
+              items={data.vulnerabilities}
+              emptyMessage="No vulnerabilities linked to this work order."
+            />
           </TabsContent>
         </Tabs>
-      </div>
-
-      <ActivityTimeline
-        ticketId={data.id}
-        comments={data.comments}
-        activities={data.activities}
-      />
+      )}
     </EntityContainer>
   );
 };

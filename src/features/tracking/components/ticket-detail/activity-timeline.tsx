@@ -1,30 +1,26 @@
 "use client";
 
-import { format, formatDistanceToNow } from "date-fns";
-import {
-  ArrowRightIcon,
-  BoxIcon,
-  BuildingIcon,
-  CalendarIcon,
-  GitBranchIcon,
-  HistoryIcon,
-  MessageSquareIcon,
-  PencilIcon,
-  TagIcon,
-  UserIcon,
-} from "lucide-react";
+import { format } from "date-fns";
+import { BotIcon, PlusIcon } from "lucide-react";
+import { useState } from "react";
+import { priorityConfig } from "@/components/priority-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { getChipClass } from "@/features/tag-colors/palette";
-import type { TicketCategory, TicketStatus } from "@/generated/prisma";
+import type {
+  Priority,
+  TicketCategory,
+  TicketStatus,
+} from "@/generated/prisma";
 import type { TicketDetail } from "../../types";
 import { AddCommentForm } from "./add-comment-form";
+import { CollapsibleSectionCard } from "./section-card";
 import {
   categoryLabels,
   formatDate,
-  Section,
-  statusHue,
-  statusLabels,
+  formatScheduled,
+  StatusChip,
 } from "./shared";
 
 type Comment = TicketDetail["comments"][number];
@@ -43,61 +39,100 @@ const initialsOf = (name?: string | null) =>
     .join("")
     .toUpperCase();
 
-const relativeTime = (date: Date | string) =>
-  formatDistanceToNow(date instanceof Date ? date : new Date(date), {
-    addSuffix: true,
-  });
+const isAgentUser = (user: Activity["user"]) => !!user.integrationUser;
 
-const absoluteTime = (date: Date | string) =>
-  format(
-    date instanceof Date ? date : new Date(date),
-    "MMM d, yyyy 'at' h:mm a",
+// Automation actors (integration users) surface under one identity rather than
+// the specific integration's user name (e.g. "Siemens Healthineers ... Fleet").
+const AGENT_DISPLAY_NAME = "VIPER";
+const actorName = (user: Activity["user"]) =>
+  isAgentUser(user) ? AGENT_DISPLAY_NAME : user.name;
+
+const SetField = ({ label, value }: { label: string; value: string }) => (
+  <span>
+    <span className="font-medium text-foreground">{label}</span> was set to{" "}
+    <span className="font-medium text-foreground">{value}</span>
+  </span>
+);
+
+const AgentBadge = () => (
+  <Badge
+    variant="secondary"
+    className="px-1.5 py-0 text-[10px] font-semibold uppercase tracking-wide"
+  >
+    AI Agent
+  </Badge>
+);
+
+const ActorAvatar = ({ user }: { user: Activity["user"] }) =>
+  isAgentUser(user) ? (
+    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+      <BotIcon className="size-4" />
+    </span>
+  ) : (
+    <Avatar className="size-8 shrink-0 border">
+      {user.image && <AvatarImage src={user.image} alt={user.name ?? ""} />}
+      <AvatarFallback className="bg-accent text-accent-foreground text-xs">
+        {initialsOf(user.name)}
+      </AvatarFallback>
+    </Avatar>
   );
 
-const activityIcon = (type: Activity["type"]) => {
-  switch (type) {
-    case "STATUS_CHANGED":
-    case "CATEGORY_CHANGED":
-      return TagIcon;
-    case "ASSIGNEE_CHANGED":
-      return UserIcon;
-    case "DEPARTMENTS_CHANGED":
-      return BuildingIcon;
-    case "SCHEDULED_AT_CHANGED":
-      return CalendarIcon;
-    case "SUMMARY_CHANGED":
-    case "DESCRIPTION_CHANGED":
-      return PencilIcon;
-    case "CHILD_ATTACHED":
-    case "CHILD_DETACHED":
-      return GitBranchIcon;
-    case "ASSET_ATTACHED":
-    case "ASSET_DETACHED":
-      return BoxIcon;
+const WorkOrderCreatedBody = ({ activity }: { activity: Activity }) => {
+  const data = activity.data as {
+    source?: string | null;
+    advisoryTitle?: string | null;
+    cveId?: string | null;
+    externalRecordId?: string | null;
+    category?: TicketCategory | null;
+    priority?: Priority | null;
+  };
+
+  const generatedParts: string[] = [];
+  if (data.advisoryTitle) {
+    generatedParts.push(
+      `advisory ${data.advisoryTitle}${data.cveId ? ` (${data.cveId})` : ""}`,
+    );
   }
+  if (data.externalRecordId) {
+    generatedParts.push(
+      `${data.source ?? "external"} record ${data.externalRecordId}`,
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-foreground">
+        Created this work order{data.source ? ` from ${data.source}` : ""}
+      </span>
+      {generatedParts.length > 0 && (
+        <span className="text-xs">
+          Generated from {generatedParts.join(" · ")}
+        </span>
+      )}
+      {data.category && (
+        <SetField label="Category" value={categoryLabels[data.category]} />
+      )}
+      {data.priority && (
+        <SetField
+          label="Priority"
+          value={priorityConfig[data.priority].label}
+        />
+      )}
+    </div>
+  );
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: activity.data is a Json blob with type-specific shape
-const renderActivityTagline = (a: Activity): React.ReactNode => {
+const renderActivity = (a: Activity): React.ReactNode => {
   const data = a.data as any;
   switch (a.type) {
+    case "WORK_ORDER_CREATED":
+      return <WorkOrderCreatedBody activity={a} />;
     case "STATUS_CHANGED":
       return (
         <>
-          changed status from{" "}
-          <Badge
-            variant="outline"
-            className={getChipClass(statusHue[data.from as TicketStatus])}
-          >
-            {statusLabels[data.from as TicketStatus]}
-          </Badge>{" "}
-          to{" "}
-          <Badge
-            variant="outline"
-            className={getChipClass(statusHue[data.to as TicketStatus])}
-          >
-            {statusLabels[data.to as TicketStatus]}
-          </Badge>
+          changed status from <StatusChip status={data.from as TicketStatus} />{" "}
+          to <StatusChip status={data.to as TicketStatus} />
         </>
       );
     case "CATEGORY_CHANGED":
@@ -189,17 +224,19 @@ const renderActivityTagline = (a: Activity): React.ReactNode => {
     case "DESCRIPTION_CHANGED": {
       const dept = data.department as
         | { id: string; name: string; color: string | null }
+        | null
         | undefined;
-      const verb =
+      const action =
         !data.from && data.to
-          ? "added a description for"
+          ? "added"
           : data.from && !data.to
-            ? "removed the description for"
-            : "edited the description for";
-      if (!dept) return <>{verb} a department</>;
+            ? "removed"
+            : "edited";
+      // No department → the general/original description.
+      if (!dept) return <>{action} the description</>;
       return (
         <>
-          {verb}{" "}
+          {action} the description for{" "}
           <Badge variant="outline" className={getChipClass(dept.color)}>
             {dept.name}
           </Badge>
@@ -245,44 +282,56 @@ const renderActivityTagline = (a: Activity): React.ReactNode => {
   }
 };
 
-const ActivityRow = ({ activity }: { activity: Activity }) => {
-  const Icon = activityIcon(activity.type);
-  return (
-    <li
-      className="flex items-start gap-3 text-sm"
-      aria-label={`Activity: ${activity.type}`}
-    >
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full border bg-muted/40 text-muted-foreground">
-        <Icon className="size-3.5" />
-      </span>
-      <div className="flex flex-col min-w-0 flex-1 pt-1.5 gap-0.5">
-        <div className="flex flex-wrap items-center gap-1.5 text-foreground">
-          <span className="font-semibold">{activity.user.name}</span>
-          <span className="text-muted-foreground">
-            {renderActivityTagline(activity)}
-          </span>
-        </div>
-        <span
-          className="text-xs text-muted-foreground"
-          title={absoluteTime(activity.createdAt)}
-        >
-          {relativeTime(activity.createdAt)}
+const TimelineConnector = () => (
+  <span
+    aria-hidden
+    className="-bottom-4 -translate-x-1/2 absolute top-8 left-4 w-px bg-border"
+  />
+);
+
+const ActivityRow = ({
+  activity,
+  isLast,
+}: {
+  activity: Activity;
+  isLast: boolean;
+}) => (
+  <li
+    className="relative flex items-start gap-3 text-sm"
+    aria-label={`Activity: ${activity.type}`}
+  >
+    {!isLast && <TimelineConnector />}
+    <ActorAvatar user={activity.user} />
+    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        <span className="font-semibold">{actorName(activity.user)}</span>
+        {isAgentUser(activity.user) && <AgentBadge />}
+        <span className="text-xs text-muted-foreground">
+          {formatScheduled(activity.createdAt, "·")}
         </span>
       </div>
-    </li>
-  );
-};
+      <div className="text-muted-foreground">{renderActivity(activity)}</div>
+    </div>
+  </li>
+);
 
-const CommentRow = ({ comment }: { comment: Comment }) => (
-  <li className="flex gap-3" aria-label="Comment">
-    <Avatar className="size-8 shrink-0">
+const CommentRow = ({
+  comment,
+  isLast,
+}: {
+  comment: Comment;
+  isLast: boolean;
+}) => (
+  <li className="relative flex gap-3" aria-label="Comment">
+    {!isLast && <TimelineConnector />}
+    <Avatar className="size-8 shrink-0 border">
       {comment.author.image && (
         <AvatarImage
           src={comment.author.image}
           alt={comment.author.name ?? ""}
         />
       )}
-      <AvatarFallback className="text-xs">
+      <AvatarFallback className="bg-accent text-accent-foreground text-xs">
         {initialsOf(comment.author.name)}
       </AvatarFallback>
     </Avatar>
@@ -326,41 +375,58 @@ export const ActivityTimeline = ({
       createdAt: new Date(row.createdAt),
       row,
     })),
-  ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    // Newest first.
+  ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  const [showComment, setShowComment] = useState(false);
 
   return (
-    <div className="rounded-lg border bg-background p-4">
-      <Section
-        title={
-          <span className="flex items-center gap-1.5">
-            <HistoryIcon className="size-3.5" /> Activity
-            <span className="text-muted-foreground font-normal">
-              <MessageSquareIcon className="inline size-3" aria-hidden="true" />{" "}
-              {comments.length}{" "}
-              <ArrowRightIcon
-                className="inline size-3 mx-0.5"
-                aria-hidden="true"
-              />{" "}
-              {activities.length} change{activities.length === 1 ? "" : "s"}
-            </span>
-          </span>
-        }
-      >
+    <CollapsibleSectionCard
+      title="Activity"
+      meta={`${entries.length} event${entries.length === 1 ? "" : "s"}`}
+      action={
+        !showComment && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowComment(true)}
+          >
+            <PlusIcon className="size-3.5" />
+            Add comment
+          </Button>
+        )
+      }
+    >
+      <div className="flex flex-col gap-4">
+        {showComment && (
+          <AddCommentForm
+            ticketId={ticketId}
+            onCancel={() => setShowComment(false)}
+            onSubmitted={() => setShowComment(false)}
+          />
+        )}
         {entries.length > 0 ? (
           <ul className="flex flex-col gap-4">
-            {entries.map((entry) =>
+            {entries.map((entry, i) =>
               entry.kind === "activity" ? (
-                <ActivityRow key={`a-${entry.row.id}`} activity={entry.row} />
+                <ActivityRow
+                  key={`a-${entry.row.id}`}
+                  activity={entry.row}
+                  isLast={i === entries.length - 1}
+                />
               ) : (
-                <CommentRow key={`c-${entry.row.id}`} comment={entry.row} />
+                <CommentRow
+                  key={`c-${entry.row.id}`}
+                  comment={entry.row}
+                  isLast={i === entries.length - 1}
+                />
               ),
             )}
           </ul>
         ) : (
           <p className="text-sm text-muted-foreground">No activity yet.</p>
         )}
-        <AddCommentForm ticketId={ticketId} />
-      </Section>
-    </div>
+      </div>
+    </CollapsibleSectionCard>
   );
 };

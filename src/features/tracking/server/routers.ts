@@ -17,6 +17,7 @@ import {
   UnmanagedAssetsError,
 } from "@/features/integrations/teamplay-fleet/tracking";
 import {
+  Priority,
   type Prisma,
   ResourceType,
   TicketCategory,
@@ -55,6 +56,7 @@ import {
 import {
   recordAssetActivity,
   recordChildActivity,
+  recordCreationActivity,
   recordUpdateActivities,
   snapshotBeforeUpdate,
 } from "./activities";
@@ -401,8 +403,10 @@ export const trackingRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         summary: z.string().trim().min(1).max(255).optional(),
+        body: z.string().max(50_000).nullish(),
         status: z.nativeEnum(TicketStatus).optional(),
         category: z.nativeEnum(TicketCategory).optional(),
+        priority: z.nativeEnum(Priority).optional(),
         departmentIds: z.array(z.string()).optional(),
         descriptions: z
           .array(
@@ -1097,6 +1101,22 @@ export const trackingRouter = createTRPCRouter({
         }
       });
 
+      try {
+        const childIds = isMulti
+          ? (
+              await prisma.workOrderTicket.findMany({
+                where: { parentId: root.id },
+                select: { id: true },
+              })
+            ).map((c) => c.id)
+          : [];
+        await Promise.all(
+          [root.id, ...childIds].map((id) => recordCreationActivity(id)),
+        );
+      } catch (error) {
+        console.error("recordCreationActivity (fleet) failed", error);
+      }
+
       return {
         ticketId: root.id,
         externalIds: filed.map(({ result }) => result.externalId),
@@ -1167,6 +1187,7 @@ export const trackingRouter = createTRPCRouter({
               artifactsData: undefined,
             };
           },
+          onItemCreated: (id) => recordCreationActivity(id),
         },
         input,
         userId,

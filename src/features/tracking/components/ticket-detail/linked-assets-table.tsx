@@ -2,6 +2,7 @@
 
 import { XIcon } from "lucide-react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -11,13 +12,70 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { getChipClass } from "@/features/tag-colors/palette";
+import type { AssetStatus } from "@/generated/prisma";
 import { matchingAppliesToDeviceGroup } from "@/lib/device-matching";
+import { cn } from "@/lib/utils";
 import {
   type DetailAsset,
   type DetailRemediation,
   formatLocation,
-  truncate,
 } from "./shared";
+
+const EM_DASH = "—";
+
+// Renders a cell value clamped to two lines. On hover, a tooltip shows the full
+// value. Empty values (or the em-dash placeholder) render as a muted dash with
+// no tooltip.
+const ClampedCell = ({
+  text,
+  maxWidthClass = "max-w-[10rem]",
+}: {
+  text: string | null | undefined;
+  maxWidthClass?: string;
+}) => {
+  const value = text?.trim();
+  if (!value || value === EM_DASH) {
+    return <span className="text-muted-foreground">{EM_DASH}</span>;
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          className={cn(
+            "line-clamp-2 cursor-default whitespace-normal",
+            maxWidthClass,
+          )}
+        >
+          {value}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs whitespace-pre-wrap">
+        {value}
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
+const assetStatusHue: Record<AssetStatus, string> = {
+  Active: "green",
+  Maintenance: "yellow",
+  Decommissioned: "gray",
+};
+
+const AssetStatusBadge = ({ status }: { status: AssetStatus | null }) => {
+  if (!status) return <span className="text-muted-foreground">—</span>;
+  return (
+    <Badge variant="outline" className={getChipClass(assetStatusHue[status])}>
+      {status}
+    </Badge>
+  );
+};
 
 export const LinkedAssetsTable = ({
   assets,
@@ -44,12 +102,14 @@ export const LinkedAssetsTable = ({
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead>Asset ID</TableHead>
           <TableHead>Role</TableHead>
           <TableHead>Model</TableHead>
           <TableHead>IP Address</TableHead>
           <TableHead>MAC Address</TableHead>
           <TableHead>Location</TableHead>
           <TableHead>Remediation</TableHead>
+          <TableHead>Status</TableHead>
           {onDetach && <TableHead className="w-10" />}
         </TableRow>
       </TableHeader>
@@ -69,31 +129,37 @@ export const LinkedAssetsTable = ({
               <TableCell>
                 <Link
                   href={`/assets/${a.id}`}
-                  className="text-sm hover:underline"
+                  className="font-mono text-xs font-medium text-primary hover:underline"
                 >
-                  {a.role ?? "—"}
+                  {a.hostname ?? a.id.slice(0, 8)}
                 </Link>
               </TableCell>
-              <TableCell className="text-sm">{model || "—"}</TableCell>
+              <TableCell className="text-sm">
+                <ClampedCell text={a.role} />
+              </TableCell>
+              <TableCell className="text-sm">
+                <ClampedCell text={model} />
+              </TableCell>
               <TableCell className="font-mono text-xs">{a.ip}</TableCell>
               <TableCell className="font-mono text-xs">
                 {a.macAddress ?? "—"}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
-                {formatLocation(a.location)}
+                <ClampedCell text={formatLocation(a.location)} />
               </TableCell>
               <TableCell className="text-sm">
-                {remediation ? (
-                  <span title={remediation.description ?? undefined}>
-                    {truncate(
-                      remediation.description ??
-                        `Remediation ${remediation.id}`,
-                      60,
-                    )}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
+                <ClampedCell
+                  text={
+                    remediation
+                      ? (remediation.description ??
+                        `Remediation ${remediation.id}`)
+                      : null
+                  }
+                  maxWidthClass="max-w-[14rem]"
+                />
+              </TableCell>
+              <TableCell>
+                <AssetStatusBadge status={a.status} />
               </TableCell>
               {onDetach && (
                 <TableCell className="w-10">

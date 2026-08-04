@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 beforeAll(() => {
@@ -310,11 +311,16 @@ const makeTicket = (
     comments: [],
     creator: { id: "u1", name: "Alice", email: "alice@example.com" },
     sourceLabel: null,
+    body: null,
+    priority: "Unsorted",
     parentId: null,
     creatorId: "u1",
     assigneeId: "u1",
     isWatching: false,
     activities: [],
+    externalMappings: [],
+    sources: [],
+    notification: null,
     ...overrides,
     // biome-ignore lint/suspicious/noExplicitAny: test stub for TicketDetail shape
   }) as any;
@@ -526,10 +532,12 @@ describe("TicketEditForm", () => {
     const user = userEvent.setup();
     render(<TicketEditForm data={makeTicket()} onCancel={() => {}} />);
 
-    // Open the assignee Select (Radix combobox role on trigger)
-    const triggers = screen.getAllByRole("combobox");
-    // First combobox in the form is the assignee Select (DepartmentMultiSelect comes later)
-    await user.click(triggers[0]);
+    // Open the assignee Select (Radix combobox trigger, found by its id since
+    // Priority now precedes it in the grid).
+    const assigneeTrigger = screen
+      .getAllByRole("combobox")
+      .find((el) => el.id === "ticket-assignee") as HTMLElement;
+    await user.click(assigneeTrigger);
     const listbox = await screen.findByRole("listbox");
     await user.click(within(listbox).getByText("Bob"));
 
@@ -616,6 +624,7 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   hostname: "host-1",
   ip: "10.0.0.5",
   role: "Infusion Pump",
+  status: "Active",
   macAddress: "00:11:22:33:44:55",
   location: { building: "A", floor: "3", room: "302" },
   deviceGroupId: "dg-1",
@@ -644,12 +653,12 @@ describe("LinkedAssetsTable", () => {
     expect(screen.getByText("A · 3 · 302")).toBeInTheDocument();
   });
 
-  it("links the role cell to the asset detail page", () => {
+  it("links the asset id cell to the asset detail page", () => {
     render(
       <LinkedAssetsTable assets={[sampleAsset()] as never} remediations={[]} />,
     );
 
-    const link = screen.getByRole("link", { name: /infusion pump/i });
+    const link = screen.getByRole("link", { name: /host-1/i });
     expect(link).toHaveAttribute("href", "/assets/asset-1");
   });
 
@@ -772,11 +781,16 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
   comments: [],
   creator: { id: "u1", name: "Alice", email: "alice@example.com" },
   sourceLabel: null,
+  body: null,
+  priority: "Unsorted",
   parentId: null,
   creatorId: "u1",
   assigneeId: "u2",
   isWatching: false,
   activities: [],
+  externalMappings: [],
+  sources: [],
+  notification: null,
   ...overrides,
 });
 
@@ -784,7 +798,11 @@ const renderDetail = (overrides: Record<string, unknown> = {}) => {
   mockUseSuspenseTrackingTicket.mockReturnValue({
     data: baseTicketDetail(overrides),
   });
-  return render(<TicketDetailContent id="ticket-1" />);
+  return render(<TicketDetailContent id="ticket-1" />, {
+    wrapper: ({ children }) => (
+      <NuqsTestingAdapter>{children}</NuqsTestingAdapter>
+    ),
+  });
 };
 
 describe("TicketDetailContent — view mode", () => {
@@ -866,17 +884,21 @@ describe("TicketDetailContent — view mode", () => {
     expect(screen.getByText("Done")).toBeInTheDocument();
   });
 
-  it("shows 'No assets linked' when there are no linked assets", () => {
+  it("shows 'No assets linked' when there are no linked assets", async () => {
+    const user = userEvent.setup();
     renderDetail();
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
     expect(
       screen.getByText(/no assets linked to this ticket/i),
     ).toBeInTheDocument();
   });
 
-  it("renders the Linked Assets table when assets are present", () => {
+  it("renders the Linked Assets table when assets are present", async () => {
+    const user = userEvent.setup();
     renderDetail({
       assets: [sampleAsset()],
     });
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
     expect(screen.getByText("Infusion Pump")).toBeInTheDocument();
   });
 
@@ -902,7 +924,7 @@ describe("TicketDetailContent — view mode", () => {
     expect(screen.getByText("Biomed")).toBeInTheDocument();
   });
 
-  it("renders activity entries interleaved with comments in chronological order", () => {
+  it("renders activity entries interleaved with comments in newest-first order", () => {
     renderDetail({
       comments: [
         {
@@ -955,8 +977,8 @@ describe("TicketDetailContent — view mode", () => {
     // Asset label surfaces in the tagline
     expect(screen.getByText("host-icu-1")).toBeInTheDocument();
 
-    // Chronological order: status change (12:00) before comment (13:00)
-    // before asset attach (14:00). Check by position in the timeline.
+    // Newest first: asset attach (14:00) before comment (13:00) before status
+    // change (12:00). Check by position in the timeline.
     const items = screen.getAllByRole("listitem");
     const orderedLabels = items.map(
       (li) => li.getAttribute("aria-label") ?? "",
@@ -964,9 +986,9 @@ describe("TicketDetailContent — view mode", () => {
     const statusIdx = orderedLabels.indexOf("Activity: STATUS_CHANGED");
     const commentIdx = orderedLabels.indexOf("Comment");
     const assetIdx = orderedLabels.indexOf("Activity: ASSET_ATTACHED");
-    expect(statusIdx).toBeGreaterThanOrEqual(0);
-    expect(commentIdx).toBeGreaterThan(statusIdx);
-    expect(assetIdx).toBeGreaterThan(commentIdx);
+    expect(assetIdx).toBeGreaterThanOrEqual(0);
+    expect(commentIdx).toBeGreaterThan(assetIdx);
+    expect(statusIdx).toBeGreaterThan(commentIdx);
   });
 
   it("shows 'No activity yet' when there are no comments or activities", () => {
@@ -1042,11 +1064,14 @@ describe("TicketDetailContent — watch toggle", () => {
 });
 
 describe("TicketDetailContent — sub-tickets attach/detach", () => {
-  it("shows the 'Add sub-ticket' button and an empty state when there are no children", () => {
+  it("shows the 'Add sub-ticket' button and an empty state when there are no children", async () => {
+    const user = userEvent.setup();
     renderDetail();
     expect(
       screen.getByRole("button", { name: /add sub-ticket/i }),
     ).toBeInTheDocument();
+    // The card is collapsed when empty — expand it to reveal the empty state.
+    await user.click(screen.getByRole("button", { name: /sub-tickets/i }));
     expect(screen.getByText(/no sub-tickets yet/i)).toBeInTheDocument();
   });
 
@@ -1108,8 +1133,10 @@ describe("TicketDetailContent — sub-tickets attach/detach", () => {
 });
 
 describe("TicketDetailContent — assets attach/detach", () => {
-  it("renders an 'Add asset' button in the Linked Assets tab", () => {
+  it("renders an 'Add asset' button in the Linked Assets tab", async () => {
+    const user = userEvent.setup();
     renderDetail();
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
     expect(
       screen.getByRole("button", { name: /add asset/i }),
     ).toBeInTheDocument();
@@ -1119,6 +1146,7 @@ describe("TicketDetailContent — assets attach/detach", () => {
     const user = userEvent.setup();
     renderDetail();
 
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
     await user.click(screen.getByRole("button", { name: /add asset/i }));
     await user.click(
       await screen.findByRole("option", { name: /host-loose-1/i }),
@@ -1135,6 +1163,7 @@ describe("TicketDetailContent — assets attach/detach", () => {
       assets: [sampleAsset({ id: "linked-asset", hostname: "linked-host" })],
     });
 
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
     const detachBtn = screen.getByRole("button", {
       name: /detach linked-host/i,
     });

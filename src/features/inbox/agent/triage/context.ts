@@ -18,6 +18,7 @@ import {
   vulnerabilityToMarkdown,
   workflowClinicalSummary,
 } from "@/lib/markdown";
+import { buildEntityRefs, type EntityRefs, swapIdsForRefs } from "../refs";
 
 export type LinkableIds = {
   vulnerabilityIds: string[];
@@ -30,6 +31,7 @@ export type TriageContext = {
   markdown: string;
   affectedAssetIds: string[];
   linkableIds: LinkableIds;
+  refs: EntityRefs;
 };
 
 const EMPTY_LINKABLE_IDS: LinkableIds = {
@@ -96,6 +98,7 @@ export async function gatherTriageContext(
       markdown: "",
       affectedAssetIds: [],
       linkableIds: EMPTY_LINKABLE_IDS,
+      refs: buildEntityRefs(EMPTY_LINKABLE_IDS),
     };
   }
 
@@ -240,15 +243,19 @@ export async function gatherTriageContext(
         : null,
   });
 
+  const linkableIds = {
+    vulnerabilityIds: vulnerabilities.map((v) => v.id),
+    remediationIds: remediations.map((r) => r.id),
+    deviceGroupMatchingIds: matchings.map((m) => m.id),
+  };
+  const refs = buildEntityRefs(linkableIds);
+
   return {
     notificationId,
-    markdown,
+    markdown: swapIdsForRefs(markdown, refs),
     affectedAssetIds,
-    linkableIds: {
-      vulnerabilityIds: vulnerabilities.map((v) => v.id),
-      remediationIds: remediations.map((r) => r.id),
-      deviceGroupMatchingIds: matchings.map((m) => m.id),
-    },
+    linkableIds,
+    refs,
   };
 }
 
@@ -338,11 +345,11 @@ function renderTriagePrompt(args: RenderArgs): string {
 
   if (args.vexIssues.length > 0) {
     sections.push(
-      "## VEX determinations (already sorted for this notification)\n\n" +
+      "<issues>\n## Device exposure review (already sorted for this notification)\n\n" +
         args.vexIssues
           .map((i) => {
             const scope = i.assetId
-              ? `asset ${i.assetId}`
+              ? `asset ${args.noteLabels.assetLabel.get(i.assetId) ?? "one specific asset"}`
               : i.deviceGroupMatchingId
                 ? `device group ${args.noteLabels.matchingLabel.get(i.deviceGroupMatchingId) ?? i.deviceGroupMatchingId}`
                 : "unscoped";
@@ -354,7 +361,8 @@ function renderTriagePrompt(args: RenderArgs): string {
               : "";
             return `- ${i.cve} — **${i.status}**${just}${conf} — ${scope}`;
           })
-          .join("\n"),
+          .join("\n") +
+        "\n</issues>",
     );
   }
 

@@ -42,6 +42,7 @@ import type { PaginatedResponse } from "@/lib/pagination";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
 import { getAssetRoleLabel } from "../utils";
+import { AssetQrPdfLink } from "./asset-qr-pdf-link";
 
 export const AssetContainer = ({ children }: { children: React.ReactNode }) => {
   return <EntityContainer>{children}</EntityContainer>;
@@ -293,9 +294,12 @@ export const AssetHeader = ({ assetId }: { assetId: string }) => {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <h1 className="text-3xl font-semibold tracking-tight pb-2">
-        {getAssetRoleLabel(asset)}
-      </h1>
+      <div className="flex items-center justify-between gap-2 pb-2">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          {getAssetRoleLabel(asset)}
+        </h1>
+        <AssetQrPdfLink assetId={assetId} />
+      </div>
 
       <div className="flex items-center gap-2">
         <Badge variant="outline">

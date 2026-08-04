@@ -55,6 +55,7 @@ interface DashboardDrawerShellProps {
   tabs: DrawerTab[];
   infoColumn: ReactNode;
   children?: ReactNode;
+  actions?: ReactNode;
 }
 
 // ============================================================================
@@ -69,6 +70,7 @@ export function DashboardDrawerShell({
   tabs,
   infoColumn,
   children,
+  actions,
 }: DashboardDrawerShellProps) {
   const isMobile = useIsMobile();
 
@@ -88,9 +90,12 @@ export function DashboardDrawerShell({
                 {description}
               </DrawerDescription>
             </div>
-            <DrawerClose asChild>
-              <Button variant="outline">Close</Button>
-            </DrawerClose>
+            <div className="flex items-center gap-2">
+              {actions}
+              <DrawerClose asChild>
+                <Button variant="outline">Close</Button>
+              </DrawerClose>
+            </div>
           </div>
         </DrawerHeader>
 

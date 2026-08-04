@@ -23,7 +23,8 @@ const ROWS: {
   {
     priority: Priority.Critical,
     type: NotificationType.Advisory,
-    title: "Baxter Life2000 Ventilation System — multiple critical vulnerabilities",
+    title:
+      "Baxter Life2000 Ventilation System — multiple critical vulnerabilities",
     minutesAgo: 120,
   },
   {

@@ -5,11 +5,11 @@ import type { OpenApiMeta } from "trpc-to-openapi";
 import { getSession, verifyApiKey } from "@/lib/auth-utils";
 import { TRPC_TRANSFORMER } from "@/lib/trpc-config";
 
-export const createTRPCContext = async (opts: CreateNextContextOptions) => {
+export const createTRPCContext = async (opts?: CreateNextContextOptions) => {
   /**
    * @see: https://trpc.io/docs/server/context
    */
-  return { req: opts.req };
+  return { req: opts?.req };
 };
 
 export type Context = Awaited<ReturnType<typeof createTRPCContext>> & {

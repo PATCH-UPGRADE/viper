@@ -343,6 +343,5 @@ When modeling hospital systems:
 
 ### Testing Requirements
 
-- **Unit tests**: All AI node prompts with golden samples
-- **Integration tests**: Full workflow simulations with hospital simulator (WHS)
+- **Unit tests**: All AI prompts with golden samples
 - **Validation**: Time calculations, risk metrics, downtime estimates must be deterministic and testable

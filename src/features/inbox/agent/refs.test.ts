@@ -19,6 +19,19 @@ describe("buildEntityRefs", () => {
     expect(refs.refById.cmg_c).toBe("group-3");
   });
 
+  it("swaps asset ids too, though assets are never linkable", () => {
+    const refs = buildEntityRefs({
+      vulnerabilityIds: [],
+      remediationIds: [],
+      deviceGroupMatchingIds: [],
+      assetIds: ["cma_1", "cma_2"],
+    });
+    expect(refs.assetRefs).toEqual(["asset-1", "asset-2"]);
+    expect(swapIdsForRefs("Asset pacs-syngo-03 (id: cma_2)", refs)).toBe(
+      "Asset pacs-syngo-03 (id: asset-2)",
+    );
+  });
+
   it("handles empty id lists", () => {
     const refs = buildEntityRefs({
       vulnerabilityIds: [],

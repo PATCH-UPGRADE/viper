@@ -248,7 +248,7 @@ export async function gatherTriageContext(
     remediationIds: remediations.map((r) => r.id),
     deviceGroupMatchingIds: matchings.map((m) => m.id),
   };
-  const refs = buildEntityRefs(linkableIds);
+  const refs = buildEntityRefs({ ...linkableIds, assetIds: affectedAssetIds });
 
   return {
     notificationId,

@@ -5,6 +5,8 @@ export type EntityRefs = {
   vulnerabilityRefs: string[];
   remediationRefs: string[];
   deviceGroupMatchingRefs: string[];
+  /** Assets are never linkable by the agent; they are here only so their ids get swapped out too. */
+  assetRefs: string[];
   /** ref -> database id */
   idByRef: Record<string, string>;
   /** database id -> ref */
@@ -15,6 +17,7 @@ export function buildEntityRefs(ids: {
   vulnerabilityIds: string[];
   remediationIds: string[];
   deviceGroupMatchingIds: string[];
+  assetIds?: string[];
 }): EntityRefs {
   const idByRef: Record<string, string> = {};
   const refById: Record<string, string> = {};
@@ -29,6 +32,7 @@ export function buildEntityRefs(ids: {
     vulnerabilityRefs: assign(ids.vulnerabilityIds, "vuln"),
     remediationRefs: assign(ids.remediationIds, "rem"),
     deviceGroupMatchingRefs: assign(ids.deviceGroupMatchingIds, "group"),
+    assetRefs: assign(ids.assetIds ?? [], "asset"),
     idByRef,
     refById,
   };

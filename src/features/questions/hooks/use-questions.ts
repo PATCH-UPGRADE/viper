@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
+import { SuggestedVendorEmail } from "../types";
 
 export function useSuspenseQuestionsByNotificationId(notificationId: string) {
   const trpc = useTRPC();
@@ -57,4 +58,41 @@ export function useSuspenseSuggestedEmailsByNotificationId(
       notificationId,
     }),
   );
+}
+
+export function useApproveEscalation(notificationId: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.questions.approveEscalationEmail.mutationOptions({
+      onSuccess: (_data, variables) => {
+        toast.success("Email sent");
+        const filter =
+          trpc.questions.getSuggestedEmailByNotificationId.queryFilter({
+            notificationId,
+          });
+        queryClient.setQueriesData<SuggestedVendorEmail[]>(
+          filter,
+          (emailList) => 
+            emailList?.filter(
+              (email) => email.questionId !== variables.questionId,
+            )
+        );
+      },
+      onError: (err) => toast.error(`Failed to send: ${err.message}`),
+    }),
+  );
+}
+
+export function useDismissEscalation() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return (questionId: string) => {
+    const filter =
+      trpc.questions.getSuggestedEmailByNotificationId.queryFilter();
+    queryClient.setQueriesData<SuggestedVendorEmail[]>(filter, (emailList) =>
+      emailList?.filter((email) => email.questionId !== questionId),
+    );
+    toast.success("Dismissed email");
+  };
 }

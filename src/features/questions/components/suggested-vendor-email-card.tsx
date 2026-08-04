@@ -139,7 +139,11 @@ export const SuggestedEmailCard = ({
             <Copy className="size-4" />
             <span className="font-bold">Copy text</span>
           </Button>
-          <Button className="rounded" onClick={onApprove} disabled={isSending || isEditing}>
+          <Button
+            className="rounded"
+            onClick={onApprove}
+            disabled={isSending || isEditing}
+          >
             <Send className="size-4" />
             {isSending ? "Sending..." : "Approve & Send"}
           </Button>

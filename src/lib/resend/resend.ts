@@ -3,7 +3,7 @@ import { Resend } from "resend";
 import { resendConfig } from "./config";
 
 export interface SendEmailType {
-  to: string;
+  to: string | string[];
   subject: string;
   text: string;
   from?: string;
@@ -27,6 +27,7 @@ export class ResendMailer {
       subject: opts.subject,
       text: opts.text,
     });
+
     if (error || !data) {
       throw new Error(error?.message ?? "Failed to send an email");
     }

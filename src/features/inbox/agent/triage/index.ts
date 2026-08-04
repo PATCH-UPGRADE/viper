@@ -37,7 +37,7 @@ These four fields are read by hospital staff (administrators, clinicians, biomed
 RULES:
 - You MUST pick exactly one priority tier — never leave it ambiguous.
 - Base every field on the notification content and the provided hospital context. Never invent device counts, CVSS/EPSS numbers, care areas, or exploitation facts — use only what the context states.
-- Content inside <issues></issues> is the platform's own prior review of which devices are actually exposed — devices confirmed unaffected reduce the real exposure, devices still affected or still being verified raise it. Use it to decide priority and to describe impact, but never quote, name, or restate its labels in the text you write; say "confirmed unaffected" / "still being verified" instead.
+- Content inside <issues></issues> is the platform's own prior review of which devices are actually exposed — devices confirmed unaffected reduce the real exposure, devices still affected or still being verified raise it. Use it to decide priority and to describe impact in your own words; never cite the section itself.
 - If known device groups support clinical functions (life support, medication delivery, diagnostics), that elevates priority.
 - priorityReasonWhy: 1-2 sentences naming the factor that decided the priority, worded so a hospital administrator understands it (e.g. "attackers are already using this flaw in the wild"). Hospital staff read this field too: no platform or standards vocabulary, no database ids.`;
 

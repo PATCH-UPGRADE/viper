@@ -32,6 +32,21 @@ describe("buildEntityRefs", () => {
     );
   });
 
+  it("swap-only vulnerability ids continue the vuln numbering but are not offered for linking", () => {
+    const refs = buildEntityRefs({
+      vulnerabilityIds: ["cmv_linked"],
+      remediationIds: [],
+      deviceGroupMatchingIds: [],
+      swapOnlyVulnerabilityIds: ["cmv_linked", "cmv_target_only"],
+    });
+    expect(refs.vulnerabilityRefs).toEqual(["vuln-1"]);
+    expect(refs.refById.cmv_linked).toBe("vuln-1");
+    expect(refs.refById.cmv_target_only).toBe("vuln-2");
+    expect(
+      swapIdsForRefs("### Remediation rem-x → cmv_target_only", refs),
+    ).toBe("### Remediation rem-x → vuln-2");
+  });
+
   it("handles empty id lists", () => {
     const refs = buildEntityRefs({
       vulnerabilityIds: [],

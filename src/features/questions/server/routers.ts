@@ -11,7 +11,7 @@ import { questionInclude, type SuggestedVendorEmail } from "../types";
 // TODO:PS for testing only, wire with real DB later with dummy body text
 const MOCK_CONTACTS = [
   { name: "Perry Sy", email: "perrydev17@gmail.com" },
-  { name: "Perry Sy 2", email: "perry.sy+2@bugcrowd.com" },
+  { name: "Perry Sy 2", email: "perrydev17+2@bugcrowd.com" },
 ];
 // TODO:PS for testing only, wire with real DB later with dummy body text
 // const MOCK_EMAIL: SuggestedVendorEmail[] = [

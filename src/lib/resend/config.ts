@@ -1,3 +1,4 @@
+import "server-only";
 const allowFallBack = process.env.NODE_ENV !== "production";
 const devFROM = "onboarding@resend.dev";
 

@@ -28,6 +28,7 @@ type Ticket = ReturnType<
 const makeTicket = (overrides: Partial<Ticket> = {}): Ticket => ({
   id: "t1",
   summary: "Patch ICU monitor",
+  body: null,
   status: "TO_DO",
   category: "PATCH",
   scheduledAt: new Date(),
@@ -60,6 +61,7 @@ describe("SuggestedWorkOrderModal", () => {
       }),
       makeTicket({
         summary: "Past work order",
+        body: "Routine coolant filter swap.",
         scheduledAt: hoursFromNow(-1),
       }),
     ]);
@@ -70,6 +72,9 @@ describe("SuggestedWorkOrderModal", () => {
     expect(screen.getByText("Past work order")).toBeInTheDocument();
     expect(screen.queryByText("Future work order")).not.toBeInTheDocument();
     expect(screen.getByText("Biomed")).toBeInTheDocument();
+    expect(
+      screen.getByText("Routine coolant filter swap."),
+    ).toBeInTheDocument();
   });
 
   it("dismisses without mutating when 'No' is clicked", async () => {

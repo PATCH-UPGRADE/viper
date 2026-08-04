@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -75,14 +76,19 @@ export const SuggestedWorkOrderModal = ({ assetId }: { assetId: string }) => {
             <Badge variant="outline">{categoryLabels[ticket.category]}</Badge>
             <DepartmentChips departments={ticket.departments} />
           </div>
+          {ticket.body && (
+            <p className="line-clamp-2 text-sm text-muted-foreground">
+              {ticket.body}
+            </p>
+          )}
           <div className="text-sm text-muted-foreground">
             Scheduled {formatScheduled(ticket.scheduledAt)}
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            No
-          </Button>
+          <DialogClose asChild>
+            <Button variant="outline">No</Button>
+          </DialogClose>
           <Button onClick={complete} disabled={update.isPending}>
             Yes
           </Button>

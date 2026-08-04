@@ -375,6 +375,7 @@ export const trackingRouter = createTRPCRouter({
         select: {
           id: true,
           summary: true,
+          body: true,
           status: true,
           category: true,
           scheduledAt: true,
@@ -408,6 +409,7 @@ export const trackingRouter = createTRPCRouter({
         .map((ticket) => ({
           id: ticket.id,
           summary: ticket.summary,
+          body: ticket.body,
           status: ticket.status,
           category: ticket.category,
           scheduledAt: ticket.scheduledAt,

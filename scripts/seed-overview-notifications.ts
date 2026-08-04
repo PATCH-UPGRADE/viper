@@ -97,7 +97,19 @@ function assertLocalDatabase() {
   }
 }
 
-const run = process.argv.includes("--clean") ? clean : seed;
+// Reject anything unrecognised rather than falling through to seed: a typo'd
+// --clean would otherwise write rows when the caller meant to delete them.
+const args = process.argv.slice(2);
+const unknown = args.filter((arg) => arg !== "--clean");
+if (unknown.length > 0) {
+  console.error(
+    `Unknown argument(s): ${unknown.join(", ")}\n` +
+      "Usage: npx tsx scripts/seed-overview-notifications.ts [--clean]",
+  );
+  process.exit(1);
+}
+
+const run = args.includes("--clean") ? clean : seed;
 Promise.resolve()
   .then(assertLocalDatabase)
   .then(run)

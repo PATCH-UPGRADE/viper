@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { TicketStatus } from "@/generated/prisma";
+import { formatScheduled } from "@/lib/date-utils";
 import {
   useSuspenseAssetWorkOrders,
   useUpdateTicket,
@@ -20,7 +21,6 @@ import {
 import {
   categoryLabels,
   DepartmentChips,
-  formatScheduled,
   StatusChip,
 } from "./ticket-detail/shared";
 

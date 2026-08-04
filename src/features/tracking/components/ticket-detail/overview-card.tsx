@@ -15,13 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { resolveWorkOrderDetailUrl } from "@/features/integrations/teamplay-fleet/urls";
 import { getChipClass } from "@/features/tag-colors/palette";
+import { formatScheduled } from "@/lib/date-utils";
 import type { TicketDetail } from "../../types";
-import {
-  CategoryChip,
-  formatDate,
-  formatScheduled,
-  StatusChip,
-} from "./shared";
+import { CategoryChip, formatDate, StatusChip } from "./shared";
 
 const FieldLabel = ({ children }: { children: React.ReactNode }) => (
   <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

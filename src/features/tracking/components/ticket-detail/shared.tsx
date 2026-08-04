@@ -41,17 +41,6 @@ export const formatDate = (date: Date | string | null | undefined) => {
   return format(d, "MMM d, yyyy");
 };
 
-// `separator` sits between the date and the time (e.g. "Jul 21, 2026 at 3:00
-// PM" vs "· 3:00 PM"); it is a date-fns literal, so it is not interpreted.
-export const formatScheduled = (
-  date: Date | string | null | undefined,
-  separator = "at",
-) => {
-  if (!date) return null;
-  const d = date instanceof Date ? date : new Date(date);
-  return format(d, `MMM d, yyyy '${separator}' h:mm a`);
-};
-
 export const CategoryChip = ({ category }: { category: TicketCategory }) => {
   const color = useCategoryColor(category);
   return (

@@ -13,15 +13,11 @@ import type {
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
+import { formatScheduled } from "@/lib/date-utils";
 import type { TicketDetail } from "../../types";
 import { AddCommentForm } from "./add-comment-form";
 import { CollapsibleSectionCard } from "./section-card";
-import {
-  categoryLabels,
-  formatDate,
-  formatScheduled,
-  StatusChip,
-} from "./shared";
+import { categoryLabels, formatDate, StatusChip } from "./shared";
 
 type Comment = TicketDetail["comments"][number];
 type Activity = TicketDetail["activities"][number];

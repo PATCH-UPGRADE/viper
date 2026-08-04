@@ -155,7 +155,7 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
           value={tab}
           onValueChange={(v) => setTab(v as (typeof TAB_VALUES)[number])}
         >
-          <TabsList variant="line">
+          <TabsList variant="line-primary">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="assets">
               Assets

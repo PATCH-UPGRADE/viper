@@ -4,6 +4,7 @@ import { XIcon } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ClampedCell } from "@/components/ui/clamped-cell";
 import {
   Table,
   TableBody,
@@ -12,55 +13,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { getChipClass } from "@/features/tag-colors/palette";
 import type { AssetStatus } from "@/generated/prisma";
 import { matchingAppliesToDeviceGroup } from "@/lib/device-matching";
-import { cn } from "@/lib/utils";
 import {
   type DetailAsset,
   type DetailRemediation,
   formatLocation,
 } from "./shared";
-
-const EM_DASH = "—";
-
-// Renders a cell value clamped to two lines. On hover, a tooltip shows the full
-// value. Empty values (or the em-dash placeholder) render as a muted dash with
-// no tooltip.
-const ClampedCell = ({
-  text,
-  maxWidthClass = "max-w-[10rem]",
-}: {
-  text: string | null | undefined;
-  maxWidthClass?: string;
-}) => {
-  const value = text?.trim();
-  if (!value || value === EM_DASH) {
-    return <span className="text-muted-foreground">{EM_DASH}</span>;
-  }
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div
-          className={cn(
-            "line-clamp-2 cursor-default whitespace-normal",
-            maxWidthClass,
-          )}
-        >
-          {value}
-        </div>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-xs whitespace-pre-wrap">
-        {value}
-      </TooltipContent>
-    </Tooltip>
-  );
-};
 
 const assetStatusHue: Record<AssetStatus, string> = {
   Active: "green",

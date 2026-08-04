@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   EntityContainer,
   ErrorView,
@@ -19,11 +19,15 @@ const greetingFor = (hour: number) => {
 
 /**
  * The greeting and the date come from the viewer's clock, so the server HTML
- * can disagree with the first client render. `suppressHydrationWarning` lets
- * the client value replace it without a hydration warning.
+ * can disagree with the first client render. `suppressHydrationWarning` hides
+ * that mismatch, but it also stops React from patching the server text. The
+ * effect writes the viewer's clock after mount, which does replace it.
  */
 export const OverviewGreeting = ({ name }: { name: string }) => {
-  const now = new Date();
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    setNow(new Date());
+  }, []);
   const firstName = name.trim().split(/\s+/)[0] || name;
 
   return (

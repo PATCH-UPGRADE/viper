@@ -34,7 +34,7 @@ export const SuggestedWorkOrdersCard = () => {
     <OverviewCard
       icon={ListChecksIcon}
       title="Suggested Work Orders"
-      description="Open tickets, highest priority first"
+      description="Work orders, highest priority first"
       action={{ label: "All work orders", href: "/tracking" }}
     >
       {data.length === 0 && <OverviewCardEmpty message="No work orders yet." />}

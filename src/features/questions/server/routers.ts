@@ -4,7 +4,6 @@ import { inngest } from "@/inngest/client";
 import { sendEscalationEmail } from "@/inngest/functions/send-escalation-email";
 import prisma from "@/lib/db";
 import { renderQnA } from "@/lib/markdown/note";
-import { resendMailer } from "@/lib/resend/resend";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { draftEscalationEmail } from "../agent/escalationEmail";
 import { questionInclude, type SuggestedVendorEmail } from "../types";
@@ -15,24 +14,24 @@ const MOCK_CONTACTS = [
   { name: "Perry Sy 2", email: "perry.sy+2@bugcrowd.com" },
 ];
 // TODO:PS for testing only, wire with real DB later with dummy body text
-const MOCK_EMAIL: SuggestedVendorEmail[] = [
-  {
-    questionId: "qustion-1",
-    audience: "MANUFACTURER",
-    companyName: "Siemens Healthineers",
-    productName: "SOMATOM go.All",
-    reasonWhy:
-      "The advisory doesn't help Viper confirm the running version on the go.All. A written confirmation from Siemens (or an SRS query) would let Viper move this asset out of 'potentially at risk' with confidence.",
-    subject:
-      "Version confirmation - SOMATOM go.All exposure to SSA-220609 (CVE-2022-29875)",
-    body: `Hello Siemens Healthineers ProductCERT,\n\n We are scoping remediation for....\n\n\ We operate... `,
-    contacts: [
-      { email: "perrydev17@gmail.com", name: "perry" },
-      { name: "Perry Sy 2", email: "perry.sy+2@bugcrowd.com" },
-    ],
-    toEmails: ["perrydev17@gmail.com"],
-  },
-];
+// const MOCK_EMAIL: SuggestedVendorEmail[] = [
+//   {
+//     questionId: "qustion-1",
+//     audience: "MANUFACTURER",
+//     companyName: "Siemens Healthineers",
+//     productName: "SOMATOM go.All",
+//     reasonWhy:
+//       "The advisory doesn't help Viper confirm the running version on the go.All. A written confirmation from Siemens (or an SRS query) would let Viper move this asset out of 'potentially at risk' with confidence.",
+//     subject:
+//       "Version confirmation - SOMATOM go.All exposure to SSA-220609 (CVE-2022-29875)",
+//     body: `Hello Siemens Healthineers ProductCERT,\n\n We are scoping remediation for....\n\n\ We operate... `,
+//     contacts: [
+//       { email: "perrydev17@gmail.com", name: "perry" },
+//       { name: "Perry Sy 2", email: "perry.sy+2@bugcrowd.com" },
+//     ],
+//     toEmails: ["perrydev17@gmail.com"],
+//   },
+// ];
 
 export const questionsRouter = createTRPCRouter({
   getManyByNotificationId: protectedProcedure

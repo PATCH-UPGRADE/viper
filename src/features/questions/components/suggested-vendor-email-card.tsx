@@ -18,7 +18,12 @@ export const SuggestedEmailCard = ({
   isSending = false,
 }: {
   email: SuggestedVendorEmail;
-  onApprove?: () => void;
+  onApprove: (payload: {
+    questionId: string;
+    toEmails: string[];
+    subject: string;
+    body: string;
+  }) => void;
   onDismiss?: () => void;
   isSending: boolean;
 }) => {
@@ -87,7 +92,7 @@ export const SuggestedEmailCard = ({
                   />
                 ) : (
                   <span className="block truncate text-left font-mono">
-                    {email.toEmails.join(",")}
+                    {toEmails.join(",")}
                   </span>
                 )}
               </div>
@@ -104,7 +109,7 @@ export const SuggestedEmailCard = ({
                   className="h-8"
                 />
               ) : (
-                <span className="font-bold">{email.subject}</span>
+                <span className="font-bold">{subject}</span>
               )}
             </div>
           </div>
@@ -117,7 +122,7 @@ export const SuggestedEmailCard = ({
             />
           ) : (
             <p className="whitespace-pre-line text-sm text-muted-foreground px-3 py-4">
-              {email.body}
+              {body}
             </p>
           )}
         </div>
@@ -141,7 +146,14 @@ export const SuggestedEmailCard = ({
           </Button>
           <Button
             className="rounded"
-            onClick={onApprove}
+            onClick={() =>
+              onApprove({
+                questionId: email.questionId,
+                toEmails,
+                subject,
+                body,
+              })
+            }
             disabled={isSending || isEditing}
           >
             <Send className="size-4" />

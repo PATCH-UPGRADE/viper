@@ -2,8 +2,6 @@ import "server-only";
 import type { QuestionWithIssue } from "@/features/questions/types";
 
 export function buildEscalationContext(question: QuestionWithIssue): string {
-  const { issue } = question;
-  const matching = issue.deviceGroupMatching;
   const vendorName = "The vendor"; // get it later;
   const productName = "The product";
 

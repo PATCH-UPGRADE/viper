@@ -25,12 +25,7 @@ export function NotificationQuestionTab({
   const dismiss = useDismissEscalation();
 
   const handleApprove = (email: any) => {
-    approve.mutate({
-      questionId: email.questionId,
-      toEmails: email.toEmails,
-      subject: email.subject,
-      body: email.body,
-    });
+    approve.mutate(email);
   };
   const handleDismiss = (questionId: string) => {
     dismiss(questionId);
@@ -91,7 +86,7 @@ export function NotificationQuestionTab({
           key={email.questionId}
           email={email}
           isSending={approve.isPending}
-          onApprove={() => handleApprove(email)}
+          onApprove={handleApprove}
           onDismiss={() => handleDismiss(email.questionId)}
         />
       ))}

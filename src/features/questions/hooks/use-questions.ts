@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
-import { SuggestedVendorEmail } from "../types";
+import type { SuggestedVendorEmail } from "../types";
 
 export function useSuspenseQuestionsByNotificationId(notificationId: string) {
   const trpc = useTRPC();
@@ -73,10 +73,10 @@ export function useApproveEscalation(notificationId: string) {
           });
         queryClient.setQueriesData<SuggestedVendorEmail[]>(
           filter,
-          (emailList) => 
+          (emailList) =>
             emailList?.filter(
               (email) => email.questionId !== variables.questionId,
-            )
+            ),
         );
       },
       onError: (err) => toast.error(`Failed to send: ${err.message}`),

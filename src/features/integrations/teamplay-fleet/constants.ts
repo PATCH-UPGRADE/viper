@@ -1,6 +1,10 @@
 // Client-safe Fleet constants (no server-only imports) — shared by the outbound
 // work-order client, the agent tool schema, and the chat proposal card.
 
+/** Fleet's host — the authoritative identity of the upstream, as in REST_MAPPERS. */
+export const FLEET_HOST = "fleet.siemens-healthineers.com";
+export const FLEET_SOURCE_LABEL = "Siemens Healthineers teamplay Fleet";
+
 /**
  * The device's current operational status, which Fleet uses as the ticket
  * severity (problemSeverityID) — LOWER is worse. Fleet only offers two: "1" =

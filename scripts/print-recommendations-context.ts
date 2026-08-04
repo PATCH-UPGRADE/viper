@@ -1,22 +1,58 @@
 #!/usr/bin/env tsx
 
-// Debug script used to return tool call output, largely just for token counting
+// Debug script: prints the prompt the recommendations agent receives before its
+// first turn — the system message plus the deterministically preloaded context
+// message — largely just for token counting.
 
-import { loadRecommendationsContextMarkdown } from "@/features/chat/viper-agent/tools/get-recommendations-context";
-import prisma from "@/lib/db";
+import Module from "node:module";
+import { fileURLToPath } from "node:url";
+
+// Stub server-only to avoid getting an error when we import from client
+const serverOnlyStub = fileURLToPath(
+  new URL("../src/test/server-only-stub.ts", import.meta.url),
+);
+const mod = Module as unknown as {
+  _resolveFilename(request: string, ...rest: unknown[]): string;
+};
+const resolveFilename = mod._resolveFilename;
+mod._resolveFilename = function (request, ...rest) {
+  return resolveFilename.call(
+    this,
+    request === "server-only" ? serverOnlyStub : request,
+    ...rest,
+  );
+};
 
 async function main() {
-  try {
-    const user = await prisma.user.findFirstOrThrow({
-      where: { email: "user@example.com" },
-    });
+  const { USER_ROLES } = await import("@/features/chat/utils");
+  const { buildSystemPrompt } = await import(
+    "@/features/chat/viper-agent/langgraph/recommendations-graph"
+  );
+  const { loadPersistentNotesMarkdown } = await import(
+    "@/features/chat/viper-agent/langgraph/notes-preload"
+  );
+  const { default: prisma } = await import("@/lib/db");
 
-    const result = await loadRecommendationsContextMarkdown(
-      user.id,
-      "hospital administration",
+  const roleArg = process.argv[2] ?? "hospital administration";
+  if (!USER_ROLES.includes(roleArg as (typeof USER_ROLES)[number])) {
+    throw new Error(
+      `Unknown role "${roleArg}". Valid roles: ${USER_ROLES.join(", ")}`,
     );
+  }
+  const role = roleArg as (typeof USER_ROLES)[number];
 
-    process.stdout.write(`${result}\n`);
+  try {
+    // The system message the agent is invoked with (build-graph.ts:99).
+    const systemPrompt = buildSystemPrompt(role);
+
+    // The deterministic context injected as the first HumanMessage before the
+    // agent's first turn (build-graph.ts:96).
+    const contextMessage = `(Context for you)\n${await loadPersistentNotesMarkdown()}`;
+
+    process.stdout.write("===== SYSTEM MESSAGE =====\n\n");
+    process.stdout.write(`${systemPrompt}\n\n`);
+    process.stdout.write("===== CONTEXT MESSAGE (role: user) =====\n\n");
+    process.stdout.write(`${contextMessage}\n`);
   } finally {
     await prisma.$disconnect();
   }

@@ -1,9 +1,14 @@
 import { z } from "zod";
 import {
+  attachNote,
+  attachNotes,
+} from "@/features/notes/server/get-relevant-notes";
+import {
   type AlohaStatus,
   type Prisma,
   ResourceType,
 } from "@/generated/prisma";
+import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
@@ -80,7 +85,10 @@ export const remediationsRouter = createTRPCRouter({
 
       return {
         ...result,
-        items: result.items.map(transformArtifactWrapper),
+        items: await attachNotes(
+          "REMEDIATION",
+          result.items.map(transformArtifactWrapper),
+        ),
       };
     }),
 
@@ -103,7 +111,10 @@ export const remediationsRouter = createTRPCRouter({
         where: { id: input.id },
         include: remediationInclude,
       });
-      return transformArtifactWrapper(requireExistence(rem, "Remediation"));
+      const found = transformArtifactWrapper(
+        requireExistence(rem, "Remediation"),
+      );
+      return attachNote("REMEDIATION", found);
     }),
 
   // POST /api/remediations - Create remediation
@@ -166,6 +177,15 @@ export const remediationsRouter = createTRPCRouter({
           include: remediationInclude,
         });
       });
+
+      await inngest
+        .send({
+          name: "remediation/analysis.requested",
+          data: { remediationId: result.id },
+        })
+        .catch((err) => {
+          console.error("Failed to dispatch remediation analysis event:", err);
+        });
 
       return {
         remediation: transformArtifactWrapper(result),

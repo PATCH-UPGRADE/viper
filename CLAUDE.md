@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -31,8 +31,6 @@ Rather than a raw network simulator, the VMP is a **hospital digital twin** wher
 
 1. **Clinicians**: Define clinical workflows representing patient care paths (e.g., "Lab → EMR → Nurse Station → Infusion Pump")
 2. **Security Engineers**: Define security workflows for patch management and vulnerability remediation
-
-The platform is built as a visual workflow builder (similar to n8n/Zapier) with Next.js 15 and a node-based editor powered by React Flow.
 
 ## Development Commands
 
@@ -90,7 +88,7 @@ Each feature is self-contained in `src/features/[feature]/`:
 ```
 feature/
 ├── components/        # React components
-├── hooks/            # Custom hooks (e.g., use-workflows.ts)
+├── hooks/            # Custom hooks (e.g., use-assets.ts)
 ├── server/
 │   ├── routers.ts    # tRPC router definitions
 │   ├── prefetch.ts   # Server-side data prefetching
@@ -125,14 +123,14 @@ This pattern is used throughout the app for server-rendered pages with client in
 // Server Component (Page)
 const Page = async ({ searchParams }: Props) => {
   await requireAuth();                          // 1. Check authentication
-  const params = await paramsLoader(searchParams); // 2. Parse URL params
-  prefetchWorkflows(params);                    // 3. Prefetch data on server
+  const params = await assetsParamsLoader(searchParams); // 2. Parse URL params
+  prefetchAssets(params);                       // 3. Prefetch data on server
 
   return (
     <HydrateClient>                             {/* 4. Hydrate to client */}
       <ErrorBoundary fallback={<Error />}>
         <Suspense fallback={<Loading />}>       {/* 5. Handle loading */}
-          <WorkflowsClient />                   {/* 6. Client component */}
+          <AssetsList />                         {/* 6. Client component */}
         </Suspense>
       </ErrorBoundary>
     </HydrateClient>
@@ -141,108 +139,33 @@ const Page = async ({ searchParams }: Props) => {
 
 // Client Component
 'use client';
-const WorkflowsClient = () => {
+const AssetsList = () => {
   // Uses suspense queries - no loading states needed
-  const { data } = useSuspenseWorkflows();
+  const { data } = useSuspenseAssets();
   return <div>{data.map(...)}</div>;
 };
 ```
+
+> In practice the real list pages compose this pattern via the `createListPage`
+> factory (e.g. `src/app/(dashboard)/(rest)/assets/page.tsx`); the shape above is
+> the underlying pattern it implements.
 
 ### URL State Management (nuqs)
 
 Each feature defines URL state schemas for searchable/shareable state:
 
 ```typescript
-// src/features/workflows/params.ts
-export const workflowsParams = {
-  page: parseAsInteger.withDefault(1),
-  pageSize: parseAsInteger.withDefault(5),
-  search: parseAsString.withDefault(""),
-};
+// src/features/assets/params.ts
+// createPaginationParams() → page, pageSize, search, sort,
+//                            lastUpdatedStartTime, lastUpdatedEndTime
+export const assetsParams = createPaginationParams();
 
-// Server-side: params-loader.ts
-export const workflowsParamsLoader = createLoader(workflowsParams);
+// Server-side: server/params-loader.ts
+export const assetsParamsLoader = createLoader(assetsParams);
 
-// Client-side: hooks/use-workflows-params.ts
-export const useWorkflowsParams = () => useQueryStates(workflowsParams);
+// Client-side: hooks/use-asset-params.ts
+export const useAssetsParams = () => useQueryStates(assetsParams);
 ```
-
-### React Flow Node System
-
-The VMP uses a **node-based workflow DSL** with the following node categories:
-
-**VMP Node Categories**:
-
-1. **Trigger Nodes**: Fire on events (e.g., "new patch submitted", "new CVE for device class", "ticket state changes")
-2. **Transform Nodes**: Shape the payload (dependency expansion, data cleanup, CMDB lookup)
-3. **AI Execution Nodes**: LLM-powered tools that summarize, classify, plan
-   - `AI.PatchRead`: Extract structured data from patch notes (requires reboot, downtime estimate, affected services)
-   - `AI.RiskNarrative`: Generate human-readable risk summaries for hospital admins
-   - `AI.RolloutPlanner`: Propose staged rollout schedules respecting maintenance windows
-   - `AI.ChangeSummary`: Create admin-readable markdown summaries
-4. **Deterministic Execution Nodes**: Simulate events in the WHS (Workflow Hospital Simulator), e.g., patch device, calculate downtime
-5. **Human-in-the-Loop Nodes**: Approvals, edits, overrides (clinical lead approval gates)
-6. **Policy Nodes**: Boolean gates (e.g., "Downtime < 15m", "life_safety=true")
-
-**Node Registration** (`src/config/node-components.ts`):
-
-```typescript
-export const nodeComponents = {
-  [NodeType.INITIAL]: InitialNode,
-  [NodeType.HTTP_REQUEST]: HttpRequestNode,
-  [NodeType.MANUAL_TRIGGER]: ManualTriggerNode,
-} as const satisfies NodeTypes;
-```
-
-To add a new node type:
-
-1. Add enum value to `NodeType` in Prisma schema
-2. Create node component extending an existing base 
-3. Register in `node-components.ts`
-4. Add to node selector in `components/node-selector.tsx`
-
-**Node Component Architecture**:
-
-- Base components: `BaseTriggerNode`, `BaseExecutionNode`, `BaseAssetNode`, `BaseStepNode`
-- Wrapper: `WorkflowNode` (provides toolbar, delete button, settings)
-- Primitives: `BaseNode`, `BaseHandle`, `NodeStatusIndicator`
-- Each node type has companion dialog for configuration
-
-**Node State & Data Flow**:
-
-- Editor instance stored in Jotai atom (`editorAtom`)
-- Nodes/edges synced with database via tRPC mutations
-- Local React state for real-time editing, debounced saves to database
-- Data flows forward as a JSON payload ("context bag"); nodes append artifacts (summaries, diffs, charts) and outputs
-
-### Example VMP Workflow
-
-A typical patch management workflow:
-
-```
-PatchSubmitted (trigger)
-  → AI.PatchRead (extracts: requires_reboot, downtime)
-  → CMDBLookup (find affected assets)
-  → DependencyExpand (map clinical workflows)
-  → SimulateImpact (calculate downtime, risk delta)
-  → CriticalityGate (if life_safety=true)
-      → Approval (clinical lead review) → RolloutPlanner
-      → SchedulePatch
-  → AI.RiskNarrative (generate summary)
-  → AI.RolloutPlanner (staged rollout schedule)
-  → OpenChangeTicket
-  → ReportPDF
-  → Notify (Teams, Email)
-  → GitCommit (manifest.json)
-```
-
-**Key VMP Workflow Outcomes**:
-
-- Risk reduction metrics (e.g., "risk ↓ 46%, from CVSS 8.2 → 4.4")
-- Downtime estimates (e.g., "30 min total across 15 ICU monitors")
-- Clinical impact analysis (e.g., "affects life_safety path: Lab→EMR→Nurse Station→medical delivery")
-- Staged rollout plan (e.g., "two 30m ICU windows, staggered to avoid shift changes")
-- Approval gates for high-criticality changes
 
 ### Authentication Flow
 
@@ -288,7 +211,6 @@ export const { GET, POST, PUT } = serve({
     syncIntegration,
     enrichVulnerability,
     enrichAllVulnerabilities,
-    manageMemoriesFn,
     purgeExpiredTokensFn,
   ],
 });
@@ -317,10 +239,14 @@ The chat and recommendations agents run as a **streaming Next.js route**
 **Key Models**:
 
 - `User`: Authentication (managed by Better Auth)
-- `Workflow`: Top-level workflow container (user-owned)
-- `Node`: Individual workflow nodes with position, type, and JSON data
-- `Connection`: Edges between nodes with from/to handles
-- `NodeType` enum: INITIAL, MANUAL_TRIGGER, HTTP_REQUEST
+- `Asset`: A concrete networked device instance on the hospital network (a real box with an IP)
+- `DeviceGroup`: Canonical identity for a *class* of devices — the resolved Vendor + Product + Version triple that `Asset`s are grouped under
+- `DeviceGroupMatching`: A matching *rule* (wildcard-capable: null `productId` = all products of a vendor; `versionRange` is a VERS expression) that attaches `Vulnerability`, `Remediation`, and `Issue` records to whole classes of devices.
+* `Issue`: A mapping between a Vulnerability and an Asset/DeviceGroupMatching. An Issue affects an Asset if:
+    * The issue is linked to a device group matching that resolves to that asset, and there is no issue that overrides it
+    * The issue is directly linked to the asset
+
+**Model relationships**: `Asset` → `DeviceGroup` is the concrete grouping; `DeviceGroupMatching` is the parallel *rule* construct (there is no direct FK between `DeviceGroup` and `DeviceGroupMatching`). `Issue` joins a `Vulnerability` to either a `DeviceGroupMatching` (class-level) or a specific `Asset` (which overrides the class-level record).
 
 **Schema Location**: `prisma/schema.prisma`
 
@@ -335,9 +261,9 @@ The chat and recommendations agents run as a **streaming Next.js route**
 
 ### File Naming
 
-- Components: PascalCase (e.g., `WorkflowNode.tsx`)
+- Components: PascalCase (e.g., `AssetNode.tsx`)
 - Utilities: kebab-case (e.g., `auth-utils.ts`)
-- Features: organized by domain (auth, workflows, editor)
+- Features: organized by domain (auth, assets, editor)
 
 ### Import Aliases
 
@@ -371,11 +297,11 @@ The chat and recommendations agents run as a **streaming Next.js route**
 - `src/trpc/init.ts` - tRPC procedures and context
 - `src/lib/auth.ts` - Better Auth configuration
 
-**Feature Example (Workflows)**:
+**Feature Example (Assets)**:
 
-- `src/features/workflows/server/routers.ts` - tRPC router
-- `src/features/workflows/hooks/use-workflows.ts` - Client hooks
-- `src/features/workflows/params.ts` - URL state schema
+- `src/features/assets/server/routers.ts` - tRPC router (`assetsRouter`)
+- `src/features/assets/hooks/use-assets.ts` - Client hooks
+- `src/features/assets/params.ts` - URL state schema
 
 **Editor**:
 
@@ -394,25 +320,6 @@ The chat and recommendations agents run as a **streaming Next.js route**
 - `docs/upgrade-baa.pdf` - ARPA-H BAA funding requirements and mission
 
 ## VMP-Specific Development Guidelines
-
-### AI Execution Node Patterns
-
-When implementing AI execution nodes:
-
-1. **AI.PatchRead** (extraction, deterministic JSON):
-   - System: "Extract ONLY fields per schema. If uncertain, set null."
-   - Output: Structured JSON only (no free-text)
-   - Guard: regex validator + max tokens
-
-2. **AI.RiskNarrative** (NLG, human-facing):
-   - System: "Summarize for non-technical hospital admin"
-   - Must reference fields by key; never invent numbers
-   - Unit test with golden samples
-
-3. **AI.RolloutPlanner** (planning):
-   - System: "Propose batches respecting windows, concurrency, blackout rules"
-   - Output: Validated time-based schedule
-   - Validator checks time math
 
 ### Healthcare Data Compliance
 

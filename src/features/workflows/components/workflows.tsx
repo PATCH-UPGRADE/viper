@@ -18,14 +18,12 @@ import type { Workflow } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import {
   useCreateWorkflow,
-  useExportWorkflowMermaidDownload,
-  useExportWorkflowSerializedDownload,
   useRemoveWorkflow,
   useSuspenseWorkflows,
 } from "../hooks/use-workflows";
 import { useWorkflowsParams } from "../hooks/use-workflows-params";
 
-export const WorkflowsSearch = () => {
+const WorkflowsSearch = () => {
   const [params, setParams] = useWorkflowsParams();
   const { searchValue, onSearchChange } = useEntitySearch({
     params,
@@ -54,7 +52,7 @@ export const WorkflowsList = () => {
   );
 };
 
-export const WorkflowsHeader = ({ disabled }: { disabled?: boolean }) => {
+const WorkflowsHeader = ({ disabled }: { disabled?: boolean }) => {
   const router = useRouter();
   const createWorkflow = useCreateWorkflow();
 
@@ -81,7 +79,7 @@ export const WorkflowsHeader = ({ disabled }: { disabled?: boolean }) => {
   );
 };
 
-export const WorkflowsPagination = () => {
+const WorkflowsPagination = () => {
   const workflows = useSuspenseWorkflows();
   const [params, setParams] = useWorkflowsParams();
 
@@ -119,7 +117,7 @@ export const WorkflowsError = () => {
   return <ErrorView message="Error loading workflows" />;
 };
 
-export const WorkflowsEmpty = () => {
+const WorkflowsEmpty = () => {
   const router = useRouter();
   const createWorkflow = useCreateWorkflow();
 
@@ -142,22 +140,11 @@ export const WorkflowsEmpty = () => {
   );
 };
 
-export const WorkflowItem = ({ data }: { data: Workflow }) => {
+const WorkflowItem = ({ data }: { data: Workflow }) => {
   const removeWorkflow = useRemoveWorkflow();
-  const exportWorkflowSerializedDownload =
-    useExportWorkflowSerializedDownload();
-  const exportWorkflowMermaidDownload = useExportWorkflowMermaidDownload();
 
   const handleRemove = () => {
     removeWorkflow.mutate({ id: data.id });
-  };
-
-  const handleExportSerialized = async () => {
-    await exportWorkflowSerializedDownload(data.id, data.name);
-  };
-
-  const handleExportMermaid = async () => {
-    await exportWorkflowMermaidDownload(data.id, data.name);
   };
 
   return (
@@ -184,8 +171,6 @@ export const WorkflowItem = ({ data }: { data: Workflow }) => {
         </div>
       }
       onRemove={handleRemove}
-      onExportJSON={handleExportSerialized}
-      onExportMermaid={handleExportMermaid}
       isRemoving={removeWorkflow.isPending}
     />
   );

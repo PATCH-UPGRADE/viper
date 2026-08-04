@@ -14,6 +14,7 @@ import {
   deviceGroupSelect,
   deviceGroupWithUrlsSchema,
 } from "../device-groups/types";
+import { scopedNoteSchema } from "../notes/schemas";
 import { remediationCardInclude } from "../remediations/types";
 
 const assetStatusSchema = z.enum(Object.values(AssetStatus));
@@ -76,6 +77,7 @@ export const assetResponseSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
   user: userSchema,
+  notes: z.array(scopedNoteSchema).optional(),
 });
 export type AssetResponse = z.infer<typeof assetResponseSchema>;
 
@@ -89,7 +91,7 @@ export const integrationAssetInputSchema =
 
 export const assetsVulnsInputSchema = z.object({
   assetIds: z.array(z.string()).optional(),
-  cpes: z.array(cpeSchema).optional(),
+  deviceGroupMatchingIds: z.array(z.string()).optional(),
 });
 export type AssetsVulnsInput = z.infer<typeof assetsVulnsInputSchema>;
 

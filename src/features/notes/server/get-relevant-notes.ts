@@ -6,6 +6,7 @@
 import "server-only";
 import type { NoteStatus, ScopeTargetModel } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import type { ScopedNote } from "../schemas";
 
 /** The projection of a Note returned by the note helpers. */
 export type RelevantNote = {
@@ -25,6 +26,30 @@ const NOTE_SELECT = {
 } as const;
 
 /**
+ * Attach each entity's SCOPED notes onto a batch of entities, keyed by id.
+ * Used in paginated routers to add notes to returned items
+ */
+export async function attachNotes<T extends { id: string }>(
+  targetModel: ScopeTargetModel,
+  items: T[],
+): Promise<(T & { notes: ScopedNote[] })[]> {
+  const byEntity = await getScopedNotesByInstance(
+    targetModel,
+    items.map((item) => item.id),
+  );
+  return items.map((item) => ({ ...item, notes: byEntity.get(item.id) ?? [] }));
+}
+
+/** Single-entity convenience wrapper around {@link attachNotes}. */
+export async function attachNote<T extends { id: string }>(
+  targetModel: ScopeTargetModel,
+  item: T,
+): Promise<T & { notes: ScopedNote[] }> {
+  const [withNotes] = await attachNotes(targetModel, [item]);
+  return withNotes;
+}
+
+/**
  * Notes matching one or more objects of a single targetModel, by id. Does not
  * include PERSISTENT notes (see getRelevantNotes for that).
  */
@@ -39,6 +64,7 @@ export async function getNotesForInstance(
   // id. Matches are materialized by the resolve-entity-filters Inngest job.
   return prisma.note.findMany({
     where: {
+      deletedAt: null,
       OR: [
         { targetModel, instanceId: { in: ids } },
         {
@@ -53,6 +79,78 @@ export async function getNotesForInstance(
     },
     select: NOTE_SELECT,
   });
+}
+
+/**
+ * SCOPED notes matching a batch of entity ids of one targetModel, grouped by the
+ * entity id each note resolves to — directly (Note.instanceId) AND via
+ * EntityFilterMatch.targetId. Excludes PERSISTENT notes. A note that matches an
+ * entity both ways appears once for that entity.
+ */
+export async function getScopedNotesByInstance(
+  targetModel: ScopeTargetModel,
+  ids: string[],
+): Promise<Map<string, ScopedNote[]>> {
+  const byEntity = new Map<string, ScopedNote[]>();
+  if (ids.length === 0) return byEntity;
+
+  const idSet = new Set(ids);
+  const notes = await prisma.note.findMany({
+    where: {
+      status: "SCOPED",
+      deletedAt: null,
+      OR: [
+        { targetModel, instanceId: { in: ids } },
+        {
+          filters: {
+            some: {
+              targetModel,
+              matches: { some: { targetId: { in: ids } } },
+            },
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      text: true,
+      instanceId: true,
+      filters: {
+        where: { targetModel },
+        select: {
+          matches: {
+            where: { targetId: { in: ids } },
+            select: { targetId: true },
+          },
+        },
+      },
+    },
+  });
+
+  const attach = (entityId: string, note: ScopedNote) => {
+    const existing = byEntity.get(entityId);
+    if (!existing) {
+      byEntity.set(entityId, [note]);
+    } else if (!existing.some((n) => n.id === note.id)) {
+      existing.push(note);
+    }
+  };
+
+  for (const note of notes) {
+    const payload: ScopedNote = { id: note.id, text: note.text };
+    // Direct match: instanceId is one of the requested ids.
+    if (note.instanceId && idSet.has(note.instanceId)) {
+      attach(note.instanceId, payload);
+    }
+    // Filter-resolved matches: each match's targetId is one of the requested ids.
+    for (const filter of note.filters) {
+      for (const match of filter.matches) {
+        attach(match.targetId, payload);
+      }
+    }
+  }
+
+  return byEntity;
 }
 
 /**
@@ -102,7 +200,7 @@ export async function getRelevantNotes(
   const [persistent, vulnerabilities, remediations, matchings, assets] =
     await Promise.all([
       prisma.note.findMany({
-        where: { status: "PERSISTENT" },
+        where: { status: "PERSISTENT", deletedAt: null },
         select: NOTE_SELECT,
       }),
       getNotesForInstance("VULNERABILITY", scope.vulnerabilityIds ?? []),

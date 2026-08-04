@@ -146,10 +146,6 @@ export function NodeSelector({
   const handleNodeSelect = useCallback(
     (selection: NodeTypeOption) => {
       setNodes((nodes) => {
-        const hasInitialTrigger = nodes.some(
-          (node) => node.type === NodeType.INITIAL,
-        );
-
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
 
@@ -168,11 +164,6 @@ export function NodeSelector({
           position: flowPosition,
           type: selection.type,
         };
-
-        if (hasInitialTrigger) {
-          newNode.position = { x: 0, y: 0 };
-          return [newNode];
-        }
 
         return [...nodes, newNode];
       });

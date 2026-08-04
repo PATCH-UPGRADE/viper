@@ -3,12 +3,12 @@ import {
   type NetworkTopology,
   networkTopologySchema,
 } from "@/features/network/types";
+import type { workflowSerializeInclude } from "@/features/workflows/utils";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   assetToMarkdown,
   deviceGroupLabel,
-  generateMemoryMarkdown,
   generateWorkflowsMarkdown,
   remediationToMarkdown,
   renderUtilization,
@@ -71,7 +71,7 @@ function generateVulnAssetRemMap(
 }
 
 type WorkflowWithRelations = Prisma.WorkflowGetPayload<{
-  include: { nodes: true; connections: true };
+  include: typeof workflowSerializeInclude;
 }>;
 
 // ─── Network flow ─────────────────────────────────────────────────────────────
@@ -235,7 +235,9 @@ export type RemediationForContext = Prisma.RemediationGetPayload<{
 
 // ─── Context generator ────────────────────────────────────────────────────────
 
-function generateContextMarkdown(
+// TODO: Should this be removed? Unused currently
+// Leaving intact for now (2026-07-28) if we switch model prompting strategies...
+function _generateContextMarkdown(
   assets: AssetForContext[],
   vulnerabilities: VulnerabilityForContext[],
   remediations: RemediationForContext[],
@@ -324,42 +326,4 @@ function generateContextMarkdown(
   sections.push(`## Device Utilization Windows\n\n${utilizationSection}`);
 
   return sections.join("\n\n---\n\n");
-}
-
-/**
- * Loads the full recommendations context (memories + assets + vulns +
- * remediations + workflows + network flow + utilization) as markdown.
- * The recommendations graph preloads this deterministically (not as a model
- * tool call).
- */
-export async function loadRecommendationsContextMarkdown(
-  userId: string,
-  userRole?: string,
-): Promise<string> {
-  const [
-    memories,
-    assets,
-    vulnerabilities,
-    remediations,
-    workflows,
-    networkTopology,
-    fleetAssets,
-  ] = await Promise.all([
-    prisma.memory.findMany({
-      where: { userId },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.asset.findMany({ include: assetContextInclude }),
-    prisma.vulnerability.findMany({ include: vulnerabilityContextInclude }),
-    prisma.remediation.findMany({ include: remediationContextInclude }),
-    prisma.workflow.findMany({ include: { nodes: true, connections: true } }),
-    fetchNetworkTopologyForContext(),
-    listFleetManagedAssets(),
-  ]);
-
-  const fleetManaged = new Map(
-    fleetAssets.map((a) => [a.assetId, a.equipmentKey]),
-  );
-
-  return `${generateMemoryMarkdown(memories)}\n\n---\n\n${generateContextMarkdown(assets, vulnerabilities, remediations, workflows, networkTopology, fleetManaged, userRole)}`;
 }

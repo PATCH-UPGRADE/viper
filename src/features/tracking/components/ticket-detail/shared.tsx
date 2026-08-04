@@ -76,6 +76,30 @@ export const StatusChip = ({
   </Badge>
 );
 
+export const DepartmentChips = ({
+  departments,
+}: {
+  departments: { id: string; name: string; color: string | null }[];
+}) => {
+  if (departments.length === 0) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {departments.map((department) => (
+        <Badge
+          key={department.id}
+          variant="outline"
+          className={getChipClass(department.color)}
+        >
+          {department.name}
+        </Badge>
+      ))}
+    </div>
+  );
+};
+
 export type DetailAsset = TicketDetail["assets"][number];
 export type DetailRemediation = TicketDetail["remediations"][number];
 

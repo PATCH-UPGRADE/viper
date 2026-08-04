@@ -22,6 +22,10 @@ import {
 } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSuspenseMitigationPlans } from "@/features/mitigation/hooks/use-mitigation";
+import {
+  useSuspenseQuestionsByNotificationId,
+  useSuspenseSuggestedEmailsByNotificationId,
+} from "@/features/questions/hooks/use-questions";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
 import type { NotificationType, Priority } from "@/generated/prisma";
 import {
@@ -32,6 +36,7 @@ import {
 import type { NotificationDetailSource } from "../types";
 import { NotificationAffectedAssetsTab } from "./notification-affected-assets-tab";
 import { NotificationDetailsTab } from "./notification-details-tab";
+import { NotificationQuestionTab } from "./notification-questions-tab";
 import { NotificationRespondTab } from "./notification-respond-tab";
 import { NotificationTypeBadge } from "./notification-type-badge";
 
@@ -62,6 +67,8 @@ function formatSourceChannel(source: NotificationDetailSource): string {
       return "polled api";
     case "Crawl":
       return "crawl";
+    case "TA4":
+      return "TA4";
   }
 }
 
@@ -139,6 +146,21 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
 
   type TabDef = { value: string; trigger: ReactNode; content: ReactNode };
 
+  const { data: questions } = useSuspenseQuestionsByNotificationId(
+    notification.id,
+  );
+  const { data: suggestedEmails } = useSuspenseSuggestedEmailsByNotificationId(
+    notification.id,
+  );
+  const emailsCount = suggestedEmails.filter(
+    (email) => email.status === "DRAFT",
+  ).length;
+
+  const pendingQuestionCount = questions.filter(
+    (q) => q.status === "PENDING",
+  ).length;
+  const questionTabCount = pendingQuestionCount + emailsCount;
+
   const tabs = (
     [
       hasPlans && {
@@ -184,6 +206,23 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
             deviceGroupsMatchings={notification.deviceGroupsMatchings}
           />
         ),
+      },
+      {
+        value: "questions",
+        trigger: (
+          <>
+            Questions{" "}
+            {questionTabCount > 0 && (
+              <Badge
+                variant="destructive"
+                className="rounded-full border-orange-200/80 bg-orange-50/80 dark:border-orange-900/70 dark:bg-orange-950/40"
+              >
+                {questionTabCount}
+              </Badge>
+            )}
+          </>
+        ),
+        content: <NotificationQuestionTab notificationId={notification.id} />,
       },
     ] as (TabDef | false)[]
   ).filter((t): t is TabDef => Boolean(t));

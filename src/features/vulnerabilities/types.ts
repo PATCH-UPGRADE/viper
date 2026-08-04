@@ -15,6 +15,7 @@ import {
   userSchema,
 } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
+import { scopedNoteSchema } from "../notes/schemas";
 import { remediationCardInclude } from "../remediations/types";
 
 // Validation schemas
@@ -82,6 +83,7 @@ export const vulnerabilityResponseSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
   user: userSchema,
+  notes: z.array(scopedNoteSchema).optional(),
 });
 export type VulnerabilityResponse = z.infer<typeof vulnerabilityResponseSchema>;
 

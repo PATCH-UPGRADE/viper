@@ -1,12 +1,17 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
 import {
+  attachNote,
+  attachNotes,
+} from "@/features/notes/server/get-relevant-notes";
+import {
   IssueStatus,
   type Prisma,
   ResourceType,
   Severity,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { renderUtilization } from "@/lib/markdown";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
@@ -15,6 +20,7 @@ import {
 import {
   cpeToDeviceGroup,
   fetchPaginated,
+  findDeviceGroupIdsForMatchings,
   findVulnerabilitiesMatchingDeviceGroups,
   processIntegrationSync,
   processIntegrationToken,
@@ -83,10 +89,15 @@ export const assetsRouter = createTRPCRouter({
 
       const where = createSearchFilter(search);
 
-      return fetchPaginated(prisma.asset, input, {
+      const result = await fetchPaginated(prisma.asset, input, {
         where: where,
         include: assetInclude,
       });
+
+      return {
+        ...result,
+        items: await attachNotes("ASSET", result.items),
+      };
     }),
 
   // GET /api/deviceGroups/{deviceGroupId}/assets - List assets for a device group
@@ -126,10 +137,53 @@ export const assetsRouter = createTRPCRouter({
               id: deviceGroupId,
             },
           };
-      return fetchPaginated(prisma.asset, input, {
+      const result = await fetchPaginated(prisma.asset, input, {
         where: whereFilter,
         include: assetInclude,
       });
+
+      return {
+        ...result,
+        items: await attachNotes("ASSET", result.items),
+      };
+    }),
+
+  // Assets used in a clinical workflow — either linked directly to one of its
+  // nodes, or belonging to a device group matched by a node's device-group
+  // matching.
+  getManyByWorkflow: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .output(assetArrayResponseSchema)
+    .query(async ({ input }) => {
+      const { id: workflowId } = input;
+
+      const matchings = await prisma.deviceGroupMatching.findMany({
+        where: { nodes: { some: { workflowId } } },
+        select: {
+          vendorId: true,
+          productId: true,
+          versionId: true,
+          versionRange: true,
+        },
+      });
+      const matchedGroupIds = await findDeviceGroupIdsForMatchings(matchings);
+
+      // Find assets that are directly linked by a node
+      // and assets that are indirectly linked via a node's device group
+      const assets = await prisma.asset.findMany({
+        where: {
+          OR: [
+            { nodes: { some: { workflowId } } },
+            ...(matchedGroupIds.length
+              ? [{ deviceGroupId: { in: matchedGroupIds } }]
+              : []),
+          ],
+        },
+        include: assetInclude,
+        orderBy: { updatedAt: "desc" },
+      });
+
+      return attachNotes("ASSET", assets);
     }),
 
   // not exposed on OpenAPI
@@ -329,16 +383,34 @@ export const assetsRouter = createTRPCRouter({
   }),
 
   // Internal API for asset vulnerability matching
+  // Used only on workflow node detail
   getManyWithVulns: protectedProcedure
     .input(assetsVulnsInputSchema)
     .query(async ({ input }) => {
-      const { cpes, assetIds } = input;
+      const { deviceGroupMatchingIds, assetIds } = input;
 
-      // Return empty results if no filters provided
-      if (
-        (!assetIds || assetIds.length === 0) &&
-        (!cpes || cpes.length === 0)
-      ) {
+      // Assets are matched directly by id and/or via the device-group matchings
+      // the node links (each matching resolves to the device groups, and thus
+      // assets, it applies to).
+      const orConditions: Prisma.AssetWhereInput[] = [];
+      if (assetIds?.length) orConditions.push({ id: { in: assetIds } });
+      if (deviceGroupMatchingIds?.length) {
+        const matchings = await prisma.deviceGroupMatching.findMany({
+          where: { id: { in: deviceGroupMatchingIds } },
+          select: {
+            vendorId: true,
+            productId: true,
+            versionId: true,
+            versionRange: true,
+          },
+        });
+        const matchedGroupIds = await findDeviceGroupIdsForMatchings(matchings);
+        if (matchedGroupIds.length)
+          orConditions.push({ deviceGroupId: { in: matchedGroupIds } });
+      }
+
+      // No resolvable filters => nothing matches.
+      if (orConditions.length === 0) {
         return {
           assets: [],
           assetsCount: 0,
@@ -347,14 +419,7 @@ export const assetsRouter = createTRPCRouter({
         };
       }
 
-      const where = {
-        OR: [
-          ...(assetIds?.length ? [{ id: { in: assetIds } }] : []),
-          ...(cpes?.length
-            ? [{ deviceGroup: { is: { cpe: { hasSome: cpes } } } }]
-            : []),
-        ],
-      };
+      const where = { OR: orConditions };
       const assetsCount = await prisma.asset.count({ where: where });
 
       const assetItems = await prisma.asset.findMany({
@@ -408,7 +473,21 @@ export const assetsRouter = createTRPCRouter({
         where: { id: input.id },
         include: assetInclude,
       });
-      return requireExistence(asset, "Asset");
+      const found = requireExistence(asset, "Asset");
+      return attachNote("ASSET", found);
+    }),
+
+  // Internal: a single asset's utilization schedule rendered as a readable summary.
+  // Used by the chat agent's query_platform_data tool for progressive disclosure
+  getUtilization: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const asset = await prisma.asset.findUnique({
+        where: { id: input.id },
+        select: { utilization: true },
+      });
+      const found = requireExistence(asset, "Asset");
+      return { utilization: renderUtilization(found.utilization) };
     }),
 
   // POST /api/assets - Create asset

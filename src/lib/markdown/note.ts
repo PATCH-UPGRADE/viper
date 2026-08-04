@@ -16,7 +16,7 @@ export function renderNoteTarget(
   note: NoteRow,
   labels: NoteTargetLabels,
 ): string {
-  if (note.status === "PERSISTENT") return "Persistent (hospital-wide)";
+  if (note.status === "PERSISTENT") return "";
   const id = note.instanceId ?? "";
   switch (note.targetModel) {
     case "ASSET":
@@ -30,4 +30,9 @@ export function renderNoteTarget(
     default:
       return "Unknown target";
   }
+}
+
+// build the question and answer text stored in a note
+export function renderQnA(title: string, answer: string | null): string {
+  return `Q: ${title}\nA: ${answer ?? "(no answer)"}`;
 }

@@ -7,6 +7,7 @@ import {
   NotificationType,
   Priority,
 } from "@/generated/prisma";
+import { requestNoteAction } from "@/inngest/functions/notes-action";
 import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
@@ -608,14 +609,14 @@ export const notificationsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      await prisma.$transaction(async (tx) => {
+      const feedback = await prisma.$transaction(async (tx) => {
         if (input.targetType === "NotificationDeviceGroupMapping") {
           await tx.notificationDeviceGroupMapping.update({
             where: { id: input.targetId },
             data: { confidence: "Rejected" },
           });
         }
-        await tx.matchFeedback.create({
+        return await tx.matchFeedback.create({
           data: {
             targetType: input.targetType,
             targetId: input.targetId,
@@ -625,6 +626,9 @@ export const notificationsRouter = createTRPCRouter({
           },
         });
       });
+      if (input.comment?.trim()) {
+        await requestNoteAction("MATCH_FEEDBACK", feedback.id);
+      }
     }),
 
   update: protectedProcedure

@@ -226,67 +226,71 @@ export function NotificationDetailsTab({
     }
   };
 
+  const hasAssets = withAssets.length > 0;
+
   return (
     <>
       <HospitalImpactCard notification={notification} />
       <NotificationSummaryCard notification={notification} />
 
       {/* Affected Products */}
-      <CollapsibleCard defaultOpen>
-        <CollapsibleCardTrigger>Affected Products</CollapsibleCardTrigger>
-        <CollapsibleCardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Vendor</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead>Affected Versions</TableHead>
-                <TableHead className="text-right">Affected Assets</TableHead>
-                <TableHead className="w-0" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[...vendorGroups.entries()].map(([vendor, matchings]) =>
-                matchings.map((m, index) => (
-                  <TableRow key={m.id}>
-                    {index === 0 && (
-                      <TableCell
-                        rowSpan={matchings.length}
-                        className="border-r align-top font-semibold"
-                      >
-                        {vendor}
+      {hasAssets && (
+        <CollapsibleCard defaultOpen>
+          <CollapsibleCardTrigger>Affected Products</CollapsibleCardTrigger>
+          <CollapsibleCardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vendor</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Affected Versions</TableHead>
+                  <TableHead className="text-right">Affected Assets</TableHead>
+                  <TableHead className="w-0" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...vendorGroups.entries()].map(([vendor, matchings]) =>
+                  matchings.map((m, index) => (
+                    <TableRow key={m.id}>
+                      {index === 0 && (
+                        <TableCell
+                          rowSpan={matchings.length}
+                          className="border-r align-top font-semibold"
+                        >
+                          {vendor}
+                        </TableCell>
+                      )}
+                      <TableCell className="font-medium">
+                        {displayName(m.deviceGroupMatching.product)}
                       </TableCell>
-                    )}
-                    <TableCell className="font-medium">
-                      {displayName(m.deviceGroupMatching.product)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {displayName(m.deviceGroupMatching.version) ??
-                          m.deviceGroupMatching.versionRange}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-bold">
-                      {m.assetCount}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive"
-                        onClick={() => setRejecting(m)}
-                        aria-label="Unlink this device group"
-                      >
-                        <Unlink className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )),
-              )}
-            </TableBody>
-          </Table>
-        </CollapsibleCardContent>
-      </CollapsibleCard>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {displayName(m.deviceGroupMatching.version) ??
+                            m.deviceGroupMatching.versionRange}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-bold">
+                        {m.assetCount}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive"
+                          onClick={() => setRejecting(m)}
+                          aria-label="Unlink this device group"
+                        >
+                          <Unlink className="size-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )),
+                )}
+              </TableBody>
+            </Table>
+          </CollapsibleCardContent>
+        </CollapsibleCard>
+      )}
 
       {/* Details */}
       <CollapsibleCard defaultOpen>

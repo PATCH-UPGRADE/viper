@@ -15,6 +15,7 @@ import prisma, { type TransactionClient } from "@/lib/db";
 import { requireExistence } from "@/trpc/middleware";
 import {
   type DeviceGroupIdentity,
+  deviceGroupWhereForMatching,
   type MatchingLike,
   matchingAppliesToDeviceGroup,
   matchingWhereForDeviceGroup,
@@ -492,6 +493,30 @@ export async function findMatchingIdsForDeviceGroup(
   return candidates
     .filter((matching) => identityAppliesToGroup(matching, group))
     .map((matching) => matching.id);
+}
+
+/**
+ * Inverse of {@link findMatchingIdsForDeviceGroup}: resolve a set of device-group
+ * matchings to the concrete device-group ids they apply to. Coarse vendor/product
+ * DB filter, then the in-memory VERS-range check (matchingAppliesToDeviceGroup).
+ */
+export async function findDeviceGroupIdsForMatchings(
+  matchings: MatchingLike[],
+): Promise<string[]> {
+  if (matchings.length === 0) return [];
+  const candidateGroups = await prisma.deviceGroup.findMany({
+    where: { OR: matchings.map(deviceGroupWhereForMatching) },
+    select: {
+      id: true,
+      vendorId: true,
+      productId: true,
+      versionId: true,
+      version: { select: { canonicalName: true } },
+    },
+  });
+  return candidateGroups
+    .filter((group) => matchings.some((m) => identityAppliesToGroup(m, group)))
+    .map((group) => group.id);
 }
 
 export async function fetchPaginated<

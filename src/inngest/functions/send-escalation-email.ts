@@ -16,7 +16,8 @@ export async function sendEscalationEmail(
   try {
     await inngest.send({ name: SEND_EMAIL_EVENT, data: payload });
   } catch (error) {
-    console.warn(`Failed to send email, ${error}`);
+    console.error(`Failed to send email, ${error}`);
+    throw error;
   }
 }
 
@@ -31,9 +32,9 @@ export const sendEscalationEmailFn = inngest.createFunction(
     const { toEmails, subject, body } =
       event.data as sendEscalationEmailPayload;
 
-    const emailId = await step.run("send-email", () => {
-      resendMailer.sendEmail({ to: toEmails, subject, text: body });
-    });
+    const emailId = await step.run("send-email", () =>
+      resendMailer.sendEmail({ to: toEmails, subject, text: body }),
+    );
 
     return { sent: true, emailId };
   },

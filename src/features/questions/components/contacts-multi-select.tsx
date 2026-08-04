@@ -24,11 +24,12 @@ export function ContactMultiSelect({
   options,
   selected,
   onChange,
+  ...aria
 }: {
   options: ContactOptions[];
   selected: string[];
   onChange: (emails: string[]) => void;
-}) {
+} & React.AriaAttributes) {
   const [open, setOpen] = useState(false);
   const toggle = (email: string) =>
     onChange(
@@ -69,6 +70,7 @@ export function ContactMultiSelect({
             aria-expanded={open}
             disabled={false}
             className="h-8 justify-between font-normal"
+            {...aria}
           >
             <span className="text-muted-foreground">
               {selected.length === 0

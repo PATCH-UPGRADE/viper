@@ -66,7 +66,6 @@ export function useApproveEscalation(notificationId: string) {
   return useMutation(
     trpc.questions.approveEscalationEmail.mutationOptions({
       onSuccess: (_data, variables) => {
-        toast.success("Email sent");
         const filter =
           trpc.questions.getSuggestedEmailByNotificationId.queryFilter({
             notificationId,
@@ -78,6 +77,7 @@ export function useApproveEscalation(notificationId: string) {
               (email) => email.questionId !== variables.questionId,
             ),
         );
+        toast.success("Email sent");
       },
       onError: (err) => toast.error(`Failed to send: ${err.message}`),
     }),

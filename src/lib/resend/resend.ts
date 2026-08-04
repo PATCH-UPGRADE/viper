@@ -1,6 +1,6 @@
 import "server-only";
 import { Resend } from "resend";
-import { resendConfig } from "./config";
+import { getResendConfig } from "./config";
 
 export interface SendEmailType {
   to: string | string[];
@@ -10,8 +10,9 @@ export interface SendEmailType {
   replyTo?: string;
 }
 
+const { apiKey, from } = getResendConfig();
 export class ResendMailer {
-  private client: Resend = new Resend(resendConfig.apiKey);
+  private client: Resend = new Resend(apiKey);
   private from: string;
 
   constructor(from: string) {
@@ -35,4 +36,4 @@ export class ResendMailer {
   }
 }
 
-export const resendMailer = new ResendMailer(resendConfig.from);
+export const resendMailer = new ResendMailer(from);

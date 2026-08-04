@@ -1,6 +1,6 @@
 "use client";
 import { Check, Copy, Info, Mail, Pencil, Send } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,10 @@ export const SuggestedEmailCard = ({
   const [subject, setSubject] = useState(email.subject);
   const [body, setBody] = useState(email.body);
   const [isEditing, setIsEditing] = useState(false);
+
+  const fieldId = useId();
+  const toLabelId = `${fieldId}-to`;
+  const subjectLabelId = `${fieldId}-subject`;
 
   const onhandleClickCopy = async () => {
     await handleCopy(`${email.body}`, () => toast.success("Email text copied"));
@@ -82,7 +86,12 @@ export const SuggestedEmailCard = ({
         <div className="rounded border">
           <div className="flex flex-col gap-2 text-sm border-b bg-muted/50 p-3">
             <div className="flex items-center gap-2">
-              <span className="w-16 shrink-0 text-muted-foreground">To</span>
+              <span
+                id={toLabelId}
+                className="w-16 shrink-0 text-muted-foreground"
+              >
+                To
+              </span>
               <div className="min-w-0 flex-1">
                 {isEditing ? (
                   <ContactMultiSelect
@@ -98,7 +107,10 @@ export const SuggestedEmailCard = ({
               </div>
             </div>
             <div className="flex gap-2">
-              <span className="w-16 shrink-0 text-muted-foreground">
+              <span
+                id={subjectLabelId}
+                className="w-16 shrink-0 text-muted-foreground"
+              >
                 Subject
               </span>
               {isEditing ? (
@@ -115,6 +127,7 @@ export const SuggestedEmailCard = ({
           </div>
           {isEditing ? (
             <Textarea
+              aria-label="Email body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               disabled={isSending}

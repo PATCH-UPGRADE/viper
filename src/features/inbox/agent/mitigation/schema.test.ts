@@ -112,6 +112,40 @@ describe("buildMitigationPlansSchema", () => {
     expect(parsed.success).toBe(false);
   });
 
+  it("rejects an opaque ref leaking into work-order prose, even with valid links", () => {
+    const parsed = schema.safeParse(
+      withWorkOrder({
+        ...goldenPlan.workOrders[0],
+        detailedDescription:
+          "Patch the workstations in group-1 during the next maintenance window.",
+      }),
+    );
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects an opaque ref leaking into a plan card", () => {
+    const parsed = schema.safeParse({
+      plans: [
+        {
+          ...goldenPlan,
+          cards: { ...goldenPlan.cards, coverage: "all assets in group-2" },
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("does not flag prose that merely resembles a ref", () => {
+    const parsed = schema.safeParse(
+      withWorkOrder({
+        ...goldenPlan.workOrders[0],
+        detailedDescription:
+          "Move the scanners to VLAN group-10 and verify subgroup-1 connectivity.",
+      }),
+    );
+    expect(parsed.success).toBe(true);
+  });
+
   it("rejects a device group id outside the catalog", () => {
     const parsed = schema.safeParse(
       withWorkOrder({

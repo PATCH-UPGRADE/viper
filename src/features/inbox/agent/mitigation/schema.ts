@@ -67,20 +67,53 @@ export function buildMitigationPlansSchema(refs: EntityRefs) {
       ),
   });
 
-  const mitigationPlanItemSchema = z.object({
-    title: z.string(),
-    summary: z.string().describe("what this plan does, in plain terms"),
-    compareLine: z
-      .string()
-      .describe("short blurb comparing this plan to the other plans"),
-    tags: z.array(z.enum(PlanTagEnum)),
-    cards: planCardsSchema,
-    workOrders: z
-      .array(planWorkOrderSchema)
-      .describe(
-        "the work orders that would be created if this plan is accepted",
-      ),
-  });
+  // Refs belong in the linking fields only; a ref in prose fails the parse, so
+  // the Inngest retry re-rolls the model instead of the leak reaching users.
+  const offered = Object.keys(refs.idByRef);
+  const leakPattern =
+    offered.length > 0 ? new RegExp(`\\b(?:${offered.join("|")})\\b`) : null;
+
+  const mitigationPlanItemSchema = z
+    .object({
+      title: z.string(),
+      summary: z.string().describe("what this plan does, in plain terms"),
+      compareLine: z
+        .string()
+        .describe("short blurb comparing this plan to the other plans"),
+      tags: z.array(z.enum(PlanTagEnum)),
+      cards: planCardsSchema,
+      workOrders: z
+        .array(planWorkOrderSchema)
+        .describe(
+          "the work orders that would be created if this plan is accepted",
+        ),
+    })
+    .superRefine((plan, ctx) => {
+      if (!leakPattern) return;
+      const check = (text: string, path: (string | number)[]) => {
+        const hit = text.match(leakPattern);
+        if (hit) {
+          ctx.addIssue({
+            code: "custom",
+            path,
+            message: `internal reference "${hit[0]}" must not appear in staff-visible text`,
+          });
+        }
+      };
+      check(plan.title, ["title"]);
+      check(plan.summary, ["summary"]);
+      check(plan.compareLine, ["compareLine"]);
+      for (const [key, value] of Object.entries(plan.cards)) {
+        check(value, ["cards", key]);
+      }
+      plan.workOrders.forEach((w, i) => {
+        check(w.shortDescription, ["workOrders", i, "shortDescription"]);
+        check(w.detailedDescription, ["workOrders", i, "detailedDescription"]);
+        w.deviceGroups.forEach((g, j) => {
+          check(g.reasonWhy, ["workOrders", i, "deviceGroups", j, "reasonWhy"]);
+        });
+      });
+    });
 
   return z.object({
     plans: z

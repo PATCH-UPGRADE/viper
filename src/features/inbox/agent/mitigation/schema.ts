@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { LinkableIds } from "@/features/inbox/agent/triage/context";
+import type { EntityRefs } from "@/features/inbox/agent/refs";
 import { PlanTagEnum } from "@/generated/prisma";
 
 // Stored in MitigationPlan.card
@@ -26,9 +26,10 @@ function idArray(ids: string[], description: string) {
 }
 
 /**
- * Bake valid ID's into the schema we give the model itself...
+ * Bake the valid refs into the schema we give the model itself. The model never
+ * sees database ids — `createMitigationPlans` translates refs back after parsing.
  */
-export function buildMitigationPlansSchema(ids: LinkableIds) {
+export function buildMitigationPlansSchema(refs: EntityRefs) {
   const planWorkOrderSchema = z.object({
     shortDescription: z
       .string()
@@ -37,19 +38,19 @@ export function buildMitigationPlansSchema(ids: LinkableIds) {
       .string()
       .describe("full description of the work to perform"),
     vulnerabilityIds: idArray(
-      ids.vulnerabilityIds,
-      "ids of ONLY the vulnerabilities this specific work order addresses; empty if none",
+      refs.vulnerabilityRefs,
+      "refs (e.g. vuln-1) of ONLY the vulnerabilities this specific work order addresses; empty if none",
     ),
     remediationIds: idArray(
-      ids.remediationIds,
-      "ids of ONLY the remediations this specific work order applies; empty if none",
+      refs.remediationRefs,
+      "refs (e.g. rem-1) of ONLY the remediations this specific work order applies; empty if none",
     ),
     deviceGroups: z
       .array(
         z.object({
           id:
-            ids.deviceGroupMatchingIds.length > 0
-              ? z.enum(ids.deviceGroupMatchingIds as [string, ...string[]])
+            refs.deviceGroupMatchingRefs.length > 0
+              ? z.enum(refs.deviceGroupMatchingRefs as [string, ...string[]])
               : z.never(),
           confidence: z
             .enum(["NeedsReview", "Matched"])

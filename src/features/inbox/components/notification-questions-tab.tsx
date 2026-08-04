@@ -4,6 +4,8 @@ import { CheckCircle2, MessageSquareText } from "lucide-react";
 import { QuestionCard } from "@/features/questions/components/question-card";
 import { SuggestedEmailCard } from "@/features/questions/components/suggested-vendor-email-card";
 import {
+  useApproveEscalation,
+  useDismissEscalation,
   useSuspenseQuestionsByNotificationId,
   useSuspenseSuggestedEmailsByNotificationId,
 } from "@/features/questions/hooks/use-questions";
@@ -19,17 +21,24 @@ export function NotificationQuestionTab({
   const { data: suggestedEmails } =
     useSuspenseSuggestedEmailsByNotificationId(notificationId);
 
-  const handleApprove = () => {
-    console.log("Approve the draft and send email");
+  const approve = useApproveEscalation(notificationId);
+  const dismiss = useDismissEscalation();
+
+  const handleApprove = (email: any) => {
+    approve.mutate({
+      questionId: email.questionId,
+      toEmails: email.toEmails,
+      subject: email.subject,
+      body: email.body,
+    });
   };
-  const handleDismiss = () => {
-    console.log("Approve the draft and send email");
+  const handleDismiss = (questionId: string) => {
+    dismiss(questionId);
   };
 
   const pending = questions.filter((q) => q.status === "PENDING");
-  const emails = suggestedEmails.filter((email) => email.status === "DRAFT");
 
-  if (pending.length === 0 && emails.length === 0) {
+  if (pending.length === 0 && suggestedEmails.length === 0) {
     if (questions.length === 0 && suggestedEmails.length === 0) {
       return (
         <p className="text-sm text-muted-foreground">
@@ -51,16 +60,16 @@ export function NotificationQuestionTab({
       `${pending.length} question${pending.length === 1 ? "" : "s"}`,
     );
   }
-  if (emails.length > 0) {
+  if (suggestedEmails.length > 0) {
     bannerText.push(
-      `${emails.length} suggested vendor email${emails.length === 1 ? "" : "s"}`,
+      `${suggestedEmails.length} suggested vendor email${suggestedEmails.length === 1 ? "" : "s"}`,
     );
   }
   const fullText = bannerText.join(" and ");
 
   return (
     <div className="flex flex-col gap-4">
-      {(pending.length > 0 || emails.length > 0) && (
+      {(pending.length > 0 || suggestedEmails.length > 0) && (
         <div className="flex items-start gap-2 rounded-md border bg-muted/50 p-4 text-sm rounded-xl border-orange-200/80 bg-orange-50/80 dark:border-orange-900/70 dark:bg-orange-950/40">
           <MessageSquareText className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
           <p>
@@ -77,16 +86,15 @@ export function NotificationQuestionTab({
       {pending.map((q) => (
         <QuestionCard key={q.id} question={q} />
       ))}
-      {false &&
-        emails.map((email) => (
-          <SuggestedEmailCard
-            key={email.id}
-            email={email}
-            isSending={false}
-            onApprove={handleApprove}
-            onDismiss={handleDismiss}
-          />
-        ))}
+      {suggestedEmails.map((email) => (
+        <SuggestedEmailCard
+          key={email.questionId}
+          email={email}
+          isSending={approve.isPending}
+          onApprove={() => handleApprove(email)}
+          onDismiss={() => handleDismiss(email.questionId)}
+        />
+      ))}
     </div>
   );
 }

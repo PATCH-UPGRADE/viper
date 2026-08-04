@@ -111,7 +111,8 @@ const SidebarNavItem = ({ item }: { item: NavItem }) => {
       <SidebarMenuButton
         tooltip={item.title}
         isActive={
-          item.url === "/" ? pathname === "/" : pathname.startsWith(item.url)
+          pathname === item.url ||
+          (item.url !== "/" && pathname.startsWith(`${item.url}/`))
         }
         asChild
         className="gap-x-4 h-10 px-4"

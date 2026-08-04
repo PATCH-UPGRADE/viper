@@ -86,8 +86,21 @@ async function seed() {
   console.log(`\n✨ Added ${ROWS.length} unread notifications`);
 }
 
+function assertLocalDatabase() {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) throw new Error("DATABASE_URL is not set.");
+  const { hostname } = new URL(raw);
+  if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+    throw new Error(
+      `Refusing to run: DATABASE_URL points at "${hostname}". This script writes and deletes notifications and only runs against a local database.`,
+    );
+  }
+}
+
 const run = process.argv.includes("--clean") ? clean : seed;
-run()
+Promise.resolve()
+  .then(assertLocalDatabase)
+  .then(run)
   .catch((error) => {
     console.error(error);
     process.exitCode = 1;

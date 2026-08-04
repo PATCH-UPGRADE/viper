@@ -1,6 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
+import type { ReactNode } from "react";
 import {
   EntityContainer,
   ErrorView,
@@ -45,7 +46,7 @@ export const OverviewContainer = ({
   children,
 }: {
   name: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) => (
   <EntityContainer header={<OverviewGreeting name={name} />}>
     {children}

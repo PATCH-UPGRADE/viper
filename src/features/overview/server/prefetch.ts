@@ -1,3 +1,4 @@
+import "server-only";
 import { prefetch, trpc } from "@/trpc/server";
 
 export const prefetchOverview = () => {

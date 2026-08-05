@@ -41,6 +41,7 @@ function buildHtml(asset: QrPdfAsset, url: string, qrSvg: string): string {
         margin: 0;
         padding: 64px 72px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 14px;
         color: #111827;
       }
       h1 {
@@ -50,12 +51,10 @@ function buildHtml(asset: QrPdfAsset, url: string, qrSvg: string): string {
       }
       .url {
         font-family: "SF Mono", Menlo, Consolas, monospace;
-        font-size: 14px;
         color: #374151;
         margin: 0 0 20px;
       }
       .description {
-        font-size: 14px;
         color: #6b7280;
         max-width: 480px;
         line-height: 1.5;
@@ -74,7 +73,6 @@ function buildHtml(asset: QrPdfAsset, url: string, qrSvg: string): string {
         margin: 0 0 4px;
       }
       .device-label {
-        font-size: 14px;
         color: #6b7280;
         margin: 0 0 24px;
       }
@@ -91,7 +89,6 @@ function buildHtml(asset: QrPdfAsset, url: string, qrSvg: string): string {
         margin: 0 0 4px;
       }
       .serial-value {
-        font-size: 14px;
         font-weight: 700;
         margin: 0;
       }
@@ -109,7 +106,6 @@ function buildHtml(asset: QrPdfAsset, url: string, qrSvg: string): string {
         margin-top: 12px;
       }
       .brand span {
-        font-size: 14px;
         font-weight: 700;
       }
     </style>

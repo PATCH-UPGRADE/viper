@@ -1,11 +1,9 @@
 import { expect, it } from "vitest";
 import { escapeHtml, renderAssetQrPdf } from "../qr-pdf";
 
-it("escapes HTML control characters", () => {
+it("renders a safe PDF", async () => {
   expect(escapeHtml(`&<>"'`)).toBe("&amp;&lt;&gt;&quot;&#39;");
-});
 
-it("renders a real PDF", async () => {
   const pdf = await renderAssetQrPdf({
     id: "asset_123",
     role: "ICU Monitor",

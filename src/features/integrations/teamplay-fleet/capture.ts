@@ -1,4 +1,14 @@
-import { launchHeadlessBrowser } from "@/lib/headless-browser";
+async function launchBrowser() {
+  const { chromium } = await import("playwright-core");
+
+  if (!process.env.VERCEL) return chromium.launch();
+
+  const { default: sparticuzChromium } = await import("@sparticuz/chromium");
+  return chromium.launch({
+    executablePath: await sparticuzChromium.executablePath(),
+    args: sparticuzChromium.args,
+  });
+}
 
 export interface SessionLoginConfig {
   welcomeUrl: string;
@@ -27,7 +37,7 @@ export async function grabSessionCookie(
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxAttempt; attempt++) {
-    const browser = await launchHeadlessBrowser();
+    const browser = await launchBrowser();
 
     try {
       const context = await browser.newContext();

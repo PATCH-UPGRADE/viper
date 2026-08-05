@@ -5,10 +5,12 @@ import {
 import { getSession } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
 
-type RouteParams = { params: Promise<{ assetId: string }> };
-
-export async function GET(_req: Request, { params }: RouteParams) {
-  if (!(await getSession())) {
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ assetId: string }> },
+) {
+  const session = await getSession();
+  if (!session) {
     return new Response("Unauthorized", { status: 401 });
   }
 

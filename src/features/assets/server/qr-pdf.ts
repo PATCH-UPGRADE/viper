@@ -29,7 +29,6 @@ const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
 const MARGIN_X = 72;
 const MARGIN_TOP = 64;
-const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_X * 2;
 
 const DARK = rgb(0.067, 0.094, 0.153);
 const LINE_GRAY = rgb(0.216, 0.255, 0.318);
@@ -46,33 +45,11 @@ const LOGO_PATHS = [
   { d: "M19.5 0H31.5L12.5 32H0.5L19.5 0Z", color: rgb(1, 0.737, 0.49) },
 ];
 
-function wrapText(
-  font: PDFFont,
-  text: string,
-  size: number,
-  maxWidth: number,
-): string[] {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let line = "";
-  for (const word of words) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (line && font.widthOfTextAtSize(candidate, size) > maxWidth) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = candidate;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
 export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   const url = `${getBaseUrl()}/assets/${asset.id}/work-orders`;
+  const qrSize = 150;
   const qrPng = await QRCode.toBuffer(url, {
-    type: "png",
-    width: 250,
+    width: qrSize,
     margin: 1,
   });
 
@@ -84,9 +61,14 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   const qrImage = await pdfDoc.embedPng(qrPng);
 
   let y = PAGE_HEIGHT - MARGIN_TOP;
-  const text = (str: string, size: number, font: PDFFont, color: Color) =>
-    page.drawText(str, { x: MARGIN_X, y, size, font, color });
-  const divider = () =>
+  const drawText = (
+    text: string,
+    size: number,
+    font: PDFFont,
+    color: Color,
+    lineHeight?: number,
+  ) => page.drawText(text, { x: MARGIN_X, y, size, font, color, lineHeight });
+  const drawDivider = () =>
     page.drawLine({
       start: { x: MARGIN_X, y },
       end: { x: PAGE_WIDTH - MARGIN_X, y },
@@ -95,24 +77,21 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
     });
 
   y -= 28;
-  text("Quick access to your equipment", 28, bold, DARK);
+  drawText("Quick access to your equipment", 28, bold, DARK);
   y -= 32;
 
-  text(url, 12, mono, LINE_GRAY);
+  drawText(url, 12, mono, LINE_GRAY);
   y -= 28;
 
-  for (const line of wrapText(
-    font,
-    "Scan the QR code below to view this device's live status, open work orders, and service history in an instant.",
+  drawText(
+    "Scan the QR code below to view this device's live status, open work orders, and service\nhistory in an instant.",
     12,
-    CONTENT_WIDTH,
-  )) {
-    text(line, 12, font, GRAY);
-    y -= 18;
-  }
-  y -= 14;
+    font,
+    GRAY,
+    18,
+  );
+  y -= 50;
 
-  const qrSize = 250;
   const qrPad = 12;
   const qrBoxSize = qrSize + qrPad * 2;
   page.drawRectangle({
@@ -131,51 +110,48 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   });
   y -= qrBoxSize + 24;
 
-  text(getAssetRoleLabel(asset), 18, bold, DARK);
+  drawText(getAssetRoleLabel(asset), 18, bold, DARK);
   y -= 22;
 
-  text(deviceGroupLabel(asset.deviceGroup), 12, font, GRAY);
+  drawText(deviceGroupLabel(asset.deviceGroup), 12, font, GRAY);
   y -= 24;
 
-  divider();
+  drawDivider();
   y -= 24;
 
   if (asset.serialNumber) {
-    text("SERIAL NUMBER", 9, bold, LIGHT_GRAY);
+    drawText("SERIAL NUMBER", 9, bold, LIGHT_GRAY);
     y -= 15;
-    text(asset.serialNumber, 12, bold, DARK);
+    drawText(asset.serialNumber, 12, bold, DARK);
     y -= 24;
 
-    divider();
+    drawDivider();
     y -= 24;
   }
 
-  for (const line of wrapText(
-    font,
-    "This document was generated automatically by Viper and reflects device data as of the date of creation. Contact your IT administrator for the latest status.",
+  drawText(
+    "This document was generated automatically by Viper and reflects device data as of the date of creation.\nContact your IT administrator for the latest status.",
     9,
-    420,
-  )) {
-    text(line, 9, font, LIGHT_GRAY);
-    y -= 13;
-  }
+    font,
+    LIGHT_GRAY,
+    13,
+  );
 
   const wordmarkWidth = bold.widthOfTextAtSize("Viper", 12);
   const logoScale = 0.5;
   const logoX =
     PAGE_WIDTH - MARGIN_X - LOGO_WIDTH * logoScale - 8 - wordmarkWidth;
-  const logoY = MARGIN_TOP;
   for (const { d, color } of LOGO_PATHS) {
     page.drawSvgPath(d, {
       x: logoX,
-      y: logoY + LOGO_HEIGHT * logoScale,
+      y: MARGIN_TOP + LOGO_HEIGHT * logoScale,
       scale: logoScale,
       color,
     });
   }
   page.drawText("Viper", {
     x: logoX + LOGO_WIDTH * logoScale + 8,
-    y: logoY + (LOGO_HEIGHT * logoScale - 12) / 2,
+    y: MARGIN_TOP + (LOGO_HEIGHT * logoScale - 12) / 2,
     size: 12,
     font: bold,
     color: DARK,

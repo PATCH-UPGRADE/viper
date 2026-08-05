@@ -823,7 +823,6 @@ export function AssetDashboardDrawer({
           addSuffix: true,
         })}
       </span>
-      <AssetQrPdfLink assetId={asset.id} />
     </>
   );
 

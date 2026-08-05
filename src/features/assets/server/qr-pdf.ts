@@ -1,4 +1,10 @@
-import { PDFDocument, type PDFFont, rgb, StandardFonts } from "pdf-lib";
+import {
+  type Color,
+  PDFDocument,
+  type PDFFont,
+  rgb,
+  StandardFonts,
+} from "pdf-lib";
 import QRCode from "qrcode";
 import type { Prisma } from "@/generated/prisma";
 import { deviceGroupLabel } from "@/lib/markdown";
@@ -78,24 +84,21 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   const qrImage = await pdfDoc.embedPng(qrPng);
 
   let y = PAGE_HEIGHT - MARGIN_TOP;
+  const text = (str: string, size: number, font: PDFFont, color: Color) =>
+    page.drawText(str, { x: MARGIN_X, y, size, font, color });
+  const divider = () =>
+    page.drawLine({
+      start: { x: MARGIN_X, y },
+      end: { x: PAGE_WIDTH - MARGIN_X, y },
+      thickness: 1,
+      color: BORDER_GRAY,
+    });
 
   y -= 28;
-  page.drawText("Quick access to your equipment", {
-    x: MARGIN_X,
-    y,
-    size: 28,
-    font: bold,
-    color: DARK,
-  });
+  text("Quick access to your equipment", 28, bold, DARK);
   y -= 32;
 
-  page.drawText(url, {
-    x: MARGIN_X,
-    y,
-    size: 12,
-    font: mono,
-    color: LINE_GRAY,
-  });
+  text(url, 12, mono, LINE_GRAY);
   y -= 28;
 
   for (const line of wrapText(
@@ -104,7 +107,7 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
     12,
     CONTENT_WIDTH,
   )) {
-    page.drawText(line, { x: MARGIN_X, y, size: 12, font, color: GRAY });
+    text(line, 12, font, GRAY);
     y -= 18;
   }
   y -= 14;
@@ -128,56 +131,22 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   });
   y -= qrBoxSize + 24;
 
-  page.drawText(getAssetRoleLabel(asset), {
-    x: MARGIN_X,
-    y,
-    size: 18,
-    font: bold,
-    color: DARK,
-  });
+  text(getAssetRoleLabel(asset), 18, bold, DARK);
   y -= 22;
 
-  page.drawText(deviceGroupLabel(asset.deviceGroup), {
-    x: MARGIN_X,
-    y,
-    size: 12,
-    font,
-    color: GRAY,
-  });
+  text(deviceGroupLabel(asset.deviceGroup), 12, font, GRAY);
   y -= 24;
 
-  page.drawLine({
-    start: { x: MARGIN_X, y },
-    end: { x: PAGE_WIDTH - MARGIN_X, y },
-    thickness: 1,
-    color: BORDER_GRAY,
-  });
+  divider();
   y -= 24;
 
   if (asset.serialNumber) {
-    page.drawText("SERIAL NUMBER", {
-      x: MARGIN_X,
-      y,
-      size: 9,
-      font: bold,
-      color: LIGHT_GRAY,
-    });
+    text("SERIAL NUMBER", 9, bold, LIGHT_GRAY);
     y -= 15;
-    page.drawText(asset.serialNumber, {
-      x: MARGIN_X,
-      y,
-      size: 12,
-      font: bold,
-      color: DARK,
-    });
+    text(asset.serialNumber, 12, bold, DARK);
     y -= 24;
 
-    page.drawLine({
-      start: { x: MARGIN_X, y },
-      end: { x: PAGE_WIDTH - MARGIN_X, y },
-      thickness: 1,
-      color: BORDER_GRAY,
-    });
+    divider();
     y -= 24;
   }
 
@@ -187,7 +156,7 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
     9,
     420,
   )) {
-    page.drawText(line, { x: MARGIN_X, y, size: 9, font, color: LIGHT_GRAY });
+    text(line, 9, font, LIGHT_GRAY);
     y -= 13;
   }
 

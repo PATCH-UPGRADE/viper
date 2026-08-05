@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
+import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import { AssetWorkOrders } from "@/features/tracking/components/asset-work-orders";
 import { SuggestedWorkOrderModal } from "@/features/tracking/components/suggested-work-order-modal";
 import {
@@ -21,14 +21,14 @@ const Page = async ({ params }: PageProps) => {
 
   return (
     <HydrateClient>
-      <ErrorBoundary fallback={<TrackingError />}>
+      <ReportingErrorBoundary fallback={<TrackingError />}>
         <Suspense fallback={<TrackingLoading />}>
           <SuggestedWorkOrderModal assetId={assetId} />
           <div className="px-4">
             <AssetWorkOrders assetId={assetId} />
           </div>
         </Suspense>
-      </ErrorBoundary>
+      </ReportingErrorBoundary>
     </HydrateClient>
   );
 };

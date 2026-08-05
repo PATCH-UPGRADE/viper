@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
+import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import {
   OverviewContainer,
   OverviewError,
@@ -17,11 +17,11 @@ const Page = async () => {
   return (
     <OverviewContainer name={session.user.name ?? "there"}>
       <HydrateClient>
-        <ErrorBoundary fallback={<OverviewError />}>
+        <ReportingErrorBoundary fallback={<OverviewError />}>
           <Suspense fallback={<OverviewLoading />}>
             <OverviewPanels />
           </Suspense>
-        </ErrorBoundary>
+        </ReportingErrorBoundary>
       </HydrateClient>
     </OverviewContainer>
   );

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
+import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import {
   IntegrationsError,
   IntegrationsList,
@@ -34,11 +34,11 @@ const Page = async ({
 
   return (
     <HydrateClient>
-      <ErrorBoundary fallback={<IntegrationsError />}>
+      <ReportingErrorBoundary fallback={<IntegrationsError />}>
         <Suspense fallback={<IntegrationsLoading />}>
           <IntegrationsList resourceType={resourceType} />
         </Suspense>
-      </ErrorBoundary>
+      </ReportingErrorBoundary>
     </HydrateClient>
   );
 };

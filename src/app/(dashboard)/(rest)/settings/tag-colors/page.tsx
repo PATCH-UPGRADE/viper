@@ -1,6 +1,6 @@
 import "server-only";
 import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
+import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import { prefetchDepartments } from "@/features/departments/server/prefetch";
 import {
   TagColorsContainer,
@@ -19,11 +19,11 @@ const Page = async () => {
   return (
     <TagColorsContainer>
       <HydrateClient>
-        <ErrorBoundary fallback={<TagColorsError />}>
+        <ReportingErrorBoundary fallback={<TagColorsError />}>
           <Suspense fallback={<TagColorsLoading />}>
             <TagColorsList />
           </Suspense>
-        </ErrorBoundary>
+        </ReportingErrorBoundary>
       </HydrateClient>
     </TagColorsContainer>
   );

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type React from "react";
 import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
+import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import {
   AssetsError,
   AssetsList,
@@ -88,11 +88,11 @@ const Page = async ({
 
   return (
     <HydrateClient>
-      <ErrorBoundary fallback={<config.errorElement />}>
+      <ReportingErrorBoundary fallback={<config.errorElement />}>
         <Suspense fallback={<config.loadingElement />}>
           <config.listElement />
         </Suspense>
-      </ErrorBoundary>
+      </ReportingErrorBoundary>
     </HydrateClient>
   );
 };

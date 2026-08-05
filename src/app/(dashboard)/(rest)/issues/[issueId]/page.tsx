@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
+import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import {
   IssueContainer,
   IssueDetailPage,
@@ -26,11 +26,11 @@ const Page = async ({ params }: PageProps) => {
   return (
     <IssueContainer>
       <HydrateClient>
-        <ErrorBoundary fallback={<IssueError />}>
+        <ReportingErrorBoundary fallback={<IssueError />}>
           <Suspense fallback={<IssueLoading />}>
             <IssueDetailPage id={issueId} />
           </Suspense>
-        </ErrorBoundary>
+        </ReportingErrorBoundary>
       </HydrateClient>
     </IssueContainer>
   );

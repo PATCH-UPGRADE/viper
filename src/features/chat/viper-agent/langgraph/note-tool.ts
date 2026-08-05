@@ -25,7 +25,14 @@ export function makeRecordNoteTool(userId: string) {
         userId,
       };
 
-      await requestNoteAction("CHAT", crypto.randomUUID(), input);
+      const queued = await requestNoteAction(
+        "CHAT",
+        crypto.randomUUID(),
+        input,
+      );
+      if (!queued) {
+        return `NOT RECORDED. Tell the user their note did not save and to try again in a momment. Do you claim you record anything.`;
+      }
 
       return [
         `Queued for ${targetModel}.`,

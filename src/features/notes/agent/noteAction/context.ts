@@ -65,8 +65,6 @@ export async function gatherNoteActionContext(
   return { request, markdown, candidates };
 }
 
-// TODO: Agent should have a choice to omit notes, best decision would come from seeing user behavior, VW-393 will have another agent using a tool to record notes
-// https://github.com/PATCH-UPGRADE/viper/pull/194#discussion_r3691510350
 export const SYSTEM_PROMPT = `You maintain a hospital vulnerability-management team's notes about their medice devices, assets, vulnerabilities,
 and remediations. Notes are the team's durable memory: they are fed into every later AI run and shown to staff on the asset, vulnerability, and
 remediation pages. A user has just taken an action and left a comment. Decide what should change in the notes.

@@ -28,7 +28,8 @@ export async function resolveNoteTargetLabel(
         select: { description: true },
       });
       if (!remediation) return null;
-      return `Remediation ${instanceId}`;
+      const firstSentence = remediation.description?.trim().split("\n")[0];
+      return firstSentence ? firstSentence : `Remediation ${instanceId}`;
     }
     case "DEVICE_GROUP_MATCHING": {
       const matching = await prisma.deviceGroupMatching.findUnique({

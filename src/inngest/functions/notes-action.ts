@@ -11,14 +11,16 @@ export async function requestNoteAction(
   source: NoteActionSource,
   refId: string,
   input?: ChatNoteInput,
-): Promise<void> {
+): Promise<boolean> {
   try {
     await inngest.send({
       name: ACTION_EVENT,
       data: { source, refId, input, key: `${source}: ${refId}` },
     });
+    return true;
   } catch (err) {
     console.error(`Failed to request note edit for ${source}: ${refId}`, err);
+    return false;
   }
 }
 

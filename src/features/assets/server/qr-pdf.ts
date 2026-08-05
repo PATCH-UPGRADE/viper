@@ -48,10 +48,7 @@ const LOGO_PATHS = [
 export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   const url = `${getBaseUrl()}/assets/${asset.id}/work-orders`;
   const qrSize = 100;
-  const qrPng = await QRCode.toBuffer(url, {
-    width: qrSize,
-    margin: 1,
-  });
+  const qrPng = await QRCode.toBuffer(url, { margin: 1 });
 
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
@@ -141,18 +138,18 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   const logoScale = 0.5;
   const logoX =
     PAGE_WIDTH - MARGIN_X - LOGO_WIDTH * logoScale - 8 - wordmarkWidth;
-  const logoY = y - 64;
+  y -= 64;
   for (const { d, color } of LOGO_PATHS) {
     page.drawSvgPath(d, {
       x: logoX,
-      y: logoY + LOGO_HEIGHT * logoScale,
+      y: y + LOGO_HEIGHT * logoScale,
       scale: logoScale,
       color,
     });
   }
   page.drawText("Viper", {
     x: logoX + LOGO_WIDTH * logoScale + 8,
-    y: logoY + (LOGO_HEIGHT * logoScale - 12) / 2,
+    y: y + (LOGO_HEIGHT * logoScale - 12) / 2,
     size: 12,
     font: bold,
     color: DARK,

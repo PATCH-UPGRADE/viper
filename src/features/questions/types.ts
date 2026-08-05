@@ -1,16 +1,15 @@
 import type { Prisma } from "@/generated/prisma";
 
 export type SuggestedVendorEmail = {
-  id: string;
   questionId: string;
   audience: "VENDOR" | "MANUFACTURER";
   companyName: string;
   productName: string;
   reasonWhy: string;
-  toEmail: string;
+  contacts: { email: string; name?: string }[];
+  toEmails: string[];
   subject: string;
   body: string;
-  status: "DRAFT" | "SENT" | "FAILED" | "RESPONDED" | "DISMISSED";
 };
 
 export const questionInclude = {

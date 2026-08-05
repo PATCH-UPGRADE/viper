@@ -152,9 +152,7 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
   const { data: suggestedEmails } = useSuspenseSuggestedEmailsByNotificationId(
     notification.id,
   );
-  const emailsCount = suggestedEmails.filter(
-    (email) => email.status === "DRAFT",
-  ).length;
+  const emailsCount = suggestedEmails.length;
 
   const pendingQuestionCount = questions.filter(
     (q) => q.status === "PENDING",

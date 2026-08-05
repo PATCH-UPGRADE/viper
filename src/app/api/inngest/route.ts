@@ -14,6 +14,7 @@ import {
   resolveAllEntityFilters,
   resolveEntityFilterFn,
 } from "@/inngest/functions/resolve-entity-filters";
+import { sendEscalationEmailFn } from "@/inngest/functions/send-escalation-email";
 import {
   syncAllIntegrations,
   syncIntegration,
@@ -34,5 +35,6 @@ export const { GET, POST, PUT } = serve({
     extractArtifactNotesFn,
     reevaluateIssueOnAnswer,
     actionNotesFn,
+    sendEscalationEmailFn,
   ],
 });

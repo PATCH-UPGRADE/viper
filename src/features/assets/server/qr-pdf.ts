@@ -12,7 +12,7 @@ export const qrPdfAssetSelect = {
   serialNumber: true,
   deviceGroup: {
     select: {
-      vendor: { select: { canonicalDisplayName: true } },
+      manufacturer: { select: { canonicalDisplayName: true } },
       product: { select: { canonicalDisplayName: true } },
     },
   },

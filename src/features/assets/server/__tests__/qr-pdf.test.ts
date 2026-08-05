@@ -11,7 +11,7 @@ it("renders a PDF", async () => {
     role: "ICU Monitor",
     serialNumber: "SN-001",
     deviceGroup: {
-      vendor: { canonicalDisplayName: "Acme" },
+      manufacturer: { canonicalDisplayName: "Acme" },
       product: { canonicalDisplayName: "Monitor" },
     },
   });

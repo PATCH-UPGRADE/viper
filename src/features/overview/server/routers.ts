@@ -43,7 +43,7 @@ export const overviewRouter = createTRPCRouter({
             confidence: true,
             deviceGroupMatching: {
               select: {
-                vendorId: true,
+                manufacturerId: true,
                 productId: true,
                 versionId: true,
                 versionRange: true,

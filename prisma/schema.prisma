@@ -1122,6 +1122,7 @@ model WorkOrderTicket {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+  @@index([priority])
   @@index([assigneeId])
   @@index([creatorId])
   @@index([parentId])
@@ -1159,6 +1160,7 @@ model TicketSeen {
 }
 
 enum TicketActivityType {
+  WORK_ORDER_CREATED
   STATUS_CHANGED
   CATEGORY_CHANGED
   ASSIGNEE_CHANGED

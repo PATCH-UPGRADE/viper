@@ -1,6 +1,6 @@
 import "server-only";
 import type { TicketCategory, TicketStatus } from "@/generated/prisma";
-import type { TransactionClient } from "@/lib/db";
+import prisma, { type TransactionClient } from "@/lib/db";
 
 // Activity rows are intentionally lightweight: `type` is the discriminator,
 // `data` is a Json blob whose shape varies. We snapshot human-readable values
@@ -17,6 +17,7 @@ type AssigneeSnapshot = { id: string; name: string } | null;
 
 type BeforeTicket = {
   summary: string;
+  body: string | null;
   status: TicketStatus;
   category: TicketCategory;
   scheduledAt: Date | null;
@@ -30,6 +31,7 @@ export type DescriptionInput = { departmentId: string; body: string };
 
 type UpdateInput = {
   summary?: string;
+  body?: string | null;
   status?: TicketStatus;
   category?: TicketCategory;
   departmentIds?: string[];
@@ -50,6 +52,7 @@ export async function snapshotBeforeUpdate(
     where: { id: ticketId },
     select: {
       summary: true,
+      body: true,
       status: true,
       category: true,
       scheduledAt: true,
@@ -84,6 +87,15 @@ export async function recordUpdateActivities(
     rows.push({
       type: "SUMMARY_CHANGED",
       data: { from: before.summary, to: input.summary },
+    });
+  }
+  if (
+    input.body !== undefined &&
+    (input.body ?? null) !== (before.body ?? null)
+  ) {
+    rows.push({
+      type: "DESCRIPTION_CHANGED",
+      data: { department: null, from: before.body, to: input.body ?? null },
     });
   }
   if (input.descriptions !== undefined) {
@@ -195,6 +207,53 @@ export async function recordUpdateActivities(
         | "DESCRIPTION_CHANGED",
       data: r.data,
     })),
+  });
+}
+
+/**
+ * Records the WORK_ORDER_CREATED activity for a new ticket. Writes one row.
+ * This function reads the creator, source, advisory, category, and priority
+ * from the ticket, so the caller passes only the id. The activity belongs to
+ * the ticket creator. For an automation-sourced ticket, the creator is the
+ * integration user, and the UI shows an "AI Agent" badge. Call this function
+ * after the external mappings and sources exist.
+ */
+export async function recordCreationActivity(ticketId: string): Promise<void> {
+  const t = await prisma.workOrderTicket.findUnique({
+    where: { id: ticketId },
+    select: {
+      creatorId: true,
+      category: true,
+      priority: true,
+      sourceLabel: true,
+      notification: { select: { title: true } },
+      vulnerabilities: { select: { cveId: true }, take: 10 },
+      externalMappings: {
+        select: {
+          externalId: true,
+          integration: { select: { name: true } },
+        },
+        take: 1,
+      },
+    },
+  });
+  if (!t) return;
+
+  const mapping = t.externalMappings[0];
+  await prisma.ticketActivity.create({
+    data: {
+      ticketId,
+      userId: t.creatorId,
+      type: "WORK_ORDER_CREATED",
+      data: {
+        source: t.sourceLabel ?? mapping?.integration?.name ?? null,
+        advisoryTitle: t.notification?.title ?? null,
+        cveId: t.vulnerabilities.find((v) => v.cveId)?.cveId ?? null,
+        externalRecordId: mapping?.externalId ?? null,
+        category: t.category,
+        priority: t.priority,
+      },
+    },
   });
 }
 

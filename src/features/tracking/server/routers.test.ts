@@ -130,6 +130,9 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   comments: [],
   watchers: [],
   activities: [],
+  sources: [],
+  externalMappings: [],
+  notification: null,
   ...overrides,
 });
 
@@ -894,6 +897,78 @@ describe("trackingRouter.getMany", () => {
   });
 });
 
+describe("trackingRouter.getManyByAssetId", () => {
+  it("returns direct and device-group-matched open work orders", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue({
+      deviceGroup: {
+        id: "dg-1",
+        vendorId: "vendor-1",
+        productId: "product-1",
+        versionId: "version-1",
+        version: { canonicalName: "1.0.0" },
+      },
+    });
+    const ticket = {
+      summary: "Ticket",
+      status: "TO_DO",
+      category: "OTHER",
+      scheduledAt: null,
+      departments: [],
+      assets: [],
+      deviceGroups: [],
+      _count: { comments: 0 },
+    };
+    const matching = {
+      deviceGroupMatching: {
+        vendorId: "vendor-1",
+        productId: "product-1",
+        versionId: "version-1",
+        versionRange: null,
+      },
+    };
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      { ...ticket, id: "direct", assets: [{ id: "a1" }] },
+      { ...ticket, id: "matched", deviceGroups: [matching] },
+      {
+        ...ticket,
+        id: "unmatched",
+        deviceGroups: [
+          {
+            deviceGroupMatching: {
+              ...matching.deviceGroupMatching,
+              versionId: "version-2",
+            },
+          },
+        ],
+      },
+    ]);
+
+    const result = await caller.getManyByAssetId({ assetId: "a1" });
+
+    expect(result.map(({ id }) => id)).toEqual(["direct", "matched"]);
+    expect(mockPrisma.workOrderTicket.findMany).toHaveBeenCalledOnce();
+    expect(
+      mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where,
+    ).toMatchObject({
+      isDraft: false,
+      status: { not: "DONE" },
+    });
+    expect(
+      mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where,
+    ).not.toHaveProperty("parentId");
+  });
+
+  it("throws NOT_FOUND for a missing asset", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue(null);
+
+    await expect(
+      caller.getManyByAssetId({ assetId: "missing" }),
+    ).rejects.toThrow(/not found/i);
+  });
+});
+
 describe("trackingRouter.markSeen", () => {
   it("upserts a TicketSeen row for (current user, ticket)", async () => {
     const caller = setup();
@@ -1449,7 +1524,7 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     // tool-call id so a concurrent accept can't file a second order.
     const claim = mockPrisma.workOrderTicket.create.mock.calls[0][0].data;
     expect(claim.chatToolCallId).toBe("call_abc");
-    expect(claim.sourceLabel).toBe("Siemens Healthineers Fleet");
+    expect(claim.sourceLabel).toBe("Siemens Healthineers teamplay Fleet");
     expect(claim.assets).toEqual({ connect: [{ id: MRI.assetId }] });
 
     // The mapping is attached after Fleet accepts — this is what makes the next

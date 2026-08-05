@@ -17,12 +17,17 @@ import {
   UnmanagedAssetsError,
 } from "@/features/integrations/teamplay-fleet/tracking";
 import {
+  Priority,
   type Prisma,
   ResourceType,
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import {
+  matchingAppliesToDeviceGroup,
+  matchingWhereForDeviceGroup,
+} from "@/lib/device-matching";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
@@ -55,6 +60,7 @@ import {
 import {
   recordAssetActivity,
   recordChildActivity,
+  recordCreationActivity,
   recordUpdateActivities,
   snapshotBeforeUpdate,
 } from "./activities";
@@ -325,6 +331,95 @@ export const trackingRouter = createTRPCRouter({
       return createPaginatedResponse(items, meta);
     }),
 
+  getManyByAssetId: protectedProcedure
+    .input(z.object({ assetId: z.string() }))
+    .query(async ({ input }) => {
+      const asset = requireExistence(
+        await prisma.asset.findUnique({
+          where: { id: input.assetId },
+          select: {
+            deviceGroup: {
+              select: {
+                id: true,
+                vendorId: true,
+                productId: true,
+                versionId: true,
+                version: { select: { canonicalName: true } },
+              },
+            },
+          },
+        }),
+        "Asset",
+      );
+
+      const candidates: Prisma.WorkOrderTicketWhereInput[] = [
+        { assets: { some: { id: input.assetId } } },
+      ];
+      if (asset.deviceGroup.vendorId) {
+        candidates.push({
+          deviceGroups: {
+            some: {
+              deviceGroupMatching: matchingWhereForDeviceGroup({
+                vendorId: asset.deviceGroup.vendorId,
+                productId: asset.deviceGroup.productId,
+              }),
+            },
+          },
+        });
+      }
+
+      const tickets = await prisma.workOrderTicket.findMany({
+        where: {
+          isDraft: false,
+          status: { not: TicketStatus.DONE },
+          OR: candidates,
+        },
+        select: {
+          id: true,
+          summary: true,
+          body: true,
+          status: true,
+          category: true,
+          scheduledAt: true,
+          departments: {
+            select: { id: true, name: true, color: true },
+            orderBy: { name: "asc" },
+          },
+          assets: {
+            where: { id: input.assetId },
+            select: { id: true },
+          },
+          deviceGroups: {
+            select: { deviceGroupMatching: true },
+          },
+          _count: { select: { comments: true } },
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+
+      return tickets
+        .filter(
+          (ticket) =>
+            ticket.assets.length > 0 ||
+            ticket.deviceGroups.some((mapping) =>
+              matchingAppliesToDeviceGroup(
+                mapping.deviceGroupMatching,
+                asset.deviceGroup,
+              ),
+            ),
+        )
+        .map((ticket) => ({
+          id: ticket.id,
+          summary: ticket.summary,
+          body: ticket.body,
+          status: ticket.status,
+          category: ticket.category,
+          scheduledAt: ticket.scheduledAt,
+          departments: ticket.departments,
+          commentCount: ticket._count.comments,
+        }));
+    }),
+
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .meta({
@@ -401,8 +496,10 @@ export const trackingRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         summary: z.string().trim().min(1).max(255).optional(),
-        status: z.nativeEnum(TicketStatus).optional(),
-        category: z.nativeEnum(TicketCategory).optional(),
+        body: z.string().max(50_000).nullish(),
+        status: z.enum(TicketStatus).optional(),
+        category: z.enum(TicketCategory).optional(),
+        priority: z.enum(Priority).optional(),
         departmentIds: z.array(z.string()).optional(),
         descriptions: z
           .array(
@@ -1097,6 +1194,22 @@ export const trackingRouter = createTRPCRouter({
         }
       });
 
+      try {
+        const childIds = isMulti
+          ? (
+              await prisma.workOrderTicket.findMany({
+                where: { parentId: root.id },
+                select: { id: true },
+              })
+            ).map((c) => c.id)
+          : [];
+        await Promise.all(
+          [root.id, ...childIds].map((id) => recordCreationActivity(id)),
+        );
+      } catch (error) {
+        console.error("recordCreationActivity (fleet) failed", error);
+      }
+
       return {
         ticketId: root.id,
         externalIds: filed.map(({ result }) => result.externalId),
@@ -1167,6 +1280,7 @@ export const trackingRouter = createTRPCRouter({
               artifactsData: undefined,
             };
           },
+          onItemCreated: (id) => recordCreationActivity(id),
         },
         input,
         userId,

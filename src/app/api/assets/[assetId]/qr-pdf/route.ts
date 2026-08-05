@@ -2,17 +2,13 @@ import {
   qrPdfAssetSelect,
   renderAssetQrPdf,
 } from "@/features/assets/server/qr-pdf";
-import { getAssetRoleLabel } from "@/features/assets/utils";
 import { getSession } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
 
-interface RouteParams {
-  params: Promise<{ assetId: string }>;
-}
+type RouteParams = { params: Promise<{ assetId: string }> };
 
 export async function GET(_req: Request, { params }: RouteParams) {
-  const session = await getSession();
-  if (!session) {
+  if (!(await getSession())) {
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -25,15 +21,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     return new Response("Asset not found", { status: 404 });
   }
 
-  const pdf = await renderAssetQrPdf(asset);
-  const filename = `${getAssetRoleLabel(asset)
-    .replace(/[^a-z0-9]+/gi, "-")
-    .toLowerCase()}-work-orders.pdf`;
-
-  return new Response(new Uint8Array(pdf), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${filename}"`,
-    },
+  return new Response(new Uint8Array(await renderAssetQrPdf(asset)), {
+    headers: { "Content-Type": "application/pdf" },
   });
 }

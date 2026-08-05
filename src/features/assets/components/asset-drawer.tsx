@@ -823,6 +823,7 @@ export function AssetDashboardDrawer({
           addSuffix: true,
         })}
       </span>
+      <AssetQrPdfLink assetId={asset.id} />
     </>
   );
 
@@ -834,7 +835,6 @@ export function AssetDashboardDrawer({
       description={description}
       tabs={tabs}
       infoColumn={<AssetInfoColumn asset={asset} />}
-      actions={<AssetQrPdfLink assetId={asset.id} />}
     >
       {children}
     </DashboardDrawerShell>

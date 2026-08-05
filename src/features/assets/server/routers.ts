@@ -55,7 +55,7 @@ const createSearchFilter = (search: string) => {
           { role: insensitive },
           {
             deviceGroup: {
-              is: { vendor: { is: { canonicalName: insensitive } } },
+              is: { manufacturer: { is: { canonicalName: insensitive } } },
             },
           },
           {
@@ -160,7 +160,7 @@ export const assetsRouter = createTRPCRouter({
       const matchings = await prisma.deviceGroupMatching.findMany({
         where: { nodes: { some: { workflowId } } },
         select: {
-          vendorId: true,
+          manufacturerId: true,
           productId: true,
           versionId: true,
           versionRange: true,
@@ -398,7 +398,7 @@ export const assetsRouter = createTRPCRouter({
         const matchings = await prisma.deviceGroupMatching.findMany({
           where: { id: { in: deviceGroupMatchingIds } },
           select: {
-            vendorId: true,
+            manufacturerId: true,
             productId: true,
             versionId: true,
             versionRange: true,
@@ -437,7 +437,7 @@ export const assetsRouter = createTRPCRouter({
         where: { id: { in: deviceGroupIds } },
         select: {
           id: true,
-          vendorId: true,
+          manufacturerId: true,
           productId: true,
           versionId: true,
           version: { select: { canonicalName: true } },
@@ -694,7 +694,7 @@ export const assetsRouter = createTRPCRouter({
         select: {
           deviceGroup: {
             select: {
-              vendor: { select: { canonicalName: true } },
+              manufacturer: { select: { canonicalName: true } },
               product: { select: { canonicalName: true } },
             },
           },
@@ -705,9 +705,9 @@ export const assetsRouter = createTRPCRouter({
       if (cpe) {
         deviceGroupId = (await cpeToDeviceGroup(cpe)).id;
       } else if (version || versionStatus) {
-        if (current.deviceGroup.vendor && current.deviceGroup.product) {
+        if (current.deviceGroup.manufacturer && current.deviceGroup.product) {
           const target = await resolveDeviceGroup({
-            vendor: current.deviceGroup.vendor.canonicalName,
+            manufacturer: current.deviceGroup.manufacturer.canonicalName,
             product: current.deviceGroup.product.canonicalName,
             version: version ?? null,
             versionStatus: version ? "KNOWN" : (versionStatus ?? "UNKNOWN"),

@@ -38,7 +38,7 @@ const canonicalRefSelect = {
 const deviceGroupSummarySelect = {
   select: {
     id: true,
-    vendor: canonicalRefSelect,
+    manufacturer: canonicalRefSelect,
     product: canonicalRefSelect,
     version: canonicalRefSelect,
     versionStatus: true,

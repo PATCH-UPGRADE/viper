@@ -51,7 +51,7 @@ export const cpeSchema = z
 export const versionStatusSchema = z.enum(Object.values(VersionStatus));
 export const versSchemeSchema = z.enum(Object.values(VersScheme));
 
-/** A canonical vendor/product/version reference as returned by the API. */
+/** A canonical manufacturer/product/version reference as returned by the API. */
 const canonicalRefSchema = z.object({
   canonicalName: z.string(),
   canonicalDisplayName: z.string(),
@@ -60,7 +60,7 @@ const canonicalRefSchema = z.object({
 /** A stored device-group matching as returned by the API. */
 export const deviceGroupMatchingResponseSchema = z.object({
   id: z.string(),
-  vendor: canonicalRefSchema,
+  manufacturer: canonicalRefSchema,
   product: canonicalRefSchema.nullable(),
   version: canonicalRefSchema.nullable(),
   versionRange: z.string().nullable(),

@@ -153,7 +153,7 @@ const canonicalNameSelect = {
 
 const matchingContextSelect = {
   select: {
-    vendor: canonicalNameSelect,
+    manufacturer: canonicalNameSelect,
     product: canonicalNameSelect,
     version: canonicalNameSelect,
     versionRange: true,
@@ -163,7 +163,7 @@ const matchingContextSelect = {
 export const assetContextInclude = {
   deviceGroup: {
     select: {
-      vendor: canonicalNameSelect,
+      manufacturer: canonicalNameSelect,
       product: canonicalNameSelect,
       version: canonicalNameSelect,
       cpe: true,

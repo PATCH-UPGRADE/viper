@@ -15,7 +15,7 @@ const MODEL = "claude-haiku-4-5-20251001";
 const SYSTEM_PROMPT = `You extract structured fields for a hospital work-order ticket from an actionable email.
 
 Produce:
-- summary: a concise, action-oriented title (prefer device/vendor specifics over generic phrasing)
+- summary: a concise, action-oriented title (prefer device/manufacturer/vendor specifics over generic phrasing)
 - category: the best-fit work category from the allowed set; use OTHER when unsure
 - scheduledAt: an ISO 8601 date (YYYY-MM-DD or full timestamp) ONLY if the email states a due/scheduled date; otherwise null
 - suggestedAssignee: the responsible party if the email names one (often an external vendor or a person/team); otherwise null

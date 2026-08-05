@@ -121,9 +121,9 @@ function buildWhereSchema(
 // ----------------------------------------------------------------------------
 
 // Single relation hop off Asset: lets a note target e.g. all device groups of a
-// vendor/product ("all infusion pumps").
+// manufacturer/product ("all infusion pumps").
 const deviceGroupWhere = buildWhereSchema({
-  vendorId: stringFilter,
+  manufacturerId: stringFilter,
   productId: stringFilter,
   versionId: stringFilter,
   versionStatus: stringFilter,
@@ -167,7 +167,7 @@ const remediationFilterSchema = buildWhereSchema({
 
 const deviceGroupMatchingFilterSchema = buildWhereSchema({
   id: stringFilter,
-  vendorId: stringFilter,
+  manufacturerId: stringFilter,
   productId: stringFilter,
   versionId: stringFilter,
   versionRange: stringFilter,

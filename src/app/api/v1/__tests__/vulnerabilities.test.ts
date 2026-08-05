@@ -158,10 +158,10 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
 
     // Check that the single object in the array has the correct match values
     // (resolved from the uploaded CPE: cpe:2.3:<part>:<vendor>:<product>:<version>)
-    const [, , , cpeVendor, cpeProduct, cpeVersion] =
+    const [, , , cpeManufacturer, cpeProduct, cpeVersion] =
       payload.cpes[0].split(":");
     const matching = detailRes.body.deviceGroupMatchings[0];
-    expect(matching.vendor.canonicalName).toBe(cpeVendor);
+    expect(matching.manufacturer.canonicalName).toBe(cpeManufacturer);
     expect(matching.product?.canonicalName).toBe(cpeProduct);
     expect(matching.version?.canonicalName).toBe(cpeVersion);
 

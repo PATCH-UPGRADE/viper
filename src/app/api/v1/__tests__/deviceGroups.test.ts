@@ -15,12 +15,12 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     upstreamApi: "https://api.hospital-upstream.com/v1",
   };
 
-  // Unique per run: the update rewrites the device group's (vendor, product,
+  // Unique per run: the update rewrites the device group's (manufacturer, product,
   // version) identity, which is now a unique key — a fixed value would collide
   // with a group left over from a previous run.
   const updateIdentitySuffix = `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
   const updateDeviceGroupPayload = {
-    vendor: `Test Manufacturer ${updateIdentitySuffix}`,
+    manufacturer: `Test Manufacturer ${updateIdentitySuffix}`,
     product: "Test Model",
     version: "123.456",
   };
@@ -138,7 +138,7 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
     // grab the last / oldest deviceGroup as it is much less likely to be cleared by another test
     const deviceGroup = listRes.body.items.at(-1);
     expect(deviceGroup).toHaveProperty("id");
-    expect(deviceGroup).toHaveProperty("vendor");
+    expect(deviceGroup).toHaveProperty("manufacturer");
     expect(deviceGroup).toHaveProperty("product");
     expect(deviceGroup).toHaveProperty("cpe");
     expect(deviceGroup).toHaveProperty("url");
@@ -155,8 +155,8 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
 
     expect(firstDetailRes.status).toBe(200);
     expect(firstDetailRes.body.id).toBe(deviceGroupId);
-    expect(firstDetailRes.body.vendor?.canonicalName).toBe(
-      deviceGroup.vendor?.canonicalName,
+    expect(firstDetailRes.body.manufacturer?.canonicalName).toBe(
+      deviceGroup.manufacturer?.canonicalName,
     );
     expect(firstDetailRes.body).toHaveProperty("url");
     expect(firstDetailRes.body).toHaveProperty("sbomUrl");
@@ -179,8 +179,8 @@ describe("Device Groups Endpoint (/deviceGroups)", () => {
       .send(updateDeviceGroupPayload);
     expect(updateDeviceGroup.status).toBe(200);
     expect(updateDeviceGroup.body.id).toBe(assetDeviceGroupId);
-    expect(updateDeviceGroup.body.vendor?.canonicalDisplayName).toBe(
-      updateDeviceGroupPayload.vendor,
+    expect(updateDeviceGroup.body.manufacturer?.canonicalDisplayName).toBe(
+      updateDeviceGroupPayload.manufacturer,
     );
     expect(updateDeviceGroup.body.product?.canonicalDisplayName).toBe(
       updateDeviceGroupPayload.product,

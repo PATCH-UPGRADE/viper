@@ -230,7 +230,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     });
 
     // Verify the response structure: a device-group matching reflects the CPE's
-    // vendor/product/version.
+    // manufacturer/product/version.
     expect(createdDeviceArtifact).toHaveProperty("deviceGroupMatchings");
     expect(
       createdDeviceArtifact.deviceGroupMatchings.some(
@@ -625,7 +625,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       },
       include: {
         deviceGroupMatchings: {
-          include: { vendor: true, product: true, version: true },
+          include: { manufacturer: true, product: true, version: true },
         },
         artifacts: true,
       },
@@ -659,7 +659,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
       },
       include: {
         deviceGroupMatchings: {
-          include: { vendor: true, product: true, version: true },
+          include: { manufacturer: true, product: true, version: true },
         },
         artifacts: true,
       },

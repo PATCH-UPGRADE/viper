@@ -903,7 +903,7 @@ describe("trackingRouter.getManyByAssetId", () => {
     mockPrisma.asset.findUnique.mockResolvedValue({
       deviceGroup: {
         id: "dg-1",
-        vendorId: "vendor-1",
+        manufacturerId: "manufacturer-1",
         productId: "product-1",
         versionId: "version-1",
         version: { canonicalName: "1.0.0" },
@@ -921,7 +921,7 @@ describe("trackingRouter.getManyByAssetId", () => {
     };
     const matching = {
       deviceGroupMatching: {
-        vendorId: "vendor-1",
+        manufacturerId: "manufacturer-1",
         productId: "product-1",
         versionId: "version-1",
         versionRange: null,

@@ -17,8 +17,8 @@ const MODEL = "claude-haiku-4-5-20251001";
 const SYSTEM_PROMPT = `You triage inbound email for a hospital cybersecurity and operations platform. Judge the email on its body AND any attached PDFs together — an email's real content is often only in the attachment.
 
 Choose exactly one kind:
-- "work_order": relevant and ACTIONABLE — the email asks the hospital to DO something. Examples: a vendor service request or work order, a maintenance/patch/firmware request, a request to schedule or perform work on a device, an RMA, a manual task assignment.
-- "notification": relevant and INFORMATIONAL — a security advisory, CVE/patch notice, vulnerability disclosure, medical device recall or safety communication, FDA/ICS-CERT alert, threat bulletin, vendor update announcement, or other FYI with no specific task asked of the hospital.
+- "work_order": relevant and ACTIONABLE — the email asks the hospital to DO something. Examples: a manufacturer or vendor service request or work order, a maintenance/patch/firmware request, a request to schedule or perform work on a device, an RMA, a manual task assignment.
+- "notification": relevant and INFORMATIONAL — a security advisory, CVE/patch notice, vulnerability disclosure, medical device recall or safety communication, FDA/ICS-CERT alert, threat bulletin, manufacturer or vendor update announcement, or other FYI with no specific task asked of the hospital.
 - "not_relevant": nothing to do with hospital cybersecurity, medical-device security, or device/infrastructure operations. Examples: marketing emails, sales pitches, meeting invitations, catering and food orders, thank-you notes, general newsletters, HR communications, billing receipts.
 
 An attachment does not by itself make an email relevant — judge it on what it is actually about. A catering order with a PDF menu attached is still "not_relevant", even if it is dressed up in work-order language.

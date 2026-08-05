@@ -115,7 +115,7 @@ export function versSatisfies(version: string | null, range: string): boolean {
 // ============================================================================
 
 export type MatchingLike = {
-  vendorId: string;
+  manufacturerId: string;
   productId: string | null;
   versionId: string | null;
   versionRange: string | null;
@@ -123,7 +123,7 @@ export type MatchingLike = {
 
 export type DeviceGroupIdentity = {
   id: string;
-  vendorId: string | null;
+  manufacturerId: string | null;
   productId: string | null;
   versionId: string | null;
   // canonical version string, needed for VERS-range checks
@@ -131,7 +131,7 @@ export type DeviceGroupIdentity = {
 };
 
 /**
- * Whether a matching applies to a concrete device group. Vendor/product/exact-
+ * Whether a matching applies to a concrete device group. Manufacturer/product/exact-
  * version comparisons use canonical FK ids; version-range checks use the
  * version's canonical string.
  */
@@ -139,15 +139,18 @@ export function matchingAppliesToDeviceGroup(
   matching: MatchingLike,
   deviceGroup: DeviceGroupIdentity,
 ): boolean {
-  if (!deviceGroup.vendorId || matching.vendorId !== deviceGroup.vendorId) {
+  if (
+    !deviceGroup.manufacturerId ||
+    matching.manufacturerId !== deviceGroup.manufacturerId
+  ) {
     return false;
   }
 
-  // Wildcard product (null) matches every product of the vendor.
+  // Wildcard product (null) matches every product of the manufacturer.
   if (matching.productId === null) return true;
   if (matching.productId !== deviceGroup.productId) return false;
 
-  // Vendor + product match. Now resolve the version constraint.
+  // Manufacturer + product match. Now resolve the version constraint.
   if (matching.versionId !== null) {
     return matching.versionId === deviceGroup.versionId;
   }
@@ -164,7 +167,7 @@ export function matchingAppliesToDeviceGroup(
 }
 
 /**
- * Prisma `where` selecting device groups a matching could apply to (vendor +
+ * Prisma `where` selecting device groups a matching could apply to (manufacturer +
  * optional product). Version filtering is done in memory via
  * matchingAppliesToDeviceGroup.
  */
@@ -172,7 +175,7 @@ export function deviceGroupWhereForMatching(
   matching: MatchingLike,
 ): Prisma.DeviceGroupWhereInput {
   return {
-    vendorId: matching.vendorId,
+    manufacturerId: matching.manufacturerId,
     ...(matching.productId !== null ? { productId: matching.productId } : {}),
   };
 }
@@ -187,7 +190,7 @@ export function unknownVersionDeviceGroupWhere(
     return null;
 
   return {
-    vendorId: matching.vendorId,
+    manufacturerId: matching.manufacturerId,
     ...(matching.productId !== null ? { productId: matching.productId } : {}),
     versionStatus: { in: [VersionStatus.UNKNOWN, VersionStatus.UNSURE] },
   };
@@ -195,15 +198,15 @@ export function unknownVersionDeviceGroupWhere(
 
 /**
  * Prisma `where` selecting matchings that could apply to a device group: same
- * vendor, and either a wildcard product or the same product (the naive
- * same-vendor/product scan). Caller must pass a group that has a vendorId.
+ * manufacturer, and either a wildcard product or the same product (the naive
+ * same-manufacturer/product scan). Caller must pass a group that has a manufacturerId.
  */
 export function matchingWhereForDeviceGroup(deviceGroup: {
-  vendorId: string;
+  manufacturerId: string;
   productId: string | null;
 }): Prisma.DeviceGroupMatchingWhereInput {
   return {
-    vendorId: deviceGroup.vendorId,
+    manufacturerId: deviceGroup.manufacturerId,
     OR: [{ productId: null }, { productId: deviceGroup.productId }],
   };
 }

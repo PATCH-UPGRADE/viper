@@ -36,7 +36,7 @@ import {
 } from "./affected-assets";
 
 type MatchingIdentity = {
-  vendorId: string;
+  manufacturerId: string;
   productId: string | null;
   versionId: string | null;
   versionRange: string | null;
@@ -83,7 +83,7 @@ async function resolvedDeviceGroupAssetCount(
     where: deviceGroupWhereForMatching(matching),
     select: {
       id: true,
-      vendorId: true,
+      manufacturerId: true,
       productId: true,
       versionId: true,
       version: { select: { canonicalName: true } },
@@ -115,7 +115,7 @@ async function resolveMatchedDeviceGroupIds(
     where: deviceGroupWhereForMatching(matching),
     select: {
       id: true,
-      vendorId: true,
+      manufacturerId: true,
       productId: true,
       versionId: true,
       version: { select: { canonicalName: true } },
@@ -185,7 +185,7 @@ async function buildMatchingContexts(
   if (extraIds.length > 0) {
     const extra = await prisma.deviceGroupMatching.findMany({
       where: { id: { in: extraIds } },
-      include: { vendor: true, product: true, version: true },
+      include: { manufacturer: true, product: true, version: true },
     });
     for (const dm of extra) {
       displayMatchings.set(dm.id, {
@@ -238,7 +238,7 @@ async function buildMatchingContexts(
             id: true,
             deviceGroup: {
               select: {
-                vendorId: true,
+                manufacturerId: true,
                 productId: true,
                 versionId: true,
                 version: { select: { canonicalName: true } },
@@ -437,7 +437,7 @@ export const notificationsRouter = createTRPCRouter({
               id: true,
               confidence: true,
               deviceGroupMatching: {
-                include: { vendor: true, product: true, version: true },
+                include: { manufacturer: true, product: true, version: true },
               },
             },
           },
@@ -667,13 +667,16 @@ export const notificationsRouter = createTRPCRouter({
       });
     }),
 
-  getVersionForVendorProduct: protectedProcedure
-    .input(z.object({ vendorId: z.string(), productId: z.string() }))
+  getVersionForManufacturerProduct: protectedProcedure
+    .input(z.object({ manufacturerId: z.string(), productId: z.string() }))
     .query(async ({ input }) => {
       return prisma.version.findMany({
         where: {
           deviceGroups: {
-            some: { vendorId: input.vendorId, productId: input.productId },
+            some: {
+              manufacturerId: input.manufacturerId,
+              productId: input.productId,
+            },
           },
         },
         select: { canonicalDisplayName: true },

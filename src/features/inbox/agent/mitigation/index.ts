@@ -31,7 +31,7 @@ RULES:
 - cards: fill effort, downtime, residual_risk, coverage, and timeline for each plan as short at-a-glance strings. These will be rendered as pills, so keep these short.
 - workOrders: each plan lists the concrete work orders that would be created if it is accepted. shortDescription is action-oriented, a title; detailedDescription is the full instruction.
 - LINKING: every work order names the vulnerabilities, remediations, and device groups IT specifically addresses, using the exact ids shown inline in the hospital context (e.g. "(id: …)" on a vulnerability heading, the id on a remediation heading, "(id: …)" on a device group line). Never invent an id.
-- Link narrowly. A work order that firewalls one device group must NOT list the other groups, and one that applies a single vendor patch must NOT list every remediation. Different work orders in a plan usually target different device groups. Leave a list empty rather than padding it.
+- Link narrowly. A work order that firewalls one device group must NOT list the other groups, and one that applies a single manufacturer/vendor patch must NOT list every remediation. Different work orders in a plan usually target different device groups. Leave a list empty rather than padding it.
 - Each device group line states how many hospital assets it resolves to. A group with 0 assets is a product the hospital does not appear to own — do not attach work orders to it unless the work is explicitly about confirming inventory.
 - For each device group a work order touches, give a one-line reasonWhy and set confidence: Matched only with strong evidence, otherwise NeedsReview.
 - If there is not enough information to responsibly propose any plan, return an empty plans array. Do not force a plan.`;

@@ -36,7 +36,7 @@ const SYSTEM_PROMPT = `You are a classification agent for a hospital cybersecuri
 
 Your tasks:
 1. Classify the email into one of: Advisory, Recall, UpdateAvailable, Other
-2. Extract a concise, informative title (prefer vendor/CVE/device names over generic phrases)
+2. Extract a concise, informative title (prefer manufacturer/vendor/CVE/device names over generic phrases)
 3. Write a 1–3 sentence summary suitable for a hospital security officer
 4. Assign a TLP level if one is stated or strongly implied; otherwise return null
 5. Decide whether this is a new notification or an update to an existing one
@@ -44,7 +44,7 @@ Your tasks:
 NOTIFICATION TYPES:
 - Advisory: CVE/patch notifications, threat bulletins, CISA/ICS-CERT/FDA cybersecurity advisories, vulnerability disclosures
 - Recall: Medical device recalls, FDA safety communications about device removal or correction
-- UpdateAvailable: Vendor firmware or software update announcements
+- UpdateAvailable: Manufacturer or vendor firmware or software update announcements
 - Other: Security-relevant notifications that don't fit the above categories
 
 UPSERT DECISION:

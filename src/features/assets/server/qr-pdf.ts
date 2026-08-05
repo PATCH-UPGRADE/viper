@@ -28,7 +28,6 @@ type QrPdfAsset = Prisma.AssetGetPayload<{ select: typeof qrPdfAssetSelect }>;
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
 const MARGIN_X = 72;
-const MARGIN_TOP = 64;
 
 const DARK = rgb(0.067, 0.094, 0.153);
 const LINE_GRAY = rgb(0.216, 0.255, 0.318);
@@ -57,7 +56,7 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   const mono = await pdfDoc.embedFont(StandardFonts.Courier);
   const qrImage = await pdfDoc.embedPng(qrPng);
 
-  let y = PAGE_HEIGHT - MARGIN_TOP;
+  let y = PAGE_HEIGHT - 64;
   const drawText = (
     text: string,
     size: number,

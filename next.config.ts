@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/",
-        destination: "/inbox",
+        destination: "/overview",
         permanent: false,
       },
       {

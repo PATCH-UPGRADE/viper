@@ -10,6 +10,7 @@ import { integrationsRouter } from "@/features/integrations/server/routers";
 import { issuesRouter } from "@/features/issues/server/routers";
 import { mitigationRouter } from "@/features/mitigation/server/routers";
 import { networkRouter } from "@/features/network/server/router";
+import { overviewRouter } from "@/features/overview/server/routers";
 import { questionsRouter } from "@/features/questions/server/routers";
 import { remediationsRouter } from "@/features/remediations/server/routers";
 import { tagColorsRouter } from "@/features/tag-colors/server/routers";
@@ -39,6 +40,7 @@ export const appRouter = createTRPCRouter({
   chat: chatRouter,
   apiKeyConnectors: apiKeyConnectorsRouter,
   network: networkRouter,
+  overview: overviewRouter,
   tracking: trackingRouter,
   departments: departmentsRouter,
   tagColors: tagColorsRouter,

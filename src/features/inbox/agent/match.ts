@@ -10,8 +10,8 @@ import prisma from "@/lib/db";
 import { deviceIdentityInline } from "@/lib/markdown";
 import { resolveMatchingId } from "@/lib/router-utils";
 import {
+  addManufacturerAlias,
   addProductAlias,
-  addVendorAlias,
   enrichAssetIdentifiers,
   enrichDeviceGroupIdentifiers,
   enrichVulnerabilityCvss,
@@ -286,7 +286,7 @@ export async function matchAndLinkEntities(
  * Separated from the LLM call so it can be unit-tested in isolation.
  *
  * Idempotent: mappings are upserted on (owner, deviceGroupId) and new device
- * groups are resolved to their canonical (vendor/product/version) identity via
+ * groups are resolved to their canonical (manufacturer/product/version) identity via
  * resolveDeviceGroup, so replaying does not duplicate rows.
  */
 export async function applyDecisions(
@@ -384,7 +384,7 @@ export async function applyDecisions(
           if (!data.cpe && !data.udi) return;
           const matching = await tx.deviceGroupMatching.findUnique({
             where: { id: deviceGroupMatchingId },
-            select: { vendorId: true, productId: true, versionId: true },
+            select: { manufacturerId: true, productId: true, versionId: true },
           });
           if (matching) {
             await enrichDeviceGroupIdentifiers(matching, {
@@ -420,7 +420,7 @@ export async function applyDecisions(
             summary.skipped++;
             continue;
           }
-          // Vendor/product/version are part of a device group's identity now and
+          // Manufacturer/product/version are part of a device group's identity now and
           // can't be mutated in place; the only safe enrichment is unioning a new
           // CPE into the existing group's cpe[] array.
           const data = cleanFields(decision.fields);
@@ -429,7 +429,7 @@ export async function applyDecisions(
             where: { id: decision.targetId },
             select: {
               versionRange: true,
-              vendorId: true,
+              manufacturerId: true,
               productId: true,
               versionId: true,
             },
@@ -447,7 +447,10 @@ export async function applyDecisions(
           }
           if (targetMatching) {
             if (data.manufacturer) {
-              await addVendorAlias(targetMatching.vendorId, data.manufacturer);
+              await addManufacturerAlias(
+                targetMatching.manufacturerId,
+                data.manufacturer,
+              );
             }
             if (data.modelName && targetMatching.productId) {
               await addProductAlias(targetMatching.productId, data.modelName);
@@ -464,7 +467,7 @@ export async function applyDecisions(
             continue;
           }
           const matchingId = await resolveMatchingId({
-            vendor: data.manufacturer,
+            manufacturer: data.manufacturer,
             product: data.modelName,
             version: data.version,
             versionRange: data.versionRange,

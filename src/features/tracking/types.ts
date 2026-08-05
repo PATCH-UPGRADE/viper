@@ -136,10 +136,10 @@ export const ticketDetailInclude = {
       deviceGroup: {
         select: {
           id: true,
-          vendorId: true,
+          manufacturerId: true,
           productId: true,
           versionId: true,
-          vendor: { select: { canonicalDisplayName: true } },
+          manufacturer: { select: { canonicalDisplayName: true } },
           product: { select: { canonicalDisplayName: true } },
           version: { select: { canonicalName: true } },
         },
@@ -155,7 +155,7 @@ export const ticketDetailInclude = {
       description: true,
       deviceGroupMatchings: {
         select: {
-          vendorId: true,
+          manufacturerId: true,
           productId: true,
           versionId: true,
           versionRange: true,
@@ -421,10 +421,10 @@ const detailLinkedAssetSchema = linkedAssetSchema.extend({
   deviceGroupId: z.string(),
   deviceGroup: z.object({
     id: z.string(),
-    vendorId: z.string().nullable(),
+    manufacturerId: z.string().nullable(),
     productId: z.string().nullable(),
     versionId: z.string().nullable(),
-    vendor: z.object({ canonicalDisplayName: z.string() }).nullable(),
+    manufacturer: z.object({ canonicalDisplayName: z.string() }).nullable(),
     product: z.object({ canonicalDisplayName: z.string() }).nullable(),
     version: z.object({ canonicalName: z.string() }).nullable(),
   }),
@@ -435,7 +435,7 @@ const detailLinkedRemediationSchema = z.object({
   description: z.string().nullable(),
   deviceGroupMatchings: z.array(
     z.object({
-      vendorId: z.string(),
+      manufacturerId: z.string(),
       productId: z.string().nullable(),
       versionId: z.string().nullable(),
       versionRange: z.string().nullable(),

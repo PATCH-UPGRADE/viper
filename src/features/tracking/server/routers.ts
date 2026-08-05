@@ -341,7 +341,7 @@ export const trackingRouter = createTRPCRouter({
             deviceGroup: {
               select: {
                 id: true,
-                vendorId: true,
+                manufacturerId: true,
                 productId: true,
                 versionId: true,
                 version: { select: { canonicalName: true } },
@@ -355,12 +355,12 @@ export const trackingRouter = createTRPCRouter({
       const candidates: Prisma.WorkOrderTicketWhereInput[] = [
         { assets: { some: { id: input.assetId } } },
       ];
-      if (asset.deviceGroup.vendorId) {
+      if (asset.deviceGroup.manufacturerId) {
         candidates.push({
           deviceGroups: {
             some: {
               deviceGroupMatching: matchingWhereForDeviceGroup({
-                vendorId: asset.deviceGroup.vendorId,
+                manufacturerId: asset.deviceGroup.manufacturerId,
                 productId: asset.deviceGroup.productId,
               }),
             },
@@ -839,7 +839,7 @@ export const trackingRouter = createTRPCRouter({
           role: true,
           deviceGroup: {
             select: {
-              vendor: { select: { canonicalDisplayName: true } },
+              manufacturer: { select: { canonicalDisplayName: true } },
               product: { select: { canonicalDisplayName: true } },
             },
           },

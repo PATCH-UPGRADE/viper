@@ -306,7 +306,7 @@ export const workflowsRouter = createTRPCRouter({
           deviceGroup: {
             select: {
               id: true,
-              vendorId: true,
+              manufacturerId: true,
               productId: true,
               versionId: true,
               version: { select: { canonicalName: true } },

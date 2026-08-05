@@ -31,7 +31,7 @@ async function resolveMatchingFeedbackTarget(
       deviceGroupMatching: {
         select: {
           versionRange: true,
-          vendor: { select: { canonicalDisplayName: true } },
+          manufacturer: { select: { canonicalDisplayName: true } },
           product: { select: { canonicalDisplayName: true } },
           version: { select: { canonicalDisplayName: true } },
         },

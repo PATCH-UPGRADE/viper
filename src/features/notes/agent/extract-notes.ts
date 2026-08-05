@@ -1,4 +1,4 @@
-// Reads a chunk of vendor device documentation (extracted PDF text) and emits
+// Reads a chunk of manufacturer device documentation (extracted PDF text) and emits
 // structured create/update operations against Note records. Large PDFs are
 // split into text chunks upstream (see ../server/artifact-notes) and fed here
 // sequentially so a fact spanning chunks isn't duplicated.
@@ -27,7 +27,7 @@ export type NoteOps = z.infer<typeof noteOpsSchema>;
 /** An existing note offered to the model as an update/dedupe candidate. */
 export type ExistingNote = { id: string; text: string };
 
-const SYSTEM_PROMPT = `You extract durable security facts about a medical device from an excerpt of its vendor documentation.
+const SYSTEM_PROMPT = `You extract durable security facts about a medical device from an excerpt of its manufacturer documentation.
 
 Focus ONLY on facts useful for vulnerability management and hardening, such as:
 - Device hardening guidance and secure-configuration options
@@ -35,7 +35,7 @@ Focus ONLY on facts useful for vulnerability management and hardening, such as:
 - Authentication: default credentials, password policy, certificate/key handling
 - Network exposure and segmentation guidance
 - Compensating controls, mitigations, and known operational constraints
-- Patch/update mechanism and any constraints (e.g. requires downtime, vendor-signed)
+- Patch/update mechanism and any constraints (e.g. requires downtime, manufacturer-signed)
 
 Rules:
 - Emit each fact as its own concise, self-contained note (one atomic fact per note). No preamble.

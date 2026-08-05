@@ -5,7 +5,7 @@ import { deviceGroupMatchingsSummary } from "./device-group";
 import type { CanonicalRef } from "./shared";
 
 type DeviceGroupMatchingForMarkdown = {
-  vendor?: CanonicalRef;
+  manufacturer?: CanonicalRef;
   product?: CanonicalRef;
   version?: CanonicalRef;
   versionRange?: string | null;

@@ -97,13 +97,13 @@ export const useUpdateNotification = () => {
   );
 };
 
-export const useVersionForVendorProduct = (args: {
-  vendorId: string;
+export const useVersionForManufacturerProduct = (args: {
+  manufacturerId: string;
   productId: string;
 }) => {
   const trpc = useTRPC();
   return useQuery(
-    trpc.notifications.getVersionForVendorProduct.queryOptions(args),
+    trpc.notifications.getVersionForManufacturerProduct.queryOptions(args),
   );
 };
 

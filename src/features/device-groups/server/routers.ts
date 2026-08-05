@@ -5,8 +5,8 @@ import prisma from "@/lib/db";
 import { fetchSbom } from "@/lib/helm";
 import {
   fetchPaginated,
+  resolveManufacturer,
   resolveProduct,
-  resolveVendor,
   resolveVersion,
 } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
@@ -28,7 +28,7 @@ const canonicalRefInclude = {
 } as const;
 
 const deviceGroupRelationInclude = {
-  vendor: canonicalRefInclude,
+  manufacturer: canonicalRefInclude,
   product: canonicalRefInclude,
   version: canonicalRefInclude,
 } as const;
@@ -70,8 +70,8 @@ export const deviceGroupsRouter = createTRPCRouter({
       const where = search
         ? {
             OR: [
-              { vendor: { is: { canonicalName: insensitive } } },
-              { vendor: { is: { canonicalDisplayName: insensitive } } },
+              { manufacturer: { is: { canonicalName: insensitive } } },
+              { manufacturer: { is: { canonicalDisplayName: insensitive } } },
               { product: { is: { canonicalName: insensitive } } },
               { product: { is: { canonicalDisplayName: insensitive } } },
               { udi: insensitive },
@@ -147,11 +147,11 @@ export const deviceGroupsRouter = createTRPCRouter({
     })
     .output(deviceGroupDetailsResponseSchema)
     .mutation(async ({ input }) => {
-      const { id, vendor, product, version, versionStatus, udi } = input;
+      const { id, manufacturer, product, version, versionStatus, udi } = input;
       const data: Prisma.DeviceGroupUpdateInput = {};
-      if (vendor !== undefined) {
-        const row = await resolveVendor(vendor);
-        data.vendor = { connect: { id: row.id } };
+      if (manufacturer !== undefined) {
+        const row = await resolveManufacturer(manufacturer);
+        data.manufacturer = { connect: { id: row.id } };
       }
       if (product !== undefined) {
         const row = await resolveProduct(product);

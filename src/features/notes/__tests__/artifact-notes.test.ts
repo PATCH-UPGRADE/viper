@@ -8,7 +8,7 @@ import {
 
 describe("isProcessableDocPdf", () => {
   const base = {
-    name: "vendor-hardening-guide.pdf",
+    name: "manufacturer-hardening-guide.pdf",
     artifactType: "Documentation",
     downloadUrl: "https://s3.example.com/artifacts/x.pdf",
   };

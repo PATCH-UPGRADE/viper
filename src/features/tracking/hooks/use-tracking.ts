@@ -381,7 +381,7 @@ export const useAttachAsset = (ticketId: string) => {
               ip: string;
               role: string | null;
               deviceGroup: {
-                vendor: { canonicalDisplayName: string } | null;
+                manufacturer: { canonicalDisplayName: string } | null;
                 product: { canonicalDisplayName: string } | null;
               } | null;
             }
@@ -406,10 +406,10 @@ export const useAttachAsset = (ticketId: string) => {
                   deviceGroup: candidate.deviceGroup
                     ? {
                         id: "",
-                        vendorId: null,
+                        manufacturerId: null,
                         productId: null,
                         versionId: null,
-                        vendor: candidate.deviceGroup.vendor,
+                        manufacturer: candidate.deviceGroup.manufacturer,
                         product: candidate.deviceGroup.product,
                         version: null,
                       }

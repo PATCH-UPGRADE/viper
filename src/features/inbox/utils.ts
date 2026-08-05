@@ -145,7 +145,7 @@ export async function existingIds<T extends { id: string }>(
 // creating one from notification would pollute inventory
 export async function enrichDeviceGroupIdentifiers(
   identity: {
-    vendorId: string;
+    manufacturerId: string;
     productId: string | null;
     versionId: string | null;
   },
@@ -153,7 +153,7 @@ export async function enrichDeviceGroupIdentifiers(
 ): Promise<void> {
   const deviceGroup = await prisma.deviceGroup.findFirst({
     where: {
-      vendorId: identity.vendorId,
+      manufacturerId: identity.manufacturerId,
       productId: identity.productId,
       versionId: identity.versionId,
     },
@@ -227,9 +227,12 @@ export async function enrichAssetIdentifiers(
   });
 }
 
-export async function addVendorAlias(id: string, alias: string): Promise<void> {
+export async function addManufacturerAlias(
+  id: string,
+  alias: string,
+): Promise<void> {
   const normalized = normalizeName(alias);
-  const row = await prisma.vendor.findUnique({
+  const row = await prisma.manufacturer.findUnique({
     where: { id },
     select: { canonicalName: true, nameMappings: true },
   });
@@ -241,7 +244,7 @@ export async function addVendorAlias(id: string, alias: string): Promise<void> {
   ) {
     return;
   }
-  await prisma.vendor.update({
+  await prisma.manufacturer.update({
     where: { id },
     data: { nameMappings: { push: normalized } },
   });

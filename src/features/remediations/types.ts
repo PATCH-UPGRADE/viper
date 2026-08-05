@@ -23,7 +23,7 @@ const canonicalRefInclude = {
 
 const matchingInclude = {
   include: {
-    vendor: canonicalRefInclude,
+    manufacturer: canonicalRefInclude,
     product: canonicalRefInclude,
     version: canonicalRefInclude,
   },

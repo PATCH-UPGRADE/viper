@@ -67,9 +67,9 @@ export function buildMitigationPlansSchema(refs: EntityRefs) {
       ),
   });
 
-  // Refs belong in the linking fields only; a ref in prose fails the parse, so
-  // the Inngest retry re-rolls the model instead of the leak reaching users.
+  // Every ref the model saw, not just the linkable three: asset refs arrive via note lines.
   const offered = Object.keys(refs.idByRef);
+  // Literal refs, never /(vuln|rem|group)-\d+/: a work order may legitimately say "VLAN group-10".
   const leakPattern =
     offered.length > 0 ? new RegExp(`\\b(?:${offered.join("|")})\\b`) : null;
 
@@ -88,6 +88,7 @@ export function buildMitigationPlansSchema(refs: EntityRefs) {
           "the work orders that would be created if this plan is accepted",
         ),
     })
+    // Reject rather than strip the ref: a silent scrub would ship the plan that leaked.
     .superRefine((plan, ctx) => {
       if (!leakPattern) return;
       const check = (text: string, path: (string | number)[]) => {

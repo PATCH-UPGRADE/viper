@@ -72,7 +72,7 @@ export const AssetWorkOrders = ({ assetId }: { assetId: string }) => {
         <TableBody>
           {tickets.map((ticket) => (
             <TableRow key={ticket.id} className="hover:bg-muted/40">
-              <TableCell className="max-w-96">
+              <TableCell className="max-w-96 whitespace-normal align-top">
                 <div className="flex flex-col gap-1">
                   <Link
                     href={`/tracking/${ticket.id}`}
@@ -83,19 +83,19 @@ export const AssetWorkOrders = ({ assetId }: { assetId: string }) => {
                   <CategoryChip category={ticket.category} />
                 </div>
               </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 <StatusChip status={ticket.status} />
               </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 <MarkCompleteButton ticketId={ticket.id} />
               </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 <DepartmentChips departments={ticket.departments} />
               </TableCell>
-              <TableCell className="text-sm">
+              <TableCell className="align-top text-sm">
                 {formatScheduled(ticket.scheduledAt) ?? "—"}
               </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <MessageSquareIcon className="size-3.5" />
                   <span>{ticket.commentCount}</span>

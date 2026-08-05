@@ -1,7 +1,6 @@
-import fs from "node:fs";
+import { PDFDocument, type PDFFont, rgb, StandardFonts } from "pdf-lib";
 import QRCode from "qrcode";
 import type { Prisma } from "@/generated/prisma";
-import { launchHeadlessBrowser } from "@/lib/headless-browser";
 import { deviceGroupLabel } from "@/lib/markdown";
 import { getBaseUrl } from "@/lib/url-utils";
 import { getAssetRoleLabel } from "../utils";
@@ -20,137 +19,198 @@ export const qrPdfAssetSelect = {
 
 type QrPdfAsset = Prisma.AssetGetPayload<{ select: typeof qrPdfAssetSelect }>;
 
-const logoSvg = fs.readFileSync("public/logos/logo.svg", "utf-8");
+const PAGE_WIDTH = 612;
+const PAGE_HEIGHT = 792;
+const MARGIN_X = 72;
+const MARGIN_TOP = 64;
+const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_X * 2;
 
-export function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
+const DARK = rgb(0.067, 0.094, 0.153);
+const LINE_GRAY = rgb(0.216, 0.255, 0.318);
+const GRAY = rgb(0.42, 0.447, 0.502);
+const LIGHT_GRAY = rgb(0.612, 0.639, 0.686);
+const BORDER_GRAY = rgb(0.898, 0.906, 0.922);
 
-function buildHtml(asset: QrPdfAsset, url: string, qrSvg: string): string {
-  return `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <style>
-      body {
-        margin: 0;
-        padding: 64px 72px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-size: 14px;
-        color: #111827;
-      }
-      h1 {
-        font-size: 28px;
-        font-weight: 700;
-        margin: 0 0 12px;
-      }
-      .url {
-        font-family: "SF Mono", Menlo, Consolas, monospace;
-        color: #374151;
-        margin: 0 0 20px;
-      }
-      .description {
-        color: #6b7280;
-        max-width: 480px;
-        line-height: 1.5;
-        margin: 0 0 32px;
-      }
-      .qr {
-        display: inline-block;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 12px;
-        margin-bottom: 32px;
-      }
-      .asset-name {
-        font-size: 20px;
-        font-weight: 700;
-        margin: 0 0 4px;
-      }
-      .device-label {
-        color: #6b7280;
-        margin: 0 0 24px;
-      }
-      .divider {
-        border: none;
-        border-top: 1px solid #e5e7eb;
-        margin: 24px 0;
-      }
-      .serial-label {
-        font-size: 11px;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        color: #9ca3af;
-        margin: 0 0 4px;
-      }
-      .serial-value {
-        font-weight: 700;
-        margin: 0;
-      }
-      .footer {
-        font-size: 11px;
-        color: #9ca3af;
-        line-height: 1.5;
-        max-width: 420px;
-      }
-      .brand {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 6px;
-        margin-top: 12px;
-      }
-      .brand span {
-        font-weight: 700;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>Quick access to your equipment</h1>
-    <p class="url">${escapeHtml(url)}</p>
-    <p class="description">
-      Scan the QR code below to view this device's live status, open work
-      orders, and service history in an instant.
-    </p>
-    <div class="qr">${qrSvg}</div>
-    <p class="asset-name">${escapeHtml(getAssetRoleLabel(asset))}</p>
-    <p class="device-label">${escapeHtml(deviceGroupLabel(asset.deviceGroup))}</p>
-    <hr class="divider" />
-    ${
-      asset.serialNumber
-        ? `<p class="serial-label">Serial Number</p>
-    <p class="serial-value">${escapeHtml(asset.serialNumber)}</p>`
-        : ""
+// Viper's mark: three parallel slanted bars, from public/logos/logo.svg (78x32 viewBox).
+const LOGO_WIDTH = 78;
+const LOGO_HEIGHT = 32;
+const LOGO_PATHS = [
+  { d: "M55.5 0H77.5L58.5 32H36.5L55.5 0Z", color: rgb(1, 0.478, 0) },
+  { d: "M35.5 0H51.5L32.5 32H16.5L35.5 0Z", color: rgb(1, 0.592, 0.212) },
+  { d: "M19.5 0H31.5L12.5 32H0.5L19.5 0Z", color: rgb(1, 0.737, 0.49) },
+];
+
+function wrapText(
+  font: PDFFont,
+  text: string,
+  size: number,
+  maxWidth: number,
+): string[] {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (line && font.widthOfTextAtSize(candidate, size) > maxWidth) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = candidate;
     }
-    <hr class="divider" />
-    <p class="footer">
-      This document was generated automatically by Viper and reflects device
-      data as of the date of creation. Contact your IT administrator for the
-      latest status.
-    </p>
-    <div class="brand">
-      ${logoSvg}
-      <span>Viper</span>
-    </div>
-  </body>
-</html>`;
+  }
+  if (line) lines.push(line);
+  return lines;
 }
 
 export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   const url = `${getBaseUrl()}/assets/${asset.id}/work-orders`;
-  const qrSvg = await QRCode.toString(url, { type: "svg", width: 250 });
+  const qrPng = await QRCode.toBuffer(url, {
+    type: "png",
+    width: 250,
+    margin: 1,
+  });
 
-  const browser = await launchHeadlessBrowser();
-  try {
-    const page = await browser.newPage();
-    await page.setContent(buildHtml(asset, url, qrSvg));
-    return await page.pdf({ printBackground: true });
-  } finally {
-    await browser.close();
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const mono = await pdfDoc.embedFont(StandardFonts.Courier);
+  const qrImage = await pdfDoc.embedPng(qrPng);
+
+  let y = PAGE_HEIGHT - MARGIN_TOP;
+
+  y -= 28;
+  page.drawText("Quick access to your equipment", {
+    x: MARGIN_X,
+    y,
+    size: 28,
+    font: bold,
+    color: DARK,
+  });
+  y -= 32;
+
+  page.drawText(url, {
+    x: MARGIN_X,
+    y,
+    size: 12,
+    font: mono,
+    color: LINE_GRAY,
+  });
+  y -= 28;
+
+  for (const line of wrapText(
+    font,
+    "Scan the QR code below to view this device's live status, open work orders, and service history in an instant.",
+    12,
+    CONTENT_WIDTH,
+  )) {
+    page.drawText(line, { x: MARGIN_X, y, size: 12, font, color: GRAY });
+    y -= 18;
   }
+  y -= 14;
+
+  const qrSize = 250;
+  const qrPad = 12;
+  const qrBoxSize = qrSize + qrPad * 2;
+  page.drawRectangle({
+    x: MARGIN_X,
+    y: y - qrBoxSize,
+    width: qrBoxSize,
+    height: qrBoxSize,
+    borderColor: BORDER_GRAY,
+    borderWidth: 1,
+  });
+  page.drawImage(qrImage, {
+    x: MARGIN_X + qrPad,
+    y: y - qrBoxSize + qrPad,
+    width: qrSize,
+    height: qrSize,
+  });
+  y -= qrBoxSize + 24;
+
+  page.drawText(getAssetRoleLabel(asset), {
+    x: MARGIN_X,
+    y,
+    size: 18,
+    font: bold,
+    color: DARK,
+  });
+  y -= 22;
+
+  page.drawText(deviceGroupLabel(asset.deviceGroup), {
+    x: MARGIN_X,
+    y,
+    size: 12,
+    font,
+    color: GRAY,
+  });
+  y -= 24;
+
+  page.drawLine({
+    start: { x: MARGIN_X, y },
+    end: { x: PAGE_WIDTH - MARGIN_X, y },
+    thickness: 1,
+    color: BORDER_GRAY,
+  });
+  y -= 24;
+
+  if (asset.serialNumber) {
+    page.drawText("SERIAL NUMBER", {
+      x: MARGIN_X,
+      y,
+      size: 9,
+      font: bold,
+      color: LIGHT_GRAY,
+    });
+    y -= 15;
+    page.drawText(asset.serialNumber, {
+      x: MARGIN_X,
+      y,
+      size: 12,
+      font: bold,
+      color: DARK,
+    });
+    y -= 24;
+
+    page.drawLine({
+      start: { x: MARGIN_X, y },
+      end: { x: PAGE_WIDTH - MARGIN_X, y },
+      thickness: 1,
+      color: BORDER_GRAY,
+    });
+    y -= 24;
+  }
+
+  for (const line of wrapText(
+    font,
+    "This document was generated automatically by Viper and reflects device data as of the date of creation. Contact your IT administrator for the latest status.",
+    9,
+    420,
+  )) {
+    page.drawText(line, { x: MARGIN_X, y, size: 9, font, color: LIGHT_GRAY });
+    y -= 13;
+  }
+
+  const wordmarkWidth = bold.widthOfTextAtSize("Viper", 12);
+  const logoScale = 0.5;
+  const logoX =
+    PAGE_WIDTH - MARGIN_X - LOGO_WIDTH * logoScale - 8 - wordmarkWidth;
+  const logoY = MARGIN_TOP;
+  for (const { d, color } of LOGO_PATHS) {
+    page.drawSvgPath(d, {
+      x: logoX,
+      y: logoY + LOGO_HEIGHT * logoScale,
+      scale: logoScale,
+      color,
+    });
+  }
+  page.drawText("Viper", {
+    x: logoX + LOGO_WIDTH * logoScale + 8,
+    y: logoY + (LOGO_HEIGHT * logoScale - 12) / 2,
+    size: 12,
+    font: bold,
+    color: DARK,
+  });
+
+  return Buffer.from(await pdfDoc.save());
 }

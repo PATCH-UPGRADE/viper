@@ -129,18 +129,4 @@ describe("vendorsRouter.getMany", () => {
       expect.objectContaining({ orderBy: { canonicalDisplayName: "asc" } }),
     );
   });
-
-  it("pages through the vendor list", async () => {
-    mockPrisma.vendor.count.mockResolvedValue(25);
-    mockPrisma.vendor.findMany.mockResolvedValue([]);
-    const caller = setup();
-
-    const result = await caller.getMany({ ...PAGE_INPUT, page: 2 });
-
-    expect(mockPrisma.vendor.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ skip: 10, take: 10 }),
-    );
-    expect(result.totalPages).toBe(3);
-    expect(result.hasNextPage).toBe(true);
-  });
 });

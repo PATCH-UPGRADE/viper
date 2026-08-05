@@ -67,9 +67,8 @@ export function buildMitigationPlansSchema(refs: EntityRefs) {
       ),
   });
 
-  // Every ref the model saw, not just the linkable three: asset refs arrive via note lines.
-  const offered = Object.keys(refs.idByRef);
-  // Literal refs, never /(vuln|rem|group)-\d+/: a work order may legitimately say "VLAN group-10".
+  const offered = Object.keys(refs.idByRef); // ["vuln-1","rem-1","group-1","group-2","asset-1"]
+  // Finds those exact refs as whole words: "group-1" hits, "VLAN group-10" doesn't.
   const leakPattern =
     offered.length > 0 ? new RegExp(`\\b(?:${offered.join("|")})\\b`) : null;
 

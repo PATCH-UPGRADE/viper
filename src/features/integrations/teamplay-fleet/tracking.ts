@@ -40,10 +40,12 @@ import type {
   FleetPatientDanger,
   FleetSupportType,
 } from "./constants";
+import { FLEET_HOST, FLEET_SOURCE_LABEL } from "./constants";
 
-/** Fleet's host — the authoritative identity of the upstream, as in REST_MAPPERS. */
-export const FLEET_HOST = "fleet.siemens-healthineers.com";
-export const FLEET_SOURCE_LABEL = "Siemens Healthineers Fleet";
+// These constants live in the client-safe `constants` module, so client
+// components such as the work-order Source card can import them. This module
+// re-exports them for the existing server-side import sites.
+export { FLEET_HOST, FLEET_SOURCE_LABEL };
 
 // ─── Integration lookup ──────────────────────────────────────────────────────
 

@@ -42,6 +42,7 @@ import type { PaginatedResponse } from "@/lib/pagination";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
 import { getAssetRoleLabel } from "../utils";
+import { AssetQrPdfLink } from "./asset-qr-pdf-link";
 
 export const AssetContainer = ({ children }: { children: React.ReactNode }) => {
   return <EntityContainer>{children}</EntityContainer>;
@@ -273,43 +274,52 @@ interface AssetDetailProps {
   assetId: string;
 }
 
+export const AssetHeader = ({ assetId }: { assetId: string }) => {
+  const assetResult = useSuspenseAsset(assetId);
+  const asset = assetResult.data;
+
+  return (
+    <div className="flex flex-col px-4">
+      <Breadcrumb className="pb-6">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/assets">All Assets</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator>
+            <SlashIcon />
+          </BreadcrumbSeparator>
+          <BreadcrumbItem>
+            <BreadcrumbPage>{getAssetRoleLabel(asset)}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
+      <div className="flex items-center justify-between gap-2 pb-2">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          {getAssetRoleLabel(asset)}
+        </h1>
+        <AssetQrPdfLink assetId={assetId} />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Badge variant="outline">
+          <ServerIcon className="size-3 mr-1" />
+          Hospital Asset
+        </Badge>
+        <span className="text-xs">
+          Updated {formatDistanceToNow(asset.updatedAt, { addSuffix: true })}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
   const assetResult = useSuspenseAsset(assetId);
   const asset = assetResult.data;
 
   return (
     <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4 text-sm">
-      {/* Asset Detail Header */}
-      <div className="flex flex-col">
-        <Breadcrumb className="pb-6">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/assets">All Assets</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator>
-              <SlashIcon />
-            </BreadcrumbSeparator>
-            <BreadcrumbItem>
-              <BreadcrumbPage>{getAssetRoleLabel(asset)}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
-        <h1 className="text-3xl font-semibold tracking-tight pb-2">
-          {getAssetRoleLabel(asset)}
-        </h1>
-
-        <div className="flex items-center gap-2">
-          <Badge variant="outline">
-            <ServerIcon className="size-3 mr-1" />
-            Hospital Asset
-          </Badge>
-          <span className="text-xs">
-            Updated {formatDistanceToNow(asset.updatedAt, { addSuffix: true })}
-          </span>
-        </div>
-      </div>
-
       {/* Left / Right Column Body */}
       <div className="flex gap-6">
         {/* Left Column - Meta Information */}

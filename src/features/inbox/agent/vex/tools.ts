@@ -77,7 +77,7 @@ const issueValueSchema = z.object({
     .string()
     .nullish()
     .describe(
-      'Concise reasoning for the group-level status, if you set one. Hospital staff read this text, so write it in plain words: name devices by vendor, product and hostname, and use no internal vocabulary (no "VEX", no status codes such as NOT_AFFECTED) and no database ids.',
+      'Concise reasoning for the group-level status, if you set one. Hospital staff read this text, so write it in plain words: name devices by manufacturer/vendor, product and hostname, and use no internal vocabulary (no "VEX", no status codes such as NOT_AFFECTED) and no database ids.',
     ),
   confidence: z
     .enum(["NeedsReview", "Matched"])

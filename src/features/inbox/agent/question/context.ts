@@ -19,7 +19,7 @@ export type QuestionContext = {
 
 type MatchingWithRefs = MatchingLike & {
   id: string;
-  vendor?: { canonicalDisplayName: string } | null;
+  manufacturer?: { canonicalDisplayName: string } | null;
   product?: { canonicalDisplayName: string } | null;
   version?: { canonicalDisplayName: string } | null;
 };
@@ -87,7 +87,7 @@ export async function gatherQuestionContext(
             include: {
               deviceGroupMatchings: {
                 include: {
-                  vendor: { select: { canonicalDisplayName: true } },
+                  manufacturer: { select: { canonicalDisplayName: true } },
                   product: { select: { canonicalDisplayName: true } },
                   version: { select: { canonicalDisplayName: true } },
                 },
@@ -126,7 +126,7 @@ export async function gatherQuestionContext(
           where: { OR: matchings.map(deviceGroupWhereForMatching) },
           select: {
             id: true,
-            vendorId: true,
+            manufacturerId: true,
             productId: true,
             versionId: true,
             version: { select: { canonicalName: true } },
@@ -219,7 +219,7 @@ export async function gatherQuestionContextForIssue(
   const matching = await prisma.deviceGroupMatching.findUnique({
     where: { id: issue.deviceGroupMatchingId },
     include: {
-      vendor: { select: { canonicalDisplayName: true } },
+      manufacturer: { select: { canonicalDisplayName: true } },
       product: { select: { canonicalDisplayName: true } },
       version: { select: { canonicalDisplayName: true } },
     },
@@ -231,7 +231,7 @@ export async function gatherQuestionContextForIssue(
     where: deviceGroupWhereForMatching(matching),
     select: {
       id: true,
-      vendorId: true,
+      manufacturerId: true,
       productId: true,
       versionId: true,
       version: { select: { canonicalName: true } },

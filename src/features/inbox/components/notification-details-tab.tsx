@@ -189,19 +189,18 @@ export function NotificationDetailsTab({
     (m) => m.assetCount > 0,
   );
 
-  // Group matchings by vendor (first-seen order) so the vendor cell can span
-  // all of that vendor's product rows in the table below.
-  const vendorGroups = withAssets.reduce<Map<string, DeviceGroupMapping[]>>(
-    (groups, m) => {
-      const vendor =
-        displayName(m.deviceGroupMatching.vendor) ?? "Unknown vendor";
-      const existing = groups.get(vendor);
-      if (existing) existing.push(m);
-      else groups.set(vendor, [m]);
-      return groups;
-    },
-    new Map(),
-  );
+  // Group matchings by manufacturer (first-seen order) so the manufacturer cell can span
+  // all of that manufacturer's product rows in the table below.
+  const manufacturerGroups = withAssets.reduce<
+    Map<string, DeviceGroupMapping[]>
+  >((groups, m) => {
+    const manufacturer =
+      displayName(m.deviceGroupMatching.manufacturer) ?? "Unknown manufacturer";
+    const existing = groups.get(manufacturer);
+    if (existing) existing.push(m);
+    else groups.set(manufacturer, [m]);
+    return groups;
+  }, new Map());
 
   const closeDialog = () => {
     setRejecting(null);
@@ -226,67 +225,72 @@ export function NotificationDetailsTab({
     }
   };
 
+  const hasAssets = withAssets.length > 0;
+
   return (
     <>
       <HospitalImpactCard notification={notification} />
       <NotificationSummaryCard notification={notification} />
 
       {/* Affected Products */}
-      <CollapsibleCard defaultOpen>
-        <CollapsibleCardTrigger>Affected Products</CollapsibleCardTrigger>
-        <CollapsibleCardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Vendor</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead>Affected Versions</TableHead>
-                <TableHead className="text-right">Affected Assets</TableHead>
-                <TableHead className="w-0" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[...vendorGroups.entries()].map(([vendor, matchings]) =>
-                matchings.map((m, index) => (
-                  <TableRow key={m.id}>
-                    {index === 0 && (
-                      <TableCell
-                        rowSpan={matchings.length}
-                        className="border-r align-top font-semibold"
-                      >
-                        {vendor}
-                      </TableCell>
-                    )}
-                    <TableCell className="font-medium">
-                      {displayName(m.deviceGroupMatching.product)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {displayName(m.deviceGroupMatching.version) ??
-                          m.deviceGroupMatching.versionRange}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-bold">
-                      {m.assetCount}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive"
-                        onClick={() => setRejecting(m)}
-                        aria-label="Unlink this device group"
-                      >
-                        <Unlink className="size-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )),
-              )}
-            </TableBody>
-          </Table>
-        </CollapsibleCardContent>
-      </CollapsibleCard>
+      {hasAssets && (
+        <CollapsibleCard defaultOpen>
+          <CollapsibleCardTrigger>Affected Products</CollapsibleCardTrigger>
+          <CollapsibleCardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Manufacturer</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Affected Versions</TableHead>
+                  <TableHead className="text-right">Affected Assets</TableHead>
+                  <TableHead className="w-0" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...manufacturerGroups.entries()].map(
+                  ([manufacturer, matchings]) =>
+                    matchings.map((m, index) => (
+                      <TableRow key={m.id}>
+                        {index === 0 && (
+                          <TableCell
+                            rowSpan={matchings.length}
+                            className="border-r align-top font-semibold"
+                          >
+                            {manufacturer}
+                          </TableCell>
+                        )}
+                        <TableCell className="font-medium">
+                          {displayName(m.deviceGroupMatching.product)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {displayName(m.deviceGroupMatching.version) ??
+                              m.deviceGroupMatching.versionRange}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-bold">
+                          {m.assetCount}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive"
+                            onClick={() => setRejecting(m)}
+                            aria-label="Unlink this device group"
+                          >
+                            <Unlink className="size-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )),
+                )}
+              </TableBody>
+            </Table>
+          </CollapsibleCardContent>
+        </CollapsibleCard>
+      )}
 
       {/* Details */}
       <CollapsibleCard defaultOpen>

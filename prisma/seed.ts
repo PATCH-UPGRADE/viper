@@ -743,7 +743,7 @@ const SAMPLE_NOTES = [
     text: "The hospital is a rural, critical access hospital with 12 inpatient beds.",
   },
   {
-    text: "If applying a patch to an OT device, unless it has already been tested by the vendor, the device should be validated after patching to ensure that its essential clinical functionality hasn't been compromised. This process can often be time intensive and should be accounted for as applicable in remediation recommendations.",
+    text: "If applying a patch to an OT device, unless it has already been tested by the manufacturer, the device should be validated after patching to ensure that its essential clinical functionality hasn't been compromised. This process can often be time intensive and should be accounted for as applicable in remediation recommendations.",
   },
 ];
 
@@ -777,7 +777,7 @@ const SAMPLE_REMEDIATIONS = [
     description:
       "Windows 7 and Server 2008 R2 are end-of-life and do not receive patches via standard Windows Update. Apply MS17-010 via Microsoft extended support if contracted, then implement network-level compensating controls to mitigate EternalBlue (CVE-2017-0144) across all five imaging network Windows hosts.",
     narrative:
-      "Immediate actions: (1) Disable SMBv1 on all five affected hosts via PowerShell (Set-SmbServerConfiguration -EnableSMB1Protocol $false) and registry (HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters, SMB1=0). (2) Block TCP port 445 inbound at the Cisco Catalyst 2960S switch using ACLs on all imaging and PACS VLANs. (3) Deploy host-based firewall rules to block SMB from non-management hosts. (4) Micro-segment each workstation subnet to minimize lateral movement. Long-term: coordinate with GE Healthcare to plan migration of CT acquisition workstation and PACS server to a supported OS — Advantage Workstation 4.6 and Centricity PACS-IW 5.0 compatibility with newer Windows versions must be confirmed with the vendor before upgrading.",
+      "Immediate actions: (1) Disable SMBv1 on all five affected hosts via PowerShell (Set-SmbServerConfiguration -EnableSMB1Protocol $false) and registry (HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters, SMB1=0). (2) Block TCP port 445 inbound at the Cisco Catalyst 2960S switch using ACLs on all imaging and PACS VLANs. (3) Deploy host-based firewall rules to block SMB from non-management hosts. (4) Micro-segment each workstation subnet to minimize lateral movement. Long-term: coordinate with GE Healthcare to plan migration of CT acquisition workstation and PACS server to a supported OS — Advantage Workstation 4.6 and Centricity PACS-IW 5.0 compatibility with newer Windows versions must be confirmed with the manufacturer before upgrading.",
     upstreamApi: "https://www.microsoft.com/en-us/windows/end-of-support",
   },
   // CVE-2016-6366 remediation for Cisco ASA 5505 (both VPN gateway and firewall)
@@ -829,7 +829,7 @@ const SAMPLE_DEPARTMENTS = [
   },
   {
     name: "Procurement",
-    description: "Capital equipment sourcing and vendor management.",
+    description: "Capital equipment sourcing and manufacturer management.",
     color: "blue",
   },
   {
@@ -992,7 +992,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         linkedAssetIds: ["rad-ws-001"],
         comments: [
           "Life-safety path: confirm fallback procedure before rollout.",
-          "Vendor compat check pending with GE for Advantage Workstation 4.6.",
+          "Manufacturer compat check pending with GE for Advantage Workstation 4.6.",
         ],
       },
       {
@@ -1130,7 +1130,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
   {
     summary: "Patient Device Roadmap",
     description:
-      "Tracks longer-horizon decisions for patient monitor and infusion pump fleets — vendor engagement, fleet refresh planning.",
+      "Tracks longer-horizon decisions for patient monitor and infusion pump fleets — manufacturer engagement, fleet refresh planning.",
     status: TicketStatus.TO_DO,
     category: TicketCategory.OTHER,
     department: "Biomed",
@@ -1182,6 +1182,11 @@ async function clearDatabase() {
   await prisma.externalVulnerabilityMapping.deleteMany();
   await prisma.artifact.deleteMany();
   await prisma.artifactWrapper.deleteMany();
+  // ContractAsset references Asset, so it must go before the asset delete below.
+  await prisma.contractAsset.deleteMany();
+  await prisma.contract.deleteMany();
+  await prisma.vendorContact.deleteMany();
+  await prisma.vendor.deleteMany();
   await prisma.remediation.deleteMany();
   await prisma.vulnerability.deleteMany();
   await prisma.deviceArtifact.deleteMany();
@@ -1249,9 +1254,9 @@ function cpeVersionStatus(cpe: string): "UNKNOWN" | "NOT_APPLICABLE" | "KNOWN" {
 
 // Canonical resolvers (seed avoids importing the server-only router-utils).
 // canonicalName is @unique so upsert is race-safe.
-function upsertVendor(name: string) {
+function upsertManufacturer(name: string) {
   const canonicalName = name.trim().toLowerCase();
-  return prisma.vendor.upsert({
+  return prisma.manufacturer.upsert({
     where: { canonicalName },
     update: {},
     create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
@@ -1275,7 +1280,7 @@ function upsertVersion(name: string) {
 }
 
 type GroupIdentity = {
-  vendorId: string | null;
+  manufacturerId: string | null;
   productId: string | null;
   versionId: string | null;
 };
@@ -1283,11 +1288,11 @@ type GroupIdentity = {
 async function seedDeviceGroups() {
   console.log("\n🌱 Seeding device groups...");
 
-  // Sequential to keep find-or-create of the (vendor, product, version) identity
+  // Sequential to keep find-or-create of the (manufacturer, product, version) identity
   // race-free.
   const deviceGroups = [];
   for (const dg of SAMPLE_DEVICE_GROUPS) {
-    const vendor = await upsertVendor(dg.manufacturer);
+    const manufacturer = await upsertManufacturer(dg.manufacturer);
     const product = await upsertProduct(dg.modelName);
     // versionStatus follows the CPE's version token; only KNOWN groups get a
     // version row (NOT_APPLICABLE / UNKNOWN groups have versionId = null).
@@ -1300,7 +1305,7 @@ async function seedDeviceGroups() {
 
     const existing = await prisma.deviceGroup.findFirst({
       where: {
-        vendorId: vendor.id,
+        manufacturerId: manufacturer.id,
         productId: product.id,
         versionId: version?.id ?? null,
         versionStatus,
@@ -1311,7 +1316,7 @@ async function seedDeviceGroups() {
       existing ??
       (await prisma.deviceGroup.create({
         data: {
-          vendorId: vendor.id,
+          manufacturerId: manufacturer.id,
           productId: product.id,
           versionId: version?.id ?? null,
           versionStatus,
@@ -1459,9 +1464,9 @@ async function seedFleetIntegration(userId: string) {
 
 // Find-or-create a shared DeviceGroupMatching for a device-group identity.
 async function matchingForGroup(dg: GroupIdentity): Promise<string | null> {
-  if (!dg.vendorId) return null;
+  if (!dg.manufacturerId) return null;
   const where = {
-    vendorId: dg.vendorId,
+    manufacturerId: dg.manufacturerId,
     productId: dg.productId,
     versionId: dg.versionId,
     versionRange: null,
@@ -1487,7 +1492,7 @@ async function seedVulnerabilities(userId: string) {
             where: { cpe: { has: cpe } },
             select: {
               id: true,
-              vendorId: true,
+              manufacturerId: true,
               productId: true,
               versionId: true,
             },
@@ -1534,12 +1539,12 @@ async function seedDeviceArtifacts(userId: string) {
       // Resolve the artifact's identity (the device it's for) from its CPE.
       const parts = deviceArtifact.cpe.split(":");
       const norm = (v?: string) => (!v || v === "-" || v === "*" ? null : v);
-      const vendor = await upsertVendor(norm(parts[3]) ?? "-");
+      const manufacturer = await upsertManufacturer(norm(parts[3]) ?? "-");
       const product = await upsertProduct(norm(parts[4]) ?? "-");
       const versionName = norm(parts[5]);
       const version = versionName ? await upsertVersion(versionName) : null;
       const identityMatchingId = await matchingForGroup({
-        vendorId: vendor.id,
+        manufacturerId: manufacturer.id,
         productId: product.id,
         versionId: version?.id ?? null,
       });
@@ -1627,7 +1632,7 @@ async function seedRemediations(userId: string) {
       // Link the remediation to the device group via its own matching, and to
       // the vulnerability that affects the same group.
       const matchingId = await matchingForGroup({
-        vendorId: deviceGroup.vendorId,
+        manufacturerId: deviceGroup.manufacturerId,
         productId: deviceGroup.productId,
         versionId: deviceGroup.versionId,
       });
@@ -1636,7 +1641,7 @@ async function seedRemediations(userId: string) {
         where: {
           deviceGroupMatchings: {
             some: {
-              vendorId: deviceGroup.vendorId ?? undefined,
+              manufacturerId: deviceGroup.manufacturerId ?? undefined,
               productId: deviceGroup.productId,
             },
           },
@@ -1714,10 +1719,38 @@ async function seedNotes(userId: string) {
   return notes;
 }
 
+// Resolve CPE strings to shared DeviceGroupMatching ids (via their device group)
+// so workflow ASSET nodes can link a device class relationally instead of by CPE.
+async function matchingIdsForCpes(cpes: string[]): Promise<string[]> {
+  const ids: string[] = [];
+  for (const cpe of cpes) {
+    const dg = await prisma.deviceGroup.findFirst({
+      where: { cpe: { has: cpe } },
+      select: {
+        id: true,
+        manufacturerId: true,
+        productId: true,
+        versionId: true,
+      },
+    });
+    if (!dg) {
+      console.warn(`⚠️  No device group for CPE ${cpe}; skipping matching link`);
+      continue;
+    }
+    const matchingId = await matchingForGroup(dg);
+    if (matchingId) ids.push(matchingId);
+  }
+  return [...new Set(ids)];
+}
+
 async function seedWorkflows(userId: string) {
   console.log("\n🌱 Seeding workflows...");
 
   const STEP_POS = 100;
+
+  const ctScannerMatchingIds = await matchingIdsForCpes([
+    "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
+  ]);
 
   // ── Workflow 1: Emergency CT — Acute Stroke / Trauma Protocol ───────────────
   const workflow1 = await prisma.workflow.create({
@@ -1767,9 +1800,9 @@ async function seedWorkflows(userId: string) {
           label: "GE BrightSpeed Elite Select",
           description:
             "GE BrightSpeed Elite Select acquires axial and helical CT studies. Completed images are sent to the CT acquisition workstation via DICOM.",
-          cpes: [
-            "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
-          ],
+        },
+        deviceGroupMatchings: {
+          connect: ctScannerMatchingIds.map((id) => ({ id })),
         },
       },
     }),
@@ -1784,8 +1817,8 @@ async function seedWorkflows(userId: string) {
           label: "CT Acquisition Workstation",
           description:
             "GE Advantage Workstation 4.6 processes raw CT data, reconstructs images, and pushes the completed study to PACS.",
-          assetIds: ["rad-ws-001"],
         },
+        assets: { connect: [{ id: "rad-ws-001" }] },
       },
     }),
     prisma.node.create({
@@ -1799,8 +1832,8 @@ async function seedWorkflows(userId: string) {
           label: "PACS Server",
           description:
             "Centricity PACS-IW v5.0 stores and routes DICOM studies to radiology workstations and the ED image viewer.",
-          assetIds: ["rad-pacs-001"],
         },
+        assets: { connect: [{ id: "rad-pacs-001" }] },
       },
     }),
     prisma.node.create({
@@ -1814,8 +1847,8 @@ async function seedWorkflows(userId: string) {
           label: "Radiology Diagnostic Workstations",
           description:
             "Radiologist interprets the CT study on a diagnostic-grade display, dictates findings, and signs the final report.",
-          assetIds: ["rad-rws-001", "rad-rws-002"],
         },
+        assets: { connect: [{ id: "rad-rws-001" }, { id: "rad-rws-002" }] },
       },
     }),
     prisma.node.create({
@@ -1829,8 +1862,8 @@ async function seedWorkflows(userId: string) {
           label: "ED Image Viewer",
           description:
             "ED team reviews the imaging study and the signed radiology report to guide treatment and disposition decisions.",
-          assetIds: ["rad-ed-001"],
         },
+        assets: { connect: [{ id: "rad-ed-001" }] },
       },
     }),
     prisma.node.create({
@@ -1872,6 +1905,11 @@ async function seedWorkflows(userId: string) {
     },
   });
 
+  const imagingDeviceMatchingIds = await matchingIdsForCpes([
+    "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
+    "cpe:2.3:h:gehealthcare:optima_xr200amx:-:*:*:*:*:*:*:*",
+  ]);
+
   const w2nodes = await Promise.all([
     prisma.node.create({
       data: {
@@ -1897,10 +1935,9 @@ async function seedWorkflows(userId: string) {
           label: "Portable Ultrasound / X-Ray",
           description:
             "GE LOGIQ e R7 portable ultrasound or Optima XR200amx DR system acquires bedside or mobile studies for inpatients.",
-          cpes: [
-            "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
-            "cpe:2.3:h:gehealthcare:optima_xr200amx:-:*:*:*:*:*:*:*",
-          ],
+        },
+        deviceGroupMatchings: {
+          connect: imagingDeviceMatchingIds.map((id) => ({ id })),
         },
       },
     }),
@@ -1915,8 +1952,8 @@ async function seedWorkflows(userId: string) {
           label: "PACS Server",
           description:
             "Centricity PACS-IW v5.0 stores the study and routes it to the remote radiologist via the VPN gateway.",
-          assetIds: ["rad-pacs-001"],
         },
+        assets: { connect: [{ id: "rad-pacs-001" }] },
       },
     }),
     prisma.node.create({
@@ -1930,8 +1967,8 @@ async function seedWorkflows(userId: string) {
           label: "Remote Radiology VPN Gateway",
           description:
             "Cisco ASA 5505 VPN gateway provides secure encrypted connectivity for remote radiologist access to the hospital PACS.",
-          assetIds: ["rad-vpn-001"],
         },
+        assets: { connect: [{ id: "rad-vpn-001" }] },
       },
     }),
     prisma.node.create({
@@ -2164,6 +2201,75 @@ async function seedWorkOrderTickets(userId: string) {
   );
 }
 
+async function seedVendors() {
+  console.log("\n🌱 Seeding vendors...");
+
+  const manufacturer = await upsertManufacturer("Siemens Healthineers");
+
+  const vendor = await prisma.vendor.upsert({
+    where: { canonicalName: "siemens healthineers" },
+    update: { manufacturerId: manufacturer.id },
+    create: {
+      canonicalName: "siemens healthineers",
+      canonicalDisplayName: "Siemens Healthineers",
+      overview: "Manages imaging fleet across radiology and cardiology.",
+      partnerSince: new Date("2019-04-01"),
+      manufacturerId: manufacturer.id,
+    },
+  });
+
+  // Rebuilt rather than upserted: neither model has a natural unique key, so a
+  // re-seed without SEED_CLEAR_DB would otherwise stack duplicates every run.
+  await prisma.contract.deleteMany({ where: { vendorId: vendor.id } });
+  await prisma.vendorContact.deleteMany({ where: { vendorId: vendor.id } });
+
+  await prisma.vendorContact.createMany({
+    data: [
+      {
+        vendorId: vendor.id,
+        name: "Dana Whitfield",
+        title: "Hospital Biomed Lead",
+        email: "dana.whitfield@example-siemens.test",
+        phone: "+1-555-0142",
+        notes: "Usually responds the fastest.",
+      },
+      {
+        vendorId: vendor.id,
+        name: "Marcus Feld",
+        title: "Field Service Engineer",
+        email: "marcus.feld@example-siemens.test",
+      },
+    ],
+  });
+
+  const assets = await prisma.asset.findMany({
+    where: { deviceGroup: { manufacturerId: manufacturer.id } },
+    select: { id: true },
+  });
+
+  const contract = await prisma.contract.create({
+    data: {
+      vendorId: vendor.id,
+      title: "Imaging Fleet Managed Service Agreement",
+      effectiveFrom: new Date("2024-01-01"),
+      effectiveTo: new Date("2027-12-31"),
+      coverageSummary: `Managed security and maintenance across imaging (${assets.length} assets)`,
+    },
+  });
+
+  await prisma.contractAsset.createMany({
+    data: assets.map((asset) => ({
+      contractId: contract.id,
+      assetId: asset.id,
+    })),
+    skipDuplicates: true,
+  });
+
+  console.log(
+    `✅ Seeded vendor ${vendor.canonicalDisplayName} with 1 contract covering ${assets.length} assets`,
+  );
+}
+
 async function main() {
   console.log("🌱 Starting database seed...\n");
 
@@ -2179,6 +2285,7 @@ async function main() {
     await seedCategoryColors();
     await seedDeviceGroups();
     await seedAssets(user.id);
+    await seedVendors();
     await seedFleetIntegration(user.id);
     await seedVulnerabilities(user.id);
     await seedDeviceArtifacts(user.id);

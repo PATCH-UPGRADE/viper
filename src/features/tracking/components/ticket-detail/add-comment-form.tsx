@@ -8,7 +8,15 @@ import { useBeforeUnload } from "@/hooks/use-before-unload";
 import { authClient } from "@/lib/auth-client";
 import { useAddTicketComment } from "../../hooks/use-tracking";
 
-export const AddCommentForm = ({ ticketId }: { ticketId: string }) => {
+export const AddCommentForm = ({
+  ticketId,
+  onCancel,
+  onSubmitted,
+}: {
+  ticketId: string;
+  onCancel?: () => void;
+  onSubmitted?: () => void;
+}) => {
   const [body, setBody] = useState("");
   const addComment = useAddTicketComment(ticketId);
   const { data: session } = authClient.useSession();
@@ -22,7 +30,12 @@ export const AddCommentForm = ({ ticketId }: { ticketId: string }) => {
     if (!canSubmit) return;
     addComment.mutate(
       { ticketId, body: trimmed },
-      { onSuccess: () => setBody("") },
+      {
+        onSuccess: () => {
+          setBody("");
+          onSubmitted?.();
+        },
+      },
     );
   };
 
@@ -41,6 +54,7 @@ export const AddCommentForm = ({ ticketId }: { ticketId: string }) => {
           onChange={(e) => setBody(e.target.value)}
           placeholder="Write a comment..."
           rows={3}
+          autoFocus={!!onCancel}
           disabled={addComment.isPending}
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -49,7 +63,18 @@ export const AddCommentForm = ({ ticketId }: { ticketId: string }) => {
             }
           }}
         />
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {onCancel && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={onCancel}
+              disabled={addComment.isPending}
+            >
+              Cancel
+            </Button>
+          )}
           <Button type="submit" size="sm" disabled={!canSubmit}>
             {addComment.isPending ? "Posting..." : "Comment"}
           </Button>

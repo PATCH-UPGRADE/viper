@@ -102,7 +102,7 @@ export interface AssetForMarkdown {
   utilization?: unknown;
   updatedAt?: Date;
   deviceGroup: {
-    vendor?: CanonicalRef;
+    manufacturer?: CanonicalRef;
     product?: CanonicalRef;
     version?: CanonicalRef;
     cpe?: string[];

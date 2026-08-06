@@ -21,6 +21,13 @@ export const useSuspenseTrackingTicket = (id: string) => {
   return useSuspenseQuery(trpc.tracking.getOne.queryOptions({ id }));
 };
 
+export const useSuspenseAssetWorkOrders = (assetId: string) => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(
+    trpc.tracking.getManyByAssetId.queryOptions({ assetId }),
+  );
+};
+
 export const useUpdateTicket = (ticketId: string) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -31,6 +38,9 @@ export const useUpdateTicket = (ticketId: string) => {
           trpc.tracking.getOne.queryFilter({ id: ticketId }),
         );
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.tracking.getManyByAssetId.queryFilter(),
+        );
         toast.success("Ticket updated");
       },
       onError: (error) => {
@@ -371,7 +381,7 @@ export const useAttachAsset = (ticketId: string) => {
               ip: string;
               role: string | null;
               deviceGroup: {
-                vendor: { canonicalDisplayName: string } | null;
+                manufacturer: { canonicalDisplayName: string } | null;
                 product: { canonicalDisplayName: string } | null;
               } | null;
             }
@@ -396,10 +406,10 @@ export const useAttachAsset = (ticketId: string) => {
                   deviceGroup: candidate.deviceGroup
                     ? {
                         id: "",
-                        vendorId: null,
+                        manufacturerId: null,
                         productId: null,
                         versionId: null,
-                        vendor: candidate.deviceGroup.vendor,
+                        manufacturer: candidate.deviceGroup.manufacturer,
                         product: candidate.deviceGroup.product,
                         version: null,
                       }

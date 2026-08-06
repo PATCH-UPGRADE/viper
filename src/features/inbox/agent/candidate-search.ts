@@ -70,7 +70,7 @@ const nameOrClauses = (term: string) => [
   { nameMappings: { has: normalizeName(term) } },
 ];
 
-const vendorNameOr = (term: string): Prisma.VendorWhereInput[] =>
+const manufacturerNameOr = (term: string): Prisma.ManufacturerWhereInput[] =>
   nameOrClauses(term);
 const productNameOr = (term: string): Prisma.ProductWhereInput[] =>
   nameOrClauses(term);
@@ -94,19 +94,19 @@ async function searchDeviceGroupMatching(
   if (identifierWhere.length > 0) {
     const deviceGroup = await prisma.deviceGroup.findFirst({
       where: { OR: identifierWhere },
-      select: { vendorId: true, productId: true, versionId: true },
+      select: { manufacturerId: true, productId: true, versionId: true },
     });
-    if (deviceGroup?.vendorId) {
+    if (deviceGroup?.manufacturerId) {
       const matchingSelect = {
         id: true,
-        vendor: { select: { canonicalDisplayName: true } },
+        manufacturer: { select: { canonicalDisplayName: true } },
         product: { select: { canonicalDisplayName: true } },
         version: { select: { canonicalDisplayName: true } },
         versionRange: true,
       } as const;
 
       const identity = {
-        vendorId: deviceGroup.vendorId,
+        manufacturerId: deviceGroup.manufacturerId,
         productId: deviceGroup.productId,
         versionId: deviceGroup.versionId,
       };
@@ -125,7 +125,7 @@ async function searchDeviceGroupMatching(
 
       matched.set(matching.id, {
         id: matching.id,
-        manufacturer: matching.vendor?.canonicalDisplayName ?? null,
+        manufacturer: matching.manufacturer?.canonicalDisplayName ?? null,
         modelName: matching.product?.canonicalDisplayName ?? null,
         version: matching.version?.canonicalDisplayName ?? null,
         versionRange: matching.versionRange,
@@ -143,10 +143,10 @@ async function searchDeviceGroupMatching(
   // TODO: consider something like a fuzzy search?
   // or an embedding. For example, if the identified manufacturer is Draeger Inc, and the db manufactuerer is "Draeger", this contains fails
   for (const term of terms) {
-    // Identity now lives in canonical Vendor/Product rows and the cpe[] array.
+    // Identity now lives in canonical Manufacturer/Product rows and the cpe[] array.
     // cpe is a String[], which supports exact-element `has` (not substring).
     or.push(
-      { vendor: { OR: vendorNameOr(term) } },
+      { manufacturer: { OR: manufacturerNameOr(term) } },
       { product: { OR: productNameOr(term) } },
     );
   }
@@ -155,7 +155,7 @@ async function searchDeviceGroupMatching(
     where: { OR: or },
     select: {
       id: true,
-      vendor: { select: { canonicalDisplayName: true } },
+      manufacturer: { select: { canonicalDisplayName: true } },
       product: { select: { canonicalDisplayName: true } },
       version: { select: { canonicalDisplayName: true } },
       versionRange: true,
@@ -166,7 +166,7 @@ async function searchDeviceGroupMatching(
   for (const row of rows) {
     matched.set(row.id, {
       id: row.id,
-      manufacturer: row.vendor?.canonicalDisplayName ?? null,
+      manufacturer: row.manufacturer?.canonicalDisplayName ?? null,
       modelName: row.product?.canonicalDisplayName ?? null,
       version: row.version?.canonicalDisplayName ?? null,
       versionRange: row.versionRange,
@@ -233,7 +233,7 @@ async function searchRemediation(
       vulnerability: { select: { cveId: true } },
       deviceGroupMatchings: {
         select: {
-          vendor: { select: { canonicalDisplayName: true } },
+          manufacturer: { select: { canonicalDisplayName: true } },
           product: { select: { canonicalDisplayName: true } },
         },
         take: 1,
@@ -273,7 +273,7 @@ async function searchAsset(
       serialNumber: true,
       deviceGroup: {
         select: {
-          vendor: { select: { canonicalDisplayName: true } },
+          manufacturer: { select: { canonicalDisplayName: true } },
           product: { select: { canonicalDisplayName: true } },
         },
       },

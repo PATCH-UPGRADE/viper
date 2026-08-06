@@ -165,6 +165,9 @@ model Node {
   position Json
   data     Json @default("{}")
 
+  assets               Asset[]
+  deviceGroupMatchings DeviceGroupMatching[]
+
   outputConnections Connection[] @relation("FromNode")
   inputConnections  Connection[] @relation("ToNode")
 
@@ -216,8 +219,8 @@ enum VersScheme {
   CONAN
 }
 
-// Canonical vendor registry. `nameMappings` are aliases that resolve to this row.
-model Vendor {
+// Canonical manufacturer registry. `nameMappings` are aliases that resolve to this row.
+model Manufacturer {
   id                   String                @id @default(cuid())
   canonicalName        String                @unique
   canonicalDisplayName String
@@ -225,11 +228,89 @@ model Vendor {
   nameMappings         String[]              @default([])
   deviceGroups         DeviceGroup[]
   matchings            DeviceGroupMatching[]
+  vendors              Vendor[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
   @@index([canonicalName])
+  @@map("manufacturer")
+}
+
+// A company the hospital contracts with to manage equipment. Distinct from
+// Manufacturer, which is the canonical registry of who *built* a device.
+model Vendor {
+  id                   String    @id @default(cuid())
+  canonicalName        String    @unique
+  canonicalDisplayName String
+  overview             String?
+  partnerSince         DateTime?
+
+  manufacturerId String?
+  manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
+
+  contracts Contract[]
+  contacts  VendorContact[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([canonicalName])
+  @@index([manufacturerId])
   @@map("vendor")
+}
+
+model VendorContact {
+  id    String  @id @default(cuid())
+  name  String
+  title String?
+  phone String?
+  email String?
+  notes String? @db.Text
+
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vendorId])
+  @@map("vendor_contact")
+}
+
+model Contract {
+  id              String    @id @default(cuid())
+  title           String?
+  effectiveFrom   DateTime?
+  effectiveTo     DateTime?
+  coverageSummary String?
+
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  files  ArtifactWrapper[]
+  covers ContractAsset[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vendorId])
+  @@map("contract")
+}
+
+model ContractAsset {
+  id String @id @default(cuid())
+
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  assetId    String
+  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([contractId, assetId])
+  @@index([contractId])
+  @@index([assetId])
+  @@map("contract_asset")
 }
 
 model Product {
@@ -264,10 +345,10 @@ model Version {
 model DeviceGroup {
   id String @id @default(cuid())
 
-  vendorId      String?
-  vendor        Vendor?       @relation(fields: [vendorId], references: [id], onDelete: SetNull)
-  productId     String?
-  product       Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  manufacturerId String?
+  manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
+  productId      String?
+  product        Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
   versionId     String?
   version       Version?      @relation(fields: [versionId], references: [id], onDelete: SetNull)
   versionStatus VersionStatus @default(UNKNOWN)
@@ -281,18 +362,19 @@ model DeviceGroup {
   deviceGroupHistories DeviceGroupHistory[]
   assets               Asset[]
 
-  @@unique([vendorId, productId, versionId, versionStatus], name: "device_group_identity")
-  @@index([vendorId, productId])
+  // Explicit map: the generated name would be 65 chars and Postgres truncates at 63.
+  @@unique([manufacturerId, productId, versionId, versionStatus], name: "device_group_identity", map: "device_group_identity_key")
+  @@index([manufacturerId, productId])
   @@map("device_group")
 }
 
 model DeviceGroupMatching {
   id String @id @default(cuid())
 
-  vendorId  String
-  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  productId String? // null => wildcard (all products of the vendor)
-  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  manufacturerId String
+  manufacturer   Manufacturer @relation(fields: [manufacturerId], references: [id], onDelete: Cascade)
+  productId      String? // null => wildcard (all products of the manufacturer)
+  product        Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
   versionId String? // exact version when set
   version   Version? @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
@@ -303,11 +385,12 @@ model DeviceGroupMatching {
   deviceArtifacts      DeviceArtifact[]                 @relation("DeviceArtifactMatchings")
   issues               Issue[]
   notificationMappings NotificationDeviceGroupMapping[]
+  nodes                Node[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([vendorId, productId])
+  @@index([manufacturerId, productId])
   @@map("device_group_matching")
 }
 
@@ -354,8 +437,10 @@ model Asset {
   issues               Issue[]
   deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
+  contractAssets       ContractAsset[]
   workOrderTickets     WorkOrderTicket[]          @relation("WorkOrderTicketAssets")
   notificationMappings NotificationAssetMapping[]
+  nodes                Node[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -461,6 +546,8 @@ model ArtifactWrapper {
   deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: Cascade)
   remediationId    String?
   remediation      Remediation?    @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+  contractId       String?
+  contract         Contract?       @relation(fields: [contractId], references: [id], onDelete: Cascade)
 
   latestArtifactId String?   @unique
   latestArtifact   Artifact? @relation("LatestArtifact", fields: [latestArtifactId], references: [id], onDelete: SetNull)
@@ -475,6 +562,7 @@ model ArtifactWrapper {
 
   @@index([remediationId])
   @@index([deviceArtifactId])
+  @@index([contractId])
   @@index([userId])
   @@index([latestArtifactId])
   @@map("artifact_wrapper")
@@ -551,6 +639,9 @@ enum Severity {
   Low
 }
 
+// Order: most urgent -> least urgent
+// Certain components (e.g. the Overview Cards) leverage this order
+// maintain order when possible if expanding this later
 enum Priority {
   Critical
   High
@@ -695,6 +786,7 @@ model Note {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 
   @@index([targetModel, instanceId])
   @@index([userId])
@@ -1116,6 +1208,7 @@ model WorkOrderTicket {
   updatedAt DateTime @updatedAt
 
   @@index([status])
+  @@index([priority])
   @@index([assigneeId])
   @@index([creatorId])
   @@index([parentId])
@@ -1153,6 +1246,7 @@ model TicketSeen {
 }
 
 enum TicketActivityType {
+  WORK_ORDER_CREATED
   STATUS_CHANGED
   CATEGORY_CHANGED
   ASSIGNEE_CHANGED
@@ -1511,8 +1605,8 @@ model Question {
   resultingNoteId String? @unique // create note after user answer
   resultingNote   Note?   @relation(fields: [resultingNoteId], references: [id], onDelete: SetNull)
 
-  parentQuestionId String? @unique
-  parentQuestion  Question? @relation("QuestionChain", fields:[parentQuestionId], references: [id], onDelete: SetNull)
+  parentQuestionId String?   @unique
+  parentQuestion   Question? @relation("QuestionChain", fields: [parentQuestionId], references: [id], onDelete: SetNull)
   followupQuestion Question? @relation("QuestionChain")
 
   createdAt DateTime @default(now())

@@ -1,7 +1,10 @@
 import { z } from "zod";
 import {
+  AssetStatus,
   IssueStatus,
   NotificationChannel,
+  NotificationSourceType,
+  NotificationType,
   Priority,
   type Prisma,
   Severity,
@@ -93,7 +96,14 @@ export const ticketDetailInclude = {
     },
     orderBy: { department: { name: "asc" as const } },
   },
-  assignee: { select: { id: true, name: true, email: true } },
+  assignee: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      department: { select: { id: true, name: true, color: true } },
+    },
+  },
   creator: { select: { id: true, name: true, email: true } },
   parent: { select: { id: true, summary: true } },
   children: {
@@ -101,6 +111,7 @@ export const ticketDetailInclude = {
       id: true,
       summary: true,
       status: true,
+      assignee: { select: { id: true, name: true } },
       departments: {
         select: { id: true, name: true, color: true },
         orderBy: { name: "asc" as const },
@@ -118,16 +129,17 @@ export const ticketDetailInclude = {
       hostname: true,
       ip: true,
       role: true,
+      status: true,
       macAddress: true,
       location: true,
       deviceGroupId: true,
       deviceGroup: {
         select: {
           id: true,
-          vendorId: true,
+          manufacturerId: true,
           productId: true,
           versionId: true,
-          vendor: { select: { canonicalDisplayName: true } },
+          manufacturer: { select: { canonicalDisplayName: true } },
           product: { select: { canonicalDisplayName: true } },
           version: { select: { canonicalName: true } },
         },
@@ -143,7 +155,7 @@ export const ticketDetailInclude = {
       description: true,
       deviceGroupMatchings: {
         select: {
-          vendorId: true,
+          manufacturerId: true,
           productId: true,
           versionId: true,
           versionRange: true,
@@ -169,10 +181,39 @@ export const ticketDetailInclude = {
   watchers: { select: { userId: true } },
   activities: {
     include: {
-      user: { select: { id: true, name: true, image: true } },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          // An integration relation marks the actor as an automation
+          integrationUser: { select: { id: true } },
+        },
+      },
     },
     orderBy: { createdAt: "asc" as const },
   },
+  sources: {
+    select: {
+      id: true,
+      channel: true,
+      externalId: true,
+      referenceUrl: true,
+      sourceType: true,
+    },
+    orderBy: { receivedAt: "desc" as const },
+  },
+  externalMappings: {
+    select: {
+      id: true,
+      externalId: true,
+      lastSynced: true,
+      integration: {
+        select: { id: true, name: true, integrationUri: true },
+      },
+    },
+  },
+  notification: { select: { id: true, title: true, type: true } },
 } satisfies Prisma.WorkOrderTicketInclude;
 
 // What clients receive from the detail endpoints: the per-user `watchers`
@@ -319,8 +360,38 @@ const ticketChildRefSchema = z.object({
   id: z.string(),
   summary: z.string(),
   status: z.enum(TicketStatus),
+  assignee: z.object({ id: z.string(), name: z.string() }).nullable(),
   departments: z.array(departmentItemSchema),
   _count: z.object({ comments: z.number() }),
+});
+
+const detailAssigneeSchema = assigneeItemSchema.extend({
+  department: departmentItemSchema.nullable(),
+});
+
+const ticketSourceSchema = z.object({
+  id: z.string(),
+  channel: z.enum(NotificationChannel),
+  externalId: z.string().nullable(),
+  referenceUrl: z.string().nullable(),
+  sourceType: z.enum(NotificationSourceType),
+});
+
+const ticketExternalMappingSchema = z.object({
+  id: z.string(),
+  externalId: z.string(),
+  lastSynced: z.date().nullable(),
+  integration: z.object({
+    id: z.string(),
+    name: z.string(),
+    integrationUri: z.string(),
+  }),
+});
+
+const ticketNotificationRefSchema = z.object({
+  id: z.string(),
+  title: z.string().nullable(),
+  type: z.enum(NotificationType),
 });
 
 const ticketCommentAuthorSchema = z.object({
@@ -342,6 +413,7 @@ export const ticketCommentResponseSchema = z.object({
 });
 
 const detailLinkedAssetSchema = linkedAssetSchema.extend({
+  status: z.enum(AssetStatus).nullable(),
   macAddress: z.string().nullable(),
   // Prisma's Json column. Using z.any() so the inferred TS type is `any`,
   // which stays assignable to Prisma.JsonValue on the UI side.
@@ -349,10 +421,10 @@ const detailLinkedAssetSchema = linkedAssetSchema.extend({
   deviceGroupId: z.string(),
   deviceGroup: z.object({
     id: z.string(),
-    vendorId: z.string().nullable(),
+    manufacturerId: z.string().nullable(),
     productId: z.string().nullable(),
     versionId: z.string().nullable(),
-    vendor: z.object({ canonicalDisplayName: z.string() }).nullable(),
+    manufacturer: z.object({ canonicalDisplayName: z.string() }).nullable(),
     product: z.object({ canonicalDisplayName: z.string() }).nullable(),
     version: z.object({ canonicalName: z.string() }).nullable(),
   }),
@@ -363,7 +435,7 @@ const detailLinkedRemediationSchema = z.object({
   description: z.string().nullable(),
   deviceGroupMatchings: z.array(
     z.object({
-      vendorId: z.string(),
+      manufacturerId: z.string(),
       productId: z.string().nullable(),
       versionId: z.string().nullable(),
       versionRange: z.string().nullable(),
@@ -382,6 +454,8 @@ const ticketActivityUserSchema = z.object({
   id: z.string(),
   name: z.string(),
   image: z.string().nullable(),
+  // Non-null when the actor is an automation user (AI agent).
+  integrationUser: z.object({ id: z.string() }).nullable(),
 });
 
 export const ticketActivitySchema = z.object({
@@ -431,7 +505,7 @@ export const workOrderDetailResponseSchema = z.object({
   notificationId: z.string().nullable(),
   departments: z.array(departmentItemSchema),
   descriptions: z.array(ticketDescriptionSchema),
-  assignee: assigneeItemSchema.nullable(),
+  assignee: detailAssigneeSchema.nullable(),
   creator: ticketCreatorSchema,
   parent: ticketParentRefSchema,
   children: z.array(ticketChildRefSchema),
@@ -442,4 +516,7 @@ export const workOrderDetailResponseSchema = z.object({
   comments: z.array(ticketCommentResponseSchema),
   isWatching: z.boolean(),
   activities: z.array(ticketActivitySchema),
+  sources: z.array(ticketSourceSchema),
+  externalMappings: z.array(ticketExternalMappingSchema),
+  notification: ticketNotificationRefSchema.nullable(),
 });

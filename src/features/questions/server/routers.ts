@@ -1,10 +1,37 @@
 import "server-only";
 import { z } from "zod";
 import { inngest } from "@/inngest/client";
+import { sendEscalationEmail } from "@/inngest/functions/send-escalation-email";
 import prisma from "@/lib/db";
 import { renderQnA } from "@/lib/markdown/note";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { questionInclude } from "../types";
+import { draftEscalationEmail } from "../agent/escalationEmail";
+import { questionInclude, type SuggestedVendorEmail } from "../types";
+
+// TODO:PS for testing only, wire with real DB later with dummy body text
+const MOCK_CONTACTS = [
+  { name: "Perry Sy", email: "perrydev17@gmail.com" },
+  { name: "Perry Sy 2", email: "perrydev17+2@bugcrowd.com" },
+];
+// TODO:PS for testing only, wire with real DB later with dummy body text
+// const MOCK_EMAIL: SuggestedVendorEmail[] = [
+//   {
+//     questionId: "qustion-1",
+//     audience: "MANUFACTURER",
+//     companyName: "Siemens Healthineers",
+//     productName: "SOMATOM go.All",
+//     reasonWhy:
+//       "The advisory doesn't help Viper confirm the running version on the go.All. A written confirmation from Siemens (or an SRS query) would let Viper move this asset out of 'potentially at risk' with confidence.",
+//     subject:
+//       "Version confirmation - SOMATOM go.All exposure to SSA-220609 (CVE-2022-29875)",
+//     body: `Hello Siemens Healthineers ProductCERT,\n\n We are scoping remediation for....\n\n\ We operate... `,
+//     contacts: [
+//       { email: "perrydev17@gmail.com", name: "perry" },
+//       { name: "Perry Sy 2", email: "perry.sy+2@bugcrowd.com" },
+//     ],
+//     toEmails: ["perrydev17@gmail.com"],
+//   },
+// ];
 
 export const questionsRouter = createTRPCRouter({
   getManyByNotificationId: protectedProcedure
@@ -116,5 +143,55 @@ export const questionsRouter = createTRPCRouter({
       });
 
       return { status };
+    }),
+
+  getSuggestedEmailByNotificationId: protectedProcedure
+    .input(z.object({ notificationId: z.string() }))
+    //.query((): SuggestedVendorEmail[] => MOCK_EMAIL),   // TODO: PS remove after testing
+    .query(async ({ ctx, input }): Promise<SuggestedVendorEmail[]> => {
+      const sender = await prisma.user.findUnique({
+        where: { id: ctx.auth.user.id },
+        select: { name: true, department: { select: { name: true } } },
+      });
+      const signature = [sender?.name, sender?.department?.name]
+        .filter(Boolean)
+        .join("\n");
+      const questions = await prisma.question.findMany({
+        where: { notificationId: input.notificationId, status: "UNSURE" },
+        include: questionInclude,
+      });
+
+      return Promise.all(
+        questions.map(async (question) => {
+          const draft = await draftEscalationEmail(question);
+          const contacts = MOCK_CONTACTS; // TODO:PS get it from vendorContact
+          const [primary] = contacts;
+          return {
+            questionId: question.id,
+            ...draft,
+            body: `${draft.body.trimEnd()}\n${signature}`,
+            contacts,
+            toEmails: primary ? [primary.email] : [],
+          };
+        }),
+      );
+    }),
+
+  approveEscalationEmail: protectedProcedure
+    .input(
+      z.object({
+        questionId: z.string(),
+        toEmails: z.array(z.string().email()).min(1),
+        subject: z.string(),
+        body: z.string(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      await sendEscalationEmail({
+        toEmails: input.toEmails,
+        subject: input.subject,
+        body: input.body,
+      });
+      return { queued: true };
     }),
 });

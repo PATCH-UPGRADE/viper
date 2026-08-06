@@ -8,7 +8,7 @@ import {
 
 const { AFFECTED, NOT_AFFECTED, UNDER_INVESTIGATION } = IssueStatus;
 
-// Minimal stand-in for the vendor/product/version labels; only identity matters.
+// Minimal stand-in for the manufacturer/product/version labels; only identity matters.
 const labels = (id: string) => ({ id }) as unknown as MatchingWithLabels;
 
 describe("computeMatchingBuckets", () => {

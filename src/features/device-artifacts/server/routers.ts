@@ -109,7 +109,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
         where: { id: deviceGroupId },
         select: {
           id: true,
-          vendorId: true,
+          manufacturerId: true,
           productId: true,
           versionId: true,
           version: { select: { canonicalName: true } },

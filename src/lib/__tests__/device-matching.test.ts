@@ -55,17 +55,17 @@ describe("matchingAppliesToDeviceGroup", () => {
   // device group identity uses canonical FK ids; version carries its string.
   const dg = {
     id: "dg1",
-    vendorId: "v-acme",
+    manufacturerId: "v-acme",
     productId: "p-radiator",
     versionId: "ver-213",
     version: { canonicalName: "2.1.3" },
   };
 
-  it("is false when the vendor differs", () => {
+  it("is false when the manufacturer differs", () => {
     expect(
       matchingAppliesToDeviceGroup(
         {
-          vendorId: "v-other",
+          manufacturerId: "v-other",
           productId: null,
           versionId: null,
           versionRange: null,
@@ -75,11 +75,11 @@ describe("matchingAppliesToDeviceGroup", () => {
     ).toBe(false);
   });
 
-  it("is true for a wildcard-product matching (vendor only)", () => {
+  it("is true for a wildcard-product matching (manufacturer only)", () => {
     expect(
       matchingAppliesToDeviceGroup(
         {
-          vendorId: "v-acme",
+          manufacturerId: "v-acme",
           productId: null,
           versionId: null,
           versionRange: null,
@@ -89,11 +89,11 @@ describe("matchingAppliesToDeviceGroup", () => {
     ).toBe(true);
   });
 
-  it("is true when vendor+product match and there's no version constraint", () => {
+  it("is true when manufacturer+product match and there's no version constraint", () => {
     expect(
       matchingAppliesToDeviceGroup(
         {
-          vendorId: "v-acme",
+          manufacturerId: "v-acme",
           productId: "p-radiator",
           versionId: null,
           versionRange: null,
@@ -107,7 +107,7 @@ describe("matchingAppliesToDeviceGroup", () => {
     expect(
       matchingAppliesToDeviceGroup(
         {
-          vendorId: "v-acme",
+          manufacturerId: "v-acme",
           productId: "p-radiator",
           versionId: "ver-213",
           versionRange: null,
@@ -121,7 +121,7 @@ describe("matchingAppliesToDeviceGroup", () => {
     expect(
       matchingAppliesToDeviceGroup(
         {
-          vendorId: "v-acme",
+          manufacturerId: "v-acme",
           productId: "p-radiator",
           versionId: "ver-999",
           versionRange: null,
@@ -135,7 +135,7 @@ describe("matchingAppliesToDeviceGroup", () => {
     expect(
       matchingAppliesToDeviceGroup(
         {
-          vendorId: "v-acme",
+          manufacturerId: "v-acme",
           productId: "p-radiator",
           versionId: null,
           versionRange: "vers:semver/>=2.0.0|<3.0.0",
@@ -149,7 +149,7 @@ describe("matchingAppliesToDeviceGroup", () => {
     expect(
       matchingAppliesToDeviceGroup(
         {
-          vendorId: "v-acme",
+          manufacturerId: "v-acme",
           productId: "p-radiator",
           versionId: null,
           versionRange: "vers:semver/>=3.0.0",
@@ -164,32 +164,32 @@ describe("resolveMatches", () => {
   const groups = [
     {
       id: "a",
-      vendorId: "v-acme",
+      manufacturerId: "v-acme",
       productId: "p-radiator",
       versionId: "ver-213",
       version: { canonicalName: "2.1.3" },
     },
     {
       id: "b",
-      vendorId: "v-acme",
+      manufacturerId: "v-acme",
       productId: "p-radiator",
       versionId: "ver-999",
       version: { canonicalName: "9.9.9" },
     },
     {
       id: "c",
-      vendorId: "v-other",
+      manufacturerId: "v-other",
       productId: "p-widget",
       versionId: "ver-100",
       version: { canonicalName: "1.0.0" },
     },
   ];
 
-  it("resolves a wildcard-product matching to all of that vendor's groups", () => {
+  it("resolves a wildcard-product matching to all of that manufacturer's groups", () => {
     const matches = resolveMatches(
       [
         {
-          vendorId: "v-acme",
+          manufacturerId: "v-acme",
           productId: null,
           versionId: null,
           versionRange: null,
@@ -204,13 +204,13 @@ describe("resolveMatches", () => {
     const matches = resolveMatches(
       [
         {
-          vendorId: "v-acme",
+          manufacturerId: "v-acme",
           productId: null,
           versionId: null,
           versionRange: null,
         }, // matches group a (and b)
         {
-          vendorId: "v-acme",
+          manufacturerId: "v-acme",
           productId: "p-radiator",
           versionId: "ver-213",
           versionRange: null,
@@ -226,7 +226,7 @@ describe("resolveMatches", () => {
       resolveMatches(
         [
           {
-            vendorId: "v-nobody",
+            manufacturerId: "v-nobody",
             productId: null,
             versionId: null,
             versionRange: null,

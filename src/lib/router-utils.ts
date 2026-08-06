@@ -15,6 +15,7 @@ import prisma, { type TransactionClient } from "@/lib/db";
 import { requireExistence } from "@/trpc/middleware";
 import {
   type DeviceGroupIdentity,
+  deviceGroupWhereForMatching,
   type MatchingLike,
   matchingAppliesToDeviceGroup,
   matchingWhereForDeviceGroup,
@@ -84,7 +85,7 @@ interface PrismaClientLike {
 // ============================================================================
 
 // ============================================================================
-// Canonical Vendor / Product / Version resolution
+// Canonical Manufacturer / Product / Version resolution
 // ============================================================================
 
 // Normalize a name for canonical lookup (the displayName keeps the original).
@@ -106,7 +107,7 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
- * Find-or-create the canonical Vendor for a name. Matches an existing row by
+ * Find-or-create the canonical Manufacturer for a name. Matches an existing row by
  * canonicalName or by membership in its nameMappings (aliases).
  *
  * Canonicals are an idempotent shared registry, so this runs on the autocommit
@@ -114,13 +115,13 @@ function isUniqueViolation(error: unknown): boolean {
  * unique race throws P2002, which would poison an enclosing interactive
  * transaction. Instead we catch P2002 and re-read the winner's row.
  */
-export async function resolveVendor(
+export async function resolveManufacturer(
   name: string,
   opts: { hasCpe?: boolean } = {},
 ) {
   const canonicalName = normalizeName(name);
   const find = () =>
-    prisma.vendor.findFirst({
+    prisma.manufacturer.findFirst({
       where: {
         OR: [{ canonicalName }, { nameMappings: { has: canonicalName } }],
       },
@@ -128,7 +129,7 @@ export async function resolveVendor(
   const existing = await find();
   if (existing) return existing;
   try {
-    return await prisma.vendor.create({
+    return await prisma.manufacturer.create({
       data: {
         canonicalName,
         canonicalDisplayName: name,
@@ -205,7 +206,7 @@ export async function resolveVersion(
 // ============================================================================
 
 export interface DeviceGroupIdentityInput {
-  vendor: string;
+  manufacturer: string;
   product: string;
   version?: string | null;
   versionStatus?: VersionStatus;
@@ -218,10 +219,10 @@ export interface DeviceGroupIdentityInput {
 }
 
 /**
- * Resolve (find-or-create) the DeviceGroup for a vendor/product/version identity,
+ * Resolve (find-or-create) the DeviceGroup for a manufacturer/product/version identity,
  * resolving each part to a canonical row first.
  *
- * NOTE: the composite unique on (vendorId, productId, versionId, versionStatus)
+ * NOTE: the composite unique on (manufacturerId, productId, versionId, versionStatus)
  * does not enforce uniqueness when versionId is null (Postgres NULLs are
  * distinct), so we find-then-create and recover from a P2002 create-race when
  * the version is known. Canonicals are resolved on the autocommit client so a
@@ -229,7 +230,7 @@ export interface DeviceGroupIdentityInput {
  */
 export async function resolveDeviceGroup(identity: DeviceGroupIdentityInput) {
   const {
-    vendor,
+    manufacturer,
     product,
     version = null,
     versionStatus,
@@ -239,7 +240,7 @@ export async function resolveDeviceGroup(identity: DeviceGroupIdentityInput) {
     hasCpe = false,
   } = identity;
 
-  const vendorRow = await resolveVendor(vendor, { hasCpe });
+  const manufacturerRow = await resolveManufacturer(manufacturer, { hasCpe });
   const productRow = await resolveProduct(product, { hasCpe });
   const versionRow = version
     ? await resolveVersion(version, { hasCpe, versScheme })
@@ -248,7 +249,7 @@ export async function resolveDeviceGroup(identity: DeviceGroupIdentityInput) {
     versionStatus ?? (versionRow ? VersionStatus.KNOWN : VersionStatus.UNKNOWN);
 
   const where = {
-    vendorId: vendorRow.id,
+    manufacturerId: manufacturerRow.id,
     productId: productRow.id,
     versionId: versionRow?.id ?? null,
     versionStatus: status,
@@ -298,25 +299,25 @@ function cpeVersionStatus(versionRaw: string): VersionStatus {
 }
 
 /**
- * Parse a CPE 2.3 string into a vendor/product/version identity.
+ * Parse a CPE 2.3 string into a manufacturer/product/version identity.
  * Format: cpe:2.3:<part>:<vendor>:<product>:<version>:...
- * Unknown tokens ("-", "*", empty) map to "-" for vendor/product and null for
+ * Unknown tokens ("-", "*", empty) map to "-" for manufacturer/product and null for
  * version; `versionStatus` preserves the NA-vs-ANY distinction for the version.
  */
 export function parseCpe(cpe: string): {
-  vendor: string;
+  manufacturer: string;
   product: string;
   version: string | null;
   versionStatus: VersionStatus;
 } {
   const parts = cpe.split(":");
-  const vendorRaw = parts[3] ?? "-";
+  const manufacturerRaw = parts[3] ?? "-";
   const productRaw = parts[4] ?? "-";
   const versionRaw = parts[5] ?? "";
   const norm = (value: string, fallback: string) =>
     CPE_UNKNOWN_TOKENS.has(value) ? fallback : value;
   return {
-    vendor: norm(vendorRaw, "-"),
+    manufacturer: norm(manufacturerRaw, "-"),
     product: norm(productRaw, "-"),
     version: CPE_UNKNOWN_TOKENS.has(versionRaw) ? null : versionRaw,
     versionStatus: cpeVersionStatus(versionRaw),
@@ -324,7 +325,7 @@ export function parseCpe(cpe: string): {
 }
 
 /**
- * Resolve a device group from a CPE string: parse it into a vendor/product/
+ * Resolve a device group from a CPE string: parse it into a manufacturer/product/
  * version identity, attach the CPE to the group's `cpe` array, and mark the
  * canonical rows as CPE-backed.
  */
@@ -350,7 +351,7 @@ export async function cpesToDeviceGroups(cpes: string[]) {
 // ============================================================================
 
 type MatchingResolveInput = {
-  vendor: string;
+  manufacturer: string;
   product?: string | null;
   version?: string | null;
   versionRange?: string | null;
@@ -358,7 +359,7 @@ type MatchingResolveInput = {
 };
 
 /**
- * Find-or-create a shared DeviceGroupMatching for a vendor/product/version
+ * Find-or-create a shared DeviceGroupMatching for a manufacturer/product/version
  * identity (resolved to canonical rows). Identities come from CPEs, so
  * canonicals are marked CPE-backed.
  */
@@ -366,7 +367,9 @@ export async function resolveMatchingId(
   input: MatchingResolveInput,
 ): Promise<string> {
   const hasCpe = input.hasCpe ?? true;
-  const vendorRow = await resolveVendor(input.vendor, { hasCpe });
+  const manufacturerRow = await resolveManufacturer(input.manufacturer, {
+    hasCpe,
+  });
   const productRow = input.product
     ? await resolveProduct(input.product, { hasCpe })
     : null;
@@ -375,7 +378,7 @@ export async function resolveMatchingId(
     : null;
 
   const where = {
-    vendorId: vendorRow.id,
+    manufacturerId: manufacturerRow.id,
     productId: productRow?.id ?? null,
     versionId: versionRow?.id ?? null,
     versionRange: input.versionRange ?? null,
@@ -393,8 +396,8 @@ export async function resolveMatchingId(
  * of a device artifact — the device it emulates/describes).
  */
 export async function resolveMatchingIdFromCpe(cpe: string): Promise<string> {
-  const { vendor, product, version } = parseCpe(cpe);
-  return resolveMatchingId({ vendor, product, version });
+  const { manufacturer, product, version } = parseCpe(cpe);
+  return resolveMatchingId({ manufacturer, product, version });
 }
 
 /**
@@ -412,14 +415,15 @@ export async function cpesToMatchingConnect(cpes: string[]) {
 
 /**
  * Find the vulnerabilities whose matchings apply to any of the given device
- * groups. Naive scan: only matchings sharing the group's vendor (+product or
+ * groups. Naive scan: only matchings sharing the group's manufacturer (+product or
  * wildcard) are loaded, then confirmed in memory (handles version + VERS ranges).
  */
 export async function findVulnerabilitiesMatchingDeviceGroups(
   deviceGroups: DeviceGroupIdentity[],
 ) {
   const groups = deviceGroups.filter(
-    (g): g is DeviceGroupIdentity & { vendorId: string } => g.vendorId !== null,
+    (g): g is DeviceGroupIdentity & { manufacturerId: string } =>
+      g.manufacturerId !== null,
   );
   if (groups.length === 0) return [];
 
@@ -427,7 +431,7 @@ export async function findVulnerabilitiesMatchingDeviceGroups(
     where: {
       OR: groups.map((g) =>
         matchingWhereForDeviceGroup({
-          vendorId: g.vendorId,
+          manufacturerId: g.manufacturerId,
           productId: g.productId,
         }),
       ),
@@ -449,7 +453,7 @@ export async function findVulnerabilitiesMatchingDeviceGroups(
 
 const matchingIdentitySelect = {
   id: true,
-  vendorId: true,
+  manufacturerId: true,
   productId: true,
   versionId: true,
   versionRange: true,
@@ -458,13 +462,16 @@ const matchingIdentitySelect = {
 
 // Whether a matching's identity applies to a device group. Exact/range version
 // matching when the group's version is known; for an unknown-version group we
-// fall back to vendor (+product) — per the spec's "same vendor/product" rule.
+// fall back to manufacturer (+product) — per the spec's "same manufacturer/product" rule.
 function identityAppliesToGroup(
   matching: MatchingLike,
   group: DeviceGroupIdentity,
 ): boolean {
   if (matchingAppliesToDeviceGroup(matching, group)) return true;
-  if (group.versionId === null && group.vendorId === matching.vendorId) {
+  if (
+    group.versionId === null &&
+    group.manufacturerId === matching.manufacturerId
+  ) {
     return (
       matching.productId === null || matching.productId === group.productId
     );
@@ -474,17 +481,17 @@ function identityAppliesToGroup(
 
 /**
  * Find the ids of DeviceGroupMatchings that apply to the given device group
- * (same vendor/product, with version exact/range, or vendor/product fallback
+ * (same manufacturer/product, with version exact/range, or manufacturer/product fallback
  * for an unknown-version group). Used to list a group's artifacts and to
  * identify which of an artifact's matchings represent the device itself.
  */
 export async function findMatchingIdsForDeviceGroup(
   group: DeviceGroupIdentity,
 ): Promise<string[]> {
-  if (!group.vendorId) return [];
+  if (!group.manufacturerId) return [];
   const candidates = await prisma.deviceGroupMatching.findMany({
     where: matchingWhereForDeviceGroup({
-      vendorId: group.vendorId,
+      manufacturerId: group.manufacturerId,
       productId: group.productId,
     }),
     select: matchingIdentitySelect,
@@ -492,6 +499,30 @@ export async function findMatchingIdsForDeviceGroup(
   return candidates
     .filter((matching) => identityAppliesToGroup(matching, group))
     .map((matching) => matching.id);
+}
+
+/**
+ * Inverse of {@link findMatchingIdsForDeviceGroup}: resolve a set of device-group
+ * matchings to the concrete device-group ids they apply to. Coarse manufacturer/product
+ * DB filter, then the in-memory VERS-range check (matchingAppliesToDeviceGroup).
+ */
+export async function findDeviceGroupIdsForMatchings(
+  matchings: MatchingLike[],
+): Promise<string[]> {
+  if (matchings.length === 0) return [];
+  const candidateGroups = await prisma.deviceGroup.findMany({
+    where: { OR: matchings.map(deviceGroupWhereForMatching) },
+    select: {
+      id: true,
+      manufacturerId: true,
+      productId: true,
+      versionId: true,
+      version: { select: { canonicalName: true } },
+    },
+  });
+  return candidateGroups
+    .filter((group) => matchings.some((m) => identityAppliesToGroup(m, group)))
+    .map((group) => group.id);
 }
 
 export async function fetchPaginated<

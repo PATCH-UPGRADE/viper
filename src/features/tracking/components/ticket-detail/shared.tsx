@@ -1,11 +1,11 @@
 "use client";
 
 import { format } from "date-fns";
-import type React from "react";
 import { Badge } from "@/components/ui/badge";
 import { useCategoryColor } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
 import type { TicketCategory, TicketStatus } from "@/generated/prisma";
+import { cn } from "@/lib/utils";
 import type { TicketDetail } from "../../types";
 
 export const statusLabels: Record<TicketStatus, string> = {
@@ -41,27 +41,6 @@ export const formatDate = (date: Date | string | null | undefined) => {
   return format(d, "MMM d, yyyy");
 };
 
-export const formatScheduled = (date: Date | string | null | undefined) => {
-  if (!date) return null;
-  const d = date instanceof Date ? date : new Date(date);
-  return format(d, "MMM d, yyyy 'at' h:mm a");
-};
-
-export const MetadataRow = ({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) => (
-  <div className="flex flex-col gap-1">
-    <span className="text-xs uppercase tracking-wide text-muted-foreground">
-      {label}
-    </span>
-    <div>{children}</div>
-  </div>
-);
-
 export const CategoryChip = ({ category }: { category: TicketCategory }) => {
   const color = useCategoryColor(category);
   return (
@@ -71,32 +50,44 @@ export const CategoryChip = ({ category }: { category: TicketCategory }) => {
   );
 };
 
-export const Section = ({
-  title,
-  children,
-  count,
-  trailing,
+export const StatusChip = ({
+  status,
+  className,
 }: {
-  title: React.ReactNode;
-  count?: number;
-  children: React.ReactNode;
-  trailing?: React.ReactNode;
+  status: TicketStatus;
+  className?: string;
 }) => (
-  <section className="flex flex-col gap-3">
-    <div className="flex items-center justify-between gap-2">
-      <h2 className="text-sm font-semibold flex items-center gap-2">
-        {title}
-        {typeof count === "number" && (
-          <Badge variant="secondary" className="text-xs">
-            {count}
-          </Badge>
-        )}
-      </h2>
-      {trailing}
-    </div>
-    {children}
-  </section>
+  <Badge
+    variant="outline"
+    className={cn(getChipClass(statusHue[status]), className)}
+  >
+    {statusLabels[status]}
+  </Badge>
 );
+
+export const DepartmentChips = ({
+  departments,
+}: {
+  departments: { id: string; name: string; color: string | null }[];
+}) => {
+  if (departments.length === 0) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {departments.map((department) => (
+        <Badge
+          key={department.id}
+          variant="outline"
+          className={getChipClass(department.color)}
+        >
+          {department.name}
+        </Badge>
+      ))}
+    </div>
+  );
+};
 
 export type DetailAsset = TicketDetail["assets"][number];
 export type DetailRemediation = TicketDetail["remediations"][number];
@@ -109,6 +100,3 @@ export const formatLocation = (location: unknown): string => {
   );
   return parts.length > 0 ? parts.join(" · ") : "—";
 };
-
-export const truncate = (s: string, n = 80) =>
-  s.length > n ? `${s.slice(0, n - 1)}…` : s;

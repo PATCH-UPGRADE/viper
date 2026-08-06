@@ -2,13 +2,12 @@
 
 import {
   AlertTriangleIcon,
-  MessageSquareIcon,
   PlusIcon,
+  SquareCheckBigIcon,
   XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -28,15 +27,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getChipClass } from "@/features/tag-colors/palette";
-import { cn } from "@/lib/utils";
 import {
   useAttachableChildren,
   useAttachChild,
   useDetachChild,
 } from "../../hooks/use-tracking";
 import type { TicketDetail } from "../../types";
-import { Section, statusHue, statusLabels } from "./shared";
+import { CollapsibleSectionCard } from "./section-card";
+import { StatusChip } from "./shared";
 
 const AttachChildPopover = ({ parentId }: { parentId: string }) => {
   const [open, setOpen] = useState(false);
@@ -83,15 +81,7 @@ const AttachChildPopover = ({ parentId }: { parentId: string }) => {
                     </Tooltip>
                   )}
                   <span className="truncate flex-1">{t.summary}</span>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "ml-2 text-xs",
-                      getChipClass(statusHue[t.status]),
-                    )}
-                  >
-                    {statusLabels[t.status]}
-                  </Badge>
+                  <StatusChip status={t.status} className="ml-2 text-xs" />
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -114,47 +104,38 @@ export const SubTicketsSection = ({
   const detach = useDetachChild(parentId);
 
   return (
-    <Section
+    <CollapsibleSectionCard
       title="Sub-tickets"
-      count={childTickets.length > 0 ? childTickets.length : undefined}
-      trailing={<AttachChildPopover parentId={parentId} />}
+      meta={childTickets.length}
+      action={<AttachChildPopover parentId={parentId} />}
+      defaultOpen={childTickets.length > 0}
     >
       {childTickets.length > 0 ? (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col divide-y">
           {childTickets.map((child) => (
-            <li key={child.id} className="flex items-center gap-2">
+            <li
+              key={child.id}
+              className="group relative flex items-center py-2.5"
+            >
               <Link
                 href={`/tracking/${child.id}`}
-                className="flex-1 flex items-center justify-between gap-3 rounded-md border bg-background hover:bg-muted/50 transition px-3 py-2 min-w-0"
+                className="flex min-w-0 flex-1 items-center gap-3 transition-[padding] group-hover:pr-8 group-focus-within:pr-8"
               >
-                <span className="text-sm font-medium truncate">
+                <SquareCheckBigIcon className="size-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium group-hover:underline">
                   {child.summary}
                 </span>
-                <div className="flex items-center gap-2 shrink-0">
-                  {child.departments.map((d) => (
-                    <Badge
-                      key={d.id}
-                      variant="outline"
-                      className={getChipClass(d.color)}
-                    >
-                      {d.name}
-                    </Badge>
-                  ))}
-                  <Badge
-                    variant="outline"
-                    className={getChipClass(statusHue[child.status])}
-                  >
-                    {statusLabels[child.status]}
-                  </Badge>
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <MessageSquareIcon className="size-3.5" />
-                    {child._count.comments}
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="text-xs text-muted-foreground">
+                    {child.assignee?.name ?? "Unassigned"}
                   </span>
+                  <StatusChip status={child.status} />
                 </div>
               </Link>
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
+                className="absolute right-0 top-1/2 size-7 -translate-y-1/2 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
                 onClick={() => detach.mutate({ ticketId: child.id })}
                 disabled={detach.isPending}
                 aria-label={`Detach ${child.summary}`}
@@ -167,6 +148,6 @@ export const SubTicketsSection = ({
       ) : (
         <p className="text-sm text-muted-foreground">No sub-tickets yet.</p>
       )}
-    </Section>
+    </CollapsibleSectionCard>
   );
 };

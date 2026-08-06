@@ -22,7 +22,10 @@ import {
 } from "@/components/ui/hover-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSuspenseMitigationPlans } from "@/features/mitigation/hooks/use-mitigation";
-import { useSuspenseQuestionsByNotificationId } from "@/features/questions/hooks/use-questions";
+import {
+  useSuspenseQuestionsByNotificationId,
+  useSuspenseSuggestedEmailsByNotificationId,
+} from "@/features/questions/hooks/use-questions";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
 import type { NotificationType, Priority } from "@/generated/prisma";
 import {
@@ -146,9 +149,15 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
   const { data: questions } = useSuspenseQuestionsByNotificationId(
     notification.id,
   );
+  const { data: suggestedEmails } = useSuspenseSuggestedEmailsByNotificationId(
+    notification.id,
+  );
+  const emailsCount = suggestedEmails.length;
+
   const pendingQuestionCount = questions.filter(
     (q) => q.status === "PENDING",
   ).length;
+  const questionTabCount = pendingQuestionCount + emailsCount;
 
   const tabs = (
     [
@@ -201,12 +210,12 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
         trigger: (
           <>
             Questions{" "}
-            {pendingQuestionCount > 0 && (
+            {questionTabCount > 0 && (
               <Badge
                 variant="destructive"
                 className="rounded-full border-orange-200/80 bg-orange-50/80 dark:border-orange-900/70 dark:bg-orange-950/40"
               >
-                {pendingQuestionCount}
+                {questionTabCount}
               </Badge>
             )}
           </>

@@ -22,9 +22,9 @@ const SEED_USER = {
 // Canonical entity helpers
 // ---------------------------------------------------------------------------
 
-function upsertVendor(name: string) {
+function upsertManufacturer(name: string) {
   const canonicalName = name.trim().toLowerCase();
-  return prisma.vendor.upsert({
+  return prisma.manufacturer.upsert({
     where: { canonicalName },
     update: {},
     create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
@@ -58,7 +58,7 @@ function upsertVersion(name: string) {
 // the group-level issue) stay AFFECTED.
 
 const SYNGO_PLAZA = {
-  vendor: "Siemens Healthineers",
+  manufacturer: "Siemens Healthineers",
   product: "syngo.plaza",
   version: "VB30E",
 };
@@ -85,12 +85,12 @@ const SYNGO_PLAZA_ASSETS = [
 async function seedSyngoPlazaVexScenario(userId: string) {
   console.log("\n🌱 Seeding Siemens syngo.plaza VEX scenario...");
 
-  const vendor = await upsertVendor(SYNGO_PLAZA.vendor);
+  const manufacturer = await upsertManufacturer(SYNGO_PLAZA.manufacturer);
   const product = await upsertProduct(SYNGO_PLAZA.product);
   const version = await upsertVersion(SYNGO_PLAZA.version);
 
   const groupIdentity = {
-    vendorId: vendor.id,
+    manufacturerId: manufacturer.id,
     productId: product.id,
     versionId: version.id,
     versionStatus: VersionStatus.KNOWN,
@@ -120,7 +120,7 @@ async function seedSyngoPlazaVexScenario(userId: string) {
   const matching =
     (await prisma.deviceGroupMatching.findFirst({
       where: {
-        vendorId: vendor.id,
+        manufacturerId: manufacturer.id,
         productId: product.id,
         versionId: version.id,
         versionRange: null,
@@ -128,7 +128,7 @@ async function seedSyngoPlazaVexScenario(userId: string) {
     })) ??
     (await prisma.deviceGroupMatching.create({
       data: {
-        vendorId: vendor.id,
+        manufacturerId: manufacturer.id,
         productId: product.id,
         versionId: version.id,
       },
@@ -310,7 +310,8 @@ The affected application does not encrypt passwords properly. This could allow a
       notificationId: notification.id,
       vulnerabilityId: vulnerability.id,
       confidence: ConfidenceLevel.Confirmed,
-      reasonWhy: "CVE-2024-52334 explicitly named in the vendor advisory.",
+      reasonWhy:
+        "CVE-2024-52334 explicitly named in the manufacturer advisory.",
     },
   });
 
@@ -320,7 +321,7 @@ The affected application does not encrypt passwords properly. This could allow a
       deviceGroupMatchingId: matching.id,
       confidence: ConfidenceLevel.Confirmed,
       reasonWhy:
-        "Vendor, product, and affected version range matched from the advisory's affected-products table.",
+        "Manufacturer, product, and affected version range matched from the advisory's affected-products table.",
     },
   });
 
@@ -356,7 +357,7 @@ The affected application does not encrypt passwords properly. This could allow a
 // notifications plus an asset-level NOT_AFFECTED issue backed by a compensating
 // control (the vulnerable ports are firewalled at the segment boundary).
 
-const DESERIALIZATION_VENDOR = "Siemens Healthineers";
+const DESERIALIZATION_MANUFACTURER = "Siemens Healthineers";
 
 // Affected products from the advisory's affected-products table. Use `versionRange`
 // (a `vers:` string) when the advisory enumerates multiple versions; otherwise an
@@ -499,12 +500,12 @@ async function upsertDeserializationMatching(spec: {
   version?: string;
   versionRange?: string;
 }) {
-  const vendor = await upsertVendor(DESERIALIZATION_VENDOR);
+  const manufacturer = await upsertManufacturer(DESERIALIZATION_MANUFACTURER);
   const product = await upsertProduct(spec.product);
   const version = spec.version ? await upsertVersion(spec.version) : null;
 
   const where = {
-    vendorId: vendor.id,
+    manufacturerId: manufacturer.id,
     productId: product.id,
     versionId: version?.id ?? null,
     versionRange: spec.versionRange ?? null,
@@ -523,20 +524,20 @@ async function upsertDeviceGroupForAsset(
     ? VersionStatus.KNOWN
     : VersionStatus.UNKNOWN,
 ) {
-  const vendor = await upsertVendor(DESERIALIZATION_VENDOR);
+  const manufacturer = await upsertManufacturer(DESERIALIZATION_MANUFACTURER);
   const productRec = await upsertProduct(product);
   const versionRec = version ? await upsertVersion(version) : null;
 
-  const vendorId = vendor.id;
+  const manufacturerId = manufacturer.id;
   const productId = productRec.id;
   const versionId = versionRec?.id ?? null;
 
   return (
     (await prisma.deviceGroup.findFirst({
-      where: { vendorId, productId, versionId, versionStatus },
+      where: { manufacturerId, productId, versionId, versionStatus },
     })) ??
     (await prisma.deviceGroup.create({
-      data: { vendorId, productId, versionId, versionStatus },
+      data: { manufacturerId, productId, versionId, versionStatus },
     }))
   );
 }
@@ -690,10 +691,10 @@ async function seedDeserializationScenario(userId: string) {
         careAreas:
           "Radiology & Nuclear Medicine — MRI, CT, PET/CT, SPECT/CT, mammography, syngo.via reading/reporting",
         likelihood:
-          "Unauthenticated network RCE (CVSS 9.8) · gated on reachability of ports 32912/tcp & 32914/tcp · vendor fixes available",
+          "Unauthenticated network RCE (CVSS 9.8) · gated on reachability of ports 32912/tcp & 32914/tcp · manufacturer fixes available",
       } satisfies HospitalImpact,
       priorityReasonWhy:
-        "Unauthenticated remote code execution (CVSS 9.8) on life-adjacent imaging infrastructure. Exploitability is gated on reachability of ports 32912/tcp and 32914/tcp — block them at the network boundary immediately and schedule the vendor fixes.",
+        "Unauthenticated remote code execution (CVSS 9.8) on life-adjacent imaging infrastructure. Exploitability is gated on reachability of ports 32912/tcp and 32914/tcp — block them at the network boundary immediately and schedule the manufacturer fixes.",
     },
   });
 
@@ -742,7 +743,8 @@ The application deserialises untrusted data without sufficient validations that 
       notificationId: notification.id,
       vulnerabilityId: vulnerability.id,
       confidence: ConfidenceLevel.Confirmed,
-      reasonWhy: "CVE-2022-29875 explicitly named in the vendor advisory.",
+      reasonWhy:
+        "CVE-2022-29875 explicitly named in the manufacturer advisory.",
     },
   });
 
@@ -754,7 +756,7 @@ The application deserialises untrusted data without sufficient validations that 
           deviceGroupMatchingId: matching.id,
           confidence: ConfidenceLevel.Confirmed,
           reasonWhy:
-            "Vendor, product, and affected version(s) matched from the advisory's affected-products table.",
+            "Manufacturer, product, and affected version(s) matched from the advisory's affected-products table.",
         },
       }),
     ),

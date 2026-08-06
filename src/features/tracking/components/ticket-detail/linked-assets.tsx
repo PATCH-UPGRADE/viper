@@ -3,6 +3,7 @@
 import { PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   Command,
   CommandEmpty,
@@ -46,7 +47,7 @@ const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
               {(candidates ?? []).map((a) => {
                 const label = a.hostname ?? a.ip;
                 const model = [
-                  a.deviceGroup?.vendor?.canonicalDisplayName,
+                  a.deviceGroup?.manufacturer?.canonicalDisplayName,
                   a.deviceGroup?.product?.canonicalDisplayName,
                 ]
                   .filter(Boolean)
@@ -95,22 +96,28 @@ export const LinkedAssetsTabContent = ({
   const detach = useDetachAsset(ticketId);
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex justify-end">
+    <Card className="gap-0 py-0">
+      <div className="flex items-center justify-between gap-2 border-b px-5 py-4">
+        <h2 className="text-base font-semibold">
+          Linked Assets{" "}
+          <span className="text-muted-foreground">({assets.length})</span>
+        </h2>
         <AttachAssetPopover ticketId={ticketId} />
       </div>
-      {assets.length > 0 ? (
-        <LinkedAssetsTable
-          assets={assets}
-          remediations={remediations}
-          onDetach={(assetId) => detach.mutate({ ticketId, assetId })}
-          detachPending={detach.isPending}
-        />
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          No assets linked to this ticket.
-        </p>
-      )}
-    </div>
+      <div className="p-2">
+        {assets.length > 0 ? (
+          <LinkedAssetsTable
+            assets={assets}
+            remediations={remediations}
+            onDetach={(assetId) => detach.mutate({ ticketId, assetId })}
+            detachPending={detach.isPending}
+          />
+        ) : (
+          <p className="p-4 text-sm text-muted-foreground">
+            No assets linked to this ticket.
+          </p>
+        )}
+      </div>
+    </Card>
   );
 };

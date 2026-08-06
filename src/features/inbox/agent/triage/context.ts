@@ -1,5 +1,9 @@
 import "server-only";
 import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
+import {
+  workflowSerializeInclude,
+  workflowsUsingAssetsOrMatchings,
+} from "@/features/workflows/utils";
 import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
@@ -53,7 +57,7 @@ export async function gatherTriageContext(
       deviceGroupsMatchings: {
         include: {
           deviceGroupMatching: {
-            include: { vendor: true, product: true, version: true },
+            include: { manufacturer: true, product: true, version: true },
           },
         },
       },
@@ -62,12 +66,16 @@ export async function gatherTriageContext(
           vulnerability: {
             include: {
               deviceGroupMatchings: {
-                include: { vendor: true, product: true, version: true },
+                include: { manufacturer: true, product: true, version: true },
               },
               remediations: {
                 include: {
                   deviceGroupMatchings: {
-                    include: { vendor: true, product: true, version: true },
+                    include: {
+                      manufacturer: true,
+                      product: true,
+                      version: true,
+                    },
                   },
                   vulnerability: { select: { id: true, cveId: true } },
                 },
@@ -82,7 +90,7 @@ export async function gatherTriageContext(
           remediation: {
             include: {
               deviceGroupMatchings: {
-                include: { vendor: true, product: true, version: true },
+                include: { manufacturer: true, product: true, version: true },
               },
               vulnerability: { select: { id: true, cveId: true } },
             },
@@ -136,7 +144,7 @@ export async function gatherTriageContext(
       ? await prisma.deviceGroup.findMany({
           where: { OR: matchings.map(deviceGroupWhereForMatching) },
           include: {
-            vendor: true,
+            manufacturer: true,
             product: true,
             version: true,
             assets: true,
@@ -167,10 +175,17 @@ export async function gatherTriageContext(
     assetIds: affectedAssetIds,
   });
 
+  // Only workflows relevant to this notification: a node links an affected
+  // asset directly, or links one of the advisory's device-group matchings.
+  const affectedMatchingIds = matchings.map((m) => m.id);
   const workflows =
-    affectedAssetIds.length > 0
+    affectedAssetIds.length > 0 || affectedMatchingIds.length > 0
       ? await prisma.workflow.findMany({
-          include: { nodes: true, connections: true },
+          where: workflowsUsingAssetsOrMatchings(
+            affectedAssetIds,
+            affectedMatchingIds,
+          ),
+          include: workflowSerializeInclude,
         })
       : [];
 
@@ -238,8 +253,12 @@ export async function gatherTriageContext(
     noteLabels,
     includeIds: opts.includeIds ?? false,
     workflowsMarkdown:
-      affectedAssetIds.length > 0
-        ? workflowClinicalSummary(workflows, affectedAssetIds)
+      affectedAssetIds.length > 0 || affectedMatchingIds.length > 0
+        ? workflowClinicalSummary(
+            workflows,
+            affectedAssetIds,
+            affectedMatchingIds,
+          )
         : null,
   });
 
@@ -289,7 +308,7 @@ type VexIssue = {
 };
 
 type GroupForRender = {
-  vendor?: { canonicalDisplayName: string } | null;
+  manufacturer?: { canonicalDisplayName: string } | null;
   product?: { canonicalDisplayName: string } | null;
   version?: { canonicalDisplayName: string } | null;
   cpe?: string[];

@@ -30,7 +30,7 @@ export const VULNERABILITY_ROLE_INSTRUCTIONS: Record<UserRole, string> = {
   "hospital administration":
     "The user is hospital administration. Focus on operational disruption, cost-benefit of remediation timing, regulatory implications, and communication to stakeholders.",
   "biomedical engineer":
-    "The user is a biomedical engineer. Focus on affected device models, vendor patches, firmware impacts, device functionality after patching, and interoperability concerns.",
+    "The user is a biomedical engineer. Focus on affected device models, manufacturer/vendor patches, firmware impacts, device functionality after patching, and interoperability concerns.",
 };
 
 export const RECOMMENDATION_ROLE_INSTRUCTIONS: Record<UserRole, string> = {

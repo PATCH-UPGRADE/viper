@@ -1,12 +1,24 @@
 import type { Prisma } from "@/generated/prisma";
 
+export type SuggestedVendorEmail = {
+  questionId: string;
+  audience: "VENDOR" | "MANUFACTURER";
+  companyName: string;
+  productName: string;
+  reasonWhy: string;
+  contacts: { email: string; name?: string }[];
+  toEmails: string[];
+  subject: string;
+  body: string;
+};
+
 export const questionInclude = {
   issue: {
     include: {
       vulnerability: true,
       deviceGroupMatching: {
         include: {
-          vendor: { select: { canonicalDisplayName: true } },
+          manufacturer: { select: { canonicalDisplayName: true } },
           product: { select: { canonicalDisplayName: true } },
           version: { select: { canonicalDisplayName: true } },
         },

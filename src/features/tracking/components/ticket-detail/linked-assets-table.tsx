@@ -2,7 +2,9 @@
 
 import { XIcon } from "lucide-react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ClampedCell } from "@/components/ui/clamped-cell";
 import {
   Table,
   TableBody,
@@ -11,13 +13,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getChipClass } from "@/features/tag-colors/palette";
+import type { AssetStatus } from "@/generated/prisma";
 import { matchingAppliesToDeviceGroup } from "@/lib/device-matching";
 import {
   type DetailAsset,
   type DetailRemediation,
   formatLocation,
-  truncate,
 } from "./shared";
+
+const assetStatusHue: Record<AssetStatus, string> = {
+  Active: "green",
+  Maintenance: "yellow",
+  Decommissioned: "gray",
+};
+
+const AssetStatusBadge = ({ status }: { status: AssetStatus | null }) => {
+  if (!status) return <span className="text-muted-foreground">—</span>;
+  return (
+    <Badge variant="outline" className={getChipClass(assetStatusHue[status])}>
+      {status}
+    </Badge>
+  );
+};
 
 export const LinkedAssetsTable = ({
   assets,
@@ -31,7 +49,7 @@ export const LinkedAssetsTable = ({
   detachPending?: boolean;
 }) => {
   // Remediations no longer link device groups directly; each carries
-  // vendor/product/version matching rules. Resolve the first remediation whose
+  // manufacturer/product/version matching rules. Resolve the first remediation whose
   // rules apply to a given asset's device group.
   const remediationForAsset = (a: DetailAsset): DetailRemediation | undefined =>
     remediations.find((r) =>
@@ -44,12 +62,14 @@ export const LinkedAssetsTable = ({
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead>Asset ID</TableHead>
           <TableHead>Role</TableHead>
           <TableHead>Model</TableHead>
           <TableHead>IP Address</TableHead>
           <TableHead>MAC Address</TableHead>
           <TableHead>Location</TableHead>
           <TableHead>Remediation</TableHead>
+          <TableHead>Status</TableHead>
           {onDetach && <TableHead className="w-10" />}
         </TableRow>
       </TableHeader>
@@ -58,7 +78,7 @@ export const LinkedAssetsTable = ({
           const remediation = remediationForAsset(a);
           const model = a.deviceGroup
             ? [
-                a.deviceGroup.vendor?.canonicalDisplayName,
+                a.deviceGroup.manufacturer?.canonicalDisplayName,
                 a.deviceGroup.product?.canonicalDisplayName,
               ]
                 .filter(Boolean)
@@ -69,31 +89,37 @@ export const LinkedAssetsTable = ({
               <TableCell>
                 <Link
                   href={`/assets/${a.id}`}
-                  className="text-sm hover:underline"
+                  className="font-mono text-xs font-medium text-primary hover:underline"
                 >
-                  {a.role ?? "—"}
+                  {a.hostname ?? a.id.slice(0, 8)}
                 </Link>
               </TableCell>
-              <TableCell className="text-sm">{model || "—"}</TableCell>
+              <TableCell className="text-sm">
+                <ClampedCell text={a.role} />
+              </TableCell>
+              <TableCell className="text-sm">
+                <ClampedCell text={model} />
+              </TableCell>
               <TableCell className="font-mono text-xs">{a.ip}</TableCell>
               <TableCell className="font-mono text-xs">
                 {a.macAddress ?? "—"}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
-                {formatLocation(a.location)}
+                <ClampedCell text={formatLocation(a.location)} />
               </TableCell>
               <TableCell className="text-sm">
-                {remediation ? (
-                  <span title={remediation.description ?? undefined}>
-                    {truncate(
-                      remediation.description ??
-                        `Remediation ${remediation.id}`,
-                      60,
-                    )}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
+                <ClampedCell
+                  text={
+                    remediation
+                      ? (remediation.description ??
+                        `Remediation ${remediation.id}`)
+                      : null
+                  }
+                  maxWidthClass="max-w-[14rem]"
+                />
+              </TableCell>
+              <TableCell>
+                <AssetStatusBadge status={a.status} />
               </TableCell>
               {onDetach && (
                 <TableCell className="w-10">

@@ -13,7 +13,7 @@ import { emailPromptText, type InboundEmail } from "./prompt";
 // vers schema, if we provide that + maybe a skill to use it if necessary, has a way to provide multiple OR versions
 //  https://www.packageurl.org/docs/vers/schemas
 // TODO: if we can find more data to support this, add something like serialRange
-// TODO: What about more unique ID's for specific vendors? e.g, Siemens has material number as a unique device group code
+// TODO: What about more unique ID's for specific manufacturers? e.g, Siemens has material number as a unique device group code
 //    something like externalId on an Integration model
 export const extractedDeviceGroupSchema = z.object({
   cpe: z.string().nullish(),

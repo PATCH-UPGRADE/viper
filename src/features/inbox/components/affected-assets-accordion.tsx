@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import {
   useAffectedAssetsPage,
   useAnswerAssetVersion,
-  useVersionForVendorProduct,
+  useVersionForManufacturerProduct,
 } from "../hooks/use-notifications";
 import type {
   AffectedAssetGroupSummary,
@@ -123,12 +123,12 @@ export function MatchingAssetTable({
   const appendedPages = useRef(new Set<number>());
 
   const matching = group.deviceGroupMatching;
-  // TODO: confrim if there are unnecessary api calls where DGM with same vendor/product
-  // appears in both AFFECTED and NOT_AFFECTED, or two DGM with same vendor/product both
+  // TODO: confrim if there are unnecessary api calls where DGM with same manufacturer/product
+  // appears in both AFFECTED and NOT_AFFECTED, or two DGM with same manufacturer/product both
   // AFFECTED but with different version range. If so, make it more efficient by
   // https://github.com/PATCH-UPGRADE/viper/pull/171#discussion_r3631431484
-  const { data: knownVersions } = useVersionForVendorProduct({
-    vendorId: matching.vendorId,
+  const { data: knownVersions } = useVersionForManufacturerProduct({
+    manufacturerId: matching.manufacturerId,
     productId: matching.productId ?? "",
   });
 
@@ -362,7 +362,7 @@ export function BucketAccordion({
                         </span>
                         <span className="text-xs font-normal text-muted-foreground">
                           {[
-                            displayName(matching.vendor),
+                            displayName(matching.manufacturer),
                             displayName(matching.version) ??
                               matching.versionRange,
                           ]

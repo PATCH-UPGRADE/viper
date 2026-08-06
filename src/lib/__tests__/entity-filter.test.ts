@@ -39,7 +39,7 @@ describe("validateEntityFilter", () => {
       const result = validateEntityFilter("ASSET", {
         OR: [
           { networkSegment: { contains: "ICU" } },
-          { deviceGroup: { vendorId: "vendor_1" } },
+          { deviceGroup: { manufacturerId: "manufacturer_1" } },
         ],
         NOT: { status: "Decommissioned" },
       });
@@ -150,7 +150,7 @@ describe("validateEntityFilter", () => {
     it("accepts allowlisted device group matching fields", () => {
       expect(
         validateEntityFilter("DEVICE_GROUP_MATCHING", {
-          vendorId: "vendor_1",
+          manufacturerId: "manufacturer_1",
           productId: { in: ["p1", "p2"] },
         }).success,
       ).toBe(true);

@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 beforeAll(() => {
@@ -82,7 +83,7 @@ const {
           ip: "10.0.0.1",
           role: "Workstation",
           deviceGroup: {
-            vendor: { canonicalDisplayName: "Acme" },
+            manufacturer: { canonicalDisplayName: "Acme" },
             product: { canonicalDisplayName: "X100" },
           },
         },
@@ -310,11 +311,16 @@ const makeTicket = (
     comments: [],
     creator: { id: "u1", name: "Alice", email: "alice@example.com" },
     sourceLabel: null,
+    body: null,
+    priority: "Unsorted",
     parentId: null,
     creatorId: "u1",
     assigneeId: "u1",
     isWatching: false,
     activities: [],
+    externalMappings: [],
+    sources: [],
+    notification: null,
     ...overrides,
     // biome-ignore lint/suspicious/noExplicitAny: test stub for TicketDetail shape
   }) as any;
@@ -526,10 +532,12 @@ describe("TicketEditForm", () => {
     const user = userEvent.setup();
     render(<TicketEditForm data={makeTicket()} onCancel={() => {}} />);
 
-    // Open the assignee Select (Radix combobox role on trigger)
-    const triggers = screen.getAllByRole("combobox");
-    // First combobox in the form is the assignee Select (DepartmentMultiSelect comes later)
-    await user.click(triggers[0]);
+    // Open the assignee Select (Radix combobox trigger, found by its id since
+    // Priority now precedes it in the grid).
+    const assigneeTrigger = screen
+      .getAllByRole("combobox")
+      .find((el) => el.id === "ticket-assignee") as HTMLElement;
+    await user.click(assigneeTrigger);
     const listbox = await screen.findByRole("listbox");
     await user.click(within(listbox).getByText("Bob"));
 
@@ -537,6 +545,49 @@ describe("TicketEditForm", () => {
 
     const [payload] = mockMutate.mock.calls[0];
     expect(payload.assigneeId).toBe("u2");
+  });
+
+  it("falls back to a remaining description tab when the active department is removed", async () => {
+    const user = userEvent.setup();
+    render(
+      <TicketEditForm
+        data={makeTicket({
+          departments: [
+            { id: "d-radio", name: "Radiology", color: "blue" },
+            { id: "d-it", name: "IT", color: "purple" },
+          ],
+          descriptions: [
+            {
+              id: "desc-radio",
+              ticketId: "ticket-1",
+              departmentId: "d-radio",
+              body: "Radiology body",
+              createdAt: new Date("2026-05-01T00:00:00Z"),
+              updatedAt: new Date("2026-05-01T00:00:00Z"),
+              department: { id: "d-radio", name: "Radiology", color: "blue" },
+            },
+            {
+              id: "desc-it",
+              ticketId: "ticket-1",
+              departmentId: "d-it",
+              body: "IT body",
+              createdAt: new Date("2026-05-01T00:00:00Z"),
+              updatedAt: new Date("2026-05-01T00:00:00Z"),
+              department: { id: "d-it", name: "IT", color: "purple" },
+            },
+          ],
+        })}
+        onCancel={() => {}}
+      />,
+    );
+
+    // Radiology is the active tab, so its textarea is visible.
+    expect(screen.getByDisplayValue("Radiology body")).toBeInTheDocument();
+
+    // Remove the active department; the tab must fall back to IT.
+    await user.click(screen.getByRole("button", { name: /remove radiology/i }));
+
+    expect(screen.getByDisplayValue("IT body")).toBeInTheDocument();
   });
 });
 
@@ -616,15 +667,16 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   hostname: "host-1",
   ip: "10.0.0.5",
   role: "Infusion Pump",
+  status: "Active",
   macAddress: "00:11:22:33:44:55",
   location: { building: "A", floor: "3", room: "302" },
   deviceGroupId: "dg-1",
   deviceGroup: {
     id: "dg-1",
-    vendorId: "vendor-icu",
+    manufacturerId: "manufacturer-icu",
     productId: "product-plum",
     versionId: null,
-    vendor: { canonicalDisplayName: "ICU Medical" },
+    manufacturer: { canonicalDisplayName: "ICU Medical" },
     product: { canonicalDisplayName: "Plum 360" },
     version: null,
   },
@@ -644,12 +696,12 @@ describe("LinkedAssetsTable", () => {
     expect(screen.getByText("A · 3 · 302")).toBeInTheDocument();
   });
 
-  it("links the role cell to the asset detail page", () => {
+  it("links the asset id cell to the asset detail page", () => {
     render(
       <LinkedAssetsTable assets={[sampleAsset()] as never} remediations={[]} />,
     );
 
-    const link = screen.getByRole("link", { name: /infusion pump/i });
+    const link = screen.getByRole("link", { name: /host-1/i });
     expect(link).toHaveAttribute("href", "/assets/asset-1");
   });
 
@@ -685,7 +737,7 @@ describe("LinkedAssetsTable", () => {
               description: "Apply firmware patch v2.3",
               deviceGroupMatchings: [
                 {
-                  vendorId: "vendor-icu",
+                  manufacturerId: "manufacturer-icu",
                   productId: "product-plum",
                   versionId: null,
                   versionRange: null,
@@ -711,7 +763,7 @@ describe("LinkedAssetsTable", () => {
               description: "Different group only",
               deviceGroupMatchings: [
                 {
-                  vendorId: "vendor-other",
+                  manufacturerId: "manufacturer-other",
                   productId: null,
                   versionId: null,
                   versionRange: null,
@@ -772,11 +824,16 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
   comments: [],
   creator: { id: "u1", name: "Alice", email: "alice@example.com" },
   sourceLabel: null,
+  body: null,
+  priority: "Unsorted",
   parentId: null,
   creatorId: "u1",
   assigneeId: "u2",
   isWatching: false,
   activities: [],
+  externalMappings: [],
+  sources: [],
+  notification: null,
   ...overrides,
 });
 
@@ -784,7 +841,11 @@ const renderDetail = (overrides: Record<string, unknown> = {}) => {
   mockUseSuspenseTrackingTicket.mockReturnValue({
     data: baseTicketDetail(overrides),
   });
-  return render(<TicketDetailContent id="ticket-1" />);
+  return render(<TicketDetailContent id="ticket-1" />, {
+    wrapper: ({ children }) => (
+      <NuqsTestingAdapter>{children}</NuqsTestingAdapter>
+    ),
+  });
 };
 
 describe("TicketDetailContent — view mode", () => {
@@ -866,17 +927,21 @@ describe("TicketDetailContent — view mode", () => {
     expect(screen.getByText("Done")).toBeInTheDocument();
   });
 
-  it("shows 'No assets linked' when there are no linked assets", () => {
+  it("shows 'No assets linked' when there are no linked assets", async () => {
+    const user = userEvent.setup();
     renderDetail();
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
     expect(
       screen.getByText(/no assets linked to this ticket/i),
     ).toBeInTheDocument();
   });
 
-  it("renders the Linked Assets table when assets are present", () => {
+  it("renders the Linked Assets table when assets are present", async () => {
+    const user = userEvent.setup();
     renderDetail({
       assets: [sampleAsset()],
     });
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
     expect(screen.getByText("Infusion Pump")).toBeInTheDocument();
   });
 
@@ -902,7 +967,7 @@ describe("TicketDetailContent — view mode", () => {
     expect(screen.getByText("Biomed")).toBeInTheDocument();
   });
 
-  it("renders activity entries interleaved with comments in chronological order", () => {
+  it("renders activity entries interleaved with comments in newest-first order", () => {
     renderDetail({
       comments: [
         {
@@ -955,8 +1020,8 @@ describe("TicketDetailContent — view mode", () => {
     // Asset label surfaces in the tagline
     expect(screen.getByText("host-icu-1")).toBeInTheDocument();
 
-    // Chronological order: status change (12:00) before comment (13:00)
-    // before asset attach (14:00). Check by position in the timeline.
+    // Newest first: asset attach (14:00) before comment (13:00) before status
+    // change (12:00). Check by position in the timeline.
     const items = screen.getAllByRole("listitem");
     const orderedLabels = items.map(
       (li) => li.getAttribute("aria-label") ?? "",
@@ -964,14 +1029,42 @@ describe("TicketDetailContent — view mode", () => {
     const statusIdx = orderedLabels.indexOf("Activity: STATUS_CHANGED");
     const commentIdx = orderedLabels.indexOf("Comment");
     const assetIdx = orderedLabels.indexOf("Activity: ASSET_ATTACHED");
-    expect(statusIdx).toBeGreaterThanOrEqual(0);
-    expect(commentIdx).toBeGreaterThan(statusIdx);
-    expect(assetIdx).toBeGreaterThan(commentIdx);
+    expect(assetIdx).toBeGreaterThanOrEqual(0);
+    expect(commentIdx).toBeGreaterThan(assetIdx);
+    expect(statusIdx).toBeGreaterThan(commentIdx);
   });
 
   it("shows 'No activity yet' when there are no comments or activities", () => {
     renderDetail();
     expect(screen.getByText(/no activity yet/i)).toBeInTheDocument();
+  });
+
+  it("omits an unknown priority in a WORK_ORDER_CREATED entry without crashing", () => {
+    renderDetail({
+      activities: [
+        {
+          id: "wc1",
+          ticketId: "ticket-1",
+          userId: "u1",
+          type: "WORK_ORDER_CREATED",
+          data: {
+            source: "Fleet",
+            category: "PATCH",
+            priority: "NOT_A_PRIORITY",
+          },
+          createdAt: new Date("2026-05-15T12:00:00Z"),
+          user: { id: "u1", name: "Alice", image: null, integrationUser: null },
+        },
+      ],
+    });
+
+    const entry = screen.getByLabelText("Activity: WORK_ORDER_CREATED");
+    expect(
+      within(entry).getByText(/created this work order/i),
+    ).toBeInTheDocument();
+    // Known category still renders; the unknown priority is omitted (no crash).
+    expect(within(entry).getByText("Category")).toBeInTheDocument();
+    expect(within(entry).queryByText("Priority")).not.toBeInTheDocument();
   });
 });
 
@@ -1042,11 +1135,14 @@ describe("TicketDetailContent — watch toggle", () => {
 });
 
 describe("TicketDetailContent — sub-tickets attach/detach", () => {
-  it("shows the 'Add sub-ticket' button and an empty state when there are no children", () => {
+  it("shows the 'Add sub-ticket' button and an empty state when there are no children", async () => {
+    const user = userEvent.setup();
     renderDetail();
     expect(
       screen.getByRole("button", { name: /add sub-ticket/i }),
     ).toBeInTheDocument();
+    // The card is collapsed when empty — expand it to reveal the empty state.
+    await user.click(screen.getByRole("button", { name: /sub-tickets/i }));
     expect(screen.getByText(/no sub-tickets yet/i)).toBeInTheDocument();
   });
 
@@ -1108,8 +1204,10 @@ describe("TicketDetailContent — sub-tickets attach/detach", () => {
 });
 
 describe("TicketDetailContent — assets attach/detach", () => {
-  it("renders an 'Add asset' button in the Linked Assets tab", () => {
+  it("renders an 'Add asset' button in the Linked Assets tab", async () => {
+    const user = userEvent.setup();
     renderDetail();
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
     expect(
       screen.getByRole("button", { name: /add asset/i }),
     ).toBeInTheDocument();
@@ -1119,6 +1217,7 @@ describe("TicketDetailContent — assets attach/detach", () => {
     const user = userEvent.setup();
     renderDetail();
 
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
     await user.click(screen.getByRole("button", { name: /add asset/i }));
     await user.click(
       await screen.findByRole("option", { name: /host-loose-1/i }),
@@ -1135,6 +1234,7 @@ describe("TicketDetailContent — assets attach/detach", () => {
       assets: [sampleAsset({ id: "linked-asset", hostname: "linked-host" })],
     });
 
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
     const detachBtn = screen.getByRole("button", {
       name: /detach linked-host/i,
     });

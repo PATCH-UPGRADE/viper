@@ -10,11 +10,13 @@ import { integrationsRouter } from "@/features/integrations/server/routers";
 import { issuesRouter } from "@/features/issues/server/routers";
 import { mitigationRouter } from "@/features/mitigation/server/routers";
 import { networkRouter } from "@/features/network/server/router";
+import { overviewRouter } from "@/features/overview/server/routers";
 import { questionsRouter } from "@/features/questions/server/routers";
 import { remediationsRouter } from "@/features/remediations/server/routers";
 import { tagColorsRouter } from "@/features/tag-colors/server/routers";
 import { trackingRouter } from "@/features/tracking/server/routers";
 import { userRouter } from "@/features/user/server/routers";
+import { vendorsRouter } from "@/features/vendors/server/routers";
 import { vulnerabilitiesRouter } from "@/features/vulnerabilities/server/routers";
 import { webhooksRouter } from "@/features/webhooks/server/routers";
 import { workflowsRouter } from "@/features/workflows/server/routers";
@@ -38,9 +40,11 @@ export const appRouter = createTRPCRouter({
   chat: chatRouter,
   apiKeyConnectors: apiKeyConnectorsRouter,
   network: networkRouter,
+  overview: overviewRouter,
   tracking: trackingRouter,
   departments: departmentsRouter,
   tagColors: tagColorsRouter,
+  vendors: vendorsRouter,
 });
 // export type definition of API
 export type AppRouter = typeof appRouter;

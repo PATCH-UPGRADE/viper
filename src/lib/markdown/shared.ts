@@ -1,6 +1,6 @@
 // Shared primitives for the db-item → markdown renderers.
 
-/** A canonical (vendor/product/version) reference as selected for rendering. */
+/** A canonical (manufacturer/product/version) reference as selected for rendering. */
 export type CanonicalRef = { canonicalDisplayName: string } | null | undefined;
 
 /** First 8 chars of an id, for compact human-facing references. */

@@ -46,6 +46,7 @@ import {
   locationSchema,
 } from "../types";
 import { getAssetRoleLabel } from "../utils";
+import { AssetQrPdfLink } from "./asset-qr-pdf-link";
 
 // ============================================================================
 // Types
@@ -421,6 +422,10 @@ function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
           <AssetUtilizationGrid utilization={asset.utilization} />
         </div>
       ),
+    },
+    {
+      header: "Links",
+      content: <AssetQrPdfLink assetId={asset.id} />,
     },
   ];
 

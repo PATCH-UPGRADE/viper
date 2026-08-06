@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
+import type { SuggestedVendorEmail } from "../types";
 
 export function useSuspenseQuestionsByNotificationId(notificationId: string) {
   const trpc = useTRPC();
@@ -46,4 +47,52 @@ export function useRespondToQuestion() {
         toast.error(`Failed to respond to question: ${error.message}`),
     }),
   );
+}
+
+export function useSuspenseSuggestedEmailsByNotificationId(
+  notificationId: string,
+) {
+  const trpc = useTRPC();
+  return useSuspenseQuery(
+    trpc.questions.getSuggestedEmailByNotificationId.queryOptions({
+      notificationId,
+    }),
+  );
+}
+
+export function useApproveEscalation(notificationId: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.questions.approveEscalationEmail.mutationOptions({
+      onSuccess: (_data, variables) => {
+        const filter =
+          trpc.questions.getSuggestedEmailByNotificationId.queryFilter({
+            notificationId,
+          });
+        queryClient.setQueriesData<SuggestedVendorEmail[]>(
+          filter,
+          (emailList) =>
+            emailList?.filter(
+              (email) => email.questionId !== variables.questionId,
+            ),
+        );
+        toast.success("Email sent");
+      },
+      onError: (err) => toast.error(`Failed to send: ${err.message}`),
+    }),
+  );
+}
+
+export function useDismissEscalation() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return (questionId: string) => {
+    const filter =
+      trpc.questions.getSuggestedEmailByNotificationId.queryFilter();
+    queryClient.setQueriesData<SuggestedVendorEmail[]>(filter, (emailList) =>
+      emailList?.filter((email) => email.questionId !== questionId),
+    );
+    toast.success("Dismissed email");
+  };
 }

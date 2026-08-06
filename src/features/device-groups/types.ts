@@ -12,7 +12,7 @@ const canonicalRefSchema = z.object({
 
 export const deviceGroupSchema = z.object({
   id: z.string(),
-  vendor: canonicalRefSchema.nullable(),
+  manufacturer: canonicalRefSchema.nullable(),
   product: canonicalRefSchema.nullable(),
   version: canonicalRefSchema.nullable(),
   versionStatus: versionStatusSchema,
@@ -29,7 +29,7 @@ export const paginationInputWithUpdatedAtFilterFields =
 export const deviceGroupInputSchema = z
   .object({
     id: z.string(),
-    vendor: z.string().min(1).optional(),
+    manufacturer: z.string().min(1).optional(),
     product: z.string().min(1).optional(),
     version: z.string().min(1).nullish(),
     versionStatus: versionStatusSchema.optional(),
@@ -37,7 +37,7 @@ export const deviceGroupInputSchema = z
   })
   .refine(
     (data) =>
-      data.vendor !== undefined ||
+      data.manufacturer !== undefined ||
       data.product !== undefined ||
       data.version !== undefined ||
       data.versionStatus !== undefined ||
@@ -99,7 +99,7 @@ const canonicalRefSelect = {
 export const deviceGroupSelect = {
   select: {
     id: true,
-    vendor: canonicalRefSelect,
+    manufacturer: canonicalRefSelect,
     product: canonicalRefSelect,
     version: canonicalRefSelect,
     versionStatus: true,

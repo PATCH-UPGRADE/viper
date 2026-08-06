@@ -6,6 +6,7 @@ vi.mock("server-only", () => ({}));
 const { mockPrisma, mockGetSession } = vi.hoisted(() => ({
   mockPrisma: {
     vendor: {
+      count: vi.fn(),
       findMany: vi.fn(),
     },
   },
@@ -51,12 +52,23 @@ const setup = () => {
   return createCaller({ req: {} as any });
 };
 
+const PAGE_INPUT = {
+  page: 1,
+  pageSize: 10,
+  search: "",
+  sort: "",
+  lastUpdatedStartTime: "",
+  lastUpdatedEndTime: "",
+} as const;
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mockPrisma.vendor.count.mockResolvedValue(0);
 });
 
 describe("vendorsRouter.getMany", () => {
   it("counts each asset once even when two contracts cover it", async () => {
+    mockPrisma.vendor.count.mockResolvedValue(1);
     mockPrisma.vendor.findMany.mockResolvedValue([
       {
         id: "vendor-1",
@@ -72,9 +84,9 @@ describe("vendorsRouter.getMany", () => {
     ]);
     const caller = setup();
 
-    const result = await caller.getMany();
+    const result = await caller.getMany(PAGE_INPUT);
 
-    expect(result).toEqual([
+    expect(result.items).toEqual([
       {
         id: "vendor-1",
         canonicalName: "siemens healthineers",
@@ -84,6 +96,7 @@ describe("vendorsRouter.getMany", () => {
         assetCount: 3,
       },
     ]);
+    expect(result.totalCount).toBe(1);
   });
 
   it("reports zero for a vendor with no contracts", async () => {
@@ -99,7 +112,9 @@ describe("vendorsRouter.getMany", () => {
     ]);
     const caller = setup();
 
-    const [vendor] = await caller.getMany();
+    const {
+      items: [vendor],
+    } = await caller.getMany(PAGE_INPUT);
 
     expect(vendor.assetCount).toBe(0);
   });
@@ -108,7 +123,7 @@ describe("vendorsRouter.getMany", () => {
     mockPrisma.vendor.findMany.mockResolvedValue([]);
     const caller = setup();
 
-    await caller.getMany();
+    await caller.getMany(PAGE_INPUT);
 
     expect(mockPrisma.vendor.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: { canonicalDisplayName: "asc" } }),

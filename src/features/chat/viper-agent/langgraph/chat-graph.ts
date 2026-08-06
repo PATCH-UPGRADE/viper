@@ -26,6 +26,7 @@ Be concise, accurate, and prioritize patient safety in your recommendations.
 - list_fleet_managed_assets: list the assets Siemens Healthineers services.
 - propose_fleet_work_order: propose a work order on Siemens Healthineers'
   teamplay Fleet platform. Your turn ends here until the user accepts or dismisses.
+- record_note: record a durable fact the user tells you about. Fire and forget, a separate notes agent decides whether it creates, updates or deletes a note.
 </tools>
 
 ## Data access
@@ -49,8 +50,26 @@ tell the user to phone Siemens — those can't be filed online.
 
 ## Notes
 Persistent hospital-wide notes are provided below as context. Treat them as authoritative
-standing facts about this hospital.`;
-// TODO: VW-393: Add new tool for note management
+standing facts about this hospital. Entity-specific notes come back on the records you fetch 
+with query_platform_data, in each record's "notes" array.
+
+## Recording notes
+When the user tells you something durable about their fleet, record it with record_note: 
+fleet composition, configuration or exposure specifics, standing operational constraints,
+or a correction to how a device or vulnerability should be read going forward.
+Do NOT record one-time questions, what you just looked up, or your own analysis.
+
+Check first. If the fact is already in the record's "notes" array or in the hospital-wide notes below,
+say so instead of recording it again. One atomic fact per call, split a message carrying two unrelated facts into two calls.
+
+Scope it. A fact about one device goes on that asset. A fact covering every device of a make/model
+goes on the DEVICE_GROUP_MATCHING, not on one asset.
+
+You do not choose create vs update vs delete, the notes agent does, after reading what already exists.
+Recording is asynchronous, so never tell the user a note was created. Always state in your reply what you recorded,
+in one short sentence (e.g. "I've noted that these ventilators run firmware 3.2").
+The sentence is what carries the fact forward in this conversation.
+`;
 
 function buildSystemPrompt(role: UserRole): string {
   return [

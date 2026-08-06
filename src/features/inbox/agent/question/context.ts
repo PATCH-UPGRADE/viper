@@ -61,7 +61,10 @@ function renderQuestionPrompt(args: {
     sections.push(
       "## Notes (evidence)\n\n" +
         args.notes
-          .map((n) => `- **${renderNoteTarget(n, args.labels)}** ${n.text}`)
+          .map((n) => {
+            const target = renderNoteTarget(n, args.labels);
+            return target ? `- **${target}** ${n.text}`: `- ${n.text}`; 
+          })
           .join("\n"),
     );
   }
@@ -102,7 +105,7 @@ function buildNoteLabels(args: {
     matchingLabel: new Map(
       args.matchings.map((matching) => [
         matching.id,
-        deviceGroupMatchingLabel(matching),
+        deviceGroupMatchingLabel(matching) || matching.id,
       ]),
     ),
     cveById: new Map(

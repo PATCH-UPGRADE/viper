@@ -48,7 +48,7 @@ function renderNoteActionPrompt(args: {
 
   if (persistent.length > 0) {
     sections.push(
-      `## Standing hospital wide facts (already recorded, never created a duplicate of these)\n\n`,
+      `## Standing hospital wide facts\n\n `,
     ) + persistent.map((perstn) => `- ${perstn}`).join("\n");
   }
 
@@ -127,7 +127,7 @@ A comment carrying two genuinely unrelated facts becomes two operations. A comme
 
 ## Writing the text
 
-- A note is stored on its own and is often read detached from the record it hangs off. Take the subject from "What this note is about", and never use a pronoun for the device.
+- A note is stored alongside its target. Use "What this note is about" to understand the target. Do not include the target label or a pronoune for it in note text.
 - Write standalone statement of fact. Do not mention "the user", "the comment", "the notification", or the action that produced it. A reader six months from now should understand it with no other context.
 - Do not restate the subject. The note is displayed alongside the record it is attached to, and that record's name is resolved fresh at read time. A name written into the text goes stale the moment the device is renamed - writes "runs firmware 3.2, not 4.x", not "MRI-01 runs firmware 3.2.".
 - One atomic fact per note.

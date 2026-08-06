@@ -1,6 +1,6 @@
 import type { SearchParams } from "nuqs/server";
 import React, { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
+import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient } from "@/trpc/server";
 import type { SearchParamsPageProps } from "./page-types";
@@ -53,11 +53,11 @@ export function createListPage<TParams>(
     return (
       <Container>
         <HydrateClient>
-          <ErrorBoundary fallback={<config.Error />}>
+          <ReportingErrorBoundary fallback={<config.Error />}>
             <Suspense fallback={<config.Loading />}>
               <config.List />
             </Suspense>
-          </ErrorBoundary>
+          </ReportingErrorBoundary>
         </HydrateClient>
       </Container>
     );

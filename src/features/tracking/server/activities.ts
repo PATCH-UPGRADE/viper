@@ -1,5 +1,5 @@
 import "server-only";
-import type { TicketCategory, TicketStatus } from "@/generated/prisma";
+import { type TicketCategory, TicketStatus } from "@/generated/prisma";
 import prisma, { type TransactionClient } from "@/lib/db";
 
 // Activity rows are intentionally lightweight: `type` is the discriminator,
@@ -300,4 +300,59 @@ export async function recordAssetActivity(
       },
     },
   });
+}
+
+/**
+ * A ticket that's itself an AssetTicket's dedicated child, once marked Done,
+ * checks whether every sibling AssetTicket under the same parent is also
+ * Done — if so, marks the parent Done too, and recurses (a parent can itself
+ * be someone else's asset-ticket child, since nesting is unrestricted).
+ *
+ * Sibling scoping is deliberately via AssetTicket.parentTicketId, not the
+ * generic `children` relation — a ticket can have both auto-spawned
+ * asset-children and manually-attached sub-tickets under the same parentId,
+ * and only the asset-children should gate "mark parent Done."
+ */
+export async function cascadeDoneStatus(
+  tx: TransactionClient,
+  ticketId: string,
+  actorId: string,
+): Promise<void> {
+  const link = await tx.assetTicket.findUnique({
+    where: { ticketId },
+    select: { parentTicketId: true },
+  });
+  if (!link) return;
+
+  const siblings = await tx.assetTicket.findMany({
+    where: { parentTicketId: link.parentTicketId },
+    select: { ticket: { select: { status: true } } },
+  });
+  const allDone = siblings.every((s) => s.ticket.status === TicketStatus.DONE);
+  if (!allDone) return;
+
+  const parent = await tx.workOrderTicket.findUniqueOrThrow({
+    where: { id: link.parentTicketId },
+    select: { status: true },
+  });
+  if (parent.status === TicketStatus.DONE) return; // already done, no-op
+
+  await tx.workOrderTicket.update({
+    where: { id: link.parentTicketId },
+    data: { status: TicketStatus.DONE },
+  });
+  await tx.ticketActivity.create({
+    data: {
+      ticketId: link.parentTicketId,
+      userId: actorId,
+      type: "STATUS_CHANGED",
+      data: {
+        from: parent.status,
+        to: TicketStatus.DONE,
+        cause: "all-asset-tickets-done",
+      },
+    },
+  });
+
+  await cascadeDoneStatus(tx, link.parentTicketId, actorId);
 }

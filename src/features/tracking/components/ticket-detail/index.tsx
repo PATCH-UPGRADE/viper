@@ -189,7 +189,7 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
           <TabsContent value="assets" className="mt-4">
             <LinkedAssetsTabContent
               ticketId={data.id}
-              assets={data.assets}
+              assetTickets={data.assets}
               remediations={data.remediations}
             />
           </TabsContent>

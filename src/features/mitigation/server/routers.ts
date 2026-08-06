@@ -1,8 +1,13 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { createAssetTicket } from "@/features/tracking/server/asset-tickets";
 import { Priority, TicketCategory } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import {
+  deviceGroupWhereForMatching,
+  matchingAppliesToDeviceGroup,
+} from "@/lib/device-matching";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 // Draft work orders proposed by a plan, in the shape the plan UI renders and
@@ -67,7 +72,7 @@ export const mitigationRouter = createTRPCRouter({
           .default([]),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const plan = await prisma.mitigationPlan.findUnique({
         where: { id: input.planId },
         select: { id: true, notificationId: true },
@@ -128,10 +133,61 @@ export const mitigationRouter = createTRPCRouter({
           },
           data: { isDraft: true },
         });
-        await tx.workOrderTicket.updateMany({
+
+        // Promoting a device-group-linked draft is the actual "creation
+        // time" for its asset tickets: resolve every asset the linked
+        // device-group matching(s) apply to and spawn a dedicated
+        // per-asset child for each, same as the manual attachAsset path.
+        const promoted = await tx.workOrderTicket.findMany({
           where: { mitigationPlanId: plan.id },
-          data: { isDraft: false },
+          select: {
+            id: true,
+            deviceGroups: { select: { deviceGroupMatchingId: true } },
+          },
         });
+        for (const ticket of promoted) {
+          await tx.workOrderTicket.update({
+            where: { id: ticket.id },
+            data: { isDraft: false },
+          });
+          for (const { deviceGroupMatchingId } of ticket.deviceGroups) {
+            const matching = await tx.deviceGroupMatching.findUniqueOrThrow({
+              where: { id: deviceGroupMatchingId },
+              select: {
+                manufacturerId: true,
+                productId: true,
+                versionId: true,
+                versionRange: true,
+              },
+            });
+            const candidates = await tx.asset.findMany({
+              where: { deviceGroup: deviceGroupWhereForMatching(matching) },
+              select: {
+                id: true,
+                deviceGroup: {
+                  select: {
+                    id: true,
+                    manufacturerId: true,
+                    productId: true,
+                    versionId: true,
+                    version: { select: { canonicalName: true } },
+                  },
+                },
+              },
+            });
+            const matched = candidates.filter((a) =>
+              matchingAppliesToDeviceGroup(matching, a.deviceGroup),
+            );
+            for (const asset of matched) {
+              await createAssetTicket(tx, {
+                parentTicketId: ticket.id,
+                assetId: asset.id,
+                actorId: ctx.auth.user.id,
+              });
+            }
+          }
+        }
+
         return tx.mitigationPlan.findUniqueOrThrow({
           where: { id: plan.id },
           include: mitigationPlanInclude,

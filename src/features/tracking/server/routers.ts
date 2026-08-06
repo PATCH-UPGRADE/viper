@@ -58,12 +58,14 @@ import {
   workOrderListInclude,
 } from "../types";
 import {
+  cascadeDoneStatus,
   recordAssetActivity,
   recordChildActivity,
   recordCreationActivity,
   recordUpdateActivities,
   snapshotBeforeUpdate,
 } from "./activities";
+import { createAssetTicket } from "./asset-tickets";
 
 /**
  * Siemens calls whoever approved the work order, so the contact is the accepting
@@ -140,13 +142,13 @@ const ticketLinkedCount = (count: {
 
 const buildLinkedPreview = (ticket: {
   vulnerabilities: { id: string; cveId: string | null }[];
-  assets: { id: string; hostname: string | null }[];
+  assets: { asset: { id: string; hostname: string | null } }[];
 }) => [
   ...ticket.vulnerabilities.map((v) => ({
     id: v.id,
     label: v.cveId ?? v.id,
   })),
-  ...ticket.assets.map((a) => ({
+  ...ticket.assets.map(({ asset: a }) => ({
     id: a.id,
     label: a.hostname ?? a.id,
   })),
@@ -353,7 +355,7 @@ export const trackingRouter = createTRPCRouter({
       );
 
       const candidates: Prisma.WorkOrderTicketWhereInput[] = [
-        { assets: { some: { id: input.assetId } } },
+        { assets: { some: { assetId: input.assetId } } },
       ];
       if (asset.deviceGroup.manufacturerId) {
         candidates.push({
@@ -386,7 +388,7 @@ export const trackingRouter = createTRPCRouter({
             orderBy: { name: "asc" },
           },
           assets: {
-            where: { id: input.assetId },
+            where: { assetId: input.assetId },
             select: { id: true },
           },
           deviceGroups: {
@@ -618,6 +620,12 @@ export const trackingRouter = createTRPCRouter({
               ? descriptionsForActivity
               : undefined,
         });
+        if (
+          rest.status === TicketStatus.DONE &&
+          rest.status !== before.status
+        ) {
+          await cascadeDoneStatus(tx, id, ctx.auth.user.id);
+        }
         // Auto-watch: whoever a ticket is (re)assigned to starts watching it.
         if (
           rest.assigneeId !== undefined &&
@@ -656,7 +664,7 @@ export const trackingRouter = createTRPCRouter({
       }
       const child = await prisma.workOrderTicket.findUnique({
         where: { id: input.childId },
-        select: { _count: { select: { children: true } } },
+        select: { ticket: { select: { id: true } } },
       });
       if (!child) {
         throw new TRPCError({
@@ -664,10 +672,13 @@ export const trackingRouter = createTRPCRouter({
           message: "Ticket not found",
         });
       }
-      if (child._count.children > 0) {
+      // A ticket that's already a dedicated asset-ticket can't be manually
+      // re-parented — that would desync AssetTicket.parentTicketId from
+      // WorkOrderTicket.parentId. Nesting sub-tickets is otherwise fine.
+      if (child.ticket) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Cannot attach a ticket that already has sub-tickets",
+          message: "Cannot attach a ticket that's linked to an asset",
         });
       }
       return prisma.$transaction(async (tx) => {
@@ -694,8 +705,19 @@ export const trackingRouter = createTRPCRouter({
         // belongs on the parent's timeline.
         const child = await tx.workOrderTicket.findUnique({
           where: { id: input.ticketId },
-          select: { parentId: true },
+          select: { parentId: true, ticket: { select: { id: true } } },
         });
+        // A dedicated asset-ticket must not float free of parentId — that
+        // would desync it from its AssetTicket row (which still thinks it
+        // belongs to the original parent). Detach the asset from the Linked
+        // Assets tab instead, which deletes this ticket outright.
+        if (child?.ticket) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Cannot detach an asset-linked ticket here — detach the asset from the Linked Assets tab instead",
+          });
+        }
         const updated = await tx.workOrderTicket.update({
           where: { id: input.ticketId },
           data: { parentId: null },
@@ -716,13 +738,14 @@ export const trackingRouter = createTRPCRouter({
   listAttachableChildren: protectedProcedure
     .input(z.object({ parentId: z.string() }))
     .query(async ({ input }) => {
-      // Eligible candidates: any ticket other than the current parent that
-      // doesn't already have sub-tickets of its own (we keep the tree flat
-      // since the UI only renders one level of children).
+      // Eligible candidates: any ticket other than the current parent, and
+      // not already someone's dedicated asset-ticket (that link is managed
+      // from the Linked Assets tab, not here). Nesting is otherwise
+      // unrestricted, so childless-ness is no longer a precondition.
       const tickets = await prisma.workOrderTicket.findMany({
         where: {
           id: { not: input.parentId },
-          children: { none: {} },
+          ticket: null,
           isDraft: false,
         },
         select: {
@@ -762,21 +785,15 @@ export const trackingRouter = createTRPCRouter({
     .output(workOrderDetailResponseSchema)
     .mutation(async ({ input, ctx }) => {
       return prisma.$transaction(async (tx) => {
-        const updated = await tx.workOrderTicket.update({
-          where: { id: input.ticketId },
-          data: { assets: { connect: { id: input.assetId } } },
+        await createAssetTicket(tx, {
+          parentTicketId: input.ticketId,
+          assetId: input.assetId,
+          actorId: ctx.auth.user.id,
         });
-        await recordAssetActivity(
-          tx,
-          input.ticketId,
-          ctx.auth.user.id,
-          input.assetId,
-          "attached",
-        );
         // Re-fetch so activities and the just-attached asset are in the
         // response.
         const refetched = await tx.workOrderTicket.findUniqueOrThrow({
-          where: { id: updated.id },
+          where: { id: input.ticketId },
           include: {
             ...ticketDetailInclude,
             ...watchedBy(ctx.auth.user.id),
@@ -801,10 +818,21 @@ export const trackingRouter = createTRPCRouter({
     .output(workOrderDetailResponseSchema)
     .mutation(async ({ input, ctx }) => {
       return prisma.$transaction(async (tx) => {
-        const updated = await tx.workOrderTicket.update({
-          where: { id: input.ticketId },
-          data: { assets: { disconnect: { id: input.assetId } } },
+        const assetTicket = await tx.assetTicket.findUnique({
+          where: {
+            parentTicketId_assetId: {
+              parentTicketId: input.ticketId,
+              assetId: input.assetId,
+            },
+          },
+          select: { ticketId: true },
         });
+        if (!assetTicket) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Asset is not linked to this ticket",
+          });
+        }
         await recordAssetActivity(
           tx,
           input.ticketId,
@@ -812,8 +840,13 @@ export const trackingRouter = createTRPCRouter({
           input.assetId,
           "detached",
         );
+        // Deleting the child ticket cascades the AssetTicket row (ticketId
+        // FK, onDelete: Cascade) — one call, no orphaned rows.
+        await tx.workOrderTicket.delete({
+          where: { id: assetTicket.ticketId },
+        });
         const refetched = await tx.workOrderTicket.findUniqueOrThrow({
-          where: { id: updated.id },
+          where: { id: input.ticketId },
           include: {
             ...ticketDetailInclude,
             ...watchedBy(ctx.auth.user.id),
@@ -830,7 +863,7 @@ export const trackingRouter = createTRPCRouter({
       // doesn't show duplicates of what's already in the table.
       return prisma.asset.findMany({
         where: {
-          workOrderTickets: { none: { id: input.ticketId } },
+          assetTickets: { none: { parentTicketId: input.ticketId } },
         },
         select: {
           id: true,
@@ -991,8 +1024,9 @@ export const trackingRouter = createTRPCRouter({
   /**
    * Accept an agent's work-order proposal: file it on teamplay Fleet, then
    * record it in VIPER. Fleet models activities per equipment, so a proposal
-   * covering N assets files N work orders; when N > 1 they become children of a
-   * parent ticket that carries the proposal's toolCallId.
+   * covering N assets files N work orders; each becomes a dedicated
+   * per-asset child of a parent ticket that carries the proposal's
+   * toolCallId, same as any other asset attachment.
    */
   createFleetWorkOrder: protectedProcedure
     .input(
@@ -1079,7 +1113,8 @@ export const trackingRouter = createTRPCRouter({
       // Claim the idempotency row BEFORE any Fleet call. The unique
       // chatToolCallId means a concurrent request loses this create race (P2002)
       // and returns the winner instead of filing a second set of Fleet orders.
-      // This root ticket is the single ticket (one asset) or the parent (many).
+      // This root ticket is always the parent shell — every filed asset gets
+      // its own child ticket below, even when there's only one.
       let root: { id: string };
       try {
         root = await prisma.workOrderTicket.create({
@@ -1092,7 +1127,6 @@ export const trackingRouter = createTRPCRouter({
             sourceLabel: FLEET_SOURCE_LABEL,
             chatToolCallId: input.toolCallId,
             creator: { connect: { id: userId } },
-            assets: { connect: assets.map((a) => ({ id: a.assetId })) },
           },
           select: { id: true },
         });
@@ -1150,28 +1184,14 @@ export const trackingRouter = createTRPCRouter({
         });
       }
 
-      const isMulti = filed.length > 1;
-
       // Attach the Fleet results. The external mapping (integrationId,
       // externalId) is what makes the next inbound /activities poll UPDATE the
-      // ticket instead of duplicating it. Single asset: the root ticket carries
-      // the mapping. Many: the root is the parent and each filed asset becomes a
-      // child carrying its own order + mapping.
+      // ticket instead of duplicating it. Every filed asset — including a lone
+      // one — gets its own dedicated child ticket + AssetTicket, same as the
+      // manual attachAsset path, carrying its own order + mapping.
       await prisma.$transaction(async (tx) => {
-        if (!isMulti) {
-          await tx.externalWorkOrderMapping.create({
-            data: {
-              itemId: root.id,
-              integrationId: integration.id,
-              externalId: filed[0].result.externalId,
-              lastSynced: new Date(),
-            },
-          });
-          return;
-        }
-
         for (const { asset, result } of filed) {
-          await tx.workOrderTicket.create({
+          const child = await tx.workOrderTicket.create({
             data: {
               summary: `${input.summary} — ${asset.hostname ?? asset.ip}`,
               body: input.description,
@@ -1180,7 +1200,6 @@ export const trackingRouter = createTRPCRouter({
               scheduledAt,
               sourceLabel: FLEET_SOURCE_LABEL,
               creator: { connect: { id: userId } },
-              assets: { connect: { id: asset.assetId } },
               parent: { connect: { id: root.id } },
               externalMappings: {
                 create: {
@@ -1190,19 +1209,32 @@ export const trackingRouter = createTRPCRouter({
                 },
               },
             },
+            select: { id: true },
           });
+          await tx.assetTicket.create({
+            data: {
+              assetId: asset.assetId,
+              parentTicketId: root.id,
+              ticketId: child.id,
+            },
+          });
+          await recordAssetActivity(
+            tx,
+            root.id,
+            userId,
+            asset.assetId,
+            "attached",
+          );
         }
       });
 
       try {
-        const childIds = isMulti
-          ? (
-              await prisma.workOrderTicket.findMany({
-                where: { parentId: root.id },
-                select: { id: true },
-              })
-            ).map((c) => c.id)
-          : [];
+        const childIds = (
+          await prisma.workOrderTicket.findMany({
+            where: { parentId: root.id },
+            select: { id: true },
+          })
+        ).map((c) => c.id);
         await Promise.all(
           [root.id, ...childIds].map((id) => recordCreationActivity(id)),
         );

@@ -372,53 +372,10 @@ export const useAttachAsset = (ticketId: string) => {
         const previousDetail = queryClient.getQueriesData(detailFilter);
         const previousPicker = queryClient.getQueriesData(pickerFilter);
 
-        const candidate = previousPicker
-          .flatMap(([, data]) => (Array.isArray(data) ? data : []))
-          .find((c: { id: string }) => c.id === assetId) as
-          | {
-              id: string;
-              hostname: string | null;
-              ip: string;
-              role: string | null;
-              deviceGroup: {
-                manufacturer: { canonicalDisplayName: string } | null;
-                product: { canonicalDisplayName: string } | null;
-              } | null;
-            }
-          | undefined;
-
-        if (candidate) {
-          // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape
-          queryClient.setQueriesData<any>(detailFilter, (old: any) => {
-            if (!old?.assets) return old;
-            return {
-              ...old,
-              assets: [
-                ...old.assets,
-                {
-                  id: candidate.id,
-                  hostname: candidate.hostname,
-                  ip: candidate.ip,
-                  role: candidate.role,
-                  macAddress: null,
-                  location: null,
-                  deviceGroupId: "",
-                  deviceGroup: candidate.deviceGroup
-                    ? {
-                        id: "",
-                        manufacturerId: null,
-                        productId: null,
-                        versionId: null,
-                        manufacturer: candidate.deviceGroup.manufacturer,
-                        product: candidate.deviceGroup.product,
-                        version: null,
-                      }
-                    : null,
-                },
-              ],
-            };
-          });
-        }
+        // No optimistic insert into the detail cache here: attaching now
+        // spawns a real child ticket server-side (id, status, etc.), which
+        // isn't worth faking. The picker still optimistically drops the
+        // candidate, and onSettled's invalidation brings in the real row.
         // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape
         queryClient.setQueriesData<any>(pickerFilter, (old: any) => {
           if (!Array.isArray(old)) return old;
@@ -467,7 +424,9 @@ export const useDetachAsset = (ticketId: string) => {
           if (!old?.assets) return old;
           return {
             ...old,
-            assets: old.assets.filter((a: { id: string }) => a.id !== assetId),
+            assets: old.assets.filter(
+              (at: { asset: { id: string } }) => at.asset.id !== assetId,
+            ),
           };
         });
         return { previousDetail };

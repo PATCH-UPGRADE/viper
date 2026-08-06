@@ -14,8 +14,24 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     },
     workOrderTicket: {
       findMany: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      create: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
+    },
+    deviceGroupMatching: {
+      findUniqueOrThrow: vi.fn(),
+    },
+    asset: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+    },
+    assetTicket: {
+      create: vi.fn(),
+    },
+    ticketActivity: {
+      create: vi.fn(),
     },
     // The router uses prisma.$transaction(async (tx) => {...}) — invoke the
     // callback with the same mocked client so call assertions still work.
@@ -92,6 +108,9 @@ beforeEach(() => {
     id: PLAN_ID,
     workOrders: [],
   });
+  // No promoted work orders / no device-group links by default — tests that
+  // exercise promotion or asset resolution override this.
+  mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
 });
 
 describe("mitigationRouter.accept", () => {
@@ -105,7 +124,10 @@ describe("mitigationRouter.accept", () => {
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it("marks the plan accepted and promotes its drafts to real tickets", async () => {
+  it("marks the plan accepted and promotes its (device-group-free) drafts to real tickets", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      { id: "wo-solo", deviceGroups: [] },
+    ]);
     const caller = setup();
 
     await caller.accept({ planId: PLAN_ID });
@@ -119,7 +141,7 @@ describe("mitigationRouter.accept", () => {
       where: { id: PLAN_ID },
       data: { isAccepted: true },
     });
-    // Losing plans go back to drafts; this plan's become real tickets.
+    // Losing plans go back to drafts.
     expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
       where: {
         notificationId: NOTIFICATION_ID,
@@ -127,16 +149,19 @@ describe("mitigationRouter.accept", () => {
       },
       data: { isDraft: true },
     });
-    expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
-      where: { mitigationPlanId: PLAN_ID },
+    // This plan's own ticket is promoted individually (not via updateMany),
+    // since promotion is also where device-group asset resolution happens.
+    expect(mockPrisma.workOrderTicket.update).toHaveBeenCalledWith({
+      where: { id: "wo-solo" },
       data: { isDraft: false },
     });
+    expect(mockPrisma.assetTicket.create).not.toHaveBeenCalled();
   });
 
   it("applies the user's edits before promoting the drafts", async () => {
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      { id: "wo-1" },
-      { id: "wo-2" },
+      { id: "wo-1", deviceGroups: [] },
+      { id: "wo-2", deviceGroups: [] },
     ]);
     const caller = setup();
 
@@ -163,8 +188,12 @@ describe("mitigationRouter.accept", () => {
         data: expect.objectContaining({ assignee: { disconnect: true } }),
       }),
     );
-    expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
-      where: { mitigationPlanId: PLAN_ID },
+    expect(mockPrisma.workOrderTicket.update).toHaveBeenCalledWith({
+      where: { id: "wo-1" },
+      data: { isDraft: false },
+    });
+    expect(mockPrisma.workOrderTicket.update).toHaveBeenCalledWith({
+      where: { id: "wo-2" },
       data: { isDraft: false },
     });
   });
@@ -183,6 +212,79 @@ describe("mitigationRouter.accept", () => {
 
     expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
     expect(mockPrisma.mitigationPlan.update).not.toHaveBeenCalled();
+  });
+
+  it("resolves matched assets for a device-group-linked ticket and spawns per-asset children", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      { id: "wo-dg", deviceGroups: [{ deviceGroupMatchingId: "dgm-1" }] },
+    ]);
+    mockPrisma.deviceGroupMatching.findUniqueOrThrow.mockResolvedValue({
+      manufacturerId: "manufacturer-icu",
+      productId: "product-plum",
+      versionId: null,
+      versionRange: null,
+    });
+    // Two candidate assets in the coarse manufacturer/product scan; only the
+    // first's device group actually matches the matching's rule.
+    mockPrisma.asset.findMany.mockResolvedValue([
+      {
+        id: "asset-1",
+        deviceGroup: {
+          id: "dg-1",
+          manufacturerId: "manufacturer-icu",
+          productId: "product-plum",
+          versionId: null,
+          version: null,
+        },
+      },
+      {
+        id: "asset-2",
+        deviceGroup: {
+          id: "dg-2",
+          manufacturerId: "manufacturer-other",
+          productId: null,
+          versionId: null,
+          version: null,
+        },
+      },
+    ]);
+    // createAssetTicket's own reads (clone-from-parent + child creation).
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
+      summary: "Patch ICU pumps",
+      body: null,
+      category: "PATCH",
+      priority: "Unsorted",
+      creatorId: FAKE_USER_ID,
+      scheduledAt: null,
+      sourceLabel: null,
+    });
+    mockPrisma.asset.findUniqueOrThrow.mockResolvedValue({
+      hostname: "host-icu-1",
+      ip: "10.0.0.1",
+    });
+    mockPrisma.workOrderTicket.create.mockResolvedValue({ id: "child-1" });
+    mockPrisma.assetTicket.create.mockResolvedValue({ id: "at-1" });
+
+    const caller = setup();
+    await caller.accept({ planId: PLAN_ID });
+
+    expect(
+      mockPrisma.deviceGroupMatching.findUniqueOrThrow,
+    ).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "dgm-1" } }));
+    // Only asset-1's device group matches the matching's manufacturer/product.
+    expect(mockPrisma.assetTicket.create).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.assetTicket.create).toHaveBeenCalledWith({
+      data: {
+        assetId: "asset-1",
+        parentTicketId: "wo-dg",
+        ticketId: "child-1",
+      },
+      select: { id: true },
+    });
+    expect(mockPrisma.workOrderTicket.update).toHaveBeenCalledWith({
+      where: { id: "wo-dg" },
+      data: { isDraft: false },
+    });
   });
 });
 

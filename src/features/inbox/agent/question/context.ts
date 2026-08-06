@@ -6,7 +6,12 @@ import {
   type MatchingLike,
   matchingAppliesToDeviceGroup,
 } from "@/lib/device-matching";
-import { deviceGroupMatchingLabel, type NoteRow } from "@/lib/markdown";
+import {
+  deviceGroupMatchingLabel,
+  type NoteRow,
+  type NoteTargetLabels,
+  renderNoteTarget,
+} from "@/lib/markdown";
 import { renderQnA } from "@/lib/markdown/note";
 
 export type QuestionIssueContext = { issueId: string; vulnerabilityId: string };
@@ -38,6 +43,7 @@ function renderQuestionPrompt(args: {
     statusNotes: string | null;
   }>;
   notes: NoteRow[];
+  labels: NoteTargetLabels;
 }): string {
   const sections: string[] = [];
 
@@ -53,7 +59,10 @@ function renderQuestionPrompt(args: {
 
   if (args.notes.length > 0) {
     sections.push(
-      "## Notes (evidence)\n\n" + args.notes.map((n) => `${n.text}`).join("\n"),
+      "## Notes (evidence)\n\n" +
+        args.notes
+          .map((n) => `- **${renderNoteTarget(n, args.labels)}** ${n.text}`)
+          .join("\n"),
     );
   }
   sections.push(
@@ -73,6 +82,36 @@ function renderQuestionPrompt(args: {
   );
 
   return sections.join("\n\n");
+}
+
+function buildNoteLabels(args: {
+  groups: { assets: { id: string; hostname: string | null; ip: string }[] }[];
+  matchings: MatchingWithRefs[];
+  vulnerabilities: { id: string; cveId: string | null }[];
+}): NoteTargetLabels {
+  return {
+    assetLabel: new Map(
+      args.groups.flatMap((g) =>
+        g.assets.map(
+          (asset) =>
+            [asset.id, asset.hostname ?? asset.ip ?? asset.id] as const,
+        ),
+      ),
+    ),
+    groupLabel: new Map(),
+    matchingLabel: new Map(
+      args.matchings.map((matching) => [
+        matching.id,
+        deviceGroupMatchingLabel(matching),
+      ]),
+    ),
+    cveById: new Map(
+      args.vulnerabilities.map(
+        (vulnerability) =>
+          [vulnerability.id, vulnerability.cveId ?? vulnerability.id] as const,
+      ),
+    ),
+  };
 }
 
 export async function gatherQuestionContext(
@@ -131,7 +170,7 @@ export async function gatherQuestionContext(
             versionId: true,
             version: { select: { canonicalName: true } },
             assets: {
-              select: { id: true },
+              select: { id: true, hostname: true, ip: true },
             },
           },
         })
@@ -189,10 +228,17 @@ export async function gatherQuestionContext(
     assetIds,
   });
 
+  const labels: NoteTargetLabels = buildNoteLabels({
+    groups: candidateGroups,
+    matchings,
+    vulnerabilities,
+  });
+
   const markdown = renderQuestionPrompt({
     vulnerabilities,
     issueRenders,
     notes,
+    labels,
   });
 
   return { notificationId, markdown, issues };
@@ -235,7 +281,7 @@ export async function gatherQuestionContextForIssue(
       productId: true,
       versionId: true,
       version: { select: { canonicalName: true } },
-      assets: { select: { id: true } },
+      assets: { select: { id: true, hostname: true, ip: true } },
     },
   });
 
@@ -250,6 +296,12 @@ export async function gatherQuestionContextForIssue(
     vulnerabilityIds: [issue.vulnerabilityId],
     deviceGroupMatchingIds: [matching.id],
     assetIds,
+  });
+
+  const labels: NoteTargetLabels = buildNoteLabels({
+    groups,
+    matchings: [matching],
+    vulnerabilities: [issue.vulnerability],
   });
 
   const priorQnAText = priorQnA
@@ -269,6 +321,7 @@ export async function gatherQuestionContextForIssue(
         },
       ],
       notes,
+      labels,
     }) +
     "\n\n## Already asked and answered - do not repeat this, ask something more specific\n\n" +
     priorQnAText;

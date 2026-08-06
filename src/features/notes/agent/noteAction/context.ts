@@ -2,6 +2,7 @@ import "server-only";
 import type { ScopedNote } from "@/features/notes/schemas";
 import { getScopedNotesByInstance } from "@/features/notes/server/get-relevant-notes";
 import type { ScopeTargetModel } from "@/generated/prisma";
+import prisma from "@/lib/db";
 
 // current and future create/edit Note Source
 export type NoteActionSource =
@@ -29,12 +30,27 @@ export type NoteActionContext = {
   candidates: ScopedNote[];
 };
 
+async function loadPersistentNoteTexts(): Promise<string[]> {
+  const rows = await prisma.note.findMany({
+    where: { status: "PERSISTENT", deletedAt: null },
+    select: { text: true },
+  });
+  return rows.map((row) => row.text);
+}
+
 function renderNoteActionPrompt(args: {
   request: NoteActionRequest;
   candidates: ScopedNote[];
+  persistent: string[];
 }): string {
-  const { request, candidates } = args;
+  const { request, candidates, persistent } = args;
   const sections: string[] = [];
+
+  if (persistent.length > 0) {
+    sections.push(
+      `## Standing hospital wide facts (already recorded, never created a duplicate of these)\n\n`,
+    ) + persistent.map((perstn) => `- ${perstn}`).join("\n");
+  }
 
   sections.push(
     "## What this note is about\n\n" +
@@ -58,9 +74,12 @@ export async function gatherNoteActionContext(
   if (!request.updatedText.trim()) return null;
 
   const { targetModel, instanceId } = request.target;
-  const byEntity = await getScopedNotesByInstance(targetModel, [instanceId]);
+  const [byEntity, persistent] = await Promise.all([
+    getScopedNotesByInstance(targetModel, [instanceId]),
+    loadPersistentNoteTexts(),
+  ]);
   const candidates = byEntity.get(instanceId) ?? [];
-  const markdown = renderNoteActionPrompt({ request, candidates });
+  const markdown = renderNoteActionPrompt({ request, candidates, persistent });
 
   return { request, markdown, candidates };
 }
@@ -108,8 +127,9 @@ A comment carrying two genuinely unrelated facts becomes two operations. A comme
 
 ## Writing the text
 
-- Name the subject. A note is stored on its own and is often read detached from the record it hangs off: e.g. "MRI-01 runs firmware 3.2" is usable, "runs firmware 3.2" is not. Take the subject from "What this note is about", and never use a pronoun for the device.
+- A note is stored on its own and is often read detached from the record it hangs off. Take the subject from "What this note is about", and never use a pronoun for the device.
 - Write standalone statement of fact. Do not mention "the user", "the comment", "the notification", or the action that produced it. A reader six months from now should understand it with no other context.
+- Do not restate the subject. The note is displayed alongside the record it is attached to, and that record's name is resolved fresh at read time. A name written into the text goes stale the moment the device is renamed - writes "runs firmware 3.2, not 4.x", not "MRI-01 runs firmware 3.2.".
 - One atomic fact per note.
 - Keep the user's specificity. Do not round numbers, generalize a model name, or drop a qualifier.
 

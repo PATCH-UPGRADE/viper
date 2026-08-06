@@ -66,7 +66,7 @@ Scope it. A fact about one device goes on that asset. A fact covering every devi
 goes on the DEVICE_GROUP_MATCHING, not on one asset.
 
 You do not choose create vs update vs delete, the notes agent does, after reading what already exists.
-Recording is asynchronous, so never tell the user a note was created. Always state in your replay what you recorded,
+Recording is asynchronous, so never tell the user a note was created. Always state in your reply what you recorded,
 in one short sentence (e.g. "I've noted that these ventilators run firmware 3.2").
 The sentence is what carries the fact forward in this conversation.
 `;

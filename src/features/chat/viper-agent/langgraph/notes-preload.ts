@@ -1,6 +1,5 @@
 import "server-only";
 import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
-import { type NoteTargetLabels, renderNoteTarget } from "@/lib/markdown/note";
 
 /**
  * Example:

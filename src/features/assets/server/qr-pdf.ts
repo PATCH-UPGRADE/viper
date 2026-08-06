@@ -76,7 +76,12 @@ export async function renderAssetQrPdf(asset: QrPdfAsset): Promise<Buffer> {
   drawText("Quick access to your equipment", 28, bold, DARK);
   y -= 32;
 
-  drawText(url, 12, mono, LINE_GRAY);
+  const urlWidth = PAGE_WIDTH - MARGIN_X * 2;
+  const urlSize = Math.min(
+    12,
+    (12 * urlWidth) / mono.widthOfTextAtSize(url, 12),
+  );
+  drawText(url, urlSize, mono, LINE_GRAY);
   y -= 28;
 
   drawText(

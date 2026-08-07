@@ -14,6 +14,7 @@ CREATE TABLE "asset_ticket" (
     "parentTicketId" TEXT NOT NULL,
     "ticketId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "asset_ticket_pkey" PRIMARY KEY ("id")
 );

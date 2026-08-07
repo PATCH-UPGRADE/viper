@@ -1232,6 +1232,7 @@ model AssetTicket {
   ticket   WorkOrderTicket @relation("WorkOrderAssetTicket", fields: [ticketId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([parentTicketId, assetId])
   @@index([assetId])

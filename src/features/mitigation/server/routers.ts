@@ -1,13 +1,9 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createAssetTicket } from "@/features/tracking/server/asset-tickets";
+import { createAssetTicketsForDeviceGroupMatching } from "@/features/tracking/server/asset-tickets";
 import { Priority, TicketCategory } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import {
-  deviceGroupWhereForMatching,
-  matchingAppliesToDeviceGroup,
-} from "@/lib/device-matching";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
 // Draft work orders proposed by a plan, in the shape the plan UI renders and
@@ -148,39 +144,11 @@ export const mitigationRouter = createTRPCRouter({
 
         for (const ticket of promoted) {
           for (const { deviceGroupMatchingId } of ticket.deviceGroups) {
-            const matching = await tx.deviceGroupMatching.findUniqueOrThrow({
-              where: { id: deviceGroupMatchingId },
-              select: {
-                manufacturerId: true,
-                productId: true,
-                versionId: true,
-                versionRange: true,
-              },
+            await createAssetTicketsForDeviceGroupMatching(tx, {
+              parentTicketId: ticket.id,
+              deviceGroupMatchingId,
+              actorId: ctx.auth.user.id,
             });
-            const candidates = await tx.asset.findMany({
-              where: { deviceGroup: deviceGroupWhereForMatching(matching) },
-              select: {
-                id: true,
-                deviceGroup: {
-                  select: {
-                    id: true,
-                    manufacturerId: true,
-                    productId: true,
-                    versionId: true,
-                    version: { select: { canonicalName: true } },
-                  },
-                },
-              },
-            });
-            for (const asset of candidates) {
-              if (!matchingAppliesToDeviceGroup(matching, asset.deviceGroup))
-                continue;
-              await createAssetTicket(tx, {
-                parentTicketId: ticket.id,
-                assetId: asset.id,
-                actorId: ctx.auth.user.id,
-              });
-            }
           }
         }
 

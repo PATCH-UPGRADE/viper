@@ -58,14 +58,13 @@ import {
   workOrderListInclude,
 } from "../types";
 import {
-  cascadeDoneStatus,
   recordAssetActivity,
   recordChildActivity,
   recordCreationActivity,
   recordUpdateActivities,
   snapshotBeforeUpdate,
 } from "./activities";
-import { createAssetTicket } from "./asset-tickets";
+import { cascadeDoneStatus, createAssetTicket } from "./asset-tickets";
 
 /**
  * Siemens calls whoever approved the work order, so the contact is the accepting
@@ -814,7 +813,10 @@ export const trackingRouter = createTRPCRouter({
               assetId: input.assetId,
             },
           },
-          select: { ticketId: true },
+          select: {
+            ticketId: true,
+            asset: { select: { hostname: true, ip: true } },
+          },
         });
         if (!assetTicket) {
           throw new TRPCError({
@@ -828,6 +830,7 @@ export const trackingRouter = createTRPCRouter({
           ctx.auth.user.id,
           input.assetId,
           "detached",
+          assetTicket.asset,
         );
         await tx.workOrderTicket.delete({
           where: { id: assetTicket.ticketId },
@@ -1179,17 +1182,10 @@ export const trackingRouter = createTRPCRouter({
             parentTicketId: root.id,
             assetId: asset.assetId,
             actorId: userId,
-          });
-          await tx.workOrderTicket.update({
-            where: { id: childTicketId },
-            data: {
-              externalMappings: {
-                create: {
-                  integrationId: integration.id,
-                  externalId: result.externalId,
-                  lastSynced: new Date(),
-                },
-              },
+            externalMapping: {
+              integrationId: integration.id,
+              externalId: result.externalId,
+              lastSynced: new Date(),
             },
           });
           childIds.push(childTicketId);

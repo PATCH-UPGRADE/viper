@@ -1444,7 +1444,10 @@ describe("trackingRouter.detachAsset", () => {
       where: {
         parentTicketId_assetId: { parentTicketId: "t1", assetId: "a1" },
       },
-      select: { ticketId: true },
+      select: {
+        ticketId: true,
+        asset: { select: { hostname: true, ip: true } },
+      },
     });
     expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({
       where: { id: "child-9" },
@@ -1614,11 +1617,7 @@ describe("activity writes", () => {
     const caller = setup();
     mockPrisma.assetTicket.findUnique.mockResolvedValue({
       ticketId: "child-9",
-    });
-    mockPrisma.asset.findUnique.mockResolvedValueOnce({
-      id: "a1",
-      hostname: null,
-      ip: "10.0.0.42",
+      asset: { hostname: null, ip: "10.0.0.42" },
     });
 
     await caller.detachAsset({ ticketId: "t1", assetId: "a1" });
@@ -1693,16 +1692,11 @@ describe("trackingRouter.createFleetWorkOrder", () => {
 
     const child = mockPrisma.workOrderTicket.create.mock.calls[1][0].data;
     expect(child.parent).toEqual({ connect: { id: "t-new" } });
-    expect(mockPrisma.workOrderTicket.update).toHaveBeenCalledWith({
-      where: { id: "child-new" },
-      data: {
-        externalMappings: {
-          create: {
-            integrationId: "int-fleet",
-            externalId: "US_400501937577",
-            lastSynced: expect.any(Date),
-          },
-        },
+    expect(child.externalMappings).toEqual({
+      create: {
+        integrationId: "int-fleet",
+        externalId: "US_400501937577",
+        lastSynced: expect.any(Date),
       },
     });
     expect(child.ticket).toEqual({

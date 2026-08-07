@@ -1,5 +1,5 @@
 import "server-only";
-import { type TicketCategory, TicketStatus } from "@/generated/prisma";
+import type { TicketCategory, TicketStatus } from "@/generated/prisma";
 import prisma, { type TransactionClient } from "@/lib/db";
 
 // Activity rows are intentionally lightweight: `type` is the discriminator,
@@ -303,48 +303,4 @@ export async function recordAssetActivity(
       },
     },
   });
-}
-
-export async function cascadeDoneStatus(
-  tx: TransactionClient,
-  ticketId: string,
-  actorId: string,
-): Promise<void> {
-  const link = await tx.assetTicket.findUnique({
-    where: { ticketId },
-    select: {
-      parentTicketId: true,
-      parentTicket: {
-        select: {
-          status: true,
-          assets: { select: { ticket: { select: { status: true } } } },
-        },
-      },
-    },
-  });
-  if (!link || link.parentTicket.status === TicketStatus.DONE) return;
-
-  const allDone = link.parentTicket.assets.every(
-    (a) => a.ticket.status === TicketStatus.DONE,
-  );
-  if (!allDone) return;
-
-  await tx.workOrderTicket.update({
-    where: { id: link.parentTicketId },
-    data: { status: TicketStatus.DONE },
-  });
-  await tx.ticketActivity.create({
-    data: {
-      ticketId: link.parentTicketId,
-      userId: actorId,
-      type: "STATUS_CHANGED",
-      data: {
-        from: link.parentTicket.status,
-        to: TicketStatus.DONE,
-        cause: "all-asset-tickets-done",
-      },
-    },
-  });
-
-  await cascadeDoneStatus(tx, link.parentTicketId, actorId);
 }

@@ -16,11 +16,7 @@ import {
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
-// This script runs under tsx, not Next's webpack build, so the real
-// `server-only` package (which unconditionally throws outside a webpack
-// server bundle) would blow up as soon as we import a `server/` module.
-// Same fix as scripts/print-recommendations-context.ts: alias it to a no-op
-// before dynamically importing anything that pulls it in.
+// Stub server-only to avoid getting an error when we import from client
 const serverOnlyStub = fileURLToPath(
   new URL("../src/test/server-only-stub.ts", import.meta.url),
 );
@@ -36,7 +32,6 @@ mod._resolveFilename = function (request, ...rest) {
   );
 };
 
-// Assigned in main(), after the stub above is installed.
 let createAssetTicket: typeof import("@/features/tracking/server/asset-tickets")["createAssetTicket"];
 
 // Seed user credentials
@@ -2307,8 +2302,7 @@ async function seedVendors() {
 async function main() {
   console.log("🌱 Starting database seed...\n");
 
-  // Dynamic import: must resolve after the server-only stub above is
-  // installed, since a static top-level import would be hoisted ahead of it.
+  // Must be dynamic: a static import would be hoisted ahead of the stub above.
   ({ createAssetTicket } = await import(
     "@/features/tracking/server/asset-tickets"
   ));

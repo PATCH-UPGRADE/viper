@@ -2,6 +2,7 @@
 
 import { XIcon } from "lucide-react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ClampedCell } from "@/components/ui/clamped-cell";
 import {
@@ -12,6 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getChipClass } from "@/features/tag-colors/palette";
+import type { AssetStatus } from "@/generated/prisma";
 import { matchingAppliesToDeviceGroup } from "@/lib/device-matching";
 import {
   type DetailAsset,
@@ -20,6 +23,21 @@ import {
   formatLocation,
   StatusChip,
 } from "./shared";
+
+const assetStatusHue: Record<AssetStatus, string> = {
+  Active: "green",
+  Maintenance: "yellow",
+  Decommissioned: "gray",
+};
+
+const AssetStatusBadge = ({ status }: { status: AssetStatus | null }) => {
+  if (!status) return <span className="text-muted-foreground">—</span>;
+  return (
+    <Badge variant="outline" className={getChipClass(assetStatusHue[status])}>
+      {status}
+    </Badge>
+  );
+};
 
 export const LinkedAssetsTable = ({
   assetTickets,
@@ -53,6 +71,7 @@ export const LinkedAssetsTable = ({
           <TableHead>MAC Address</TableHead>
           <TableHead>Location</TableHead>
           <TableHead>Remediation</TableHead>
+          <TableHead>Asset Status</TableHead>
           <TableHead>Ticket Status</TableHead>
           {onDetach && <TableHead className="w-10" />}
         </TableRow>
@@ -101,6 +120,9 @@ export const LinkedAssetsTable = ({
                   }
                   maxWidthClass="max-w-[14rem]"
                 />
+              </TableCell>
+              <TableCell>
+                <AssetStatusBadge status={a.status} />
               </TableCell>
               <TableCell>
                 <StatusChip status={ticket.status} />

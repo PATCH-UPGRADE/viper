@@ -1195,9 +1195,7 @@ model WorkOrderTicket {
   remediations    Remediation[]                    @relation("WorkOrderTicketRemediations")
   deviceGroups    NotificationDeviceGroupMapping[]
 
-  // was: assets Asset[] @relation("WorkOrderTicketAssets")
   assets AssetTicket[] @relation("WorkOrderAssets")
-  // Set only on tickets that are themselves a dedicated per-asset child.
   ticket AssetTicket?  @relation("WorkOrderAssetTicket")
 
   comments         TicketComment[]
@@ -1227,23 +1225,15 @@ model AssetTicket {
   assetId String
   asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
-  // "the original ticket" per the Jira spec — the ticket the asset was
-  // attached to (may itself be a per-asset child ticket, since nesting is
-  // allowed).
   parentTicketId String
   parentTicket   WorkOrderTicket @relation("WorkOrderAssets", fields: [parentTicketId], references: [id], onDelete: Cascade)
 
-  // The dedicated child ticket for this asset. 1:1 — deleting it cascades
-  // this join row away, which is how detach is implemented.
   ticketId String          @unique
   ticket   WorkOrderTicket @relation("WorkOrderAssetTicket", fields: [ticketId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  // One AssetTicket per (parent, asset) pair — attach is not append-only.
   @@unique([parentTicketId, assetId])
-  @@index([parentTicketId])
   @@index([assetId])
   @@map("asset_ticket")
 }

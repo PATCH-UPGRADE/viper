@@ -317,8 +317,6 @@ const linkedAssetSchema = z.object({
   role: z.string().nullable(),
 });
 
-// A ticket's `assets` relation is now the AssetTicket join, one row per
-// attached asset — wraps the asset shape rather than replacing it.
 const assetTicketItemSchema = z.object({ asset: linkedAssetSchema });
 
 const linkedVulnerabilitySchema = z.object({

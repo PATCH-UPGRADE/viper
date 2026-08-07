@@ -134,10 +134,6 @@ export const mitigationRouter = createTRPCRouter({
           data: { isDraft: true },
         });
 
-        // Promoting a device-group-linked draft is the actual "creation
-        // time" for its asset tickets: resolve every asset the linked
-        // device-group matching(s) apply to and spawn a dedicated
-        // per-asset child for each, same as the manual attachAsset path.
         const promoted = await tx.workOrderTicket.findMany({
           where: { mitigationPlanId: plan.id },
           select: {
@@ -145,11 +141,12 @@ export const mitigationRouter = createTRPCRouter({
             deviceGroups: { select: { deviceGroupMatchingId: true } },
           },
         });
+        await tx.workOrderTicket.updateMany({
+          where: { id: { in: promoted.map((t) => t.id) } },
+          data: { isDraft: false },
+        });
+
         for (const ticket of promoted) {
-          await tx.workOrderTicket.update({
-            where: { id: ticket.id },
-            data: { isDraft: false },
-          });
           for (const { deviceGroupMatchingId } of ticket.deviceGroups) {
             const matching = await tx.deviceGroupMatching.findUniqueOrThrow({
               where: { id: deviceGroupMatchingId },
@@ -175,10 +172,9 @@ export const mitigationRouter = createTRPCRouter({
                 },
               },
             });
-            const matched = candidates.filter((a) =>
-              matchingAppliesToDeviceGroup(matching, a.deviceGroup),
-            );
-            for (const asset of matched) {
+            for (const asset of candidates) {
+              if (!matchingAppliesToDeviceGroup(matching, asset.deviceGroup))
+                continue;
               await createAssetTicket(tx, {
                 parentTicketId: ticket.id,
                 assetId: asset.id,

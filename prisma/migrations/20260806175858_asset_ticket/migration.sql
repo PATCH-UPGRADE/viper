@@ -1,4 +1,3 @@
-
 -- DropForeignKey
 ALTER TABLE "_WorkOrderTicketAssets" DROP CONSTRAINT "_WorkOrderTicketAssets_A_fkey";
 
@@ -15,16 +14,12 @@ CREATE TABLE "asset_ticket" (
     "parentTicketId" TEXT NOT NULL,
     "ticketId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "asset_ticket_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
 CREATE UNIQUE INDEX "asset_ticket_ticketId_key" ON "asset_ticket"("ticketId");
-
--- CreateIndex
-CREATE INDEX "asset_ticket_parentTicketId_idx" ON "asset_ticket"("parentTicketId");
 
 -- CreateIndex
 CREATE INDEX "asset_ticket_assetId_idx" ON "asset_ticket"("assetId");

@@ -284,11 +284,14 @@ export async function recordAssetActivity(
   userId: string,
   assetId: string,
   action: "attached" | "detached",
+  knownAsset?: { hostname: string | null; ip: string },
 ): Promise<void> {
-  const asset = await tx.asset.findUnique({
-    where: { id: assetId },
-    select: { id: true, hostname: true, ip: true },
-  });
+  const asset =
+    knownAsset ??
+    (await tx.asset.findUnique({
+      where: { id: assetId },
+      select: { hostname: true, ip: true },
+    }));
   await tx.ticketActivity.create({
     data: {
       ticketId,
@@ -302,17 +305,6 @@ export async function recordAssetActivity(
   });
 }
 
-/**
- * A ticket that's itself an AssetTicket's dedicated child, once marked Done,
- * checks whether every sibling AssetTicket under the same parent is also
- * Done — if so, marks the parent Done too, and recurses (a parent can itself
- * be someone else's asset-ticket child, since nesting is unrestricted).
- *
- * Sibling scoping is deliberately via AssetTicket.parentTicketId, not the
- * generic `children` relation — a ticket can have both auto-spawned
- * asset-children and manually-attached sub-tickets under the same parentId,
- * and only the asset-children should gate "mark parent Done."
- */
 export async function cascadeDoneStatus(
   tx: TransactionClient,
   ticketId: string,
@@ -320,22 +312,22 @@ export async function cascadeDoneStatus(
 ): Promise<void> {
   const link = await tx.assetTicket.findUnique({
     where: { ticketId },
-    select: { parentTicketId: true },
+    select: {
+      parentTicketId: true,
+      parentTicket: {
+        select: {
+          status: true,
+          assets: { select: { ticket: { select: { status: true } } } },
+        },
+      },
+    },
   });
-  if (!link) return;
+  if (!link || link.parentTicket.status === TicketStatus.DONE) return;
 
-  const siblings = await tx.assetTicket.findMany({
-    where: { parentTicketId: link.parentTicketId },
-    select: { ticket: { select: { status: true } } },
-  });
-  const allDone = siblings.every((s) => s.ticket.status === TicketStatus.DONE);
+  const allDone = link.parentTicket.assets.every(
+    (a) => a.ticket.status === TicketStatus.DONE,
+  );
   if (!allDone) return;
-
-  const parent = await tx.workOrderTicket.findUniqueOrThrow({
-    where: { id: link.parentTicketId },
-    select: { status: true },
-  });
-  if (parent.status === TicketStatus.DONE) return; // already done, no-op
 
   await tx.workOrderTicket.update({
     where: { id: link.parentTicketId },
@@ -347,7 +339,7 @@ export async function cascadeDoneStatus(
       userId: actorId,
       type: "STATUS_CHANGED",
       data: {
-        from: parent.status,
+        from: link.parentTicket.status,
         to: TicketStatus.DONE,
         cause: "all-asset-tickets-done",
       },

@@ -683,7 +683,6 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-// The ticket's `assets` field is an AssetTicket join row: {id, ticket, asset}.
 const sampleAssetTicket = (
   assetOverrides: Record<string, unknown> = {},
   ticketOverrides: Record<string, unknown> = {},

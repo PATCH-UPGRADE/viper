@@ -26,6 +26,9 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
       findMany: vi.fn(),
       findUniqueOrThrow: vi.fn(),
     },
+    assetTicket: {
+      findUnique: vi.fn(),
+    },
     ticketActivity: {
       create: vi.fn(),
     },
@@ -105,6 +108,7 @@ beforeEach(() => {
     workOrders: [],
   });
   mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+  mockPrisma.assetTicket.findUnique.mockResolvedValue(null);
 });
 
 describe("mitigationRouter.accept", () => {
@@ -225,8 +229,6 @@ describe("mitigationRouter.accept", () => {
         versionRange: null,
       },
     ]);
-    // Both matchings resolve both assets. The combined candidate query returns
-    // each asset once.
     mockPrisma.asset.findMany.mockResolvedValue([
       {
         id: "asset-1",

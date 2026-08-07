@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  AssetStatus,
   IssueStatus,
   NotificationChannel,
   NotificationSourceType,
@@ -132,6 +133,7 @@ export const ticketDetailInclude = {
           hostname: true,
           ip: true,
           role: true,
+          status: true,
           macAddress: true,
           location: true,
           deviceGroupId: true,
@@ -421,6 +423,7 @@ export const ticketCommentResponseSchema = z.object({
 });
 
 const detailLinkedAssetSchema = linkedAssetSchema.extend({
+  status: z.enum(AssetStatus).nullable(),
   macAddress: z.string().nullable(),
   // Prisma's Json column. Using z.any() so the inferred TS type is `any`,
   // which stays assignable to Prisma.JsonValue on the UI side.

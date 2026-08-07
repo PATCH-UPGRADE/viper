@@ -16,7 +16,6 @@ import {
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
-// Stub server-only to avoid getting an error when we import from client
 const serverOnlyStub = fileURLToPath(
   new URL("../src/test/server-only-stub.ts", import.meta.url),
 );
@@ -2085,6 +2084,7 @@ async function createWorkOrderTicket(
   ticket: SampleTicket,
   userId: string,
   parentId: string | null,
+  ticketedAssetIds: Set<string> = new Set(),
 ) {
   // Normalize single-dept and multi-dept shapes to one ordered list. The
   // first entry is the "primary" department, used as the fallback target
@@ -2200,6 +2200,8 @@ async function createWorkOrderTicket(
   });
 
   for (const asset of linkedAssets) {
+    if (ticketedAssetIds.has(asset.id)) continue;
+    ticketedAssetIds.add(asset.id);
     await createAssetTicket(prisma, {
       parentTicketId: created.id,
       assetId: asset.id,
@@ -2217,10 +2219,16 @@ async function seedWorkOrderTickets(userId: string) {
   let childCount = 0;
 
   for (const parent of SAMPLE_CHANGE_TICKETS) {
-    const created = await createWorkOrderTicket(parent, userId, null);
+    const ticketedAssetIds = new Set<string>();
+    const created = await createWorkOrderTicket(
+      parent,
+      userId,
+      null,
+      ticketedAssetIds,
+    );
     parentCount++;
     for (const child of parent.children ?? []) {
-      await createWorkOrderTicket(child, userId, created.id);
+      await createWorkOrderTicket(child, userId, created.id, ticketedAssetIds);
       childCount++;
     }
   }
@@ -2302,7 +2310,6 @@ async function seedVendors() {
 async function main() {
   console.log("🌱 Starting database seed...\n");
 
-  // Must be dynamic: a static import would be hoisted ahead of the stub above.
   ({ createAssetTicket } = await import(
     "@/features/tracking/server/asset-tickets"
   ));

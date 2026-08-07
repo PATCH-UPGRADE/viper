@@ -220,9 +220,8 @@ export const trackingRouter = createTRPCRouter({
       if (tab === "requires-approval") {
         const status = TicketStatus.REQUIRES_APPROVAL;
         childTabWhere = { ...childTabWhere, status };
-        // Show a parent if it matches OR any of its children matches.
         parentTabWhere = {
-          OR: [{ status }, { children: { some: childTabWhere } }],
+          OR: [{ status }, { children: { some: { status } } }],
         };
       } else if (tab === "suggested") {
         // "Suggested" surfaces auto-ingested tickets — those with a source
@@ -230,7 +229,7 @@ export const trackingRouter = createTRPCRouter({
         const ingested = { sources: { some: {} } };
         childTabWhere = { ...childTabWhere, ...ingested };
         parentTabWhere = {
-          OR: [ingested, { children: { some: childTabWhere } }],
+          OR: [ingested, { children: { some: ingested } }],
         };
       } else if (tab === "my-department") {
         const me = await prisma.user.findUnique({
@@ -331,11 +330,17 @@ export const trackingRouter = createTRPCRouter({
   getManyByAssetId: protectedProcedure
     .input(z.object({ assetId: z.string() }))
     .query(async ({ input }) => {
+      const asset = await prisma.asset.findUnique({
+        where: { id: input.assetId },
+        select: { id: true },
+      });
+      requireExistence(asset, "Asset");
+
       const tickets = await prisma.workOrderTicket.findMany({
         where: {
           isDraft: false,
           status: { not: TicketStatus.DONE },
-          assets: { some: { assetId: input.assetId } },
+          ticket: { assetId: input.assetId },
         },
         select: {
           id: true,
@@ -1110,9 +1115,6 @@ export const trackingRouter = createTRPCRouter({
         });
       }
 
-      // The external mapping (integrationId, externalId) is what makes the
-      // next inbound /activities poll UPDATE the ticket instead of
-      // duplicating it.
       const childIds: string[] = [];
       await prisma.$transaction(async (tx) => {
         for (const { asset, result } of filed) {

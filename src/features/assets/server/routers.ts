@@ -664,9 +664,14 @@ export const assetsRouter = createTRPCRouter({
       // Verify ownership
       await requireOwnership(input.id, ctx.auth.user.id, "asset");
 
-      return prisma.asset.delete({
-        where: { id: input.id },
-        include: assetInclude,
+      return prisma.$transaction(async (tx) => {
+        await tx.workOrderTicket.deleteMany({
+          where: { ticket: { assetId: input.id } },
+        });
+        return tx.asset.delete({
+          where: { id: input.id },
+          include: assetInclude,
+        });
       });
     }),
 

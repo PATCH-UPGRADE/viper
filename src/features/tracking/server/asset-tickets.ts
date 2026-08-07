@@ -22,6 +22,12 @@ export async function createAssetTicket(
 ): Promise<string> {
   const { parentTicketId, assetId, actorId, externalMapping } = params;
 
+  const existing = await tx.assetTicket.findUnique({
+    where: { parentTicketId_assetId: { parentTicketId, assetId } },
+    select: { ticketId: true },
+  });
+  if (existing) return existing.ticketId;
+
   const [parent, asset] = await Promise.all([
     tx.workOrderTicket.findUniqueOrThrow({
       where: { id: parentTicketId },
@@ -134,15 +140,15 @@ export async function cascadeDoneStatus(
       parentTicket: {
         select: {
           status: true,
-          assets: { select: { ticket: { select: { status: true } } } },
+          children: { select: { status: true } },
         },
       },
     },
   });
   if (!link || link.parentTicket.status === TicketStatus.DONE) return;
 
-  const allDone = link.parentTicket.assets.every(
-    (a) => a.ticket.status === TicketStatus.DONE,
+  const allDone = link.parentTicket.children.every(
+    (c) => c.status === TicketStatus.DONE,
   );
   if (!allDone) return;
 

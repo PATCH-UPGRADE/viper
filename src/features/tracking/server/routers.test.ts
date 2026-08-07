@@ -212,6 +212,7 @@ beforeEach(() => {
     hostname: "host",
     ip: "10.0.0.9",
   });
+  mockPrisma.assetTicket.findUnique.mockResolvedValue(null);
   mockPrisma.workOrderTicket.create.mockResolvedValue({ id: "child-1" });
 });
 
@@ -459,10 +460,7 @@ describe("trackingRouter.update — Done cascade", () => {
       parentTicketId: "parent-1",
       parentTicket: {
         status: "IN_PROGRESS",
-        assets: [
-          { ticket: { status: "DONE" } },
-          { ticket: { status: "TO_DO" } },
-        ],
+        children: [{ status: "DONE" }, { status: "TO_DO" }],
       },
     });
 
@@ -481,10 +479,7 @@ describe("trackingRouter.update — Done cascade", () => {
               parentTicketId: "parent-1",
               parentTicket: {
                 status: "IN_PROGRESS",
-                assets: [
-                  { ticket: { status: "DONE" } },
-                  { ticket: { status: "DONE" } },
-                ],
+                children: [{ status: "DONE" }, { status: "DONE" }],
               },
             }
           : null,
@@ -513,7 +508,7 @@ describe("trackingRouter.update — Done cascade", () => {
             parentTicketId: "parent-1",
             parentTicket: {
               status: "IN_PROGRESS",
-              assets: [{ ticket: { status: "DONE" } }],
+              children: [{ status: "DONE" }],
             },
           };
         }
@@ -522,7 +517,7 @@ describe("trackingRouter.update — Done cascade", () => {
             parentTicketId: "grandparent-1",
             parentTicket: {
               status: "IN_PROGRESS",
-              assets: [{ ticket: { status: "DONE" } }],
+              children: [{ status: "DONE" }],
             },
           };
         }
@@ -547,7 +542,7 @@ describe("trackingRouter.update — Done cascade", () => {
       parentTicketId: "parent-1",
       parentTicket: {
         status: "DONE",
-        assets: [{ ticket: { status: "DONE" } }],
+        children: [{ status: "DONE" }],
       },
     });
 
@@ -1039,6 +1034,7 @@ describe("trackingRouter.getMany", () => {
 describe("trackingRouter.getManyByAssetId", () => {
   it("returns open work orders linked through AssetTicket", async () => {
     const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue({ id: "a1" });
     const ticket = {
       id: "direct",
       summary: "Ticket",
@@ -1060,9 +1056,17 @@ describe("trackingRouter.getManyByAssetId", () => {
     expect(mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where).toEqual({
       isDraft: false,
       status: { not: "DONE" },
-      assets: { some: { assetId: "a1" } },
+      ticket: { assetId: "a1" },
     });
-    expect(mockPrisma.asset.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("throws NOT_FOUND for a missing asset", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUnique.mockResolvedValue(null);
+
+    await expect(
+      caller.getManyByAssetId({ assetId: "missing" }),
+    ).rejects.toThrow(/not found/i);
   });
 });
 
@@ -1773,8 +1777,6 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     await expect(caller.createFleetWorkOrder(proposal)).rejects.toThrow(
       /401 Forbidden/,
     );
-    // The claim was made, but with no Fleet order it must be dropped so a
-    // genuine retry can proceed — no orphaned ticket, and no child spawned.
     expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({
       where: { id: "t-new" },
     });

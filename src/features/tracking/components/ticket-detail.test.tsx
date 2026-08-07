@@ -667,7 +667,6 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   hostname: "host-1",
   ip: "10.0.0.5",
   role: "Infusion Pump",
-  status: "Active",
   macAddress: "00:11:22:33:44:55",
   location: { building: "A", floor: "3", room: "302" },
   deviceGroupId: "dg-1",
@@ -687,7 +686,6 @@ const sampleAssetTicket = (
   assetOverrides: Record<string, unknown> = {},
   ticketOverrides: Record<string, unknown> = {},
 ) => ({
-  id: `at-${(assetOverrides.id as string | undefined) ?? "asset-1"}`,
   ticket: { id: "child-1", status: "TO_DO", ...ticketOverrides },
   asset: sampleAsset(assetOverrides),
 });
@@ -706,6 +704,7 @@ describe("LinkedAssetsTable", () => {
     expect(screen.getByText("10.0.0.5")).toBeInTheDocument();
     expect(screen.getByText("00:11:22:33:44:55")).toBeInTheDocument();
     expect(screen.getByText("A · 3 · 302")).toBeInTheDocument();
+    expect(screen.getByText("To Do")).toBeInTheDocument();
   });
 
   it("links the asset id cell to its dedicated per-asset ticket", () => {

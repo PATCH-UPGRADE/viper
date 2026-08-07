@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  AssetStatus,
   IssueStatus,
   NotificationChannel,
   NotificationSourceType,
@@ -107,6 +106,7 @@ export const ticketDetailInclude = {
   creator: { select: { id: true, name: true, email: true } },
   parent: { select: { id: true, summary: true } },
   children: {
+    where: { ticket: null },
     select: {
       id: true,
       summary: true,
@@ -125,7 +125,6 @@ export const ticketDetailInclude = {
   },
   assets: {
     select: {
-      id: true,
       ticket: { select: { id: true, status: true } },
       asset: {
         select: {
@@ -133,7 +132,6 @@ export const ticketDetailInclude = {
           hostname: true,
           ip: true,
           role: true,
-          status: true,
           macAddress: true,
           location: true,
           deviceGroupId: true,
@@ -423,7 +421,6 @@ export const ticketCommentResponseSchema = z.object({
 });
 
 const detailLinkedAssetSchema = linkedAssetSchema.extend({
-  status: z.enum(AssetStatus).nullable(),
   macAddress: z.string().nullable(),
   // Prisma's Json column. Using z.any() so the inferred TS type is `any`,
   // which stays assignable to Prisma.JsonValue on the UI side.
@@ -441,7 +438,6 @@ const detailLinkedAssetSchema = linkedAssetSchema.extend({
 });
 
 const detailAssetTicketSchema = z.object({
-  id: z.string(),
   ticket: z.object({ id: z.string(), status: z.enum(TicketStatus) }),
   asset: detailLinkedAssetSchema,
 });

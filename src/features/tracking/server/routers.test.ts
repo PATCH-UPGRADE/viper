@@ -697,7 +697,10 @@ describe("trackingRouter.list", () => {
     expect(mockPrisma.workOrderTicket.findMany).toHaveBeenCalledTimes(1);
     const findManyArg = mockPrisma.workOrderTicket.findMany.mock.calls[0][0];
     // The isDraft filter and the (empty) search filter end up in the AND list
-    expect(findManyArg.where.AND).toEqual([{ isDraft: false }, {}]);
+    expect(findManyArg.where.AND).toEqual([
+      { isDraft: false, ticket: null },
+      {},
+    ]);
   });
 
   it("filters by departmentIds via m2m `some` + `in`", async () => {
@@ -876,6 +879,7 @@ describe("trackingRouter.getOne", () => {
       where: { userId: FAKE_USER_ID },
       select: { userId: true },
     });
+    expect(arg.include.children.where).toEqual({ ticket: null });
   });
 
   it("collapses watchers into an isWatching boolean", async () => {
@@ -924,6 +928,10 @@ describe("trackingRouter.getMany", () => {
     expect(include.children.include.seenBy).toEqual({
       where: { userId: FAKE_USER_ID },
       select: { seenAt: true },
+    });
+    expect(include.children.where).toMatchObject({
+      isDraft: false,
+      ticket: null,
     });
   });
 
@@ -1029,74 +1037,32 @@ describe("trackingRouter.getMany", () => {
 });
 
 describe("trackingRouter.getManyByAssetId", () => {
-  it("returns direct and device-group-matched open work orders", async () => {
+  it("returns open work orders linked through AssetTicket", async () => {
     const caller = setup();
-    mockPrisma.asset.findUnique.mockResolvedValue({
-      deviceGroup: {
-        id: "dg-1",
-        manufacturerId: "manufacturer-1",
-        productId: "product-1",
-        versionId: "version-1",
-        version: { canonicalName: "1.0.0" },
-      },
-    });
     const ticket = {
+      id: "direct",
       summary: "Ticket",
+      body: null,
       status: "TO_DO",
       category: "OTHER",
       scheduledAt: null,
       departments: [],
-      assets: [],
-      deviceGroups: [],
       _count: { comments: 0 },
     };
-    const matching = {
-      deviceGroupMatching: {
-        manufacturerId: "manufacturer-1",
-        productId: "product-1",
-        versionId: "version-1",
-        versionRange: null,
-      },
-    };
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      { ...ticket, id: "direct", assets: [{ id: "a1" }] },
-      { ...ticket, id: "matched", deviceGroups: [matching] },
-      {
-        ...ticket,
-        id: "unmatched",
-        deviceGroups: [
-          {
-            deviceGroupMatching: {
-              ...matching.deviceGroupMatching,
-              versionId: "version-2",
-            },
-          },
-        ],
-      },
-    ]);
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([ticket]);
 
     const result = await caller.getManyByAssetId({ assetId: "a1" });
 
-    expect(result.map(({ id }) => id)).toEqual(["direct", "matched"]);
-    expect(mockPrisma.workOrderTicket.findMany).toHaveBeenCalledOnce();
-    expect(
-      mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where,
-    ).toMatchObject({
+    expect(result).toEqual([
+      expect.objectContaining({ id: "direct", commentCount: 0 }),
+    ]);
+    expect(result[0]).not.toHaveProperty("_count");
+    expect(mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where).toEqual({
       isDraft: false,
       status: { not: "DONE" },
+      assets: { some: { assetId: "a1" } },
     });
-    expect(
-      mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where,
-    ).not.toHaveProperty("parentId");
-  });
-
-  it("throws NOT_FOUND for a missing asset", async () => {
-    const caller = setup();
-    mockPrisma.asset.findUnique.mockResolvedValue(null);
-
-    await expect(
-      caller.getManyByAssetId({ assetId: "missing" }),
-    ).rejects.toThrow(/not found/i);
+    expect(mockPrisma.asset.findUnique).not.toHaveBeenCalled();
   });
 });
 

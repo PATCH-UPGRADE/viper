@@ -1,7 +1,7 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createAssetTicketsForDeviceGroupMatching } from "@/features/tracking/server/asset-tickets";
+import { attachMatchingAssets } from "@/features/tracking/server/asset-tickets";
 import { Priority, TicketCategory } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
@@ -143,13 +143,13 @@ export const mitigationRouter = createTRPCRouter({
         });
 
         for (const ticket of promoted) {
-          for (const { deviceGroupMatchingId } of ticket.deviceGroups) {
-            await createAssetTicketsForDeviceGroupMatching(tx, {
-              parentTicketId: ticket.id,
-              deviceGroupMatchingId,
-              actorId: ctx.auth.user.id,
-            });
-          }
+          await attachMatchingAssets(tx, {
+            parentTicketId: ticket.id,
+            matchingIds: ticket.deviceGroups.map(
+              (group) => group.deviceGroupMatchingId,
+            ),
+            actorId: ctx.auth.user.id,
+          });
         }
 
         return tx.mitigationPlan.findUniqueOrThrow({

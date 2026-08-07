@@ -47,7 +47,6 @@ export async function createAssetTicket(
       body: parent.body,
       category: parent.category,
       priority: parent.priority,
-      status: TicketStatus.TO_DO,
       scheduledAt: parent.scheduledAt,
       sourceLabel: parent.sourceLabel,
       creator: { connect: { id: parent.creatorId } },
@@ -72,23 +71,19 @@ export async function createAssetTicket(
   return child.id;
 }
 
-/**
- * Resolve a device-group matching to its concrete assets and attach each one
- * as a dedicated per-asset child of `parentTicketId`, same as a direct
- * attach.
- */
-export async function createAssetTicketsForDeviceGroupMatching(
+export async function attachMatchingAssets(
   tx: TransactionClient,
   params: {
     parentTicketId: string;
-    deviceGroupMatchingId: string;
+    matchingIds: string[];
     actorId: string;
   },
 ): Promise<void> {
-  const { parentTicketId, deviceGroupMatchingId, actorId } = params;
+  const { parentTicketId, matchingIds, actorId } = params;
+  if (matchingIds.length === 0) return;
 
-  const matching = await tx.deviceGroupMatching.findUniqueOrThrow({
-    where: { id: deviceGroupMatchingId },
+  const matchings = await tx.deviceGroupMatching.findMany({
+    where: { id: { in: matchingIds } },
     select: {
       manufacturerId: true,
       productId: true,
@@ -97,7 +92,9 @@ export async function createAssetTicketsForDeviceGroupMatching(
     },
   });
   const candidates = await tx.asset.findMany({
-    where: { deviceGroup: deviceGroupWhereForMatching(matching) },
+    where: {
+      deviceGroup: { OR: matchings.map(deviceGroupWhereForMatching) },
+    },
     select: {
       id: true,
       deviceGroup: {
@@ -112,8 +109,16 @@ export async function createAssetTicketsForDeviceGroupMatching(
     },
   });
   for (const asset of candidates) {
-    if (!matchingAppliesToDeviceGroup(matching, asset.deviceGroup)) continue;
-    await createAssetTicket(tx, { parentTicketId, assetId: asset.id, actorId });
+    const matches = matchings.some((matching) =>
+      matchingAppliesToDeviceGroup(matching, asset.deviceGroup),
+    );
+    if (!matches) continue;
+
+    await createAssetTicket(tx, {
+      parentTicketId,
+      assetId: asset.id,
+      actorId,
+    });
   }
 }
 

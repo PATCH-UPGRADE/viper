@@ -20,7 +20,7 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
       updateMany: vi.fn(),
     },
     deviceGroupMatching: {
-      findUniqueOrThrow: vi.fn(),
+      findMany: vi.fn(),
     },
     asset: {
       findMany: vi.fn(),
@@ -201,16 +201,32 @@ describe("mitigationRouter.accept", () => {
     expect(mockPrisma.mitigationPlan.update).not.toHaveBeenCalled();
   });
 
-  it("resolves matched assets for a device-group-linked ticket and spawns per-asset children", async () => {
+  it("creates one child per resolved asset across overlapping device-group links", async () => {
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      { id: "wo-dg", deviceGroups: [{ deviceGroupMatchingId: "dgm-1" }] },
+      {
+        id: "wo-dg",
+        deviceGroups: [
+          { deviceGroupMatchingId: "dgm-1" },
+          { deviceGroupMatchingId: "dgm-2" },
+        ],
+      },
     ]);
-    mockPrisma.deviceGroupMatching.findUniqueOrThrow.mockResolvedValue({
-      manufacturerId: "manufacturer-icu",
-      productId: "product-plum",
-      versionId: null,
-      versionRange: null,
-    });
+    mockPrisma.deviceGroupMatching.findMany.mockResolvedValue([
+      {
+        manufacturerId: "manufacturer-icu",
+        productId: "product-plum",
+        versionId: null,
+        versionRange: null,
+      },
+      {
+        manufacturerId: "manufacturer-icu",
+        productId: "product-plum",
+        versionId: null,
+        versionRange: null,
+      },
+    ]);
+    // Both matchings resolve both assets. The combined candidate query returns
+    // each asset once.
     mockPrisma.asset.findMany.mockResolvedValue([
       {
         id: "asset-1",
@@ -226,8 +242,8 @@ describe("mitigationRouter.accept", () => {
         id: "asset-2",
         deviceGroup: {
           id: "dg-2",
-          manufacturerId: "manufacturer-other",
-          productId: null,
+          manufacturerId: "manufacturer-icu",
+          productId: "product-plum",
           versionId: null,
           version: null,
         },
@@ -251,14 +267,21 @@ describe("mitigationRouter.accept", () => {
     const caller = setup();
     await caller.accept({ planId: PLAN_ID });
 
+    expect(mockPrisma.deviceGroupMatching.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: { in: ["dgm-1", "dgm-2"] } } }),
+    );
+    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledTimes(2);
     expect(
-      mockPrisma.deviceGroupMatching.findUniqueOrThrow,
-    ).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "dgm-1" } }));
-    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledTimes(1);
+      mockPrisma.workOrderTicket.create.mock.calls.map(
+        ([{ data }]) => data.ticket.create.assetId,
+      ),
+    ).toEqual(["asset-1", "asset-2"]);
     expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          ticket: { create: { assetId: "asset-1", parentTicketId: "wo-dg" } },
+          ticket: expect.objectContaining({
+            create: expect.objectContaining({ parentTicketId: "wo-dg" }),
+          }),
         }),
       }),
     );

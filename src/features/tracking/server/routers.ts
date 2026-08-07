@@ -25,10 +25,6 @@ import {
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
-  matchingAppliesToDeviceGroup,
-  matchingWhereForDeviceGroup,
-} from "@/lib/device-matching";
-import {
   buildPaginationMeta,
   createPaginatedResponse,
   paginationInputSchema,
@@ -219,22 +215,22 @@ export const trackingRouter = createTRPCRouter({
       // Build the parent-row filter and a separate "child match" filter that
       // determines which children are returned inside each parent's expander.
       let parentTabWhere: Prisma.WorkOrderTicketWhereInput = {};
-      let childTabWhere: Prisma.WorkOrderTicketWhereInput | undefined;
+      let childTabWhere: Prisma.WorkOrderTicketWhereInput = { ticket: null };
 
       if (tab === "requires-approval") {
         const status = TicketStatus.REQUIRES_APPROVAL;
-        childTabWhere = { status };
+        childTabWhere = { ...childTabWhere, status };
         // Show a parent if it matches OR any of its children matches.
         parentTabWhere = {
-          OR: [{ status }, { children: { some: { status } } }],
+          OR: [{ status }, { children: { some: childTabWhere } }],
         };
       } else if (tab === "suggested") {
         // "Suggested" surfaces auto-ingested tickets — those with a source
         // artifact (email/integration) rather than a user creating it by hand.
         const ingested = { sources: { some: {} } };
-        childTabWhere = ingested;
+        childTabWhere = { ...childTabWhere, ...ingested };
         parentTabWhere = {
-          OR: [ingested, { children: { some: ingested } }],
+          OR: [ingested, { children: { some: childTabWhere } }],
         };
       } else if (tab === "my-department") {
         const me = await prisma.user.findUnique({
@@ -335,45 +331,11 @@ export const trackingRouter = createTRPCRouter({
   getManyByAssetId: protectedProcedure
     .input(z.object({ assetId: z.string() }))
     .query(async ({ input }) => {
-      const asset = requireExistence(
-        await prisma.asset.findUnique({
-          where: { id: input.assetId },
-          select: {
-            deviceGroup: {
-              select: {
-                id: true,
-                manufacturerId: true,
-                productId: true,
-                versionId: true,
-                version: { select: { canonicalName: true } },
-              },
-            },
-          },
-        }),
-        "Asset",
-      );
-
-      const candidates: Prisma.WorkOrderTicketWhereInput[] = [
-        { assets: { some: { assetId: input.assetId } } },
-      ];
-      if (asset.deviceGroup.manufacturerId) {
-        candidates.push({
-          deviceGroups: {
-            some: {
-              deviceGroupMatching: matchingWhereForDeviceGroup({
-                manufacturerId: asset.deviceGroup.manufacturerId,
-                productId: asset.deviceGroup.productId,
-              }),
-            },
-          },
-        });
-      }
-
       const tickets = await prisma.workOrderTicket.findMany({
         where: {
           isDraft: false,
           status: { not: TicketStatus.DONE },
-          OR: candidates,
+          assets: { some: { assetId: input.assetId } },
         },
         select: {
           id: true,
@@ -386,39 +348,15 @@ export const trackingRouter = createTRPCRouter({
             select: { id: true, name: true, color: true },
             orderBy: { name: "asc" },
           },
-          assets: {
-            where: { assetId: input.assetId },
-            select: { id: true },
-          },
-          deviceGroups: {
-            select: { deviceGroupMatching: true },
-          },
           _count: { select: { comments: true } },
         },
         orderBy: { updatedAt: "desc" },
       });
 
-      return tickets
-        .filter(
-          (ticket) =>
-            ticket.assets.length > 0 ||
-            ticket.deviceGroups.some((mapping) =>
-              matchingAppliesToDeviceGroup(
-                mapping.deviceGroupMatching,
-                asset.deviceGroup,
-              ),
-            ),
-        )
-        .map((ticket) => ({
-          id: ticket.id,
-          summary: ticket.summary,
-          body: ticket.body,
-          status: ticket.status,
-          category: ticket.category,
-          scheduledAt: ticket.scheduledAt,
-          departments: ticket.departments,
-          commentCount: ticket._count.comments,
-        }));
+      return tickets.map(({ _count, ...ticket }) => ({
+        ...ticket,
+        commentCount: _count.comments,
+      }));
     }),
 
   getOne: protectedProcedure
@@ -461,7 +399,7 @@ export const trackingRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const { search, departmentIds, assigneeIds } = input;
       const filters: Prisma.WorkOrderTicketWhereInput[] = [
-        { isDraft: false },
+        { isDraft: false, ticket: null },
         createSearchFilter(search),
       ];
 

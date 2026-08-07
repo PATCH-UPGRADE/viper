@@ -284,14 +284,8 @@ export async function recordAssetActivity(
   userId: string,
   assetId: string,
   action: "attached" | "detached",
-  knownAsset?: { hostname: string | null; ip: string },
+  asset: { hostname: string | null; ip: string },
 ): Promise<void> {
-  const asset =
-    knownAsset ??
-    (await tx.asset.findUnique({
-      where: { id: assetId },
-      select: { hostname: true, ip: true },
-    }));
   await tx.ticketActivity.create({
     data: {
       ticketId,
@@ -299,7 +293,7 @@ export async function recordAssetActivity(
       type: action === "attached" ? "ASSET_ATTACHED" : "ASSET_DETACHED",
       data: {
         assetId,
-        assetLabel: asset?.hostname ?? asset?.ip ?? null,
+        assetLabel: asset.hostname ?? asset.ip,
       },
     },
   });

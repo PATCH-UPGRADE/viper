@@ -2084,7 +2084,7 @@ async function createWorkOrderTicket(
   ticket: SampleTicket,
   userId: string,
   parentId: string | null,
-  ticketedAssetIds: Set<string> = new Set(),
+  ticketedAssetIds: Set<string>,
 ) {
   // Normalize single-dept and multi-dept shapes to one ordered list. The
   // first entry is the "primary" department, used as the fallback target

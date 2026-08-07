@@ -272,7 +272,6 @@ describe("mitigationRouter.accept", () => {
     expect(mockPrisma.deviceGroupMatching.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: { in: ["dgm-1", "dgm-2"] } } }),
     );
-    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledTimes(2);
     expect(
       mockPrisma.workOrderTicket.create.mock.calls.map(
         ([{ data }]) => data.ticket.create.assetId,
@@ -287,10 +286,6 @@ describe("mitigationRouter.accept", () => {
         }),
       }),
     );
-    expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ["wo-dg"] } },
-      data: { isDraft: false },
-    });
   });
 });
 

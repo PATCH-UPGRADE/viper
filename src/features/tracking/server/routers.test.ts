@@ -1406,6 +1406,7 @@ describe("trackingRouter.detachAsset", () => {
     const caller = setup();
     mockPrisma.assetTicket.findUnique.mockResolvedValue({
       ticketId: "child-9",
+      asset: { hostname: "host-9", ip: "10.0.0.9" },
     });
 
     await caller.detachAsset({ ticketId: "t1", assetId: "a1" });

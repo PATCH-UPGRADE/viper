@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -72,6 +72,13 @@ const notification = (
 });
 
 describe("overview.recentUpdates", () => {
+  beforeEach(() => {
+    mockPrisma.deviceGroup.findMany.mockResolvedValue([]);
+    mockPrisma.notification.findMany.mockResolvedValue([]);
+    mockPrisma.ticketActivity.findMany.mockResolvedValue([]);
+    mockPrisma.asset.findMany.mockResolvedValue([]);
+  });
+
   it("keeps notifications whose matchings resolve to owned assets and drops the rest", async () => {
     mockPrisma.deviceGroup.findMany.mockResolvedValue([OWNED]);
     mockPrisma.notification.findMany.mockResolvedValue([
@@ -80,8 +87,6 @@ describe("overview.recentUpdates", () => {
       notification("no-matchings", "Advisory", []),
       notification("recall", "Recall", [ownedMatching]),
     ]);
-    mockPrisma.ticketActivity.findMany.mockResolvedValue([]);
-    mockPrisma.asset.findMany.mockResolvedValue([]);
 
     const result = await caller.recentUpdates();
 
@@ -92,11 +97,6 @@ describe("overview.recentUpdates", () => {
   });
 
   it("does not query UpdateAvailable — the card has no chip for it", async () => {
-    mockPrisma.deviceGroup.findMany.mockResolvedValue([]);
-    mockPrisma.notification.findMany.mockResolvedValue([]);
-    mockPrisma.ticketActivity.findMany.mockResolvedValue([]);
-    mockPrisma.asset.findMany.mockResolvedValue([]);
-
     await caller.recentUpdates();
 
     expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
@@ -115,8 +115,6 @@ describe("overview.recentUpdates", () => {
         { ...ownedMatching, confidence: "Rejected" },
       ]),
     ]);
-    mockPrisma.ticketActivity.findMany.mockResolvedValue([]);
-    mockPrisma.asset.findMany.mockResolvedValue([]);
 
     const result = await caller.recentUpdates();
 
@@ -124,9 +122,6 @@ describe("overview.recentUpdates", () => {
   });
 
   it("collapses repeated status changes to the latest per ticket", async () => {
-    mockPrisma.deviceGroup.findMany.mockResolvedValue([]);
-    mockPrisma.notification.findMany.mockResolvedValue([]);
-    mockPrisma.asset.findMany.mockResolvedValue([]);
     // Newest first, as the router orders them.
     mockPrisma.ticketActivity.findMany.mockResolvedValue([
       {
@@ -154,9 +149,6 @@ describe("overview.recentUpdates", () => {
   });
 
   it("counts new assets individually but lists them collapsed by model", async () => {
-    mockPrisma.deviceGroup.findMany.mockResolvedValue([]);
-    mockPrisma.notification.findMany.mockResolvedValue([]);
-    mockPrisma.ticketActivity.findMany.mockResolvedValue([]);
     const monitor = {
       id: "dg-1",
       manufacturer: { canonicalDisplayName: "GE" },

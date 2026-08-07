@@ -7,7 +7,11 @@ import {
   type TicketStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { type MatchingLike, resolveMatches } from "@/lib/device-matching";
+import {
+  type DeviceGroupIdentity,
+  type MatchingLike,
+  resolveMatches,
+} from "@/lib/device-matching";
 import { deviceGroupLabel } from "@/lib/markdown/device-group";
 import { findDeviceGroupIdsForMatchings } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
@@ -35,12 +39,7 @@ async function notificationAssetCount(
 }
 
 /** A device group that currently has assets, plus how many. */
-type InventoryDeviceGroup = {
-  id: string;
-  manufacturerId: string | null;
-  productId: string | null;
-  versionId: string | null;
-  version: { canonicalName: string } | null;
+type InventoryDeviceGroup = DeviceGroupIdentity & {
   _count: { assets: number };
 };
 
@@ -72,6 +71,66 @@ const changeGroup = <T>(items: T[], count = items.length): ChangeGroup<T> => ({
   items: items.slice(0, CHANGE_ROW_LIMIT),
   truncated: items.length > CHANGE_ROW_LIMIT,
 });
+
+type StatusChangeRow = {
+  data: unknown;
+  createdAt: Date;
+  ticket: { id: string; summary: string };
+};
+
+/**
+ * One row per ticket, carrying its most recent status change. Expects the rows
+ * newest-first: a ticket touched three times in the window still counts once.
+ */
+const activitiesToWorkOrders = (statusChanges: StatusChangeRow[]) => {
+  const latestByTicket = new Map<string, StatusChangeRow>();
+  for (const change of statusChanges) {
+    if (!latestByTicket.has(change.ticket.id)) {
+      latestByTicket.set(change.ticket.id, change);
+    }
+  }
+
+  return [...latestByTicket.values()].map((change) => {
+    const data = change.data as { from?: string; to?: string };
+    return {
+      id: change.ticket.id,
+      summary: change.ticket.summary,
+      changedAt: change.createdAt,
+      from: (data.from ?? null) as TicketStatus | null,
+      to: (data.to ?? null) as TicketStatus | null,
+    };
+  });
+};
+
+type NewAssetRow = {
+  deviceGroup: Parameters<typeof deviceGroupLabel>[0] & { id: string };
+  externalMappings: { integration: { name: string } }[];
+};
+
+const assetsToRows = (newAssets: NewAssetRow[]) => {
+  const rows = new Map<
+    string,
+    { key: string; label: string; source: string | null; count: number }
+  >();
+
+  for (const asset of newAssets) {
+    const source = asset.externalMappings[0]?.integration.name ?? null;
+    const key = `${asset.deviceGroup.id}:${source ?? ""}`;
+    const existing = rows.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      rows.set(key, {
+        key,
+        label: deviceGroupLabel(asset.deviceGroup),
+        source,
+        count: 1,
+      });
+    }
+  }
+
+  return [...rows.values()];
+};
 
 export const overviewRouter = createTRPCRouter({
   /** Highest-priority notifications the current user has not read yet. */
@@ -252,52 +311,17 @@ export const overviewRouter = createTRPCRouter({
     const byType = (type: NotificationType) =>
       changeGroup(withAssets.filter((n) => n.type === type));
 
-    const latestByTicket = new Map<string, (typeof statusChanges)[number]>();
-    for (const change of statusChanges) {
-      if (!latestByTicket.has(change.ticket.id)) {
-        latestByTicket.set(change.ticket.id, change);
-      }
-    }
-    const workOrders = changeGroup(
-      [...latestByTicket.values()].map((change) => {
-        const data = change.data as { from?: string; to?: string };
-        return {
-          id: change.ticket.id,
-          summary: change.ticket.summary,
-          changedAt: change.createdAt,
-          from: (data.from ?? null) as TicketStatus | null,
-          to: (data.to ?? null) as TicketStatus | null,
-        };
-      }),
-    );
-
-    const newAssetCount = newAssets.length;
-    const assetRows = new Map<
-      string,
-      { key: string; label: string; source: string | null; count: number }
-    >();
-    for (const asset of newAssets) {
-      const source = asset.externalMappings[0]?.integration.name ?? null;
-      const label = deviceGroupLabel(asset.deviceGroup);
-      const key = `${asset.deviceGroup.id}:${source ?? ""}`;
-      const existing = assetRows.get(key);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        assetRows.set(key, { key, label, source, count: 1 });
-      }
-    }
-
     const advisories = byType(NotificationType.Advisory);
     const recalls = byType(NotificationType.Recall);
+    const workOrders = changeGroup(activitiesToWorkOrders(statusChanges));
 
     return {
       advisories,
       recalls,
       workOrders,
-      newAssets: changeGroup([...assetRows.values()], newAssetCount),
+      newAssets: changeGroup(assetsToRows(newAssets), newAssets.length),
       totalCount:
-        advisories.count + recalls.count + workOrders.count + newAssetCount,
+        advisories.count + recalls.count + workOrders.count + newAssets.length,
     };
   }),
 });

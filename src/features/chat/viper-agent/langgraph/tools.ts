@@ -18,6 +18,7 @@ import {
 } from "@/features/integrations/teamplay-fleet/tracking";
 import { TicketCategory } from "@/generated/prisma";
 import { TOOL_REJECTED_PREFIX } from "./build-graph";
+import { makeRecordNoteTool } from "./note-tool";
 import { makeQueryPlatformDataTool } from "./query-platform-tool";
 
 /** ```viper-ask-user ...``` block the chat UI parses to render question chips. */
@@ -211,5 +212,6 @@ export function buildChatTools(userId: string) {
     askUserQuestions,
     listFleetManagedAssetsTool,
     proposeFleetWorkOrder,
+    makeRecordNoteTool(userId),
   ];
 }

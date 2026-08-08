@@ -9,6 +9,8 @@ import type {
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
+import { ChatNoteInput } from "../types";
+import { resolveNoteTargetLabel } from "./note-targets";
 
 type ResolvedTarget = {
   targetModel: ScopeTargetModel;
@@ -79,14 +81,38 @@ async function resolveMatchFeedbackRequest(
   };
 }
 
+async function resolveChatInput(
+  input: ChatNoteInput,
+): Promise<NoteActionRequest | null> {
+  const comment = input.comment?.trim();
+  if (!comment) return null;
+
+  const label = await resolveNoteTargetLabel(
+    input.targetModel,
+    input.instanceId,
+  );
+  if (!label) return null;
+
+  return {
+    source: "CHAT",
+    updatedText: comment,
+    target: { targetModel: input.targetModel, instanceId: input.instanceId },
+    targetLabel: label,
+    userId: input.userId,
+  };
+}
+
 // add other note source case here
 export async function resolveNoteActionRequest(
   source: NoteActionSource,
   refId: string,
+  input?: ChatNoteInput,
 ): Promise<NoteActionRequest | null> {
   switch (source) {
     case "MATCH_FEEDBACK":
       return resolveMatchFeedbackRequest(refId);
+    case "CHAT":
+      return input ? resolveChatInput(input) : null;
     default:
       return null;
   }

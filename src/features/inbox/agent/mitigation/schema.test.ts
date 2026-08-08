@@ -1,14 +1,18 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
+import { buildEntityRefs } from "../refs";
 import { buildMitigationPlansSchema } from "./schema";
 
-const ids = {
-  vulnerabilityIds: ["vuln_1", "vuln_2"],
-  remediationIds: ["rem_1"],
-  deviceGroupMatchingIds: ["dgm_1", "dgm_2"],
-};
+const refs = buildEntityRefs({
+  vulnerabilityIds: ["cmvuln0000000000000000001", "cmvuln0000000000000000002"],
+  remediationIds: ["cmrem00000000000000000001"],
+  deviceGroupMatchingIds: [
+    "cmdgm00000000000000000001",
+    "cmdgm00000000000000000002",
+  ],
+});
 
-const schema = buildMitigationPlansSchema(ids);
+const schema = buildMitigationPlansSchema(refs);
 
 const goldenPlan = {
   title: "Contain now, patch on schedule",
@@ -28,11 +32,11 @@ const goldenPlan = {
       shortDescription: "Block TCP 32912/32914 at the imaging VLAN boundary",
       detailedDescription:
         "Add deny rules for TCP 32912 and 32914 inbound to the imaging VLAN.",
-      vulnerabilityIds: ["vuln_1"],
+      vulnerabilityIds: ["vuln-1"],
       remediationIds: [],
       deviceGroups: [
         {
-          id: "dgm_1",
+          id: "group-1",
           confidence: "Matched",
           reasonWhy: "These are the scanners exposed on the imaging VLAN.",
         },
@@ -98,12 +102,56 @@ describe("buildMitigationPlansSchema", () => {
     expect(parsed.success).toBe(false);
   });
 
+  it("rejects a raw database id — the model only ever sees refs", () => {
+    const parsed = schema.safeParse(
+      withWorkOrder({
+        ...goldenPlan.workOrders[0],
+        vulnerabilityIds: ["cmvuln0000000000000000001"],
+      }),
+    );
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects an opaque ref leaking into work-order prose, even with valid links", () => {
+    const parsed = schema.safeParse(
+      withWorkOrder({
+        ...goldenPlan.workOrders[0],
+        detailedDescription:
+          "Patch the workstations in group-1 during the next maintenance window.",
+      }),
+    );
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects an opaque ref leaking into a plan card", () => {
+    const parsed = schema.safeParse({
+      plans: [
+        {
+          ...goldenPlan,
+          cards: { ...goldenPlan.cards, coverage: "all assets in group-2" },
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("does not flag prose that merely resembles a ref", () => {
+    const parsed = schema.safeParse(
+      withWorkOrder({
+        ...goldenPlan.workOrders[0],
+        detailedDescription:
+          "Move the scanners to VLAN group-10 and verify subgroup-1 connectivity.",
+      }),
+    );
+    expect(parsed.success).toBe(true);
+  });
+
   it("rejects a device group id outside the catalog", () => {
     const parsed = schema.safeParse(
       withWorkOrder({
         ...goldenPlan.workOrders[0],
         deviceGroups: [
-          { id: "dgm_nope", confidence: "Matched", reasonWhy: "invented" },
+          { id: "group_nope", confidence: "Matched", reasonWhy: "invented" },
         ],
       }),
     );
@@ -111,11 +159,13 @@ describe("buildMitigationPlansSchema", () => {
   });
 
   it("allows no ids at all when the context resolved none", () => {
-    const emptySchema = buildMitigationPlansSchema({
-      vulnerabilityIds: [],
-      remediationIds: [],
-      deviceGroupMatchingIds: [],
-    });
+    const emptySchema = buildMitigationPlansSchema(
+      buildEntityRefs({
+        vulnerabilityIds: [],
+        remediationIds: [],
+        deviceGroupMatchingIds: [],
+      }),
+    );
     const workOrder = {
       shortDescription: "Ask the vendor for an advisory",
       detailedDescription: "No hospital entities resolved yet.",
@@ -133,7 +183,7 @@ describe("buildMitigationPlansSchema", () => {
         plans: [
           {
             ...goldenPlan,
-            workOrders: [{ ...workOrder, vulnerabilityIds: ["vuln_1"] }],
+            workOrders: [{ ...workOrder, vulnerabilityIds: ["vuln-1"] }],
           },
         ],
       }).success,

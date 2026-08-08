@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { LinkableIds } from "@/features/inbox/agent/triage/context";
+import type { EntityRefs } from "@/features/inbox/agent/refs";
 import { PlanTagEnum } from "@/generated/prisma";
 
 // Stored in MitigationPlan.card
@@ -26,9 +26,10 @@ function idArray(ids: string[], description: string) {
 }
 
 /**
- * Bake valid ID's into the schema we give the model itself...
+ * Bake the valid refs into the schema we give the model itself. The model never
+ * sees database ids — `createMitigationPlans` translates refs back after parsing.
  */
-export function buildMitigationPlansSchema(ids: LinkableIds) {
+export function buildMitigationPlansSchema(refs: EntityRefs) {
   const planWorkOrderSchema = z.object({
     shortDescription: z
       .string()
@@ -37,19 +38,19 @@ export function buildMitigationPlansSchema(ids: LinkableIds) {
       .string()
       .describe("full description of the work to perform"),
     vulnerabilityIds: idArray(
-      ids.vulnerabilityIds,
-      "ids of ONLY the vulnerabilities this specific work order addresses; empty if none",
+      refs.vulnerabilityRefs,
+      "refs (e.g. vuln-1) of ONLY the vulnerabilities this specific work order addresses; empty if none",
     ),
     remediationIds: idArray(
-      ids.remediationIds,
-      "ids of ONLY the remediations this specific work order applies; empty if none",
+      refs.remediationRefs,
+      "refs (e.g. rem-1) of ONLY the remediations this specific work order applies; empty if none",
     ),
     deviceGroups: z
       .array(
         z.object({
           id:
-            ids.deviceGroupMatchingIds.length > 0
-              ? z.enum(ids.deviceGroupMatchingIds as [string, ...string[]])
+            refs.deviceGroupMatchingRefs.length > 0
+              ? z.enum(refs.deviceGroupMatchingRefs as [string, ...string[]])
               : z.never(),
           confidence: z
             .enum(["NeedsReview", "Matched"])
@@ -66,20 +67,53 @@ export function buildMitigationPlansSchema(ids: LinkableIds) {
       ),
   });
 
-  const mitigationPlanItemSchema = z.object({
-    title: z.string(),
-    summary: z.string().describe("what this plan does, in plain terms"),
-    compareLine: z
-      .string()
-      .describe("short blurb comparing this plan to the other plans"),
-    tags: z.array(z.enum(PlanTagEnum)),
-    cards: planCardsSchema,
-    workOrders: z
-      .array(planWorkOrderSchema)
-      .describe(
-        "the work orders that would be created if this plan is accepted",
-      ),
-  });
+  const offered = Object.keys(refs.idByRef); // ["vuln-1","rem-1","group-1","group-2","asset-1"]
+  // Finds those exact refs as whole words: "group-1" hits, "VLAN group-10" doesn't.
+  const leakPattern =
+    offered.length > 0 ? new RegExp(`\\b(?:${offered.join("|")})\\b`) : null;
+
+  const mitigationPlanItemSchema = z
+    .object({
+      title: z.string(),
+      summary: z.string().describe("what this plan does, in plain terms"),
+      compareLine: z
+        .string()
+        .describe("short blurb comparing this plan to the other plans"),
+      tags: z.array(z.enum(PlanTagEnum)),
+      cards: planCardsSchema,
+      workOrders: z
+        .array(planWorkOrderSchema)
+        .describe(
+          "the work orders that would be created if this plan is accepted",
+        ),
+    })
+    // Reject rather than strip the ref: a silent scrub would ship the plan that leaked.
+    .superRefine((plan, ctx) => {
+      if (!leakPattern) return;
+      const check = (text: string, path: (string | number)[]) => {
+        const hit = text.match(leakPattern);
+        if (hit) {
+          ctx.addIssue({
+            code: "custom",
+            path,
+            message: `internal reference "${hit[0]}" must not appear in staff-visible text`,
+          });
+        }
+      };
+      check(plan.title, ["title"]);
+      check(plan.summary, ["summary"]);
+      check(plan.compareLine, ["compareLine"]);
+      for (const [key, value] of Object.entries(plan.cards)) {
+        check(value, ["cards", key]);
+      }
+      plan.workOrders.forEach((w, i) => {
+        check(w.shortDescription, ["workOrders", i, "shortDescription"]);
+        check(w.detailedDescription, ["workOrders", i, "detailedDescription"]);
+        w.deviceGroups.forEach((g, j) => {
+          check(g.reasonWhy, ["workOrders", i, "deviceGroups", j, "reasonWhy"]);
+        });
+      });
+    });
 
   return z.object({
     plans: z

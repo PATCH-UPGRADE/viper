@@ -41,6 +41,10 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     asset: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+    },
+    assetTicket: {
+      findUnique: vi.fn(),
     },
     department: {
       findMany: vi.fn(),
@@ -204,6 +208,12 @@ beforeEach(() => {
   );
   mockPrisma.department.findMany.mockResolvedValue([]);
   mockPrisma.asset.findUnique.mockResolvedValue(null);
+  mockPrisma.asset.findUniqueOrThrow.mockResolvedValue({
+    hostname: "host",
+    ip: "10.0.0.9",
+  });
+  mockPrisma.assetTicket.findUnique.mockResolvedValue(null);
+  mockPrisma.workOrderTicket.create.mockResolvedValue({ id: "child-1" });
 });
 
 describe("trackingRouter.update", () => {
@@ -429,6 +439,122 @@ describe("trackingRouter.update", () => {
   });
 });
 
+describe("trackingRouter.update — Done cascade", () => {
+  beforeEach(() => {
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
+      makeUpdateBefore({ status: "TO_DO" }),
+    );
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
+      ...makeTicketDetail(),
+      status: "IN_PROGRESS",
+    });
+  });
+
+  async function updateStatus(id: string, status: string) {
+    const caller = setup();
+    await caller.update({ id, status: status as never });
+  }
+
+  it("leaves the parent alone when a sibling asset-ticket is still not Done", async () => {
+    mockPrisma.assetTicket.findUnique.mockResolvedValue({
+      parentTicketId: "parent-1",
+      parentTicket: {
+        status: "IN_PROGRESS",
+        children: [{ status: "DONE" }, { status: "TO_DO" }],
+      },
+    });
+
+    await updateStatus("child-1", "DONE");
+
+    expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "parent-1" } }),
+    );
+  });
+
+  it("flips the parent to Done once every sibling asset-ticket is Done", async () => {
+    mockPrisma.assetTicket.findUnique.mockImplementation(
+      async ({ where }: { where: { ticketId: string } }) =>
+        where.ticketId === "child-1"
+          ? {
+              parentTicketId: "parent-1",
+              parentTicket: {
+                status: "IN_PROGRESS",
+                children: [{ status: "DONE" }, { status: "DONE" }],
+              },
+            }
+          : null,
+    );
+
+    await updateStatus("child-1", "DONE");
+
+    expect(mockPrisma.workOrderTicket.update).toHaveBeenCalledWith({
+      where: { id: "parent-1" },
+      data: { status: "DONE" },
+    });
+    expect(mockPrisma.ticketActivity.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        ticketId: "parent-1",
+        type: "STATUS_CHANGED",
+        data: expect.objectContaining({ cause: "all-asset-tickets-done" }),
+      }),
+    });
+  });
+
+  it("cascades two levels — a completed parent flips its own asset-ticket parent too", async () => {
+    mockPrisma.assetTicket.findUnique.mockImplementation(
+      async ({ where }: { where: { ticketId: string } }) => {
+        if (where.ticketId === "child-1") {
+          return {
+            parentTicketId: "parent-1",
+            parentTicket: {
+              status: "IN_PROGRESS",
+              children: [{ status: "DONE" }],
+            },
+          };
+        }
+        if (where.ticketId === "parent-1") {
+          return {
+            parentTicketId: "grandparent-1",
+            parentTicket: {
+              status: "IN_PROGRESS",
+              children: [{ status: "DONE" }],
+            },
+          };
+        }
+        return null;
+      },
+    );
+
+    await updateStatus("child-1", "DONE");
+
+    expect(mockPrisma.workOrderTicket.update).toHaveBeenCalledWith({
+      where: { id: "parent-1" },
+      data: { status: "DONE" },
+    });
+    expect(mockPrisma.workOrderTicket.update).toHaveBeenCalledWith({
+      where: { id: "grandparent-1" },
+      data: { status: "DONE" },
+    });
+  });
+
+  it("does not update or re-log a parent that's already Done", async () => {
+    mockPrisma.assetTicket.findUnique.mockResolvedValue({
+      parentTicketId: "parent-1",
+      parentTicket: {
+        status: "DONE",
+        children: [{ status: "DONE" }],
+      },
+    });
+
+    await updateStatus("child-1", "DONE");
+
+    expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "parent-1" } }),
+    );
+    expect(mockPrisma.ticketActivity.create).not.toHaveBeenCalled();
+  });
+});
+
 describe("trackingRouter.getMany — my-department tab", () => {
   const emptyResults = () => {
     mockPrisma.workOrderTicket.count.mockResolvedValue(0);
@@ -566,7 +692,10 @@ describe("trackingRouter.list", () => {
     expect(mockPrisma.workOrderTicket.findMany).toHaveBeenCalledTimes(1);
     const findManyArg = mockPrisma.workOrderTicket.findMany.mock.calls[0][0];
     // The isDraft filter and the (empty) search filter end up in the AND list
-    expect(findManyArg.where.AND).toEqual([{ isDraft: false }, {}]);
+    expect(findManyArg.where.AND).toEqual([
+      { isDraft: false, ticket: null },
+      {},
+    ]);
   });
 
   it("filters by departmentIds via m2m `some` + `in`", async () => {
@@ -745,6 +874,7 @@ describe("trackingRouter.getOne", () => {
       where: { userId: FAKE_USER_ID },
       select: { userId: true },
     });
+    expect(arg.include.children.where).toEqual({ ticket: null });
   });
 
   it("collapses watchers into an isWatching boolean", async () => {
@@ -793,6 +923,10 @@ describe("trackingRouter.getMany", () => {
     expect(include.children.include.seenBy).toEqual({
       where: { userId: FAKE_USER_ID },
       select: { seenAt: true },
+    });
+    expect(include.children.where).toMatchObject({
+      isDraft: false,
+      ticket: null,
     });
   });
 
@@ -898,65 +1032,32 @@ describe("trackingRouter.getMany", () => {
 });
 
 describe("trackingRouter.getManyByAssetId", () => {
-  it("returns direct and device-group-matched open work orders", async () => {
+  it("returns open work orders linked through AssetTicket", async () => {
     const caller = setup();
-    mockPrisma.asset.findUnique.mockResolvedValue({
-      deviceGroup: {
-        id: "dg-1",
-        manufacturerId: "manufacturer-1",
-        productId: "product-1",
-        versionId: "version-1",
-        version: { canonicalName: "1.0.0" },
-      },
-    });
+    mockPrisma.asset.findUnique.mockResolvedValue({ id: "a1" });
     const ticket = {
+      id: "direct",
       summary: "Ticket",
+      body: null,
       status: "TO_DO",
       category: "OTHER",
       scheduledAt: null,
       departments: [],
-      assets: [],
-      deviceGroups: [],
       _count: { comments: 0 },
     };
-    const matching = {
-      deviceGroupMatching: {
-        manufacturerId: "manufacturer-1",
-        productId: "product-1",
-        versionId: "version-1",
-        versionRange: null,
-      },
-    };
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      { ...ticket, id: "direct", assets: [{ id: "a1" }] },
-      { ...ticket, id: "matched", deviceGroups: [matching] },
-      {
-        ...ticket,
-        id: "unmatched",
-        deviceGroups: [
-          {
-            deviceGroupMatching: {
-              ...matching.deviceGroupMatching,
-              versionId: "version-2",
-            },
-          },
-        ],
-      },
-    ]);
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([ticket]);
 
     const result = await caller.getManyByAssetId({ assetId: "a1" });
 
-    expect(result.map(({ id }) => id)).toEqual(["direct", "matched"]);
-    expect(mockPrisma.workOrderTicket.findMany).toHaveBeenCalledOnce();
-    expect(
-      mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where,
-    ).toMatchObject({
+    expect(result).toEqual([
+      expect.objectContaining({ id: "direct", commentCount: 0 }),
+    ]);
+    expect(result[0]).not.toHaveProperty("_count");
+    expect(mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where).toEqual({
       isDraft: false,
       status: { not: "DONE" },
+      ticket: { assetId: "a1" },
     });
-    expect(
-      mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where,
-    ).not.toHaveProperty("parentId");
   });
 
   it("throws NOT_FOUND for a missing asset", async () => {
@@ -1148,10 +1249,10 @@ describe("trackingRouter sort param", () => {
 });
 
 describe("trackingRouter.attachChild", () => {
-  it("sets parentId on the child ticket when it has no sub-tickets of its own", async () => {
+  it("sets parentId on the child ticket when it isn't a dedicated asset-ticket", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
-      _count: { children: 0 },
+      ticket: null,
     });
     mockPrisma.workOrderTicket.update.mockResolvedValue({ id: "c1" });
 
@@ -1172,15 +1273,15 @@ describe("trackingRouter.attachChild", () => {
     expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
   });
 
-  it("rejects attaching a ticket that already has its own sub-tickets", async () => {
+  it("rejects attaching a ticket that's already someone's dedicated asset-ticket", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
-      _count: { children: 2 },
+      ticket: { id: "at-1" },
     });
 
     await expect(
       caller.attachChild({ parentId: "p1", childId: "c1" }),
-    ).rejects.toThrow(/already has sub-tickets/i);
+    ).rejects.toThrow(/linked to an asset/i);
     expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
   });
 
@@ -1207,10 +1308,23 @@ describe("trackingRouter.detachChild", () => {
       data: { parentId: null },
     });
   });
+
+  it("rejects detaching a ticket that's a dedicated asset-ticket", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      parentId: "p1",
+      ticket: { id: "at-1" },
+    });
+
+    await expect(caller.detachChild({ ticketId: "c1" })).rejects.toThrow(
+      /linked assets tab/i,
+    );
+    expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
+  });
 });
 
 describe("trackingRouter.listAttachableChildren", () => {
-  it("excludes the parent itself and any ticket that already has children", async () => {
+  it("excludes the parent itself and any ticket that's already a dedicated asset-ticket", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
 
@@ -1219,7 +1333,7 @@ describe("trackingRouter.listAttachableChildren", () => {
     const arg = mockPrisma.workOrderTicket.findMany.mock.calls[0][0];
     expect(arg.where).toEqual({
       id: { not: "p1" },
-      children: { none: {} },
+      ticket: null,
       isDraft: false,
     });
     expect(arg.select.parent).toEqual({
@@ -1271,34 +1385,54 @@ describe("trackingRouter.listAttachableChildren", () => {
 });
 
 describe("trackingRouter.attachAsset", () => {
-  it("connects the asset to the ticket via the m2m relation", async () => {
+  it("creates a dedicated child ticket + AssetTicket join row for the asset", async () => {
     const caller = setup();
-    mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
 
     await caller.attachAsset({ ticketId: "t1", assetId: "a1" });
 
-    expect(mockPrisma.workOrderTicket.update).toHaveBeenCalledWith(
+    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "t1" },
-        data: { assets: { connect: { id: "a1" } } },
+        data: expect.objectContaining({
+          parent: { connect: { id: "t1" } },
+          ticket: { create: { assetId: "a1", parentTicketId: "t1" } },
+        }),
       }),
     );
   });
 });
 
 describe("trackingRouter.detachAsset", () => {
-  it("disconnects the asset from the ticket", async () => {
+  it("deletes the asset's dedicated child ticket, cascading the AssetTicket row", async () => {
     const caller = setup();
-    mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
+    mockPrisma.assetTicket.findUnique.mockResolvedValue({
+      ticketId: "child-9",
+      asset: { hostname: "host-9", ip: "10.0.0.9" },
+    });
 
     await caller.detachAsset({ ticketId: "t1", assetId: "a1" });
 
-    expect(mockPrisma.workOrderTicket.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "t1" },
-        data: { assets: { disconnect: { id: "a1" } } },
-      }),
-    );
+    expect(mockPrisma.assetTicket.findUnique).toHaveBeenCalledWith({
+      where: {
+        parentTicketId_assetId: { parentTicketId: "t1", assetId: "a1" },
+      },
+      select: {
+        ticketId: true,
+        asset: { select: { hostname: true, ip: true } },
+      },
+    });
+    expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({
+      where: { id: "child-9" },
+    });
+  });
+
+  it("throws NOT_FOUND when the asset isn't linked to this ticket", async () => {
+    const caller = setup();
+    mockPrisma.assetTicket.findUnique.mockResolvedValue(null);
+
+    await expect(
+      caller.detachAsset({ ticketId: "t1", assetId: "a1" }),
+    ).rejects.toThrow(/not linked/i);
+    expect(mockPrisma.workOrderTicket.delete).not.toHaveBeenCalled();
   });
 });
 
@@ -1311,7 +1445,7 @@ describe("trackingRouter.listAttachableAssets", () => {
 
     const arg = mockPrisma.asset.findMany.mock.calls[0][0];
     expect(arg.where).toEqual({
-      workOrderTickets: { none: { id: "t1" } },
+      assetTickets: { none: { parentTicketId: "t1" } },
     });
     expect(arg.take).toBe(100);
     expect(arg.orderBy).toEqual([{ hostname: "asc" }, { ip: "asc" }]);
@@ -1415,9 +1549,8 @@ describe("activity writes", () => {
 
   it("records CHILD_ATTACHED with the child's summary snapshot", async () => {
     const caller = setup();
-    // First findUnique = child-children-count check, second = activity helper
     mockPrisma.workOrderTicket.findUnique
-      .mockResolvedValueOnce({ _count: { children: 0 } })
+      .mockResolvedValueOnce({ ticket: null })
       .mockResolvedValueOnce({ id: "c1", summary: "Patch ICU pumps" });
 
     await caller.attachChild({ parentId: "p1", childId: "c1" });
@@ -1434,8 +1567,7 @@ describe("activity writes", () => {
 
   it("records ASSET_ATTACHED with the asset's hostname snapshot", async () => {
     const caller = setup();
-    mockPrisma.asset.findUnique.mockResolvedValueOnce({
-      id: "a1",
+    mockPrisma.asset.findUniqueOrThrow.mockResolvedValueOnce({
       hostname: "host-icu-1",
       ip: "10.0.0.1",
     });
@@ -1454,10 +1586,9 @@ describe("activity writes", () => {
 
   it("records ASSET_DETACHED falling back to IP when hostname is null", async () => {
     const caller = setup();
-    mockPrisma.asset.findUnique.mockResolvedValueOnce({
-      id: "a1",
-      hostname: null,
-      ip: "10.0.0.42",
+    mockPrisma.assetTicket.findUnique.mockResolvedValue({
+      ticketId: "child-9",
+      asset: { hostname: null, ip: "10.0.0.42" },
     });
 
     await caller.detachAsset({ ticketId: "t1", assetId: "a1" });
@@ -1496,7 +1627,10 @@ describe("trackingRouter.createFleetWorkOrder", () => {
   beforeEach(() => {
     // No prior acceptance of this proposal, unless a test says otherwise.
     mockPrisma.workOrderTicket.findUnique.mockResolvedValue(null);
-    mockPrisma.workOrderTicket.create.mockResolvedValue({ id: "t-new" });
+    let createCallCount = 0;
+    mockPrisma.workOrderTicket.create.mockImplementation(async () => ({
+      id: createCallCount++ === 0 ? "t-new" : "child-new",
+    }));
     mockFleet.getFleetWorkOrderIntegration.mockResolvedValue(INTEGRATION);
     mockFleet.resolveFleetAssets.mockResolvedValue([MRI]);
     mockFleet.createFleetWorkOrder.mockResolvedValue({
@@ -1507,7 +1641,7 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     });
   });
 
-  it("claims the ticket, files on Fleet, then maps the ticket to it", async () => {
+  it("claims a parent ticket, files on Fleet, then spawns a per-asset child carrying the mapping", async () => {
     const caller = setup();
 
     const result = await caller.createFleetWorkOrder(proposal);
@@ -1525,17 +1659,19 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     const claim = mockPrisma.workOrderTicket.create.mock.calls[0][0].data;
     expect(claim.chatToolCallId).toBe("call_abc");
     expect(claim.sourceLabel).toBe("Siemens Healthineers teamplay Fleet");
-    expect(claim.assets).toEqual({ connect: [{ id: MRI.assetId }] });
+    expect(claim.assets).toBeUndefined();
 
-    // The mapping is attached after Fleet accepts — this is what makes the next
-    // inbound sync update this ticket rather than duplicate it.
-    expect(mockPrisma.externalWorkOrderMapping.create).toHaveBeenCalledWith({
-      data: {
-        itemId: "t-new",
+    const child = mockPrisma.workOrderTicket.create.mock.calls[1][0].data;
+    expect(child.parent).toEqual({ connect: { id: "t-new" } });
+    expect(child.externalMappings).toEqual({
+      create: {
         integrationId: "int-fleet",
         externalId: "US_400501937577",
         lastSynced: expect.any(Date),
       },
+    });
+    expect(child.ticket).toEqual({
+      create: { assetId: MRI.assetId, parentTicketId: "t-new" },
     });
   });
 
@@ -1642,11 +1778,9 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     await expect(caller.createFleetWorkOrder(proposal)).rejects.toThrow(
       /401 Forbidden/,
     );
-    // The claim was made, but with no Fleet order it must be dropped so a
-    // genuine retry can proceed — no orphaned ticket, no mapping.
     expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({
       where: { id: "t-new" },
     });
-    expect(mockPrisma.externalWorkOrderMapping.create).not.toHaveBeenCalled();
+    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledTimes(1);
   });
 });

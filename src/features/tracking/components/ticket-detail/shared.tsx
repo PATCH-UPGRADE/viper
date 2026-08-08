@@ -89,7 +89,7 @@ export const DepartmentChips = ({
   );
 };
 
-export type DetailAsset = TicketDetail["assets"][number];
+export type DetailAssetTicket = TicketDetail["assets"][number];
 export type DetailRemediation = TicketDetail["remediations"][number];
 
 export const formatLocation = (location: unknown): string => {

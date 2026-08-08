@@ -63,7 +63,7 @@ function renderQuestionPrompt(args: {
         args.notes
           .map((n) => {
             const target = renderNoteTarget(n, args.labels);
-            return target ? `- **${target}** ${n.text}`: `- ${n.text}`; 
+            return target ? `- **${target}** ${n.text}` : `- ${n.text}`;
           })
           .join("\n"),
     );

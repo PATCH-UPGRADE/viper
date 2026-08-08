@@ -2,7 +2,7 @@ import "server-only";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { resolveNoteTargetLabel } from "@/features/notes/server/note-targets";
-import { ChatNoteInput } from "@/features/notes/types";
+import type { ChatNoteInput } from "@/features/notes/types";
 import { ScopeTargetModel } from "@/generated/prisma";
 import { requestNoteAction } from "@/inngest/functions/notes-action";
 

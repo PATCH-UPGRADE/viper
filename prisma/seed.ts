@@ -1,3 +1,5 @@
+import Module from "node:module";
+import { fileURLToPath } from "node:url";
 import { hashPassword } from "better-auth/crypto";
 import {
   type ArtifactType,
@@ -13,6 +15,23 @@ import {
   TicketStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+
+const serverOnlyStub = fileURLToPath(
+  new URL("../src/test/server-only-stub.ts", import.meta.url),
+);
+const mod = Module as unknown as {
+  _resolveFilename(request: string, ...rest: unknown[]): string;
+};
+const resolveFilename = mod._resolveFilename;
+mod._resolveFilename = function (request, ...rest) {
+  return resolveFilename.call(
+    this,
+    request === "server-only" ? serverOnlyStub : request,
+    ...rest,
+  );
+};
+
+let createAssetTicket: typeof import("@/features/tracking/server/asset-tickets")["createAssetTicket"];
 
 // Seed user credentials
 const SEED_USER = {
@@ -2065,6 +2084,7 @@ async function createWorkOrderTicket(
   ticket: SampleTicket,
   userId: string,
   parentId: string | null,
+  ticketedAssetIds: Set<string>,
 ) {
   // Normalize single-dept and multi-dept shapes to one ordered list. The
   // first entry is the "primary" department, used as the fallback target
@@ -2126,7 +2146,7 @@ async function createWorkOrderTicket(
     })
     .filter((d): d is { body: string; departmentId: string } => d !== null);
 
-  return prisma.workOrderTicket.create({
+  const created = await prisma.workOrderTicket.create({
     data: {
       summary: ticket.summary,
       status: ticket.status,
@@ -2164,7 +2184,6 @@ async function createWorkOrderTicket(
       },
       scheduledAt: ticket.scheduledAt,
       vulnerabilities: { connect: linkedVulns.map((v) => ({ id: v.id })) },
-      assets: { connect: linkedAssets.map((a) => ({ id: a.id })) },
       remediations: {
         connect: linkedRemediations.map((r) => ({ id: r.id })),
       },
@@ -2179,6 +2198,18 @@ async function createWorkOrderTicket(
         : undefined,
     },
   });
+
+  for (const asset of linkedAssets) {
+    if (ticketedAssetIds.has(asset.id)) continue;
+    ticketedAssetIds.add(asset.id);
+    await createAssetTicket(prisma, {
+      parentTicketId: created.id,
+      assetId: asset.id,
+      actorId: userId,
+    });
+  }
+
+  return created;
 }
 
 async function seedWorkOrderTickets(userId: string) {
@@ -2188,10 +2219,16 @@ async function seedWorkOrderTickets(userId: string) {
   let childCount = 0;
 
   for (const parent of SAMPLE_CHANGE_TICKETS) {
-    const created = await createWorkOrderTicket(parent, userId, null);
+    const ticketedAssetIds = new Set<string>();
+    const created = await createWorkOrderTicket(
+      parent,
+      userId,
+      null,
+      ticketedAssetIds,
+    );
     parentCount++;
     for (const child of parent.children ?? []) {
-      await createWorkOrderTicket(child, userId, created.id);
+      await createWorkOrderTicket(child, userId, created.id, ticketedAssetIds);
       childCount++;
     }
   }
@@ -2272,6 +2309,10 @@ async function seedVendors() {
 
 async function main() {
   console.log("🌱 Starting database seed...\n");
+
+  ({ createAssetTicket } = await import(
+    "@/features/tracking/server/asset-tickets"
+  ));
 
   try {
     const shouldClear = process.env.SEED_CLEAR_DB === "true";

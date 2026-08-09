@@ -15,9 +15,7 @@ export function buildEscalationEmailSchema(
       ),
     vendorId: idFrom(vendorIds)
       .nullable()
-      .describe(
-        "Id of the chosen vendor. Null when audience is MANUFACTURER.",
-      ),
+      .describe("Id of the chosen vendor. Null when audience is MANUFACTURER."),
     contactIds: z
       .array(idFrom(contactIds))
       .describe(

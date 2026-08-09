@@ -1,12 +1,44 @@
 import { z } from "zod";
 
-export const escalationEmailschema = z.object({
-  audience: z.enum(["VENDOR", "MANUFACTURER"]),
-  companyName: z.string(),
-  productName: z.string(),
-  reasonWhy: z.string(),
-  subject: z.string(),
-  body: z.string(),
-});
+const idFrom = (ids: string[]) =>
+  ids.length > 0 ? z.enum(ids as [string, ...string[]]) : z.string();
 
-export type EscalationDraft = z.infer<typeof escalationEmailschema>;
+export function buildEscalationEmailSchema(
+  vendorIds: string[],
+  contactIds: string[],
+) {
+  return z.object({
+    audience: z
+      .enum(["VENDOR", "MANUFACTURER"])
+      .describe(
+        "MANUFACTURER when only the company that built the device can answer; VENDOR when the company contracted to service our units can answer. Must be MANUFACTURER if no vendors are listed.",
+      ),
+    vendorId: idFrom(vendorIds)
+      .nullable()
+      .describe(
+        "Id of the chosen vendor. Null when audience is MANUFACTURER.",
+      ),
+    contactIds: z
+      .array(idFrom(contactIds))
+      .describe(
+        "Contact ids from the chosen vendor. Empty array when no listed contact is clearly fits, or when audience is MANUFACTURER - the user types an address in.",
+      ),
+    reasonWhy: z
+      .string()
+      .describe(
+        "INTERNAL note shown to the hospital user under 'Why send this:', not part of the email. One or two sentences on what answering this unblocks.",
+      ),
+    subject: z
+      .string()
+      .describe("Email subject line; name the product and the CVE."),
+    body: z
+      .string()
+      .describe(
+        "Plain-text email body, ending with a sign-off line and nothing after it.",
+      ),
+  });
+}
+
+export type EscalationDraft = z.infer<
+  ReturnType<typeof buildEscalationEmailSchema>
+>;

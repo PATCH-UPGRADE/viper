@@ -29,11 +29,7 @@ export const questionInclude = {
 } satisfies Prisma.QuestionInclude;
 
 export type QuestionWithIssue = Prisma.QuestionGetPayload<{
-  include: {
-    issue: {
-      include: { vulnerability: true; deviceGroupMatching: true; asset: true };
-    };
-  };
+  include: typeof questionInclude;
 }>;
 
 export function groupQuestionChains(

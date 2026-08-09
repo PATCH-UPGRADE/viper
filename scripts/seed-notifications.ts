@@ -765,6 +765,148 @@ The application deserialises untrusted data without sufficient validations that 
   console.log(`  ✅ Created: ${title}`);
 }
 
+async function seedUnsureQuestion() {
+  await prisma.question.deleteMany({ where: { status : "UNSURE"}})
+  const mapping = await prisma.notificationDeviceGroupMapping.findFirst({
+    where: { notificationId: { not: null } },
+    orderBy: { notification: { createdAt: "asc" } },
+    select: {
+      notificationId: true,
+      deviceGroupMatching: {
+        select: {
+          id: true,
+          manufacturer: { select: { canonicalDisplayName: true } },
+          product: { select: { canonicalDisplayName: true } },
+        },
+      },
+    },
+  });
+
+  if (!mapping?.notificationId) {
+    console.log("No notification mapping found");
+    return;
+  }
+
+  const issue = await prisma.issue.findFirst({
+    where: { deviceGroupMatchingId: mapping?.deviceGroupMatching.id },
+    select: { id: true },
+  });
+
+  if (!issue) {
+    console.log("No issue on that matching");
+    return;
+  }
+
+  await prisma.question.deleteMany({
+    where: { status: "UNSURE" },
+  });
+
+  const { manufacturer, product } = mapping.deviceGroupMatching;
+  const productLabel =
+    product?.canonicalDisplayName ??
+    `${manufacturer.canonicalDisplayName} devices`;
+
+  // const seen = new Set<string>();
+  // let created = 0;
+
+  // for (const mapping of mappings) {
+  //   const notificationId = mapping.notificationId;
+  //   if (!notificationId || seen.has(notificationId)) continue;
+
+  //   const issue = await prisma.issue.findFirst({
+  //     where: { deviceGroupMatchingId: mapping.deviceGroupMatchingId },
+  //     select: { id: true },
+  //   });
+  //   if (!issue) continue;
+
+  //   seen.add(notificationId);
+  await prisma.question.create({
+    data: {
+      issueId: issue.id,
+      notificationId: mapping.notificationId,
+      title: `Which ${productLabel} version is running on our units?`,
+      reasonWhy: `The advisory lists affected ${productLabel} versions, but our inventory records the version as unknown, so we cannot confirm exposure.`,
+      status: "UNSURE",
+    },
+  });
+  //   created++;
+  // }
+  console.log(`  ✅ Seeded UNSURE question`);
+}
+
+async function seedVendorCoverage() {
+  console.log("\n🌱 Seeding vendor coverage...");
+
+  const manufacturer = await upsertManufacturer("Siemens Healthineers");
+
+  const vendor = await prisma.vendor.upsert({
+    where: { canonicalName: "siemens healthineers" },
+    update: { manufacturerId: manufacturer.id },
+    create: {
+      canonicalName: "siemens healthineers",
+      canonicalDisplayName: "Siemens Healthineers",
+      overview: "Manages imaging fleet for radiology",
+      partnerSince: new Date("2019-01-01"),
+      manufacturerId: manufacturer.id,
+    },
+  });
+
+  await prisma.contract.deleteMany({ where: { vendorId: vendor.id } });
+  await prisma.vendorContact.deleteMany({ where: { vendorId: vendor.id } });
+
+  await prisma.vendorContact.createMany({
+    data: [
+      {
+        vendorId: vendor.id,
+        name: "John Doe",
+        title: "Hospital Biomed Lead",
+        email: "johndoe@example.com",
+        phone: "123-456-7890",
+        notes: "Usually responds the fastest",
+      },
+      {
+        vendorId: vendor.id,
+        name: "Jane Doe",
+        title: "IT engineer",
+        email: "janedoe@example.com",
+      },
+      {
+        vendorId: vendor.id,
+        name: "James Doe",
+        title: "Admin",
+        phone: "908-765-4321",
+      },
+    ],
+  });
+
+  const assets = await prisma.asset.findMany({
+    where: { deviceGroup: { manufacturerId: manufacturer.id } },
+    select: { id: true },
+  });
+
+  const contract = await prisma.contract.create({
+    data: {
+      vendorId: vendor.id,
+      title: "Fleet Imaging Service Agreement",
+      effectiveFrom: new Date("2025-01-01"),
+      effectiveTo: new Date("2027-01-01"),
+      coverageSummary: `Managed security and maintenance across imaging ${assets.length} assets`,
+    },
+  });
+
+  await prisma.contractAsset.createMany({
+    data: assets.map((asset) => ({
+      contractId: contract.id,
+      assetId: asset.id,
+    })),
+    skipDuplicates: true,
+  });
+
+  console.log(
+    `  ✅ Vendor: ${vendor.canonicalDisplayName}: 3 contacts (2 with emails), contract covering ${assets.length} assets`,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main seed function
 // ---------------------------------------------------------------------------
@@ -781,6 +923,8 @@ async function main() {
   const user = await getSeedUser();
   await seedSyngoPlazaVexScenario(user.id);
   await seedDeserializationScenario(user.id);
+  await seedVendorCoverage();
+  await seedUnsureQuestion();
 
   console.log("\n✨ Done.");
   await prisma.$disconnect();

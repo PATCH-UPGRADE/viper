@@ -40,6 +40,15 @@ export const SuggestedEmailCard = ({
     await handleCopy(`${email.body}`, () => toast.success("Email text copied"));
   };
 
+  const handleRecipientsChange = (value: string) => {
+    setToEmails(
+      value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center gap-2 pb-2">
@@ -94,14 +103,26 @@ export const SuggestedEmailCard = ({
               </span>
               <div className="min-w-0 flex-1">
                 {isEditing ? (
-                  <ContactMultiSelect
-                    options={email.contacts}
-                    selected={toEmails}
-                    onChange={setToEmails}
-                  />
+                  email.contacts.length > 0 ? (
+                    <ContactMultiSelect
+                      options={email.contacts}
+                      selected={toEmails}
+                      onChange={setToEmails}
+                    />
+                  ) : (
+                    <Input
+                      value={toEmails.join(", ")}
+                      onChange={(e) => handleRecipientsChange(e.target.value)}
+                      placeholder="product@vendor.com"
+                      disabled={isSending}
+                      className="h-8"
+                    />
+                  )
                 ) : (
                   <span className="block truncate text-left font-mono">
-                    {toEmails.join(",")}
+                    {toEmails.length > 0
+                      ? toEmails.join(",")
+                      : "No recipient yet, add one"}
                   </span>
                 )}
               </div>
@@ -152,7 +173,7 @@ export const SuggestedEmailCard = ({
             className="rounded"
             variant="outline"
             onClick={onhandleClickCopy}
-            disabled={isSending}
+            disabled={isSending || isEditing || toEmails.length === 0}
           >
             <Copy className="size-4" />
             <span className="font-bold">Copy text</span>
@@ -167,7 +188,7 @@ export const SuggestedEmailCard = ({
                 body,
               })
             }
-            disabled={isSending || isEditing}
+            disabled={isSending || isEditing || toEmails.length === 0}
           >
             <Send className="size-4" />
             {isSending ? "Sending..." : "Approve & Send"}

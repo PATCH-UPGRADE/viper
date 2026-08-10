@@ -137,7 +137,7 @@ export const mitigationRouter = createTRPCRouter({
           },
         });
         await tx.workOrderTicket.updateMany({
-          where: { id: { in: promoted.map((t) => t.id) } },
+          where: { mitigationPlanId: plan.id },
           data: { isDraft: false },
         });
         for (const ticket of promoted) {

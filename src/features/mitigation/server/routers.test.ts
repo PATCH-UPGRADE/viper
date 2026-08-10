@@ -145,7 +145,7 @@ describe("mitigationRouter.accept", () => {
       data: { isDraft: true },
     });
     expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: [] } },
+      where: { mitigationPlanId: PLAN_ID },
       data: { isDraft: false },
     });
   });
@@ -181,7 +181,7 @@ describe("mitigationRouter.accept", () => {
       }),
     );
     expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ["wo-1", "wo-2"] } },
+      where: { mitigationPlanId: PLAN_ID },
       data: { isDraft: false },
     });
   });

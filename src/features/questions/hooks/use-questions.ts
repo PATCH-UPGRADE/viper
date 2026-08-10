@@ -63,7 +63,7 @@ export function useSuspenseSuggestedEmailsByNotificationId(
     ...trpc.questions.getSuggestedEmailByNotificationId.queryOptions({
       notificationId,
     }),
-    // I experienced seeing a new draft email when we have refetch, adding this to prevent a draft email change experience
+    // I noticed a new draft email was being created when we refetched, I add this to prevent the draft email from changing unexpectedly during a refetch.
     staleTime: 60 * (60 * 1000), // set it for 1 hour
     gcTime: 60 * (60 * 1000), // garbadge collection/cache time
     refetchOnWindowFocus: false,

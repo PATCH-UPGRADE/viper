@@ -1,8 +1,5 @@
 import { z } from "zod";
 
-const idFrom = (ids: string[]) =>
-  ids.length > 0 ? z.enum(ids as [string, ...string[]]) : z.string();
-
 export function buildEscalationEmailSchema(
   vendorIds: string[],
   contactIds: string[],

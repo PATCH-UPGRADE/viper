@@ -1015,7 +1015,7 @@ async function seedVendorCoverage() {
     ["syngo.via"],
   );
   await coverProducts(phillipVendor.id, "MRI Fleet Managed Service Agreement", [
-    "MAGENTOM FAMILY",
+    "MAGNETOM FAMILY",
   ]);
 }
 

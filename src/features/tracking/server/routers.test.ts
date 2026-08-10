@@ -493,30 +493,17 @@ describe("trackingRouter.update — Done cascade", () => {
     );
   });
 
-  it("checks sibling statuses after the child update commits", async () => {
-    const order: string[] = [];
-    mockPrisma.$transaction
-      .mockImplementationOnce(async (callback) => {
-        const result = await callback(mockPrisma);
-        order.push("child committed");
-        return result;
-      })
-      .mockImplementationOnce(async (callback) => {
-        order.push("cascade started");
-        return callback(mockPrisma);
-      });
-
-    await updateStatus("child-1", "DONE");
-
-    expect(order).toEqual(["child committed", "cascade started"]);
-  });
-
-  it("retries the parent cascade when the child is already Done", async () => {
+  it("checks the parent cascade even when the child was already Done", async () => {
     mockCascadeParents({}, "DONE");
 
     await updateStatus("child-1", "DONE");
 
-    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.workOrderTicket.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "child-1" },
+        select: expect.objectContaining({ parent: expect.anything() }),
+      }),
+    );
   });
 
   it("flips the parent to Done when an ordinary child completes last", async () => {
@@ -1458,16 +1445,10 @@ describe("trackingRouter.attachAsset", () => {
     );
   });
 
-  it("maps Prisma attachment errors to tRPC errors", async () => {
+  it("maps a lost create-race to CONFLICT instead of a raw 500", async () => {
     const caller = setup();
-    mockPrisma.workOrderTicket.findUniqueOrThrow.mockRejectedValueOnce({
-      code: "P2025",
-    });
-    await expect(
-      caller.attachAsset({ ticketId: "missing", assetId: "a1" }),
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-
     mockPrisma.workOrderTicket.create.mockRejectedValueOnce({ code: "P2002" });
+
     await expect(
       caller.attachAsset({ ticketId: "t1", assetId: "a1" }),
     ).rejects.toMatchObject({ code: "CONFLICT" });

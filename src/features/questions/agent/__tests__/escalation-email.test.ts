@@ -49,7 +49,6 @@ describe("resolveEscalationTarget", () => {
   it("names the chosen vendor and returns the chosen contacts' emails", () => {
     const result = resolveEscalationTarget(
       {
-        audience: "VENDOR",
         vendorId: "siemensID_1",
         contactIds: ["vendorContact_1", "vendorContact_2", "vendorContact_3"],
       },
@@ -67,7 +66,6 @@ describe("resolveEscalationTarget", () => {
   it("leaves toEmails empty when the model picks no contact, but keeps the options", () => {
     const result = resolveEscalationTarget(
       {
-        audience: "VENDOR",
         vendorId: "siemensID_1",
         contactIds: [],
       },
@@ -82,7 +80,6 @@ describe("resolveEscalationTarget", () => {
   it("uses the manufacturer name and no contacts for a MANUFACTURER audience", () => {
     const result = resolveEscalationTarget(
       {
-        audience: "MANUFACTURER",
         vendorId: null,
         contactIds: [],
       },
@@ -99,7 +96,6 @@ describe("resolveEscalationTarget", () => {
   it("falls back to MANUFACTURER when no vendors were offered", () => {
     const result = resolveEscalationTarget(
       {
-        audience: "VENDOR",
         vendorId: "vendor_unknown",
         contactIds: ["mockContact_1"],
       },
@@ -114,7 +110,6 @@ describe("resolveEscalationTarget", () => {
   it("drops correct ids that belong to a different vendor", () => {
     const result = resolveEscalationTarget(
       {
-        audience: "VENDOR",
         vendorId: "siemensID_1",
         contactIds: ["mockContact_5"],
       },

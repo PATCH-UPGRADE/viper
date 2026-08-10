@@ -13,7 +13,6 @@ import {
   VersionStatus,
 } from "@/generated/prisma";
 import prisma from "../src/lib/db";
-import { AsteriskSquare } from "lucide-react";
 
 const SEED_USER = {
   email: "user@example.com",

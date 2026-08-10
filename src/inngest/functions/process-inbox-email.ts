@@ -321,8 +321,6 @@ export const processInboxEmail = inngest.createFunction(
           where: { workOrderTicketId, confidence: "Matched" },
           select: { deviceGroupMatchingId: true },
         });
-        if (matched.length === 0) return;
-
         const automation = await getAutomationUser();
         await prisma.$transaction((tx) =>
           attachMatchingAssets(tx, {

@@ -13,6 +13,7 @@ import {
   VersionStatus,
 } from "@/generated/prisma";
 import prisma from "../src/lib/db";
+import { AsteriskSquare } from "lucide-react";
 
 const SEED_USER = {
   email: "user@example.com",
@@ -80,6 +81,19 @@ const SYNGO_PLAZA_ASSETS = [
     role: "PACS Workstation",
     networkSegment: "RADIOLOGY-PACS",
   },
+];
+
+// Mock differnt use cases
+const QUESTION_CASES = [
+  {
+    product: "syngo.via",
+    expect: "VENDOR GE Healthcare - dropdown, 2 contacts",
+  },
+  {
+    product: "MAGNETOM FAMILY",
+    expect: "VENDOR Philips - dropdown, 1 contact",
+  },
+  { product: "Symbia Intevo", expect: "MANUFACTURER - no contacts, input" },
 ];
 
 async function seedSyngoPlazaVexScenario(userId: string) {
@@ -765,132 +779,31 @@ The application deserialises untrusted data without sufficient validations that 
   console.log(`  ✅ Created: ${title}`);
 }
 
-async function seedUnsureQuestion() {
-  await prisma.question.deleteMany({ where: { status : "UNSURE"}})
-  const mapping = await prisma.notificationDeviceGroupMapping.findFirst({
-    where: { notificationId: { not: null } },
-    orderBy: { notification: { createdAt: "asc" } },
-    select: {
-      notificationId: true,
-      deviceGroupMatching: {
-        select: {
-          id: true,
-          manufacturer: { select: { canonicalDisplayName: true } },
-          product: { select: { canonicalDisplayName: true } },
+async function coverProducts(
+  vendorId: string,
+  title: string,
+  products: string[],
+) {
+  const assets = await prisma.asset.findMany({
+    where: {
+      deviceGroup: {
+        product: {
+          canonicalDisplayName: {
+            in: products.map((product) => product.trim().toLowerCase()),
+          },
         },
       },
     },
-  });
-
-  if (!mapping?.notificationId) {
-    console.log("No notification mapping found");
-    return;
-  }
-
-  const issue = await prisma.issue.findFirst({
-    where: { deviceGroupMatchingId: mapping?.deviceGroupMatching.id },
-    select: { id: true },
-  });
-
-  if (!issue) {
-    console.log("No issue on that matching");
-    return;
-  }
-
-  await prisma.question.deleteMany({
-    where: { status: "UNSURE" },
-  });
-
-  const { manufacturer, product } = mapping.deviceGroupMatching;
-  const productLabel =
-    product?.canonicalDisplayName ??
-    `${manufacturer.canonicalDisplayName} devices`;
-
-  // const seen = new Set<string>();
-  // let created = 0;
-
-  // for (const mapping of mappings) {
-  //   const notificationId = mapping.notificationId;
-  //   if (!notificationId || seen.has(notificationId)) continue;
-
-  //   const issue = await prisma.issue.findFirst({
-  //     where: { deviceGroupMatchingId: mapping.deviceGroupMatchingId },
-  //     select: { id: true },
-  //   });
-  //   if (!issue) continue;
-
-  //   seen.add(notificationId);
-  await prisma.question.create({
-    data: {
-      issueId: issue.id,
-      notificationId: mapping.notificationId,
-      title: `Which ${productLabel} version is running on our units?`,
-      reasonWhy: `The advisory lists affected ${productLabel} versions, but our inventory records the version as unknown, so we cannot confirm exposure.`,
-      status: "UNSURE",
-    },
-  });
-  //   created++;
-  // }
-  console.log(`  ✅ Seeded UNSURE question`);
-}
-
-async function seedVendorCoverage() {
-  console.log("\n🌱 Seeding vendor coverage...");
-
-  const manufacturer = await upsertManufacturer("Siemens Healthineers");
-
-  const vendor = await prisma.vendor.upsert({
-    where: { canonicalName: "siemens healthineers" },
-    update: { manufacturerId: manufacturer.id },
-    create: {
-      canonicalName: "siemens healthineers",
-      canonicalDisplayName: "Siemens Healthineers",
-      overview: "Manages imaging fleet for radiology",
-      partnerSince: new Date("2019-01-01"),
-      manufacturerId: manufacturer.id,
-    },
-  });
-
-  await prisma.contract.deleteMany({ where: { vendorId: vendor.id } });
-  await prisma.vendorContact.deleteMany({ where: { vendorId: vendor.id } });
-
-  await prisma.vendorContact.createMany({
-    data: [
-      {
-        vendorId: vendor.id,
-        name: "John Doe",
-        title: "Hospital Biomed Lead",
-        email: "johndoe@example.com",
-        phone: "123-456-7890",
-        notes: "Usually responds the fastest",
-      },
-      {
-        vendorId: vendor.id,
-        name: "Jane Doe",
-        title: "IT engineer",
-        email: "janedoe@example.com",
-      },
-      {
-        vendorId: vendor.id,
-        name: "James Doe",
-        title: "Admin",
-        phone: "908-765-4321",
-      },
-    ],
-  });
-
-  const assets = await prisma.asset.findMany({
-    where: { deviceGroup: { manufacturerId: manufacturer.id } },
     select: { id: true },
   });
 
   const contract = await prisma.contract.create({
     data: {
-      vendorId: vendor.id,
-      title: "Fleet Imaging Service Agreement",
-      effectiveFrom: new Date("2025-01-01"),
-      effectiveTo: new Date("2027-01-01"),
-      coverageSummary: `Managed security and maintenance across imaging ${assets.length} assets`,
+      vendorId,
+      title,
+      effectiveFrom: new Date("2023-01-01"),
+      effectiveTo: new Date("2028-01-01"),
+      coverageSummary: `${products.join(", ")} (${assets.length} assets)`,
     },
   });
 
@@ -902,9 +815,209 @@ async function seedVendorCoverage() {
     skipDuplicates: true,
   });
 
-  console.log(
-    `  ✅ Vendor: ${vendor.canonicalDisplayName}: 3 contacts (2 with emails), contract covering ${assets.length} assets`,
+  console.log(` ✅  ${title}:${assets.length} assets`);
+}
+
+async function reportEscalationCoverage() {
+  for (const { product } of QUESTION_CASES) {
+    const canonicalName = product.trim().toLowerCase();
+    const matching = await prisma.deviceGroupMatching.findFirst({
+      where: { product: { canonicalName } },
+      select: { manufacturerId: true, productId: true },
+    });
+    if (!matching) {
+      console.log(`${product}: no DeviceGroupMatching`);
+      continue;
+    }
+
+    const assetWhere = {
+      deviceGroup: {
+        manufactureId: matching.manufacturerId,
+        ...(matching.productId ? { productId: matching.productId } : {}),
+      },
+    };
+
+    const assets = await prisma.asset.count({ where: assetWhere });
+    const covered = await prisma.contractAsset.count({
+      where: { asset: assetWhere },
+    });
+    const vendors = await prisma.vendor.findMany({
+      where: {
+        contracts: { some: { covers: { some: { asset: assetWhere } } } },
+      },
+      select: {
+        canonicalDisplayName: true,
+        contacts: { where: { email: { not: null } }, select: { id: true } },
+      },
+    });
+
+    const summary =
+      vendors
+        .map(
+          (vendor) =>
+            `${vendor.canonicalDisplayName} ${vendor.contacts.length} emailable`,
+        )
+        .join(", ") || "NO VENDOR, MANUFACTURER";
+    console.log(`${product}: ${assets} assets, ${covered} cover to ${summary}`);
+  }
+}
+
+async function seedQuestion() {
+  await prisma.question.deleteMany({
+    where: { status: { in: ["PENDING", "UNSURE"] } },
+  });
+
+  for (const { product, expect } of QUESTION_CASES) {
+    const canonicalName = product.trim().toLowerCase();
+
+    const mapping = await prisma.notificationDeviceGroupMapping.findFirst({
+      where: {
+        notificationId: { not: null },
+        deviceGroupMatching: { product: { canonicalName } },
+      },
+
+      select: {
+        notificationId: true,
+        deviceGroupMatchingId: true,
+        notification: { select: { title: true } },
+      },
+    });
+
+    if (!mapping?.notificationId) {
+      console.log(`No notification mapping found for ${product}`);
+      continue;
+    }
+
+    const issue = await prisma.issue.findFirst({
+      where: { deviceGroupMatchingId: mapping?.deviceGroupMatchingId },
+      select: { id: true },
+    });
+
+    if (!issue) {
+      console.log(`No issue on the ${product} matching`);
+      continue;
+    }
+
+    await prisma.question.create({
+      data: {
+        issueId: issue.id,
+        notificationId: mapping.notificationId,
+        title: `Which ${product} version is running on our units?`,
+        reasonWhy: `The advisory lists affected ${product} versions, but our inventory records the version as unknown, so we cannot confirm exposure.`,
+        suggestedAnswers: [
+          "Yes, we should look into it",
+          "No, isolated",
+          "Partially, needs checking",
+        ],
+      },
+    });
+
+    await prisma.question.create({
+      data: {
+        issueId: issue.id,
+        notificationId: mapping.notificationId,
+        title: `Are the ${product} units reachable from the clinical VLAN?`,
+        reasonWhy: `Exposure depends on segmentation, which the advisory cannot tell us.`,
+        status: "UNSURE",
+      },
+    });
+
+    console.log(`  ✅ Seeded ${product} -> expect ${expect}`);
+  }
+
+  console.log(`  ✅ Seeded UNSURE question`);
+}
+
+async function seedVendorCoverage() {
+  console.log("\n🌱 Seeding vendor coverage...");
+
+  const sieManu = await upsertManufacturer("Siemens Healthineers");
+  const geManu = await upsertManufacturer("GE Healthcare");
+  const phillipsManu = await upsertManufacturer("Philips");
+
+  const shVendor = await prisma.vendor.upsert({
+    where: { canonicalName: "siemens healthineers" },
+    update: { manufacturerId: sieManu.id },
+    create: {
+      canonicalName: "siemens healthineers",
+      canonicalDisplayName: "Siemens Healthineers",
+      overview: "Manages imaging fleet for radiology",
+      partnerSince: new Date("2019-01-01"),
+      manufacturerId: sieManu.id,
+    },
+  });
+  const geVendor = await prisma.vendor.upsert({
+    where: { canonicalName: "ge healthcare" },
+    update: { manufacturerId: geManu.id },
+    create: {
+      canonicalName: "ge healthcare",
+      canonicalDisplayName: "GE Healthcare",
+      overview: "Multivendor managed service across the imaging fleet",
+      partnerSince: new Date("2019-02-01"),
+      manufacturerId: geManu.id,
+    },
+  });
+
+  const phillipVendor = await prisma.vendor.upsert({
+    where: { canonicalName: "philips" },
+    update: { manufacturerId: phillipsManu.id },
+    create: {
+      canonicalName: "philips",
+      canonicalDisplayName: "Philips",
+      overview: "Mantains the MRI fleet under a single-engineer contract.",
+      partnerSince: new Date("2019-03-01"),
+      manufacturerId: phillipsManu.id,
+    },
+  });
+
+  const vendorIds = [shVendor.id, geVendor.id, phillipVendor.id];
+  await prisma.contract.deleteMany({ where: { vendorId: { in: vendorIds } } });
+  await prisma.vendorContact.deleteMany({
+    where: { vendorId: { in: vendorIds } },
+  });
+
+  await prisma.vendorContact.createMany({
+    data: [
+      {
+        vendorId: shVendor.id,
+        name: "John Doe",
+        title: "Hospital Biomed Lead",
+        email: "johndoe@example.com",
+        phone: "123-456-7890",
+        notes: "Usually responds the fastest",
+      },
+      {
+        vendorId: shVendor.id,
+        name: "Jane Doe",
+        title: "IT engineer",
+        email: "janedoe@example.com",
+      },
+      {
+        vendorId: geVendor.id,
+        name: "Gordon Doe",
+        title: "Field service engineer",
+        email: "janedoe@example.com",
+      },
+      {
+        vendorId: phillipVendor.id,
+        name: "Phillips Doe",
+        title: "Admin",
+        phone: "908-765-4321",
+      },
+    ],
+  });
+
+  await coverProducts(shVendor.id, "Manages imaging fleet for radiology", [
+    "syngo.via",
+  ]);
+  await coverProducts(
+    geVendor.id,
+    "Multivendor managed service across the imaging fleet",
+    ["syngo.via"],
   );
+  await coverProducts(phillipVendor.id, "MRI Fleet Managed Service Agreement", [
+    "MAGENTOM FAMILY",
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -924,7 +1037,7 @@ async function main() {
   await seedSyngoPlazaVexScenario(user.id);
   await seedDeserializationScenario(user.id);
   await seedVendorCoverage();
-  await seedUnsureQuestion();
+  await seedQuestion();
 
   console.log("\n✨ Done.");
   await prisma.$disconnect();

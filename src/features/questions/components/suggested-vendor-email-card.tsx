@@ -105,12 +105,14 @@ export const SuggestedEmailCard = ({
                 {isEditing ? (
                   email.contacts.length > 0 ? (
                     <ContactMultiSelect
+                      aria-labelledby={toLabelId}
                       options={email.contacts}
                       selected={toEmails}
                       onChange={setToEmails}
                     />
                   ) : (
                     <Input
+                      aria-labelledby={toLabelId}
                       value={toEmails.join(", ")}
                       onChange={(e) => handleRecipientsChange(e.target.value)}
                       placeholder="product@vendor.com"

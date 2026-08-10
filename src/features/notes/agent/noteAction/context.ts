@@ -47,8 +47,9 @@ function renderNoteActionPrompt(args: {
   const sections: string[] = [];
 
   if (persistent.length > 0) {
-    sections.push(`## Standing hospital wide facts\n\n `) +
-      persistent.map((perstn) => `- ${perstn}`).join("\n");
+    sections.push(
+      `## Standing hospital-wide facts\n\n${persistent.map((fact) => `- ${fact}`).join("\n")}`,
+    );
   }
 
   sections.push(

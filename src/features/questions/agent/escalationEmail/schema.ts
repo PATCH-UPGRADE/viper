@@ -7,17 +7,26 @@ export function buildEscalationEmailSchema(
   vendorIds: string[],
   contactIds: string[],
 ) {
+  const vendorId =
+    vendorIds.length > 0
+      ? z.enum(vendorIds as [string, ...string[]]).nullable()
+      : z.null();
+  const contactId =
+    contactIds.length > 0
+      ? z.enum(vendorIds as [string, ...string[]])
+      : z.string();
+
   return z.object({
     audience: z
       .enum(["VENDOR", "MANUFACTURER"])
       .describe(
         "MANUFACTURER when only the company that built the device can answer; VENDOR when the company contracted to service our units can answer. Must be MANUFACTURER if no vendors are listed.",
       ),
-    vendorId: idFrom(vendorIds)
-      .nullable()
-      .describe("Id of the chosen vendor. Null when audience is MANUFACTURER."),
+    vendorId: vendorId.describe(
+      "Id of the chosen vendor. Null when audience is MANUFACTURER.",
+    ),
     contactIds: z
-      .array(idFrom(contactIds))
+      .array(contactId)
       .describe(
         "Contact ids from the chosen vendor. Empty array when no listed contact is clearly fits, or when audience is MANUFACTURER - the user types an address in.",
       ),

@@ -2,13 +2,12 @@ import type { EscalationDraft } from "./schema";
 import type { EscalationTarget, EscalationVendorCandidate } from "./types";
 
 export function resolveEscalationTarget(
-  draft: Pick<EscalationDraft, "audience" | "vendorId" | "contactIds">,
+  draft: Pick<EscalationDraft, "vendorId" | "contactIds">,
   context: { manufacturerName: string; vendors: EscalationVendorCandidate[] },
 ): EscalationTarget {
-  const vendor =
-    draft.audience === "VENDOR" && draft.vendorId
-      ? context.vendors.find((vendor) => vendor.id === draft.vendorId)
-      : undefined;
+  const vendor = draft.vendorId
+    ? context.vendors.find((vendor) => vendor.id === draft.vendorId)
+    : undefined;
 
   if (!vendor) {
     return {

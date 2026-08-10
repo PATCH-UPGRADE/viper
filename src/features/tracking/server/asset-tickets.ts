@@ -78,11 +78,11 @@ export async function cascadeDoneStatus(
   ticketId: string,
   actorId: string,
 ): Promise<void> {
-  const link = await tx.assetTicket.findUnique({
-    where: { ticketId },
+  const ticket = await tx.workOrderTicket.findUnique({
+    where: { id: ticketId },
     select: {
-      parentTicketId: true,
-      parentTicket: {
+      parentId: true,
+      parent: {
         select: {
           status: true,
           children: { select: { status: true } },
@@ -90,30 +90,31 @@ export async function cascadeDoneStatus(
       },
     },
   });
-  if (!link || link.parentTicket.status === TicketStatus.DONE) return;
+  if (!ticket?.parentId || !ticket.parent) return;
+  if (ticket.parent.status === TicketStatus.DONE) return;
 
-  const allDone = link.parentTicket.children.every(
+  const allDone = ticket.parent.children.every(
     (c) => c.status === TicketStatus.DONE,
   );
   if (!allDone) return;
 
   const { count } = await tx.workOrderTicket.updateMany({
-    where: { id: link.parentTicketId, status: { not: TicketStatus.DONE } },
+    where: { id: ticket.parentId, status: { not: TicketStatus.DONE } },
     data: { status: TicketStatus.DONE },
   });
   if (count === 0) return;
   await tx.ticketActivity.create({
     data: {
-      ticketId: link.parentTicketId,
+      ticketId: ticket.parentId,
       userId: actorId,
       type: "STATUS_CHANGED",
       data: {
-        from: link.parentTicket.status,
+        from: ticket.parent.status,
         to: TicketStatus.DONE,
-        cause: "all-asset-tickets-done",
+        cause: "all-child-tickets-done",
       },
     },
   });
 
-  await cascadeDoneStatus(tx, link.parentTicketId, actorId);
+  await cascadeDoneStatus(tx, ticket.parentId, actorId);
 }

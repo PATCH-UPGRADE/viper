@@ -442,10 +442,26 @@ describe("trackingRouter.update", () => {
 });
 
 describe("trackingRouter.update — Done cascade", () => {
-  beforeEach(() => {
-    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
-      makeUpdateBefore({ status: "TO_DO" }),
+  const mockCascadeParents = (
+    parents: Record<
+      string,
+      {
+        parentId: string;
+        parent: { status: string; children: { status: string }[] };
+      }
+    > = {},
+    status = "TO_DO",
+  ) => {
+    mockPrisma.workOrderTicket.findUnique.mockImplementation(
+      async ({ where, select }) =>
+        select?.parent
+          ? (parents[where.id] ?? null)
+          : makeUpdateBefore({ status }),
     );
+  };
+
+  beforeEach(() => {
+    mockCascadeParents();
     mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
       ...makeTicketDetail(),
       status: "IN_PROGRESS",
@@ -457,12 +473,14 @@ describe("trackingRouter.update — Done cascade", () => {
     await caller.update({ id, status: status as never });
   }
 
-  it("leaves the parent alone when a sibling asset-ticket is still not Done", async () => {
-    mockPrisma.assetTicket.findUnique.mockResolvedValue({
-      parentTicketId: "parent-1",
-      parentTicket: {
-        status: "IN_PROGRESS",
-        children: [{ status: "DONE" }, { status: "TO_DO" }],
+  it("leaves the parent alone when a sibling is still not Done", async () => {
+    mockCascadeParents({
+      "child-1": {
+        parentId: "parent-1",
+        parent: {
+          status: "IN_PROGRESS",
+          children: [{ status: "DONE" }, { status: "TO_DO" }],
+        },
       },
     });
 
@@ -492,28 +510,23 @@ describe("trackingRouter.update — Done cascade", () => {
   });
 
   it("retries the parent cascade when the child is already Done", async () => {
-    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
-      makeUpdateBefore({ status: "DONE" }),
-    );
+    mockCascadeParents({}, "DONE");
 
     await updateStatus("child-1", "DONE");
 
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(2);
   });
 
-  it("flips the parent to Done once every sibling asset-ticket is Done", async () => {
-    mockPrisma.assetTicket.findUnique.mockImplementation(
-      async ({ where }: { where: { ticketId: string } }) =>
-        where.ticketId === "child-1"
-          ? {
-              parentTicketId: "parent-1",
-              parentTicket: {
-                status: "IN_PROGRESS",
-                children: [{ status: "DONE" }, { status: "DONE" }],
-              },
-            }
-          : null,
-    );
+  it("flips the parent to Done when an ordinary child completes last", async () => {
+    mockCascadeParents({
+      "child-1": {
+        parentId: "parent-1",
+        parent: {
+          status: "IN_PROGRESS",
+          children: [{ status: "DONE" }, { status: "DONE" }],
+        },
+      },
+    });
 
     await updateStatus("child-1", "DONE");
 
@@ -525,35 +538,28 @@ describe("trackingRouter.update — Done cascade", () => {
       data: expect.objectContaining({
         ticketId: "parent-1",
         type: "STATUS_CHANGED",
-        data: expect.objectContaining({ cause: "all-asset-tickets-done" }),
+        data: expect.objectContaining({ cause: "all-child-tickets-done" }),
       }),
     });
   });
 
-  it("cascades two levels — a completed parent flips its own asset-ticket parent too", async () => {
-    mockPrisma.assetTicket.findUnique.mockImplementation(
-      async ({ where }: { where: { ticketId: string } }) => {
-        if (where.ticketId === "child-1") {
-          return {
-            parentTicketId: "parent-1",
-            parentTicket: {
-              status: "IN_PROGRESS",
-              children: [{ status: "DONE" }],
-            },
-          };
-        }
-        if (where.ticketId === "parent-1") {
-          return {
-            parentTicketId: "grandparent-1",
-            parentTicket: {
-              status: "IN_PROGRESS",
-              children: [{ status: "DONE" }],
-            },
-          };
-        }
-        return null;
+  it("cascades completion through two levels", async () => {
+    mockCascadeParents({
+      "child-1": {
+        parentId: "parent-1",
+        parent: {
+          status: "IN_PROGRESS",
+          children: [{ status: "DONE" }],
+        },
       },
-    );
+      "parent-1": {
+        parentId: "grandparent-1",
+        parent: {
+          status: "IN_PROGRESS",
+          children: [{ status: "DONE" }],
+        },
+      },
+    });
 
     await updateStatus("child-1", "DONE");
 
@@ -568,11 +574,13 @@ describe("trackingRouter.update — Done cascade", () => {
   });
 
   it("does not update or re-log a parent that's already Done", async () => {
-    mockPrisma.assetTicket.findUnique.mockResolvedValue({
-      parentTicketId: "parent-1",
-      parentTicket: {
-        status: "DONE",
-        children: [{ status: "DONE" }],
+    mockCascadeParents({
+      "child-1": {
+        parentId: "parent-1",
+        parent: {
+          status: "DONE",
+          children: [{ status: "DONE" }],
+        },
       },
     });
 

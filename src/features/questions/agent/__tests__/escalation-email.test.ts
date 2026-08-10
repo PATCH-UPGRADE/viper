@@ -36,9 +36,14 @@ const mockVendor_1: EscalationVendorCandidate = {
 };
 
 const context = {
-  manufacturerName: "Siemens Healthineers",
+  manufacturerName: "Siemens healthineers Service",
   vendors: [siemens, mockVendor_1],
 };
+
+const noVendorContext = {
+  manufacturerName: "Siemens healthineers Service",
+  vendors: [],
+}
 
 describe("resolveEscalationTarget", () => {
   it("names the chosen vendor and returns the chosen contacts' emails", () => {
@@ -95,17 +100,15 @@ describe("resolveEscalationTarget", () => {
     const result = resolveEscalationTarget(
       {
         audience: "VENDOR",
-        vendorId: "siemensID_1",
+        vendorId: "vendor_unknown",
         contactIds: ["mockContact_1"],
       },
-      {
-        manufacturerName: "Siemens healthineers Service",
-        vendors: [],
-      },
+    noVendorContext
     );
 
     expect(result.audience).toBe("MANUFACTURER");
     expect(result.companyName).toBe("Siemens healthineers Service");
+    expect(result.toEmails).toEqual([]);
   });
 
   it("drops correct ids that belong to a different vendor", () => {
@@ -119,6 +122,6 @@ describe("resolveEscalationTarget", () => {
     );
 
     expect(result.companyName).toBe("Siemens healthineers Service");
-    expect(result.toEmails).toEqual([mockContact_1.email]);
+    expect(result.toEmails).toEqual([]);
   });
 });

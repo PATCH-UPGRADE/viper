@@ -515,7 +515,7 @@ export const trackingRouter = createTRPCRouter({
     .output(workOrderDetailResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { id, departmentIds, descriptions, ...rest } = input;
-      let shouldCascadeDone = false;
+      const shouldCascadeDone = rest.status === TicketStatus.DONE;
       const updated = await prisma.$transaction(async (tx) => {
         const before = await snapshotBeforeUpdate(tx, id);
         if (!before) {
@@ -608,7 +608,6 @@ export const trackingRouter = createTRPCRouter({
               ? descriptionsForActivity
               : undefined,
         });
-        shouldCascadeDone = rest.status === TicketStatus.DONE;
         // Auto-watch: whoever a ticket is (re)assigned to starts watching it.
         if (
           rest.assigneeId !== undefined &&

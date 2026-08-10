@@ -486,8 +486,10 @@ describe("trackingRouter.update — Done cascade", () => {
 
     await updateStatus("child-1", "DONE");
 
-    expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "parent-1" } }),
+    expect(mockPrisma.workOrderTicket.updateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "parent-1", status: { not: "DONE" } },
+      }),
     );
   });
 
@@ -586,8 +588,10 @@ describe("trackingRouter.update — Done cascade", () => {
 
     await updateStatus("child-1", "DONE");
 
-    expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "parent-1" } }),
+    expect(mockPrisma.workOrderTicket.updateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "parent-1", status: { not: "DONE" } },
+      }),
     );
     expect(mockPrisma.ticketActivity.create).not.toHaveBeenCalledWith(
       expect.objectContaining({

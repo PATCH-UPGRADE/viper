@@ -1,6 +1,7 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { attachMatchingAssets } from "@/features/tracking/server/asset-tickets";
 import { Priority, TicketCategory } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
@@ -67,7 +68,7 @@ export const mitigationRouter = createTRPCRouter({
           .default([]),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const plan = await prisma.mitigationPlan.findUnique({
         where: { id: input.planId },
         select: { id: true, notificationId: true },
@@ -128,10 +129,27 @@ export const mitigationRouter = createTRPCRouter({
           },
           data: { isDraft: true },
         });
-        await tx.workOrderTicket.updateMany({
+        const promoted = await tx.workOrderTicket.findMany({
           where: { mitigationPlanId: plan.id },
+          select: {
+            id: true,
+            deviceGroups: { select: { deviceGroupMatchingId: true } },
+          },
+        });
+        await tx.workOrderTicket.updateMany({
+          where: { id: { in: promoted.map((t) => t.id) } },
           data: { isDraft: false },
         });
+        for (const ticket of promoted) {
+          await attachMatchingAssets(tx, {
+            parentTicketId: ticket.id,
+            matchingIds: ticket.deviceGroups.map(
+              (group) => group.deviceGroupMatchingId,
+            ),
+            actorId: ctx.auth.user.id,
+          });
+        }
+
         return tx.mitigationPlan.findUniqueOrThrow({
           where: { id: plan.id },
           include: mitigationPlanInclude,

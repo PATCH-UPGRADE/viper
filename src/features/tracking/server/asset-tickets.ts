@@ -1,6 +1,10 @@
 import "server-only";
 import { TicketStatus } from "@/generated/prisma";
 import type { TransactionClient } from "@/lib/db";
+import {
+  deviceGroupWhereForMatching,
+  matchingAppliesToDeviceGroup,
+} from "@/lib/device-matching";
 import { recordAssetActivity } from "./activities";
 
 export async function createAssetTicket(
@@ -71,6 +75,53 @@ export async function createAssetTicket(
   );
 
   return child.id;
+}
+
+export async function attachMatchingAssets(
+  tx: TransactionClient,
+  params: {
+    parentTicketId: string;
+    matchingIds: string[];
+    actorId: string;
+  },
+): Promise<void> {
+  const { parentTicketId, matchingIds, actorId } = params;
+  if (matchingIds.length === 0) return;
+
+  const matchings = await tx.deviceGroupMatching.findMany({
+    where: { id: { in: matchingIds } },
+    select: {
+      manufacturerId: true,
+      productId: true,
+      versionId: true,
+      versionRange: true,
+    },
+  });
+  const candidates = await tx.asset.findMany({
+    where: {
+      deviceGroup: { OR: matchings.map(deviceGroupWhereForMatching) },
+    },
+    select: {
+      id: true,
+      deviceGroup: {
+        select: {
+          id: true,
+          manufacturerId: true,
+          productId: true,
+          versionId: true,
+          version: { select: { canonicalName: true } },
+        },
+      },
+    },
+  });
+  for (const asset of candidates) {
+    const matches = matchings.some((matching) =>
+      matchingAppliesToDeviceGroup(matching, asset.deviceGroup),
+    );
+    if (!matches) continue;
+
+    await createAssetTicket(tx, { parentTicketId, assetId: asset.id, actorId });
+  }
 }
 
 export async function cascadeDoneStatus(

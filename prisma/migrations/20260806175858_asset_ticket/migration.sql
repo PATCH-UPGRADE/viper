@@ -1,6 +1,3 @@
--- No backfill: deployment must delete and recreate existing work-order tickets.
-DELETE FROM "work_order_ticket";
-
 -- DropForeignKey
 ALTER TABLE "_WorkOrderTicketAssets" DROP CONSTRAINT "_WorkOrderTicketAssets_A_fkey";
 

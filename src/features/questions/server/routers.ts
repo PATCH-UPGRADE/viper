@@ -148,7 +148,6 @@ export const questionsRouter = createTRPCRouter({
 
             return {
               questionId: question.id,
-              audience: target.audience,
               companyName: target.companyName,
               productName: context.productName,
               reasonWhy: draft.reasonWhy,

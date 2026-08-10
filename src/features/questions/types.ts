@@ -2,7 +2,6 @@ import type { Prisma } from "@/generated/prisma";
 
 export type SuggestedVendorEmail = {
   questionId: string;
-  audience: "VENDOR" | "MANUFACTURER";
   companyName: string;
   productName: string;
   reasonWhy: string;

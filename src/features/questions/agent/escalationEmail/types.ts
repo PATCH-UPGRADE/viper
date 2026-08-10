@@ -12,7 +12,6 @@ export type EscalationContext = {
 };
 
 export type EscalationTarget = {
-  audience: "VENDOR" | "MANUFACTURER";
   companyName: string;
   contacts: { email: string; name?: string }[];
   toEmails: string[];

@@ -11,7 +11,6 @@ export function resolveEscalationTarget(
 
   if (!vendor) {
     return {
-      audience: "MANUFACTURER",
       companyName: context.manufacturerName,
       contacts: [],
       toEmails: [],
@@ -20,7 +19,6 @@ export function resolveEscalationTarget(
 
   const chosenContact = new Set(draft.contactIds);
   return {
-    audience: "VENDOR",
     companyName: vendor.displayName,
     contacts: vendor.contacts.map((contact) => ({
       email: contact.email,

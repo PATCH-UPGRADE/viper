@@ -54,7 +54,6 @@ describe("resolveEscalationTarget", () => {
       },
       context,
     );
-    expect(result.audience).toBe("VENDOR");
     expect(result.companyName).toBe("Siemens healthineers Service");
     expect(result.toEmails).toEqual([
       mockContact_1.email,
@@ -72,7 +71,6 @@ describe("resolveEscalationTarget", () => {
       context,
     );
 
-    expect(result.audience).toBe("VENDOR");
     expect(result.toEmails).toEqual([]);
     expect(result.contacts).toHaveLength(3); // the dropdown case
   });
@@ -102,7 +100,6 @@ describe("resolveEscalationTarget", () => {
       noVendorContext,
     );
 
-    expect(result.audience).toBe("MANUFACTURER");
     expect(result.companyName).toBe("Siemens healthineers Service");
     expect(result.toEmails).toEqual([]);
   });

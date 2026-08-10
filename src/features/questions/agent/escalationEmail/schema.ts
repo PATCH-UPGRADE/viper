@@ -14,18 +14,13 @@ export function buildEscalationEmailSchema(
       : z.string();
 
   return z.object({
-    audience: z
-      .enum(["VENDOR", "MANUFACTURER"])
-      .describe(
-        "MANUFACTURER when only the company that built the device can answer; VENDOR when the company contracted to service our units can answer. Must be MANUFACTURER if no vendors are listed.",
-      ),
     vendorId: vendorId.describe(
-      "Id of the chosen vendor. Null when audience is MANUFACTURER.",
+      "Id of the chosen vendor to email. frp, tje VEMDPR list. Null means email the manufacturer instead, choose that only when no listed vendor could answer the question, or when no vendors are listed.",
     ),
     contactIds: z
       .array(contactId)
       .describe(
-        "Contact ids from the chosen vendor. Empty array when no listed contact is clearly fits, or when audience is MANUFACTURER - the user types an address in.",
+        "Contact ids from the chosen vendor. Empty array when no listed contact is clearly fits, and always when vendorId is null.",
       ),
     reasonWhy: z
       .string()

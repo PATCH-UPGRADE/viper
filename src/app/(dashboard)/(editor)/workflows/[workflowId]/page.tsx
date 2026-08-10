@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
+import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import {
   Editor,
   EditorError,
@@ -24,14 +24,14 @@ const Page = async ({ params }: PageProps) => {
 
   return (
     <HydrateClient>
-      <ErrorBoundary fallback={<EditorError />}>
+      <ReportingErrorBoundary fallback={<EditorError />}>
         <Suspense fallback={<EditorLoading />}>
           <EditorHeader workflowId={workflowId} />
           <main className="flex-1">
             <Editor workflowId={workflowId} />
           </main>
         </Suspense>
-      </ErrorBoundary>
+      </ReportingErrorBoundary>
     </HydrateClient>
   );
 };

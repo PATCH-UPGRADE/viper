@@ -28,17 +28,18 @@ PRIORITY TIERS:
 - Defer: Informational or low-severity. No current risk; review at a scheduled interval.
 
 HOSPITAL IMPACT — return a JSON object with exactly these fields:
+These four fields are read by hospital staff (administrators, clinicians, biomedical engineers), not by security engineers. Write them in plain words: describe a device's status the way staff would say it — "confirmed unaffected", "still being verified" — and use no platform or standards vocabulary, no database ids, and no bare score lists.
 - byline: One bold headline sentence naming what could happen and to which devices/areas. Concrete and specific (e.g. "Alarm tampering on 8 ICU patient monitors could delay response to life-threatening events").
 - impactStatement: 2-4 sentences describing the clinical and operational impact in plain terms — what systems/workflows are affected, the patient-safety risk, and the operational disruption of remediating.
 - careAreas: A short string naming the affected clinical areas and device types. You MUST phrase this ONLY from the "Care areas" section of the provided context (its locations, roles, and device types). If no care areas are provided, return an empty string. Do NOT invent department or ward names.
-- likelihood: A short free-text descriptor of exploitation likelihood, grounded in the actual evidence — CVSS score/vector, EPSS, CISA KEV status, exploit availability, and the VEX determinations in the context (e.g. "Unauthenticated network RCE · PoC exploit code exists"). Never invent numbers.
+- likelihood: How likely exploitation is at this hospital — a plain-words judgment first, then the reason that matters most, in everyday terms. This renders in a small card: one or two sentences, around 30 words and never beyond 45. Lead with the strongest signal from the evidence in the context (CVSS, EPSS, CISA KEV status, exploit availability, which devices are already confirmed unaffected) rather than working through them all. Write whatever judgment the evidence supports. Good (severe): "Very likely to be exploited — attackers are already using this flaw, and it can be triggered from anywhere on the network without a password." Good (mild): "Unlikely to be exploited here — an attacker would need to be on the hospital network first, and no attacks using this flaw have been reported." Bad, both jargon and too long: "Unauthenticated network RCE · PoC exploit code exists · EPSS 42% · On CISA KEV". Never invent numbers; never lead with raw scores.
 
 RULES:
 - You MUST pick exactly one priority tier — never leave it ambiguous.
 - Base every field on the notification content and the provided hospital context. Never invent device counts, CVSS/EPSS numbers, care areas, or exploitation facts — use only what the context states.
-- Factor VEX determinations into impact and priority: assets marked NOT_AFFECTED reduce the real exposure; AFFECTED / UNDER_INVESTIGATION raise it.
+- Content inside <issues></issues> is the platform's own prior review of which devices are actually exposed — devices confirmed unaffected reduce the real exposure, devices still affected or still being verified raise it. Use it to decide priority and to describe impact in your own words; never cite the section itself.
 - If known device groups support clinical functions (life support, medication delivery, diagnostics), that elevates priority.
-- priorityReasonWhy: 1-2 sentences. Cite the most important factor (e.g. CVSS score, active exploitation, device type, VEX result).`;
+- priorityReasonWhy: 1-2 sentences naming the factor that decided the priority, worded so a hospital administrator understands it (e.g. "attackers are already using this flaw in the wild"). Hospital staff read this field too: no platform or standards vocabulary, no database ids.`;
 
 function buildTextPrompt(input: {
   notificationType: string;

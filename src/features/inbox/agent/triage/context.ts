@@ -22,6 +22,7 @@ import {
   vulnerabilityToMarkdown,
   workflowClinicalSummary,
 } from "@/lib/markdown";
+import { buildEntityRefs, type EntityRefs, swapIdsForRefs } from "../refs";
 
 export type LinkableIds = {
   vulnerabilityIds: string[];
@@ -34,6 +35,7 @@ export type TriageContext = {
   markdown: string;
   affectedAssetIds: string[];
   linkableIds: LinkableIds;
+  refs: EntityRefs;
 };
 
 const EMPTY_LINKABLE_IDS: LinkableIds = {
@@ -104,6 +106,7 @@ export async function gatherTriageContext(
       markdown: "",
       affectedAssetIds: [],
       linkableIds: EMPTY_LINKABLE_IDS,
+      refs: buildEntityRefs(EMPTY_LINKABLE_IDS),
     };
   }
 
@@ -259,15 +262,27 @@ export async function gatherTriageContext(
         : null,
   });
 
+  const linkableIds = {
+    vulnerabilityIds: vulnerabilities.map((v) => v.id),
+    remediationIds: remediations.map((r) => r.id),
+    deviceGroupMatchingIds: matchings.map((m) => m.id),
+  };
+  const refs = buildEntityRefs({
+    ...linkableIds,
+    assetIds: affectedAssetIds,
+    // A remediation's target vulnerability may not be linked to the notification;
+    // remediationToMarkdown falls back to its raw id when it has no cveId.
+    swapOnlyVulnerabilityIds: remediations
+      .map((r) => r.vulnerability?.id ?? r.vulnerabilityId)
+      .filter((id): id is string => id != null),
+  });
+
   return {
     notificationId,
-    markdown,
+    markdown: swapIdsForRefs(markdown, refs),
     affectedAssetIds,
-    linkableIds: {
-      vulnerabilityIds: vulnerabilities.map((v) => v.id),
-      remediationIds: remediations.map((r) => r.id),
-      deviceGroupMatchingIds: matchings.map((m) => m.id),
-    },
+    linkableIds,
+    refs,
   };
 }
 
@@ -325,6 +340,29 @@ type RenderArgs = {
   workflowsMarkdown: string | null;
 };
 
+// The issues section shows the model the phrasing we want repeated back to
+// users, never the raw enum tokens (PR #200 review: show it what to say).
+const ISSUE_STATUS_LABEL: Record<string, string> = {
+  AFFECTED: "still affected",
+  UNDER_INVESTIGATION: "still being verified",
+  NOT_AFFECTED: "confirmed unaffected",
+};
+
+const JUSTIFICATION_LABEL: Record<string, string> = {
+  COMPONENT_NOT_PRESENT: "the affected component is not present",
+  VULNERABLE_CODE_NOT_PRESENT: "the vulnerable code is not present",
+  VULNERABLE_CODE_NOT_IN_EXECUTE_PATH: "the vulnerable code is never executed",
+  VULNERABLE_CODE_CANNOT_BE_CONTROLLED_BY_ADVERSARY:
+    "the vulnerable code cannot be reached by an attacker",
+  INLINE_MITIGATIONS_ALREADY_EXIST: "mitigations are already in place",
+  HOSPITAL_COMPENSATING_CONTROL: "a compensating control is in place",
+  HOSPITAL_ACCEPTS_RISK: "the hospital has accepted this risk",
+};
+
+function plainEnum(value: string, labels: Record<string, string>): string {
+  return labels[value] ?? value.toLowerCase().replaceAll("_", " ");
+}
+
 function careAreaLocation(raw: unknown): string {
   if (!raw || typeof raw !== "object") return "";
   const loc = raw as { facility?: string; building?: string; floor?: string };
@@ -357,23 +395,24 @@ function renderTriagePrompt(args: RenderArgs): string {
 
   if (args.vexIssues.length > 0) {
     sections.push(
-      "## VEX determinations (already sorted for this notification)\n\n" +
+      "<issues>\n## Device exposure review (already sorted for this notification)\n\n" +
         args.vexIssues
           .map((i) => {
             const scope = i.assetId
-              ? `asset ${i.assetId}`
+              ? `asset ${args.noteLabels.assetLabel.get(i.assetId) ?? "one specific asset"}`
               : i.deviceGroupMatchingId
-                ? `device group ${args.noteLabels.matchingLabel.get(i.deviceGroupMatchingId) ?? i.deviceGroupMatchingId}`
+                ? `device group ${args.noteLabels.matchingLabel.get(i.deviceGroupMatchingId) ?? "a device group no longer linked here"}`
                 : "unscoped";
             const just = i.notAffectedJustification
-              ? ` (${i.notAffectedJustification})`
+              ? ` (${plainEnum(i.notAffectedJustification, JUSTIFICATION_LABEL)})`
               : "";
             const conf = i.statusConfidence
               ? ` [confidence: ${i.statusConfidence}]`
               : "";
-            return `- ${i.cve} — **${i.status}**${just}${conf} — ${scope}`;
+            return `- ${i.cve} — **${plainEnum(i.status, ISSUE_STATUS_LABEL)}**${just}${conf} — ${scope}`;
           })
-          .join("\n"),
+          .join("\n") +
+        "\n</issues>",
     );
   }
 

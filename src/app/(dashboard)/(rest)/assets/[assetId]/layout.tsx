@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ErrorBoundary } from "react-error-boundary";
+import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import {
   AssetContainer,
   AssetError,
@@ -26,11 +26,11 @@ const Layout = async ({ children, params }: LayoutProps) => {
     <AssetContainer>
       <HydrateClient>
         <div className="flex flex-col gap-4">
-          <ErrorBoundary fallback={<AssetError />}>
+          <ReportingErrorBoundary fallback={<AssetError />}>
             <Suspense fallback={<AssetLoading />}>
               <AssetHeader assetId={assetId} />
             </Suspense>
-          </ErrorBoundary>
+          </ReportingErrorBoundary>
           <AssetTabs assetId={assetId} />
           {children}
         </div>

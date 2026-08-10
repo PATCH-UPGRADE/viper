@@ -19,18 +19,23 @@ import {
 const MODEL = "claude-sonnet-4-6";
 const TOOL_NAME = "record_mitigation_plans";
 
-const SYSTEM_PROMPT = `You are a mitigation-planning agent for a hospital cybersecurity platform. Given a security notification and the resolved hospital context (linked vulnerabilities, remediations, VEX determinations, affected device groups, care areas, and clinical workflows), propose a small set of distinct mitigation plans for the hospital to choose between.
+const SYSTEM_PROMPT = `You are a mitigation-planning agent for a hospital cybersecurity platform. Given a security notification and the resolved hospital context (linked vulnerabilities, remediations, the sorted status of each device group, affected device groups, care areas, and clinical workflows), propose a small set of distinct mitigation plans for the hospital to choose between.
 
 Each plan is a coherent strategy for reducing the risk from this notification, made up of concrete work orders.
+
+AUDIENCE & VOICE — plan titles, summaries, compareLines, cards, and work-order descriptions are shown directly to hospital staff (administrators, clinicians, biomedical engineers), NOT to security engineers:
+- Never put database ids in any prose field. Ids belong ONLY in the structured linking fields (vulnerabilityIds, remediationIds, deviceGroups). In prose, name things the way staff know them: the CVE number, the manufacturer/vendor and product (e.g. "the syngo.plaza VB30 workstations"), the remediation by its title, the location.
+- Describe a device's status the way hospital staff would say it: "confirmed unaffected", "still being verified", "these devices". Never use platform or standards vocabulary in prose.
+- Lead with the action and its consequence for the hospital, in plain words; keep technical detail as brief supporting explanation. A work-order detailedDescription should read like an instruction a colleague could hand to the biomedical engineering team.
 
 RULES:
 - Order the plans best-first: the FIRST plan is the one you recommend. Typically 1-3 plans.
 - Plans must be genuinely different strategies (e.g. contain-now-via-network vs. patch-every-device), not slight variations. Give each a "compareLine" that says how it trades off against the others.
 - Ground EVERY field in the provided notification and hospital context. Never invent device counts, CVSS/EPSS numbers, care areas, downtime figures, or remediations — use only what the context states. If the context is thin, keep the cards qualitative rather than fabricating numbers, or report "Uncertain"
-- Prefer plans that map to the linked remediations and affected device groups. Factor VEX determinations in: assets marked NOT_AFFECTED do not need remediating.
+- Prefer plans that map to the linked remediations and affected device groups. Content inside <issues></issues> is the platform's own prior review of which devices are actually exposed: assets already confirmed unaffected there do not need remediating. Use it to scope the plans; never cite the section itself in work-order text.
 - cards: fill effort, downtime, residual_risk, coverage, and timeline for each plan as short at-a-glance strings. These will be rendered as pills, so keep these short.
 - workOrders: each plan lists the concrete work orders that would be created if it is accepted. shortDescription is action-oriented, a title; detailedDescription is the full instruction.
-- LINKING: every work order names the vulnerabilities, remediations, and device groups IT specifically addresses, using the exact ids shown inline in the hospital context (e.g. "(id: …)" on a vulnerability heading, the id on a remediation heading, "(id: …)" on a device group line). Never invent an id.
+- LINKING: every work order names the vulnerabilities, remediations, and device groups IT specifically addresses, using the exact reference codes shown inline in the hospital context (e.g. "(id: vuln-1)" on a vulnerability heading, "rem-1" on a remediation heading, "(id: group-2)" on a device group line). Never invent a reference. These codes go ONLY in the linking fields — the prose names things by CVE, manufacturer/vendor, product, and location.
 - Link narrowly. A work order that firewalls one device group must NOT list the other groups, and one that applies a single manufacturer/vendor patch must NOT list every remediation. Different work orders in a plan usually target different device groups. Leave a list empty rather than padding it.
 - Each device group line states how many hospital assets it resolves to. A group with 0 assets is a product the hospital does not appear to own — do not attach work orders to it unless the work is explicitly about confirming inventory.
 - For each device group a work order touches, give a one-line reasonWhy and set confidence: Matched only with strong evidence, otherwise NeedsReview.
@@ -73,8 +78,8 @@ export async function createMitigationPlans(
     gatherTriageContext(notificationId, { includeIds: true }),
   ]);
 
-  const { linkableIds } = context;
-  const schema = buildMitigationPlansSchema(linkableIds);
+  const { linkableIds, refs } = context;
+  const schema = buildMitigationPlansSchema(refs);
 
   const recordTool = tool(async () => "ok", {
     name: TOOL_NAME,
@@ -119,8 +124,16 @@ export async function createMitigationPlans(
     );
   }
 
-  return {
-    plans: parsed.data.plans as MitigationPlanItem[],
-    linkableIds,
-  };
+  const toId = (ref: string) => refs.idByRef[ref];
+  const plans = (parsed.data.plans as MitigationPlanItem[]).map((plan) => ({
+    ...plan,
+    workOrders: plan.workOrders.map((w) => ({
+      ...w,
+      vulnerabilityIds: w.vulnerabilityIds.map(toId),
+      remediationIds: w.remediationIds.map(toId),
+      deviceGroups: w.deviceGroups.map((g) => ({ ...g, id: toId(g.id) })),
+    })),
+  }));
+
+  return { plans, linkableIds };
 }

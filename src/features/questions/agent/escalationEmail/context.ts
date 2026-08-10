@@ -116,23 +116,20 @@ then write the email.
 
 DECIDE IN THIS ORDER:
 
-1. audience - who can actually answer?
-- VENDOR: a company under contract to service these units. Choose this whenever the answer depends on what is actually deployed, installed, configured,
-patched, or scheduled on the hospital's own machines, which version is really running, when the fleet can be taken offline, whether a change was already
-applied during past service, who owns the maintenance window.
-- MANUFACTURER: the company that built the device. Choose this only when the answer is a property of the product itself and no one servicing the fleet
+1. vendorId - who can actually answer?
+- Pick a VENDOR id when the answer depends on what is actually deployed, installed, configured, patched, or scheduled on the hospital's own machines,
+which version is really running, when the fleet can be taken offline, whether a change was already applied during past service, who owns the maintenance window.
+- Use null to email the MANUFACTURER - the company that built the device, only when the answer is a property of the product itself and no one servicing the fleet
 could know it - whether a vulnerable component ships in the product at all, whether the flaw is reachable given the product's design, whether a patch or VEX statement exists. 
 - Tie-breaker: if a vendor is listed and the question could plausibly be answered by whoever services the fleet, choose VENDOR.
 - We hold contact address for vendors but not for manufacturers, so MANUFACTURER leaves the user to find an address themselves. Do not choose it by default.
 - A vendor may carry the same company name as the manufacturer. That does not make it the manufacturer - judge by the question, not the name.
 - if no vendor is listed, choose MANUFACTURER. You have no other option.
 
-2. vendorId - the id of the chosen vendor, or null when audience is MANUFACTURER
+2. contactIds - ids from the chosen vendor's list only. Match the role to the question: a field service engineer knows what is installed and when it can be serviced; a biomed or account
+lead handles scheduling and contractual questions. Choosing nobody is valid and often correct - return an empty array when no listed person clearly fits.
 
-3. contactIds - ids from the chosen vendor's list only. Match the role to the question: a field service engineer knows what is installed and when it can be serviced; a biomed or account
-lead handles scheduling and contractual questions. Choosing nobody is valid and often correct - return an empty array when no listed person clearly fits, and always when audience is MANUFACTURER.
-
-4. reasonWhy, subject, body.
+3. reasonWhy, subject, body.
 
 WRITING:
 - reasonWhy is INTERNAL. It appears in the app under "Why send this:" and is never sent. One or two sentences to colleague on what answering this unblocks.

@@ -75,7 +75,7 @@ describe("resolveEscalationTarget", () => {
     expect(result.contacts).toHaveLength(3); // the dropdown case
   });
 
-  it("uses the manufacturer name and no contacts for a MANUFACTURER audience", () => {
+  it("uses the manufacturer name and no contacts for a MANUFACTURER", () => {
     const result = resolveEscalationTarget(
       {
         vendorId: null,
@@ -85,7 +85,6 @@ describe("resolveEscalationTarget", () => {
     );
 
     expect(result).toEqual({
-      audience: "MANUFACTURER",
       companyName: "Siemens healthineers Service",
       contacts: [],
       toEmails: [],

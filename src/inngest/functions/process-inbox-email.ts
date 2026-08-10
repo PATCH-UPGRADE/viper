@@ -18,6 +18,7 @@ import {
   isPdf,
   pdfsFitInlineBudget,
 } from "@/features/inbox/utils";
+import { attachMatchingAssets } from "@/features/tracking/server/asset-tickets";
 import { Prisma } from "@/generated/prisma";
 import { getAutomationUser } from "@/lib/automation-user";
 import prisma from "@/lib/db";
@@ -311,6 +312,26 @@ export const processInboxEmail = inngest.createFunction(
           );
         },
       );
+
+      // Only high-confidence device-group tags spawn real per-asset child
+      // tickets — "NeedsReview" ones stay informational until a human
+      // confirms them (there's no review UI for this yet).
+      await step.run("attach-matched-device-group-assets", async () => {
+        const matched = await prisma.notificationDeviceGroupMapping.findMany({
+          where: { workOrderTicketId, confidence: "Matched" },
+          select: { deviceGroupMatchingId: true },
+        });
+        if (matched.length === 0) return;
+
+        const automation = await getAutomationUser();
+        await prisma.$transaction((tx) =>
+          attachMatchingAssets(tx, {
+            parentTicketId: workOrderTicketId,
+            matchingIds: matched.map((m) => m.deviceGroupMatchingId),
+            actorId: automation.id,
+          }),
+        );
+      });
 
       return { workOrderTicketId, sourceId, emailId, linkSummary };
     }

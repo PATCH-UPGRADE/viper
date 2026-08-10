@@ -108,6 +108,29 @@ describe("overview.recentUpdates", () => {
     );
   });
 
+  it("windows every query to the same point exactly 24 hours back", async () => {
+    const now = new Date("2026-08-10T12:00:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    try {
+      await caller.recentUpdates();
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const since = new Date("2026-08-09T12:00:00.000Z");
+    const windowed = expect.objectContaining({
+      where: expect.objectContaining({ createdAt: { gte: since } }),
+    });
+
+    // All three date-filtered queries must share one cutoff, or the chip
+    // counts would describe different windows.
+    expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(windowed);
+    expect(mockPrisma.ticketActivity.findMany).toHaveBeenCalledWith(windowed);
+    expect(mockPrisma.asset.findMany).toHaveBeenCalledWith(windowed);
+  });
+
   it("ignores a matching the user rejected", async () => {
     mockPrisma.deviceGroup.findMany.mockResolvedValue([OWNED]);
     mockPrisma.notification.findMany.mockResolvedValue([

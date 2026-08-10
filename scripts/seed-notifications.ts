@@ -995,7 +995,7 @@ async function seedVendorCoverage() {
         vendorId: geVendor.id,
         name: "Gordon Doe",
         title: "Field service engineer",
-        email: "janedoe@example.com",
+        email: "gordondoe@example.com",
       },
       {
         vendorId: phillipVendor.id,

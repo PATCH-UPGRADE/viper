@@ -167,7 +167,7 @@ export const RecentUpdatesCard = () => {
       <div className="flex items-start justify-between gap-4 p-5">
         <div className="flex flex-col gap-0.5">
           <h2 className="text-base font-semibold leading-none">
-            Updates in the last day
+            Updates in the Last Day
           </h2>
           <p className="text-sm text-muted-foreground">
             {data.totalCount === 0
@@ -184,7 +184,7 @@ export const RecentUpdatesCard = () => {
       </div>
 
       {visible.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-5 pb-5">
+        <div className="flex flex-col gap-2 px-5 pb-5">
           {visible.map((chip) => {
             const { count } = data[chip.key];
             const isOpen = chip.key === openChip;
@@ -213,7 +213,7 @@ export const RecentUpdatesCard = () => {
                 </span>
                 <ChevronDownIcon
                   className={cn(
-                    "size-4 shrink-0 text-muted-foreground transition-transform",
+                    "ml-auto size-4 shrink-0 text-muted-foreground transition-transform",
                     isOpen && "rotate-180",
                   )}
                   aria-hidden="true"

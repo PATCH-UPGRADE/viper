@@ -1,5 +1,5 @@
 /**
- * Seeds the trailing-24h data behind the Overview "Updates in the last day"
+ * Seeds the trailing-24h data behind the Overview "Updates in the Last Day"
  * card: notifications (advisories / recalls), work-order status changes, and
  * newly added assets.
  *

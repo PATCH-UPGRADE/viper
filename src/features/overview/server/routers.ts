@@ -208,7 +208,7 @@ export const overviewRouter = createTRPCRouter({
 
   /**
    * Everything that changed in the trailing 24 hours, grouped into the chips
-   * on the "Updates in the last day" card.
+   * on the "Updates in the Last Day" card.
    */
   recentUpdates: protectedProcedure.query(async () => {
     const since = new Date(Date.now() - RECENT_UPDATES_WINDOW_MS);

@@ -2084,7 +2084,6 @@ async function createWorkOrderTicket(
   ticket: SampleTicket,
   userId: string,
   parentId: string | null,
-  ticketedAssetIds: Set<string>,
 ) {
   // Normalize single-dept and multi-dept shapes to one ordered list. The
   // first entry is the "primary" department, used as the fallback target
@@ -2200,8 +2199,6 @@ async function createWorkOrderTicket(
   });
 
   for (const asset of linkedAssets) {
-    if (ticketedAssetIds.has(asset.id)) continue;
-    ticketedAssetIds.add(asset.id);
     await createAssetTicket(prisma, {
       parentTicketId: created.id,
       assetId: asset.id,
@@ -2219,16 +2216,10 @@ async function seedWorkOrderTickets(userId: string) {
   let childCount = 0;
 
   for (const parent of SAMPLE_CHANGE_TICKETS) {
-    const ticketedAssetIds = new Set<string>();
-    const created = await createWorkOrderTicket(
-      parent,
-      userId,
-      null,
-      ticketedAssetIds,
-    );
+    const created = await createWorkOrderTicket(parent, userId, null);
     parentCount++;
     for (const child of parent.children ?? []) {
-      await createWorkOrderTicket(child, userId, created.id, ticketedAssetIds);
+      await createWorkOrderTicket(child, userId, created.id);
       childCount++;
     }
   }

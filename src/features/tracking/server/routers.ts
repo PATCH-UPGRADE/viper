@@ -23,7 +23,7 @@ import {
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
-import prisma from "@/lib/db";
+import prisma, { type TransactionClient } from "@/lib/db";
 import {
   buildPaginationMeta,
   createPaginatedResponse,
@@ -84,13 +84,58 @@ function fleetContactFor(user: {
 // on `code` rather than `instanceof`: across Next.js module boundaries the thrown
 // error can be a different copy of PrismaClientKnownRequestError, so `instanceof`
 // is unreliable.
-function isUniqueViolation(error: unknown): boolean {
+function hasPrismaCode(error: unknown, code: string): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
     "code" in error &&
-    (error as { code?: unknown }).code === "P2002"
+    (error as { code?: unknown }).code === code
   );
+}
+
+const isUniqueViolation = (error: unknown): boolean =>
+  hasPrismaCode(error, "P2002");
+
+function mapAssetTicketError(error: unknown): never {
+  if (hasPrismaCode(error, "P2025")) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Ticket or asset not found",
+    });
+  }
+  if (isUniqueViolation(error)) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: "Asset is already linked to this ticket",
+    });
+  }
+  throw error;
+}
+
+async function assertNoTicketCycle(
+  tx: TransactionClient,
+  parentId: string,
+  childId: string,
+): Promise<void> {
+  const visited = new Set([childId]);
+  let ancestorId: string | null = parentId;
+
+  while (ancestorId) {
+    if (visited.has(ancestorId)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Cannot create a ticket hierarchy cycle",
+      });
+    }
+    visited.add(ancestorId);
+
+    const ancestor: { parentId: string | null } | null =
+      await tx.workOrderTicket.findUnique({
+        where: { id: ancestorId },
+        select: { parentId: true },
+      });
+    ancestorId = requireExistence(ancestor, "Parent ticket").parentId;
+  }
 }
 
 const trackingInputSchema = paginationInputSchema.extend({
@@ -470,7 +515,8 @@ export const trackingRouter = createTRPCRouter({
     .output(workOrderDetailResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { id, departmentIds, descriptions, ...rest } = input;
-      return prisma.$transaction(async (tx) => {
+      let shouldCascadeDone = false;
+      const updated = await prisma.$transaction(async (tx) => {
         const before = await snapshotBeforeUpdate(tx, id);
         if (!before) {
           throw new TRPCError({
@@ -562,12 +608,7 @@ export const trackingRouter = createTRPCRouter({
               ? descriptionsForActivity
               : undefined,
         });
-        if (
-          rest.status === TicketStatus.DONE &&
-          rest.status !== before.status
-        ) {
-          await cascadeDoneStatus(tx, id, ctx.auth.user.id);
-        }
+        shouldCascadeDone = rest.status === TicketStatus.DONE;
         // Auto-watch: whoever a ticket is (re)assigned to starts watching it.
         if (
           rest.assigneeId !== undefined &&
@@ -593,6 +634,12 @@ export const trackingRouter = createTRPCRouter({
         });
         return withIsWatching(updated);
       });
+      if (shouldCascadeDone) {
+        await prisma.$transaction((tx) =>
+          cascadeDoneStatus(tx, id, ctx.auth.user.id),
+        );
+      }
+      return updated;
     }),
 
   attachChild: protectedProcedure
@@ -621,6 +668,7 @@ export const trackingRouter = createTRPCRouter({
         });
       }
       return prisma.$transaction(async (tx) => {
+        await assertNoTicketCycle(tx, input.parentId, input.childId);
         const updated = await tx.workOrderTicket.update({
           where: { id: input.childId },
           data: { parentId: input.parentId },
@@ -715,7 +763,7 @@ export const trackingRouter = createTRPCRouter({
     })
     .output(workOrderDetailResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      return prisma.$transaction(async (tx) => {
+      const transaction = prisma.$transaction(async (tx) => {
         await createAssetTicket(tx, {
           parentTicketId: input.ticketId,
           assetId: input.assetId,
@@ -732,6 +780,7 @@ export const trackingRouter = createTRPCRouter({
         });
         return withIsWatching(refetched);
       });
+      return transaction.catch(mapAssetTicketError);
     }),
 
   detachAsset: protectedProcedure
@@ -966,7 +1015,7 @@ export const trackingRouter = createTRPCRouter({
       z.object({
         /** The chat tool call this proposal came from — the idempotency key. */
         toolCallId: z.string(),
-        assetIds: z.array(z.string()).min(1),
+        assetIds: z.array(z.string()).min(1).max(50),
         summary: z.string().min(1),
         description: z.string().default(""),
         category: z.enum(TicketCategory),
@@ -1116,21 +1165,24 @@ export const trackingRouter = createTRPCRouter({
       }
 
       const childIds: string[] = [];
-      await prisma.$transaction(async (tx) => {
-        for (const { asset, result } of filed) {
-          const childTicketId = await createAssetTicket(tx, {
-            parentTicketId: root.id,
-            assetId: asset.assetId,
-            actorId: userId,
-            externalMapping: {
-              integrationId: integration.id,
-              externalId: result.externalId,
-              lastSynced: new Date(),
-            },
-          });
-          childIds.push(childTicketId);
-        }
-      });
+      await prisma.$transaction(
+        async (tx) => {
+          for (const { asset, result } of filed) {
+            const childTicketId = await createAssetTicket(tx, {
+              parentTicketId: root.id,
+              assetId: asset.assetId,
+              actorId: userId,
+              externalMapping: {
+                integrationId: integration.id,
+                externalId: result.externalId,
+                lastSynced: new Date(),
+              },
+            });
+            childIds.push(childTicketId);
+          }
+        },
+        { timeout: 30_000 },
+      );
 
       try {
         await Promise.all(
@@ -1211,6 +1263,8 @@ export const trackingRouter = createTRPCRouter({
             };
           },
           onItemCreated: (id) => recordCreationActivity(id),
+          onItemUpdated: (id) =>
+            prisma.$transaction((tx) => cascadeDoneStatus(tx, id, userId)),
         },
         input,
         userId,

@@ -14,23 +14,8 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     },
     workOrderTicket: {
       findMany: vi.fn(),
-      findUniqueOrThrow: vi.fn(),
-      create: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
-    },
-    deviceGroupMatching: {
-      findMany: vi.fn(),
-    },
-    asset: {
-      findMany: vi.fn(),
-      findUniqueOrThrow: vi.fn(),
-    },
-    assetTicket: {
-      findUnique: vi.fn(),
-    },
-    ticketActivity: {
-      create: vi.fn(),
     },
     // The router uses prisma.$transaction(async (tx) => {...}) — invoke the
     // callback with the same mocked client so call assertions still work.
@@ -107,8 +92,6 @@ beforeEach(() => {
     id: PLAN_ID,
     workOrders: [],
   });
-  mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
-  mockPrisma.assetTicket.findUnique.mockResolvedValue(null);
 });
 
 describe("mitigationRouter.accept", () => {
@@ -122,10 +105,7 @@ describe("mitigationRouter.accept", () => {
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it("marks the plan accepted and promotes its (device-group-free) drafts to real tickets", async () => {
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      { id: "wo-solo", deviceGroups: [] },
-    ]);
+  it("marks the plan accepted and promotes its drafts to real tickets", async () => {
     const caller = setup();
 
     await caller.accept({ planId: PLAN_ID });
@@ -139,6 +119,7 @@ describe("mitigationRouter.accept", () => {
       where: { id: PLAN_ID },
       data: { isAccepted: true },
     });
+    // Losing plans go back to drafts; this plan's become real tickets.
     expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
       where: {
         notificationId: NOTIFICATION_ID,
@@ -147,16 +128,15 @@ describe("mitigationRouter.accept", () => {
       data: { isDraft: true },
     });
     expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ["wo-solo"] } },
+      where: { mitigationPlanId: PLAN_ID },
       data: { isDraft: false },
     });
-    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
   });
 
   it("applies the user's edits before promoting the drafts", async () => {
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      { id: "wo-1", deviceGroups: [] },
-      { id: "wo-2", deviceGroups: [] },
+      { id: "wo-1" },
+      { id: "wo-2" },
     ]);
     const caller = setup();
 
@@ -184,7 +164,7 @@ describe("mitigationRouter.accept", () => {
       }),
     );
     expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ["wo-1", "wo-2"] } },
+      where: { mitigationPlanId: PLAN_ID },
       data: { isDraft: false },
     });
   });
@@ -203,89 +183,6 @@ describe("mitigationRouter.accept", () => {
 
     expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
     expect(mockPrisma.mitigationPlan.update).not.toHaveBeenCalled();
-  });
-
-  it("creates one child per resolved asset across overlapping device-group links", async () => {
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      {
-        id: "wo-dg",
-        deviceGroups: [
-          { deviceGroupMatchingId: "dgm-1" },
-          { deviceGroupMatchingId: "dgm-2" },
-        ],
-      },
-    ]);
-    mockPrisma.deviceGroupMatching.findMany.mockResolvedValue([
-      {
-        manufacturerId: "manufacturer-icu",
-        productId: "product-plum",
-        versionId: null,
-        versionRange: null,
-      },
-      {
-        manufacturerId: "manufacturer-icu",
-        productId: "product-plum",
-        versionId: null,
-        versionRange: null,
-      },
-    ]);
-    mockPrisma.asset.findMany.mockResolvedValue([
-      {
-        id: "asset-1",
-        deviceGroup: {
-          id: "dg-1",
-          manufacturerId: "manufacturer-icu",
-          productId: "product-plum",
-          versionId: null,
-          version: null,
-        },
-      },
-      {
-        id: "asset-2",
-        deviceGroup: {
-          id: "dg-2",
-          manufacturerId: "manufacturer-icu",
-          productId: "product-plum",
-          versionId: null,
-          version: null,
-        },
-      },
-    ]);
-    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
-      summary: "Patch ICU pumps",
-      body: null,
-      category: "PATCH",
-      priority: "Unsorted",
-      creatorId: FAKE_USER_ID,
-      scheduledAt: null,
-      sourceLabel: null,
-    });
-    mockPrisma.asset.findUniqueOrThrow.mockResolvedValue({
-      hostname: "host-icu-1",
-      ip: "10.0.0.1",
-    });
-    mockPrisma.workOrderTicket.create.mockResolvedValue({ id: "child-1" });
-
-    const caller = setup();
-    await caller.accept({ planId: PLAN_ID });
-
-    expect(mockPrisma.deviceGroupMatching.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: { in: ["dgm-1", "dgm-2"] } } }),
-    );
-    expect(
-      mockPrisma.workOrderTicket.create.mock.calls.map(
-        ([{ data }]) => data.ticket.create.assetId,
-      ),
-    ).toEqual(["asset-1", "asset-2"]);
-    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          ticket: expect.objectContaining({
-            create: expect.objectContaining({ parentTicketId: "wo-dg" }),
-          }),
-        }),
-      }),
-    );
   });
 });
 

@@ -25,7 +25,7 @@ export async function draftNoteActions(
   ]);
 }
 
-export type NoteActionRunSummary = NoteActionSummary & { candidates: number };
+export type NoteActionRunSummary = NoteActionSummary & { candidates: Number };
 
 export async function actionNotesForRequest(
   request: NoteActionRequest,

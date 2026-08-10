@@ -2,7 +2,7 @@ import "server-only";
 import { actionNotesForRequest } from "@/features/notes/agent/noteAction";
 import type { NoteActionSource } from "@/features/notes/agent/noteAction/context";
 import { resolveNoteActionRequest } from "@/features/notes/server/note-action-requests";
-import type { ChatNoteInput } from "@/features/notes/types";
+import { ChatNoteInput } from "@/features/notes/types";
 import { inngest } from "../client";
 
 const ACTION_EVENT = "note/action.requested" as const;

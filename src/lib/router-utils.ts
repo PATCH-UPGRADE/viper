@@ -741,6 +741,8 @@ interface SyncConfig<
   // re-sync updates. Used e.g. to kick off deviceArtifact note extraction.
   // Hook failures are logged, not propagated, so they never fail the sync.
   onItemCreated?: (itemId: string) => Promise<void>;
+  // Fired after an existing item update commits.
+  onItemUpdated?: (itemId: string) => Promise<void>;
 }
 
 /**
@@ -838,6 +840,7 @@ export async function processIntegrationSync<
       }
 
       response.updatedItemsCount++;
+      await config.onItemUpdated?.(foundMapping.itemId);
       continue;
     }
 
@@ -925,6 +928,7 @@ export async function processIntegrationSync<
     }
 
     response.updatedItemsCount++;
+    await config.onItemUpdated?.(foundItem.id);
   }
 
   // Create sync status record

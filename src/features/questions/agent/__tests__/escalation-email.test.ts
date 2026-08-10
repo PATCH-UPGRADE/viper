@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveEscalationTarget } from "../escalationEmail/process_output";
-import { type EscalationVendorCandidate } from "../escalationEmail/types";
+import type { EscalationVendorCandidate } from "../escalationEmail/types";
 
 const mockContact_1 = {
   id: "vendorContact_1",
@@ -43,7 +43,7 @@ const context = {
 const noVendorContext = {
   manufacturerName: "Siemens healthineers Service",
   vendors: [],
-}
+};
 
 describe("resolveEscalationTarget", () => {
   it("names the chosen vendor and returns the chosen contacts' emails", () => {
@@ -103,7 +103,7 @@ describe("resolveEscalationTarget", () => {
         vendorId: "vendor_unknown",
         contactIds: ["mockContact_1"],
       },
-    noVendorContext
+      noVendorContext,
     );
 
     expect(result.audience).toBe("MANUFACTURER");

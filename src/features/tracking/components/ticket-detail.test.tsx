@@ -676,8 +676,6 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   hostname: "host-1",
   ip: "10.0.0.5",
   role: "Infusion Pump",
-  status: "Active",
-  macAddress: "00:11:22:33:44:55",
   location: { building: "A", floor: "3", room: "302" },
   deviceGroupId: "dg-1",
   deviceGroup: {
@@ -764,7 +762,10 @@ describe("LinkedAssetsTable", () => {
 
     // Bound to the parent ticket (whose cache backs this table), not the
     // child's own — otherwise the row wouldn't refresh after a successful edit.
-    expect(mockUseUpdateAssetTicketStatus).toHaveBeenCalledWith("t1");
+    expect(mockUseUpdateAssetTicketStatus).toHaveBeenCalledWith(
+      "t1",
+      "asset-1",
+    );
     expect(mockUpdateAssetTicketStatusMutate).toHaveBeenCalledWith({
       id: "child-42",
       status: "DONE",

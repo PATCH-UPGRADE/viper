@@ -7,6 +7,7 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type { TicketStatus } from "@/generated/prisma";
 import { useTRPC } from "@/trpc/client";
 import { useTrackingParams } from "./use-tracking-params";
 
@@ -397,12 +398,18 @@ export const useAttachAsset = (ticketId: string) => {
 };
 
 /** Updates one asset's dedicated child ticket's status from the Linked Assets
- * table, patching the parent ticket's cached `assets` list (the table's own
- * data source) rather than the child ticket's own — unmounted — queries. */
-export const useUpdateAssetTicketStatus = (parentTicketId: string) => {
+ * table. The optimistic patch targets the parent ticket's cached `assets`
+ * list, since that's what's actually mounted and rendering this table; the
+ * child's own detail page and the asset's work-orders page aren't currently
+ * visible, so they're invalidated (not patched) to stay correct next time
+ * they're opened rather than showing stale data from before this edit. */
+export const useUpdateAssetTicketStatus = (
+  parentTicketId: string,
+  assetId: string,
+) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  return useMutation(
+  const mutation = useMutation(
     trpc.tracking.update.mutationOptions({
       onMutate: async ({ id, status }) => {
         const detailFilter = trpc.tracking.getOne.queryFilter({
@@ -436,16 +443,23 @@ export const useUpdateAssetTicketStatus = (parentTicketId: string) => {
         queryClient.invalidateQueries(
           trpc.tracking.getOne.queryFilter({ id: parentTicketId }),
         );
-        // The child ticket has its own detail page (linked from the Asset ID
-        // cell) — invalidate its cache too, not just the parent's.
         queryClient.invalidateQueries(trpc.tracking.getOne.queryFilter({ id }));
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
         queryClient.invalidateQueries(
-          trpc.tracking.getManyByAssetId.queryFilter(),
+          trpc.tracking.getManyByAssetId.queryFilter({ assetId }),
         );
       },
     }),
   );
+  // Narrows the exposed mutate() to exactly what the optimistic patch above
+  // assumes — trpc.tracking.update itself accepts far more optional fields,
+  // and calling this hook with anything but {id, status} would silently
+  // write status: undefined into the cache until the next refetch corrects it.
+  return {
+    ...mutation,
+    mutate: (variables: { id: string; status: TicketStatus }) =>
+      mutation.mutate(variables),
+  };
 };
 
 export const useDetachAsset = (ticketId: string) => {

@@ -25,14 +25,16 @@ import { type DetailAssetTicket, formatLocation, statusLabels } from "./shared";
 
 const AssetTicketStatusSelect = ({
   parentTicketId,
+  assetId,
   ticketId,
   status,
 }: {
   parentTicketId: string;
+  assetId: string;
   ticketId: string;
   status: TicketStatus;
 }) => {
-  const update = useUpdateAssetTicketStatus(parentTicketId);
+  const update = useUpdateAssetTicketStatus(parentTicketId, assetId);
 
   return (
     <Select
@@ -103,6 +105,7 @@ export const LinkedAssetsTable = ({
               <TableCell>
                 <AssetTicketStatusSelect
                   parentTicketId={parentTicketId}
+                  assetId={asset.id}
                   ticketId={ticket.id}
                   status={ticket.status}
                 />

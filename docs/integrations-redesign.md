@@ -116,13 +116,10 @@ model SourceRecord {
   channel SourceChannel // { Email, Integration, TA4 }
 
   // null for email / TA4 sources, since those aren't mirrored rows
-  mappingId        String?
-  mapping          ExternalSourceRecordMapping? @relation(name: "MappingSnapshots", fields: [mappingId], references: [id], onDelete: Cascade)
-  // opposite side of ExternalSourceRecordMapping.latestSourceRecord.
-  // Prisma bookkeeping — declares the second relation, generates no column.
-  latestForMapping ExternalSourceRecordMapping? @relation(name: "LatestSourceRecord")
+  mappingId String?
+  mapping   ExternalSourceRecordMapping? @relation(fields: [mappingId], references: [id], onDelete: Cascade)
 
-  contentHash String // dedup: skip the write if it matches the mapping's latest
+  contentHash String // dedup: skip the write if it matches the mapping's newest
   raw         Json    @default("{}")
   markdown    String? @db.Text
   // channel-scoped id for sources with no mapping (e.g. the Resend email id)
@@ -171,9 +168,10 @@ model ExternalSourceRecordMapping {
   integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   externalId    String // the advisory / notification id on another platform
 
-  sourceRecords        SourceRecord[] @relation(name: "MappingSnapshots")
-  latestSourceRecordId String?        @unique
-  latestSourceRecord   SourceRecord?  @relation(name: "LatestSourceRecord", fields: [latestSourceRecordId], references: [id], onDelete: SetNull)
+  // No latest-snapshot pointer. "Newest" is an ORDER BY observedAt DESC LIMIT 1
+  // over @@index([mappingId, observedAt]) on SourceRecord — same answer, one
+  // source of truth, nothing to keep in sync on write.
+  sourceRecords SourceRecord[]
 
   lastSynced DateTime?
   createdAt  DateTime  @default(now())

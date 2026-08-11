@@ -8,7 +8,7 @@ Companion to [integrations-redesign.md](./integrations-redesign.md). That doc is
 
 In scope, in this order:
 
-1. New/changed Prisma models + migrations
+1. New/changed Prisma models + migrations - First plan should be this!
 2. `src/features/integrations/core/` — the platform interface and shared machinery
 3. `src/features/integrations/platforms/ai/` and `.../partner/` conforming to it
 
@@ -79,7 +79,7 @@ Write the schema, then the migration, then a backfill script. There is live data
 
 ### Prisma gotchas hit while designing this
 
-- **`SourceRecord` ↔ `ExternalSourceRecordMapping` needs two *named* relations.** The snapshot list and the `latestSourceRecordId` pointer are separate relations (`"MappingSnapshots"` / `"LatestSourceRecord"`) or Prisma reads them as one ambiguous pair. `latestForMapping` is a back-reference that generates **no column** — it's required bookkeeping, not a field. Same idiom as `Artifact.latestForWrapper` ↔ `ArtifactWrapper.latestArtifact`, already in the schema.
+- **`SourceRecord` ↔ `ExternalSourceRecordMapping` is a plain 1:many.** There is deliberately **no** latest-snapshot pointer. `ArtifactWrapper.latestArtifact` does it that way and we're not copying it: a denormalized pointer is a second source of truth that goes stale whenever a write path forgets to repoint (and `onDelete: SetNull` orphans it if the newest snapshot is ever pruned). "Newest for this mapping" is `ORDER BY observedAt DESC LIMIT 1` against `@@index([mappingId, observedAt])` — same answer, no maintenance. Don't add the pointer back for symmetry with `ArtifactWrapper`.
 - **`Contract.managesRelationshipId` must be `@unique`** or Prisma makes it many-to-one instead of 1:1.
 - **`Integration` → `User` twice** (creator + shadow user); the second keeps `name: "integration_user"`.
 - **`assets Asset[] @relation("ManagedAssets")`** needs `managedBy ManagesRelationship[] @relation("ManagedAssets")` added to `Asset`.

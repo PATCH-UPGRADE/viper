@@ -290,7 +290,6 @@ model Contract {
   vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   files  ArtifactWrapper[]
-  covers ContractAsset[]
 
   // one-to-one with ManagesRelationship. @unique or Prisma makes this many-to-one.
   managesRelationshipId String?              @unique
@@ -331,22 +330,6 @@ model ManagesRelationship {
   @@index([vendorId])
   @@index([workOrderIntegrationId])
   @@map("manages_relationship")
-}
-
-model ContractAsset {
-  id String @id @default(cuid())
-
-  contractId String
-  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  assetId    String
-  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@unique([contractId, assetId])
-  @@index([contractId])
-  @@index([assetId])
-  @@map("contract_asset")
 }
 
 model Product {
@@ -472,7 +455,6 @@ model Asset {
   issues               Issue[]
   deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
-  contractAssets       ContractAsset[]
   assetTickets         AssetTicket[]
   notificationMappings NotificationAssetMapping[]
   nodes                Node[]
@@ -1505,10 +1487,8 @@ model SourceRecord {
   // INVARIANT: mappingId set => externalId null
   mappingId        String?
   mapping          ExternalSourceRecordMapping? @relation(name: "MappingSnapshots", fields: [mappingId], references: [id], onDelete: Cascade)
-  latestForMapping ExternalSourceRecordMapping? @relation(name: "LatestSourceRecord")
-  // ^opposite side of ExternalSourceRecordMapping.latestSourceRecord.
 
-  contentHash String // dedup: skip the write if it matches the mapping's latest
+  contentHash String // dedup: skip the write if it matches the mapping's newest 
   raw         Json    @default("{}")
   markdown    String? @db.Text
   externalId  String? // TODO VW-448: Consider removing this; used only for email
@@ -1562,8 +1542,6 @@ model ExternalSourceRecordMapping {
   externalId    String // the advisory / notification id on another platform
 
   sourceRecords        SourceRecord[] @relation(name: "MappingSnapshots")
-  latestSourceRecordId String?        @unique
-  latestSourceRecord   SourceRecord?  @relation(name: "LatestSourceRecord", fields: [latestSourceRecordId], references: [id], onDelete: SetNull)
 
   upstreamApi String?
   webUrl      String?
@@ -1574,7 +1552,6 @@ model ExternalSourceRecordMapping {
 
   @@unique([integrationId, externalId])
   @@index([integrationId])
-  @@index([latestSourceRecordId])
   @@map("external_source_record_mappings")
 }
 

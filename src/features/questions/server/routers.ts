@@ -140,22 +140,30 @@ export const questionsRouter = createTRPCRouter({
       const drafted = await Promise.all(
         questions.map(
           async (question): Promise<SuggestedVendorEmail | null> => {
-            const context = await gatherEscalationContext(question);
-            if (!context) return null;
+            try {
+              const context = await gatherEscalationContext(question);
+              if (!context) return null;
 
-            const draft = await draftEscalationEmail(context);
-            const target = resolveEscalationTarget(draft, context);
+              const draft = await draftEscalationEmail(context);
+              const target = resolveEscalationTarget(draft, context);
 
-            return {
-              questionId: question.id,
-              companyName: target.companyName,
-              productName: context.productName,
-              reasonWhy: draft.reasonWhy,
-              contacts: target.contacts,
-              toEmails: target.toEmails,
-              subject: draft.subject,
-              body: `${draft.body.trimEnd()}\n${signature}`,
-            };
+              return {
+                questionId: question.id,
+                companyName: target.companyName,
+                productName: context.productName,
+                reasonWhy: draft.reasonWhy,
+                contacts: target.contacts,
+                toEmails: target.toEmails,
+                subject: draft.subject,
+                body: `${draft.body.trimEnd()}\n${signature}`,
+              };
+            } catch (error) {
+              console.error(
+                `Escalation draft failed for question ${question.id} `,
+                error,
+              );
+              return null;
+            }
           },
         ),
       );

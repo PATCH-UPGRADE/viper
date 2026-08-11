@@ -787,7 +787,7 @@ async function coverProducts(
     where: {
       deviceGroup: {
         product: {
-          canonicalDisplayName: {
+          canonicalName: {
             in: products.map((product) => product.trim().toLowerCase()),
           },
         },

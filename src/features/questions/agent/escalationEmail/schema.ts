@@ -10,7 +10,7 @@ export function buildEscalationEmailSchema(
       : z.null();
   const contactId =
     contactIds.length > 0
-      ? z.enum(vendorIds as [string, ...string[]])
+      ? z.enum(contactIds as [string, ...string[]])
       : z.string();
 
   return z.object({

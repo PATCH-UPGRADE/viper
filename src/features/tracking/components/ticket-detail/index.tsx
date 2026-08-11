@@ -190,7 +190,6 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
             <LinkedAssetsTabContent
               ticketId={data.id}
               assetTickets={data.assets}
-              remediations={data.remediations}
             />
           </TabsContent>
 

@@ -289,7 +289,7 @@ model Contract {
   vendorId String
   vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
-  files  ArtifactWrapper[]
+  files ArtifactWrapper[]
 
   // one-to-one with ManagesRelationship. @unique or Prisma makes this many-to-one.
   managesRelationshipId String?              @unique
@@ -1014,7 +1014,6 @@ enum SyncStatusEnum {
   Success
 }
 
-
 // stores a cursor in JSON (what do we send to external platforms?)
 // stores if a sync was successful or not
 // only one per integration resource
@@ -1485,8 +1484,8 @@ model SourceRecord {
 
   // null for email / TA4 sources, since those aren't mirrored rows.
   // INVARIANT: mappingId set => externalId null
-  mappingId        String?
-  mapping          ExternalSourceRecordMapping? @relation(name: "MappingSnapshots", fields: [mappingId], references: [id], onDelete: Cascade)
+  mappingId String?
+  mapping   ExternalSourceRecordMapping? @relation(name: "MappingSnapshots", fields: [mappingId], references: [id], onDelete: Cascade)
 
   contentHash String // dedup: skip the write if it matches the mapping's newest 
   raw         Json    @default("{}")
@@ -1541,7 +1540,7 @@ model ExternalSourceRecordMapping {
   integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   externalId    String // the advisory / notification id on another platform
 
-  sourceRecords        SourceRecord[] @relation(name: "MappingSnapshots")
+  sourceRecords SourceRecord[] @relation(name: "MappingSnapshots")
 
   upstreamApi String?
   webUrl      String?

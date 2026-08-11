@@ -1,13 +1,15 @@
 import { z } from "zod";
 
 export function buildEscalationEmailSchema(
+  audience: "VENDOR" | "MANUFACTURER",
   vendorIds: string[],
   contactIds: string[],
 ) {
   const vendorId =
-    vendorIds.length > 0
-      ? z.enum(vendorIds as [string, ...string[]]).nullable()
-      : z.null();
+    audience === "MANUFACTURER"
+      ? z.null()
+      : z.enum(vendorIds as [string, ...string[]]);
+
   const contactId =
     contactIds.length > 0
       ? z.enum(contactIds as [string, ...string[]])
@@ -15,12 +17,14 @@ export function buildEscalationEmailSchema(
 
   return z.object({
     vendorId: vendorId.describe(
-      "Id of the chosen vendor to email. frp, tje VEMDPR list. Null means email the manufacturer instead, choose that only when no listed vendor could answer the question, or when no vendors are listed.",
+      audience === "MANUFACTURER"
+        ? "Always null"
+        : "Id of the chosen vendor to email, from the VENDOR list.",
     ),
     contactIds: z
       .array(contactId)
       .describe(
-        "Contact ids from the chosen vendor. Empty array when no listed contact is clearly fits, and always when vendorId is null.",
+        "Contact ids belonging to the vendor you chose. Empty array when no listed contact clearly fits, and always when vendorId is null.",
       ),
     reasonWhy: z
       .string()

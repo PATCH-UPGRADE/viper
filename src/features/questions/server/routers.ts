@@ -140,11 +140,13 @@ export const questionsRouter = createTRPCRouter({
       const drafted = await Promise.all(
         questions.map(
           async (question): Promise<SuggestedVendorEmail | null> => {
+            const audience = question.audience ?? "MANUFACTURER";
+
             try {
-              const context = await gatherEscalationContext(question);
+              const context = await gatherEscalationContext(question, audience);
               if (!context) return null;
 
-              const draft = await draftEscalationEmail(context);
+              const draft = await draftEscalationEmail(context, audience);
               const target = resolveEscalationTarget(draft, context);
 
               return {

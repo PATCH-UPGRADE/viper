@@ -86,10 +86,12 @@ const SYNGO_PLAZA_ASSETS = [
 const QUESTION_CASES = [
   {
     product: "syngo.via",
+    audience: "VENDOR" as const,
     expect: "VENDOR GE Healthcare - dropdown, 2 contacts",
   },
   {
     product: "MAGNETOM FAMILY",
+    audience: "VENDOR" as const,
     expect: "VENDOR Philips - dropdown, 1 contact",
   },
   { product: "Symbia Intevo", expect: "MANUFACTURER - no contacts, input" },
@@ -817,56 +819,12 @@ async function coverProducts(
   console.log(` ✅  ${title}:${assets.length} assets`);
 }
 
-async function reportEscalationCoverage() {
-  for (const { product } of QUESTION_CASES) {
-    const canonicalName = product.trim().toLowerCase();
-    const matching = await prisma.deviceGroupMatching.findFirst({
-      where: { product: { canonicalName } },
-      select: { manufacturerId: true, productId: true },
-    });
-    if (!matching) {
-      console.log(`${product}: no DeviceGroupMatching`);
-      continue;
-    }
-
-    const assetWhere = {
-      deviceGroup: {
-        manufactureId: matching.manufacturerId,
-        ...(matching.productId ? { productId: matching.productId } : {}),
-      },
-    };
-
-    const assets = await prisma.asset.count({ where: assetWhere });
-    const covered = await prisma.contractAsset.count({
-      where: { asset: assetWhere },
-    });
-    const vendors = await prisma.vendor.findMany({
-      where: {
-        contracts: { some: { covers: { some: { asset: assetWhere } } } },
-      },
-      select: {
-        canonicalDisplayName: true,
-        contacts: { where: { email: { not: null } }, select: { id: true } },
-      },
-    });
-
-    const summary =
-      vendors
-        .map(
-          (vendor) =>
-            `${vendor.canonicalDisplayName} ${vendor.contacts.length} emailable`,
-        )
-        .join(", ") || "NO VENDOR, MANUFACTURER";
-    console.log(`${product}: ${assets} assets, ${covered} cover to ${summary}`);
-  }
-}
-
 async function seedQuestion() {
   await prisma.question.deleteMany({
     where: { status: { in: ["PENDING", "UNSURE"] } },
   });
 
-  for (const { product, expect } of QUESTION_CASES) {
+  for (const { product, audience, expect } of QUESTION_CASES) {
     const canonicalName = product.trim().toLowerCase();
 
     const mapping = await prisma.notificationDeviceGroupMapping.findFirst({
@@ -900,6 +858,7 @@ async function seedQuestion() {
     await prisma.question.create({
       data: {
         issueId: issue.id,
+        audience,
         notificationId: mapping.notificationId,
         title: `Which ${product} version is running on our units?`,
         reasonWhy: `The advisory lists affected ${product} versions, but our inventory records the version as unknown, so we cannot confirm exposure.`,
@@ -914,6 +873,7 @@ async function seedQuestion() {
     await prisma.question.create({
       data: {
         issueId: issue.id,
+        audience,
         notificationId: mapping.notificationId,
         title: `Are the ${product} units reachable from the clinical VLAN?`,
         reasonWhy: `Exposure depends on segmentation, which the advisory cannot tell us.`,

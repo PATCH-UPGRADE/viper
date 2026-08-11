@@ -1584,6 +1584,11 @@ enum QuestionStatus {
   UNSURE
 }
 
+enum QuestionAudience {
+  VENDOR
+  MANUFACTURER
+}
+
 model Question {
   id      String @id @default(cuid())
   issueId String
@@ -1608,6 +1613,8 @@ model Question {
   parentQuestionId String?   @unique
   parentQuestion   Question? @relation("QuestionChain", fields: [parentQuestionId], references: [id], onDelete: SetNull)
   followupQuestion Question? @relation("QuestionChain")
+
+  audience  QuestionAudience?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

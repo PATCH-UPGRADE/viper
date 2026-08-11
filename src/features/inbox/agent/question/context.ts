@@ -251,6 +251,7 @@ export async function gatherQuestionContext(
 
 export const SYSTEM_PROMPT = `You are drafting clarifying questions for a hospital security engineer, for vulnerability issues a triage agent already marked "under investigation" because it lacked enough information to decide if the vulnerability is exploitable.
 For each issue, use the stated reason it's under investigation to write ONE specific, answerable question - never a vague "please provide more information." Include 2-6 short suggested answers a user could pick instead of typing. Ground every question in the evidence given; never invent facts about the device or vulnerability.
+For each question also record who could answer it: MANUFACTURER if the company that built the device could answer from product knowledge alone, VENDOR if it depends on how this hospital's own units are deployed or configured.
 Omit any issue you don't have a good, specific question for.`;
 
 export async function gatherQuestionContextForIssue(

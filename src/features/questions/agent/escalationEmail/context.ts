@@ -19,24 +19,24 @@ function renderEscalationPrompt({
   vendors: EscalationVendorCandidate[];
 }): string {
   const vuln = question.issue.vulnerability;
-  const vendorSection = audience === "VENDOR"
-    ? [
-        "### VENDOR - under contract to service these assets",
-        ...vendors.map((vendor) => {
-          const contacts = vendor.contacts.length
-            ? vendor.contacts
-                .map((contact) => {
-                  const title = contact.title ? `${contact.title}` : "";
-                  return ` - id: ${contact.id} | ${contact.name} | ${title} | ${contact.email}`;
-                })
-                .join("\n")
-            : " (none on file)";
-          return `-id: ${vendor.id} | ${vendor.displayName}\n contacts:\n${contacts}`;
-        }),
-        "",
-      ].join("\n")
-    : null;
-    
+  const vendorSection =
+    audience === "VENDOR"
+      ? [
+          "### VENDOR - under contract to service these assets",
+          ...vendors.map((vendor) => {
+            const contacts = vendor.contacts.length
+              ? vendor.contacts
+                  .map((contact) => {
+                    const title = contact.title ? `${contact.title}` : "";
+                    return ` - id: ${contact.id} | ${contact.name} | ${title} | ${contact.email}`;
+                  })
+                  .join("\n")
+              : " (none on file)";
+            return `-id: ${vendor.id} | ${vendor.displayName}\n contacts:\n${contacts}`;
+          }),
+          "",
+        ].join("\n")
+      : null;
 
   return [
     "## Device",
@@ -66,7 +66,7 @@ function renderEscalationPrompt({
 
 export async function gatherEscalationContext(
   question: QuestionWithIssue,
-  audience: QuestionAudience
+  audience: QuestionAudience,
 ): Promise<EscalationContext | null> {
   const matching = question.issue.deviceGroupMatching;
   if (!matching) return null;

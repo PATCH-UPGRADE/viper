@@ -25,14 +25,16 @@ import { type DetailAssetTicket, formatLocation, statusLabels } from "./shared";
 
 const AssetTicketStatusSelect = ({
   parentTicketId,
+  assetId,
   ticketId,
   status,
 }: {
   parentTicketId: string;
+  assetId: string;
   ticketId: string;
   status: TicketStatus;
 }) => {
-  const update = useUpdateTicket(ticketId, parentTicketId);
+  const update = useUpdateTicket(ticketId, parentTicketId, assetId);
 
   return (
     <Select
@@ -97,12 +99,13 @@ export const LinkedAssetsTable = ({
                   href={`/tracking/${ticket.id}`}
                   className="font-mono text-xs font-medium text-primary hover:underline"
                 >
-                  {asset.id}
+                  {asset.hostname ?? asset.id}
                 </Link>
               </TableCell>
               <TableCell>
                 <AssetTicketStatusSelect
                   parentTicketId={parentTicketId}
+                  assetId={asset.id}
                   ticketId={ticket.id}
                   status={ticket.status}
                 />

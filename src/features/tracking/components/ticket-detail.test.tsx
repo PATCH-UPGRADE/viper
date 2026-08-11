@@ -715,7 +715,7 @@ describe("LinkedAssetsTable", () => {
       />,
     );
 
-    const link = screen.getByRole("link", { name: "asset-1" });
+    const link = screen.getByRole("link", { name: "host-1" });
     expect(link).toHaveAttribute("href", "/tracking/child-42");
   });
 
@@ -751,7 +751,11 @@ describe("LinkedAssetsTable", () => {
     await user.click(screen.getByRole("combobox", { name: /ticket status/i }));
     await user.click(screen.getByRole("option", { name: "Done" }));
 
-    expect(mockUseUpdateTicket).toHaveBeenCalledWith("child-42", "t1");
+    expect(mockUseUpdateTicket).toHaveBeenCalledWith(
+      "child-42",
+      "t1",
+      "asset-1",
+    );
     expect(mockMutate).toHaveBeenCalledWith({
       id: "child-42",
       status: "DONE",

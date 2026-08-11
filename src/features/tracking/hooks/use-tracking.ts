@@ -396,6 +396,58 @@ export const useAttachAsset = (ticketId: string) => {
   );
 };
 
+/** Updates one asset's dedicated child ticket's status from the Linked Assets
+ * table, patching the parent ticket's cached `assets` list (the table's own
+ * data source) rather than the child ticket's own — unmounted — queries. */
+export const useUpdateAssetTicketStatus = (parentTicketId: string) => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.tracking.update.mutationOptions({
+      onMutate: async ({ id, status }) => {
+        const detailFilter = trpc.tracking.getOne.queryFilter({
+          id: parentTicketId,
+        });
+        await queryClient.cancelQueries(detailFilter);
+        const previousDetail = queryClient.getQueriesData(detailFilter);
+        // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape
+        queryClient.setQueriesData<any>(detailFilter, (old: any) => {
+          if (!old?.assets) return old;
+          return {
+            ...old,
+            assets: old.assets.map((at: { ticket: { id: string } }) =>
+              at.ticket.id === id
+                ? { ...at, ticket: { ...at.ticket, status } }
+                : at,
+            ),
+          };
+        });
+        return { previousDetail };
+      },
+      onError: (error, _vars, context) => {
+        if (context?.previousDetail) {
+          for (const [key, data] of context.previousDetail) {
+            queryClient.setQueryData(key, data);
+          }
+        }
+        toast.error(`Failed to update status: ${error.message}`);
+      },
+      onSettled: (_data, _error, { id }) => {
+        queryClient.invalidateQueries(
+          trpc.tracking.getOne.queryFilter({ id: parentTicketId }),
+        );
+        // The child ticket has its own detail page (linked from the Asset ID
+        // cell) — invalidate its cache too, not just the parent's.
+        queryClient.invalidateQueries(trpc.tracking.getOne.queryFilter({ id }));
+        queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.tracking.getManyByAssetId.queryFilter(),
+        );
+      },
+    }),
+  );
+};
+
 export const useDetachAsset = (ticketId: string) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

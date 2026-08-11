@@ -90,7 +90,6 @@ export const DepartmentChips = ({
 };
 
 export type DetailAssetTicket = TicketDetail["assets"][number];
-export type DetailRemediation = TicketDetail["remediations"][number];
 
 export const formatLocation = (location: unknown): string => {
   if (!location || typeof location !== "object") return "—";

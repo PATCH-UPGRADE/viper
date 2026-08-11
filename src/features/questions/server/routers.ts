@@ -146,6 +146,9 @@ export const questionsRouter = createTRPCRouter({
               const context = await gatherEscalationContext(question, audience);
               if (!context) return null;
 
+              if (audience === "VENDOR" && context.vendors.length === 0)
+                return null;
+
               const draft = await draftEscalationEmail(context, audience);
               const target = resolveEscalationTarget(draft, context);
 

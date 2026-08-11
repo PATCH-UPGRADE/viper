@@ -1,6 +1,7 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { attachMatchingAssets } from "@/features/tracking/server/asset-tickets";
 import { Priority, TicketCategory } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
@@ -67,7 +68,7 @@ export const mitigationRouter = createTRPCRouter({
           .default([]),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const plan = await prisma.mitigationPlan.findUnique({
         where: { id: input.planId },
         select: { id: true, notificationId: true },
@@ -128,10 +129,30 @@ export const mitigationRouter = createTRPCRouter({
           },
           data: { isDraft: true },
         });
+        // isDraft: true excludes tickets an earlier accept call on this same
+        // plan already promoted, so a repeated accept doesn't re-run asset
+        // matching (and re-record ASSET_ATTACHED activity) for them.
+        const promoted = await tx.workOrderTicket.findMany({
+          where: { mitigationPlanId: plan.id, isDraft: true },
+          select: {
+            id: true,
+            deviceGroups: { select: { deviceGroupMatchingId: true } },
+          },
+        });
         await tx.workOrderTicket.updateMany({
           where: { mitigationPlanId: plan.id },
           data: { isDraft: false },
         });
+        for (const ticket of promoted) {
+          await attachMatchingAssets(tx, {
+            parentTicketId: ticket.id,
+            matchingIds: ticket.deviceGroups.map(
+              (group) => group.deviceGroupMatchingId,
+            ),
+            actorId: ctx.auth.user.id,
+          });
+        }
+
         return tx.mitigationPlan.findUniqueOrThrow({
           where: { id: plan.id },
           include: mitigationPlanInclude,

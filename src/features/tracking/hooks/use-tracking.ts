@@ -361,76 +361,21 @@ export const useAttachAsset = (ticketId: string) => {
   return useMutation(
     trpc.tracking.attachAsset.mutationOptions({
       onMutate: async ({ assetId }) => {
-        const detailFilter = trpc.tracking.getOne.queryFilter({
-          id: ticketId,
-        });
         const pickerFilter = trpc.tracking.listAttachableAssets.queryFilter({
           ticketId,
         });
-        await queryClient.cancelQueries(detailFilter);
         await queryClient.cancelQueries(pickerFilter);
-        const previousDetail = queryClient.getQueriesData(detailFilter);
         const previousPicker = queryClient.getQueriesData(pickerFilter);
 
-        const candidate = previousPicker
-          .flatMap(([, data]) => (Array.isArray(data) ? data : []))
-          .find((c: { id: string }) => c.id === assetId) as
-          | {
-              id: string;
-              hostname: string | null;
-              ip: string;
-              role: string | null;
-              deviceGroup: {
-                manufacturer: { canonicalDisplayName: string } | null;
-                product: { canonicalDisplayName: string } | null;
-              } | null;
-            }
-          | undefined;
-
-        if (candidate) {
-          // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape
-          queryClient.setQueriesData<any>(detailFilter, (old: any) => {
-            if (!old?.assets) return old;
-            return {
-              ...old,
-              assets: [
-                ...old.assets,
-                {
-                  id: candidate.id,
-                  hostname: candidate.hostname,
-                  ip: candidate.ip,
-                  role: candidate.role,
-                  macAddress: null,
-                  location: null,
-                  deviceGroupId: "",
-                  deviceGroup: candidate.deviceGroup
-                    ? {
-                        id: "",
-                        manufacturerId: null,
-                        productId: null,
-                        versionId: null,
-                        manufacturer: candidate.deviceGroup.manufacturer,
-                        product: candidate.deviceGroup.product,
-                        version: null,
-                      }
-                    : null,
-                },
-              ],
-            };
-          });
-        }
         // biome-ignore lint/suspicious/noExplicitAny: trpc cache shape
         queryClient.setQueriesData<any>(pickerFilter, (old: any) => {
           if (!Array.isArray(old)) return old;
           return old.filter((c: { id: string }) => c.id !== assetId);
         });
 
-        return { previousDetail, previousPicker };
+        return { previousPicker };
       },
       onError: (error, _vars, context) => {
-        for (const [key, data] of context?.previousDetail ?? []) {
-          queryClient.setQueryData(key, data);
-        }
         for (const [key, data] of context?.previousPicker ?? []) {
           queryClient.setQueryData(key, data);
         }
@@ -467,7 +412,9 @@ export const useDetachAsset = (ticketId: string) => {
           if (!old?.assets) return old;
           return {
             ...old,
-            assets: old.assets.filter((a: { id: string }) => a.id !== assetId),
+            assets: old.assets.filter(
+              (at: { asset: { id: string } }) => at.asset.id !== assetId,
+            ),
           };
         });
         return { previousDetail };

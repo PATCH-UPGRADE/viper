@@ -8,7 +8,12 @@ export const vendorListSelect = {
   canonicalDisplayName: true,
   overview: true,
   partnerSince: true,
-  contracts: { select: { covers: { select: { assetId: true } } } },
+  // a contract reaches its assets through the ManagesRelationship it belongs to
+  contracts: {
+    select: {
+      managesRelationship: { select: { assets: { select: { id: true } } } },
+    },
+  },
 } satisfies Prisma.VendorSelect;
 
 export type VendorListRow = Prisma.VendorGetPayload<{

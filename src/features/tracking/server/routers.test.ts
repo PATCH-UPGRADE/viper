@@ -1768,18 +1768,6 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
   });
 
-  it("rejects more than 50 assets before calling Fleet", async () => {
-    await expect(
-      setup().createFleetWorkOrder({
-        ...proposal,
-        assetIds: Array(51).fill("asset"),
-      }),
-    ).rejects.toThrow();
-
-    expect(mockFleet.resolveFleetAssets).not.toHaveBeenCalled();
-    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
-  });
-
   it("refuses an asset Siemens does not manage, before calling Fleet", async () => {
     const caller = setup();
     mockFleet.resolveFleetAssets.mockRejectedValue(

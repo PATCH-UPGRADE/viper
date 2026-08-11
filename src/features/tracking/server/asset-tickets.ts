@@ -7,6 +7,10 @@ import {
 } from "@/lib/device-matching";
 import { recordAssetActivity } from "./activities";
 
+// Creates the dedicated per-asset child ticket for parentTicketId + assetId
+// (copying summary/body/category/etc. from the parent) and its AssetTicket
+// join row. Idempotent: returns the existing child ticket id if one already
+// exists for this (parentTicketId, assetId) pair instead of creating another.
 export async function createAssetTicket(
   tx: TransactionClient,
   params: {
@@ -77,6 +81,9 @@ export async function createAssetTicket(
   return child.id;
 }
 
+// Given an array of DeviceGroupMatching ids, finds every asset whose device
+// group matches at least one of them and creates an AssetTicket for each,
+// parented to parentTicketId.
 export async function attachMatchingAssets(
   tx: TransactionClient,
   params: {
@@ -114,16 +121,24 @@ export async function attachMatchingAssets(
       },
     },
   });
+  // Guards against creating the same asset's child ticket twice — findMany
+  // already returns each asset once, so this only matters if that changes.
+  const attachedAssetIds = new Set<string>();
   for (const asset of candidates) {
+    if (attachedAssetIds.has(asset.id)) continue;
     const matches = matchings.some((matching) =>
       matchingAppliesToDeviceGroup(matching, asset.deviceGroup),
     );
     if (!matches) continue;
+    attachedAssetIds.add(asset.id);
 
     await createAssetTicket(tx, { parentTicketId, assetId: asset.id, actorId });
   }
 }
 
+// Walks up the ticket's parent chain: if every child of the parent is now
+// Done, marks the parent Done too and recurses, so a whole tree of per-asset
+// tickets completes as its last asset does.
 export async function cascadeDoneStatus(
   tx: TransactionClient,
   ticketId: string,

@@ -129,8 +129,11 @@ export const mitigationRouter = createTRPCRouter({
           },
           data: { isDraft: true },
         });
+        // isDraft: true excludes tickets an earlier accept call on this same
+        // plan already promoted, so a repeated accept doesn't re-run asset
+        // matching (and re-record ASSET_ATTACHED activity) for them.
         const promoted = await tx.workOrderTicket.findMany({
-          where: { mitigationPlanId: plan.id },
+          where: { mitigationPlanId: plan.id, isDraft: true },
           select: {
             id: true,
             deviceGroups: { select: { deviceGroupMatchingId: true } },

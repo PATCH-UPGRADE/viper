@@ -1,5 +1,3 @@
-import Module from "node:module";
-import { fileURLToPath } from "node:url";
 import { hashPassword } from "better-auth/crypto";
 import {
   type ArtifactType,
@@ -15,23 +13,6 @@ import {
   TicketStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
-
-const serverOnlyStub = fileURLToPath(
-  new URL("../src/test/server-only-stub.ts", import.meta.url),
-);
-const mod = Module as unknown as {
-  _resolveFilename(request: string, ...rest: unknown[]): string;
-};
-const resolveFilename = mod._resolveFilename;
-mod._resolveFilename = function (request, ...rest) {
-  return resolveFilename.call(
-    this,
-    request === "server-only" ? serverOnlyStub : request,
-    ...rest,
-  );
-};
-
-let createAssetTicket: typeof import("@/features/tracking/server/asset-tickets")["createAssetTicket"];
 
 // Seed user credentials
 const SEED_USER = {
@@ -2080,6 +2061,45 @@ const COMMENTED_AT = new Date("2026-06-20T12:00:00Z");
 const SEEN_BEFORE_COMMENT = new Date("2026-06-19T09:00:00Z");
 const SEEN_AFTER_COMMENT = new Date("2026-06-21T09:00:00Z");
 
+// Mirrors createAssetTicket() in src/features/tracking/server/asset-tickets.ts
+// (not imported directly — that module is 'server-only', which this
+// standalone seed script isn't). Keep in sync if that shape changes.
+async function seedAssetTicket(
+  parentTicket: {
+    id: string;
+    summary: string;
+    category: TicketCategory;
+    sourceLabel: string | null;
+    scheduledAt: Date | null;
+  },
+  assetId: string,
+  userId: string,
+) {
+  const asset = await prisma.asset.findUniqueOrThrow({
+    where: { id: assetId },
+    select: { hostname: true, ip: true },
+  });
+  await prisma.workOrderTicket.create({
+    data: {
+      summary: `${parentTicket.summary} — ${asset.hostname ?? asset.ip}`,
+      category: parentTicket.category,
+      sourceLabel: parentTicket.sourceLabel,
+      scheduledAt: parentTicket.scheduledAt,
+      creatorId: userId,
+      parentId: parentTicket.id,
+      ticket: { create: { assetId, parentTicketId: parentTicket.id } },
+    },
+  });
+  await prisma.ticketActivity.create({
+    data: {
+      ticketId: parentTicket.id,
+      userId,
+      type: "ASSET_ATTACHED",
+      data: { assetId, assetLabel: asset.hostname ?? asset.ip },
+    },
+  });
+}
+
 async function createWorkOrderTicket(
   ticket: SampleTicket,
   userId: string,
@@ -2199,11 +2219,7 @@ async function createWorkOrderTicket(
   });
 
   for (const asset of linkedAssets) {
-    await createAssetTicket(prisma, {
-      parentTicketId: created.id,
-      assetId: asset.id,
-      actorId: userId,
-    });
+    await seedAssetTicket(created, asset.id, userId);
   }
 
   return created;
@@ -2300,10 +2316,6 @@ async function seedVendors() {
 
 async function main() {
   console.log("🌱 Starting database seed...\n");
-
-  ({ createAssetTicket } = await import(
-    "@/features/tracking/server/asset-tickets"
-  ));
 
   try {
     const shouldClear = process.env.SEED_CLEAR_DB === "true";

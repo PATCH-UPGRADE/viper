@@ -1003,7 +1003,7 @@ export const trackingRouter = createTRPCRouter({
       z.object({
         /** The chat tool call this proposal came from — the idempotency key. */
         toolCallId: z.string(),
-        assetIds: z.array(z.string()).min(1).max(50),
+        assetIds: z.array(z.string()).min(1),
         summary: z.string().min(1),
         description: z.string().default(""),
         category: z.enum(TicketCategory),

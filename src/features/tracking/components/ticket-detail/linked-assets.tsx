@@ -115,7 +115,9 @@ export const LinkedAssetsTabContent = ({
           />
         ) : (
           <p className="p-4 text-sm text-muted-foreground">
-            No assets linked to this ticket.
+            {assetTickets.length > 0
+              ? "No active assets linked to this ticket."
+              : "No assets linked to this ticket."}
           </p>
         )}
       </div>

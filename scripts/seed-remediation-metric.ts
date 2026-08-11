@@ -175,24 +175,20 @@ async function seedFixture(userId: string) {
     (await prisma.deviceGroup.create({ data: groupIdentity }));
 
   for (const spec of ASSET_SPECS) {
+    const data = {
+      ...spec,
+      upstreamApi: "https://example.com/rdt-metric",
+      status: "Active" as AssetStatus,
+      deviceGroupId: deviceGroup.id,
+      userId,
+    };
     const existing = await prisma.asset.findFirst({
       where: { serialNumber: spec.serialNumber },
     });
     if (existing) {
-      await prisma.asset.update({
-        where: { id: existing.id },
-        data: { ...spec, deviceGroupId: deviceGroup.id },
-      });
+      await prisma.asset.update({ where: { id: existing.id }, data });
     } else {
-      await prisma.asset.create({
-        data: {
-          ...spec,
-          upstreamApi: "https://example.com/rdt-metric",
-          status: "Active" as AssetStatus,
-          deviceGroupId: deviceGroup.id,
-          userId,
-        },
-      });
+      await prisma.asset.create({ data });
     }
   }
 

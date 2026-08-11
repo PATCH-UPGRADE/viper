@@ -4,14 +4,15 @@ import {
   ConfidenceLevel,
   IssueStatus,
   NotAffectedJustification,
-  NotificationChannel,
   NotificationType,
   Priority,
   ScopeTargetModel,
   Severity,
+  SourceChannel,
   Tlp,
   VersionStatus,
 } from "@/generated/prisma";
+import { sourceContentHash } from "@/lib/source-hash";
 import prisma from "../src/lib/db";
 
 const SEED_USER = {
@@ -108,7 +109,6 @@ async function seedSyngoPlazaVexScenario(userId: string) {
       return prisma.asset.create({
         data: {
           ...asset,
-          upstreamApi: "https://example.com/placeholder",
           status: "Active" as AssetStatus,
           deviceGroupId: deviceGroup.id,
           userId,
@@ -263,11 +263,14 @@ async function seedSyngoPlazaVexScenario(userId: string) {
     },
   });
 
-  await prisma.notificationSource.create({
+  await prisma.sourceRecord.create({
     data: {
-      notificationId: notification.id,
-      channel: NotificationChannel.Email,
-      sourceType: "Source",
+      channel: SourceChannel.Email,
+      links: {
+        create: { notificationId: notification.id, sourceType: "Source" },
+      },
+      externalId: "seed-ssa-016040",
+      contentHash: sourceContentHash({ emailId: "seed-ssa-016040" }),
       raw: {
         type: "email.received",
         created_at: "2026-02-10T09:00:00.000Z",
@@ -301,7 +304,7 @@ The affected application does not encrypt passwords properly. This could allow a
 
 - CVSS v3.1 Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N
 - CWE-261: Weak Encoding for Password`,
-      receivedAt: new Date(),
+      observedAt: new Date(),
     },
   });
 
@@ -621,7 +624,6 @@ async function seedDeserializationScenario(userId: string) {
       await prisma.asset.create({
         data: {
           ...assetFields,
-          upstreamApi: "https://example.com/placeholder",
           status: "Active" as AssetStatus,
           deviceGroupId: deviceGroup.id,
           userId,
@@ -698,11 +700,14 @@ async function seedDeserializationScenario(userId: string) {
     },
   });
 
-  await prisma.notificationSource.create({
+  await prisma.sourceRecord.create({
     data: {
-      notificationId: notification.id,
-      channel: NotificationChannel.Email,
-      sourceType: "Source",
+      channel: SourceChannel.Email,
+      links: {
+        create: { notificationId: notification.id, sourceType: "Source" },
+      },
+      externalId: "seed-ssa-220609",
+      contentHash: sourceContentHash({ emailId: "seed-ssa-220609" }),
       raw: {
         type: "email.received",
         created_at: "2022-06-09T09:00:00.000Z",
@@ -734,7 +739,7 @@ The application deserialises untrusted data without sufficient validations that 
 ## Workarounds and mitigations
 - If possible, block ports 32912/tcp and 32914/tcp on an external firewall.
 - Product-specific fixes are available; contact your local Siemens Healthineers service representative.`,
-      receivedAt: new Date(),
+      observedAt: new Date(),
     },
   });
 

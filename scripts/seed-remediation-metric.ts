@@ -126,12 +126,12 @@ async function teardownFixture() {
   });
   const remediationIds = remediations.map((r) => r.id);
 
-  const sources = await prisma.notificationSource.findMany({
+  const sources = await prisma.sourceRecord.findMany({
     where: { channel: "TA4", externalId: { in: remediationIds } },
-    select: { notificationId: true },
+    select: { links: { select: { notificationId: true } } },
   });
   const notificationIds = sources
-    .map((s) => s.notificationId)
+    .flatMap((s) => s.links.map((l) => l.notificationId))
     .filter((id): id is string => id !== null);
 
   const notifications = await prisma.notification.deleteMany({

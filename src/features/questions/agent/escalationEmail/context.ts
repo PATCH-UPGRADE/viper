@@ -6,18 +6,20 @@ import { deviceGroupWhereForMatching } from "@/lib/device-matching";
 import type { EscalationContext, EscalationVendorCandidate } from "./types";
 
 function renderEscalationPrompt({
+  audience,
   manufacturerName,
   productName,
   question,
   vendors,
 }: {
+  audience: QuestionAudience;
   manufacturerName: string;
   productName: string;
   question: QuestionWithIssue;
   vendors: EscalationVendorCandidate[];
 }): string {
   const vuln = question.issue.vulnerability;
-  const vendorSection = vendors.length
+  const vendorSection = audience === "VENDOR"
     ? [
         "### VENDOR - under contract to service these assets",
         ...vendors.map((vendor) => {
@@ -34,6 +36,7 @@ function renderEscalationPrompt({
         "",
       ].join("\n")
     : null;
+    
 
   return [
     "## Device",
@@ -63,6 +66,7 @@ function renderEscalationPrompt({
 
 export async function gatherEscalationContext(
   question: QuestionWithIssue,
+  audience: QuestionAudience
 ): Promise<EscalationContext | null> {
   const matching = question.issue.deviceGroupMatching;
   if (!matching) return null;
@@ -104,6 +108,7 @@ export async function gatherEscalationContext(
     productName,
     vendors,
     markdown: renderEscalationPrompt({
+      audience,
       manufacturerName,
       productName,
       question,

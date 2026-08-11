@@ -46,10 +46,8 @@ const {
   mockUseAttachableChildren,
   mockAttachAssetMutate,
   mockDetachAssetMutate,
-  mockUpdateAssetTicketStatusMutate,
   mockUseAttachAsset,
   mockUseDetachAsset,
-  mockUseUpdateAssetTicketStatus,
   mockUseAttachableAssets,
 } = vi.hoisted(() => {
   const mockMutate = vi.fn();
@@ -60,7 +58,6 @@ const {
   const mockDetachMutate = vi.fn();
   const mockAttachAssetMutate = vi.fn();
   const mockDetachAssetMutate = vi.fn();
-  const mockUpdateAssetTicketStatusMutate = vi.fn();
   return {
     mockMutate,
     mockAddCommentMutate,
@@ -70,17 +67,12 @@ const {
     mockDetachMutate,
     mockAttachAssetMutate,
     mockDetachAssetMutate,
-    mockUpdateAssetTicketStatusMutate,
     mockUseAttachAsset: vi.fn(() => ({
       mutate: mockAttachAssetMutate,
       isPending: false,
     })),
     mockUseDetachAsset: vi.fn(() => ({
       mutate: mockDetachAssetMutate,
-      isPending: false,
-    })),
-    mockUseUpdateAssetTicketStatus: vi.fn(() => ({
-      mutate: mockUpdateAssetTicketStatusMutate,
       isPending: false,
     })),
     mockUseAttachableAssets: vi.fn(() => ({
@@ -179,7 +171,6 @@ vi.mock("../hooks/use-tracking", () => ({
   useAttachableChildren: mockUseAttachableChildren,
   useAttachAsset: mockUseAttachAsset,
   useDetachAsset: mockUseDetachAsset,
-  useUpdateAssetTicketStatus: mockUseUpdateAssetTicketStatus,
   useAttachableAssets: mockUseAttachableAssets,
 }));
 
@@ -724,7 +715,7 @@ describe("LinkedAssetsTable", () => {
       />,
     );
 
-    const link = screen.getByRole("link", { name: /host-1/i });
+    const link = screen.getByRole("link", { name: "asset-1" });
     expect(link).toHaveAttribute("href", "/tracking/child-42");
   });
 
@@ -760,13 +751,8 @@ describe("LinkedAssetsTable", () => {
     await user.click(screen.getByRole("combobox", { name: /ticket status/i }));
     await user.click(screen.getByRole("option", { name: "Done" }));
 
-    // Bound to the parent ticket (whose cache backs this table), not the
-    // child's own — otherwise the row wouldn't refresh after a successful edit.
-    expect(mockUseUpdateAssetTicketStatus).toHaveBeenCalledWith(
-      "t1",
-      "asset-1",
-    );
-    expect(mockUpdateAssetTicketStatusMutate).toHaveBeenCalledWith({
+    expect(mockUseUpdateTicket).toHaveBeenCalledWith("child-42", "t1");
+    expect(mockMutate).toHaveBeenCalledWith({
       id: "child-42",
       status: "DONE",
     });

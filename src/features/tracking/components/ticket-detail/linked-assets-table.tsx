@@ -19,22 +19,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useUpdateAssetTicketStatus } from "@/features/tracking/hooks/use-tracking";
+import { useUpdateTicket } from "@/features/tracking/hooks/use-tracking";
 import type { TicketStatus } from "@/generated/prisma";
 import { type DetailAssetTicket, formatLocation, statusLabels } from "./shared";
 
 const AssetTicketStatusSelect = ({
   parentTicketId,
-  assetId,
   ticketId,
   status,
 }: {
   parentTicketId: string;
-  assetId: string;
   ticketId: string;
   status: TicketStatus;
 }) => {
-  const update = useUpdateAssetTicketStatus(parentTicketId, assetId);
+  const update = useUpdateTicket(ticketId, parentTicketId);
 
   return (
     <Select
@@ -99,13 +97,12 @@ export const LinkedAssetsTable = ({
                   href={`/tracking/${ticket.id}`}
                   className="font-mono text-xs font-medium text-primary hover:underline"
                 >
-                  {asset.hostname ?? asset.id.slice(0, 8)}
+                  {asset.id}
                 </Link>
               </TableCell>
               <TableCell>
                 <AssetTicketStatusSelect
                   parentTicketId={parentTicketId}
-                  assetId={asset.id}
                   ticketId={ticket.id}
                   status={ticket.status}
                 />

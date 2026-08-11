@@ -46,6 +46,7 @@ describe("planQuestionWrites", () => {
           "No, it's on an isolated clinical VLAN",
           "It's segmented but I'm not certain of the boundary",
         ],
+        audience: "VENDOR",
       },
     ]);
   });

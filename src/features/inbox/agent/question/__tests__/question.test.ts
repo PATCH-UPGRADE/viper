@@ -30,6 +30,7 @@ describe("planQuestionWrites", () => {
           "No, it's on an isolated clinical VLAN",
           "It's segmented but I'm not certain of the boundary",
         ],
+        audience: "VENDOR",
       },
     };
 
@@ -45,6 +46,7 @@ describe("planQuestionWrites", () => {
           "No, it's on an isolated clinical VLAN",
           "It's segmented but I'm not certain of the boundary",
         ],
+        audience: "VENDOR",
       },
     ]);
   });
@@ -55,6 +57,7 @@ describe("planQuestionWrites", () => {
         title: "  ",
         reasonWhy: "some reasons",
         suggestedAnswers: ["A", "B"],
+        audience: "MANUFACTURER",
       },
     };
 
@@ -67,6 +70,7 @@ describe("planQuestionWrites", () => {
         title: "some title",
         reasonWhy: "some reasons",
         suggestedAnswers: ["only one suggested answer"],
+        audience: "MANUFACTURER",
       },
     };
 
@@ -84,11 +88,13 @@ describe("planQuestionWrites", () => {
         title: "title one",
         reasonWhy: "some reasons",
         suggestedAnswers: ["A", "B"],
+        audience: "VENDOR",
       },
       issue_2: {
         title: "title two",
         reasonWhy: "some reasons",
         suggestedAnswers: ["C", "D"],
+        audience: "MANUFACTURER",
       },
     };
     expect(planQuestionWrites(context, result)).toHaveLength(2);

@@ -23,14 +23,12 @@ describe("Assets Endpoint (/assets)", () => {
     ip: "192.168.1.100",
     cpe: generateCPE("asset_v1"),
     role: "Primary Server",
-    upstreamApi: "https://api.hospital-upstream.com/v1",
   };
 
   const payload2 = {
     ip: "192.168.1.101",
     cpe: generateCPE("asset_v2"),
     role: "Primary Server",
-    upstreamApi: "https://api.hospital-upstream.com/v2",
   };
 
   const mockIntegrationPayload = {
@@ -93,10 +91,9 @@ describe("Assets Endpoint (/assets)", () => {
     previous: null,
   };
 
-  it("POST /assets - should create asset with only ip and upstreamApi", async () => {
+  it("POST /assets - should create asset with only ip", async () => {
     const minimalPayload = {
       ip: "10.0.0.1",
-      upstreamApi: "https://api.hospital-upstream.com/v1",
     };
 
     const res = await request(BASE_URL)
@@ -193,7 +190,6 @@ describe("Assets Endpoint (/assets)", () => {
       ip: "192.168.1.105", // Updated field
       cpe: generateCPE("asset_v1"),
       role: "Backup Server",
-      upstreamApi: "https://api.hospital-upstream.com/v1",
     };
 
     const putRes = await request(BASE_URL)
@@ -234,14 +230,12 @@ describe("Assets Endpoint (/assets)", () => {
     expect(bodyFirst.deviceGroup).toHaveProperty("assetsUrl");
     expect(bodyFirst.deviceGroup).toHaveProperty("deviceArtifactsUrl");
     expect(bodyFirst.role).toBe(payload.role);
-    expect(bodyFirst.upstreamApi).toBe(payload.upstreamApi);
 
     const bodySecond = res.body.at(1);
     expect(bodySecond).toHaveProperty("id");
     expect(bodySecond.ip).toBe(payload2.ip);
     expect(bodySecond.deviceGroup.cpe.includes(payload2.cpe)).toBe(true);
     expect(bodySecond.role).toBe(payload2.role);
-    expect(bodySecond.upstreamApi).toBe(payload2.upstreamApi);
 
     // GET first payload from DB
     const firstAssetId = bodyFirst.id;
@@ -257,7 +251,6 @@ describe("Assets Endpoint (/assets)", () => {
     );
     expect(firstDetailRes.body.deviceGroup).toHaveProperty("url");
     expect(firstDetailRes.body.role).toBe(payload.role);
-    expect(firstDetailRes.body.upstreamApi).toBe(payload.upstreamApi);
 
     // GET second payload from DB
     const secondAssetId = bodySecond.id;
@@ -272,7 +265,6 @@ describe("Assets Endpoint (/assets)", () => {
       true,
     );
     expect(secondDetailRes.body.role).toBe(payload2.role);
-    expect(secondDetailRes.body.upstreamApi).toBe(payload2.upstreamApi);
 
     // DELETE the assets
     const deleteFirstAssetRes = await request(BASE_URL)

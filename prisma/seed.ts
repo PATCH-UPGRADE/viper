@@ -1156,6 +1156,10 @@ async function clearDatabase() {
   await prisma.artifact.deleteMany();
   await prisma.artifactWrapper.deleteMany();
   await prisma.contract.deleteMany();
+  // Both the contract and vendor deletes are SetNull, so the relationship would
+  // otherwise survive here with a null vendorId, out of reach of the
+  // vendor-scoped cleanup in seedVendors().
+  await prisma.managesRelationship.deleteMany();
   await prisma.vendorContact.deleteMany();
   await prisma.vendor.deleteMany();
   await prisma.remediation.deleteMany();

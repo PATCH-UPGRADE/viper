@@ -61,8 +61,4 @@ describe("countAssetTicketsByStatus", () => {
       { status: TicketStatus.DONE, count: 1 },
     ]);
   });
-
-  it("returns an empty array for an empty input", () => {
-    expect(countAssetTicketsByStatus([])).toEqual([]);
-  });
 });

@@ -91,6 +91,28 @@ export const DepartmentChips = ({
 
 export type DetailAssetTicket = TicketDetail["assets"][number];
 
+export const statusOrder = Object.keys(statusLabels) as TicketStatus[];
+
+// To Do → In Progress → Requires Approval → Done (doesn't mutate the input).
+export const sortAssetTicketsByStatus = (
+  assetTickets: DetailAssetTicket[],
+): DetailAssetTicket[] =>
+  [...assetTickets].sort(
+    (a, b) =>
+      statusOrder.indexOf(a.ticket.status) -
+      statusOrder.indexOf(b.ticket.status),
+  );
+
+export const countAssetTicketsByStatus = (
+  assetTickets: DetailAssetTicket[],
+): { status: TicketStatus; count: number }[] =>
+  statusOrder
+    .map((status) => ({
+      status,
+      count: assetTickets.filter((a) => a.ticket.status === status).length,
+    }))
+    .filter((c) => c.count > 0);
+
 export const formatLocation = (location: unknown): string => {
   if (!location || typeof location !== "object") return "—";
   const loc = location as Record<string, unknown>;

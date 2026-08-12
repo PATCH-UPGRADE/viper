@@ -927,6 +927,42 @@ describe("TicketDetailContent — view mode", () => {
     expect(screen.getByText("Infusion Pump")).toBeInTheDocument();
   });
 
+  it("shows a progress indicator reflecting how many linked assets are Done", async () => {
+    const user = userEvent.setup();
+    renderDetail({
+      assets: [
+        sampleAssetTicket({}, { id: "child-1" }),
+        sampleAssetTicket({}, { id: "child-2", status: "DONE" }),
+      ],
+    });
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
+    expect(screen.getByText("50% resolved")).toBeInTheDocument();
+    expect(screen.getByText(/1 of 2 done/i)).toBeInTheDocument();
+  });
+
+  it("sorts asset rows with active statuses before Done", async () => {
+    const user = userEvent.setup();
+    renderDetail({
+      assets: [
+        sampleAssetTicket(
+          { id: "asset-done", hostname: "host-done" },
+          { id: "child-done", status: "DONE" },
+        ),
+        sampleAssetTicket(
+          { id: "asset-todo", hostname: "host-todo" },
+          { id: "child-todo", status: "TO_DO" },
+        ),
+      ],
+    });
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
+
+    const rows = screen.getAllByRole("row").slice(1); // drop header row
+    const firstRowText = rows[0].textContent ?? "";
+    const secondRowText = rows[1].textContent ?? "";
+    expect(firstRowText).toContain("host-todo");
+    expect(secondRowText).toContain("host-done");
+  });
+
   it("renders the author's department badge next to their name in comments", () => {
     renderDetail({
       comments: [

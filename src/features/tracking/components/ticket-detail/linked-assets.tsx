@@ -23,7 +23,7 @@ import {
   useDetachAsset,
 } from "../../hooks/use-tracking";
 import { LinkedAssetsTable } from "./linked-assets-table";
-import type { DetailAssetTicket, DetailRemediation } from "./shared";
+import type { DetailAssetTicket } from "./shared";
 
 const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
   const [open, setOpen] = useState(false);
@@ -87,11 +87,9 @@ const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
 export const LinkedAssetsTabContent = ({
   ticketId,
   assetTickets,
-  remediations,
 }: {
   ticketId: string;
   assetTickets: DetailAssetTicket[];
-  remediations: DetailRemediation[];
 }) => {
   const detach = useDetachAsset(ticketId);
 
@@ -107,8 +105,8 @@ export const LinkedAssetsTabContent = ({
       <div className="p-2">
         {assetTickets.length > 0 ? (
           <LinkedAssetsTable
+            parentTicketId={ticketId}
             assetTickets={assetTickets}
-            remediations={remediations}
             onDetach={(assetId) => detach.mutate({ ticketId, assetId })}
             detachPending={detach.isPending}
           />

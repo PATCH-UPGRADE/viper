@@ -667,8 +667,6 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   hostname: "host-1",
   ip: "10.0.0.5",
   role: "Infusion Pump",
-  status: "Active",
-  macAddress: "00:11:22:33:44:55",
   location: { building: "A", floor: "3", room: "302" },
   deviceGroupId: "dg-1",
   deviceGroup: {
@@ -692,108 +690,76 @@ const sampleAssetTicket = (
 });
 
 describe("LinkedAssetsTable", () => {
-  it("renders one row per asset with role, model, IP, MAC, and location", () => {
+  it("renders one row per asset with role, model, IP, location, and an editable status", () => {
     render(
       <LinkedAssetsTable
+        parentTicketId="t1"
         assetTickets={[sampleAssetTicket()] as never}
-        remediations={[]}
       />,
     );
 
     expect(screen.getByText("Infusion Pump")).toBeInTheDocument();
     expect(screen.getByText("ICU Medical Plum 360")).toBeInTheDocument();
     expect(screen.getByText("10.0.0.5")).toBeInTheDocument();
-    expect(screen.getByText("00:11:22:33:44:55")).toBeInTheDocument();
     expect(screen.getByText("A · 3 · 302")).toBeInTheDocument();
-    expect(screen.getByText("Active")).toBeInTheDocument();
-    expect(screen.getByText("To Do")).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: /ticket status/i }),
+    ).toHaveTextContent("To Do");
   });
 
   it("links the asset id cell to its dedicated per-asset ticket", () => {
     render(
       <LinkedAssetsTable
+        parentTicketId="t1"
         assetTickets={[sampleAssetTicket({}, { id: "child-42" })] as never}
-        remediations={[]}
       />,
     );
 
-    const link = screen.getByRole("link", { name: /host-1/i });
+    const link = screen.getByRole("link", { name: "host-1" });
     expect(link).toHaveAttribute("href", "/tracking/child-42");
   });
 
-  it("falls back to em-dashes for missing role, MAC, and location fields", () => {
+  it("falls back to em-dashes for missing role and location fields", () => {
     render(
       <LinkedAssetsTable
+        parentTicketId="t1"
         assetTickets={
           [
             sampleAssetTicket({
               role: null,
-              macAddress: null,
               location: null,
               deviceGroup: null,
             }),
           ] as never
         }
-        remediations={[]}
       />,
     );
 
-    // The role cell contains a "—" link, MAC cell contains "—", location cell contains "—"
-    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(3);
+    // The role cell and location cell each contain a "—"
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(2);
   });
 
-  it("matches a remediation to the asset via device-group matching rules", () => {
+  it("changes the asset's ticket status via the status dropdown", async () => {
+    const user = userEvent.setup();
     render(
       <LinkedAssetsTable
-        assetTickets={[sampleAssetTicket()] as never}
-        remediations={
-          [
-            {
-              id: "rem-1",
-              description: "Apply firmware patch v2.3",
-              deviceGroupMatchings: [
-                {
-                  manufacturerId: "manufacturer-icu",
-                  productId: "product-plum",
-                  versionId: null,
-                  versionRange: null,
-                },
-              ],
-            },
-          ] as never
-        }
+        parentTicketId="t1"
+        assetTickets={[sampleAssetTicket({}, { id: "child-42" })] as never}
       />,
     );
 
-    expect(screen.getByText(/firmware patch v2\.3/i)).toBeInTheDocument();
-  });
+    await user.click(screen.getByRole("combobox", { name: /ticket status/i }));
+    await user.click(screen.getByRole("option", { name: "Done" }));
 
-  it("shows em-dash when no remediation targets the asset's device group", () => {
-    render(
-      <LinkedAssetsTable
-        assetTickets={[sampleAssetTicket()] as never}
-        remediations={
-          [
-            {
-              id: "rem-1",
-              description: "Different group only",
-              deviceGroupMatchings: [
-                {
-                  manufacturerId: "manufacturer-other",
-                  productId: null,
-                  versionId: null,
-                  versionRange: null,
-                },
-              ],
-            },
-          ] as never
-        }
-      />,
+    expect(mockUseUpdateTicket).toHaveBeenCalledWith(
+      "child-42",
+      "t1",
+      "asset-1",
     );
-
-    // role/MAC/location are populated; the remediation cell should be the lone "—"
-    const dashes = screen.getAllByText("—");
-    expect(dashes.length).toBe(1);
+    expect(mockMutate).toHaveBeenCalledWith({
+      id: "child-42",
+      status: "DONE",
+    });
   });
 });
 

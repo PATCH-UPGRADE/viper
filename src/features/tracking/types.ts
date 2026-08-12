@@ -217,9 +217,6 @@ export const ticketDetailInclude = {
       id: true,
       externalId: true,
       lastSynced: true,
-      // TODO(VW-427): was integrationUri. The platform is an enum on the row
-      // now, and the mapping carries its own URLs, so the Source chip resolves
-      // a link from those instead of parsing the integration's URL.
       upstreamApi: true,
       webUrl: true,
       integration: {
@@ -284,10 +281,6 @@ export const workOrderIntegrationItemSchema = z.object({
   // appears in the Suggested (triage) tab. `raw` holds the upstream record.
   source: z
     .object({
-      // LLM-FACING: this enum is z.toJSONSchema()'d into the contract handed to
-      // n8n / partners. PolledApi and Crawl are gone; a partner still POSTing
-      // "PolledApi" now gets a 400. referenceUrl is dropped — send the
-      // item-level `webUrl` / `upstreamApi` on the envelope instead.
       channel: z.enum(SourceChannel),
       externalId: z.string().nullish(),
       markdown: z.string().nullish(),

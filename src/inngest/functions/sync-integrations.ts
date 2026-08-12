@@ -21,11 +21,6 @@ import { inngest } from "../client";
 
 /**
  * The two Inngest functions that drive integration syncs.
- *
- * Neither knows anything platform-specific. Everything that differs between
- * platforms — pulling pages vs. handing off to n8n vs. asking a partner to push
- * — lives in that platform's own `sync` strategy. Adding a platform means adding
- * a directory; it never means editing this file.
  */
 
 export const syncAllIntegrations = inngest.createFunction(

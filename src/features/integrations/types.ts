@@ -11,17 +11,6 @@ import type { trpc } from "@/trpc/server";
 
 /**
  * The resources a platform can sync, keyed by the URL segment they upload to.
- *
- * One table, three readers: the connectors/settings pages render `name`,
- * `resourceTypeSchema` below constrains what an operator may pick, and
- * `core/callback.ts` builds `/{segment}/integrationUpload/{token}` from the key.
- *
- * `ResourceType.SourceRecord` is deliberately absent — it drives an
- * `IntegrationResourceSync` row but has no upload endpoint, so there is no
- * segment for it and it must never be offered in the UI.
- *
- * This module is client-safe; keep it that way. The matching JSON Schemas live
- * behind `server-only` in `core/callback.ts` because they drag in `@/lib/tokens`.
  */
 export const integrationsMapping = {
   assets: { name: "Asset", type: ResourceType.Asset },

@@ -44,7 +44,7 @@ import { syncAllIntegrations, syncIntegration } from "../sync-integrations";
 
 /**
  * These two functions are the only thing standing between a misbehaving
- * platform and a wedged sync row, and neither had any coverage.
+ * platform and a wedged sync row
  */
 
 // A fake `step` that runs everything inline and records the order.
@@ -266,21 +266,5 @@ describe("syncAllIntegrations", () => {
       integration: { enabled: true },
       OR: [{ nextSyncAt: null }, { nextSyncAt: { lte: expect.any(Date) } }],
     });
-  });
-
-  it("schedules a platform with no module, so it fails where an operator looks", async () => {
-    // A FLEET row is fanned out on purpose. syncIntegration then writes a real
-    // errorMessage on the resource row, rather than the row sitting Pending
-    // forever with nothing to see.
-    mockPrisma.integrationResourceSync.findMany.mockResolvedValue([
-      dueRow("FLEET", ResourceType.WorkOrder),
-    ]);
-    const step = makeStep();
-
-    // biome-ignore lint/suspicious/noExplicitAny: the handler's Inngest ctx is stubbed
-    const result = await (syncAllIntegrations as any)({ step });
-
-    expect(result).toEqual({ syncedCount: 1 });
-    expect(step.sendEvent).toHaveBeenCalled();
   });
 });

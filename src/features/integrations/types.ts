@@ -1,10 +1,20 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
-import { type Integration, ResourceType } from "@/generated/prisma";
+import {
+  type Integration,
+  PlatformEnum,
+  ResourceType,
+} from "@/generated/prisma";
 import { authSchema, safeUrlSchema } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
 
+/**
+ * Deliberately a hand-written list rather than `z.enum(ResourceType)`.
+ * `ResourceType` also carries `SourceRecord`, which drives an
+ * `IntegrationResourceSync` row but has no upload endpoint and must never be
+ * offered in the integrations UI.
+ */
 export const resourceTypeSchema = z.enum([
   "Asset",
   "Vulnerability",
@@ -13,30 +23,25 @@ export const resourceTypeSchema = z.enum([
   "WorkOrder",
 ]);
 
+/**
+ * What the create/edit form binds to — deliberately flat, even though the row
+ * stores `config` (JSON) and `credentials` (encrypted bytes). The tRPC router,
+ * not the form, does the flat -> {config, credentials} transform.
+ */
 export const integrationInputSchema = authSchema.safeExtend({
   name: z.string().min(1, "Name is required"),
-  platform: z.string().optional(),
+  platform: z.enum(PlatformEnum),
   integrationUri: safeUrlSchema,
-  integrationType: z.enum(["PARTNER", "AI", "CSAF", "REST"]),
-  prompt: z.string().optional(),
-  resourceType: resourceTypeSchema,
+  // Generic platforms (AI, PARTNER) are single-resource: the resource is part
+  // of their config. FLEET ignores this until its module lands.
+  resource: resourceTypeSchema,
+  additionalInstructions: z.string().optional(), // was `Integration.prompt`
   syncEvery: z
     .number()
     .int()
     .positive()
     .min(INTEGRATION_SYNC_EVERY_MIN * 60),
 });
-/* TODO: consider adding a CSAF integration type for notifications?
-   * .refine(
-    (data) =>
-      data.integrationType !== "CSAF" ||
-      data.resourceType === ResourceType.Vulnerability,
-    {
-      message:
-        "CSAF integrations are only available for Vulnerability resource type",
-      path: ["integrationType"],
-    },
-  )*/
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;
 
 export function isValidResourceTypeKey(
@@ -74,9 +79,8 @@ export type IntegrationWithRelations = inferOutput<
 
 export type IntegrationWithStringDates = Omit<
   Integration,
-  "createdAt" | "updatedAt" | "lastSuccessfulSync"
+  "createdAt" | "updatedAt"
 > & {
   createdAt: string;
   updatedAt: string;
-  lastSuccessfulSync: string | null;
 };

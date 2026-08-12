@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
+import { processIntegrationSync } from "@/features/integrations/core/sync/ingest";
 import {
   attachNote,
   attachNotes,
@@ -22,7 +23,6 @@ import {
   fetchPaginated,
   findDeviceGroupIdsForMatchings,
   findVulnerabilitiesMatchingDeviceGroups,
-  processIntegrationSync,
   processIntegrationToken,
   resolveDeviceGroup,
 } from "@/lib/router-utils";
@@ -572,7 +572,7 @@ export const assetsRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const { userId, integrationId } = await processIntegrationToken(
+      const { userId, integrationId, resource } = await processIntegrationToken(
         input.token,
         ResourceType.Asset,
       );
@@ -583,7 +583,16 @@ export const assetsRouter = createTRPCRouter({
           model: prisma.asset,
           mappingModel: prisma.externalAssetMapping,
           transformInputItem: async (item, userId) => {
-            const { cpe, vendorId: _vendorId, utilization, ...itemData } = item;
+            // upstreamApi / webUrl belong to the External*Mapping, not the
+            // record; processIntegrationSync writes them onto the mapping row.
+            const {
+              cpe,
+              vendorId: _vendorId,
+              utilization,
+              upstreamApi: _upstreamApi,
+              webUrl: _webUrl,
+              ...itemData
+            } = item;
             const deviceGroup = await cpeToDeviceGroup(
               cpe ?? UNKNOWN_CPE_STRING,
             );
@@ -618,6 +627,7 @@ export const assetsRouter = createTRPCRouter({
         input,
         userId,
         integrationId,
+        resource,
       );
     }),
 

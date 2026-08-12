@@ -15,8 +15,7 @@ import { aiSync } from "./sync";
  * to read it.
  *
  * Items come back already in VIPER's shape — that is what the JSON Schema in
- * the hand-off is for — so there is nothing to translate and **every
- * ResourceModule field is omitted**.
+ * the hand-off is for — so there is nothing to translate
  */
 export const ai: ConnectorModule<AiConfig, AiCreds> = {
   definition: {

@@ -9,12 +9,6 @@ import {
 import { authSchema, safeUrlSchema } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
 
-/**
- * Deliberately a hand-written list rather than `z.enum(ResourceType)`.
- * `ResourceType` also carries `SourceRecord`, which drives an
- * `IntegrationResourceSync` row but has no upload endpoint and must never be
- * offered in the integrations UI.
- */
 export const resourceTypeSchema = z.enum([
   "Asset",
   "Vulnerability",
@@ -32,10 +26,8 @@ export const integrationInputSchema = authSchema.safeExtend({
   name: z.string().min(1, "Name is required"),
   platform: z.enum(PlatformEnum),
   integrationUri: safeUrlSchema,
-  // Generic platforms (AI, PARTNER) are single-resource: the resource is part
-  // of their config. FLEET ignores this until its module lands.
   resource: resourceTypeSchema,
-  additionalInstructions: z.string().optional(), // was `Integration.prompt`
+  additionalInstructions: z.string().optional(),
   syncEvery: z
     .number()
     .int()

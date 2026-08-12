@@ -7,8 +7,7 @@ import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
 import { computeNextSyncAt, effectiveSyncEvery } from "../index";
 
 /**
- * Cadence and backoff were module-private inside the Inngest function, so
- * neither had a test. They decide how often every integration in the system
+ * Cadence and backoff decide how often every integration in the system
  * runs, and how long a broken one stays quiet.
  */
 

@@ -26,21 +26,18 @@ export async function aiSync(
       "Content-Type": "application/json",
     },
     signal: AbortSignal.timeout(30000), // 30s timeout
-    // NOTE: this body must stay byte-compatible with what the committed
-    // n8n_workflows/AI_Sync_Workflow.json reads — same keys, same order.
+    // NOTE: has to be compatible with whatever we have on n8n
     body: JSON.stringify({
-      // If you're testing this locally and need webhooks, use NEXT_PUBLIC_APP_URL
       baseApiUrl: callback.baseApiUrl,
       responsePath: callback.path,
       responseSchema: callback.schema,
       resourceType: ctx.resource,
       integrationUri: ctx.config.integrationUri,
       additionalInstructions: ctx.config.additionalInstructions,
-      // TODO(VW-427): this forwards the integration's credentials to n8n in
+      // TODO(VW-428): this forwards the integration's credentials to n8n in
       // plaintext, on purpose. n8n crawls the upstream on our behalf and has to
       // authenticate as us, so `SyncCtx.creds` exists specifically for this
-      // path. It is the ONLY place credentials leave VIPER — they must never
-      // reach toCanonical, apiUrlFor, webUrlFor or ingest.
+      // path.
       authType: ctx.creds.authType,
       authentication: ctx.creds.authentication,
     }),

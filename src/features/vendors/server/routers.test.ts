@@ -76,8 +76,6 @@ describe("vendorsRouter.getMany", () => {
         canonicalDisplayName: "Siemens Healthineers",
         overview: null,
         partnerSince: null,
-        // ContractAsset is gone; a contract reaches its assets through the
-        // ManagesRelationship it belongs to.
         contracts: [
           {
             managesRelationship: { assets: [{ id: "a1" }, { id: "a2" }] },

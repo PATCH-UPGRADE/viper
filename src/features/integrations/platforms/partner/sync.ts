@@ -35,8 +35,8 @@ export async function partnerSync(
       (parsedCursor.success ? parsedCursor.data.since : null) ??
       ctx.lastSuccessfulSync?.toISOString() ??
       new Date(0).toISOString(),
-    // Preserved deliberately: the callback token is single-use, so page 2 would
-    // 401. Lifting this needs a multi-use or per-page token — out of scope.
+    // TODO: the callback token is single-use, so page 2 would
+    // 401. Eventually want to support multi-page partner integrations... 
     max_pages: 1,
     page_size: 500,
     callback: callback.url,

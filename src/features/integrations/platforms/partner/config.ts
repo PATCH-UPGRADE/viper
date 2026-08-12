@@ -5,13 +5,10 @@ import { safeUrlSchema } from "@/lib/schemas";
 
 /**
  * What an operator has to provide for a partner integration (Blueflow, Helm).
- *
- * Single-resource, like `ai`. No `additionalInstructions`: a partner follows the
- * VIPER standard, so there is nothing to instruct.
  */
 export const configSchema = z.object({
   integrationUri: safeUrlSchema,
-  resource: z.enum(ResourceType),
+  resource: z.enum(ResourceType), // one integration per resource
 });
 export type PartnerConfig = z.infer<typeof configSchema>;
 

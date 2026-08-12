@@ -8,15 +8,11 @@ import type { AnyConnectorModule } from "./types";
 
 /**
  * Every platform VIPER knows how to run, keyed by the enum on the row.
- *
- * Deliberately `Partial`: `FLEET` has no module yet. Its old fetch-and-map path
- * has been deleted, and `platforms/teamplay-fleet/` is a later phase. Until then
- * a FLEET integration must fail with a message that says so, rather than
- * silently doing nothing.
  */
 export const registry: Partial<Record<PlatformEnum, AnyConnectorModule>> = {
   AI: ai,
   PARTNER: partner,
+  // TODO: VW-431 add teamplay Fleet here
 };
 
 export const requirePlatform = (platform: PlatformEnum): AnyConnectorModule => {
@@ -25,16 +21,16 @@ export const requirePlatform = (platform: PlatformEnum): AnyConnectorModule => {
     throw new Error(
       `No platform module is registered for ${platform}. Registered: ${Object.keys(
         registry,
-      ).join(", ")}. The teamplay Fleet module lands in a later phase; until ` +
-        `then a FLEET integration cannot be created or synced.`,
+      )}`
     );
   }
   return module;
 };
 
 /**
- * Does the cron schedule this platform?
+ * Does the cron/Inngest schedule this platform?
  *
+ * TODO Cassidy
  * An unregistered platform answers **true** on purpose. Filtering it out here
  * would bury the misconfiguration: the row would sit `Pending` forever with
  * nothing to look at. Letting it through means `syncIntegration` records a real
@@ -57,9 +53,10 @@ export const defaultSyncEveryFor = (
 // ---------------------------------------------------------------------------
 // Load-time assertions
 // ---------------------------------------------------------------------------
-// A platform that can never sync should be a startup error, not a silent no-op
-// discovered weeks later by an operator wondering why nothing imports.
+// A platform that can never sync is a startup error
 //
+//
+// TODO Cassidy:
 // Note the RFC asks to re-assert `genericConfigSchema.parse(config)` here. There
 // is no config instance at load — only a schema — so the checkable equivalent is
 // that the schema *declares* the key. That catches the same failure mode: a

@@ -16,9 +16,8 @@ export const resolveSyncStrategy = (
   module.sync ?? ((ctx) => pollSync(module, ctx));
 
 /**
- * Resolve the effective cadence for a resource. Four levels, one function: the
- * operator's per-resource override, the instance-wide override, the platform
- * author's own sense of how fast this resource moves, then the global floor.
+ * Resolve the effective cadence for a resource.
+ * Cascade based on what's defined for each resource/integration/platform
  */
 export const effectiveSyncEvery = (
   resourceSyncEvery: number | null,

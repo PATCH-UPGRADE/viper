@@ -22,9 +22,7 @@ import { PrismaClientValidationError } from "@/generated/prisma/runtime/library"
 import { type ArtifactsContent, processIntegrationSync } from "../ingest";
 
 /**
- * The ingest path used to `break` out of the item loop on the first Prisma
- * error, silently dropping every remaining item while returning HTTP 200 with
- * `createdItemsCount: 0`. These tests pin the replacement behaviour: errors are
+ * If we get a Prisma error on an integration, errors are
  * collected, the batch continues, and the response reports real partial counts.
  */
 
@@ -171,7 +169,6 @@ describe("processIntegrationSync — partial failures", () => {
 
     const response = await run(config, items(5));
 
-    // The old behaviour was createdItemsCount: 0 — items 3-5 never ran.
     expect(response.createdItemsCount).toBe(4);
     expect(response.shouldRetry).toBe(true);
     expect(config.model.create).toHaveBeenCalledTimes(5);

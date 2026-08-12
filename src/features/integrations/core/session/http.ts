@@ -1,6 +1,8 @@
 import "server-only";
 import type { Session } from "../types";
 
+
+// TODO: VW-431 Would teamplay Fleet authentication use this? If not, we should get rid of this file
 /**
  * A fetch wrapper with a base URL, JSON decoding, a timeout, and retries.
  * Platforms build their `Session` on top of this rather than reimplementing

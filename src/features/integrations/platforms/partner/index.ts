@@ -12,9 +12,6 @@ import { partnerSync } from "./sync";
 
 /**
  * A partner that follows the VIPER standard (Blueflow, Helm).
- *
- * Items arrive already in our shape, so — like `ai` — every ResourceModule
- * field is omitted and the strategy just hands off.
  */
 export const partner: ConnectorModule<PartnerConfig, PartnerCreds> = {
   definition: {

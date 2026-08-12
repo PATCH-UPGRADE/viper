@@ -11,16 +11,14 @@ import { getBaseUrl } from "@/lib/url-utils";
 import type { CallbackConfig } from "./types";
 
 /**
- * The one-time upload token, response path, and resource JSON Schema for
- * platforms that push data back to us instead of us fetching it.
- *
- * This is the only thing `ai` and `partner` share.
+ * Where should ai and partner integrations
+ * * return their responses to
+ * * what schema should they use in that response
+ * And create a callback token for this endpoint
  */
 
 /**
- * Upload endpoint + envelope schema per resource. `SourceRecord` is
- * deliberately absent: it drives an `IntegrationResourceSync` row but has no
- * upload endpoint, so asking for a callback for one is a programming error.
+ * Upload endpoint + envelope schema per resource
  */
 const ENDPOINTS = {
   [ResourceType.Asset]: {
@@ -50,9 +48,6 @@ const ENDPOINTS = {
 /**
  * Mint a one-time, resource-scoped token for the integration's shadow user and
  * describe where — and in what shape — a platform pushes data back.
- *
- * The token is consumed on first use (`consumeUserToken`), which is why a
- * platform gets one per sync attempt and why multi-page pushes don't work yet.
  */
 export const createCallback = async (
   integrationUserId: string,

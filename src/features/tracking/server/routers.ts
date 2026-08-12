@@ -1214,8 +1214,6 @@ export const trackingRouter = createTRPCRouter({
           model: prisma.workOrderTicket,
           mappingModel: prisma.externalWorkOrderMapping,
           transformInputItem: async (item, creatorId) => {
-            // upstreamApi / webUrl belong to the mapping, not the ticket;
-            // processIntegrationSync writes them onto the External*Mapping row.
             const {
               vendorId,
               scheduledAt,

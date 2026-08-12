@@ -19,9 +19,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getChipClass } from "@/features/tag-colors/palette";
 import { useUpdateTicket } from "@/features/tracking/hooks/use-tracking";
 import type { TicketStatus } from "@/generated/prisma";
-import { type DetailAssetTicket, formatLocation, statusLabels } from "./shared";
+import {
+  type DetailAssetTicket,
+  formatLocation,
+  statusHue,
+  statusLabels,
+} from "./shared";
 
 const AssetTicketStatusSelect = ({
   parentTicketId,
@@ -44,7 +50,11 @@ const AssetTicketStatusSelect = ({
       }
       disabled={update.isPending}
     >
-      <SelectTrigger size="sm" aria-label="Ticket status">
+      <SelectTrigger
+        size="sm"
+        aria-label="Ticket status"
+        className={getChipClass(statusHue[status])}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

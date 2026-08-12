@@ -8,11 +8,6 @@ import {
   type UrlBearingMapping,
 } from "../urls";
 
-/**
- * Two client components render links through these. The no-builders path has to
- * keep behaving exactly as the old `src/lib/upstream-urls.ts` did, or every
- * vulnerability link changes without anyone touching a component.
- */
 
 const mapping = (
   overrides: Partial<UrlBearingMapping> = {},
@@ -55,6 +50,8 @@ describe("without a platform module (ai / partner)", () => {
   });
 });
 
+// Can we go from an externalId into an API/web url, using the platform
+// definition?
 describe("with a platform module (code-defined platforms)", () => {
   const builders: UrlBuilders<{ base: string }> = {
     apiUrlFor: (externalId, config) => `${config.base}/api/${externalId}`,

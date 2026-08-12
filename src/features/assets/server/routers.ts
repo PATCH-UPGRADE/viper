@@ -583,8 +583,6 @@ export const assetsRouter = createTRPCRouter({
           model: prisma.asset,
           mappingModel: prisma.externalAssetMapping,
           transformInputItem: async (item, userId) => {
-            // upstreamApi / webUrl belong to the External*Mapping, not the
-            // record; processIntegrationSync writes them onto the mapping row.
             const {
               cpe,
               vendorId: _vendorId,

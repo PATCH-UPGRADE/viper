@@ -219,8 +219,6 @@ export const remediationsRouter = createTRPCRouter({
           model: prisma.remediation,
           mappingModel: prisma.externalRemediationMapping,
           transformInputItem: async (item, userId) => {
-            // upstreamApi / webUrl belong to the External*Mapping, not the
-            // record; processIntegrationSync writes them onto the mapping row.
             const {
               vendorId: _vendorId,
               artifacts,

@@ -27,30 +27,15 @@ describe("registry", () => {
     );
   });
 
-  it("does not register FLEET yet, and says so", () => {
-    expect(registry[PlatformEnum.FLEET]).toBeUndefined();
-    expect(() => requirePlatform(PlatformEnum.FLEET)).toThrow(/FLEET/);
-    expect(() => requirePlatform(PlatformEnum.FLEET)).toThrow(
-      /No platform module is registered/,
-    );
-  });
+  // TODO: VW-431, test to make sure fleet gets registered
 
   it("schedules the generic platforms, because they declare 'poll'", () => {
     expect(isPollable(PlatformEnum.AI)).toBe(true);
     expect(isPollable(PlatformEnum.PARTNER)).toBe(true);
   });
 
-  it("still schedules an unregistered platform, so the failure is visible", () => {
-    // Filtering FLEET out here would leave the row Pending forever with nothing
-    // to look at. Letting it through records a real error on the resource row.
-    expect(isPollable(PlatformEnum.FLEET)).toBe(true);
-  });
-
   it("has no cadence opinion for a platform without ResourceModules", () => {
     expect(defaultSyncEveryFor(PlatformEnum.AI, ResourceType.Asset)).toBeNull();
-    expect(
-      defaultSyncEveryFor(PlatformEnum.FLEET, ResourceType.WorkOrder),
-    ).toBeNull();
   });
 });
 

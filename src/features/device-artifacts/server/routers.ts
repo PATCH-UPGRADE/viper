@@ -248,8 +248,6 @@ export const deviceArtifactsRouter = createTRPCRouter({
           model: prisma.deviceArtifact,
           mappingModel: prisma.externalDeviceArtifactMapping,
           transformInputItem: async (item, userId) => {
-            // upstreamApi / webUrl belong to the External*Mapping, not the
-            // record; processIntegrationSync writes them onto the mapping row.
             const {
               cpe,
               vendorId: _vendorId,

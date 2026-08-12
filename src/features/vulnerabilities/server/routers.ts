@@ -278,8 +278,6 @@ export const vulnerabilitiesRouter = createTRPCRouter({
           model: prisma.vulnerability,
           mappingModel: prisma.externalVulnerabilityMapping,
           transformInputItem: async (item, userId) => {
-            // upstreamApi / webUrl belong to the External*Mapping, not the
-            // record; processIntegrationSync writes them onto the mapping row.
             const {
               cpes,
               vendorId: _vendorId,

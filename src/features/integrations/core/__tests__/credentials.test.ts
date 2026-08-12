@@ -7,11 +7,6 @@ import {
   parseAuthCredential,
 } from "../credentials";
 
-/**
- * `Integration.credentials` replaces the old plaintext `authentication` JSON
- * column. These are the properties the rest of the integration layer relies on.
- */
-
 const SECRET = {
   authType: "Bearer" as const,
   authentication: { token: "s3cr3t-value" },

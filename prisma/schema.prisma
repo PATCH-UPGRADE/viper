@@ -446,6 +446,7 @@ model Asset {
   updatedAt DateTime @updatedAt
 
   @@index([deviceGroupId])
+  @@index([createdAt])
   @@map("asset")
 }
 
@@ -1294,6 +1295,7 @@ model TicketActivity {
 
   @@index([ticketId, createdAt])
   @@index([userId])
+  @@index([type, createdAt])
   @@map("ticket_activity")
 }
 
@@ -1384,6 +1386,7 @@ model Notification {
   updatedAt DateTime @updatedAt
 
   @@index([type])
+  @@index([type, createdAt])
   @@map("notification")
 }
 

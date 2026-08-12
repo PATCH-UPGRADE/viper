@@ -7,7 +7,7 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import { SinceLastVisitCard } from "./since-last-visit-card";
+import { RecentUpdatesCard } from "./recent-updates-card";
 import { SuggestedInboxCard } from "./suggested-inbox-card";
 import { SuggestedWorkOrdersCard } from "./suggested-work-orders-card";
 
@@ -63,7 +63,7 @@ export const OverviewPanels = () => (
       <SuggestedInboxCard />
       <SuggestedWorkOrdersCard />
     </div>
-    <SinceLastVisitCard />
+    <RecentUpdatesCard />
   </div>
 );
 

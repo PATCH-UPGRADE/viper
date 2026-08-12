@@ -12,3 +12,8 @@ export const useSuspenseSuggestedWorkOrders = () => {
   const trpc = useTRPC();
   return useSuspenseQuery(trpc.overview.suggestedWorkOrders.queryOptions());
 };
+
+export const useSuspenseRecentUpdates = () => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(trpc.overview.recentUpdates.queryOptions());
+};

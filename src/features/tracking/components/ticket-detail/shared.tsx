@@ -91,7 +91,7 @@ export const DepartmentChips = ({
 
 export type DetailAssetTicket = TicketDetail["assets"][number];
 
-export const statusOrder = Object.keys(statusLabels) as TicketStatus[];
+const statusOrder = Object.keys(statusLabels) as TicketStatus[];
 
 // To Do → In Progress → Requires Approval → Done (doesn't mutate the input).
 export const sortAssetTicketsByStatus = (

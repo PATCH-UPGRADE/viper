@@ -19,10 +19,7 @@ import type { CallbackConfig } from "./types";
  */
 
 /**
- * The envelope schema per resource. The URL segment that goes with each one
- * lives in `integrationsMapping` — a client-safe table, because the connectors
- * UI reads it too. These schemas can't join it there: they reach `@/lib/tokens`
- * and would drag the server into a client bundle.
+ * Maps schemas to resource types
  */
 const ENVELOPE_SCHEMAS = {
   [ResourceType.Asset]: integrationAssetInputSchema,
@@ -52,7 +49,6 @@ export const createCallback = async (
     resource,
   );
 
-  // If you're testing this locally and need webhooks, use NEXT_PUBLIC_APP_URL
   const baseApiUrl = `${getBaseUrl()}/api/v1`;
   const path = `/${segment}/integrationUpload/${raw}`;
 

@@ -36,15 +36,7 @@ export const defaultSyncEveryFor = (
   return moduleForResource(module, resource)?.defaultSyncEvery ?? null;
 };
 
-// ---------------------------------------------------------------------------
-// Load-time assertion
-// ---------------------------------------------------------------------------
-// A registry keyed by the wrong enum would look up the wrong module at sync
-// time, which is a startup error rather than something to discover in prod.
-//
-// Everything else that used to be checked here is now structural: `sync` is a
-// required field, and a generic platform gets `resource` by composing
-// `genericConfigSchema`, so TypeScript enforces both.
+// load-time assertion 
 for (const [key, module] of Object.entries(registry)) {
   if (module && module.definition.platform !== key) {
     throw new Error(

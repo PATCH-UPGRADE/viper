@@ -90,9 +90,7 @@ export const decryptCredentials = (blob: Uint8Array): unknown => {
 };
 
 /**
- * The credential shape shared by every platform that authenticates with a
- * static header (basic / bearer / arbitrary header) — which today is all of
- * them. A platform needing something else declares its own `credentialSchema`
+ * A platform needing something else declares its own `credentialSchema`
  * and encrypts it with the generic functions above.
  */
 export const authCredentialSchema = z.object({
@@ -136,11 +134,6 @@ export const parseAuthCredential = (
 /**
  * Turn a stored credential into request headers — basic, bearer, or an
  * arbitrary header.
- *
- * This is the whole of what platforms share about authentication. There is no
- * `Session` object: `partner` makes one POST to one absolute URL and needs
- * nothing more, and a platform that authenticates some other way (Fleet drives
- * a login form and reuses the cookie) owns that itself.
  */
 export const authHeaders = (creds: AuthCredential): Record<string, string> => {
   if (creds.authType === AuthType.None) return {};

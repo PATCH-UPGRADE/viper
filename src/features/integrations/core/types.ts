@@ -1,13 +1,7 @@
 /**
- * What a Platform *is*.
- *
  * A Platform is a module of code that handles everything about one kind of
  * integration — auth, what it syncs, where its records live. An `Integration`
  * row is just an instance of one, naming its platform via `PlatformEnum`.
- *
- * This file is deliberately **not** `server-only`: `core/urls.ts` imports
- * `UrlBuilders` from here and is used by client components. Every import below
- * is `import type`, so nothing survives compilation into a bundle.
  */
 
 import type { z } from "zod";
@@ -15,9 +9,10 @@ import type { PlatformEnum, ResourceType } from "@/generated/prisma";
 
 /**
  * Opaque to core: round-tripped through `IntegrationResourceSync.cursor` and
- * interpreted only by the platform that produced it. Version your cursors and
- * carry a tiebreaker alongside any timestamp — see the RFC's "Cursors".
+ * interpreted only by the platform that produced it.
  */
+// TODO: VW-431, use a cursor to store pagination logic when polling data from fleet?
+// if you use it, great, keep it, if not, just delete it
 export type Cursor = unknown;
 
 export interface Page<TRaw> {
@@ -46,6 +41,7 @@ export interface CallbackConfig {
  * parameter. A registry lookup inside `urls.ts` would drag the whole server-only
  * platform graph into any client component that renders a link.
  */
+// TODO: VW-431 Fleet should use this on resource modules
 export interface UrlBuilders<TConfig = unknown> {
   /** What's the API URL for this record on their platform? */
   apiUrlFor?(externalId: string, config: TConfig): string | null;
@@ -55,22 +51,14 @@ export interface UrlBuilders<TConfig = unknown> {
 
 /**
  * One resource on a platform whose protocol *we* speak (Fleet, ServiceNow).
- * Platforms that speak *ours* (ai, partner) omit these entirely — see the
- * RFC's "Who speaks whose protocol".
  *
- * Nothing implements this yet; it is the shape the first pulling platform will
- * take, and `defaultSyncEveryFor` already reads it. A platform owns whatever
- * client its methods need — core has no session abstraction, because the two
- * platforms that exist authenticate to different parties and the one that comes
- * next authenticates with a browser cookie.
- *
- * Credentials never reach here. A mapper that can read credentials is one
- * refactor away from logging them, and mappers have no use for them.
- */
+ * A platform owns whatever client its methods need, including session abstratction
+*/
 export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
   extends UrlBuilders<TConfig> {
   // we pull from their platform
-  listChanged(cursor: Cursor | null): AsyncIterable<Page<TRaw>>;
+  listChanged(cursor: Cursor | null): AsyncIterable<Page<TRaw>>; 
+  // TODO: VW-431: can change `listChanged` schema if it doesn't work for fleet
   get(externalId: string): Promise<TRaw>;
   toCanonical(raw: TRaw, config: TConfig): TCanonical;
 
@@ -81,7 +69,7 @@ export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
     patch: Partial<TCanonical>,
   ): Promise<{ externalId: string; raw: TRaw }>;
 
-  /** This resource's natural cadence, in seconds. null = no opinion. */
+  /** how often this resource should sync, in seconds. null = no opinion. */
   defaultSyncEvery: number | null;
 }
 
@@ -154,11 +142,6 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
 /**
  * The erased module type, for the registry and for core helpers that must hold
  * modules of differing `TConfig`/`TCreds` side by side.
- *
- * `ConnectorModule<unknown, unknown>` does not work: zod v4's `_zod` internals
- * are invariant, so `z.ZodType<AiConfig>` is not assignable to
- * `z.ZodType<unknown>`. Per-module type safety is unaffected — it is enforced at
- * each definition site (`export const ai: ConnectorModule<AiConfig, AiCreds>`).
- */
+*/
 // biome-ignore lint/suspicious/noExplicitAny: see above — `unknown` does not erase zod's invariant internals.
 export type AnyConnectorModule = ConnectorModule<any, any>;

@@ -62,8 +62,6 @@ export const setupMockIntegration = async (
 
   expect(createdIntegration.name).toBe(mockIntegrationPayload.name);
   expect(createdIntegration.platform).toBe(mockIntegrationPayload.platform);
-  // `config` round-trips as submitted, after the platform's own schema has
-  // narrowed it — the router does not reshape it.
   expect(createdIntegration.config).toMatchObject(
     mockIntegrationPayload.config,
   );

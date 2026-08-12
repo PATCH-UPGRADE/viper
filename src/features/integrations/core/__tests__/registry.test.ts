@@ -23,10 +23,6 @@ describe("registry", () => {
   });
 
   // TODO: VW-431, test to make sure fleet gets registered
-  it("has no module for FLEET yet, and says so", () => {
-    expect(registry[PlatformEnum.FLEET]).toBeUndefined();
-    expect(() => requirePlatform(PlatformEnum.FLEET)).toThrow(/FLEET/);
-  });
 
   it("has no cadence opinion for a platform without ResourceModules", () => {
     expect(defaultSyncEveryFor(PlatformEnum.AI, ResourceType.Asset)).toBeNull();
@@ -49,8 +45,6 @@ describe("generic platform definitions", () => {
   it.each([PlatformEnum.AI, PlatformEnum.PARTNER])(
     "%s declares its resource in config, since it has no ResourceModules",
     (platform) => {
-      // This is what `resourcesFor` reads. Composing genericConfigSchema makes
-      // it structural, so a platform can't forget it.
       const parsed = requirePlatform(
         platform,
       ).definition.configSchema.safeParse({

@@ -61,10 +61,6 @@ async function main() {
           integrationUri: "http://blueflow:8000",
           resource: ResourceType.Asset,
         },
-        // Blueflow is unauthenticated: VIPER sends it no credentials, and the
-        // only secret in the flow is the single-use token in the callback path
-        // minted below. A null column *is* AuthType.None — see
-        // parseAuthCredential — so there is nothing to encrypt here.
         credentials: null,
         syncEvery: 3600,
         userId: seedUser.id,

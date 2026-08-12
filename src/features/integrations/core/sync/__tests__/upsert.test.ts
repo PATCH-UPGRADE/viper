@@ -18,8 +18,7 @@ vi.mock("@/lib/router-utils", () => ({
 }));
 
 import { ResourceType } from "@/generated/prisma";
-import { PrismaClientValidationError } from "@/generated/prisma/runtime/library";
-import { type ArtifactsContent, processIntegrationSync } from "../ingest";
+import { type ArtifactsContent, processIntegrationSync } from "../upsert";
 
 /**
  * If we get a Prisma error on an integration, errors are
@@ -184,48 +183,6 @@ describe("processIntegrationSync — partial failures", () => {
     const response = await run(config, items(5));
 
     expect(response.message).toBe("1 of 5 items failed: Internal Server Error");
-  });
-
-  it("collapses identical failures into one clause", async () => {
-    const config = makeConfig();
-    config.model.create.mockRejectedValue(new Error("same every time"));
-
-    const response = await run(config, items(4));
-
-    expect(response.message).toBe("4 of 4 items failed: Internal Server Error");
-    expect(response.message).not.toContain("more");
-  });
-
-  it("caps the summary at three distinct clauses", async () => {
-    const config = makeConfig();
-    let n = 0;
-    config.model.create.mockImplementation(async () => {
-      n += 1;
-      // Only Prisma errors keep their own message; anything else is flattened
-      // to "Internal Server Error", which would collapse to a single clause.
-      throw new PrismaClientValidationError(`failure ${n}`, {
-        clientVersion: "test",
-      });
-    });
-
-    const response = await run(config, items(5));
-
-    expect(response.message).toBe(
-      "5 of 5 items failed: failure 1; failure 2; failure 3 (+2 more)",
-    );
-  });
-
-  it("bounds the summary so it fits the errorMessage column", async () => {
-    const config = makeConfig();
-    config.model.create.mockImplementation(async () => {
-      throw new PrismaClientValidationError("x".repeat(2000), {
-        clientVersion: "test",
-      });
-    });
-
-    const response = await run(config, items(1));
-
-    expect(response.message.length).toBe(1000);
   });
 
   it("reports plain success when nothing failed", async () => {

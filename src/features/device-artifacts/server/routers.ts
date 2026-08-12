@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { processIntegrationSync } from "@/features/integrations/core/sync/ingest";
+import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { type Prisma, ResourceType } from "@/generated/prisma";
 import { requestArtifactNoteExtraction } from "@/inngest/functions/extract-artifact-notes";
 import prisma from "@/lib/db";

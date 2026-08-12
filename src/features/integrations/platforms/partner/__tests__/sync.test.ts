@@ -5,7 +5,6 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: {} }));
 
 import { AuthType, ResourceType } from "@/generated/prisma";
-import { createNoopSession } from "../../../core/session/basic";
 import type { SyncCtx } from "../../../core/types";
 import type { PartnerConfig, PartnerCreds } from "../config";
 import { partnerSync } from "../sync";
@@ -27,11 +26,8 @@ const makeCtx = (
   },
   creds: { authType: AuthType.None },
   resource: ResourceType.Asset,
-  // The platform never fetches; the data comes back at the callback.
-  session: createNoopSession(),
   cursor: null,
   lastSuccessfulSync: null,
-  ingest: async () => {},
   callback: async () => ({
     baseApiUrl: "http://localhost:3000/api/v1",
     path: "/assets/integrationUpload/tok-123",

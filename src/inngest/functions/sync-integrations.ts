@@ -8,16 +8,13 @@ import {
 } from "@/features/integrations/core/credentials";
 import {
   defaultSyncEveryFor,
-  isPollable,
   requirePlatform,
 } from "@/features/integrations/core/registry";
 import {
   computeNextSyncAt,
   effectiveSyncEvery,
-  resolveSyncStrategy,
-} from "@/features/integrations/core/sync";
-import { createIngest } from "@/features/integrations/core/sync/ingest";
-import type { Session, SyncCtx } from "@/features/integrations/core/types";
+} from "@/features/integrations/core/sync/cadence";
+import type { SyncCtx } from "@/features/integrations/core/types";
 import { Prisma, SyncStatusEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
@@ -26,9 +23,9 @@ import { inngest } from "../client";
  * The two Inngest functions that drive integration syncs.
  *
  * Neither knows anything platform-specific. Everything that differs between
- * platforms — poll vs. hand-off-to-n8n vs. ask-the-partner-to-push — lives in
- * the platform's own module, behind `resolveSyncStrategy`. Adding a platform
- * means adding a directory; it never means editing this file.
+ * platforms — pulling pages vs. handing off to n8n vs. asking a partner to push
+ * — lives in that platform's own `sync` strategy. Adding a platform means adding
+ * a directory; it never means editing this file.
  */
 
 export const syncAllIntegrations = inngest.createFunction(
@@ -45,29 +42,21 @@ export const syncAllIntegrations = inngest.createFunction(
     // syncEvery *regardless of that row's state*, so a Pending row that never
     // completed suppressed re-sync forever. nextSyncAt is stamped at attempt
     // start instead, so a crashed worker costs one cycle rather than wedging.
-    const due = await step.run("fetch-due-resource-syncs", async () => {
-      const rows = await prisma.integrationResourceSync.findMany({
+    //
+    // Every due row is scheduled, whatever its platform does with the tick.
+    // A platform with no module registered is scheduled too, on purpose: it
+    // then records a real error on its resource row, which is where an operator
+    // would look, instead of sitting `Pending` forever with nothing to see.
+    const due = await step.run("fetch-due-resource-syncs", async () =>
+      prisma.integrationResourceSync.findMany({
         where: {
           enabled: true,
           integration: { enabled: true },
           OR: [{ nextSyncAt: null }, { nextSyncAt: { lte: new Date() } }],
         },
-        select: {
-          integrationId: true,
-          resource: true,
-          integration: { select: { platform: true } },
-        },
-      });
-
-      // Whether a platform is pollable lives in code, not the DB, so it can't
-      // be part of the query. A webhook-only platform is scheduled by nobody.
-      return rows
-        .filter((row) => isPollable(row.integration.platform))
-        .map((row) => ({
-          integrationId: row.integrationId,
-          resource: row.resource,
-        }));
-    });
+        select: { integrationId: true, resource: true },
+      }),
+    );
 
     if (due.length > 0) {
       await step.sendEvent(
@@ -165,12 +154,10 @@ export const syncIntegration = inngest.createFunction(
 
     // ---- 3. Run the strategy ---------------------------------------------
     // One step, not several. `step.run` memoizes its return value as JSON, so a
-    // Session, a closure or a module cannot cross a boundary — a returned
-    // Session would arrive as `{}` with `dispose` undefined. Everything
-    // non-serializable is therefore created and consumed in here, and
-    // `dispose()` runs in a plain JS `finally` rather than a later step.
+    // closure or a module cannot cross a boundary. Everything non-serializable
+    // is therefore created and consumed in here; only `{ ok, cursor, pending }`
+    // comes out.
     const outcome = await step.run("run-sync-strategy", async () => {
-      let session: Session | undefined;
       try {
         // Inside the try on purpose: an unregistered platform then produces an
         // errorMessage the operator can see, instead of an uncaught throw that
@@ -189,26 +176,18 @@ export const syncIntegration = inngest.createFunction(
           ),
         );
 
-        session = await module.createSession({ config, creds });
-
         const ctx: SyncCtx = {
           config,
           creds,
           resource,
-          session,
           cursor: loaded.cursor,
           lastSuccessfulSync: loaded.lastSuccessfulSync
             ? new Date(loaded.lastSuccessfulSync)
             : null,
-          ingest: createIngest({
-            integrationId,
-            integrationUserId: loaded.integrationUserId,
-            resource,
-          }),
           callback: () => createCallback(loaded.integrationUserId, resource),
         };
 
-        const result = await resolveSyncStrategy(module)(ctx);
+        const result = await module.sync(ctx);
         return {
           ok: true as const,
           cursor: (result.cursor ?? null) as unknown,
@@ -220,10 +199,6 @@ export const syncIntegration = inngest.createFunction(
           errorMessage:
             error instanceof Error ? error.message : "Unknown error",
         };
-      } finally {
-        await session
-          ?.dispose?.()
-          .catch((error) => console.error("session dispose failed", error));
       }
     });
 

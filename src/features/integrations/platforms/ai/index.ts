@@ -1,5 +1,4 @@
 import "server-only";
-import { createNoopSession } from "@/features/integrations/core/session/basic";
 import type { ConnectorModule } from "@/features/integrations/core/types";
 import { PlatformEnum } from "@/generated/prisma";
 import {
@@ -23,10 +22,6 @@ export const ai: ConnectorModule<AiConfig, AiCreds> = {
     displayName: "AI Crawler",
     configSchema,
     credentialSchema,
-    // 'poll' is what makes the cron schedule it; 'push' is what happens when
-    // the tick fires. Drop 'poll' and it would never be scheduled at all.
-    changeSources: ["poll", "push"],
   },
-  createSession: async () => createNoopSession(),
   sync: aiSync,
 };

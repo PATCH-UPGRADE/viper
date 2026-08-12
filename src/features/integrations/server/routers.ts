@@ -56,24 +56,18 @@ const integrationsInclude = {
 const omitCredentials = { credentials: true } as const;
 
 /**
- * The form is flat; the row is not. Derive `config` from the submitted values
- * and hand it to the platform's own `configSchema`, so an unknown or missing
- * key fails at write time rather than at the first sync.
+ * Narrow the submitted `config` with the platform's own schema, so an unknown or
+ * missing key fails at write time rather than at the first sync.
  *
- * The wire shape is unchanged — `integrationInputSchema` is still exactly what
- * a client posts. Only the derivation moved into the platform module.
+ * The input carries `config` as opaque JSON — see `integrationInputSchema` for
+ * why it can't be narrowed there — which makes the platform module the one and
+ * only validator.
  */
 const toRowShape = (input: IntegrationFormValues) => {
   const module = requirePlatform(input.platform);
   const { definition } = module;
 
-  const config = definition.configSchema.parse({
-    integrationUri: input.integrationUri,
-    resource: input.resource,
-    ...(input.additionalInstructions
-      ? { additionalInstructions: input.additionalInstructions }
-      : {}),
-  });
+  const config = definition.configSchema.parse(input.config);
 
   // The connection-level rate-limit floor, enforced when the operator saves —
   // before any resource is in scope, which is why it lives on the definition.
@@ -107,34 +101,28 @@ const toRowShape = (input: IntegrationFormValues) => {
  */
 const toCredentialBlob = (
   module: AnyConnectorModule,
-  input: { authType: AuthType; authentication?: unknown },
+  credentials: IntegrationFormValues["credentials"],
 ) => {
-  module.definition.credentialSchema.parse(input);
-  return encodeAuthCredential(authCredentialSchema.parse(input));
+  if (!credentials) return null;
+  module.definition.credentialSchema.parse(credentials);
+  return encodeAuthCredential(authCredentialSchema.parse(credentials));
 };
 
 /**
  * What an edit should do to the stored credentials.
  *
  * The form cannot prefill them (encrypted, and not returned to the client), so
- * a blank auth section means "keep what is stored". Selecting AuthType.None is
- * therefore the *only* way to clear them — without that branch, switching an
- * integration from Bearer back to None would leave the old token on the row.
+ * omitting the whole `credentials` object means "keep what is stored". Sending
+ * `AuthType.None` is therefore the *only* way to clear them — without that
+ * branch, switching from Bearer back to None would leave the old token on the row.
  */
 const credentialsPatch = (
   module: AnyConnectorModule,
   data: IntegrationFormValues,
 ) => {
-  if (data.authType === AuthType.None) return { credentials: null };
-  if (data.authentication) {
-    return {
-      credentials: toCredentialBlob(module, {
-        authType: data.authType,
-        authentication: data.authentication,
-      }),
-    };
-  }
-  return {};
+  if (!data.credentials) return {};
+  if (data.credentials.authType === AuthType.None) return { credentials: null };
+  return { credentials: toCredentialBlob(module, data.credentials) };
 };
 
 /**
@@ -181,12 +169,12 @@ export const integrationsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(integrationInputSchema)
     .mutation(async ({ ctx, input }) => {
-      const { name, authType, authentication } = input;
+      const { name } = input;
       const { row, module, config } = asBadRequest(() => toRowShape(input));
       const credentials = asBadRequest(() =>
-        toCredentialBlob(module, { authType, authentication }),
+        toCredentialBlob(module, input.credentials),
       );
-      // For a generic platform this is exactly [input.resource]; a code-defined
+      // For a generic platform this is exactly [config.resource]; a code-defined
       // platform can serve several resources from one row.
       const resources = asBadRequest(() => resourcesFor(module, config));
 
@@ -209,9 +197,11 @@ export const integrationsRouter = createTRPCRouter({
               create: resources.map((resource) => ({ resource })),
             },
             apiKeyConnector: {
+              // ApiKeyConnector is still single-resource (TODO VW-435); a
+              // multi-resource platform gets the first of its resources here.
               create: {
                 name,
-                resourceType: input.resource,
+                resourceType: resources[0],
                 userId: ctx.auth.user.id,
               },
             },

@@ -10,15 +10,20 @@ Companion to [integrations-redesign.md](./integrations-redesign.md). That doc is
 |---|---|
 | 1 — Prisma models + migration + consumers | **Done.** Migration `20260811221210_integrations_redesign` is applied. |
 | 2 — `src/features/integrations/core/` | **Done.** |
-| 3 — `platforms/ai/` and `platforms/partner/` | **Done.** Inngest no longer knows any platform; `sync-integrations.ts` is ~250 lines of two functions. |
+| 3 — `platforms/ai/` and `platforms/partner/` | **Done.** Inngest no longer knows any platform. |
+| 4 — trim the unused abstractions | **Done.** `Session`, `poll.ts` and `changeSources` deleted; `resource` made structural; `ingest` renamed `upsert`; the tRPC input takes `config`/`credentials` directly. |
 | next — `platforms/teamplay-fleet/` | Not started. `FLEET` is unregistered, so a Fleet sync errors with a message saying so. See [FLEET is dark on purpose](#fleet-is-dark-on-purpose). |
 
-**The branch does not typecheck.** `npx tsc --noEmit` reports 56 errors, all in the UI layer, all deliberate — see [Deferred: the UI layer](#deferred-the-ui-layer). Server, schema, jobs, scripts and tests are clean. Don't treat those 56 as damage to repair; they're tracked separately.
+**The branch does not typecheck**, on purpose. `npx tsc --noEmit` reports errors in the UI layer only — see [Deferred: the UI layer](#deferred-the-ui-layer). Server, schema, jobs, scripts and tests are clean. Don't treat those as damage to repair; they're tracked separately. What matters when you change something is the *set of files* in the error list, not the count: record it before you start, and no new file may appear in it.
 
-Phases 2 and 3 also added the first tests this machinery has ever had — ~90 of them, under
-`core/**/__tests__/`, `platforms/*/__tests__/` and `src/inngest/functions/__tests__/`. Two are
-byte-compat guards on outbound request bodies (the n8n hand-off and the partner registration); if
-you change either body, you are changing a contract with something outside this repo.
+Phases 2 and 3 added the first tests this machinery has ever had, under `core/**/__tests__/`,
+`platforms/*/__tests__/` and `src/inngest/functions/__tests__/`. Two are byte-compat guards on
+outbound request bodies (the n8n hand-off and the partner registration); if you change either body,
+you are changing a contract with something outside this repo.
+
+Phase 4 removed some of them on purpose, along with the code they covered — the session stub, the
+`dispose` path, the cron's platform filter, and the three that only exercised the old
+multi-clause failure summary. A lower count is the expected outcome, not a regression.
 
 Trust nothing in this doc that you can check in under a minute. Every claim below has a command in [Verify](#verify) that confirms or refutes it.
 
@@ -48,13 +53,13 @@ These were decided deliberately. If a change looks like an obvious improvement, 
 | No `resourcesFor` hook on `ConnectorModule` | The absence of `ResourceModule` fields *is* the signal that a platform is generic; core then reads `config.resource`, validated by a shared zod schema. Don't add a per-module hook back — it would return a 1-element array for every implementor. |
 | `ai` forwards credentials to n8n | **Intended, not a leak.** n8n crawls the upstream on our behalf and authenticates as us. `SyncCtx.creds` exists for this. |
 | `ai`/`partner` are **single-resource** (`config.resource`) | One `Integration` = one resource for generic platforms. Only code-defined platforms are multi-resource. |
-| No `InstanceCtx` type | Mappers and URL builders take `config: TConfig` and nothing else. Row-level facts (`integrationId`, shadow user) stay in `core/sync/ingest.ts`, which already loads the row. |
-| Credentials appear **only** in `createSession` | Never pass them to `toCanonical`, `apiUrlFor`, or `ingest`. A mapper that can reach credentials is one refactor from logging them. |
+| No `InstanceCtx` type | Mappers and URL builders take `config: TConfig` and nothing else. Row-level facts (`integrationId`, shadow user) stay in `core/sync/upsert.ts`, which already loads the row. |
+| Credentials appear **only** in `SyncCtx.creds` | Never pass them to `toCanonical`, `apiUrlFor`, or the upsert path. A mapper that can reach credentials is one refactor from logging them. |
 | Credentials never reach the client | Every query returning an `Integration` row carries `omit: { credentials: true }`. Prisma returns all scalars by default and `include` only *adds* relations, so omitting is not automatic. |
-| `credentials IS NULL` **is** `AuthType.None` | One representation, not two. `encodeAuthCredential` / `parseAuthCredential` in `config-schema.ts` are inverses across that boundary. Never store a blob that decrypts to `{authType:"None"}`. |
+| `credentials IS NULL` **is** `AuthType.None` | One representation, not two. `encodeAuthCredential` / `parseAuthCredential` in `core/credentials.ts` are inverses across that boundary. Never store a blob that decrypts to `{authType:"None"}`. |
 | `nextSyncAt` is written at attempt **start** | If written on completion, a crashed worker never advances it and the row wedges forever. |
 | No latest-snapshot pointer on `ExternalSourceRecordMapping` | "Newest for this mapping" is `ORDER BY observedAt DESC LIMIT 1` against `@@index([mappingId, observedAt])`. A denormalized pointer is a second source of truth that goes stale. Don't add it back for symmetry with `ArtifactWrapper.latestArtifact`. |
-| One meaning per column | `syncEvery` null = inherit. `nextSyncAt` null = due now. `enabled` = operator toggle. Pollability = `changeSources.includes('poll')`. Never overload these. |
+| One meaning per column | `syncEvery` null = inherit. `nextSyncAt` null = due now. `enabled` = operator toggle. Never overload these. Whether a platform pulls or hands off is not a column or a declaration — it's whether its strategy returns `pending: true`. |
 
 ## What Phase 1 landed
 
@@ -92,13 +97,13 @@ It deletes `api_key_connector` rows with a non-null `integrationId` **before** d
 
 `createIntegrationInputSchema` in `src/lib/schemas.ts` adds optional per-item `upstreamApi` and `webUrl`. These belong to the **mapping**, not the record, and `processIntegrationSync` writes them onto the `External*Mapping` row on every create/update path.
 
-**Gotcha that will bite you when you port `processIntegrationSync` into `core/sync/ingest.ts`:** every `transformInputItem` must destructure `upstreamApi` and `webUrl` out of the item before spreading the rest into `createData`. If they reach Prisma they're unknown columns, the write throws, and the current `break`-on-error behavior returns **HTTP 200 with `createdItemsCount: 0`** — a silent total failure. All five call sites do this today; keep the pattern.
+**Gotcha that will bite you when you port `processIntegrationSync` into `core/sync/upsert.ts`:** every `transformInputItem` must destructure `upstreamApi` and `webUrl` out of the item before spreading the rest into `createData`. If they reach Prisma they're unknown columns, the write throws, and the current `break`-on-error behavior returns **HTTP 200 with `createdItemsCount: 0`** — a silent total failure. All five call sites do this today; keep the pattern.
 
 This is also an **LLM-facing contract change**. `source.channel` on the work-order envelope no longer accepts `PolledApi` or `Crawl`, so a partner still sending those gets a 400. `AI_Sync_Workflow.json` needs no edit — it reads the schema dynamically.
 
 ### Test baseline
 
-**559 passed / 559 total** (467 at the end of Phase 1, plus the ~90 added with `core/` and the platforms). The eight `src/app/api/v1/__tests__/*` suites are supertest against a live server and need both a dev server and an API key — note `npm run test` is bare `vitest`, i.e. watch mode:
+The eight `src/app/api/v1/__tests__/*` suites are supertest against a live server and need both a dev server and an API key — note `npm run test` is bare `vitest`, i.e. watch mode:
 
 ```bash
 npm run dev          # in another terminal
@@ -119,7 +124,7 @@ These existed because Phase 1 needed them before `core/` did. All are now moved;
 | `src/lib/source-hash.ts` | Unmoved. Still imported by the work-order upload path. |
 | `SyncCtx` in `sync-integrations.ts` | `core/types.ts`. Row-level facts (`integrationId`, the shadow user) dropped out of it — they're captured by the `ingest` / `callback` closures core builds. |
 | `REST_MAPPERS` / `selectRestMapper` / `syncRestIntegration` | Deleted. `mapFleetActivities` / `deriveOffsetFromUrl` survive untouched in `teamplay-fleet/activities.ts`, waiting for the Fleet module's `ResourceModule`s. |
-| `upsertResourceSync` + `processIntegrationSync` (`router-utils.ts`) | `core/sync/ingest.ts`. `processIntegrationToken` and `createArtifactWrappers` stayed behind, so the five upload procedures import from both. |
+| `upsertResourceSync` + `processIntegrationSync` (`router-utils.ts`) | `core/sync/upsert.ts` — named for what it does, and so nobody reads "ingest" as "Inngest". `processIntegrationToken` and `createArtifactWrappers` stayed behind, so the five upload procedures import from both. |
 | `getResponseConfig` (`sync-integrations.ts`) | `core/callback.ts`, as `createCallback`. Same paths, same schemas, same single-use 15-minute token. |
 
 ### FLEET is dark on purpose
@@ -134,7 +139,7 @@ Filtering it out of the fan-out instead would leave the row `Pending` forever wi
 
 **Partial ingest failures are now loud and partial.** `processIntegrationSync` used to `break` on the first Prisma error, dropping the rest of the batch and returning HTTP 200 with `createdItemsCount: 0`. It now collects errors and continues. The status is still 200 and `shouldRetry` still drives `Error` on the sync row, but the counts are real and `message` becomes `"<N> of <TOTAL> items failed: <e1>; <e2>; <e3> (+K more)"` (distinct messages only, capped at 1000 chars).
 
-**Decrypted credentials no longer cross a step boundary.** `step.run` return values are shipped to and memoized by the Inngest service, and the old `fetch-integration` step returned `creds`. The load step now runs `omit: { credentials: true }`, and the strategy step re-reads and decrypts in-process. That also forced the shape of the function: a `Session` cannot cross a boundary either (it would arrive as `{}`), so the strategy, its session and its `dispose()` all live in one step with a plain JS `finally` — not the RFC's five steps.
+**Decrypted credentials no longer cross a step boundary.** `step.run` return values are shipped to and memoized by the Inngest service, and the old `fetch-integration` step returned `creds`. The load step now runs `omit: { credentials: true }`, and the strategy step re-reads and decrypts in-process. That also forced the shape of the function: a closure or a module can't cross a boundary either, so resolving the platform, building the ctx and running the strategy all live in **one** step — four steps, not the RFC's five.
 
 Search for `VW-427` — 11 markers name the specific thing each phase should collapse. The ones outside the deferred UI files are in `sync-integrations.ts` (the intentional n8n credential forward), `integrations/server/routers.ts` (the edit form can't prefill credentials), `inbox/types.ts` and `tracking/types.ts` (`referenceUrl` / `integrationUri` replaced by mapping URLs).
 
@@ -160,17 +165,18 @@ src/features/integrations/core/
   credentials.ts  # AES-256-GCM, and the shared AuthCredential shape
   callback.ts     # createCallback: one-time token, response path, resource JSON Schema
   urls.ts         # apiUrlFor/webUrlFor, else mapping.upstreamApi/webUrl
-  session/{http,basic}.ts
+
   sync/
-    index.ts      # resolveSyncStrategy + effectiveSyncEvery + computeNextSyncAt
+    cadence.ts    # effectiveSyncEvery + computeNextSyncAt
     resources.ts  # resourcesFor — module fields, else config.resource
-    poll.ts       # pollSync — nothing uses it until Fleet, but the interface needs it
-    ingest.ts     # processIntegrationSync + upsertResourceSync + the ingest closure
+    upsert.ts     # processIntegrationSync + upsertResourceSync
 ```
 
-`registry.ts` asserts at load that every module is coherent: its key matches `definition.platform`, it declares at least one `changeSource`, and it has either a sync strategy or a `ResourceModule`. For a module with no `ResourceModule`s it also checks that the `configSchema` declares a `resource` key — the RFC asks to re-parse a config here, but at load there is only a schema, and the schema check catches the same failure (a generic platform that would throw on every create). The value-level gate stays in `resourcesFor`.
+There is **no `Session`** and no `session/` directory. The only thing platforms share about authentication is `authHeaders(creds)` in `credentials.ts`: `partner` authenticates to the partner with the integration's own credentials, `ai` authenticates to n8n with a VIPER-global `N8N_KEY`, and Fleet will authenticate with a headless-login cookie it caches itself. A `Session` object fit none of the three, which is why `createBasicSession` shipped with zero callers.
 
-`SyncCtx.ingest` is a **stub that throws** with a clear message. Only `pollSync` calls it, nothing uses `pollSync` yet, and a real implementation needs the five `SyncConfig` literals lifted out of the resource routers — that work belongs with the first code-defined platform.
+There is **no `poll.ts`** either. The pull loop it sketched couldn't run — it called an ingest closure that threw — so it wasn't an extension point, it was a placeholder. Writing it for real means first lifting the five `SyncConfig` literals out of the resource routers so core can dispatch by `ResourceType`, and that is the same piece of work as the first pulling platform. `ConnectorModule.sync` is therefore required, and every platform owns its attempt end to end.
+
+`registry.ts` asserts one thing at load: that a module's registry key matches its `definition.platform`. Everything else that used to be checked there is structural now — `sync` is required, and a generic platform gets `resource` by composing `genericConfigSchema`.
 
 ## What `ai` and `partner` are
 
@@ -179,11 +185,11 @@ src/features/integrations/platforms/{ai,partner}/
   index.ts config.ts sync.ts
 ```
 
-Both: `createSession` returns a session that *throws* if anyone tries to fetch with it, **no `ResourceModule` fields at all**, `config.resource` names the single resource, and `changeSources: ['poll', 'push']`.
+Both: **no `ResourceModule` fields at all**, `config.resource` names the single resource, and the strategy hands off and returns `{ pending: true }` instead of fetching.
 
-That pair is not a contradiction. `'poll'` is what makes the cron schedule them — they run on `syncEvery` like any poller. `'push'` describes what happens when the tick fires: the strategy hands off and returns `{ pending: true }` instead of fetching. Drop `'poll'` and they'd never be scheduled at all. `upsertResourceSync` implements the other half: a successful hand-off leaves the row `Pending` for the callback to close out, and only a *failed* hand-off is terminal, because no callback will ever fire for one.
+They are still scheduled like any other platform — the cron fans out every enabled, due resource row, and `syncEvery` applies to them the same way. What "hand-off" changes is only what happens when the tick fires. `upsertResourceSync` implements the other half: a successful hand-off leaves the row `Pending` for the callback to close out, and only a *failed* hand-off is terminal, because no callback will ever fire for one.
 
-`callback.ts` is the only thing the two share; neither touches `poll.ts`. `partner/sync.ts` uses raw `fetch` rather than `Session.request` on purpose — the latter resolves paths against a base URL, which would eat a partner `integrationUri` that already carries one (Blueflow's is `.../api/viper/webhook/`).
+`callback.ts` is the only thing the two share. Note they don't even authenticate to the same party: `partner` signs its registration POST with the integration's credentials via `authHeaders`, while `ai` authenticates to n8n with `N8N_KEY` and forwards the integration's credentials as payload. `partner/sync.ts` uses plain `fetch` because it has exactly one absolute URL to POST — the `integrationUri` from its config, path and all.
 
 `sync-integrations.ts` now holds two Inngest functions and no platform knowledge at all.
 
@@ -229,7 +235,7 @@ That file differs from the CI stack in exactly two places, both because VIPER is
 3. Create the integration through the API — no UI needed:
 
 ```bash
-curl -s -X POST 'http://localhost:3000/api/trpc/integrations.create?batch=1' -H "Authorization: Bearer $API_KEY" -H 'Content-Type: application/json' -d '{"0":{"json":{"name":"Local Blueflow","platform":"PARTNER","integrationUri":"http://localhost:8000/api/viper/webhook/","resource":"Asset","authType":"None","syncEvery":300}}}'
+curl -s -X POST 'http://localhost:3000/api/trpc/integrations.create?batch=1' -H "Authorization: Bearer $API_KEY" -H 'Content-Type: application/json' -d '{"0":{"json":{"name":"Local Blueflow","platform":"PARTNER","syncEvery":300,"config":{"integrationUri":"http://localhost:8000/api/viper/webhook/","resource":"Asset"}}}}'
 ```
 
 4. Fire `integrations.triggerSync` with that id and watch the row: `lastAttemptAt` and a jittered `nextSyncAt` are stamped at attempt *start*, the status holds `Pending` through the hand-off, and the callback flips it to `Success` with `lastSuccessfulSync` set and `consecutiveFailures` back to 0. All 326 fixture assets land, each with `upstreamApi` on its `ExternalAssetMapping`.

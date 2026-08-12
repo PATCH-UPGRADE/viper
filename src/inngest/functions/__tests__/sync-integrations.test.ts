@@ -36,16 +36,9 @@ const { mockStrategy, mockRequirePlatform } = vi.hoisted(() => ({
 
 vi.mock("@/features/integrations/core/registry", () => ({
   requirePlatform: mockRequirePlatform,
-  isPollable: (platform: string) => platform !== "NEVER_POLLED",
   defaultSyncEveryFor: () => null,
 }));
 
-vi.mock("@/features/integrations/core/sync", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  resolveSyncStrategy: () => mockStrategy,
-}));
-
-import type { Session } from "@/features/integrations/core/types";
 import { Prisma, ResourceType, SyncStatusEnum } from "@/generated/prisma";
 import { syncAllIntegrations, syncIntegration } from "../sync-integrations";
 
@@ -73,9 +66,7 @@ const PLATFORM_MODULE = {
     configSchema: { parse: (value: unknown) => value },
     credentialSchema: { parse: (value: unknown) => value },
   },
-  createSession: vi.fn(
-    async (): Promise<Session> => ({ request: async () => ({}) as never }),
-  ),
+  sync: mockStrategy,
 };
 
 const loadedRow = (overrides: Record<string, unknown> = {}) => ({
@@ -232,26 +223,12 @@ describe("syncIntegration — finalizing", () => {
       errorMessage: "No platform module is registered for FLEET.",
     });
   });
-
-  it("disposes the session even when the strategy throws", async () => {
-    const dispose = vi.fn(async () => {});
-    PLATFORM_MODULE.createSession.mockResolvedValue({
-      request: async () => ({}) as never,
-      dispose,
-    });
-    mockStrategy.mockRejectedValue(new Error("nope"));
-
-    await runSync(makeStep());
-
-    expect(dispose).toHaveBeenCalledTimes(1);
-  });
 });
 
 describe("syncAllIntegrations", () => {
-  const dueRow = (platform: string, resource: ResourceType) => ({
-    integrationId: `i-${platform}`,
+  const dueRow = (id: string, resource: ResourceType) => ({
+    integrationId: `i-${id}`,
     resource,
-    integration: { platform },
   });
 
   it("fans out one event per due (integration, resource)", async () => {
@@ -291,16 +268,19 @@ describe("syncAllIntegrations", () => {
     });
   });
 
-  it("skips platforms nothing schedules", async () => {
+  it("schedules a platform with no module, so it fails where an operator looks", async () => {
+    // A FLEET row is fanned out on purpose. syncIntegration then writes a real
+    // errorMessage on the resource row, rather than the row sitting Pending
+    // forever with nothing to see.
     mockPrisma.integrationResourceSync.findMany.mockResolvedValue([
-      dueRow("NEVER_POLLED", ResourceType.Asset),
+      dueRow("FLEET", ResourceType.WorkOrder),
     ]);
     const step = makeStep();
 
     // biome-ignore lint/suspicious/noExplicitAny: the handler's Inngest ctx is stubbed
     const result = await (syncAllIntegrations as any)({ step });
 
-    expect(result).toEqual({ syncedCount: 0 });
-    expect(step.sendEvent).not.toHaveBeenCalled();
+    expect(result).toEqual({ syncedCount: 1 });
+    expect(step.sendEvent).toHaveBeenCalled();
   });
 });

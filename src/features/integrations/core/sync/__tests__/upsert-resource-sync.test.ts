@@ -22,7 +22,7 @@ vi.mock("@/lib/router-utils", () => ({ createArtifactWrappers: vi.fn() }));
 
 import { ResourceType, SyncStatusEnum } from "@/generated/prisma";
 import type { IntegrationResponse } from "@/lib/schemas";
-import { upsertResourceSync } from "../ingest";
+import { upsertResourceSync } from "../upsert";
 
 const SYNCED_AT = new Date("2026-08-12T10:00:00.000Z");
 

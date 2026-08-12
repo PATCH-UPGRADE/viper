@@ -31,9 +31,8 @@ const moduleWith = (fields: Partial<AnyConnectorModule>): AnyConnectorModule =>
       configSchema: {} as any,
       // biome-ignore lint/suspicious/noExplicitAny: schemas are irrelevant here
       credentialSchema: {} as any,
-      changeSources: ["poll"],
     },
-    createSession: async () => ({ request: async () => ({}) }),
+    sync: async () => ({ cursor: null }),
     ...fields,
   }) as AnyConnectorModule;
 

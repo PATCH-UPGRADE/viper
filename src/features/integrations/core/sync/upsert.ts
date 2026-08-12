@@ -19,9 +19,10 @@ import type { IntegrationResponse } from "@/lib/schemas";
 /**
  * Dedup + upsert against the `External*Mapping` tables.
  *
- * Every platform's data lands here eventually. `ai`/`partner` reach it through
- * `/{resource}/integrationUpload/{token}`; a code-defined platform will reach it
- * through `SyncCtx.ingest`.
+ * Every platform's data lands here eventually, arriving at
+ * `/{resource}/integrationUpload/{token}` — the endpoint `ai` and `partner`
+ * hand out as their callback. (Named "upsert" rather than "ingest" so nobody
+ * reads it as having anything to do with Inngest, the job runner.)
  */
 
 // so we can take in `prisma` into functions and work with it
@@ -145,25 +146,6 @@ export interface SyncConfig<
   // Hook failures are logged, not propagated, so they never fail the sync.
   onItemCreated?: (itemId: string) => Promise<void>;
 }
-
-/** Keeps a batch summary readable, and the DB column bounded. */
-const MAX_MESSAGE_CHARS = 1000;
-
-/**
- * `IntegrationResponse.message` doubles as `IntegrationResourceSync.errorMessage`
- * and as the body a partner reads back, so it has to convey the *scale* of the
- * failure and stay bounded. Distinct messages only: 400 rows tripping one
- * missing FK produce one clause, not 400.
- */
-const summarizeItemErrors = (errors: string[], total: number): string => {
-  const distinct = [...new Set(errors)];
-  const head = distinct.slice(0, 3).join("; ");
-  const more = distinct.length > 3 ? ` (+${distinct.length - 3} more)` : "";
-  return `${errors.length} of ${total} items failed: ${head}${more}`.slice(
-    0,
-    MAX_MESSAGE_CHARS,
-  );
-};
 
 /**
  * Generic helper function for processing integration syncs
@@ -348,8 +330,10 @@ export async function processIntegrationSync<
   }
 
   if (errors.length > 0) {
+    // `message` doubles as `IntegrationResourceSync.errorMessage`, so it has to
+    // convey the scale of the failure, not just the first symptom.
     response.shouldRetry = true;
-    response.message = summarizeItemErrors(errors, input.items.length);
+    response.message = `${errors.length} of ${input.items.length} items failed: ${errors[0]}`;
   }
 
   // Close out this (integration, resource) sync attempt
@@ -357,46 +341,3 @@ export async function processIntegrationSync<
 
   return response;
 }
-
-/** The row-level facts an ingest closure needs, and that a strategy must not see. */
-export interface IngestRow {
-  integrationId: string;
-  integrationUserId: string;
-  resource: ResourceType;
-}
-
-type ResourceIngestor = (items: unknown[], row: IngestRow) => Promise<void>;
-
-/**
- * Empty until a poll-driven platform exists.
- *
- * `ai` and `partner` never call `SyncCtx.ingest` — they push items back through
- * `/{resource}/integrationUpload/{token}`, which reaches
- * `processIntegrationSync` above by a different door. Only `pollSync` calls
- * this, and no registered platform uses `pollSync`.
- *
- * To fill it: lift each resource router's `SyncConfig` literal into its own
- * module (e.g. `src/features/assets/server/ingest-config.ts`) and register it
- * here. That direction does not cycle — the routers import
- * `processIntegrationSync` from this file, not the configs.
- */
-const RESOURCE_INGESTORS: Partial<Record<ResourceType, ResourceIngestor>> = {};
-
-/**
- * Build the `ingest` closure for one `(integration, resource)` attempt. It
- * captures the row so attribution and mappings stay in core, and the strategy
- * never learns the integration's id or its shadow user.
- */
-export const createIngest =
-  (row: IngestRow) =>
-  async (items: unknown[]): Promise<void> => {
-    const ingestor = RESOURCE_INGESTORS[row.resource];
-    if (!ingestor) {
-      throw new Error(
-        `No poll-path ingest handler for resource ${row.resource}. Poll-driven ` +
-          `ingest lands with the first code-defined platform; ai/partner push ` +
-          `through the callback endpoint instead.`,
-      );
-    }
-    await ingestor(items, row);
-  };

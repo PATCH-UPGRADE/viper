@@ -5,7 +5,6 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: {} }));
 
 import { AuthType, ResourceType } from "@/generated/prisma";
-import { createNoopSession } from "../../../core/session/basic";
 import type { SyncCtx } from "../../../core/types";
 import type { AiConfig, AiCreds } from "../config";
 import { aiSync } from "../sync";
@@ -34,11 +33,8 @@ const makeCtx = (
   },
   creds: { authType: AuthType.Bearer, authentication: { token: "s3cret" } },
   resource: ResourceType.Vulnerability,
-  // The platform never fetches; the data comes back at the callback.
-  session: createNoopSession(),
   cursor: null,
   lastSuccessfulSync: null,
-  ingest: async () => {},
   callback: async () => CALLBACK,
   ...overrides,
 });

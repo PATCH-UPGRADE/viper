@@ -1,14 +1,16 @@
 import { z } from "zod";
 import { authCredentialSchema } from "@/features/integrations/core/credentials";
-import { ResourceType } from "@/generated/prisma";
+import { genericConfigSchema } from "@/features/integrations/core/sync/resources";
 import { safeUrlSchema } from "@/lib/schemas";
 
 /**
  * What an operator has to provide for an AI integration.
+ *
+ * Composed from `genericConfigSchema` — see the note in partner's config for
+ * why `resource` is inherited rather than redeclared.
  */
-export const configSchema = z.object({
+export const configSchema = genericConfigSchema.extend({
   integrationUri: safeUrlSchema,
-  resource: z.enum(ResourceType), // one integration per resource
   additionalInstructions: z.string().optional(), // given to n8n agent
 });
 export type AiConfig = z.infer<typeof configSchema>;

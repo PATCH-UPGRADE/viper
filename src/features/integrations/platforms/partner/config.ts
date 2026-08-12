@@ -1,14 +1,17 @@
-import { z } from "zod";
+import type { z } from "zod";
 import { authCredentialSchema } from "@/features/integrations/core/credentials";
-import { ResourceType } from "@/generated/prisma";
+import { genericConfigSchema } from "@/features/integrations/core/sync/resources";
 import { safeUrlSchema } from "@/lib/schemas";
 
 /**
  * What an operator has to provide for a partner integration (Blueflow, Helm).
+ *
+ * Composed from `genericConfigSchema` rather than redeclaring `resource`: a
+ * platform with no ResourceModules gets its resource from config, and building
+ * on the base makes that a type-level guarantee instead of a runtime assertion.
  */
-export const configSchema = z.object({
+export const configSchema = genericConfigSchema.extend({
   integrationUri: safeUrlSchema,
-  resource: z.enum(ResourceType), // one integration per resource
 });
 export type PartnerConfig = z.infer<typeof configSchema>;
 

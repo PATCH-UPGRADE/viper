@@ -1,4 +1,4 @@
-import { processIntegrationSync } from "@/features/integrations/core/sync/ingest";
+import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";

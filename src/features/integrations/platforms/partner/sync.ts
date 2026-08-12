@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { authHeaders } from "@/features/integrations/core/session/basic";
+import { authHeaders } from "@/features/integrations/core/credentials";
 import type { SyncCtx, SyncOutcome } from "@/features/integrations/core/types";
 import type { PartnerConfig, PartnerCreds } from "./config";
 
@@ -36,7 +36,7 @@ export async function partnerSync(
       ctx.lastSuccessfulSync?.toISOString() ??
       new Date(0).toISOString(),
     // TODO: the callback token is single-use, so page 2 would
-    // 401. Eventually want to support multi-page partner integrations... 
+    // 401. Eventually want to support multi-page partner integrations...
     max_pages: 1,
     page_size: 500,
     callback: callback.url,

@@ -8,7 +8,6 @@ import {
   type UrlBearingMapping,
 } from "../urls";
 
-
 const mapping = (
   overrides: Partial<UrlBearingMapping> = {},
 ): UrlBearingMapping => ({

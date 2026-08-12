@@ -1,5 +1,4 @@
 import "server-only";
-import { createNoopSession } from "@/features/integrations/core/session/basic";
 import type { ConnectorModule } from "@/features/integrations/core/types";
 import { PlatformEnum } from "@/generated/prisma";
 import {
@@ -19,8 +18,6 @@ export const partner: ConnectorModule<PartnerConfig, PartnerCreds> = {
     displayName: "Partner API",
     configSchema,
     credentialSchema,
-    changeSources: ["poll", "push"],
   },
-  createSession: async () => createNoopSession(),
   sync: partnerSync,
 };

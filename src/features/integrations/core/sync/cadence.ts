@@ -1,19 +1,12 @@
 import "server-only";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
-import type { AnyConnectorModule, SyncStrategy } from "../types";
-import { pollSync } from "./poll";
 
 /**
- * The platform's own strategy, else core's poll loop bound to its
- * ResourceModules.
+ * How often a resource syncs, and how far to back off when it fails.
  *
- * Takes the module rather than the platform enum because `pollSync` needs the
- * ResourceModule fields, and `SyncCtx` deliberately doesn't carry the module.
+ * This applies to every platform regardless of how it gets its data — a
+ * hand-off platform is scheduled on exactly the same terms as one that pulls.
  */
-export const resolveSyncStrategy = (
-  module: AnyConnectorModule,
-): SyncStrategy<unknown, unknown> =>
-  module.sync ?? ((ctx) => pollSync(module, ctx));
 
 /**
  * Resolve the effective cadence for a resource.

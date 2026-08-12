@@ -34,13 +34,17 @@ describe("Assets Endpoint (/assets)", () => {
   const mockIntegrationPayload = {
     name: "mockIntegration",
     platform: PlatformEnum.PARTNER,
-    integrationUri: "https://mock-upstream-api.com/",
-    authType: AuthType.Bearer,
-    resource: ResourceType.Asset,
-    authentication: {
-      token: AUTH_TOKEN,
-    },
     syncEvery: 300,
+    config: {
+      integrationUri: "https://mock-upstream-api.com/",
+      resource: ResourceType.Asset,
+    },
+    credentials: {
+      authType: AuthType.Bearer,
+      authentication: {
+        token: AUTH_TOKEN,
+      },
+    },
   };
 
   const assetIntegrationPayload = {
@@ -485,7 +489,7 @@ describe("Assets Endpoint (/assets)", () => {
     const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
       where: {
         integrationId: createdIntegration.id,
-        resource: mockIntegrationPayload.resource,
+        resource: mockIntegrationPayload.config.resource,
       },
     });
 
@@ -623,7 +627,7 @@ describe("Assets Endpoint (/assets)", () => {
     const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
       where: {
         integrationId: createdIntegration.id,
-        resource: mockIntegrationPayload.resource,
+        resource: mockIntegrationPayload.config.resource,
       },
     });
 
@@ -761,7 +765,7 @@ describe("Assets Endpoint (/assets)", () => {
     const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
       where: {
         integrationId: createdIntegration.id,
-        resource: mockIntegrationPayload.resource,
+        resource: mockIntegrationPayload.config.resource,
       },
     });
 
@@ -869,7 +873,7 @@ describe("Assets Endpoint (/assets)", () => {
     const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
       where: {
         integrationId: createdIntegration.id,
-        resource: mockIntegrationPayload.resource,
+        resource: mockIntegrationPayload.config.resource,
       },
     });
 

@@ -5,16 +5,11 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: {} }));
 
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
-import {
-  defaultSyncEveryFor,
-  isPollable,
-  registry,
-  requirePlatform,
-} from "../registry";
+import { defaultSyncEveryFor, registry, requirePlatform } from "../registry";
 
 /**
- * Importing this module runs the registry's load-time assertions, so simply
- * getting here proves every registered platform is coherent.
+ * Importing this module runs the registry's load-time assertion, so simply
+ * getting here proves no platform is keyed under the wrong enum.
  */
 
 describe("registry", () => {
@@ -28,10 +23,9 @@ describe("registry", () => {
   });
 
   // TODO: VW-431, test to make sure fleet gets registered
-
-  it("schedules the generic platforms, because they declare 'poll'", () => {
-    expect(isPollable(PlatformEnum.AI)).toBe(true);
-    expect(isPollable(PlatformEnum.PARTNER)).toBe(true);
+  it("has no module for FLEET yet, and says so", () => {
+    expect(registry[PlatformEnum.FLEET]).toBeUndefined();
+    expect(() => requirePlatform(PlatformEnum.FLEET)).toThrow(/FLEET/);
   });
 
   it("has no cadence opinion for a platform without ResourceModules", () => {
@@ -41,10 +35,9 @@ describe("registry", () => {
 
 describe("generic platform definitions", () => {
   it.each([PlatformEnum.AI, PlatformEnum.PARTNER])(
-    "%s hands off rather than fetching",
+    "%s owns its whole sync and maps nothing",
     (platform) => {
       const module = requirePlatform(platform);
-      expect(module.definition.changeSources).toEqual(["poll", "push"]);
       expect(module.sync).toBeTypeOf("function");
       // Items arrive already in VIPER's shape, so there is nothing to map.
       expect(module.assets).toBeUndefined();
@@ -54,15 +47,18 @@ describe("generic platform definitions", () => {
   );
 
   it.each([PlatformEnum.AI, PlatformEnum.PARTNER])(
-    "%s's session refuses to be used",
-    async (platform) => {
-      const session = await requirePlatform(platform).createSession({
-        config: {},
-        creds: {},
+    "%s declares its resource in config, since it has no ResourceModules",
+    (platform) => {
+      // This is what `resourcesFor` reads. Composing genericConfigSchema makes
+      // it structural, so a platform can't forget it.
+      const parsed = requirePlatform(
+        platform,
+      ).definition.configSchema.safeParse({
+        integrationUri: "https://example.com/",
+        resource: ResourceType.Asset,
       });
-      await expect(session.request("/anything")).rejects.toThrow(
-        /does not fetch from the upstream/,
-      );
+      expect(parsed.success).toBe(true);
+      expect(parsed.data?.resource).toBe(ResourceType.Asset);
     },
   );
 });

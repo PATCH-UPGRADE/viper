@@ -1,9 +1,8 @@
 import "server-only";
-import { z } from "zod";
 import type { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { ai } from "../platforms/ai";
 import { partner } from "../platforms/partner";
-import { hasResourceModules, moduleForResource } from "./sync/resources";
+import { moduleForResource } from "./sync/resources";
 import type { AnyConnectorModule } from "./types";
 
 /**
@@ -21,24 +20,11 @@ export const requirePlatform = (platform: PlatformEnum): AnyConnectorModule => {
     throw new Error(
       `No platform module is registered for ${platform}. Registered: ${Object.keys(
         registry,
-      )}`
+      )}`,
     );
   }
   return module;
 };
-
-/**
- * Does the cron/Inngest schedule this platform?
- *
- * TODO Cassidy
- * An unregistered platform answers **true** on purpose. Filtering it out here
- * would bury the misconfiguration: the row would sit `Pending` forever with
- * nothing to look at. Letting it through means `syncIntegration` records a real
- * error on the resource row, which is where an operator would look, and backoff
- * spaces the retries out on its own.
- */
-export const isPollable = (platform: PlatformEnum): boolean =>
-  registry[platform]?.definition.changeSources.includes("poll") ?? true;
 
 /** The platform author's own sense of how fast this resource moves. */
 export const defaultSyncEveryFor = (
@@ -51,49 +37,18 @@ export const defaultSyncEveryFor = (
 };
 
 // ---------------------------------------------------------------------------
-// Load-time assertions
+// Load-time assertion
 // ---------------------------------------------------------------------------
-// A platform that can never sync is a startup error
+// A registry keyed by the wrong enum would look up the wrong module at sync
+// time, which is a startup error rather than something to discover in prod.
 //
-//
-// TODO Cassidy:
-// Note the RFC asks to re-assert `genericConfigSchema.parse(config)` here. There
-// is no config instance at load — only a schema — so the checkable equivalent is
-// that the schema *declares* the key. That catches the same failure mode: a
-// generic platform whose config forgot `resource`, which would make
-// `resourcesFor` throw on every create. The value-level gate still runs in
-// `resourcesFor` itself.
+// Everything else that used to be checked here is now structural: `sync` is a
+// required field, and a generic platform gets `resource` by composing
+// `genericConfigSchema`, so TypeScript enforces both.
 for (const [key, module] of Object.entries(registry)) {
-  if (!module) continue;
-
-  if (module.definition.platform !== key) {
+  if (module && module.definition.platform !== key) {
     throw new Error(
       `Registry key "${key}" does not match definition.platform "${module.definition.platform}".`,
     );
-  }
-
-  if (module.definition.changeSources.length === 0) {
-    throw new Error(
-      `Platform ${key} declares no changeSources, so nothing would ever schedule it.`,
-    );
-  }
-
-  if (!module.sync && !hasResourceModules(module)) {
-    throw new Error(
-      `Platform ${key} has neither a sync strategy nor any ResourceModule; there is nothing for core to run.`,
-    );
-  }
-
-  if (!hasResourceModules(module)) {
-    // No ResourceModules => generic platform => core reads config.resource.
-    const schema = module.definition.configSchema;
-    const declaresResource =
-      schema instanceof z.ZodObject && "resource" in schema.shape;
-    if (!declaresResource) {
-      throw new Error(
-        `Platform ${key} has no ResourceModule fields, so core resolves its resource from config.resource — ` +
-          `but its configSchema does not declare a "resource" key. It would never sync.`,
-      );
-    }
   }
 }

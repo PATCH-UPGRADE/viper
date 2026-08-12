@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
-import { processIntegrationSync } from "@/features/integrations/core/sync/ingest";
+import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import {
   attachNote,
   attachNotes,

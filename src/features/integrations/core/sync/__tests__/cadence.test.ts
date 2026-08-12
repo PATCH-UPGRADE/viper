@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
-import { computeNextSyncAt, effectiveSyncEvery } from "../index";
+import { computeNextSyncAt, effectiveSyncEvery } from "../cadence";
 
 /**
  * Cadence and backoff decide how often every integration in the system

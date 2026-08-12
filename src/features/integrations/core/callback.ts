@@ -8,6 +8,7 @@ import { integrationVulnerabilityInputSchema } from "@/features/vulnerabilities/
 import { ResourceType } from "@/generated/prisma";
 import { createUserToken, DEFAULT_TOKEN_TTL_SECONDS } from "@/lib/tokens";
 import { getBaseUrl } from "@/lib/url-utils";
+import { uploadSegmentFor } from "../types";
 import type { CallbackConfig } from "./types";
 
 /**
@@ -18,32 +19,18 @@ import type { CallbackConfig } from "./types";
  */
 
 /**
- * Upload endpoint + envelope schema per resource
+ * The envelope schema per resource. The URL segment that goes with each one
+ * lives in `integrationsMapping` — a client-safe table, because the connectors
+ * UI reads it too. These schemas can't join it there: they reach `@/lib/tokens`
+ * and would drag the server into a client bundle.
  */
-const ENDPOINTS = {
-  [ResourceType.Asset]: {
-    segment: "assets",
-    schema: integrationAssetInputSchema,
-  },
-  [ResourceType.DeviceArtifact]: {
-    segment: "deviceArtifacts",
-    schema: integrationDeviceArtifactInputSchema,
-  },
-  [ResourceType.Remediation]: {
-    segment: "remediations",
-    schema: integrationRemediationInputSchema,
-  },
-  [ResourceType.Vulnerability]: {
-    segment: "vulnerabilities",
-    schema: integrationVulnerabilityInputSchema,
-  },
-  [ResourceType.WorkOrder]: {
-    segment: "workOrders",
-    schema: integrationWorkOrderInputSchema,
-  },
-} as const satisfies Partial<
-  Record<ResourceType, { segment: string; schema: z.ZodType }>
->;
+const ENVELOPE_SCHEMAS = {
+  [ResourceType.Asset]: integrationAssetInputSchema,
+  [ResourceType.DeviceArtifact]: integrationDeviceArtifactInputSchema,
+  [ResourceType.Remediation]: integrationRemediationInputSchema,
+  [ResourceType.Vulnerability]: integrationVulnerabilityInputSchema,
+  [ResourceType.WorkOrder]: integrationWorkOrderInputSchema,
+} as const satisfies Partial<Record<ResourceType, z.ZodType>>;
 
 /**
  * Mint a one-time, resource-scoped token for the integration's shadow user and
@@ -53,8 +40,9 @@ export const createCallback = async (
   integrationUserId: string,
   resource: ResourceType,
 ): Promise<CallbackConfig> => {
-  const endpoint = ENDPOINTS[resource as keyof typeof ENDPOINTS];
-  if (!endpoint) {
+  const schema = ENVELOPE_SCHEMAS[resource as keyof typeof ENVELOPE_SCHEMAS];
+  const segment = uploadSegmentFor[resource as keyof typeof uploadSegmentFor];
+  if (!schema || !segment) {
     throw new Error(`Unhandled ResourceType: ${resource}`);
   }
 
@@ -66,12 +54,12 @@ export const createCallback = async (
 
   // If you're testing this locally and need webhooks, use NEXT_PUBLIC_APP_URL
   const baseApiUrl = `${getBaseUrl()}/api/v1`;
-  const path = `/${endpoint.segment}/integrationUpload/${raw}`;
+  const path = `/${segment}/integrationUpload/${raw}`;
 
   return {
     baseApiUrl,
     path,
     url: `${baseApiUrl}${path}`,
-    schema: z.toJSONSchema(endpoint.schema) as Record<string, unknown>,
+    schema: z.toJSONSchema(schema) as Record<string, unknown>,
   };
 };

@@ -4,6 +4,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { AuthType } from "@/generated/prisma";
 import { authenticationSchema } from "@/lib/schemas";
+import { parseAuthenticationJson } from "@/lib/utils";
 
 /**
  * Encryption for `Integration.credentials`, and the shared shape of what goes
@@ -130,4 +131,19 @@ export const parseAuthCredential = (
     );
   }
   return parsed.data;
+};
+
+/**
+ * Turn a stored credential into request headers — basic, bearer, or an
+ * arbitrary header.
+ *
+ * This is the whole of what platforms share about authentication. There is no
+ * `Session` object: `partner` makes one POST to one absolute URL and needs
+ * nothing more, and a platform that authenticates some other way (Fleet drives
+ * a login form and reuses the cookie) owns that itself.
+ */
+export const authHeaders = (creds: AuthCredential): Record<string, string> => {
+  if (creds.authType === AuthType.None) return {};
+  const { header, value } = parseAuthenticationJson(creds);
+  return { [header]: value };
 };

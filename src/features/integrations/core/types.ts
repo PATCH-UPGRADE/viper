@@ -13,12 +13,6 @@
 import type { z } from "zod";
 import type { PlatformEnum, ResourceType } from "@/generated/prisma";
 
-/** An authenticated connection to an upstream platform. */
-export interface Session {
-  request<T>(path: string, init?: RequestInit): Promise<T>;
-  dispose?(): Promise<void>;
-}
-
 /**
  * Opaque to core: round-tripped through `IntegrationResourceSync.cursor` and
  * interpreted only by the platform that produced it. Version your cursors and
@@ -64,23 +58,25 @@ export interface UrlBuilders<TConfig = unknown> {
  * Platforms that speak *ours* (ai, partner) omit these entirely — see the
  * RFC's "Who speaks whose protocol".
  *
+ * Nothing implements this yet; it is the shape the first pulling platform will
+ * take, and `defaultSyncEveryFor` already reads it. A platform owns whatever
+ * client its methods need — core has no session abstraction, because the two
+ * platforms that exist authenticate to different parties and the one that comes
+ * next authenticates with a browser cookie.
+ *
  * Credentials never reach here. A mapper that can read credentials is one
  * refactor away from logging them, and mappers have no use for them.
  */
 export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
   extends UrlBuilders<TConfig> {
   // we pull from their platform
-  listChanged(s: Session, cursor: Cursor | null): AsyncIterable<Page<TRaw>>;
-  get(s: Session, externalId: string): Promise<TRaw>;
+  listChanged(cursor: Cursor | null): AsyncIterable<Page<TRaw>>;
+  get(externalId: string): Promise<TRaw>;
   toCanonical(raw: TRaw, config: TConfig): TCanonical;
 
   // we push to their platform
-  create?(
-    s: Session,
-    draft: TCanonical,
-  ): Promise<{ externalId: string; raw: TRaw }>;
+  create?(draft: TCanonical): Promise<{ externalId: string; raw: TRaw }>;
   update?(
-    s: Session,
     externalId: string,
     patch: Partial<TCanonical>,
   ): Promise<{ externalId: string; raw: TRaw }>;
@@ -93,20 +89,18 @@ export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
  * Everything one `(integration, resource)` sync attempt needs.
  *
  * Row-level facts (`integrationId`, the shadow user) are deliberately absent:
- * they are captured by the `ingest` / `callback` closures, which core builds.
- * Credentials reach exactly two places — `createSession` and here.
+ * they are captured by the `callback` closure, which core builds. `creds` is the
+ * only place credentials reach a platform — never `toCanonical`, `apiUrlFor`,
+ * `webUrlFor`, or the upsert path.
  */
 export interface SyncCtx<TConfig = unknown, TCreds = unknown> {
   config: TConfig;
   /** `ai` forwards these to n8n, which authenticates as us. That is the point. */
   creds: TCreds;
   resource: ResourceType;
-  session: Session;
   cursor: Cursor | null;
   /** Where `partner`'s `since` comes from when there is no cursor yet. */
   lastSuccessfulSync: Date | null;
-  /** Closes over the row, so attribution and mappings stay in core. */
-  ingest(items: unknown[]): Promise<void>;
   /** Mints a one-time upload token scoped to the shadow user + resource. */
   callback(): Promise<CallbackConfig>;
 }
@@ -125,17 +119,6 @@ export type SyncStrategy<TConfig = unknown, TCreds = unknown> = (
   ctx: SyncCtx<TConfig, TCreds>,
 ) => Promise<SyncOutcome>;
 
-/**
- * How change reaches us. Independent of each other:
- *   poll    — the cron schedules it                          (fleet, ai, partner)
- *   push    — data returns via our callback instead of us fetching (ai, partner)
- *   webhook — they notify us unprompted, nothing is scheduled
- *
- * `ai`/`partner` are `['poll', 'push']`: scheduled like any poller, but the tick
- * hands off rather than fetching. Drop `'poll'` and they'd never be scheduled.
- */
-export type ChangeSource = "poll" | "push" | "webhook";
-
 export interface ConnectorDefinition<TConfig, TCreds> {
   /** No free-text slug to drift from the enum. */
   platform: PlatformEnum;
@@ -144,7 +127,6 @@ export interface ConnectorDefinition<TConfig, TCreds> {
   configSchema: z.ZodType<TConfig>;
   /** Validates the decrypted `Integration.credentials`. */
   credentialSchema: z.ZodType<TCreds>;
-  changeSources: ReadonlyArray<ChangeSource>;
   /**
    * Connection-level rate-limit floor, in seconds. Enforced when the operator
    * saves the integration — before any resource is in scope, which is why it
@@ -155,13 +137,14 @@ export interface ConnectorDefinition<TConfig, TCreds> {
 
 export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
   definition: ConnectorDefinition<TConfig, TCreds>;
-  createSession(input: { config: TConfig; creds: TCreds }): Promise<Session>;
 
   /**
-   * How this platform syncs. Omitted -> core's `pollSync` drives the
-   * ResourceModules below. `ai`/`partner` set this and have no ResourceModules.
+   * How this platform syncs, end to end. Whether it pulls or hands off is the
+   * strategy's business: a puller loops and returns the cursor it reached, a
+   * pusher fires one request and returns `pending: true` so the row stays
+   * `Pending` until the callback lands.
    */
-  sync?: SyncStrategy<TConfig, TCreds>;
+  sync: SyncStrategy<TConfig, TCreds>;
 
   workOrders?: ResourceModule<unknown, unknown, TConfig>;
   assets?: ResourceModule<unknown, unknown, TConfig>;

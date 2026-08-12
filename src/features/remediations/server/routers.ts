@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { processIntegrationSync } from "@/features/integrations/core/sync/ingest";
+import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import {
   attachNote,
   attachNotes,

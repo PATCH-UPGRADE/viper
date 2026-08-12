@@ -54,11 +54,7 @@ const integrationsInclude = {
 const omitCredentials = { credentials: true } as const;
 
 /**
- * Narrow the submitted `config` with the platform's own schema, so an unknown or
- * missing key fails at write time rather than at the first sync.
- *
- * The input carries `config` as opaque JSON — see `integrationInputSchema` for
- * why it can't be narrowed there — which makes the platform module the one and
+ * The input carries `config` as opaque JSON which makes the platform module the one and
  * only validator.
  */
 const toRowShape = (input: IntegrationFormValues) => {
@@ -91,11 +87,6 @@ const toRowShape = (input: IntegrationFormValues) => {
 /**
  * Validate credentials against the platform's own schema, then encode them with
  * the shared one.
- *
- * The double parse is deliberate: `credentialSchema` is a `z.ZodType<TCreds>`
- * with `TCreds` erased in the registry, so its output isn't assignable to
- * `encodeAuthCredential`'s `AuthCredential`. The platform schema is the gate;
- * `authCredentialSchema` is the storage shape.
  */
 const toCredentialBlob = (
   module: AnyConnectorModule,

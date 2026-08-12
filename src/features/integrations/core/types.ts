@@ -47,11 +47,11 @@ export interface UrlBuilders<TConfig = unknown> {
 /**
  * One resource on a platform whose protocol *we* speak (Fleet, ServiceNow).
  * A platform owns whatever client its methods need, including session abstratction
-*/
+ */
 export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
   extends UrlBuilders<TConfig> {
   // we pull from their platform
-  listChanged(cursor: Cursor | null): AsyncIterable<Page<TRaw>>; 
+  listChanged(cursor: Cursor | null): AsyncIterable<Page<TRaw>>;
   // TODO: VW-431: can change `listChanged` schema if it doesn't work for fleet
   get(externalId: string): Promise<TRaw>;
   toCanonical(raw: TRaw, config: TConfig): TCanonical;
@@ -76,15 +76,14 @@ export interface SyncCtx<TConfig = unknown, TCreds = unknown> {
   creds: TCreds;
   resource: ResourceType;
   cursor: Cursor | null;
-  /** Where `partner`'s `since` comes from when there is no cursor yet. */
+  /** Where `partner`'s `since` comes from. */
   lastSuccessfulSync: Date | null;
   /** Mints a one-time upload token scoped to the shadow user + resource. */
   callback(): Promise<CallbackConfig>;
 }
 
 /**
- * What a strategy reports back. The worker persists the cursor; `pending: true`
- * means the work finishes when a callback lands, so the row stays `Pending`.
+ * What a strategy reports back.
  */
 export interface SyncOutcome {
   cursor: Cursor | null;
@@ -130,6 +129,6 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
 /**
  * The erased module type, for the registry and for core helpers that must hold
  * modules of differing `TConfig`/`TCreds` side by side.
-*/
+ */
 // biome-ignore lint/suspicious/noExplicitAny: see above — `unknown` does not erase zod's invariant internals.
 export type AnyConnectorModule = ConnectorModule<any, any>;

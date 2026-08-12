@@ -3,10 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
 import type { AnyConnectorModule, ResourceModule } from "../../types";
-import {
-  moduleForResource,
-  resourcesFor,
-} from "../resources";
+import { moduleForResource, resourcesFor } from "../resources";
 
 /**
  * The absence of ResourceModule fields is what tells core a platform is

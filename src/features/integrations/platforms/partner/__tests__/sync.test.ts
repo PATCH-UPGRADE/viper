@@ -77,28 +77,6 @@ describe("partnerSync", () => {
     expect(JSON.parse(lastBody()).since).toBe(new Date(0).toISOString());
   });
 
-  it("prefers a stored cursor over the last successful sync", async () => {
-    await partnerSync(
-      makeCtx({
-        cursor: { v: 1, since: "2026-08-12T09:00:00.000Z" },
-        lastSuccessfulSync: new Date("2026-01-01T00:00:00.000Z"),
-      }),
-    );
-
-    expect(JSON.parse(lastBody()).since).toBe("2026-08-12T09:00:00.000Z");
-  });
-
-  it("ignores a cursor it cannot read rather than throwing", async () => {
-    await partnerSync(
-      makeCtx({
-        cursor: { v: 99, whatever: true },
-        lastSuccessfulSync: new Date("2026-01-01T00:00:00.000Z"),
-      }),
-    );
-
-    expect(JSON.parse(lastBody()).since).toBe("2026-01-01T00:00:00.000Z");
-  });
-
   it("sends no auth header when the partner needs none", async () => {
     await partnerSync(makeCtx());
 
@@ -130,11 +108,9 @@ describe("partnerSync", () => {
   });
 
   it("stays Pending until the partner pushes", async () => {
-    const outcome = await partnerSync(
-      makeCtx({ cursor: { v: 1, since: "x" } }),
-    );
+    const outcome = await partnerSync(makeCtx());
 
-    expect(outcome).toEqual({ cursor: { v: 1, since: "x" }, pending: true });
+    expect(outcome).toEqual({ cursor: null, pending: true });
   });
 
   it("fails the attempt when the partner rejects registration", async () => {

@@ -130,12 +130,6 @@ export type IntegrationResponse = z.infer<typeof integrationResponseSchema>;
 /**
  * The upload envelope a platform POSTs back to
  * `/{resource}/integrationUpload/{token}`.
- *
- * `upstreamApi` / `webUrl` live here rather than on the per-resource input
- * schemas because they belong to the *mapping*, not the record: they should
- * never appear on the public `POST /assets` body, where there is no mapping to
- * store them on. Only the generic platforms (ai/partner) supply them —
- * code-defined platforms will derive URLs from their ResourceModule instead.
  */
 export const createIntegrationInputSchema = <T extends z.ZodRawShape>(
   inputSchema: z.ZodObject<T>,

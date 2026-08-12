@@ -36,7 +36,7 @@ export const defaultSyncEveryFor = (
   return moduleForResource(module, resource)?.defaultSyncEvery ?? null;
 };
 
-// load-time assertion 
+// load-time assertion
 for (const [key, module] of Object.entries(registry)) {
   if (module && module.definition.platform !== key) {
     throw new Error(

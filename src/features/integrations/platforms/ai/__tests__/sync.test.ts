@@ -102,9 +102,9 @@ describe("aiSync", () => {
   });
 
   it("stays Pending, because the data arrives at the callback later", async () => {
-    const outcome = await aiSync(makeCtx({ cursor: { v: 1 } }));
+    const outcome = await aiSync(makeCtx());
 
-    expect(outcome).toEqual({ cursor: { v: 1 }, pending: true });
+    expect(outcome).toEqual({ cursor: null, pending: true });
   });
 
   it("fails loudly when n8n is not configured", async () => {

@@ -271,11 +271,6 @@ export interface ConnectorDefinition<TConfig, TCreds> {
   displayName: string;
   configSchema: z.ZodType<TConfig>;      // → validates instance.config
   credentialSchema: z.ZodType<TCreds>;   // → validates what goes to `credentials` bytes
-
-  // Connection-level rate limit floor. Enforced when the operator saves the
-  // integration — before any resource is in scope, which is why it lives here
-  // and defaultSyncEvery lives on the resource module.
-  minSyncEvery?: number;
 }
 
 export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown> {
@@ -371,7 +366,7 @@ resourceSync.syncEvery                  // per-resource override, usually null
   ?? INTEGRATION_SYNC_EVERY_MIN * 60    // global floor
 ```
 
-Clamped to `definition.minSyncEvery` at write time.
+The floor is also enforced at write time, by `integrationInputSchema` — zod rejects a `syncEvery` below `INTEGRATION_SYNC_EVERY_MIN * 60` before the router ever sees it. There is deliberately no per-platform floor on top of that: no platform has needed one, and an unused knob on `ConnectorDefinition` reads as a live constraint.
 
 #### Cursors
 

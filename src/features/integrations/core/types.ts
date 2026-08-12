@@ -102,12 +102,6 @@ export interface ConnectorDefinition<TConfig, TCreds> {
   configSchema: z.ZodType<TConfig>;
   /** Validates the decrypted `Integration.credentials`. */
   credentialSchema: z.ZodType<TCreds>;
-  /**
-   * Connection-level rate-limit floor, in seconds. Enforced when the operator
-   * saves the integration — before any resource is in scope, which is why it
-   * lives here and `defaultSyncEvery` lives on the resource module.
-   */
-  minSyncEvery?: number;
 }
 
 export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {

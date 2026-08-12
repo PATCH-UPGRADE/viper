@@ -63,15 +63,6 @@ const toRowShape = (input: IntegrationFormValues) => {
 
   const config = definition.configSchema.parse(input.config);
 
-  // The connection-level rate-limit floor, enforced when the operator saves —
-  // before any resource is in scope, which is why it lives on the definition.
-  if (definition.minSyncEvery && input.syncEvery < definition.minSyncEvery) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `${definition.displayName} requires a sync interval of at least ${definition.minSyncEvery}s.`,
-    });
-  }
-
   return {
     row: {
       name: input.name,
@@ -137,9 +128,7 @@ export const integrationsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { search, resourceType } = input;
 
-      // An integration is "for" a resource if it has a sync row for it. Under
-      // the old schema this was a scalar column; a code-defined platform can
-      // now serve several resources from one row.
+      // An integration is "for" a resource if it has a sync row for it
       const whereFilter = {
         resourceSyncs: { some: { resource: resourceType } },
         name: {
@@ -163,8 +152,7 @@ export const integrationsRouter = createTRPCRouter({
       const credentials = asBadRequest(() =>
         toCredentialBlob(module, input.credentials),
       );
-      // For a generic platform this is exactly [config.resource]; a code-defined
-      // platform can serve several resources from one row.
+      // For a generic platform this is exactly [config.resource]
       const resources = asBadRequest(() => resourcesFor(module, config));
 
       const integration = await prisma.$transaction(async (tx) => {
@@ -221,7 +209,7 @@ export const integrationsRouter = createTRPCRouter({
           where: { id },
           data: {
             ...row,
-            // TODO(VW-427): credentials are encrypted bytes and are not
+            // TODO(VW-449): credentials are encrypted bytes and are not
             // returned to the client, so the edit form cannot prefill them.
             // Submitting with the auth fields blank therefore means "keep what
             // is stored" rather than "clear it" — otherwise every edit would
@@ -262,8 +250,6 @@ export const integrationsRouter = createTRPCRouter({
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
-      // Read the resources before the delete: Prisma's `delete` returns scalars
-      // only, and the client's cache invalidation keys off the resource.
       const existing = await prisma.integration.findUnique({
         where: { id: input.id },
         select: { resourceSyncs: { select: { resource: true } } },
@@ -293,8 +279,6 @@ export const integrationsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND" });
       }
 
-      // The unit of work is (integration, resource), so a manual sync fans out
-      // the same way the cron does.
       await Promise.all(
         integration.resourceSyncs.map((sync) =>
           inngest.send({

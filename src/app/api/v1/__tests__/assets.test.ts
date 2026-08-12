@@ -476,7 +476,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
     expect(foundAsset2.role).toBe(assetPayload2.role);
-    expect(mapping1.upstreamApi).toBe(assetPayload2.upstreamApi);
+    expect(mapping2.upstreamApi).toBe(assetPayload2.upstreamApi);
     expect(foundAsset2.hostname).toBe(assetPayload2.hostname);
     expect(foundAsset2.macAddress).toBe(assetPayload2.macAddress);
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
@@ -752,7 +752,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
     expect(foundAsset2.role).toBe(assetPayload2.role);
-    expect(mapping1.upstreamApi).toBe(assetPayload2.upstreamApi);
+    expect(mapping2.upstreamApi).toBe(assetPayload2.upstreamApi);
     expect(foundAsset2.hostname).toBe(assetPayload2.hostname);
     expect(foundAsset2.macAddress).toBe(assetPayload2.macAddress);
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);

@@ -295,7 +295,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(foundVuln2.description).toBe(vulnPayload2.description);
     expect(foundVuln2.narrative).toBe(vulnPayload2.narrative);
     expect(foundVuln2.impact).toBe(vulnPayload2.impact);
-    expect(mapping1.upstreamApi).toBe(vulnPayload2.upstreamApi);
+    expect(mapping2.upstreamApi).toBe(vulnPayload2.upstreamApi);
     expect(foundVuln2.exploitUri).toBe(vulnPayload2.exploitUri);
     expect(foundVuln2.sarif).toStrictEqual(vulnPayload2.sarif);
     expect(foundVuln2.deviceGroupMatchings.length).toBe(

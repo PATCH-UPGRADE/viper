@@ -669,7 +669,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     expect(mapping2.externalId).toBe(daPayload2.vendorId);
 
     expect(foundDeviceArtifact2.description).toBe(daPayload2.description);
-    expect(mapping1.upstreamApi).toBe(daPayload2.upstreamApi);
+    expect(mapping2.upstreamApi).toBe(daPayload2.upstreamApi);
     expect(
       foundDeviceArtifact2.deviceGroupMatchings.some(
         (m: { product: { canonicalName: string } | null }) =>

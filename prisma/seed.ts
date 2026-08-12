@@ -1149,6 +1149,8 @@ async function clearDatabase() {
   // Delete in order of dependencies (child tables first)
   await prisma.issue.deleteMany();
   await prisma.integrationResourceSync.deleteMany();
+  // Ticket deletion cascades SourceLink but not the records themselves.
+  await prisma.sourceRecord.deleteMany({ where: { links: { none: {} } } });
   await prisma.externalAssetMapping.deleteMany();
   await prisma.externalVulnerabilityMapping.deleteMany();
   await prisma.artifact.deleteMany();
@@ -2246,6 +2248,11 @@ async function seedVendors() {
   // Rebuilt rather than upserted: neither model has a natural unique key, so a
   // re-seed without SEED_CLEAR_DB would otherwise stack duplicates every run.
   await prisma.contract.deleteMany({ where: { vendorId: vendor.id } });
+  // Contract.managesRelationshipId is SetNull, so the delete above orphans the
+  // relationship rather than removing it — clear it explicitly.
+  await prisma.managesRelationship.deleteMany({
+    where: { vendorId: vendor.id },
+  });
   await prisma.vendorContact.deleteMany({ where: { vendorId: vendor.id } });
 
   await prisma.vendorContact.createMany({

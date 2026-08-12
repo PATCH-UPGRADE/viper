@@ -589,7 +589,7 @@ describe("Remediations Endpoint (/remediations)", () => {
 
     expect(foundRem2.description).toBe(remPayload2.description);
     expect(foundRem2.narrative).toBe(remPayload2.narrative);
-    expect(mapping1.upstreamApi).toBe(remPayload2.upstreamApi);
+    expect(mapping2.upstreamApi).toBe(remPayload2.upstreamApi);
     expect(foundRem2.artifacts.length).toBe(1);
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {

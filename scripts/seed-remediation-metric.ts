@@ -128,7 +128,7 @@ async function teardownFixture() {
 
   const sources = await prisma.sourceRecord.findMany({
     where: { channel: "TA4", externalId: { in: remediationIds } },
-    select: { links: { select: { notificationId: true } } },
+    select: { id: true, links: { select: { notificationId: true } } },
   });
   const notificationIds = sources
     .flatMap((s) => s.links.map((l) => l.notificationId))
@@ -136,6 +136,11 @@ async function teardownFixture() {
 
   const notifications = await prisma.notification.deleteMany({
     where: { id: { in: notificationIds } },
+  });
+  // Remediation.sourceRecord is SetNull and the links above cascade with their
+  // notification, so these snapshots would otherwise survive every run.
+  const orphanSources = await prisma.sourceRecord.deleteMany({
+    where: { id: { in: sources.map((s) => s.id) }, links: { none: {} } },
   });
   const deleted = await prisma.remediation.deleteMany({
     where: { id: { in: remediationIds } },
@@ -145,7 +150,7 @@ async function teardownFixture() {
   });
 
   console.log(
-    `  teardown: ${notifications.count} notification(s), ${deleted.count} remediation(s), ${vulns.count} vulnerability(s)`,
+    `  teardown: ${notifications.count} notification(s), ${orphanSources.count} source(s), ${deleted.count} remediation(s), ${vulns.count} vulnerability(s)`,
   );
 }
 

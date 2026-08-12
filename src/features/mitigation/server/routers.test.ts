@@ -14,8 +14,23 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     },
     workOrderTicket: {
       findMany: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      create: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
+    },
+    deviceGroupMatching: {
+      findMany: vi.fn(),
+    },
+    asset: {
+      findMany: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+    },
+    assetTicket: {
+      findUnique: vi.fn(),
+    },
+    ticketActivity: {
+      create: vi.fn(),
     },
     // The router uses prisma.$transaction(async (tx) => {...}) — invoke the
     // callback with the same mocked client so call assertions still work.
@@ -92,6 +107,8 @@ beforeEach(() => {
     id: PLAN_ID,
     workOrders: [],
   });
+  mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+  mockPrisma.assetTicket.findUnique.mockResolvedValue(null);
 });
 
 describe("mitigationRouter.accept", () => {
@@ -133,10 +150,25 @@ describe("mitigationRouter.accept", () => {
     });
   });
 
+  it("only re-matches assets for tickets this plan hasn't already promoted", async () => {
+    const caller = setup();
+
+    await caller.accept({ planId: PLAN_ID });
+
+    // A repeated accept call on the same plan must not re-run asset matching
+    // (and re-record ASSET_ATTACHED activity) for tickets an earlier call
+    // already promoted — isDraft: true excludes those.
+    expect(mockPrisma.workOrderTicket.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { mitigationPlanId: PLAN_ID, isDraft: true },
+      }),
+    );
+  });
+
   it("applies the user's edits before promoting the drafts", async () => {
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      { id: "wo-1" },
-      { id: "wo-2" },
+      { id: "wo-1", deviceGroups: [] },
+      { id: "wo-2", deviceGroups: [] },
     ]);
     const caller = setup();
 
@@ -183,6 +215,131 @@ describe("mitigationRouter.accept", () => {
 
     expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
     expect(mockPrisma.mitigationPlan.update).not.toHaveBeenCalled();
+  });
+
+  it("resolves matched assets for a device-group-linked ticket and spawns per-asset children", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      { id: "wo-dg", deviceGroups: [{ deviceGroupMatchingId: "dgm-1" }] },
+    ]);
+    mockPrisma.deviceGroupMatching.findMany.mockResolvedValue([
+      {
+        manufacturerId: "manufacturer-icu",
+        productId: "product-plum",
+        versionId: null,
+        versionRange: null,
+      },
+    ]);
+    mockPrisma.asset.findMany.mockResolvedValue([
+      {
+        id: "asset-1",
+        deviceGroup: {
+          id: "dg-1",
+          manufacturerId: "manufacturer-icu",
+          productId: "product-plum",
+          versionId: null,
+          version: null,
+        },
+      },
+      {
+        id: "asset-2",
+        deviceGroup: {
+          id: "dg-2",
+          manufacturerId: "manufacturer-other",
+          productId: null,
+          versionId: null,
+          version: null,
+        },
+      },
+    ]);
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
+      summary: "Patch ICU pumps",
+      body: null,
+      category: "PATCH",
+      priority: "Unsorted",
+      creatorId: FAKE_USER_ID,
+      scheduledAt: null,
+      sourceLabel: null,
+    });
+    mockPrisma.asset.findUniqueOrThrow.mockResolvedValue({
+      hostname: "host-icu-1",
+      ip: "10.0.0.1",
+    });
+    mockPrisma.workOrderTicket.create.mockResolvedValue({ id: "child-1" });
+    const caller = setup();
+
+    await caller.accept({ planId: PLAN_ID });
+
+    expect(mockPrisma.deviceGroupMatching.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: { in: ["dgm-1"] } } }),
+    );
+    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          ticket: { create: { assetId: "asset-1", parentTicketId: "wo-dg" } },
+        }),
+      }),
+    );
+  });
+
+  it("creates one child ticket for an asset matched by more than one deviceGroupMatchingId", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      {
+        id: "wo-dg",
+        deviceGroups: [
+          { deviceGroupMatchingId: "dgm-specific" },
+          { deviceGroupMatchingId: "dgm-wildcard" },
+        ],
+      },
+    ]);
+    // A specific manufacturer+product matching and a wildcard
+    // manufacturer-only matching that both apply to the same asset below.
+    mockPrisma.deviceGroupMatching.findMany.mockResolvedValue([
+      {
+        manufacturerId: "manufacturer-icu",
+        productId: "product-plum",
+        versionId: null,
+        versionRange: null,
+      },
+      {
+        manufacturerId: "manufacturer-icu",
+        productId: null,
+        versionId: null,
+        versionRange: null,
+      },
+    ]);
+    // A real findMany can't return the same row twice, but this exercises
+    // the attachedAssetIds guard directly rather than relying on that.
+    const sameAsset = {
+      id: "asset-1",
+      deviceGroup: {
+        id: "dg-1",
+        manufacturerId: "manufacturer-icu",
+        productId: "product-plum",
+        versionId: null,
+        version: null,
+      },
+    };
+    mockPrisma.asset.findMany.mockResolvedValue([sameAsset, sameAsset]);
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
+      summary: "Patch ICU pumps",
+      body: null,
+      category: "PATCH",
+      priority: "Unsorted",
+      creatorId: FAKE_USER_ID,
+      scheduledAt: null,
+      sourceLabel: null,
+    });
+    mockPrisma.asset.findUniqueOrThrow.mockResolvedValue({
+      hostname: "host-icu-1",
+      ip: "10.0.0.1",
+    });
+    mockPrisma.workOrderTicket.create.mockResolvedValue({ id: "child-1" });
+    const caller = setup();
+
+    await caller.accept({ planId: PLAN_ID });
+
+    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledTimes(1);
   });
 });
 

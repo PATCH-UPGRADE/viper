@@ -23,7 +23,7 @@ import {
   useDetachAsset,
 } from "../../hooks/use-tracking";
 import { LinkedAssetsTable } from "./linked-assets-table";
-import type { DetailAsset, DetailRemediation } from "./shared";
+import type { DetailAssetTicket, DetailRemediation } from "./shared";
 
 const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
   const [open, setOpen] = useState(false);
@@ -86,11 +86,11 @@ const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
 
 export const LinkedAssetsTabContent = ({
   ticketId,
-  assets,
+  assetTickets,
   remediations,
 }: {
   ticketId: string;
-  assets: DetailAsset[];
+  assetTickets: DetailAssetTicket[];
   remediations: DetailRemediation[];
 }) => {
   const detach = useDetachAsset(ticketId);
@@ -100,14 +100,14 @@ export const LinkedAssetsTabContent = ({
       <div className="flex items-center justify-between gap-2 border-b px-5 py-4">
         <h2 className="text-base font-semibold">
           Linked Assets{" "}
-          <span className="text-muted-foreground">({assets.length})</span>
+          <span className="text-muted-foreground">({assetTickets.length})</span>
         </h2>
         <AttachAssetPopover ticketId={ticketId} />
       </div>
       <div className="p-2">
-        {assets.length > 0 ? (
+        {assetTickets.length > 0 ? (
           <LinkedAssetsTable
-            assets={assets}
+            assetTickets={assetTickets}
             remediations={remediations}
             onDetach={(assetId) => detach.mutate({ ticketId, assetId })}
             detachPending={detach.isPending}

@@ -438,7 +438,7 @@ model Asset {
   deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
   contractAssets       ContractAsset[]
-  workOrderTickets     WorkOrderTicket[]          @relation("WorkOrderTicketAssets")
+  assetTickets         AssetTicket[]
   notificationMappings NotificationAssetMapping[]
   nodes                Node[]
 
@@ -1194,8 +1194,10 @@ model WorkOrderTicket {
   issues          Issue[]                          @relation("WorkOrderTicketIssues")
   vulnerabilities Vulnerability[]                  @relation("WorkOrderTicketVulns")
   remediations    Remediation[]                    @relation("WorkOrderTicketRemediations")
-  assets          Asset[]                          @relation("WorkOrderTicketAssets")
   deviceGroups    NotificationDeviceGroupMapping[]
+
+  assets AssetTicket[] @relation("WorkOrderAssets")
+  ticket AssetTicket?  @relation("WorkOrderAssetTicket")
 
   comments         TicketComment[]
   descriptions     TicketDescription[]
@@ -1216,6 +1218,26 @@ model WorkOrderTicket {
   @@index([mitigationPlanId])
   @@index([notificationId])
   @@map("work_order_ticket")
+}
+
+model AssetTicket {
+  id String @id @default(cuid())
+
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  parentTicketId String
+  parentTicket   WorkOrderTicket @relation("WorkOrderAssets", fields: [parentTicketId], references: [id], onDelete: Cascade)
+
+  ticketId String          @unique
+  ticket   WorkOrderTicket @relation("WorkOrderAssetTicket", fields: [ticketId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([parentTicketId, assetId])
+  @@index([assetId])
+  @@map("asset_ticket")
 }
 
 model TicketWatch {

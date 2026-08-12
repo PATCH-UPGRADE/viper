@@ -683,10 +683,21 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const sampleAssetTicket = (
+  assetOverrides: Record<string, unknown> = {},
+  ticketOverrides: Record<string, unknown> = {},
+) => ({
+  ticket: { id: "child-1", status: "TO_DO", ...ticketOverrides },
+  asset: sampleAsset(assetOverrides),
+});
+
 describe("LinkedAssetsTable", () => {
   it("renders one row per asset with role, model, IP, MAC, and location", () => {
     render(
-      <LinkedAssetsTable assets={[sampleAsset()] as never} remediations={[]} />,
+      <LinkedAssetsTable
+        assetTickets={[sampleAssetTicket()] as never}
+        remediations={[]}
+      />,
     );
 
     expect(screen.getByText("Infusion Pump")).toBeInTheDocument();
@@ -694,23 +705,28 @@ describe("LinkedAssetsTable", () => {
     expect(screen.getByText("10.0.0.5")).toBeInTheDocument();
     expect(screen.getByText("00:11:22:33:44:55")).toBeInTheDocument();
     expect(screen.getByText("A · 3 · 302")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
+    expect(screen.getByText("To Do")).toBeInTheDocument();
   });
 
-  it("links the asset id cell to the asset detail page", () => {
+  it("links the asset id cell to its dedicated per-asset ticket", () => {
     render(
-      <LinkedAssetsTable assets={[sampleAsset()] as never} remediations={[]} />,
+      <LinkedAssetsTable
+        assetTickets={[sampleAssetTicket({}, { id: "child-42" })] as never}
+        remediations={[]}
+      />,
     );
 
     const link = screen.getByRole("link", { name: /host-1/i });
-    expect(link).toHaveAttribute("href", "/assets/asset-1");
+    expect(link).toHaveAttribute("href", "/tracking/child-42");
   });
 
   it("falls back to em-dashes for missing role, MAC, and location fields", () => {
     render(
       <LinkedAssetsTable
-        assets={
+        assetTickets={
           [
-            sampleAsset({
+            sampleAssetTicket({
               role: null,
               macAddress: null,
               location: null,
@@ -729,7 +745,7 @@ describe("LinkedAssetsTable", () => {
   it("matches a remediation to the asset via device-group matching rules", () => {
     render(
       <LinkedAssetsTable
-        assets={[sampleAsset()] as never}
+        assetTickets={[sampleAssetTicket()] as never}
         remediations={
           [
             {
@@ -755,7 +771,7 @@ describe("LinkedAssetsTable", () => {
   it("shows em-dash when no remediation targets the asset's device group", () => {
     render(
       <LinkedAssetsTable
-        assets={[sampleAsset()] as never}
+        assetTickets={[sampleAssetTicket()] as never}
         remediations={
           [
             {
@@ -939,7 +955,7 @@ describe("TicketDetailContent — view mode", () => {
   it("renders the Linked Assets table when assets are present", async () => {
     const user = userEvent.setup();
     renderDetail({
-      assets: [sampleAsset()],
+      assets: [sampleAssetTicket()],
     });
     await user.click(screen.getByRole("tab", { name: /assets/i }));
     expect(screen.getByText("Infusion Pump")).toBeInTheDocument();
@@ -1231,7 +1247,9 @@ describe("TicketDetailContent — assets attach/detach", () => {
   it("renders a per-row detach button on linked assets and calls detachAsset on click", async () => {
     const user = userEvent.setup();
     renderDetail({
-      assets: [sampleAsset({ id: "linked-asset", hostname: "linked-host" })],
+      assets: [
+        sampleAssetTicket({ id: "linked-asset", hostname: "linked-host" }),
+      ],
     });
 
     await user.click(screen.getByRole("tab", { name: /assets/i }));

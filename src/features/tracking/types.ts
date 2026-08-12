@@ -23,7 +23,7 @@ export const ticketBaseInclude = {
   assignee: { select: { id: true, name: true, email: true } },
   creator: { select: { id: true, name: true, image: true } },
   vulnerabilities: { select: { id: true, cveId: true } },
-  assets: { select: { id: true, hostname: true } },
+  assets: { select: { asset: { select: { id: true, hostname: true } } } },
   // Ingested source artifact(s); the Source column renders by channel (or the
   // creator avatar when there are none — i.e. a manually-created ticket).
   sources: { select: { channel: true }, take: 1 },
@@ -107,6 +107,7 @@ export const ticketDetailInclude = {
   creator: { select: { id: true, name: true, email: true } },
   parent: { select: { id: true, summary: true } },
   children: {
+    where: { ticket: null },
     select: {
       id: true,
       summary: true,
@@ -125,23 +126,28 @@ export const ticketDetailInclude = {
   },
   assets: {
     select: {
-      id: true,
-      hostname: true,
-      ip: true,
-      role: true,
-      status: true,
-      macAddress: true,
-      location: true,
-      deviceGroupId: true,
-      deviceGroup: {
+      ticket: { select: { id: true, status: true } },
+      asset: {
         select: {
           id: true,
-          manufacturerId: true,
-          productId: true,
-          versionId: true,
-          manufacturer: { select: { canonicalDisplayName: true } },
-          product: { select: { canonicalDisplayName: true } },
-          version: { select: { canonicalName: true } },
+          hostname: true,
+          ip: true,
+          role: true,
+          status: true,
+          macAddress: true,
+          location: true,
+          deviceGroupId: true,
+          deviceGroup: {
+            select: {
+              id: true,
+              manufacturerId: true,
+              productId: true,
+              versionId: true,
+              manufacturer: { select: { canonicalDisplayName: true } },
+              product: { select: { canonicalDisplayName: true } },
+              version: { select: { canonicalName: true } },
+            },
+          },
         },
       },
     },
@@ -232,7 +238,9 @@ export const workOrderListInclude = {
   },
   assignee: { select: { id: true, name: true, email: true } },
   assets: {
-    select: { id: true, hostname: true, ip: true, role: true },
+    select: {
+      asset: { select: { id: true, hostname: true, ip: true, role: true } },
+    },
   },
   vulnerabilities: {
     select: { id: true, cveId: true, severity: true, cvssScore: true },
@@ -309,6 +317,8 @@ const linkedAssetSchema = z.object({
   role: z.string().nullable(),
 });
 
+const assetTicketItemSchema = z.object({ asset: linkedAssetSchema });
+
 const linkedVulnerabilitySchema = z.object({
   id: z.string(),
   cveId: z.string().nullable(),
@@ -335,7 +345,7 @@ export const workOrderListItemSchema = z.object({
   sourceLabel: z.string().nullable(),
   departments: z.array(departmentItemSchema),
   assignee: assigneeItemSchema.nullable(),
-  assets: z.array(linkedAssetSchema),
+  assets: z.array(assetTicketItemSchema),
   vulnerabilities: z.array(linkedVulnerabilitySchema),
   remediations: z.array(linkedRemediationSchema),
   isWatching: z.boolean(),
@@ -430,6 +440,11 @@ const detailLinkedAssetSchema = linkedAssetSchema.extend({
   }),
 });
 
+const detailAssetTicketSchema = z.object({
+  ticket: z.object({ id: z.string(), status: z.enum(TicketStatus) }),
+  asset: detailLinkedAssetSchema,
+});
+
 const detailLinkedRemediationSchema = z.object({
   id: z.string(),
   description: z.string().nullable(),
@@ -509,7 +524,7 @@ export const workOrderDetailResponseSchema = z.object({
   creator: ticketCreatorSchema,
   parent: ticketParentRefSchema,
   children: z.array(ticketChildRefSchema),
-  assets: z.array(detailLinkedAssetSchema),
+  assets: z.array(detailAssetTicketSchema),
   vulnerabilities: z.array(linkedVulnerabilitySchema),
   remediations: z.array(detailLinkedRemediationSchema),
   issues: z.array(ticketIssueSchema),

@@ -2061,6 +2061,45 @@ const COMMENTED_AT = new Date("2026-06-20T12:00:00Z");
 const SEEN_BEFORE_COMMENT = new Date("2026-06-19T09:00:00Z");
 const SEEN_AFTER_COMMENT = new Date("2026-06-21T09:00:00Z");
 
+// Mirrors createAssetTicket() in src/features/tracking/server/asset-tickets.ts
+// (not imported directly — that module is 'server-only', which this
+// standalone seed script isn't). Keep in sync if that shape changes.
+async function seedAssetTicket(
+  parentTicket: {
+    id: string;
+    summary: string;
+    category: TicketCategory;
+    sourceLabel: string | null;
+    scheduledAt: Date | null;
+  },
+  assetId: string,
+  userId: string,
+) {
+  const asset = await prisma.asset.findUniqueOrThrow({
+    where: { id: assetId },
+    select: { hostname: true, ip: true },
+  });
+  await prisma.workOrderTicket.create({
+    data: {
+      summary: `${parentTicket.summary} — ${asset.hostname ?? asset.ip}`,
+      category: parentTicket.category,
+      sourceLabel: parentTicket.sourceLabel,
+      scheduledAt: parentTicket.scheduledAt,
+      creatorId: userId,
+      parentId: parentTicket.id,
+      ticket: { create: { assetId, parentTicketId: parentTicket.id } },
+    },
+  });
+  await prisma.ticketActivity.create({
+    data: {
+      ticketId: parentTicket.id,
+      userId,
+      type: "ASSET_ATTACHED",
+      data: { assetId, assetLabel: asset.hostname ?? asset.ip },
+    },
+  });
+}
+
 async function createWorkOrderTicket(
   ticket: SampleTicket,
   userId: string,
@@ -2126,7 +2165,7 @@ async function createWorkOrderTicket(
     })
     .filter((d): d is { body: string; departmentId: string } => d !== null);
 
-  return prisma.workOrderTicket.create({
+  const created = await prisma.workOrderTicket.create({
     data: {
       summary: ticket.summary,
       status: ticket.status,
@@ -2164,7 +2203,6 @@ async function createWorkOrderTicket(
       },
       scheduledAt: ticket.scheduledAt,
       vulnerabilities: { connect: linkedVulns.map((v) => ({ id: v.id })) },
-      assets: { connect: linkedAssets.map((a) => ({ id: a.id })) },
       remediations: {
         connect: linkedRemediations.map((r) => ({ id: r.id })),
       },
@@ -2179,6 +2217,12 @@ async function createWorkOrderTicket(
         : undefined,
     },
   });
+
+  for (const asset of linkedAssets) {
+    await seedAssetTicket(created, asset.id, userId);
+  }
+
+  return created;
 }
 
 async function seedWorkOrderTickets(userId: string) {

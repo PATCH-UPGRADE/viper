@@ -2,12 +2,13 @@ import { z } from "zod";
 import {
   AssetStatus,
   IssueStatus,
-  NotificationChannel,
-  NotificationSourceType,
   NotificationType,
+  PlatformEnum,
   Priority,
   type Prisma,
   Severity,
+  SourceChannel,
+  SourceLinkType,
   TicketActivityType,
   TicketCategory,
   TicketStatus,
@@ -26,7 +27,10 @@ export const ticketBaseInclude = {
   assets: { select: { asset: { select: { id: true, hostname: true } } } },
   // Ingested source artifact(s); the Source column renders by channel (or the
   // creator avatar when there are none — i.e. a manually-created ticket).
-  sources: { select: { channel: true }, take: 1 },
+  sourceLinks: {
+    select: { sourceRecord: { select: { channel: true } } },
+    take: 1,
+  },
   // `watchers` and `seenBy` are replaced at the procedure level with a
   // where: { userId } filter so each row reflects only the current user's
   // watch/seen state. Including them here keeps the derived TS type consistent
@@ -199,23 +203,27 @@ export const ticketDetailInclude = {
     },
     orderBy: { createdAt: "asc" as const },
   },
-  sources: {
+  sourceLinks: {
     select: {
-      id: true,
-      channel: true,
-      externalId: true,
-      referenceUrl: true,
       sourceType: true,
+      sourceRecord: {
+        select: { id: true, channel: true, externalId: true },
+      },
     },
-    orderBy: { receivedAt: "desc" as const },
+    orderBy: { createdAt: "desc" as const },
   },
   externalMappings: {
     select: {
       id: true,
       externalId: true,
       lastSynced: true,
+      // TODO(VW-427): was integrationUri. The platform is an enum on the row
+      // now, and the mapping carries its own URLs, so the Source chip resolves
+      // a link from those instead of parsing the integration's URL.
+      upstreamApi: true,
+      webUrl: true,
       integration: {
-        select: { id: true, name: true, integrationUri: true },
+        select: { id: true, name: true, platform: true },
       },
     },
   },
@@ -276,9 +284,12 @@ export const workOrderIntegrationItemSchema = z.object({
   // appears in the Suggested (triage) tab. `raw` holds the upstream record.
   source: z
     .object({
-      channel: z.enum(NotificationChannel),
+      // LLM-FACING: this enum is z.toJSONSchema()'d into the contract handed to
+      // n8n / partners. PolledApi and Crawl are gone; a partner still POSTing
+      // "PolledApi" now gets a 400. referenceUrl is dropped — send the
+      // item-level `webUrl` / `upstreamApi` on the envelope instead.
+      channel: z.enum(SourceChannel),
       externalId: z.string().nullish(),
-      referenceUrl: z.string().nullish(),
       markdown: z.string().nullish(),
       raw: z.any().optional(),
     })
@@ -379,22 +390,27 @@ const detailAssigneeSchema = assigneeItemSchema.extend({
   department: departmentItemSchema.nullable(),
 });
 
+// A link plus the snapshot it points at. sourceType lives on the link because
+// it describes the decision to attach, not the record.
 const ticketSourceSchema = z.object({
-  id: z.string(),
-  channel: z.enum(NotificationChannel),
-  externalId: z.string().nullable(),
-  referenceUrl: z.string().nullable(),
-  sourceType: z.enum(NotificationSourceType),
+  sourceType: z.enum(SourceLinkType),
+  sourceRecord: z.object({
+    id: z.string(),
+    channel: z.enum(SourceChannel),
+    externalId: z.string().nullable(),
+  }),
 });
 
 const ticketExternalMappingSchema = z.object({
   id: z.string(),
   externalId: z.string(),
   lastSynced: z.date().nullable(),
+  upstreamApi: z.string().nullable(),
+  webUrl: z.string().nullable(),
   integration: z.object({
     id: z.string(),
     name: z.string(),
-    integrationUri: z.string(),
+    platform: z.enum(PlatformEnum),
   }),
 });
 
@@ -531,7 +547,7 @@ export const workOrderDetailResponseSchema = z.object({
   comments: z.array(ticketCommentResponseSchema),
   isWatching: z.boolean(),
   activities: z.array(ticketActivitySchema),
-  sources: z.array(ticketSourceSchema),
+  sourceLinks: z.array(ticketSourceSchema),
   externalMappings: z.array(ticketExternalMappingSchema),
   notification: ticketNotificationRefSchema.nullable(),
 });

@@ -21,27 +21,19 @@ import { inngest } from "../client";
 
 /**
  * The two Inngest functions that drive integration syncs.
+ * TODO VW-437: Document in a CLAUDE.md file somewhere that adding a platform
+ *    should not make changes to this file
  */
 
 export const syncAllIntegrations = inngest.createFunction(
   { id: "sync-all-integrations" },
   { cron: `*/${INTEGRATION_SYNC_EVERY_MIN} * * * *` }, // Run every 5 minutes
   async ({ step }) => {
-    // The unit of work is (integration, resource), not the integration. Three
-    // separate facts get three separate columns:
-    //   integration.enabled  — the whole connection is switched off
-    //   resourceSync.enabled — this one resource is switched off
-    //   nextSyncAt           — when this resource is next due (null = due now)
-    //
-    // The old predicate compared `now - newestSyncStatus.syncedAt` against
-    // syncEvery *regardless of that row's state*, so a Pending row that never
-    // completed suppressed re-sync forever. nextSyncAt is stamped at attempt
-    // start instead, so a crashed worker costs one cycle rather than wedging.
+    //  integration.enabled  — the whole connection is switched off
+    //  resourceSync.enabled — this one resource is switched off
+    //  nextSyncAt           — when this resource is next due (null = due now)
     //
     // Every due row is scheduled, whatever its platform does with the tick.
-    // A platform with no module registered is scheduled too, on purpose: it
-    // then records a real error on its resource row, which is where an operator
-    // would look, instead of sitting `Pending` forever with nothing to see.
     const due = await step.run("fetch-due-resource-syncs", async () =>
       prisma.integrationResourceSync.findMany({
         where: {
@@ -70,8 +62,6 @@ export const syncAllIntegrations = inngest.createFunction(
 export const syncIntegration = inngest.createFunction(
   {
     id: "sync-integration",
-    // A manual "Sync Now" and the cron could previously run the same
-    // integration twice at once. The unit of work is (integration, resource).
     concurrency: {
       key: "event.data.integrationId + event.data.resource",
       limit: 1,
@@ -82,10 +72,7 @@ export const syncIntegration = inngest.createFunction(
     const { integrationId, resource } = event.data;
 
     // ---- 1. Load ---------------------------------------------------------
-    // Only JSON-safe, non-secret facts leave this step. `credentials` is
-    // omitted deliberately: a step's return value is shipped to and memoized by
-    // the Inngest service, so returning decrypted credentials would store
-    // plaintext outside the process. Step 3 re-reads and decrypts in-process.
+    // Only JSON-safe, non-secret facts leave this step.
     const loaded = await step.run("load-integration", async () => {
       const integration = await prisma.integration.findUnique({
         where: { id: integrationId },
@@ -111,15 +98,12 @@ export const syncIntegration = inngest.createFunction(
     });
 
     if (!loaded) {
-      // Retrying a deleted integration four times helps nobody.
       throw new NonRetriableError(`Integration ${integrationId} not found`);
     }
 
     // ---- 2. Claim the attempt, before doing any work ---------------------
-    // Stamping lastAttemptAt and pushing nextSyncAt forward first means a
-    // worker that crashes mid-sync costs one cycle instead of wedging the row
-    // on a stuck Pending. It also closes the old race where a callback could
-    // land before the status row existed.
+    // Compute when to sync next so that if we get an error, we know when to
+    // retry
     await step.run("claim-attempt", async () => {
       const seconds = effectiveSyncEvery(
         loaded.resourceSyncEvery,
@@ -148,15 +132,8 @@ export const syncIntegration = inngest.createFunction(
     });
 
     // ---- 3. Run the strategy ---------------------------------------------
-    // One step, not several. `step.run` memoizes its return value as JSON, so a
-    // closure or a module cannot cross a boundary. Everything non-serializable
-    // is therefore created and consumed in here; only `{ ok, cursor, pending }`
-    // comes out.
     const outcome = await step.run("run-sync-strategy", async () => {
       try {
-        // Inside the try on purpose: an unregistered platform then produces an
-        // errorMessage the operator can see, instead of an uncaught throw that
-        // would skip step 4 entirely.
         const module = requirePlatform(loaded.platform);
         const config = module.definition.configSchema.parse(loaded.config);
 
@@ -231,9 +208,6 @@ export const syncIntegration = inngest.createFunction(
               : (outcome.cursor as Prisma.InputJsonValue),
         },
       });
-
-      // The old 5-row prune is gone with SyncStatus: there is now exactly one
-      // durable row per (integration, resource), so there is nothing to trim.
     });
 
     return { success: outcome.ok, pending: outcome.ok && outcome.pending };

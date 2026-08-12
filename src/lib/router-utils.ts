@@ -644,7 +644,5 @@ export const processIntegrationToken = async (
     select: { id: true },
   });
   const integrationId = requireExistence(integration, "Integration").id;
-  // The token's permission scope *is* the ResourceType, and the sync row is
-  // keyed on (integration, resource), so hand it back to the caller.
   return { userId, integrationId, resource: expectedPermissions };
 };

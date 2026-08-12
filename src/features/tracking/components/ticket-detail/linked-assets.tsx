@@ -92,32 +92,27 @@ export const LinkedAssetsTabContent = ({
   assetTickets: DetailAssetTicket[];
 }) => {
   const detach = useDetachAsset(ticketId);
-  // Same "quickly see what's remaining" reasoning as the asset's own work-orders
-  // view: once a per-asset ticket is Done, it drops off this list too.
-  const active = assetTickets.filter((at) => at.ticket.status !== "DONE");
 
   return (
     <Card className="gap-0 py-0">
       <div className="flex items-center justify-between gap-2 border-b px-5 py-4">
         <h2 className="text-base font-semibold">
           Linked Assets{" "}
-          <span className="text-muted-foreground">({active.length})</span>
+          <span className="text-muted-foreground">({assetTickets.length})</span>
         </h2>
         <AttachAssetPopover ticketId={ticketId} />
       </div>
       <div className="p-2">
-        {active.length > 0 ? (
+        {assetTickets.length > 0 ? (
           <LinkedAssetsTable
             parentTicketId={ticketId}
-            assetTickets={active}
+            assetTickets={assetTickets}
             onDetach={(assetId) => detach.mutate({ ticketId, assetId })}
             detachPending={detach.isPending}
           />
         ) : (
           <p className="p-4 text-sm text-muted-foreground">
-            {assetTickets.length > 0
-              ? "No active assets linked to this ticket."
-              : "No assets linked to this ticket."}
+            No assets linked to this ticket.
           </p>
         )}
       </div>

@@ -5,9 +5,6 @@ import { safeUrlSchema } from "@/lib/schemas";
 
 /**
  * What an operator has to provide for an AI integration.
- *
- * Composed from `genericConfigSchema` — see the note in partner's config for
- * why `resource` is inherited rather than redeclared.
  */
 export const configSchema = genericConfigSchema.extend({
   integrationUri: safeUrlSchema,

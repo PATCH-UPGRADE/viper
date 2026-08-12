@@ -34,7 +34,7 @@ export async function aiSync(
       resourceType: ctx.resource,
       integrationUri: ctx.config.integrationUri,
       additionalInstructions: ctx.config.additionalInstructions,
-      // TODO(VW-428): this forwards the integration's credentials to n8n in
+      // NOTE: this forwards the integration's credentials to n8n in
       // plaintext, on purpose. n8n crawls the upstream on our behalf and has to
       // authenticate as us, so `SyncCtx.creds` exists specifically for this
       // path.

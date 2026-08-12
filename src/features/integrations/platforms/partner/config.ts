@@ -5,10 +5,6 @@ import { safeUrlSchema } from "@/lib/schemas";
 
 /**
  * What an operator has to provide for a partner integration (Blueflow, Helm).
- *
- * Composed from `genericConfigSchema` rather than redeclaring `resource`: a
- * platform with no ResourceModules gets its resource from config, and building
- * on the base makes that a type-level guarantee instead of a runtime assertion.
  */
 export const configSchema = genericConfigSchema.extend({
   integrationUri: safeUrlSchema,

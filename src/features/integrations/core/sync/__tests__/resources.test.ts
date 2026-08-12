@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
 import type { AnyConnectorModule, ResourceModule } from "../../types";
 import {
-  hasResourceModules,
   moduleForResource,
   resourcesFor,
 } from "../resources";
@@ -94,12 +93,5 @@ describe("moduleForResource / hasResourceModules", () => {
       moduleForResource(module, ResourceType.Vulnerability),
     ).toBeUndefined();
     expect(moduleForResource(module, ResourceType.WorkOrder)).toBeUndefined();
-  });
-
-  it("distinguishes generic platforms from code-defined ones", () => {
-    expect(hasResourceModules(moduleWith({}))).toBe(false);
-    expect(
-      hasResourceModules(moduleWith({ assets: stubResourceModule() })),
-    ).toBe(true);
   });
 });

@@ -70,7 +70,7 @@ describe("aiSync", () => {
 
   it("forwards the integration's credentials to n8n, on purpose", async () => {
     // Not a leak: n8n crawls the upstream on our behalf and has to authenticate
-    // as us. If you are here to "fix" this, read the TODO(VW-427) in sync.ts.
+    // as us.
     await aiSync(makeCtx());
 
     expect(JSON.parse(lastBody())).toMatchObject({

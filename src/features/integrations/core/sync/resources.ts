@@ -4,11 +4,6 @@ import type { AnyConnectorModule, ResourceModule } from "../types";
 
 /**
  * Which resources does an integration sync, and which module handles each?
- *
- * `ResourceModule`s are named fields rather than a `ResourceType`-keyed map
- * (deliberate — see the RFC's Ground rules), which means core needs a
- * field -> ResourceType mapping. It lives here, in exactly one place, so adding
- * a field means editing one array.
  */
 
 const MODULE_FIELDS = [
@@ -21,8 +16,7 @@ const MODULE_FIELDS = [
 }>;
 
 /**
- * A generic platform's resource lives in its config. Parsing it here makes that
- * a validated contract rather than a silent convention.
+ * A generic platform's resource lives in its config.
  */
 export const genericConfigSchema = z.object({
   resource: z.enum(ResourceType),
@@ -44,20 +38,13 @@ export const moduleForResource = (
 };
 
 /**
- * ResourceModules present -> one resource per module field.
- * None -> generic platform, so the resource is `config.resource`.
- *
- * There is no `resourcesFor` hook on the module: the *absence* of
- * ResourceModule fields is itself the signal that a platform is generic. A
- * per-module hook would return a 1-element array for every implementor.
+ * ResourceModules present -> returns one resource per module field.
+ * None -> generic platform, returns `config.resource`.
  */
 export const resourcesFor = (
   module: AnyConnectorModule,
   config: unknown,
 ): ResourceType[] => {
-  // A plain loop rather than map+filter: `.filter(Boolean)` does not narrow, and
-  // a type predicate can't widen the literal union `map` produces back to
-  // `ResourceType`.
   const fromModules: ResourceType[] = [];
   for (const { field, resource } of MODULE_FIELDS) {
     if (module[field]) fromModules.push(resource);

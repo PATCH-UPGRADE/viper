@@ -49,9 +49,7 @@ const integrationsInclude = {
 } as const;
 
 /**
- * Encrypted credentials must never reach the browser. Prisma returns every
- * scalar by default and `include` only *adds* relations, so without this the
- * ciphertext ships on each integrations page load.
+ * Encrypted credentials must never reach the browser
  */
 const omitCredentials = { credentials: true } as const;
 

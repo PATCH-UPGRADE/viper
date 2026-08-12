@@ -36,11 +36,6 @@ export interface CallbackConfig {
   schema: Record<string, unknown>;
 }
 
-/**
- * Split out of `ResourceModule` so `core/urls.ts` can take them as a plain
- * parameter. A registry lookup inside `urls.ts` would drag the whole server-only
- * platform graph into any client component that renders a link.
- */
 // TODO: VW-431 Fleet should use this on resource modules
 export interface UrlBuilders<TConfig = unknown> {
   /** What's the API URL for this record on their platform? */
@@ -51,7 +46,6 @@ export interface UrlBuilders<TConfig = unknown> {
 
 /**
  * One resource on a platform whose protocol *we* speak (Fleet, ServiceNow).
- *
  * A platform owns whatever client its methods need, including session abstratction
 */
 export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
@@ -75,11 +69,6 @@ export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
 
 /**
  * Everything one `(integration, resource)` sync attempt needs.
- *
- * Row-level facts (`integrationId`, the shadow user) are deliberately absent:
- * they are captured by the `callback` closure, which core builds. `creds` is the
- * only place credentials reach a platform — never `toCanonical`, `apiUrlFor`,
- * `webUrlFor`, or the upsert path.
  */
 export interface SyncCtx<TConfig = unknown, TCreds = unknown> {
   config: TConfig;
@@ -108,7 +97,6 @@ export type SyncStrategy<TConfig = unknown, TCreds = unknown> = (
 ) => Promise<SyncOutcome>;
 
 export interface ConnectorDefinition<TConfig, TCreds> {
-  /** No free-text slug to drift from the enum. */
   platform: PlatformEnum;
   displayName: string;
   /** Validates `Integration.config`. */

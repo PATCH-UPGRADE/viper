@@ -3,9 +3,6 @@ import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
 
 /**
  * How often a resource syncs, and how far to back off when it fails.
- *
- * This applies to every platform regardless of how it gets its data — a
- * hand-off platform is scheduled on exactly the same terms as one that pulls.
  */
 
 /**

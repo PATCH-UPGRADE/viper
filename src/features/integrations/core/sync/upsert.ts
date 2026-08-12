@@ -17,12 +17,7 @@ import {
 import type { IntegrationResponse } from "@/lib/schemas";
 
 /**
- * Dedup + upsert against the `External*Mapping` tables.
- *
- * Every platform's data lands here eventually, arriving at
- * `/{resource}/integrationUpload/{token}` — the endpoint `ai` and `partner`
- * hand out as their callback. (Named "upsert" rather than "ingest" so nobody
- * reads it as having anything to do with Inngest, the job runner.)
+ * Dedup + upsert data we get in from platforms against the `External*Mapping` tables.
  */
 
 // so we can take in `prisma` into functions and work with it
@@ -52,13 +47,6 @@ export const handlePrismaError = (e: unknown): string => {
 
 /**
  * Close out the sync attempt for one (integration, resource).
- *
- * There is exactly one durable row per pair rather than an append-only log, so
- * this upserts in place: no "find the newest Pending row" dance, and no 5-row
- * prune.
- *
- * `lastSuccessfulSync` lives on the resource row, not on `Integration` — a slow
- * asset pull no longer overwrites the work-order sync's watermark.
  */
 export async function upsertResourceSync(
   integrationId: string,
@@ -92,6 +80,7 @@ export async function upsertResourceSync(
     });
 
     // integrations do not have api keys. update when the request was made here
+    // TODO: VW-435 should probably remove this
     await tx.apiKeyConnector.updateMany({
       where: { integrationId },
       data: { lastRequest: lastSynced },
@@ -149,19 +138,10 @@ export interface SyncConfig<
 
 /**
  * Generic helper function for processing integration syncs
- *
- * A failing item no longer aborts the batch. This used to `break` on the first
- * Prisma error, silently dropping every remaining item while returning HTTP 200
- * with `createdItemsCount: 0` — a total failure that read as a quiet success.
- * Errors are now collected, the loop continues, and the response reports real
- * partial counts alongside a summary of what went wrong.
  */
 export async function processIntegrationSync<
   TInputItem extends {
     vendorId: string;
-    // upstreamApi / webUrl belong to the mapping, not the record. They arrive
-    // on the upload envelope (see createIntegrationInputSchema) and are written
-    // to the External*Mapping row below rather than onto the item.
     upstreamApi?: string | null;
     webUrl?: string | null;
   },
@@ -196,9 +176,6 @@ export async function processIntegrationSync<
 
   for (const item of input.items) {
     const { vendorId, upstreamApi = null, webUrl = null } = item;
-    // Defaulted to null rather than left undefined on purpose: Prisma reads
-    // `undefined` as "leave this column alone", so a platform that *removes* a
-    // URL would never be able to clear it.
     const mappingUrls = { upstreamApi, webUrl };
 
     // Look for an existing mapping first

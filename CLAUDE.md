@@ -218,15 +218,65 @@ export const { GET, POST, PUT } = serve({
 
 **Development**: Run `npm run inngest:dev` (or `npm run dev:all`) to start the Inngest dev server
 
-### AI Chat (LangGraph + AI SDK UI)
+### AI Agents
 
-The chat and recommendations agents run as a **streaming Next.js route**
-(`src/app/api/chat/route.ts`) — not as Inngest jobs:
+Agents come in two shapes that live in different places. Which shape you need decides
+where the code goes.
 
-- **LangGraph** orchestrates each agent graph in `src/features/chat/viper-agent/langgraph/` (`buildAgentGraph`: deterministic context preload → model ↔ tools, with an `ask_user_questions` human-in-the-loop stop).
-- Models are **LangChain `ChatAnthropic`** — Haiku for the chat agent, Opus + extended thinking for the recommendations agent.
-- The route streams token + reasoning + tool deltas to the client via **Vercel AI SDK UI** (`useChat` in `src/features/chat/hooks/use-viper-chat.ts`); `langgraph/stream-bridge.ts` maps LangGraph `streamEvents` onto the AI SDK UI message stream.
-- Conversation history is persisted to Prisma (`ChatThread` / `ChatMessage`); the `manage_memories` tool dispatches to the `manageMemoriesFn` Inngest function.
+**Conversational agents — `src/features/agents/`**
+
+LangGraph agents that run a model ↔ tools loop and stream to the UI. They share a
+toolset, so they share a home:
+
+- `shared/` — everything used by more than one conversational agent:
+  `buildAgentGraph` (deterministic context preload → model ↔ tools, with an
+  `ask_user_questions` human-in-the-loop stop), the `streamEvents` → AI SDK UI
+  bridge, the hospital-wide notes preload, and thread persistence + titling.
+- `tools/` — model-facing tools: `query_platform_data` (a read-only allowlist of tRPC
+  query procedures — mutations are not representable), `record_note`, and
+  `buildAgentTools`, the registry every conversational agent binds.
+- One directory per agent (`chat/`, `recommendations/`) holding only that agent's
+  graph and prompt.
+
+Because every agent binds the same `buildAgentTools` set, a tool added to the
+registry is armed for all of them — describe it in each agent's `<tools>` prompt
+block or that agent can call something it was never told about.
+
+**Known exception:** the per-role prompt fragments (`ASSET_ROLE_INSTRUCTIONS`,
+`VULNERABILITY_ROLE_INSTRUCTIONS`, `RECOMMENDATION_ROLE_INSTRUCTIONS`) still live in
+`src/features/chat/utils.ts`, and both graphs import them from there — so not all
+agent prompt text is under `agents/` yet. They are keyed `Record<UserRole, string>`,
+and `UserRole` is also used by the asset and vulnerability drawers, so rehoming the
+fragments means first moving that enum somewhere neutral. Until then, a prompt edit
+may mean editing `features/chat/utils.ts`.
+
+Both currently run as a **streaming Next.js route** (`src/app/api/chat/route.ts`),
+not as Inngest jobs:
+
+- Haiku for the chat agent, Opus + extended thinking for the recommendations agent.
+- The route streams token + reasoning + tool deltas to the client via **Vercel AI SDK UI** (`useChat` in `src/features/chat/hooks/use-viper-chat.ts`); `agents/shared/stream-bridge.ts` maps LangGraph `streamEvents` onto the AI SDK UI message stream.
+- Conversation history is persisted to Prisma (`ChatThread` / `ChatMessage`); the `record_note` tool dispatches to the `actionNotesFn` Inngest function.
+
+**Task agents — `src/features/<feature>/agent/`**
+
+Single-shot calls that classify, extract, or score one record. No graph, no tool
+loop, no streaming — they are invoked from Inngest background jobs rather than from
+a user turn, so they stay beside the feature that owns the data:
+
+- `inbox/agent/` — classify, extract, match, triage, vex, mitigation, question
+- `notes/agent/` — extract-notes, noteAction
+- `questions/agent/escalationEmail/`
+
+Typical shape: `new ChatAnthropic({ … }).withStructuredOutput(zodSchema)`.
+
+**Constraint that shapes both shapes:** Anthropic extended thinking requires
+`tool_choice: "auto"`, and `withStructuredOutput()` forces `tool_choice` — so the two
+cannot be combined. When an agent needs thinking *and* a guaranteed output shape,
+bind a single recording tool and read its call args instead; see
+`inbox/agent/vex/index.ts` and `inbox/agent/mitigation/index.ts`. The same constraint
+is why `buildAgentGraph` preloads mandatory context deterministically instead of
+forcing a first tool call — a single forced tool turn disables thinking for the rest
+of the conversation.
 
 ## Database
 

@@ -18,10 +18,10 @@ import {
 } from "@/features/chat/utils";
 import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
 import { assetToMarkdown, vulnerabilityToMarkdown } from "@/lib/markdown";
-import { buildAgentGraph } from "./build-graph";
-import { loadPersistentNotesMarkdown } from "./notes-preload";
-import { PLATFORM_CATALOG } from "./query-platform-tool";
-import { buildChatTools } from "./tools";
+import { buildAgentGraph } from "../shared/build-graph";
+import { loadPersistentNotesMarkdown } from "../shared/notes-preload";
+import { PLATFORM_CATALOG } from "../tools/query-platform-tool";
+import { buildAgentTools } from "../tools/registry";
 
 const RECOMMENDATIONS_MODEL = "claude-opus-4-6";
 
@@ -230,7 +230,7 @@ export function buildRecommendationsGraph({
   vulnerabilityData?: VulnerabilityWithRelations;
   loadContext?: () => Promise<string>;
 }) {
-  const tools = buildChatTools(userId);
+  const tools = buildAgentTools(userId);
   const model = new ChatAnthropic({
     model: RECOMMENDATIONS_MODEL,
     maxTokens: 8000,

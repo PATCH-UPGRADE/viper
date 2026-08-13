@@ -26,10 +26,10 @@ mod._resolveFilename = function (request, ...rest) {
 async function main() {
   const { USER_ROLES } = await import("@/features/chat/utils");
   const { buildSystemPrompt } = await import(
-    "@/features/chat/viper-agent/langgraph/recommendations-graph"
+    "@/features/agents/recommendations/graph"
   );
   const { loadPersistentNotesMarkdown } = await import(
-    "@/features/chat/viper-agent/langgraph/notes-preload"
+    "@/features/agents/shared/notes-preload"
   );
   const { default: prisma } = await import("@/lib/db");
 

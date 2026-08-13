@@ -8,7 +8,7 @@ import {
 
 export type HeatmapAxis = {
   count: number;
-  label: (index: number) => string;
+  label: (index: number) => string | null;
   name: (index: number) => string;
 };
 

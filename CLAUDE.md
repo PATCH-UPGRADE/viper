@@ -193,7 +193,7 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
 
 Inngest runs the durable/background work: integration syncs (cron + event-driven),
 nightly vulnerability enrichment (EPSS / KEV), chat memory persistence, and
-expired-token cleanup. The AI chat does **not** run in Inngest — see "AI Chat" below.
+expired-token cleanup. The AI chat does **not** run in Inngest — see "AI Agents" below.
 
 **Setup** (`src/inngest/functions/`):
 
@@ -229,9 +229,9 @@ LangGraph agents that run a model ↔ tools loop and stream to the UI. They shar
 toolset, so they share a home:
 
 - `shared/` — everything used by more than one conversational agent:
-  `buildAgentGraph` (deterministic context preload → model ↔ tools, with an
-  `ask_user_questions` human-in-the-loop stop), the `streamEvents` → AI SDK UI
-  bridge, the hospital-wide notes preload, and thread persistence + titling.
+  `buildAgentGraph` (deterministic context preload → model ↔ tools, with
+  human-in-the-loop stops), the `streamEvents` → AI SDK UI bridge, the hospital-wide
+  notes preload, and thread persistence + titling.
 - `tools/` — model-facing tools: `query_platform_data` (a read-only allowlist of tRPC
   query procedures — mutations are not representable), `record_note`, and
   `buildAgentTools`, the registry every conversational agent binds.
@@ -241,6 +241,13 @@ toolset, so they share a home:
 Because every agent binds the same `buildAgentTools` set, a tool added to the
 registry is armed for all of them — describe it in each agent's `<tools>` prompt
 block or that agent can call something it was never told about.
+
+`buildAgentGraph` ends the turn after any tool in `HALT_TOOLS` —
+`ask_user_questions` and `propose_fleet_work_order` — so the graph stops until the
+user answers or accepts. A halting tool can suppress its own stop by prefixing its
+result with `TOOL_REJECTED_PREFIX` (`"REJECTED:"`): the turn then continues, so the
+model sees its own refusal and can correct or explain it, and the UI does not render
+an approval card for a proposal that was rejected.
 
 **Known exception:** the per-role prompt fragments (`ASSET_ROLE_INSTRUCTIONS`,
 `VULNERABILITY_ROLE_INSTRUCTIONS`, `RECOMMENDATION_ROLE_INSTRUCTIONS`) still live in

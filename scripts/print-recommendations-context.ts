@@ -42,11 +42,12 @@ async function main() {
   const role = roleArg as (typeof USER_ROLES)[number];
 
   try {
-    // The system message the agent is invoked with (build-graph.ts:99).
+    // The system message buildAgentGraph prepends to every model call in its
+    // "agent" node.
     const systemPrompt = buildSystemPrompt(role);
 
-    // The deterministic context injected as the first HumanMessage before the
-    // agent's first turn (build-graph.ts:96).
+    // The deterministic context buildAgentGraph injects as a HumanMessage in its
+    // "preload" node, before the agent's first turn.
     const contextMessage = `(Context for you)\n${await loadPersistentNotesMarkdown()}`;
 
     process.stdout.write("===== SYSTEM MESSAGE =====\n\n");

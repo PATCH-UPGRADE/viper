@@ -1,6 +1,7 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { fetchUtilizationGrids } from "@/features/assets/server/utilization";
 import {
   IssueStatus,
   MatchFeedbackTargetType,
@@ -20,6 +21,7 @@ import {
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
+import { findDeviceGroupIdsForMatchings } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
   type MatchingWithLabels,
@@ -34,8 +36,6 @@ import {
   computeMatchingBuckets,
   type MatchingBucketGroup,
 } from "./affected-assets";
-import { findDeviceGroupIdsForMatchings } from "@/lib/router-utils";
-import { fetchUtilizationGrids } from "@/features/assets/server/utilization";
 
 type MatchingIdentity = {
   manufacturerId: string;

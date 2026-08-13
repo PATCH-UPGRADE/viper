@@ -178,7 +178,9 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
               parentId={data.id}
               childTickets={data.children}
             />
-            <AdditionalDetailsCard />
+            <AdditionalDetailsCard
+              assetIds={data.assets.map((a) => a.asset.id)}
+            />
             <ActivityTimeline
               ticketId={data.id}
               comments={data.comments}

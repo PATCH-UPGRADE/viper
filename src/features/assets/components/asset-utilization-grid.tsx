@@ -2,6 +2,7 @@
 
 import { HeatMapGrid } from "@/components/heatmap-grid";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAssetUtilization } from "../hooks/use-assets";
 import type { UtilizationGridsResult } from "../server/utilization";
 import { assetUtilizationSchema } from "../types";
 
@@ -106,6 +107,10 @@ export function UtilizationGridList({
   isPending: boolean;
   isError: boolean;
 }) {
+  const assetsWithUtilization = data?.assets.filter(
+    (asset) => assetUtilizationSchema.safeParse(asset.utilization).success,
+  );
+
   if (isPending) {
     return (
       <div className="space-y-3">
@@ -123,29 +128,30 @@ export function UtilizationGridList({
     );
   }
 
-  if (data.assets.length === 0) {
+  if (assetsWithUtilization && assetsWithUtilization.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No devices found for this record.
+        No utilization data found for this record.
       </p>
     );
   }
 
   return (
     <div className="space-y-5">
-      {data.assets.map((asset) => (
-        <div key={asset.id} className="space-y-1.5">
-          <p className="text-sm font-semibold">
-            {asset.label}
-            {asset.hostname && (
-              <span className="ml-2 font-normal text-muted-foreground">
-                {asset.hostname}
-              </span>
-            )}
-          </p>
-          <AssetUtilizationHeatMapGrid utilization={asset.utilization} />
-        </div>
-      ))}
+      {assetsWithUtilization &&
+        assetsWithUtilization.map((asset) => (
+          <div key={asset.id} className="space-y-1.5">
+            <p className="text-sm font-semibold">
+              {asset.label}
+              {asset.hostname && (
+                <span className="ml-2 font-normal text-muted-foreground">
+                  {asset.hostname}
+                </span>
+              )}
+            </p>
+            <AssetUtilizationHeatMapGrid utilization={asset.utilization} />
+          </div>
+        ))}
       <UtilizationLegend />
       {data.totalAssetCount > data.assets.length && (
         <p className="text-xs text-muted-foreground">
@@ -155,4 +161,8 @@ export function UtilizationGridList({
       )}
     </div>
   );
+}
+
+export function AssetUtilizationAnswer({ assetIds }: { assetIds: string[] }) {
+  return <UtilizationGridList {...useAssetUtilization(assetIds)} />;
 }

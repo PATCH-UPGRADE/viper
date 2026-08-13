@@ -34,6 +34,8 @@ import {
   computeMatchingBuckets,
   type MatchingBucketGroup,
 } from "./affected-assets";
+import { findDeviceGroupIdsForMatchings } from "@/lib/router-utils";
+import { fetchUtilizationGrids } from "@/features/assets/server/utilization";
 
 type MatchingIdentity = {
   manufacturerId: string;
@@ -579,6 +581,39 @@ export const notificationsRouter = createTRPCRouter({
         statusNotes: noteByAsset.get(a.id) ?? null,
       }));
       return createPaginatedResponse(items, meta);
+    }),
+
+  getAffectedAssetUtilization: protectedProcedure
+    .input(z.object({ notificationId: z.string() }))
+    .query(async ({ input }) => {
+      const notification = await prisma.notification.findUnique({
+        where: { id: input.notificationId },
+        select: {
+          deviceGroupsMatchings: {
+            select: {
+              confidence: true,
+              deviceGroupMatching: {
+                select: {
+                  manufacturerId: true,
+                  productId: true,
+                  versionId: true,
+                  versionRange: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!notification) throw new TRPCError({ code: "NOT_FOUND" });
+      const matchings = notification.deviceGroupsMatchings
+        .filter((m) => m.confidence !== "Rejected")
+        .map((m) => m.deviceGroupMatching);
+
+      const deviceGroupIds = await findDeviceGroupIdsForMatchings(matchings);
+      if (deviceGroupIds.length === 0) {
+        return { assets: [], totalAssetCount: 0 };
+      }
+      return fetchUtilizationGrids({ deviceGroupId: { in: deviceGroupIds } });
     }),
 
   markRead: protectedProcedure

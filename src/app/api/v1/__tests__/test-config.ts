@@ -62,15 +62,11 @@ export const setupMockIntegration = async (
 
   expect(createdIntegration.name).toBe(mockIntegrationPayload.name);
   expect(createdIntegration.platform).toBe(mockIntegrationPayload.platform);
-  expect(createdIntegration.integrationUri).toBe(
-    mockIntegrationPayload.integrationUri,
-  );
-  expect(createdIntegration.integrationType).toBe(
-    mockIntegrationPayload.integrationType,
-  );
-  expect(createdIntegration.resourceType).toBe(
-    mockIntegrationPayload.resourceType,
-  );
+  // TODO: VW-428 confirm this works
+  expect(createdIntegration.config).toMatchObject({
+    integrationUri: mockIntegrationPayload.integrationUri,
+    resource: mockIntegrationPayload.resource,
+  });
   expect(createdIntegration.syncEvery).toBe(mockIntegrationPayload.syncEvery);
 
   // create an api key for the integration user

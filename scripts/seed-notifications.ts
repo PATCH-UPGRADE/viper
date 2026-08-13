@@ -4,14 +4,15 @@ import {
   ConfidenceLevel,
   IssueStatus,
   NotAffectedJustification,
-  NotificationChannel,
   NotificationType,
   Priority,
   ScopeTargetModel,
   Severity,
+  SourceChannel,
   Tlp,
   VersionStatus,
 } from "@/generated/prisma";
+import { sourceContentHash } from "@/lib/source-hash";
 import prisma from "../src/lib/db";
 
 const SEED_USER = {
@@ -123,7 +124,6 @@ async function seedSyngoPlazaVexScenario(userId: string) {
       return prisma.asset.create({
         data: {
           ...asset,
-          upstreamApi: "https://example.com/placeholder",
           status: "Active" as AssetStatus,
           deviceGroupId: deviceGroup.id,
           userId,
@@ -278,27 +278,22 @@ async function seedSyngoPlazaVexScenario(userId: string) {
     },
   });
 
-  await prisma.notificationSource.create({
+  const ssa016040Raw = {
+    type: "email.received",
+    created_at: "2026-02-10T09:00:00.000Z",
     data: {
-      notificationId: notification.id,
-      channel: NotificationChannel.Email,
-      sourceType: "Source",
-      raw: {
-        type: "email.received",
-        created_at: "2026-02-10T09:00:00.000Z",
-        data: {
-          email_id: "seed-ssa-016040",
-          created_at: "2026-02-10T09:00:00.000Z",
-          from: "psirt@siemens-healthineers.com",
-          to: ["security@hospital.org"],
-          cc: [],
-          bcc: [],
-          subject:
-            "SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E",
-          attachments: [],
-        },
-      },
-      markdown: `# SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E
+      email_id: "seed-ssa-016040",
+      created_at: "2026-02-10T09:00:00.000Z",
+      from: "psirt@siemens-healthineers.com",
+      to: ["security@hospital.org"],
+      cc: [],
+      bcc: [],
+      subject:
+        "SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E",
+      attachments: [],
+    },
+  };
+  const ssa016040Markdown = `# SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E
 
 **Publication Date**: 2026-02-10 · **CVSS v3.1**: 5.3 · **CVSS v4.0**: 6.3
 
@@ -315,8 +310,19 @@ Siemens Healthineers has released a new hot fix (HF07) for syngo.plaza version V
 The affected application does not encrypt passwords properly. This could allow an attacker to recover the original passwords and might gain unauthorized access.
 
 - CVSS v3.1 Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N
-- CWE-261: Weak Encoding for Password`,
-      receivedAt: new Date(),
+- CWE-261: Weak Encoding for Password`;
+
+  await prisma.sourceRecord.create({
+    data: {
+      channel: SourceChannel.Email,
+      links: {
+        create: { notificationId: notification.id, sourceType: "Source" },
+      },
+      externalId: "seed-ssa-016040",
+      contentHash: sourceContentHash(ssa016040Raw, ssa016040Markdown),
+      raw: ssa016040Raw,
+      markdown: ssa016040Markdown,
+      observedAt: new Date(),
     },
   });
 
@@ -636,7 +642,6 @@ async function seedDeserializationScenario(userId: string) {
       await prisma.asset.create({
         data: {
           ...assetFields,
-          upstreamApi: "https://example.com/placeholder",
           status: "Active" as AssetStatus,
           deviceGroupId: deviceGroup.id,
           userId,
@@ -713,27 +718,22 @@ async function seedDeserializationScenario(userId: string) {
     },
   });
 
-  await prisma.notificationSource.create({
+  const ssa220609Raw = {
+    type: "email.received",
+    created_at: "2022-06-09T09:00:00.000Z",
     data: {
-      notificationId: notification.id,
-      channel: NotificationChannel.Email,
-      sourceType: "Source",
-      raw: {
-        type: "email.received",
-        created_at: "2022-06-09T09:00:00.000Z",
-        data: {
-          email_id: "seed-ssa-220609",
-          created_at: "2022-06-09T09:00:00.000Z",
-          from: "psirt@siemens-healthineers.com",
-          to: ["security@hospital.org"],
-          cc: [],
-          bcc: [],
-          subject:
-            "SSA-220609: Deserialization Vulnerability in Healthcare Products",
-          attachments: [],
-        },
-      },
-      markdown: `# SSA-220609: Deserialization Vulnerability in Healthcare Products
+      email_id: "seed-ssa-220609",
+      created_at: "2022-06-09T09:00:00.000Z",
+      from: "psirt@siemens-healthineers.com",
+      to: ["security@hospital.org"],
+      cc: [],
+      bcc: [],
+      subject:
+        "SSA-220609: Deserialization Vulnerability in Healthcare Products",
+      attachments: [],
+    },
+  };
+  const ssa220609Markdown = `# SSA-220609: Deserialization Vulnerability in Healthcare Products
 
 **Publication Date**: 2022-05-31 · **Last Update**: 2022-06-09 · **CVSS v3.1**: 9.8
 
@@ -748,8 +748,19 @@ The application deserialises untrusted data without sufficient validations that 
 
 ## Workarounds and mitigations
 - If possible, block ports 32912/tcp and 32914/tcp on an external firewall.
-- Product-specific fixes are available; contact your local Siemens Healthineers service representative.`,
-      receivedAt: new Date(),
+- Product-specific fixes are available; contact your local Siemens Healthineers service representative.`;
+
+  await prisma.sourceRecord.create({
+    data: {
+      channel: SourceChannel.Email,
+      links: {
+        create: { notificationId: notification.id, sourceType: "Source" },
+      },
+      externalId: "seed-ssa-220609",
+      contentHash: sourceContentHash(ssa220609Raw, ssa220609Markdown),
+      raw: ssa220609Raw,
+      markdown: ssa220609Markdown,
+      observedAt: new Date(),
     },
   });
 

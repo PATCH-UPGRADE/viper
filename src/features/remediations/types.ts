@@ -1,12 +1,11 @@
 import { z } from "zod";
-import type { Prisma } from "@/generated/prisma";
+import { PlatformEnum, type Prisma } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   alohaResponseSchema,
   cpeSchema,
   createIntegrationInputSchema,
   deviceGroupMatchingResponseSchema,
-  safeUrlSchema,
   userIncludeSelect,
   userSchema,
 } from "@/lib/schemas";
@@ -36,7 +35,6 @@ export const remediationInputSchema = z.object({
   vulnerabilityId: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
-  upstreamApi: safeUrlSchema.nullish(),
   artifacts: z
     .array(artifactInputSchema)
     .min(1, "at least one artifact is required"),
@@ -52,7 +50,6 @@ export const remediationUpdateSchema = z.object({
   vulnerabilityId: z.string().nullish(),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
-  upstreamApi: safeUrlSchema.nullish(),
   artifacts: z.array(artifactInputSchema).optional(),
 });
 
@@ -64,7 +61,18 @@ export const vulnerabilitySchema = z.object({
 export const remediationResponseSchema = z.object({
   id: z.string(),
   deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
-  upstreamApi: z.string().nullish(),
+  externalMappings: z.array(
+    z.object({
+      externalId: z.string(),
+      upstreamApi: z.string().nullable(),
+      webUrl: z.string().nullable(),
+      integration: z.object({
+        id: z.string(),
+        name: z.string(),
+        platform: z.enum(PlatformEnum),
+      }),
+    }),
+  ),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
   vulnerability: vulnerabilitySchema.nullish(),
@@ -103,6 +111,14 @@ export const remediationInclude = {
   deviceGroupMatchings: matchingInclude,
   vulnerability: remediationVulnerabilitySelect,
   artifacts: artifactWrapperSelect,
+  externalMappings: {
+    select: {
+      externalId: true,
+      upstreamApi: true,
+      webUrl: true,
+      integration: { select: { id: true, name: true, platform: true } },
+    },
+  },
 };
 
 export const remediationCardInclude = {

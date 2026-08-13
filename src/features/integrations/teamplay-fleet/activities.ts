@@ -1,6 +1,8 @@
+// TODO: VW-433
+
 import { z } from "zod";
 import {
-  NotificationChannel,
+  SourceChannel,
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
@@ -35,9 +37,8 @@ export interface FleetWorkOrderItem {
   sourceLabel: string;
   body: string;
   source: {
-    channel: NotificationChannel;
+    channel: SourceChannel;
     externalId: string;
-    referenceUrl: string | null;
     markdown: string;
     raw: FleetActivity;
   };
@@ -123,12 +124,9 @@ export function mapFleetActivities(
       scheduledAt: toIso(a.plannedStart ?? a.dueDate, offset),
       sourceLabel: "Siemens Healthineers Fleet",
       body,
-      // Polled from a REST API → PolledApi channel. Drives the source badge and
-      // Suggested-tab membership; `raw` keeps the original activity.
       source: {
-        channel: NotificationChannel.PolledApi,
+        channel: SourceChannel.Integration,
         externalId: a.ticketKey,
-        referenceUrl: null,
         markdown: body,
         raw: a,
       },

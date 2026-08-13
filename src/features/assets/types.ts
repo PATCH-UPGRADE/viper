@@ -1,11 +1,10 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
-import { AssetStatus, type Prisma } from "@/generated/prisma";
+import { AssetStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   cpeSchema,
   createIntegrationInputSchema,
-  safeUrlSchema,
   userIncludeSelect,
   userSchema,
 } from "@/lib/schemas";
@@ -38,7 +37,6 @@ export const assetInputSchema = z.object({
   networkSegment: z.string().nullish(),
   cpe: cpeSchema.nullish(),
   role: z.string().min(1).nullish(),
-  upstreamApi: safeUrlSchema,
   hostname: z.string().nullish(),
   macAddress: z.string().nullish(),
   serialNumber: z.string().nullish(),
@@ -65,7 +63,18 @@ export const assetResponseSchema = z.object({
   ip: z.string(),
   deviceGroup: deviceGroupWithUrlsSchema,
   role: z.string().nullable(),
-  upstreamApi: z.string(),
+  externalMappings: z.array(
+    z.object({
+      externalId: z.string(),
+      upstreamApi: z.string().nullable(),
+      webUrl: z.string().nullable(),
+      integration: z.object({
+        id: z.string(),
+        name: z.string(),
+        platform: z.enum(PlatformEnum),
+      }),
+    }),
+  ),
   networkSegment: z.string().nullable(),
   hostname: z.string().nullable(),
   macAddress: z.string().nullable(),
@@ -98,14 +107,27 @@ export type AssetsVulnsInput = z.infer<typeof assetsVulnsInputSchema>;
 export const assetInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
+  externalMappings: {
+    select: {
+      externalId: true,
+      upstreamApi: true,
+      webUrl: true,
+      integration: { select: { id: true, name: true, platform: true } },
+    },
+  },
 };
 
 export const assetDashboardInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
   externalMappings: {
-    include: {
-      integration: { select: { id: true, name: true } },
+    select: {
+      id: true,
+      externalId: true,
+      lastSynced: true,
+      upstreamApi: true,
+      webUrl: true,
+      integration: { select: { id: true, name: true, platform: true } },
     },
   },
   issues: {

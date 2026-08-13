@@ -17,13 +17,68 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { getSwatchClass } from "@/features/tag-colors/palette";
+import { TicketStatus } from "@/generated/prisma";
+import { cn } from "@/lib/utils";
 import {
   useAttachAsset,
   useAttachableAssets,
   useDetachAsset,
 } from "../../hooks/use-tracking";
 import { LinkedAssetsTable } from "./linked-assets-table";
-import type { DetailAssetTicket } from "./shared";
+import {
+  countAssetTicketsByStatus,
+  type DetailAssetTicket,
+  sortAssetTicketsByStatus,
+  statusHue,
+  statusLabels,
+} from "./shared";
+
+const AssetProgressStrip = ({
+  assetTickets,
+}: {
+  assetTickets: DetailAssetTicket[];
+}) => {
+  const total = assetTickets.length;
+  if (total === 0) return null;
+  const counts = countAssetTicketsByStatus(assetTickets);
+  const done = counts.find((c) => c.status === TicketStatus.DONE)?.count ?? 0;
+  const pctResolved = Math.round((done / total) * 100);
+
+  return (
+    <div className="border-b px-5 py-4">
+      <p className="text-sm">
+        <span className="font-semibold">{pctResolved}% resolved</span>
+        <span className="text-muted-foreground">
+          {" "}
+          — {done} of {total} done
+        </span>
+      </p>
+      <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full bg-muted">
+        {counts.map(({ status, count }) => (
+          <div
+            key={status}
+            className={getSwatchClass(statusHue[status])}
+            style={{ width: `${(count / total) * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        {counts.map(({ status, count }) => (
+          <span key={status} className="inline-flex items-center gap-1.5">
+            <span
+              className={cn(
+                "size-2 rounded-full",
+                getSwatchClass(statusHue[status]),
+              )}
+            />
+            {count} {statusLabels[status]}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
   const [open, setOpen] = useState(false);
@@ -92,6 +147,7 @@ export const LinkedAssetsTabContent = ({
   assetTickets: DetailAssetTicket[];
 }) => {
   const detach = useDetachAsset(ticketId);
+  const sortedAssetTickets = sortAssetTicketsByStatus(assetTickets);
 
   return (
     <Card className="gap-0 py-0">
@@ -102,11 +158,12 @@ export const LinkedAssetsTabContent = ({
         </h2>
         <AttachAssetPopover ticketId={ticketId} />
       </div>
+      <AssetProgressStrip assetTickets={sortedAssetTickets} />
       <div className="p-2">
         {assetTickets.length > 0 ? (
           <LinkedAssetsTable
             parentTicketId={ticketId}
-            assetTickets={assetTickets}
+            assetTickets={sortedAssetTickets}
             onDetach={(assetId) => detach.mutate({ ticketId, assetId })}
             detachPending={detach.isPending}
           />

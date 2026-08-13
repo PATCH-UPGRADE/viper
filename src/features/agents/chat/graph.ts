@@ -5,10 +5,10 @@ import {
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
 } from "@/features/chat/utils";
-import { buildAgentGraph } from "./build-graph";
-import { loadPersistentNotesMarkdown } from "./notes-preload";
-import { PLATFORM_CATALOG } from "./query-platform-tool";
-import { buildChatTools } from "./tools";
+import { buildAgentGraph } from "../shared/build-graph";
+import { loadPersistentNotesMarkdown } from "../shared/notes-preload";
+import { PLATFORM_CATALOG } from "../tools/query-platform-tool";
+import { buildAgentTools } from "../tools/registry";
 
 const CHAT_MODEL = "claude-haiku-4-5-20251001";
 
@@ -87,7 +87,7 @@ export function buildChatGraph({
   userRole?: UserRole;
   loadNotes?: () => Promise<string>;
 }) {
-  const tools = buildChatTools(userId);
+  const tools = buildAgentTools(userId);
   const model = new ChatAnthropic({
     model: CHAT_MODEL,
     maxTokens: 4096,

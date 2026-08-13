@@ -62,9 +62,7 @@ export function HeatMapGrid({
       <table className="w-full min-w-[320px] table-fixed border-separate border-spacing-0.5 text-xs">
         <thead>
           <tr>
-            <th
-              className={`sticky left-0 bg-background ${rowHeaderClassName}`}
-            />
+            <th className={`sticky left-0 ${rowHeaderClassName}`} />
             {headerGroups.map(({ label, span }, idx) => (
               <th
                 key={idx + label}

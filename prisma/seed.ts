@@ -405,6 +405,7 @@ const SAMPLE_ASSETS = [
       room: "Radiology Reading Room",
     },
     status: "Active",
+    utilization: IMAGING_UTILIZATION,
   },
   {
     id: "rad-rws-002",
@@ -421,6 +422,7 @@ const SAMPLE_ASSETS = [
       room: "Radiology Reading Room",
     },
     status: "Active",
+    utilization: IMAGING_UTILIZATION,
   },
   // ── ED Image Viewer (ED-VLAN-50) ─────────────────────────────────────────────
   // Dell OptiPlex 790, Windows 7
@@ -1356,7 +1358,7 @@ async function seedAssets(userId: string) {
         where: {
           id: "id" in asset && asset.id ? asset.id : "-1",
         },
-        update: {},
+        update: { utilization: asset.utilization },
         create: {
           ...("id" in asset && asset.id ? { id: asset.id } : {}),
           ip: asset.ip,

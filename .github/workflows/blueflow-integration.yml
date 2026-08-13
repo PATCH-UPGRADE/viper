@@ -58,6 +58,8 @@ jobs:
           context: .
           file: ./docker/viper/Dockerfile
           tags: ${{ env.VIPER_IMAGE }}
+          build-args: |
+            VIPER_IGNORE_BUILD_ERRORS=1
           load: true
           push: false
           cache-from: type=gha

@@ -50,13 +50,17 @@ describe("Remediations Endpoint (/remediations)", () => {
   const mockIntegrationPayload = {
     name: "mockVulnIntegration",
     platform: PlatformEnum.PARTNER,
-    integrationUri: "https://mock-vuln-upstream-api.com/",
-    authType: AuthType.Bearer,
-    resource: ResourceType.Remediation,
-    authentication: {
-      token: AUTH_TOKEN,
-    },
     syncEvery: 300,
+    config: {
+      integrationUri: "https://mock-vuln-upstream-api.com/",
+      resource: ResourceType.Remediation,
+    },
+    credentials: {
+      authType: AuthType.Bearer,
+      authentication: {
+        token: AUTH_TOKEN,
+      },
+    },
   };
 
   const remediationIntegrationPayload = {
@@ -601,7 +605,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
       where: {
         integrationId: createdIntegration.id,
-        resource: mockIntegrationPayload.resource,
+        resource: mockIntegrationPayload.config.resource,
       },
     });
 

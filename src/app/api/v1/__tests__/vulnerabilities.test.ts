@@ -38,10 +38,14 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
   const mockIntegrationPayload = {
     name: "mockVulnIntegration",
     platform: PlatformEnum.PARTNER,
-    integrationUri: "https://mock-vuln-upstream-api.com/",
-    resource: ResourceType.Vulnerability,
     syncEvery: 300,
-    authType: AuthType.None,
+    config: {
+      integrationUri: "https://mock-vuln-upstream-api.com/",
+      resource: ResourceType.Vulnerability,
+    },
+    credentials: {
+      authType: AuthType.None,
+    },
   };
 
   const descDeleteKeyWord = "mock-vuln-integration-test";
@@ -314,7 +318,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
       where: {
         integrationId: createdIntegration.id,
-        resource: mockIntegrationPayload.resource,
+        resource: mockIntegrationPayload.config.resource,
       },
     });
 

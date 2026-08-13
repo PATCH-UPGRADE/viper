@@ -62,12 +62,12 @@ export const setupMockIntegration = async (
 
   expect(createdIntegration.name).toBe(mockIntegrationPayload.name);
   expect(createdIntegration.platform).toBe(mockIntegrationPayload.platform);
-  // TODO: VW-428 confirm this works
-  expect(createdIntegration.config).toMatchObject({
-    integrationUri: mockIntegrationPayload.integrationUri,
-    resource: mockIntegrationPayload.resource,
-  });
+  expect(createdIntegration.config).toMatchObject(
+    mockIntegrationPayload.config,
+  );
   expect(createdIntegration.syncEvery).toBe(mockIntegrationPayload.syncEvery);
+  // Credentials are encrypted bytes and must never come back to a client.
+  expect(createdIntegration).not.toHaveProperty("credentials");
 
   // create an api key for the integration user
   // this will be used to simulate previous integrationUpload runs

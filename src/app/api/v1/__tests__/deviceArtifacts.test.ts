@@ -40,13 +40,17 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
   const mockIntegrationPayload = {
     name: "mockDeviceArtifactIntegration",
     platform: PlatformEnum.PARTNER,
-    integrationUri: "https://mock-deviceArtifact-upstream-api.com/",
-    authType: AuthType.Bearer,
-    resource: ResourceType.DeviceArtifact,
-    authentication: {
-      token: AUTH_TOKEN,
-    },
     syncEvery: 300,
+    config: {
+      integrationUri: "https://mock-deviceArtifact-upstream-api.com/",
+      resource: ResourceType.DeviceArtifact,
+    },
+    credentials: {
+      authType: AuthType.Bearer,
+      authentication: {
+        token: AUTH_TOKEN,
+      },
+    },
   };
 
   const deviceArtifactsIntegrationPayload = {
@@ -688,7 +692,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
       where: {
         integrationId: createdIntegration.id,
-        resource: mockIntegrationPayload.resource,
+        resource: mockIntegrationPayload.config.resource,
       },
     });
 

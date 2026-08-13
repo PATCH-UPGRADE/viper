@@ -127,11 +127,17 @@ export const integrationResponseSchema = z.object({
   syncedAt: z.string(),
 });
 export type IntegrationResponse = z.infer<typeof integrationResponseSchema>;
+/**
+ * The upload envelope a platform POSTs back to
+ * `/{resource}/integrationUpload/{token}`.
+ */
 export const createIntegrationInputSchema = <T extends z.ZodRawShape>(
   inputSchema: z.ZodObject<T>,
 ) => {
   const integrationInputSchema = inputSchema.extend({
     vendorId: z.string(),
+    upstreamApi: safeUrlSchema.nullish(), // the API endpoint
+    webUrl: safeUrlSchema.nullish(), // where a human looks at it
   });
   const pagesWithLinksSchema = createPaginatedResponseWithLinksSchema(
     integrationInputSchema,

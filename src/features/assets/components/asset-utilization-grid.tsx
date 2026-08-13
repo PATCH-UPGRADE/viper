@@ -17,7 +17,7 @@ const DAY_NAMES = [
   "Sunday",
 ] as const;
 
-const HOURS_TICKS: Record<number, string> = {
+const HOURS_TICKS: Record<number, string | null> = {
   0: "12a",
   6: "6a",
   12: "12p",
@@ -153,12 +153,6 @@ export function UtilizationGridList({
           </div>
         ))}
       <UtilizationLegend />
-      {data.totalAssetCount > data.assets.length && (
-        <p className="text-xs text-muted-foreground">
-          Showing the first {data.assets.length} of {data.totalAssetCount}{" "}
-          devices
-        </p>
-      )}
     </div>
   );
 }

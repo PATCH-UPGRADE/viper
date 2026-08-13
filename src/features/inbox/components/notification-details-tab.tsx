@@ -310,7 +310,7 @@ export function NotificationDetailsTab({
             </Table>
             <div className="mt-6 space-y-1">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                quesitons about these devices
+                questions about these devices
               </p>
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="utilization" className="border-b-0">

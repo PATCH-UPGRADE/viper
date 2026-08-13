@@ -4,13 +4,7 @@ import { XIcon } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ClampedCell } from "@/components/ui/clamped-cell";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -19,14 +13,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getChipClass } from "@/features/tag-colors/palette";
 import { useUpdateTicket } from "@/features/tracking/hooks/use-tracking";
 import type { TicketStatus } from "@/generated/prisma";
 import {
   type DetailAssetTicket,
   formatLocation,
-  statusHue,
-  statusLabels,
+  TicketStatusSelectTrigger,
 } from "./shared";
 
 const AssetTicketStatusSelect = ({
@@ -50,20 +42,7 @@ const AssetTicketStatusSelect = ({
       }
       disabled={update.isPending}
     >
-      <SelectTrigger
-        size="sm"
-        aria-label="Ticket status"
-        className={getChipClass(statusHue[status])}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {(Object.keys(statusLabels) as TicketStatus[]).map((s) => (
-          <SelectItem key={s} value={s}>
-            {statusLabels[s]}
-          </SelectItem>
-        ))}
-      </SelectContent>
+      <TicketStatusSelectTrigger status={status} size="sm" colored />
     </Select>
   );
 };

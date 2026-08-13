@@ -2,6 +2,12 @@
 
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import {
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useCategoryColor } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
 import type { TicketCategory, TicketStatus } from "@/generated/prisma";
@@ -21,6 +27,8 @@ export const statusHue: Record<TicketStatus, string> = {
   REQUIRES_APPROVAL: "yellow",
   DONE: "green",
 };
+
+const statusOrder = Object.keys(statusLabels) as TicketStatus[];
 
 export const categoryLabels: Record<TicketCategory, string> = {
   PATCH: "Patch",
@@ -65,6 +73,41 @@ export const StatusChip = ({
   </Badge>
 );
 
+// Trigger + option list for a ticket-status Select. Callers still own the
+// <Select value={...} onValueChange={...}> wrapper — this only standardizes
+// the trigger's coloring/labeling and the option list, since edit-form.tsx
+// (labeled via id) and linked-assets-table.tsx (labeled via aria-label,
+// no visible <Label>) need different labeling but the same options/colors.
+export const TicketStatusSelectTrigger = ({
+  status,
+  id,
+  size,
+  colored = false,
+}: {
+  status: TicketStatus;
+  id?: string;
+  size?: "sm" | "default";
+  colored?: boolean;
+}) => (
+  <>
+    <SelectTrigger
+      id={id}
+      size={size}
+      aria-label={id ? undefined : "Ticket status"}
+      className={colored ? getChipClass(statusHue[status]) : undefined}
+    >
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      {statusOrder.map((s) => (
+        <SelectItem key={s} value={s}>
+          {statusLabels[s]}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </>
+);
+
 export const DepartmentChips = ({
   departments,
 }: {
@@ -90,8 +133,6 @@ export const DepartmentChips = ({
 };
 
 export type DetailAssetTicket = TicketDetail["assets"][number];
-
-const statusOrder = Object.keys(statusLabels) as TicketStatus[];
 
 // To Do → In Progress → Requires Approval → Done (doesn't mutate the input).
 export const sortAssetTicketsByStatus = (

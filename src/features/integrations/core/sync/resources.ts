@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { resourceTypeSchema } from "@/features/integrations/types";
 import { ResourceType } from "@/generated/prisma";
 import type { AnyConnectorModule, ResourceModule } from "../types";
 
@@ -19,7 +20,7 @@ const MODULE_FIELDS = [
  * A generic platform's resource lives in its config.
  */
 export const genericConfigSchema = z.object({
-  resource: z.enum(ResourceType),
+  resource: resourceTypeSchema,
 });
 
 /** Does this platform speak its own protocol (Fleet) or ours (ai/partner)? */

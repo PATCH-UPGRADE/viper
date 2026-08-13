@@ -29,6 +29,7 @@ export const ticketBaseInclude = {
   // creator avatar when there are none — i.e. a manually-created ticket).
   sourceLinks: {
     select: { sourceRecord: { select: { channel: true } } },
+    orderBy: { createdAt: "desc" as const },
     take: 1,
   },
   // `watchers` and `seenBy` are replaced at the procedure level with a

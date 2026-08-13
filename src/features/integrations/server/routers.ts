@@ -217,14 +217,20 @@ export const integrationsRouter = createTRPCRouter({
             // ("Credentials stored — leave blank to keep") before this ships.
             ...credentials,
             resourceSyncs: {
-              // Adds rows if the operator switched resource; leaves any
-              // existing rows (and their cursors) alone.
+              // Rows are never deleted, so cursors survive a switch away and
+              // back. `enabled` is what decides whether the cron and
+              // `triggerSync` still pick them up. The two writes touch
+              // disjoint rows, so their order doesn't matter.
+              updateMany: {
+                where: { resource: { notIn: resources } },
+                data: { enabled: false },
+              },
               upsert: resources.map((resource) => ({
                 where: {
                   integrationId_resource: { integrationId: id, resource },
                 },
                 create: { resource },
-                update: {},
+                update: { enabled: true },
               })),
             },
           },
@@ -273,7 +279,15 @@ export const integrationsRouter = createTRPCRouter({
       // but if we change so later, implement that here
       const integration = await prisma.integration.findFirst({
         where: { id: input.id },
-        select: { id: true, resourceSyncs: { select: { resource: true } } },
+        select: {
+          id: true,
+          // Same filter the cron uses: a resource the operator switched off
+          // shouldn't sync just because someone hit the button.
+          resourceSyncs: {
+            where: { enabled: true },
+            select: { resource: true },
+          },
+        },
       });
       if (!integration) {
         throw new TRPCError({ code: "NOT_FOUND" });

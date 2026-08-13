@@ -307,8 +307,8 @@ export async function processIntegrationSync<
   }
 
   if (errors.length > 0) {
-    // `message` doubles as `IntegrationResourceSync.errorMessage`, so it has to
-    // convey the scale of the failure, not just the first symptom.
+    // `message` doubles as `IntegrationResourceSync.errorMessage`: the
+    // `<N> of <TOTAL>` prefix carries the scale, the first error the symptom.
     response.shouldRetry = true;
     response.message = `${errors.length} of ${input.items.length} items failed: ${errors[0]}`;
   }

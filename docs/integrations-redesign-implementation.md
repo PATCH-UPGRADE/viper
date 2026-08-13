@@ -137,7 +137,7 @@ Filtering it out of the fan-out instead would leave the row `Pending` forever wi
 
 ### Two behaviour changes worth knowing
 
-**Partial ingest failures are now loud and partial.** `processIntegrationSync` used to `break` on the first Prisma error, dropping the rest of the batch and returning HTTP 200 with `createdItemsCount: 0`. It now collects errors and continues. The status is still 200 and `shouldRetry` still drives `Error` on the sync row, but the counts are real and `message` becomes `"<N> of <TOTAL> items failed: <e1>; <e2>; <e3> (+K more)"` (distinct messages only, capped at 1000 chars).
+**Partial ingest failures are now loud and partial.** `processIntegrationSync` used to `break` on the first Prisma error, dropping the rest of the batch and returning HTTP 200 with `createdItemsCount: 0`. It now collects errors and continues. The status is still 200 and `shouldRetry` still drives `Error` on the sync row, but the counts are real and `message` becomes `"<N> of <TOTAL> items failed: <first error>"` — the count carries the scale, the first error carries the symptom.
 
 **Decrypted credentials no longer cross a step boundary.** `step.run` return values are shipped to and memoized by the Inngest service, and the old `fetch-integration` step returned `creds`. The load step now runs `omit: { credentials: true }`, and the strategy step re-reads and decrypts in-process. That also forced the shape of the function: a closure or a module can't cross a boundary either, so resolving the platform, building the ctx and running the strategy all live in **one** step — four steps, not the RFC's five.
 
@@ -187,7 +187,7 @@ src/features/integrations/platforms/{ai,partner}/
 
 Both: **no `ResourceModule` fields at all**, `config.resource` names the single resource, and the strategy hands off and returns `{ pending: true }` instead of fetching.
 
-They are still scheduled like any other platform — the cron fans out every enabled, due resource row, and `syncEvery` applies to them the same way. What "hand-off" changes is only what happens when the tick fires. `upsertResourceSync` implements the other half: a successful hand-off leaves the row `Pending` for the callback to close out, and only a *failed* hand-off is terminal, because no callback will ever fire for one.
+They are still scheduled like any other platform — the cron fans out every enabled, due resource row, and `syncEvery` applies to them the same way. What "hand-off" changes is only what happens when the tick fires. `sync-integrations.ts` claims every attempt as `Pending` and then, on a successful hand-off, returns without overwriting it — only a *failed* hand-off is terminal there, because no callback will ever fire for one. `upsertResourceSync` implements the other half: it closes the row out to `Success` or `Error` later, when the callback-driven ingest actually runs.
 
 `callback.ts` is the only thing the two share. Note they don't even authenticate to the same party: `partner` signs its registration POST with the integration's credentials via `authHeaders`, while `ai` authenticates to n8n with `N8N_KEY` and forwards the integration's credentials as payload. `partner/sync.ts` uses plain `fetch` because it has exactly one absolute URL to POST — the `integrationUri` from its config, path and all.
 

@@ -104,14 +104,20 @@ export const syncIntegration = inngest.createFunction(
     // ---- 2. Claim the attempt, before doing any work ---------------------
     // Compute when to sync next so that if we get an error, we know when to
     // retry
-    await step.run("claim-attempt", async () => {
+    const { seconds } = await step.run("claim-attempt", async () => {
       const seconds = effectiveSyncEvery(
         loaded.resourceSyncEvery,
         loaded.syncEvery,
         // A registry read, but only a number crosses the boundary.
         defaultSyncEveryFor(loaded.platform, resource),
       );
-      const nextSyncAt = computeNextSyncAt(seconds, loaded.consecutiveFailures);
+      // `consecutiveFailures` is only incremented in step 4, so it doesn't yet
+      // count the attempt being scheduled here. Add it, or every failure's
+      // penalty would land one attempt late and the first would not back off.
+      const nextSyncAt = computeNextSyncAt(
+        seconds,
+        loaded.consecutiveFailures + 1,
+      );
 
       await prisma.integrationResourceSync.upsert({
         where: { integrationId_resource: { integrationId, resource } },
@@ -129,6 +135,8 @@ export const syncIntegration = inngest.createFunction(
           nextSyncAt,
         },
       });
+
+      return { seconds };
     });
 
     // ---- 3. Run the strategy ---------------------------------------------
@@ -192,7 +200,18 @@ export const syncIntegration = inngest.createFunction(
       // the callback lands, so a successful hand-off stays Pending for
       // `upsertResourceSync` to close out. Only a failed hand-off is terminal
       // here, because no callback will ever fire for one.
-      if (outcome.pending) return;
+      //
+      // The status is left alone, but the schedule still needs clearing: step 2
+      // claimed this attempt assuming it would fail, and `upsertResourceSync`
+      // never writes `nextSyncAt`. Without this a healthy push platform would
+      // tick at twice its configured interval, forever.
+      if (outcome.pending) {
+        await prisma.integrationResourceSync.update({
+          where: { integrationId_resource: { integrationId, resource } },
+          data: { nextSyncAt: computeNextSyncAt(seconds, 0) },
+        });
+        return;
+      }
 
       await prisma.integrationResourceSync.update({
         where: { integrationId_resource: { integrationId, resource } },
@@ -201,6 +220,11 @@ export const syncIntegration = inngest.createFunction(
           errorMessage: null,
           lastSuccessfulSync: new Date(),
           consecutiveFailures: 0,
+          // Step 2 claimed this attempt with a backed-off `nextSyncAt`, and
+          // nothing else rewrites it. Clearing the backoff here is what puts a
+          // recovered resource back on its normal interval instead of making
+          // it serve out the penalty for failures it just recovered from.
+          nextSyncAt: computeNextSyncAt(seconds, 0),
           // A Json? column needs DbNull to be cleared; plain null is a type error.
           cursor:
             outcome.cursor === null

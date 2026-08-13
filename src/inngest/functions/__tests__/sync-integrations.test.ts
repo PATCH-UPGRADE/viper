@@ -162,8 +162,29 @@ describe("syncIntegration — finalizing", () => {
 
     const result = await runSync(makeStep());
 
-    expect(mockPrisma.integrationResourceSync.update).not.toHaveBeenCalled();
+    // Only the schedule is touched — no status, so the row stays Pending and
+    // `upsertResourceSync` still owns closing it out.
+    const data =
+      mockPrisma.integrationResourceSync.update.mock.calls[0][0].data;
+    expect(Object.keys(data)).toEqual(["nextSyncAt"]);
     expect(result).toEqual({ success: true, pending: true });
+  });
+
+  it("clears the failure-assumption backoff once a hand-off succeeds", async () => {
+    mockStrategy.mockResolvedValue({ cursor: null, pending: true });
+
+    await runSync(makeStep());
+
+    // The claim in step 2 assumes the attempt will fail, and
+    // `upsertResourceSync` never writes nextSyncAt. If this didn't reset it, a
+    // healthy push platform would tick at twice its configured interval.
+    const claimed =
+      mockPrisma.integrationResourceSync.upsert.mock.calls[0][0].update
+        .nextSyncAt;
+    const settled =
+      mockPrisma.integrationResourceSync.update.mock.calls[0][0].data
+        .nextSyncAt;
+    expect(settled.getTime()).toBeLessThan(claimed.getTime());
   });
 
   it("records success and the new cursor for a platform that fetched", async () => {

@@ -1,10 +1,16 @@
 "use client";
 
 import { format } from "date-fns";
-import { ExternalLinkIcon, MailIcon, Unlink } from "lucide-react";
+import { ExternalLinkIcon, HeartIcon, MailIcon, Unlink } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { TlpBadge } from "@/components/tlp-badge";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,9 +36,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { UtilizationGridList } from "@/features/assets/components/asset-utilization-grid";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
 import { displayName } from "@/lib/markdown/device-group";
-import { useMarkMatchIncorrect } from "../hooks/use-notifications";
+import {
+  useAffectedfAssetUtilization,
+  useMarkMatchIncorrect,
+} from "../hooks/use-notifications";
 import type {
   NotificationDetailSource,
   NotificationDetailWithRelations,
@@ -143,6 +153,16 @@ function SourceReference({ source }: { source: NotificationDetailSource }) {
       <span className="truncate max-w-xs">{label}</span>
       <ExternalLinkIcon className="size-3 shrink-0" />
     </a>
+  );
+}
+
+function NotificationUtilizationAnswer({
+  notificationId,
+}: {
+  notificationId: string;
+}) {
+  return (
+    <UtilizationGridList {...useAffectedfAssetUtilization(notificationId)} />
   );
 }
 
@@ -288,6 +308,26 @@ export function NotificationDetailsTab({
                 )}
               </TableBody>
             </Table>
+            <div className="mt-6 space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                quesitons about these devices
+              </p>
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="utilization" className="border-b-0">
+                  <AccordionTrigger className="px-3 text-sm rounded-lg bg-secondary hover:no-underline hover:bg-secondary/80">
+                    <span className="flex font-bold items-center gap-2.5 text-left">
+                      <HeartIcon className="size-4 shrink-0" />
+                      When are these devices being used in my hospital?
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionContent className="pl-[26px] pt-4">
+                    <NotificationUtilizationAnswer
+                      notificationId={notification.id}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </div>
           </CollapsibleCardContent>
         </CollapsibleCard>
       )}

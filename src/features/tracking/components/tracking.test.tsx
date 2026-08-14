@@ -63,8 +63,7 @@ const {
     ]),
     mockUseSuspenseTrackingTickets: vi.fn(() => ({
       data: {
-        // biome-ignore lint/suspicious/noExplicitAny: test stub - DataTable doesn't validate
-        items: [] as any[],
+        items: [] as Array<ReturnType<typeof sampleTicket>>,
         page: 1,
         pageSize: 5,
         totalCount: 0,

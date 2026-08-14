@@ -17,8 +17,6 @@ export async function requireOwnership(
   userId: string,
   modelName: keyof typeof prisma,
 ) {
-  // Type assertion needed because Prisma client types are complex: modelName is
-  // dynamic, so only the shape actually used here (findUnique by id) is asserted.
   const model = prisma[modelName] as unknown as typeof prisma.asset;
 
   const resource = requireExistence(

@@ -1,7 +1,4 @@
-import {
-  type NetworkTopology,
-  networkTopologySchema,
-} from "@/features/network/types";
+import type { NetworkTopology } from "@/features/network/types";
 import type { workflowSerializeInclude } from "@/features/workflows/utils";
 import type { Prisma } from "@/generated/prisma";
 import {
@@ -13,10 +10,6 @@ import {
   shortId,
   vulnerabilityToMarkdown,
 } from "@/lib/markdown";
-
-const NETWORK_FLOW_URL = process.env.NETWORK_FLOW_URL;
-const NETWORK_FLOW_TOKEN = process.env.NETWORK_FLOW_TOKEN;
-const NETWORK_FLOW_TIMEOUT = 15 * 1000;
 
 function generateInventorySummaryTable(assets: AssetForContext[]): string {
   if (assets.length === 0) return "_No assets in inventory._";
@@ -73,34 +66,6 @@ type WorkflowWithRelations = Prisma.WorkflowGetPayload<{
 }>;
 
 // ─── Network flow ─────────────────────────────────────────────────────────────
-
-async function _fetchNetworkTopologyForContext(): Promise<NetworkTopology | null> {
-  if (!NETWORK_FLOW_URL) return null;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), NETWORK_FLOW_TIMEOUT);
-
-  try {
-    const res = await fetch(NETWORK_FLOW_URL, {
-      headers: {
-        ...(NETWORK_FLOW_TOKEN
-          ? { Authorization: `Bearer ${NETWORK_FLOW_TOKEN}` }
-          : {}),
-        Accept: "application/json",
-      },
-      signal: controller.signal,
-    });
-
-    if (!res.ok) return null;
-
-    const json = await res.json();
-    return networkTopologySchema.parse(json);
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
 
 function generateNetworkFlowMarkdown(topology: NetworkTopology | null): string {
   if (!topology) {

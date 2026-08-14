@@ -22,3 +22,27 @@ export const planCardFields = [
   ["timeline", "Timeline"],
   ["rollback", "Rollback Ability"],
 ] as const satisfies ReadonlyArray<readonly [string, string]>;
+
+export type RiskTone = "low" | "medium" | "high" | "unknown";
+
+// Ordered most severe first: "Low now, high if the patch slips" must read as high.
+const RISK_PATTERNS: ReadonlyArray<readonly [RiskTone, RegExp]> = [
+  ["high", /\b(high|critical|severe)\b/i],
+  ["medium", /\b(medium|moderate|elevated)\b/i],
+  ["low", /\b(low|minimal|negligible)\b/i],
+];
+
+export function residualRiskTone(value: string | undefined): RiskTone {
+  const text = value ?? "";
+  for (const [tone, pattern] of RISK_PATTERNS) {
+    if (pattern.test(text)) return tone;
+  }
+  return "unknown";
+}
+
+export const riskToneClass: Record<RiskTone, string> = {
+  low: "text-green-700 dark:text-green-300",
+  medium: "text-yellow-700 dark:text-yellow-300",
+  high: "text-red-700 dark:text-red-300",
+  unknown: "",
+};

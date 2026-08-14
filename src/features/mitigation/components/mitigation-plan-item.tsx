@@ -21,7 +21,12 @@ import { CategoryChip } from "@/features/tracking/components/ticket-detail/share
 import { cn } from "@/lib/utils";
 import type { MitigationPlanWithWorkOrders } from "../types";
 import { AcceptPlanDrawer } from "./accept-plan-drawer";
-import { planCardFields, planTagLabels } from "./shared";
+import {
+  planCardFields,
+  planTagLabels,
+  residualRiskTone,
+  riskToneClass,
+} from "./shared";
 
 export function MitigationPlanItem({
   plan,
@@ -122,7 +127,13 @@ export function MitigationPlanItem({
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {label}
                   </p>
-                  <p className="mt-1 text-sm font-medium">
+                  <p
+                    className={cn(
+                      "mt-1 text-sm font-medium",
+                      field === "residual_risk" &&
+                        riskToneClass[residualRiskTone(cards[field])],
+                    )}
+                  >
                     {cards[field] || "—"}
                   </p>
                 </div>

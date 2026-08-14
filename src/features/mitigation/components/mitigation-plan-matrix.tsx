@@ -22,7 +22,7 @@ import { planCardsSchema } from "@/features/inbox/agent/mitigation/schema";
 import { cn } from "@/lib/utils";
 import type { MitigationPlanWithWorkOrders } from "../types";
 import { AcceptPlanDrawer } from "./accept-plan-drawer";
-import { planCardFields } from "./shared";
+import { planCardFields, residualRiskTone, riskToneClass } from "./shared";
 
 const ROW_LABEL = "w-48 align-top text-xs uppercase tracking-wide";
 const CELL = "align-top text-sm whitespace-normal min-w-64";
@@ -107,7 +107,15 @@ export function MitigationPlanMatrix({
               {columns.map(({ plan, cards, isHighlighted }) => (
                 <TableCell
                   key={plan.id}
-                  className={cn(CELL, tint(isHighlighted))}
+                  className={cn(
+                    CELL,
+                    tint(isHighlighted),
+                    field === "residual_risk" &&
+                      cn(
+                        "font-semibold",
+                        riskToneClass[residualRiskTone(cards?.[field])],
+                      ),
+                  )}
                 >
                   {cards?.[field] || "—"}
                 </TableCell>

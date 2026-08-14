@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import {
   attachNote,
   attachNotes,
@@ -11,6 +10,7 @@ import {
   cpesToMatchingConnect,
   fetchPaginated,
   findVulnerabilitiesMatchingDeviceGroups,
+  processIntegrationSync,
   processIntegrationToken,
 } from "@/lib/router-utils";
 import { alohaInputSchema, integrationResponseSchema } from "@/lib/schemas";
@@ -267,7 +267,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const { userId, integrationId, resource } = await processIntegrationToken(
+      const { userId, integrationId } = await processIntegrationToken(
         input.token,
         ResourceType.Vulnerability,
       );
@@ -278,13 +278,7 @@ export const vulnerabilitiesRouter = createTRPCRouter({
           model: prisma.vulnerability,
           mappingModel: prisma.externalVulnerabilityMapping,
           transformInputItem: async (item, userId) => {
-            const {
-              cpes,
-              vendorId: _vendorId,
-              upstreamApi: _upstreamApi,
-              webUrl: _webUrl,
-              ...itemData
-            } = item;
+            const { cpes, vendorId: _vendorId, ...itemData } = item;
             const connect = cpes ? await cpesToMatchingConnect(cpes) : [];
 
             return {
@@ -309,7 +303,6 @@ export const vulnerabilitiesRouter = createTRPCRouter({
         input,
         userId,
         integrationId,
-        resource,
       );
     }),
 

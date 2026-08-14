@@ -43,11 +43,9 @@ export const reevaluateIssueOnAnswer = inngest.createFunction(
 
     if (updatedIssue.status !== "UNDER_INVESTIGATION") {
       await step.run("retriage-notification", async () => {
-        const source = await prisma.sourceRecord.findFirst({
-          where: {
-            links: { some: { notificationId: question.notificationId } },
-          },
-          orderBy: { observedAt: "desc" },
+        const source = await prisma.notificationSource.findFirst({
+          where: { notificationId: question.notificationId },
+          orderBy: { receivedAt: "desc" },
         });
         if (!source) return;
         const result = await triageNotification(

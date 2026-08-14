@@ -53,9 +53,7 @@ export async function gatherVexContext(
   const notification = await prisma.notification.findUnique({
     where: { id: notificationId },
     include: {
-      sourceLinks: {
-        select: { sourceRecord: { select: { markdown: true, channel: true } } },
-      },
+      sources: { select: { markdown: true, channel: true } },
       vulnerabilities: {
         include: {
           vulnerability: {
@@ -196,7 +194,7 @@ export async function gatherVexContext(
   const cveById = new Map(vulnerabilities.map((v) => [v.id, v.cveId ?? v.id]));
 
   const markdown = renderVexPrompt({
-    sources: notification.sourceLinks.map((l) => l.sourceRecord),
+    sources: notification.sources,
     vulnerabilities,
     remediations,
     candidateGroups,
@@ -398,8 +396,8 @@ export async function gatherVexContextForIssue(
     where: { vulnerabilityId: issue.vulnerabilityId },
   });
 
-  const sources = await prisma.sourceRecord.findMany({
-    where: { links: { some: { notificationId } } },
+  const sources = await prisma.notificationSource.findMany({
+    where: { notificationId },
     select: { markdown: true, channel: true },
   });
 

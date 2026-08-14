@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import {
   attachNote,
   attachNotes,
@@ -16,6 +15,7 @@ import {
   cpesToMatchingConnect,
   createArtifactWrappers,
   fetchPaginated,
+  processIntegrationSync,
   processIntegrationToken,
   transformArtifactWrapper,
 } from "@/lib/router-utils";
@@ -208,7 +208,7 @@ export const remediationsRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const { userId, integrationId, resource } = await processIntegrationToken(
+      const { userId, integrationId } = await processIntegrationToken(
         input.token,
         ResourceType.Remediation,
       );
@@ -219,14 +219,7 @@ export const remediationsRouter = createTRPCRouter({
           model: prisma.remediation,
           mappingModel: prisma.externalRemediationMapping,
           transformInputItem: async (item, userId) => {
-            const {
-              vendorId: _vendorId,
-              artifacts,
-              cpes,
-              upstreamApi: _upstreamApi,
-              webUrl: _webUrl,
-              ...itemData
-            } = item;
+            const { vendorId: _vendorId, artifacts, cpes, ...itemData } = item;
             const matchingConnect = cpes
               ? await cpesToMatchingConnect(cpes)
               : [];
@@ -256,7 +249,6 @@ export const remediationsRouter = createTRPCRouter({
         input,
         userId,
         integrationId,
-        resource,
       );
     }),
 
@@ -381,6 +373,9 @@ export const remediationsRouter = createTRPCRouter({
           }),
           ...(updateData.description !== undefined && {
             description: updateData.description,
+          }),
+          ...(updateData.upstreamApi !== undefined && {
+            upstreamApi: updateData.upstreamApi,
           }),
           ...(updateData.vulnerabilityId !== undefined && {
             vulnerabilityId: updateData.vulnerabilityId,

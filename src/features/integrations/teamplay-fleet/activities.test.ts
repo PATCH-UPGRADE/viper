@@ -87,8 +87,8 @@ describe("mapFleetActivities", () => {
     expect(items[0].body).toContain("US_1064669350");
   });
 
-  it("attaches an Integration source keyed by ticketKey, preserving the raw record", () => {
-    expect(items[0].source.channel).toBe("Integration");
+  it("attaches a PolledApi source keyed by ticketKey, preserving the raw record", () => {
+    expect(items[0].source.channel).toBe("PolledApi");
     expect(items[0].source.externalId).toBe("US_400501937577");
     expect(items[0].source.raw.ticketKey).toBe("US_400501937577");
     // markdown mirrors the ticket body so the source view has detail.

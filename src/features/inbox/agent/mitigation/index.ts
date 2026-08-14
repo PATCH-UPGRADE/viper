@@ -66,7 +66,7 @@ export async function createMitigationPlans(
   inlinedPdfs?: PdfAttachment[],
 ): Promise<MitigationPlansResult & { linkableIds: LinkableIds }> {
   const [source, notification, pdfAttachments, context] = await Promise.all([
-    prisma.sourceRecord.findUnique({
+    prisma.notificationSource.findUnique({
       where: { id: sourceId },
       select: { markdown: true },
     }),

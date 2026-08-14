@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { type Prisma, ResourceType } from "@/generated/prisma";
 import { requestArtifactNoteExtraction } from "@/inngest/functions/extract-artifact-notes";
 import prisma from "@/lib/db";
@@ -8,6 +7,7 @@ import {
   createArtifactWrappers,
   fetchPaginated,
   findMatchingIdsForDeviceGroup,
+  processIntegrationSync,
   processIntegrationToken,
   resolveMatchingIdFromCpe,
   transformArtifactWrapper,
@@ -191,6 +191,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
           data: {
             role: input.role,
             description: input.description,
+            upstreamApi: input.upstreamApi || null,
             deviceGroupMatchings: { connect: matchingConnect },
             userId,
           },
@@ -237,7 +238,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const { userId, integrationId, resource } = await processIntegrationToken(
+      const { userId, integrationId } = await processIntegrationToken(
         input.token,
         ResourceType.DeviceArtifact,
       );
@@ -248,14 +249,7 @@ export const deviceArtifactsRouter = createTRPCRouter({
           model: prisma.deviceArtifact,
           mappingModel: prisma.externalDeviceArtifactMapping,
           transformInputItem: async (item, userId) => {
-            const {
-              cpe,
-              vendorId: _vendorId,
-              artifacts,
-              upstreamApi: _upstreamApi,
-              webUrl: _webUrl,
-              ...itemData
-            } = item;
+            const { cpe, vendorId: _vendorId, artifacts, ...itemData } = item;
             const identityMatchingId = await resolveMatchingIdFromCpe(cpe);
             const matchingConnect = [{ id: identityMatchingId }];
 
@@ -284,7 +278,6 @@ export const deviceArtifactsRouter = createTRPCRouter({
         input,
         userId,
         integrationId,
-        resource,
       );
     }),
 
@@ -339,6 +332,9 @@ export const deviceArtifactsRouter = createTRPCRouter({
         ...(updateData.role !== undefined && { role: updateData.role }),
         ...(updateData.description !== undefined && {
           description: updateData.description,
+        }),
+        ...(updateData.upstreamApi !== undefined && {
+          upstreamApi: updateData.upstreamApi,
         }),
       };
 

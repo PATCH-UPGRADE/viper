@@ -1,11 +1,6 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
-import {
-  PlatformEnum,
-  Priority,
-  type Prisma,
-  Severity,
-} from "@/generated/prisma";
+import { Priority, type Prisma, Severity } from "@/generated/prisma";
 import {
   createPaginatedResponseSchema,
   paginationInputSchema,
@@ -52,6 +47,7 @@ export const vulnerabilityInputSchema = z.object({
   cvssVector: z.string().min(1).nullish(),
   affectedComponents: z.array(z.string().min(1)).optional(),
   exploitUri: safeUrlSchema.nullish(),
+  upstreamApi: safeUrlSchema.nullish(),
   deviceArtifactId: z.string().min(1).nullish(),
 });
 
@@ -70,18 +66,7 @@ export const vulnerabilityResponseSchema = z.object({
   sarif: z.any(), // JSON data - Prisma JsonValue type
   deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
   exploitUri: z.string().nullable(),
-  externalMappings: z.array(
-    z.object({
-      externalId: z.string(),
-      upstreamApi: z.string().nullable(),
-      webUrl: z.string().nullable(),
-      integration: z.object({
-        id: z.string(),
-        name: z.string(),
-        platform: z.enum(PlatformEnum),
-      }),
-    }),
-  ),
+  upstreamApi: z.string().nullable(),
   description: z.string().nullable(),
   narrative: z.string().nullable(),
   impact: z.string().nullable(),
@@ -125,27 +110,11 @@ export const vulnerabilitiesByPriorityInputSchema =
 export const vulnerabilityInclude = {
   user: userIncludeSelect,
   deviceGroupMatchings: deviceGroupMatchingInclude,
-  externalMappings: {
-    select: {
-      externalId: true,
-      upstreamApi: true,
-      webUrl: true,
-      integration: { select: { id: true, name: true, platform: true } },
-    },
-  },
 };
 
 export const vulnerabilityByPriorityInclude = {
   user: userIncludeSelect,
   deviceGroupMatchings: deviceGroupMatchingInclude,
-  externalMappings: {
-    select: {
-      externalId: true,
-      upstreamApi: true,
-      webUrl: true,
-      integration: { select: { id: true, name: true, platform: true } },
-    },
-  },
   issues: {
     include: {
       asset: {

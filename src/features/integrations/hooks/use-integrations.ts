@@ -35,13 +35,11 @@ export const useCreateIntegration = () => {
     trpc.integrations.create.mutationOptions({
       onSuccess: (data) => {
         toast.success("Integration created");
-        for (const sync of data.resourceSyncs) {
-          queryClient.invalidateQueries(
-            trpc.integrations.getMany.queryOptions({
-              resourceType: sync.resource,
-            }),
-          );
-        }
+        queryClient.invalidateQueries(
+          trpc.integrations.getMany.queryOptions({
+            resourceType: data.resourceType,
+          }),
+        );
         // Need to recount # of active ApiKey Connectors
         queryClient.invalidateQueries(
           trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
@@ -67,13 +65,11 @@ export const useUpdateIntegration = () => {
     trpc.integrations.update.mutationOptions({
       onSuccess: (data) => {
         toast.success("Integration updated");
-        for (const sync of data.resourceSyncs) {
-          queryClient.invalidateQueries(
-            trpc.integrations.getMany.queryOptions({
-              resourceType: sync.resource,
-            }),
-          );
-        }
+        queryClient.invalidateQueries(
+          trpc.integrations.getMany.queryOptions({
+            resourceType: data.resourceType,
+          }),
+        );
         return data;
       },
       onError: (error) => {
@@ -95,11 +91,11 @@ export const useRemoveIntegration = () => {
       onSuccess: (data) => {
         toast.success("Integration removed");
         // Invalidate all getMany and getOne queries regardless of params
-        for (const resource of data.resources) {
-          queryClient.invalidateQueries(
-            trpc.integrations.getMany.queryOptions({ resourceType: resource }),
-          );
-        }
+        queryClient.invalidateQueries(
+          trpc.integrations.getMany.queryOptions({
+            resourceType: data.resourceType,
+          }),
+        );
         // Need to recount # of active ApiKey Connectors
         queryClient.invalidateQueries(
           trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),

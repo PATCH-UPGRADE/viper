@@ -1,12 +1,7 @@
 import { fail } from "node:assert";
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
-import {
-  AuthType,
-  PlatformEnum,
-  ResourceType,
-  SyncStatusEnum,
-} from "@/generated/prisma";
+import { AuthType, ResourceType, SyncStatusEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   authHeader,
@@ -37,15 +32,12 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
 
   const mockIntegrationPayload = {
     name: "mockVulnIntegration",
-    platform: PlatformEnum.PARTNER,
+    platform: "mockIntegrationPlatform",
+    integrationUri: "https://mock-vuln-upstream-api.com/",
+    integrationType: "PARTNER" as const,
+    resourceType: ResourceType.Vulnerability,
     syncEvery: 300,
-    config: {
-      integrationUri: "https://mock-vuln-upstream-api.com/",
-      resource: ResourceType.Vulnerability,
-    },
-    credentials: {
-      authType: AuthType.None,
-    },
+    authType: AuthType.None,
   };
 
   const descDeleteKeyWord = "mock-vuln-integration-test";
@@ -265,7 +257,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(foundVuln1.description).toBe(vulnPayload1.description);
     expect(foundVuln1.narrative).toBe(vulnPayload1.narrative);
     expect(foundVuln1.impact).toBe(vulnPayload1.impact);
-    expect(mapping1.upstreamApi).toBe(vulnPayload1.upstreamApi);
+    expect(foundVuln1.upstreamApi).toBe(vulnPayload1.upstreamApi);
     expect(foundVuln1.exploitUri).toBe(vulnPayload1.exploitUri);
     expect(foundVuln1.sarif).toStrictEqual(vulnPayload1.sarif);
     expect(foundVuln1.deviceGroupMatchings.length).toBe(
@@ -299,7 +291,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(foundVuln2.description).toBe(vulnPayload2.description);
     expect(foundVuln2.narrative).toBe(vulnPayload2.narrative);
     expect(foundVuln2.impact).toBe(vulnPayload2.impact);
-    expect(mapping2.upstreamApi).toBe(vulnPayload2.upstreamApi);
+    expect(foundVuln2.upstreamApi).toBe(vulnPayload2.upstreamApi);
     expect(foundVuln2.exploitUri).toBe(vulnPayload2.exploitUri);
     expect(foundVuln2.sarif).toStrictEqual(vulnPayload2.sarif);
     expect(foundVuln2.deviceGroupMatchings.length).toBe(
@@ -315,16 +307,13 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
 
     expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
 
-    const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
-      where: {
-        integrationId: createdIntegration.id,
-        resource: mockIntegrationPayload.config.resource,
-      },
+    const foundSync = await prisma.syncStatus.findFirstOrThrow({
+      where: { syncedAt: mapping1.lastSynced },
     });
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBeNullable();
-    expect(foundSync.lastSuccessfulSync).toStrictEqual(mapping2.lastSynced);
+    expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
   });
 });

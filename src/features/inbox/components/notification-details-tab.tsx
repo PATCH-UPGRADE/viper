@@ -1,4 +1,3 @@
-// TODO(VW-499): Fix changes after VW-427
 "use client";
 
 import { format } from "date-fns";

@@ -19,9 +19,8 @@ export const vendorsRouter = createTRPCRouter({
           ...vendor,
           // Contracts under one vendor may overlap, so the same asset can appear twice.
           assetCount: new Set(
-            contracts.flatMap(
-              (contract) =>
-                contract.managesRelationship?.assets.map((a) => a.id) ?? [],
+            contracts.flatMap((contract) =>
+              contract.covers.map((c) => c.assetId),
             ),
           ).size,
         }),

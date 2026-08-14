@@ -7,8 +7,8 @@ import prisma from "../src/lib/db";
 
 const url =
   "https://fleet.siemens-healthineers.com/rest/v1/security-advisories/active";
+const host = new URL(url).hostname;
 
-// TODO: VW-431, this most certainly needs to be updated as part of this ticket
 async function main() {
   const userName = process.env.FLEET_ADVISORY_USERNAME;
   const password = process.env.FLEET_ADVISORY_PASSWORD;
@@ -42,8 +42,16 @@ async function main() {
   const data = await results.json();
   console.log("data ", data);
 
+  const before = await prisma.integrationSession.findUnique({
+    where: { host },
+  });
+  console.log("before: ", before);
   const res = await FLEET.fetchWithSession(url);
   console.log("status: ", res.status);
+  const after = await prisma.integrationSession.findUnique({
+    where: { host },
+  });
+  console.log("after: ", after);
 }
 
 main()

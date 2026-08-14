@@ -1,4 +1,3 @@
-// TODO(VW-431): Move auth to teamplay fleet platform code
 import prisma from "@/lib/db";
 import {
   grabSessionCookie,

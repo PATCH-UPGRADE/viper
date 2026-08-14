@@ -4,6 +4,7 @@ import { createAgentCaller } from "@/trpc/agent-caller";
 import {
   addNavigationLinks,
   capPageSize,
+  makeQueryPlatformDataTool,
   PLATFORM_CATALOG,
   PLATFORM_QUERY_PROCEDURES,
 } from "./query-platform-tool";
@@ -13,6 +14,24 @@ const CATALOG_LINE = /^- ([a-zA-Z]+\.[a-zA-Z]+) —/gm;
 
 function documentedProcedures(): string[] {
   return [...PLATFORM_CATALOG.matchAll(CATALOG_LINE)].map((m) => m[1]);
+}
+
+/**
+ * How each router prefix is named in prose. The tool description and both agent
+ * `<tools>` blocks summarise the same domains in words, so a new prefix here is
+ * a reminder that those sentences need updating too.
+ */
+const DOMAIN_PHRASES: Record<string, string> = {
+  assets: "assets",
+  vulnerabilities: "vulnerabilities",
+  remediations: "remediations",
+  deviceGroups: "device groups",
+  workflows: "clinical workflows",
+  notifications: "notifications",
+};
+
+function allowlistedPrefixes(): string[] {
+  return [...new Set(PLATFORM_QUERY_PROCEDURES.map((p) => p.split(".")[0]))];
 }
 
 describe("PLATFORM_CATALOG stays in sync with PLATFORM_QUERY_PROCEDURES", () => {
@@ -26,6 +45,40 @@ describe("PLATFORM_CATALOG stays in sync with PLATFORM_QUERY_PROCEDURES", () => 
   // duplicate bullet. It also pins the catalog to the enum's order.
   it("documents exactly the allowlisted procedures, in order", () => {
     expect(documentedProcedures()).toEqual([...PLATFORM_QUERY_PROCEDURES]);
+  });
+
+  // The description opens with a prose list of domains before it pastes the
+  // catalog. That sentence went stale once already: it named four domains while
+  // the catalog listed sixteen procedures, and an agent that trusts the summary
+  // will refuse a request the tool would have served. Assert against the
+  // preamble only — testing the whole string passes via the pasted catalog.
+  it("names every allowlisted domain in the tool description preamble", () => {
+    const description =
+      makeQueryPlatformDataTool("test-user").description ?? "";
+    const preamble = description.split(PLATFORM_CATALOG)[0];
+
+    const missing = allowlistedPrefixes().filter((prefix) => {
+      const phrase = DOMAIN_PHRASES[prefix];
+      // An unmapped prefix is a new domain. Fail, so DOMAIN_PHRASES and the
+      // prose summaries get updated together.
+      return phrase === undefined || !preamble.includes(phrase);
+    });
+
+    expect(missing).toEqual([]);
+  });
+
+  // A matching id sent as deviceGroupId returns an empty page rather than an
+  // error, so the model reports "no assets affected" against a real count. The
+  // catalog is the only thing standing between the agent and that answer today.
+  //
+  // Anchored on the two emphasised phrases, which appear once each and only in
+  // that paragraph. Bare identifiers do not work: `deviceGroupId` appears three
+  // times in the catalog and `deviceGroups.getMany` twice, both via ordinary
+  // procedure bullets, so asserting them passes even with the warning deleted.
+  // Rewording this guidance will fail here, which is the intent.
+  it("keeps the warning that matching ids are not device group ids", () => {
+    expect(PLATFORM_CATALOG).toContain("matching RULES");
+    expect(PLATFORM_CATALOG).toContain("NOT device group ids");
   });
 
   // A typo in a dot-path, or a procedure later renamed in its router, is

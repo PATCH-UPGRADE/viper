@@ -6,32 +6,9 @@ import prisma from "@/lib/db";
 import { renderQnA } from "@/lib/markdown/note";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { draftEscalationEmail } from "../agent/escalationEmail";
+import { gatherEscalationContext } from "../agent/escalationEmail/context";
+import { resolveEscalationTarget } from "../agent/escalationEmail/process_output";
 import { questionInclude, type SuggestedVendorEmail } from "../types";
-
-// TODO:PS for testing only, wire with real DB later with dummy body text
-const MOCK_CONTACTS = [
-  { name: "Perry Sy", email: "perrydev17@gmail.com" },
-  { name: "Perry Sy 2", email: "perrydev17+2@bugcrowd.com" },
-];
-// TODO:PS for testing only, wire with real DB later with dummy body text
-// const MOCK_EMAIL: SuggestedVendorEmail[] = [
-//   {
-//     questionId: "qustion-1",
-//     audience: "MANUFACTURER",
-//     companyName: "Siemens Healthineers",
-//     productName: "SOMATOM go.All",
-//     reasonWhy:
-//       "The advisory doesn't help Viper confirm the running version on the go.All. A written confirmation from Siemens (or an SRS query) would let Viper move this asset out of 'potentially at risk' with confidence.",
-//     subject:
-//       "Version confirmation - SOMATOM go.All exposure to SSA-220609 (CVE-2022-29875)",
-//     body: `Hello Siemens Healthineers ProductCERT,\n\n We are scoping remediation for....\n\n\ We operate... `,
-//     contacts: [
-//       { email: "perrydev17@gmail.com", name: "perry" },
-//       { name: "Perry Sy 2", email: "perry.sy+2@bugcrowd.com" },
-//     ],
-//     toEmails: ["perrydev17@gmail.com"],
-//   },
-// ];
 
 export const questionsRouter = createTRPCRouter({
   getManyByNotificationId: protectedProcedure
@@ -147,7 +124,6 @@ export const questionsRouter = createTRPCRouter({
 
   getSuggestedEmailByNotificationId: protectedProcedure
     .input(z.object({ notificationId: z.string() }))
-    //.query((): SuggestedVendorEmail[] => MOCK_EMAIL),   // TODO: PS remove after testing
     .query(async ({ ctx, input }): Promise<SuggestedVendorEmail[]> => {
       const sender = await prisma.user.findUnique({
         where: { id: ctx.auth.user.id },
@@ -161,20 +137,42 @@ export const questionsRouter = createTRPCRouter({
         include: questionInclude,
       });
 
-      return Promise.all(
-        questions.map(async (question) => {
-          const draft = await draftEscalationEmail(question);
-          const contacts = MOCK_CONTACTS; // TODO:PS get it from vendorContact
-          const [primary] = contacts;
-          return {
-            questionId: question.id,
-            ...draft,
-            body: `${draft.body.trimEnd()}\n${signature}`,
-            contacts,
-            toEmails: primary ? [primary.email] : [],
-          };
-        }),
+      const drafted = await Promise.all(
+        questions.map(
+          async (question): Promise<SuggestedVendorEmail | null> => {
+            const audience = question.audience ?? "MANUFACTURER";
+
+            try {
+              const context = await gatherEscalationContext(question, audience);
+              if (!context) return null;
+
+              if (audience === "VENDOR" && context.vendors.length === 0)
+                return null;
+
+              const draft = await draftEscalationEmail(context, audience);
+              const target = resolveEscalationTarget(draft, context);
+
+              return {
+                questionId: question.id,
+                companyName: target.companyName,
+                productName: context.productName,
+                reasonWhy: draft.reasonWhy,
+                contacts: target.contacts,
+                toEmails: target.toEmails,
+                subject: draft.subject,
+                body: `${draft.body.trimEnd()}\n${signature}`,
+              };
+            } catch (error) {
+              console.error(
+                `Escalation draft failed for question ${question.id} `,
+                error,
+              );
+              return null;
+            }
+          },
+        ),
       );
+      return drafted.filter((email) => email !== null);
     }),
 
   approveEscalationEmail: protectedProcedure

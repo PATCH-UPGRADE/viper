@@ -17,7 +17,7 @@ import {
   UnmanagedAssetsError,
 } from "@/features/integrations/teamplay-fleet/tracking";
 import { TicketCategory } from "@/generated/prisma";
-import { TOOL_REJECTED_PREFIX } from "./build-graph";
+import { TOOL_REJECTED_PREFIX } from "../shared/build-graph";
 import { makeRecordNoteTool } from "./note-tool";
 import { makeQueryPlatformDataTool } from "./query-platform-tool";
 
@@ -205,8 +205,12 @@ Use this when the remediation is service work Siemens would perform — a firmwa
   },
 );
 
-/** All model-facing tools for the Chat agent, bound to a user. */
-export function buildChatTools(userId: string) {
+/**
+ * All model-facing tools, bound to a user. Every conversational agent binds this
+ * same set — `chat/graph.ts` and `recommendations/graph.ts` both call it — so a tool
+ * added here is armed for all of them and must be described in each agent's prompt.
+ */
+export function buildAgentTools(userId: string) {
   return [
     makeQueryPlatformDataTool(userId),
     askUserQuestions,

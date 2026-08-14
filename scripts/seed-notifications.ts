@@ -82,6 +82,21 @@ const SYNGO_PLAZA_ASSETS = [
   },
 ];
 
+// Mock differnt use cases
+const QUESTION_CASES = [
+  {
+    product: "syngo.via",
+    audience: "VENDOR" as const,
+    expect: "VENDOR GE Healthcare - dropdown, 2 contacts",
+  },
+  {
+    product: "MAGNETOM FAMILY",
+    audience: "VENDOR" as const,
+    expect: "VENDOR Philips - dropdown, 1 contact",
+  },
+  { product: "Symbia Intevo", expect: "MANUFACTURER - no contacts, input" },
+];
+
 async function seedSyngoPlazaVexScenario(userId: string) {
   console.log("\n🌱 Seeding Siemens syngo.plaza VEX scenario...");
 
@@ -765,6 +780,205 @@ The application deserialises untrusted data without sufficient validations that 
   console.log(`  ✅ Created: ${title}`);
 }
 
+async function coverProducts(
+  vendorId: string,
+  title: string,
+  products: string[],
+) {
+  const assets = await prisma.asset.findMany({
+    where: {
+      deviceGroup: {
+        product: {
+          canonicalName: {
+            in: products.map((product) => product.trim().toLowerCase()),
+          },
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  const contract = await prisma.contract.create({
+    data: {
+      vendorId,
+      title,
+      effectiveFrom: new Date("2023-01-01"),
+      effectiveTo: new Date("2028-01-01"),
+      coverageSummary: `${products.join(", ")} (${assets.length} assets)`,
+    },
+  });
+
+  await prisma.contractAsset.createMany({
+    data: assets.map((asset) => ({
+      contractId: contract.id,
+      assetId: asset.id,
+    })),
+    skipDuplicates: true,
+  });
+
+  console.log(` ✅  ${title}:${assets.length} assets`);
+}
+
+async function seedQuestion() {
+  await prisma.question.deleteMany({
+    where: { status: { in: ["PENDING", "UNSURE"] } },
+  });
+
+  for (const { product, audience, expect } of QUESTION_CASES) {
+    const canonicalName = product.trim().toLowerCase();
+
+    const mapping = await prisma.notificationDeviceGroupMapping.findFirst({
+      where: {
+        notificationId: { not: null },
+        deviceGroupMatching: { product: { canonicalName } },
+      },
+
+      select: {
+        notificationId: true,
+        deviceGroupMatchingId: true,
+        notification: { select: { title: true } },
+      },
+    });
+
+    if (!mapping?.notificationId) {
+      console.log(`No notification mapping found for ${product}`);
+      continue;
+    }
+
+    const issue = await prisma.issue.findFirst({
+      where: { deviceGroupMatchingId: mapping?.deviceGroupMatchingId },
+      select: { id: true },
+    });
+
+    if (!issue) {
+      console.log(`No issue on the ${product} matching`);
+      continue;
+    }
+
+    await prisma.question.create({
+      data: {
+        issueId: issue.id,
+        audience,
+        notificationId: mapping.notificationId,
+        title: `Which ${product} version is running on our units?`,
+        reasonWhy: `The advisory lists affected ${product} versions, but our inventory records the version as unknown, so we cannot confirm exposure.`,
+        suggestedAnswers: [
+          "Yes, we should look into it",
+          "No, isolated",
+          "Partially, needs checking",
+        ],
+      },
+    });
+
+    await prisma.question.create({
+      data: {
+        issueId: issue.id,
+        audience,
+        notificationId: mapping.notificationId,
+        title: `Are the ${product} units reachable from the clinical VLAN?`,
+        reasonWhy: `Exposure depends on segmentation, which the advisory cannot tell us.`,
+        status: "UNSURE",
+      },
+    });
+
+    console.log(`  ✅ Seeded ${product} -> expect ${expect}`);
+  }
+
+  console.log(`  ✅ Seeded UNSURE question`);
+}
+
+async function seedVendorCoverage() {
+  console.log("\n🌱 Seeding vendor coverage...");
+
+  const sieManu = await upsertManufacturer("Siemens Healthineers");
+  const geManu = await upsertManufacturer("GE Healthcare");
+  const phillipsManu = await upsertManufacturer("Philips");
+
+  const shVendor = await prisma.vendor.upsert({
+    where: { canonicalName: "siemens healthineers" },
+    update: { manufacturerId: sieManu.id },
+    create: {
+      canonicalName: "siemens healthineers",
+      canonicalDisplayName: "Siemens Healthineers",
+      overview: "Manages imaging fleet for radiology",
+      partnerSince: new Date("2019-01-01"),
+      manufacturerId: sieManu.id,
+    },
+  });
+  const geVendor = await prisma.vendor.upsert({
+    where: { canonicalName: "ge healthcare" },
+    update: { manufacturerId: geManu.id },
+    create: {
+      canonicalName: "ge healthcare",
+      canonicalDisplayName: "GE Healthcare",
+      overview: "Multivendor managed service across the imaging fleet",
+      partnerSince: new Date("2019-02-01"),
+      manufacturerId: geManu.id,
+    },
+  });
+
+  const phillipVendor = await prisma.vendor.upsert({
+    where: { canonicalName: "philips" },
+    update: { manufacturerId: phillipsManu.id },
+    create: {
+      canonicalName: "philips",
+      canonicalDisplayName: "Philips",
+      overview: "Mantains the MRI fleet under a single-engineer contract.",
+      partnerSince: new Date("2019-03-01"),
+      manufacturerId: phillipsManu.id,
+    },
+  });
+
+  const vendorIds = [shVendor.id, geVendor.id, phillipVendor.id];
+  await prisma.contract.deleteMany({ where: { vendorId: { in: vendorIds } } });
+  await prisma.vendorContact.deleteMany({
+    where: { vendorId: { in: vendorIds } },
+  });
+
+  await prisma.vendorContact.createMany({
+    data: [
+      {
+        vendorId: shVendor.id,
+        name: "John Doe",
+        title: "Hospital Biomed Lead",
+        email: "johndoe@example.com",
+        phone: "123-456-7890",
+        notes: "Usually responds the fastest",
+      },
+      {
+        vendorId: shVendor.id,
+        name: "Jane Doe",
+        title: "IT engineer",
+        email: "janedoe@example.com",
+      },
+      {
+        vendorId: geVendor.id,
+        name: "Gordon Doe",
+        title: "Field service engineer",
+        email: "gordondoe@example.com",
+      },
+      {
+        vendorId: phillipVendor.id,
+        name: "Phillips Doe",
+        title: "Admin",
+        phone: "908-765-4321",
+      },
+    ],
+  });
+
+  await coverProducts(shVendor.id, "Manages imaging fleet for radiology", [
+    "syngo.via",
+  ]);
+  await coverProducts(
+    geVendor.id,
+    "Multivendor managed service across the imaging fleet",
+    ["syngo.via"],
+  );
+  await coverProducts(phillipVendor.id, "MRI Fleet Managed Service Agreement", [
+    "MAGNETOM FAMILY",
+  ]);
+}
+
 // ---------------------------------------------------------------------------
 // Main seed function
 // ---------------------------------------------------------------------------
@@ -781,6 +995,8 @@ async function main() {
   const user = await getSeedUser();
   await seedSyngoPlazaVexScenario(user.id);
   await seedDeserializationScenario(user.id);
+  await seedVendorCoverage();
+  await seedQuestion();
 
   console.log("\n✨ Done.");
   await prisma.$disconnect();

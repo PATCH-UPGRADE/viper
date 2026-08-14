@@ -29,7 +29,7 @@ import {
 } from "../../hooks/use-tracking";
 import type { TicketDetail } from "../../types";
 import { DepartmentMultiSelect } from "./department-multi-select";
-import { categoryLabels, statusLabels } from "./shared";
+import { categoryLabels, TicketStatusSelectTrigger } from "./shared";
 
 const UNASSIGNED = "__unassigned__";
 
@@ -287,16 +287,11 @@ export const TicketEditForm = ({
                 setForm((f) => ({ ...f, status: v as TicketStatus }))
               }
             >
-              <SelectTrigger id="ticket-status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(statusLabels) as TicketStatus[]).map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {statusLabels[s]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <TicketStatusSelectTrigger
+                status={form.status}
+                id="ticket-status"
+                colored
+              />
             </Select>
           </div>
         </div>

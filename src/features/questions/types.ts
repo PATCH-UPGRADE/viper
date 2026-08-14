@@ -2,7 +2,6 @@ import type { Prisma } from "@/generated/prisma";
 
 export type SuggestedVendorEmail = {
   questionId: string;
-  audience: "VENDOR" | "MANUFACTURER";
   companyName: string;
   productName: string;
   reasonWhy: string;
@@ -29,11 +28,7 @@ export const questionInclude = {
 } satisfies Prisma.QuestionInclude;
 
 export type QuestionWithIssue = Prisma.QuestionGetPayload<{
-  include: {
-    issue: {
-      include: { vulnerability: true; deviceGroupMatching: true; asset: true };
-    };
-  };
+  include: typeof questionInclude;
 }>;
 
 export function groupQuestionChains(

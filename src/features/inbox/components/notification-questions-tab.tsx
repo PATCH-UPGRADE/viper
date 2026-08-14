@@ -24,7 +24,7 @@ export function NotificationQuestionTab({
   const approve = useApproveEscalation(notificationId);
   const dismiss = useDismissEscalation();
 
-  const handleApprove = (email: any) => {
+  const handleApprove = (email: Parameters<typeof approve.mutate>[0]) => {
     approve.mutate(email);
   };
   const handleDismiss = (questionId: string) => {

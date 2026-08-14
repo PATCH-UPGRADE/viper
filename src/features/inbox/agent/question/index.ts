@@ -1,6 +1,6 @@
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { buildUserMessage, PdfAttachment } from "@/lib/agent-messages";
+import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { fetchPdfAttachments } from "../../utils";
 import {

@@ -1,11 +1,9 @@
-import { listFleetManagedAssets } from "@/features/integrations/teamplay-fleet/tracking";
 import {
   type NetworkTopology,
   networkTopologySchema,
 } from "@/features/network/types";
 import type { workflowSerializeInclude } from "@/features/workflows/utils";
 import type { Prisma } from "@/generated/prisma";
-import prisma from "@/lib/db";
 import {
   assetToMarkdown,
   deviceGroupLabel,
@@ -76,7 +74,7 @@ type WorkflowWithRelations = Prisma.WorkflowGetPayload<{
 
 // ─── Network flow ─────────────────────────────────────────────────────────────
 
-async function fetchNetworkTopologyForContext(): Promise<NetworkTopology | null> {
+async function _fetchNetworkTopologyForContext(): Promise<NetworkTopology | null> {
   if (!NETWORK_FLOW_URL) return null;
 
   const controller = new AbortController();

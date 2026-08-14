@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
+import type { TransactionClient } from "../db";
 import { recordFieldCorrections } from "../field-correction";
 
-function makeMockTx() {
+function makeMockTx(): TransactionClient {
   return {
     fieldCorrection: {
       createMany: vi.fn(),
     },
-  } as any;
+  } as unknown as TransactionClient;
 }
 
 describe("recordFieldCorrection", () => {

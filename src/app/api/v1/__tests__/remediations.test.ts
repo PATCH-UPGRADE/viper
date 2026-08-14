@@ -6,6 +6,7 @@ import type { RemediationResponse } from "@/features/remediations/types";
 import {
   ArtifactType,
   AuthType,
+  PlatformEnum,
   ResourceType,
   SyncStatusEnum,
 } from "@/generated/prisma";
@@ -48,15 +49,18 @@ describe("Remediations Endpoint (/remediations)", () => {
 
   const mockIntegrationPayload = {
     name: "mockVulnIntegration",
-    platform: "mockIntegrationPlatform",
-    integrationUri: "https://mock-vuln-upstream-api.com/",
-    integrationType: "PARTNER" as const,
-    authType: AuthType.Bearer,
-    resourceType: ResourceType.Remediation,
-    authentication: {
-      token: AUTH_TOKEN,
-    },
+    platform: PlatformEnum.PARTNER,
     syncEvery: 300,
+    config: {
+      integrationUri: "https://mock-vuln-upstream-api.com/",
+      resource: ResourceType.Remediation,
+    },
+    credentials: {
+      authType: AuthType.Bearer,
+      authentication: {
+        token: AUTH_TOKEN,
+      },
+    },
   };
 
   const remediationIntegrationPayload = {
@@ -299,7 +303,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       // If the analysis job won the race and built a notification anyway, remove
       // it (deleting the notification cascades its source, mappings, mitigation
       // plans, and draft work orders).
-      const src = await prisma.notificationSource
+      const src = await prisma.sourceRecord
         .findUnique({
           where: {
             channel_externalId: {
@@ -307,12 +311,16 @@ describe("Remediations Endpoint (/remediations)", () => {
               externalId: remediationId,
             },
           },
-          select: { notificationId: true },
+          // What a snapshot fed goes through SourceLink now.
+          select: { links: { select: { notificationId: true } } },
         })
         .catch(() => null);
-      if (src?.notificationId) {
+      const notificationId = src?.links.find(
+        (l) => l.notificationId,
+      )?.notificationId;
+      if (notificationId) {
         await prisma.notification
-          .delete({ where: { id: src.notificationId } })
+          .delete({ where: { id: notificationId } })
           .catch(() => {});
       }
       await prisma.remediation
@@ -561,7 +569,7 @@ describe("Remediations Endpoint (/remediations)", () => {
 
     expect(foundRem1.description).toBe(remPayload1.description);
     expect(foundRem1.narrative).toBe(remPayload1.narrative);
-    expect(foundRem1.upstreamApi).toBe(remPayload1.upstreamApi);
+    expect(mapping1.upstreamApi).toBe(remPayload1.upstreamApi);
     expect(foundRem1.artifacts.length).toBe(1);
 
     const remPayload2 = remediationIntegrationPayload.items[1];
@@ -585,7 +593,7 @@ describe("Remediations Endpoint (/remediations)", () => {
 
     expect(foundRem2.description).toBe(remPayload2.description);
     expect(foundRem2.narrative).toBe(remPayload2.narrative);
-    expect(foundRem2.upstreamApi).toBe(remPayload2.upstreamApi);
+    expect(mapping2.upstreamApi).toBe(remPayload2.upstreamApi);
     expect(foundRem2.artifacts.length).toBe(1);
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {
@@ -594,14 +602,17 @@ describe("Remediations Endpoint (/remediations)", () => {
 
     expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
 
-    const foundSync = await prisma.syncStatus.findFirstOrThrow({
-      where: { syncedAt: mapping1.lastSynced },
+    const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
+      where: {
+        integrationId: createdIntegration.id,
+        resource: mockIntegrationPayload.config.resource,
+      },
     });
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBeNullable();
-    expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
+    expect(foundSync.lastSuccessfulSync).toStrictEqual(mapping2.lastSynced);
   });
 
   it("integration re-sync without cpes preserves existing deviceGroupMatchings", async () => {

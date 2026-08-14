@@ -1,12 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { IntegrationWithStringDates } from "@/features/integrations/types";
-import {
-  AuthType,
-  type Integration,
-  type TriggerEnum,
-  type Webhook,
-} from "@/generated/prisma";
+import { AuthType, type TriggerEnum, type Webhook } from "@/generated/prisma";
 import { basicAuthSchema, bearerAuthSchema, headerAuthSchema } from "./schemas";
 
 export function cn(...inputs: ClassValue[]) {
@@ -29,9 +23,17 @@ export function plural(s: string, count: number): string {
   return `${s}s`;
 }
 
-export const parseAuthenticationJson = (
-  itemWithAuth: Integration | IntegrationWithStringDates | Webhook,
-) => {
+/**
+ * Build an auth header from an `{ authType, authentication }` pair.
+ *
+ * Structural rather than `Integration | Webhook`: `Integration` no longer has
+ * those columns — integration callers now pass the decrypted contents of
+ * `Integration.credentials` instead. `Webhook` still satisfies this shape.
+ */
+export const parseAuthenticationJson = (itemWithAuth: {
+  authType: AuthType;
+  authentication?: unknown;
+}) => {
   if (itemWithAuth.authType === AuthType.Basic) {
     // TODO: authentication needs to be encrypted/protected somehow
     const parsed = basicAuthSchema.safeParse(itemWithAuth.authentication);

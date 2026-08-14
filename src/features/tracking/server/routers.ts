@@ -1,3 +1,4 @@
+import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -32,10 +33,10 @@ import {
 import {
   createSortParser,
   fetchPaginated,
-  processIntegrationSync,
   processIntegrationToken,
 } from "@/lib/router-utils";
 import { integrationResponseSchema } from "@/lib/schemas";
+import { sourceContentHash } from "@/lib/source-hash";
 import {
   baseProcedure,
   createTRPCRouter,
@@ -255,7 +256,7 @@ export const trackingRouter = createTRPCRouter({
       } else if (tab === "suggested") {
         // "Suggested" surfaces auto-ingested tickets — those with a source
         // artifact (email/integration) rather than a user creating it by hand.
-        const ingested = { sources: { some: {} } };
+        const ingested = { sourceLinks: { some: {} } };
         childTabWhere = { ...childTabWhere, ...ingested };
         parentTabWhere = {
           OR: [ingested, { children: { some: ingested } }],
@@ -1202,7 +1203,7 @@ export const trackingRouter = createTRPCRouter({
     })
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
-      const { userId, integrationId } = await processIntegrationToken(
+      const { userId, integrationId, resource } = await processIntegrationToken(
         input.token,
         ResourceType.WorkOrder,
       );
@@ -1213,7 +1214,14 @@ export const trackingRouter = createTRPCRouter({
           model: prisma.workOrderTicket,
           mappingModel: prisma.externalWorkOrderMapping,
           transformInputItem: async (item, creatorId) => {
-            const { vendorId, scheduledAt, source, ...fields } = item;
+            const {
+              vendorId,
+              scheduledAt,
+              source,
+              upstreamApi: _upstreamApi,
+              webUrl: _webUrl,
+              ...fields
+            } = item;
             const scheduled = scheduledAt ? new Date(scheduledAt) : null;
             return {
               // The integration user (resolved from the token) owns tickets it
@@ -1227,13 +1235,20 @@ export const trackingRouter = createTRPCRouter({
                 // tab. Re-syncs take the update path and leave sources alone.
                 ...(source
                   ? {
-                      sources: {
+                      sourceLinks: {
                         create: {
-                          channel: source.channel,
-                          externalId: source.externalId ?? vendorId,
-                          referenceUrl: source.referenceUrl ?? null,
-                          markdown: source.markdown ?? null,
-                          raw: source.raw ?? {},
+                          sourceRecord: {
+                            create: {
+                              channel: source.channel,
+                              externalId: source.externalId ?? vendorId,
+                              markdown: source.markdown ?? null,
+                              raw: source.raw ?? {},
+                              contentHash: sourceContentHash(
+                                source.raw ?? {},
+                                source.markdown,
+                              ),
+                            },
+                          },
                         },
                       },
                     }
@@ -1255,6 +1270,7 @@ export const trackingRouter = createTRPCRouter({
         input,
         userId,
         integrationId,
+        resource,
       );
     }),
 });

@@ -1,10 +1,10 @@
 import { z } from "zod";
+import { PlatformEnum } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   cpeSchema,
   createIntegrationInputSchema,
   deviceGroupMatchingResponseSchema,
-  safeUrlSchema,
   userIncludeSelect,
   userSchema,
 } from "@/lib/schemas";
@@ -31,7 +31,6 @@ export const deviceArtifactInputSchema = z.object({
   cpe: cpeSchema,
   role: z.string().min(1, "Role is required"),
   description: z.string().min(1, "Description is required"),
-  upstreamApi: safeUrlSchema.nullish(),
   artifacts: z
     .array(artifactInputSchema)
     .min(1, "at least one artifact is required"),
@@ -44,14 +43,24 @@ export const deviceArtifactUpdateSchema = z.object({
   id: z.string(),
   role: z.string().min(1, "Role is required").optional(),
   description: z.string().optional(),
-  upstreamApi: safeUrlSchema.optional(),
   cpe: cpeSchema.optional(),
 });
 
 export const deviceArtifactResponseSchema = z.object({
   id: z.string(),
   role: z.string(),
-  upstreamApi: z.string().nullable(),
+  externalMappings: z.array(
+    z.object({
+      externalId: z.string(),
+      upstreamApi: z.string().nullable(),
+      webUrl: z.string().nullable(),
+      integration: z.object({
+        id: z.string(),
+        name: z.string(),
+        platform: z.enum(PlatformEnum),
+      }),
+    }),
+  ),
   description: z.string().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -81,4 +90,12 @@ export const deviceArtifactInclude = {
   user: userIncludeSelect,
   deviceGroupMatchings: matchingInclude,
   artifacts: artifactWrapperSelect,
+  externalMappings: {
+    select: {
+      externalId: true,
+      upstreamApi: true,
+      webUrl: true,
+      integration: { select: { id: true, name: true, platform: true } },
+    },
+  },
 };

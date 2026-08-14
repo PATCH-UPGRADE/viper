@@ -1,3 +1,5 @@
+// TODO: VW-432
+
 /**
  * Outbound client for Siemens Healthineers teamplay Fleet.
  *
@@ -28,7 +30,7 @@ import "server-only";
 import { z } from "zod";
 import {
   type Asset,
-  type Integration,
+  PlatformEnum,
   ResourceType,
   type TicketCategory,
 } from "@/generated/prisma";
@@ -54,9 +56,10 @@ export { FLEET_HOST, FLEET_SOURCE_LABEL };
  * integration rows (activities → WorkOrder, equipment → Asset), and an asset is
  * "Siemens-managed" if it's mapped through ANY of them.
  */
-export function getFleetIntegrations(): Promise<Integration[]> {
+export function getFleetIntegrations() {
   return prisma.integration.findMany({
-    where: { integrationUri: { contains: FLEET_HOST, mode: "insensitive" } },
+    where: { platform: PlatformEnum.FLEET },
+    include: { resourceSyncs: { select: { resource: true } } },
     orderBy: { createdAt: "asc" },
   });
 }
@@ -68,10 +71,10 @@ export function getFleetIntegrations(): Promise<Integration[]> {
  * fallback to another resourceType: attaching the mapping to, say, the Asset
  * (equipment-sync) integration would break that dedup contract.
  */
-export async function getFleetWorkOrderIntegration(): Promise<Integration> {
+export async function getFleetWorkOrderIntegration() {
   const integrations = await getFleetIntegrations();
-  const integration = integrations.find(
-    (i) => i.resourceType === ResourceType.WorkOrder,
+  const integration = integrations.find((i) =>
+    i.resourceSyncs.some((s) => s.resource === ResourceType.WorkOrder),
   );
 
   if (!integration) {

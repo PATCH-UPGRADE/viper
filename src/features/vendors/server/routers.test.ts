@@ -77,8 +77,12 @@ describe("vendorsRouter.getMany", () => {
         overview: null,
         partnerSince: null,
         contracts: [
-          { covers: [{ assetId: "a1" }, { assetId: "a2" }] },
-          { covers: [{ assetId: "a2" }, { assetId: "a3" }] },
+          {
+            managesRelationship: { assets: [{ id: "a1" }, { id: "a2" }] },
+          },
+          {
+            managesRelationship: { assets: [{ id: "a2" }, { id: "a3" }] },
+          },
         ],
       },
     ]);

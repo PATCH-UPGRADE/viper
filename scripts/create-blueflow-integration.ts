@@ -7,12 +7,7 @@
 // capture. The token is single-use (consumed on first request), so mint it
 // immediately before registering the Blueflow webhook and push a single page.
 
-import {
-  AuthType,
-  IntegrationType,
-  Prisma,
-  ResourceType,
-} from "@/generated/prisma";
+import { PlatformEnum, Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createUserToken } from "@/lib/tokens";
 
@@ -60,14 +55,17 @@ async function main() {
     return tx.integration.create({
       data: {
         name: INTEGRATION_NAME,
-        platform: "Blueflow",
-        integrationUri: "http://blueflow:8000",
-        integrationType: IntegrationType.PARTNER,
-        authType: AuthType.None,
-        resourceType: ResourceType.Asset,
+        platform: PlatformEnum.PARTNER,
+        // integrationUri / resource live in the platform's config JSON now.
+        config: {
+          integrationUri: "http://blueflow:8000",
+          resource: ResourceType.Asset,
+        },
+        credentials: null,
         syncEvery: 3600,
         userId: seedUser.id,
         integrationUserId: integrationUser.id,
+        resourceSyncs: { create: { resource: ResourceType.Asset } },
       },
     });
   });

@@ -66,7 +66,7 @@ export async function triageNotification(
   inlinedPdfs?: PdfAttachment[],
 ): Promise<TriageResult> {
   const [source, notification, pdfAttachments, context] = await Promise.all([
-    prisma.notificationSource.findUnique({
+    prisma.sourceRecord.findUnique({
       where: { id: sourceId },
       select: { markdown: true },
     }),

@@ -4,7 +4,10 @@ RUN apt-get update && apt-get install -y openssl
 COPY . .
 RUN npm ci
 RUN npx prisma generate
-RUN npm run build
+# Set to 1 to build even when the app doesn't type check (see next.config.ts).
+# Defaults to off, so the published-image build keeps type checking.
+ARG VIPER_IGNORE_BUILD_ERRORS=0
+RUN VIPER_IGNORE_BUILD_ERRORS=$VIPER_IGNORE_BUILD_ERRORS npm run build
 
 
 FROM docker.io/node:trixie-slim

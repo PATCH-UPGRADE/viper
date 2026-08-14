@@ -1396,7 +1396,7 @@ model MitigationPlan {
   summary     String        @db.Text
   compareLine String?       @db.Text // short blurb comparing this plan to the others
   tags        PlanTagEnum[]
-  cards       Json          @default("{}") // { effort, downtime, residual_risk, coverage, timeline }
+  cards       Json          @default("{}") // { effort, downtime, residual_risk, coverage, timeline, rollback }
 
   notificationId String
   notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)

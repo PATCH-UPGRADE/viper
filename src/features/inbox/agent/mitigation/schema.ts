@@ -14,6 +14,12 @@ export const planCardsSchema = z.object({
     .string()
     .describe("how much exposure this closes, e.g. '6 of 6 assets'"),
   timeline: z.string().describe("when it lands, e.g. 'Contained today'"),
+  rollback: z
+    .string()
+    .optional()
+    .describe(
+      "how easily this plan can be undone once applied, e.g. 'Easy — the VLAN move reverts from the switch config in ~15 min.' One or two sentences: what has to be reverted, roughly how long, and whether the manufacturer has to be involved",
+    ),
 });
 
 /**

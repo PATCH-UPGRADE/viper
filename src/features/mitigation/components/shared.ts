@@ -13,11 +13,12 @@ export const planTagLabels: Record<PlanTagEnum, string> = {
   DECOMMISSION: "Decommission",
 };
 
-/** The five plan cards, in the order they render. */
+/** The plan cards, in the order they render. */
 export const planCardFields = [
   ["effort", "Effort"],
   ["downtime", "Downtime"],
   ["residual_risk", "Residual Risk"],
   ["coverage", "Coverage"],
   ["timeline", "Timeline"],
+  ["rollback", "Rollback Ability"],
 ] as const satisfies ReadonlyArray<readonly [string, string]>;

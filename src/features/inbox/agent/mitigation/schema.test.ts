@@ -26,6 +26,8 @@ const goldenPlan = {
     residual_risk: "Low",
     coverage: "6 of 6 assets",
     timeline: "Contained today · patched in ~2 weeks",
+    rollback:
+      "Easy — the firewall rules revert from the console in ~10 min. The firmware update needs a vendor session to roll back.",
   },
   workOrders: [
     {
@@ -88,6 +90,29 @@ describe("buildMitigationPlansSchema", () => {
     };
     const parsed = schema.safeParse({
       plans: [{ ...goldenPlan, cards: partialCards }],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("accepts a plan with no rollback card — rows written before the field existed", () => {
+    const { rollback: _rollback, ...cardsWithoutRollback } = goldenPlan.cards;
+    const parsed = schema.safeParse({
+      plans: [{ ...goldenPlan, cards: cardsWithoutRollback }],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects an opaque ref leaking into the rollback card", () => {
+    const parsed = schema.safeParse({
+      plans: [
+        {
+          ...goldenPlan,
+          cards: {
+            ...goldenPlan.cards,
+            rollback: "Revert the group-1 switch config.",
+          },
+        },
+      ],
     });
     expect(parsed.success).toBe(false);
   });

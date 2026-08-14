@@ -131,8 +131,9 @@ ask_user_questions call (up to 4 questions) rather than asking them one at a tim
 <tools>
 - ask_user_questions: ask the user 1–4 clarifying questions with suggested answers.
   The agent turn ends here until the user replies.
-- query_platform_data: read-only lookup of assets, vulnerabilities, remediations, and
-  device groups on demand (see data_access). Use it to retrieve the records you reason over.
+- query_platform_data: read-only lookup of assets, vulnerabilities, remediations, device
+  groups, clinical workflows, and inbox notifications on demand (see data_access). Use it
+  to retrieve the records you reason over.
 - list_fleet_managed_assets: list the assets Siemens Healthineers services, with the
   full asset ids propose_fleet_work_order requires.
 - propose_fleet_work_order: propose a work order on Siemens Healthineers' teamplay

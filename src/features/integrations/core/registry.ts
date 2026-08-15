@@ -4,6 +4,7 @@ import { ai } from "../platforms/ai";
 import { partner } from "../platforms/partner";
 import { moduleForResource } from "./sync/resources";
 import type { AnyConnectorModule } from "./types";
+import { teamplayFleet } from "../platforms/teamplay-fleet";
 
 /**
  * Every platform VIPER knows how to run, keyed by the enum on the row.
@@ -11,7 +12,7 @@ import type { AnyConnectorModule } from "./types";
 export const registry: Partial<Record<PlatformEnum, AnyConnectorModule>> = {
   AI: ai,
   PARTNER: partner,
-  // TODO: VW-431 add teamplay Fleet here
+  FLEET: teamplayFleet,
 };
 
 export const requirePlatform = (platform: PlatformEnum): AnyConnectorModule => {

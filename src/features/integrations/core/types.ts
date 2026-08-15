@@ -114,7 +114,7 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
    * `Pending` until the callback lands.
    */
   sync: SyncStrategy<TConfig, TCreds>;
-
+  onCreate?(integration: { id: string; config: TConfig }): Promise<void>;
   workOrders?: ResourceModule<unknown, unknown, TConfig>;
   assets?: ResourceModule<unknown, unknown, TConfig>;
   notifications?: ResourceModule<unknown, unknown, TConfig>;

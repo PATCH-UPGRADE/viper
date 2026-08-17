@@ -5,24 +5,24 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { INTEGRATIONS_POLL_INTERVAL_MS } from "@/config/constants";
-import type { ResourceType } from "@/generated/prisma";
 import { usePaginationParams } from "@/lib/pagination";
 import { useTRPC } from "@/trpc/client";
 
-export const useSuspenseIntegrations = (resourceType: ResourceType) => {
+export const useSuspenseIntegrations = () => {
   const trpc = useTRPC();
   const [params] = usePaginationParams();
-  // TODO: augment params to also include `asset`, right? for the `resourceType`
 
   return useSuspenseQuery({
-    ...trpc.integrations.getMany.queryOptions({
-      ...params,
-      ...{ resourceType },
-    }),
+    ...trpc.integrations.getMany.queryOptions(params),
     refetchInterval: INTEGRATIONS_POLL_INTERVAL_MS,
     refetchIntervalInBackground: true,
   });
 };
+
+const invalidateIntegrations = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  trpc: ReturnType<typeof useTRPC>,
+) => queryClient.invalidateQueries(trpc.integrations.getMany.queryFilter());
 
 /**
  * Hook to create a new Integration
@@ -33,20 +33,13 @@ export const useCreateIntegration = () => {
 
   return useMutation(
     trpc.integrations.create.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: () => {
         toast.success("Integration created");
-        for (const sync of data.resourceSyncs) {
-          queryClient.invalidateQueries(
-            trpc.integrations.getMany.queryOptions({
-              resourceType: sync.resource,
-            }),
-          );
-        }
+        invalidateIntegrations(queryClient, trpc);
         // Need to recount # of active ApiKey Connectors
         queryClient.invalidateQueries(
           trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
         );
-        return data;
       },
       onError: (error) => {
         toast.error(`Failed to create Integration: ${error.message}`);
@@ -65,16 +58,9 @@ export const useUpdateIntegration = () => {
 
   return useMutation(
     trpc.integrations.update.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: () => {
         toast.success("Integration updated");
-        for (const sync of data.resourceSyncs) {
-          queryClient.invalidateQueries(
-            trpc.integrations.getMany.queryOptions({
-              resourceType: sync.resource,
-            }),
-          );
-        }
-        return data;
+        invalidateIntegrations(queryClient, trpc);
       },
       onError: (error) => {
         toast.error(`Failed to update Integration: ${error.message}`);
@@ -92,22 +78,60 @@ export const useRemoveIntegration = () => {
 
   return useMutation(
     trpc.integrations.remove.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: () => {
         toast.success("Integration removed");
-        // Invalidate all getMany and getOne queries regardless of params
-        for (const resource of data.resources) {
-          queryClient.invalidateQueries(
-            trpc.integrations.getMany.queryOptions({ resourceType: resource }),
-          );
-        }
+        invalidateIntegrations(queryClient, trpc);
         // Need to recount # of active ApiKey Connectors
         queryClient.invalidateQueries(
           trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
         );
-        return data;
       },
       onError: (error) => {
         toast.error(`Failed to remove Integration: ${error.message}`);
+      },
+    }),
+  );
+};
+
+/**
+ * Hook to enable/disable an Integration as a whole
+ */
+export const useSetIntegrationEnabled = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.integrations.setEnabled.mutationOptions({
+      onSuccess: (data) => {
+        toast.success(
+          data.enabled ? "Integration enabled" : "Integration disabled",
+        );
+        invalidateIntegrations(queryClient, trpc);
+      },
+      onError: (error) => {
+        toast.error(`Failed to update Integration: ${error.message}`);
+      },
+    }),
+  );
+};
+
+/**
+ * Hook to enable/disable a single resource's sync on an Integration
+ */
+export const useSetResourceSyncEnabled = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.integrations.setResourceSyncEnabled.mutationOptions({
+      onSuccess: (data) => {
+        toast.success(
+          data.enabled ? "Resource sync enabled" : "Resource sync disabled",
+        );
+        invalidateIntegrations(queryClient, trpc);
+      },
+      onError: (error) => {
+        toast.error(`Failed to update sync: ${error.message}`);
       },
     }),
   );

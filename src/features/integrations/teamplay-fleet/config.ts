@@ -14,4 +14,4 @@ export const FLEET_LOGIN_CONFIG: SessionLoginConfig = {
   authUrl: "https://fleet.siemens-healthineers.com/rest/v1/users/self", // user profile endpoint
 };
 
-export const FLEET = {}
+export const FLEET = {};

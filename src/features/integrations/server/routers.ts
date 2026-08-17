@@ -16,11 +16,7 @@ import { defaultSyncEveryFor, requirePlatform } from "../core/registry";
 import { effectiveSyncEvery } from "../core/sync/cadence";
 import { resourcesFor } from "../core/sync/resources";
 import type { AnyConnectorModule } from "../core/types";
-import type { IntegrationFormValues } from "../types";
-import {
-  integrationInputSchema,
-  paginatedIntegrationsResponseSchema,
-} from "../types";
+import { type IntegrationFormValues, integrationInputSchema } from "../types";
 
 const integrationsInclude = {
   user: userIncludeSelect,
@@ -126,7 +122,6 @@ export const integrationsRouter = createTRPCRouter({
   // list across every resource type, for the enabled-integrations table.
   getMany: protectedProcedure
     .input(paginationInputSchema)
-    .output(paginatedIntegrationsResponseSchema)
     .query(async ({ input }) => {
       const where = {
         name: {

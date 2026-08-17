@@ -1,8 +1,9 @@
+import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
-import { PlatformEnum, ResourceType, SyncStatusEnum } from "@/generated/prisma";
-import { createPaginatedResponseSchema } from "@/lib/pagination";
-import { authSchema, userSchema } from "@/lib/schemas";
+import { PlatformEnum, ResourceType } from "@/generated/prisma";
+import { authSchema } from "@/lib/schemas";
+import type { trpc } from "@/trpc/server";
 
 /**
  * The resources a platform can sync, keyed by the URL segment they upload to.
@@ -121,45 +122,9 @@ export const categoryLabelFor = (
   );
 };
 
-/**
- * A row's resource sync, as returned by `integrations.getMany`. Declared as
- * an explicit `.output()` schema on that procedure (rather than left to
- * `inferOutput`) because it's built by `fetchPaginated`, whose generic
- * `findMany` call doesn't carry a concrete result type through to the client.
- */
-export const integrationResourceSyncItemSchema = z.object({
-  integrationId: z.string(),
-  resource: z.enum(ResourceType),
-  status: z.enum(SyncStatusEnum),
-  errorMessage: z.string().nullable(),
-  lastAttemptAt: z.date().nullable(),
-  lastSuccessfulSync: z.date().nullable(),
-  nextSyncAt: z.date().nullable(),
-  enabled: z.boolean(),
-  lastSyncCreatedCount: z.number().nullable(),
-  /** The resource's own override, or null to inherit. */
-  syncEvery: z.number().nullable(),
-  isOverridden: z.boolean(),
-  effectiveSyncEvery: z.number(),
-});
-export type IntegrationResourceSyncItem = z.infer<
-  typeof integrationResourceSyncItemSchema
->;
-
-export const integrationListItemSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  platform: z.enum(PlatformEnum),
-  syncEvery: z.number().nullable(),
-  enabled: z.boolean(),
-  userId: z.string(),
-  integrationUserId: z.string(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  user: userSchema,
-  resourceSyncs: z.array(integrationResourceSyncItemSchema),
-});
-export type IntegrationListItem = z.infer<typeof integrationListItemSchema>;
-
-export const paginatedIntegrationsResponseSchema =
-  createPaginatedResponseSchema(integrationListItemSchema);
+/** A row (and its resource syncs) as returned by `integrations.getMany`. */
+export type IntegrationListItem = inferOutput<
+  typeof trpc.integrations.getMany
+>["items"][number];
+export type IntegrationResourceSyncItem =
+  IntegrationListItem["resourceSyncs"][number];

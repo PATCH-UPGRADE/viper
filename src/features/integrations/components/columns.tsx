@@ -34,17 +34,8 @@ import type {
   IntegrationListItem,
   IntegrationResourceSyncItem,
 } from "../types";
-import {
-  categoryLabelFor,
-  platformLabels,
-  resourceActivityNoun,
-  resourceTypeLabel,
-} from "../types";
+import { platformLabels, resourceTypeLabel } from "../types";
 import { SyncStatusIndicator } from "./integrations";
-
-type IntegrationRow = IntegrationListItem & {
-  expandableResourceSyncs: IntegrationResourceSyncItem[];
-};
 
 const initialsOf = (name: string) =>
   name
@@ -66,11 +57,6 @@ const frequencyLabel = (sync: {
  * next-sync-due. */
 const relativeTime = (date: Date) =>
   formatDistanceToNow(date, { addSuffix: true });
-
-const activityLine = (sync: IntegrationResourceSyncItem) =>
-  sync.lastSyncCreatedCount != null
-    ? `${sync.lastSyncCreatedCount} ${resourceActivityNoun(sync.resource)}`
-    : null;
 
 const timingLine = (sync: IntegrationResourceSyncItem) => {
   if (!sync.lastSuccessfulSync) return "Never synced";
@@ -95,19 +81,26 @@ const SyncSummaryCell = ({ row }: { row: IntegrationListItem }) => {
 
   const sync = resourceSyncs[0];
   if (!sync) return null;
-  const activity = activityLine(sync);
 
   return (
-    <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-      {activity && <span>{activity}</span>}
-      <span>
-        {frequencyLabel(sync)} · {timingLine(sync)}
-      </span>
+    <div className="text-xs text-muted-foreground">
+      {frequencyLabel(sync)} · {timingLine(sync)}
     </div>
   );
 };
 
-export const columns: ColumnDef<IntegrationRow>[] = [
+const SyncStatusCell = ({ sync }: { sync: IntegrationResourceSyncItem }) => (
+  <Tooltip>
+    <TooltipTrigger>
+      <SyncStatusIndicator status={sync.status} />
+    </TooltipTrigger>
+    {sync.status === SyncStatusEnum.Error && sync.errorMessage && (
+      <TooltipContent>{sync.errorMessage}</TooltipContent>
+    )}
+  </Tooltip>
+);
+
+export const columns: ColumnDef<IntegrationListItem>[] = [
   {
     id: "integration",
     accessorKey: "name",
@@ -116,10 +109,6 @@ export const columns: ColumnDef<IntegrationRow>[] = [
     ),
     cell: ({ row }) => {
       const integration = row.original;
-      const category = categoryLabelFor(
-        integration.platform,
-        integration.resourceSyncs.map((s) => s.resource),
-      );
       return (
         <div className="flex items-start gap-3">
           <Avatar className="size-8 shrink-0 border">
@@ -135,7 +124,6 @@ export const columns: ColumnDef<IntegrationRow>[] = [
                 · {platformLabels[integration.platform]}
               </span>
             </div>
-            <span className="text-xs text-muted-foreground">{category}</span>
             <SyncSummaryCell row={integration} />
           </div>
         </div>
@@ -149,17 +137,7 @@ export const columns: ColumnDef<IntegrationRow>[] = [
     cell: ({ row }) => {
       const { resourceSyncs } = row.original;
       if (resourceSyncs.length !== 1) return null;
-      const sync = resourceSyncs[0];
-      return (
-        <Tooltip>
-          <TooltipTrigger>
-            <SyncStatusIndicator status={sync.status} />
-          </TooltipTrigger>
-          {sync.status === SyncStatusEnum.Error && sync.errorMessage && (
-            <TooltipContent>{sync.errorMessage}</TooltipContent>
-          )}
-        </Tooltip>
-      );
+      return <SyncStatusCell sync={resourceSyncs[0]} />;
     },
   },
   {
@@ -245,7 +223,6 @@ export const resourceColumns: ColumnDef<IntegrationResourceSyncItem>[] = [
           </span>
           {sync.enabled ? (
             <span className="text-xs text-muted-foreground">
-              {activityLine(sync) && `${activityLine(sync)} · `}
               {frequencyLabel(sync)} · {timingLine(sync)}
             </span>
           ) : (
@@ -258,19 +235,7 @@ export const resourceColumns: ColumnDef<IntegrationResourceSyncItem>[] = [
   {
     id: "status",
     header: "Status",
-    cell: ({ row }) => {
-      const sync = row.original;
-      return (
-        <Tooltip>
-          <TooltipTrigger>
-            <SyncStatusIndicator status={sync.status} />
-          </TooltipTrigger>
-          {sync.status === SyncStatusEnum.Error && sync.errorMessage && (
-            <TooltipContent>{sync.errorMessage}</TooltipContent>
-          )}
-        </Tooltip>
-      );
-    },
+    cell: ({ row }) => <SyncStatusCell sync={row.original} />,
   },
   {
     id: "enabled",

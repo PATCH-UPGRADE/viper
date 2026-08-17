@@ -16,11 +16,7 @@ import { defaultSyncEveryFor, requirePlatform } from "../core/registry";
 import { effectiveSyncEvery } from "../core/sync/cadence";
 import { resourcesFor } from "../core/sync/resources";
 import type { AnyConnectorModule } from "../core/types";
-import type { IntegrationFormValues } from "../types";
-import {
-  integrationInputSchema,
-  paginatedIntegrationsResponseSchema,
-} from "../types";
+import { type IntegrationFormValues, integrationInputSchema } from "../types";
 
 const integrationsInclude = {
   user: userIncludeSelect,
@@ -30,12 +26,10 @@ const integrationsInclude = {
       resource: true,
       status: true,
       errorMessage: true,
-      lastAttemptAt: true,
       lastSuccessfulSync: true,
       nextSyncAt: true,
       enabled: true,
       syncEvery: true,
-      lastSyncCreatedCount: true,
     },
     orderBy: {
       resource: "asc", // stable ordering; one row per resource
@@ -43,9 +37,17 @@ const integrationsInclude = {
   },
 } as const;
 
-type IntegrationRow = Prisma.IntegrationGetPayload<{
-  include: typeof integrationsInclude;
-  omit: typeof omitCredentials;
+const integrationListSelect = {
+  id: true,
+  name: true,
+  platform: true,
+  syncEvery: true,
+  enabled: true,
+  resourceSyncs: integrationsInclude.resourceSyncs,
+} satisfies Prisma.IntegrationSelect;
+
+type IntegrationListRow = Prisma.IntegrationGetPayload<{
+  select: typeof integrationListSelect;
 }>;
 
 /**
@@ -126,7 +128,6 @@ export const integrationsRouter = createTRPCRouter({
   // list across every resource type, for the enabled-integrations table.
   getMany: protectedProcedure
     .input(paginationInputSchema)
-    .output(paginatedIntegrationsResponseSchema)
     .query(async ({ input }) => {
       const where = {
         name: {
@@ -137,26 +138,27 @@ export const integrationsRouter = createTRPCRouter({
 
       const result = await fetchPaginated(prisma.integration, input, {
         where,
-        include: integrationsInclude,
-        omit: omitCredentials,
+        select: integrationListSelect,
       });
 
       // Add the resolved cadence to each resource sync: what actually
       // governs it (`effectiveSyncEvery`) and whether that's the resource's
       // own override or something inherited (`isOverridden`) — the table
       // needs both to show "every 5 min" vs "every 5 min (default)".
-      const items = (result.items as IntegrationRow[]).map((integration) => ({
-        ...integration,
-        resourceSyncs: integration.resourceSyncs.map((sync) => ({
-          ...sync,
-          isOverridden: sync.syncEvery !== null,
-          effectiveSyncEvery: effectiveSyncEvery(
-            sync.syncEvery,
-            integration.syncEvery,
-            defaultSyncEveryFor(integration.platform, sync.resource),
-          ),
-        })),
-      }));
+      const items = (result.items as IntegrationListRow[]).map(
+        (integration) => ({
+          ...integration,
+          resourceSyncs: integration.resourceSyncs.map((sync) => ({
+            ...sync,
+            isOverridden: sync.syncEvery !== null,
+            effectiveSyncEvery: effectiveSyncEvery(
+              sync.syncEvery,
+              integration.syncEvery,
+              defaultSyncEveryFor(integration.platform, sync.resource),
+            ),
+          })),
+        }),
+      );
 
       return { ...result, items };
     }),

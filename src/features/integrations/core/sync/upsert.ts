@@ -65,11 +65,7 @@ export async function upsertResourceSync(
         status: statusToSet,
         errorMessage,
         ...(succeeded
-          ? {
-              lastSuccessfulSync: lastSynced,
-              consecutiveFailures: 0,
-              lastSyncCreatedCount: response.createdItemsCount,
-            }
+          ? { lastSuccessfulSync: lastSynced, consecutiveFailures: 0 }
           : { consecutiveFailures: { increment: 1 } }),
       },
       create: {
@@ -78,10 +74,7 @@ export async function upsertResourceSync(
         status: statusToSet,
         errorMessage,
         ...(succeeded
-          ? {
-              lastSuccessfulSync: lastSynced,
-              lastSyncCreatedCount: response.createdItemsCount,
-            }
+          ? { lastSuccessfulSync: lastSynced }
           : { consecutiveFailures: 1 }),
       },
     });

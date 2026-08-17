@@ -143,3 +143,12 @@ export const useAnswerAssetVersion = () => {
     }),
   );
 };
+
+export const useAffectedfAssetUtilization = (notificationId: string) => {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.notifications.getAffectedAssetUtilization.queryOptions({
+      notificationId,
+    }),
+  );
+};

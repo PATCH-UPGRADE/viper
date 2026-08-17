@@ -45,6 +45,7 @@ import {
   paginatedAssetResponseSchema,
   updateAssetSchema,
 } from "../types";
+import { fetchUtilizationGrids } from "./utilization";
 
 const createSearchFilter = (search: string) => {
   const insensitive = { contains: search, mode: "insensitive" as const };
@@ -489,6 +490,12 @@ export const assetsRouter = createTRPCRouter({
       const found = requireExistence(asset, "Asset");
       return { utilization: renderUtilization(found.utilization) };
     }),
+
+  getUtilizationGrid: protectedProcedure
+    .input(z.object({ assetIds: z.array(z.string()).min(1) }))
+    .query(({ input }) =>
+      fetchUtilizationGrids({ id: { in: input.assetIds } }),
+    ),
 
   // POST /api/assets - Create asset
   create: protectedProcedure

@@ -26,3 +26,23 @@ export const MONTHS_SHORT = [
   "Nov",
   "Dec",
 ] as const;
+
+export const DAYS_SHORT = [
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+  "Sun",
+] as const;
+
+export const DAY_NAMES_SHORT = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;

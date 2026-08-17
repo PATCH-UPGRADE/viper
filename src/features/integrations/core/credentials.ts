@@ -1,5 +1,3 @@
-//import "server-only";
-
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { AuthType } from "@/generated/prisma";

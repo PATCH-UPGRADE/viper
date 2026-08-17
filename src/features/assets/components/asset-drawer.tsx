@@ -20,11 +20,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CopyCode } from "@/components/ui/code";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { AIChat } from "@/features/chat/components/chat";
 import { useChatUI } from "@/features/chat/context/chat-panel-context";
 import {
@@ -40,13 +35,10 @@ import type {
 import { RemediationCard } from "@/features/remediations/components/remediations";
 import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
 import { useTRPC } from "@/trpc/client";
-import {
-  type AssetWithIssueRelations,
-  assetUtilizationSchema,
-  locationSchema,
-} from "../types";
+import { type AssetWithIssueRelations, locationSchema } from "../types";
 import { getAssetRoleLabel } from "../utils";
 import { AssetQrPdfLink } from "./asset-qr-pdf-link";
+import { AssetUtilizationHeatMapGridVertical } from "./asset-utilization-grid";
 
 // ============================================================================
 // Types
@@ -57,110 +49,6 @@ interface AssetDashboardDrawerProps {
   open: boolean;
   setOpen: (open: boolean) => void;
   children?: React.ReactNode;
-}
-
-// ============================================================================
-// Utilization Grid
-// ============================================================================
-
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-const DAY_NAMES = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-] as const;
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
-
-function getUtilizationColor(value: number): string {
-  if (value === 0) return "hsl(120, 0%, 82%)";
-  const s = 30 + value * 0.6;
-  const l = 70 - value * 0.25;
-  return `hsl(120, ${s}%, ${l}%)`;
-}
-
-/*
- Example utilization data:
-    [
-      {"9": 1, "10": 12, "11": 8, "14": 3, "15": 5},  # 0 = Monday
-      {"9": 1, "10": 8, "11": 15},                    # 1 = Tuesday
-      {"9": 2, "14": 5},                              # 2 = Wednesday
-      {"10": 6, "11": 9, "13": 4},                    # 3 = Thursday
-      {"9": 1, "13": 2},                              # 4 = Friday
-      {},                                             # 5 = Saturday
-      {},                                             # 6 = Sunday
-    ]
- Tuesday 9am to 10am, the device had 1% utilization throughout the hour, 10am-11am it was 8%, and 11am to 12pm it was 15%, and all other hours of the day it was offline (0% utilization)
- */
-function AssetUtilizationGrid({
-  utilization,
-}: {
-  utilization: AssetWithIssueRelations["utilization"];
-}) {
-  const parsed = assetUtilizationSchema.safeParse(utilization);
-  const data = parsed.success ? parsed.data : null;
-
-  if (!data) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        No device utilization data found
-      </p>
-    );
-  }
-
-  return (
-    <div className="overflow-x-auto w-full">
-      <table className="border-separate border-spacing-0.5 text-xs">
-        <thead>
-          <tr>
-            <th className="sticky left-0 bg-background w-6 min-w-6" />
-            {DAYS.map((day) => (
-              <th
-                key={day}
-                className="text-muted-foreground font-medium text-center px-1 pb-1 min-w-8"
-              >
-                {day}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {HOURS.map((hour) => (
-            <tr key={hour}>
-              <td className="sticky left-0 bg-background text-muted-foreground text-right pr-1.5 tabular-nums leading-none py-0.5">
-                {hour}
-              </td>
-              {data.map((dayData, dayIndex) => {
-                const value = dayData[String(hour)] ?? 0;
-                return (
-                  <td key={dayIndex} className="p-0">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label={`${DAY_NAMES[dayIndex]} ${hour}:00 to ${hour + 1}:00, ${value}% utilization`}
-                          className="w-16 h-3.5 rounded-sm cursor-default"
-                          style={{
-                            backgroundColor: getUtilizationColor(value),
-                          }}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {DAY_NAMES[dayIndex]} {hour}:00–{hour + 1}:00 · {value}%
-                      </TooltipContent>
-                    </Tooltip>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
 // ============================================================================
@@ -419,7 +307,9 @@ function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
       header: "Device Utilization",
       content: (
         <div className="overflow-x-auto">
-          <AssetUtilizationGrid utilization={asset.utilization} />
+          <AssetUtilizationHeatMapGridVertical
+            utilization={asset.utilization}
+          />
         </div>
       ),
     },

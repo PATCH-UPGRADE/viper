@@ -2,20 +2,10 @@
 
 import { HeatMapGrid } from "@/components/heatmap-grid";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DAY_NAMES_SHORT, DAYS_SHORT } from "@/lib/date-utils";
 import { useAssetUtilization } from "../hooks/use-assets";
 import type { UtilizationGridsResult } from "../server/utilization";
 import { assetUtilizationSchema } from "../types";
-
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-const DAY_NAMES = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-] as const;
 
 const HOURS_TICKS: Record<number, string | null> = {
   0: "12a",
@@ -69,9 +59,9 @@ export function AssetUtilizationHeatMapGrid({
         name: (hour) => `${hour}:00`,
       }}
       y={{
-        count: DAYS.length,
-        label: (day) => DAYS[day],
-        name: (day) => DAY_NAMES[day],
+        count: DAYS_SHORT.length,
+        label: (day) => DAYS_SHORT[day],
+        name: (day) => DAY_NAMES_SHORT[day],
       }}
       getValue={(hour, day) => data[day]?.[String(hour)] ?? 0}
       getCellClass={(value) => LEVEL_CLASS[utilizationLevel(value)]}
@@ -82,6 +72,50 @@ export function AssetUtilizationHeatMapGrid({
         `${yName} ${hour}:00 to ${hour + 1}:00, ${value}% utilization, ${LEVEL_LABEL[utilizationLevel(value)]}`
       }
     />
+  );
+}
+
+export function AssetUtilizationHeatMapGridVertical({
+  utilization,
+}: {
+  utilization: unknown;
+}) {
+  const parsed = assetUtilizationSchema.safeParse(utilization);
+
+  if (!parsed.success) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No device utilization data found
+      </p>
+    );
+  }
+
+  const data = parsed.data;
+
+  return (
+    <div className="space-y-5">
+      <HeatMapGrid
+        x={{
+          count: 24,
+          label: (hour) => HOURS_TICKS[hour] ?? null,
+          name: (hour) => `${hour}:00`,
+        }}
+        y={{
+          count: DAYS_SHORT.length,
+          label: (day) => DAYS_SHORT[day],
+          name: (day) => DAY_NAMES_SHORT[day],
+        }}
+        getValue={(hour, day) => data[day]?.[String(hour)] ?? 0}
+        getCellClass={(value) => LEVEL_CLASS[utilizationLevel(value)]}
+        getTooltip={({ x: hour, yName, value }) =>
+          `${yName} ${hour}:00-${hour + 1}:00 · ${value}%`
+        }
+        getAriaLabel={({ x: hour, yName, value }) =>
+          `${yName} ${hour}:00 to ${hour + 1}:00, ${value}% utilization, ${LEVEL_LABEL[utilizationLevel(value)]}`
+        }
+      />
+      <UtilizationLegend />
+    </div>
   );
 }
 

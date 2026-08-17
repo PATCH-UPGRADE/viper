@@ -132,7 +132,9 @@ export function MitigationPlanItem({
                       "mt-1 text-sm font-medium",
                       field === "residual_risk" &&
                         riskToneClass[residualRiskTone(cards[field])],
+                      field === "rollback" && "line-clamp-4",
                     )}
+                    title={field === "rollback" ? cards[field] : undefined}
                   >
                     {cards[field] || "—"}
                   </p>

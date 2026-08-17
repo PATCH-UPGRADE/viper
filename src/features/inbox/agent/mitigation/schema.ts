@@ -18,7 +18,7 @@ export const planCardsSchema = z.object({
     .string()
     .optional()
     .describe(
-      "how easily this plan can be undone once applied, e.g. 'Easy — the VLAN move reverts from the switch config in ~15 min.' One or two sentences: what has to be reverted, roughly how long, and whether the manufacturer has to be involved",
+      "how easily this plan can be undone once applied, e.g. 'Easy — the VLAN move reverts from the switch config in ~15 min.' At most two sentences and under 200 characters: what has to be reverted, roughly how long, and whether the manufacturer has to be involved",
     ),
 });
 

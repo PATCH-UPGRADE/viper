@@ -27,11 +27,6 @@ const nextConfig: NextConfig = {
         destination: "/settings/integrations",
         permanent: false,
       },
-      {
-        source: "/settings/integrations",
-        destination: "/settings/integrations/assets",
-        permanent: false,
-      },
     ];
   },
 };

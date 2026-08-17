@@ -5,20 +5,15 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { INTEGRATIONS_POLL_INTERVAL_MS } from "@/config/constants";
-import type { ResourceType } from "@/generated/prisma";
 import { usePaginationParams } from "@/lib/pagination";
 import { useTRPC } from "@/trpc/client";
 
-export const useSuspenseIntegrations = (resourceType: ResourceType) => {
+export const useSuspenseIntegrations = () => {
   const trpc = useTRPC();
   const [params] = usePaginationParams();
-  // TODO: augment params to also include `asset`, right? for the `resourceType`
 
   return useSuspenseQuery({
-    ...trpc.integrations.getMany.queryOptions({
-      ...params,
-      ...{ resourceType },
-    }),
+    ...trpc.integrations.getMany.queryOptions(params),
     refetchInterval: INTEGRATIONS_POLL_INTERVAL_MS,
     refetchIntervalInBackground: true,
   });
@@ -33,20 +28,13 @@ export const useCreateIntegration = () => {
 
   return useMutation(
     trpc.integrations.create.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: () => {
         toast.success("Integration created");
-        for (const sync of data.resourceSyncs) {
-          queryClient.invalidateQueries(
-            trpc.integrations.getMany.queryOptions({
-              resourceType: sync.resource,
-            }),
-          );
-        }
+        queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
         // Need to recount # of active ApiKey Connectors
         queryClient.invalidateQueries(
           trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
         );
-        return data;
       },
       onError: (error) => {
         toast.error(`Failed to create Integration: ${error.message}`);
@@ -65,16 +53,9 @@ export const useUpdateIntegration = () => {
 
   return useMutation(
     trpc.integrations.update.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: () => {
         toast.success("Integration updated");
-        for (const sync of data.resourceSyncs) {
-          queryClient.invalidateQueries(
-            trpc.integrations.getMany.queryOptions({
-              resourceType: sync.resource,
-            }),
-          );
-        }
-        return data;
+        queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
       },
       onError: (error) => {
         toast.error(`Failed to update Integration: ${error.message}`);
@@ -92,22 +73,55 @@ export const useRemoveIntegration = () => {
 
   return useMutation(
     trpc.integrations.remove.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: () => {
         toast.success("Integration removed");
-        // Invalidate all getMany and getOne queries regardless of params
-        for (const resource of data.resources) {
-          queryClient.invalidateQueries(
-            trpc.integrations.getMany.queryOptions({ resourceType: resource }),
-          );
-        }
+        queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
         // Need to recount # of active ApiKey Connectors
         queryClient.invalidateQueries(
           trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
         );
-        return data;
       },
       onError: (error) => {
         toast.error(`Failed to remove Integration: ${error.message}`);
+      },
+    }),
+  );
+};
+
+/**
+ * Operator kill switch for a whole integration.
+ */
+export const useSetIntegrationEnabled = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.integrations.setEnabled.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
+      },
+      onError: (error) => {
+        toast.error(`Failed to update Integration: ${error.message}`);
+      },
+    }),
+  );
+};
+
+/**
+ * Toggle one resource on a multi-resource integration (e.g. turn off work
+ * orders, keep assets syncing).
+ */
+export const useSetResourceSyncEnabled = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.integrations.setResourceSyncEnabled.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
+      },
+      onError: (error) => {
+        toast.error(`Failed to update resource sync: ${error.message}`);
       },
     }),
   );

@@ -33,7 +33,7 @@ export const IntegrationsSearch = () => {
 };
 
 export const IntegrationsList = () => {
-  const { data: integrations, isFetching } = useSuspenseIntegrations();
+  const { data: integrations } = useSuspenseIntegrations();
 
   // Only worth expanding when there's more than one resource to break out.
   const items = integrations.items.map((integration) => ({
@@ -49,7 +49,12 @@ export const IntegrationsList = () => {
       columns={columns}
       nestedColumns={resourceColumns}
       nestedDataKey="expandableResourceSyncs"
-      isLoading={isFetching}
+      // No isLoading here on purpose: this list background-polls every
+      // INTEGRATIONS_POLL_INTERVAL_MS, and DataTable's isLoading blanks the
+      // whole table to "Loading..." — fine for a user-triggered refetch, but
+      // it would make the table flash on every silent poll tick. useSuspenseQuery
+      // also guarantees data is already present by the time this renders, so
+      // there's no genuine "loading" state left to show here anyway.
     />
   );
 };

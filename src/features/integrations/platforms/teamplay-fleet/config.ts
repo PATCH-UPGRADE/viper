@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { authCredentialSchema } from "@/features/integrations/core/credentials";
 import { AuthType } from "@/generated/prisma";
-import { FLEET_HOST } from "./urls";
 import { basicAuthSchema } from "@/lib/schemas";
+import { FLEET_HOST } from "./urls";
 
 export const SIEMENS_HEALTHINEERS = "Siemens Healthineers";
 export const BASE_URL = `https://${FLEET_HOST}`;

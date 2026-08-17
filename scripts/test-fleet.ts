@@ -1,9 +1,9 @@
-import { PlatformEnum, AuthType } from "@/generated/prisma";
 import {
   createFleetSession,
+  FLEET_LOGIN_CONFIG,
   grabSessionCookie,
 } from "@/features/integrations/platforms/teamplay-fleet/session";
-import { FLEET_LOGIN_CONFIG } from "@/features/integrations/platforms/teamplay-fleet/session";
+import { AuthType, PlatformEnum } from "@/generated/prisma";
 import prisma from "../src/lib/db";
 
 const ADVISORIES_URL =

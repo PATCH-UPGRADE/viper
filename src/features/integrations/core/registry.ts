@@ -2,9 +2,9 @@ import "server-only";
 import type { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { ai } from "../platforms/ai";
 import { partner } from "../platforms/partner";
+import { teamplayFleet } from "../platforms/teamplay-fleet";
 import { moduleForResource } from "./sync/resources";
 import type { AnyConnectorModule } from "./types";
-import { teamplayFleet } from "../platforms/teamplay-fleet";
 
 /**
  * Every platform VIPER knows how to run, keyed by the enum on the row.

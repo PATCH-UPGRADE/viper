@@ -1,10 +1,10 @@
 import { PlatformEnum } from "@/generated/prisma";
 import { ConnectorModule } from "../../core/types";
 import {
-  type FleetConfig,
-  type FleetCreds,
   configSchema,
   credentialSchema,
+  type FleetConfig,
+  type FleetCreds,
   SIEMENS_HEALTHINEERS,
 } from "./config";
 import { onCreate } from "./on-create";

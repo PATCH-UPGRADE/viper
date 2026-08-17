@@ -63,11 +63,13 @@ export function isValidResourceTypeKey(key: string): key is UploadSegment {
 
 /** Human label for a resource type, e.g. for the enabled-integrations table. */
 const resourceTypeLabels: Record<ResourceType, string> = {
-  ...Object.fromEntries(
-    Object.values(integrationsMapping).map((r) => [r.type, r.name]),
-  ),
+  [ResourceType.Asset]: "Asset",
+  [ResourceType.DeviceArtifact]: "Device Artifact",
+  [ResourceType.Remediation]: "Remediation",
+  [ResourceType.Vulnerability]: "Vulnerability",
+  [ResourceType.WorkOrder]: "Work Order",
   [ResourceType.SourceRecord]: "Notification",
-} as Record<ResourceType, string>;
+};
 export const resourceTypeLabel = (type: ResourceType): string =>
   resourceTypeLabels[type] ?? type;
 

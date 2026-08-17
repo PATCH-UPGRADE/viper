@@ -136,15 +136,13 @@ export const integrationsRouter = createTRPCRouter({
         omit: omitCredentials,
       });
 
-      // Add the resolved cadence to each resource sync: what actually
-      // governs it (`effectiveSyncEvery`) and whether that's the resource's
-      // own override or something inherited (`isOverridden`) — the table
-      // needs both to show "every 5 min" vs "every 5 min (default)".
+      // Add each resource sync's resolved cadence — the table shows "every 5
+      // min" vs "every 5 min (default)" by checking the already-selected
+      // `syncEvery` (null = inherited) alongside this.
       const items = (result.items as IntegrationRow[]).map((integration) => ({
         ...integration,
         resourceSyncs: integration.resourceSyncs.map((sync) => ({
           ...sync,
-          isOverridden: sync.syncEvery !== null,
           effectiveSyncEvery: effectiveSyncEvery(
             sync.syncEvery,
             integration.syncEvery,
@@ -279,10 +277,11 @@ export const integrationsRouter = createTRPCRouter({
   setEnabled: protectedProcedure
     .input(z.object({ id: z.string(), enabled: z.boolean() }))
     .mutation(async ({ input }) => {
+      // Caller just invalidates and refetches getMany — no need to shape a
+      // full response here, same as `remove` below.
       return prisma.integration.update({
         where: { id: input.id },
         data: { enabled: input.enabled },
-        include: integrationsInclude,
         omit: omitCredentials,
       });
     }),

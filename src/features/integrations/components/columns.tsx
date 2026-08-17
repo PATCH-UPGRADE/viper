@@ -25,6 +25,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { SyncStatusEnum } from "@/generated/prisma";
+import { initialsOf } from "@/lib/utils";
 import {
   useRemoveIntegration,
   useSetIntegrationEnabled,
@@ -46,20 +47,11 @@ type IntegrationRow = IntegrationListItem & {
   expandableResourceSyncs: IntegrationResourceSyncItem[];
 };
 
-const initialsOf = (name: string) =>
-  name
-    .split(/\s+/)
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
 const frequencyLabel = (sync: {
   effectiveSyncEvery: number;
-  isOverridden: boolean;
+  syncEvery: number | null;
 }) =>
-  `Every ${ms(sync.effectiveSyncEvery * 1000)}${sync.isOverridden ? "" : " (default)"}`;
+  `Every ${ms(sync.effectiveSyncEvery * 1000)}${sync.syncEvery === null ? " (default)" : ""}`;
 
 /** `formatDistanceToNow` with `addSuffix` reads "5 minutes ago" for the past
  * and "in 5 minutes" for the future — one helper covers both last-synced and

@@ -19,11 +19,6 @@ export const useSuspenseIntegrations = () => {
   });
 };
 
-const invalidateIntegrations = (
-  queryClient: ReturnType<typeof useQueryClient>,
-  trpc: ReturnType<typeof useTRPC>,
-) => queryClient.invalidateQueries(trpc.integrations.getMany.queryFilter());
-
 /**
  * Hook to create a new Integration
  */
@@ -35,7 +30,7 @@ export const useCreateIntegration = () => {
     trpc.integrations.create.mutationOptions({
       onSuccess: () => {
         toast.success("Integration created");
-        invalidateIntegrations(queryClient, trpc);
+        queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
         // Need to recount # of active ApiKey Connectors
         queryClient.invalidateQueries(
           trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
@@ -60,7 +55,7 @@ export const useUpdateIntegration = () => {
     trpc.integrations.update.mutationOptions({
       onSuccess: () => {
         toast.success("Integration updated");
-        invalidateIntegrations(queryClient, trpc);
+        queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
       },
       onError: (error) => {
         toast.error(`Failed to update Integration: ${error.message}`);
@@ -80,7 +75,7 @@ export const useRemoveIntegration = () => {
     trpc.integrations.remove.mutationOptions({
       onSuccess: () => {
         toast.success("Integration removed");
-        invalidateIntegrations(queryClient, trpc);
+        queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
         // Need to recount # of active ApiKey Connectors
         queryClient.invalidateQueries(
           trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
@@ -94,7 +89,7 @@ export const useRemoveIntegration = () => {
 };
 
 /**
- * Hook to enable/disable an Integration as a whole
+ * Operator kill switch for a whole integration.
  */
 export const useSetIntegrationEnabled = () => {
   const trpc = useTRPC();
@@ -102,11 +97,8 @@ export const useSetIntegrationEnabled = () => {
 
   return useMutation(
     trpc.integrations.setEnabled.mutationOptions({
-      onSuccess: (data) => {
-        toast.success(
-          data.enabled ? "Integration enabled" : "Integration disabled",
-        );
-        invalidateIntegrations(queryClient, trpc);
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
       },
       onError: (error) => {
         toast.error(`Failed to update Integration: ${error.message}`);
@@ -116,7 +108,8 @@ export const useSetIntegrationEnabled = () => {
 };
 
 /**
- * Hook to enable/disable a single resource's sync on an Integration
+ * Toggle one resource on a multi-resource integration (e.g. turn off work
+ * orders, keep assets syncing).
  */
 export const useSetResourceSyncEnabled = () => {
   const trpc = useTRPC();
@@ -124,14 +117,11 @@ export const useSetResourceSyncEnabled = () => {
 
   return useMutation(
     trpc.integrations.setResourceSyncEnabled.mutationOptions({
-      onSuccess: (data) => {
-        toast.success(
-          data.enabled ? "Resource sync enabled" : "Resource sync disabled",
-        );
-        invalidateIntegrations(queryClient, trpc);
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
       },
       onError: (error) => {
-        toast.error(`Failed to update sync: ${error.message}`);
+        toast.error(`Failed to update resource sync: ${error.message}`);
       },
     }),
   );

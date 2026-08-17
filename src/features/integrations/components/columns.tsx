@@ -15,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SortableHeader } from "@/components/ui/data-table";
 import { Switch } from "@/components/ui/switch";
@@ -33,12 +34,26 @@ import type {
   IntegrationListItem,
   IntegrationResourceSyncItem,
 } from "../types";
-import { platformLabels, resourceTypeLabel } from "../types";
+import {
+  categoryLabelFor,
+  platformLabels,
+  resourceActivityNoun,
+  resourceTypeLabel,
+} from "../types";
 import { SyncStatusIndicator } from "./integrations";
 
 type IntegrationRow = IntegrationListItem & {
   expandableResourceSyncs: IntegrationResourceSyncItem[];
 };
+
+const initialsOf = (name: string) =>
+  name
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
 const frequencyLabel = (sync: {
   effectiveSyncEvery: number;
@@ -46,51 +61,47 @@ const frequencyLabel = (sync: {
 }) =>
   `Every ${ms(sync.effectiveSyncEvery * 1000)}${sync.isOverridden ? "" : " (default)"}`;
 
-const LastSynced = ({
-  lastSuccessfulSync,
-}: {
-  lastSuccessfulSync: Date | null;
-}) => (
-  <Tooltip>
-    <TooltipTrigger>
-      {lastSuccessfulSync
-        ? `${formatDistanceToNow(lastSuccessfulSync)} ago`
-        : "Never"}
-    </TooltipTrigger>
-    <TooltipContent>
-      {lastSuccessfulSync
-        ? lastSuccessfulSync.toLocaleString()
-        : "Never synced"}
-    </TooltipContent>
-  </Tooltip>
-);
+/** `formatDistanceToNow` with `addSuffix` reads "5 minutes ago" for the past
+ * and "in 5 minutes" for the future — one helper covers both last-synced and
+ * next-sync-due. */
+const relativeTime = (date: Date) =>
+  formatDistanceToNow(date, { addSuffix: true });
+
+const activityLine = (sync: IntegrationResourceSyncItem) =>
+  sync.lastSyncCreatedCount != null
+    ? `${sync.lastSyncCreatedCount} ${resourceActivityNoun(sync.resource)}`
+    : null;
+
+const timingLine = (sync: IntegrationResourceSyncItem) => {
+  if (!sync.lastSuccessfulSync) return "Never synced";
+  const parts = [`Synced ${relativeTime(sync.lastSuccessfulSync)}`];
+  if (sync.nextSyncAt && sync.enabled) {
+    parts.push(`Next sync ${relativeTime(sync.nextSyncAt)}`);
+  }
+  return parts.join(" · ");
+};
 
 const SyncSummaryCell = ({ row }: { row: IntegrationListItem }) => {
   const { resourceSyncs } = row;
 
-  if (resourceSyncs.length !== 1) {
-    const activeCount = resourceSyncs.filter((s) => s.enabled).length;
+  if (resourceSyncs.length > 1) {
+    const enabledCount = resourceSyncs.filter((s) => s.enabled).length;
     return (
-      <span className="text-muted-foreground">
-        {activeCount} of {resourceSyncs.length} feeds active
-      </span>
+      <div className="text-xs text-muted-foreground">
+        {enabledCount} of {resourceSyncs.length} feeds active
+      </div>
     );
   }
 
   const sync = resourceSyncs[0];
+  if (!sync) return null;
+  const activity = activityLine(sync);
+
   return (
-    <div className="flex flex-col gap-0.5">
-      <Tooltip>
-        <TooltipTrigger>
-          <SyncStatusIndicator status={sync.status} />
-        </TooltipTrigger>
-        {sync.status === SyncStatusEnum.Error && sync.errorMessage && (
-          <TooltipContent>{sync.errorMessage}</TooltipContent>
-        )}
-      </Tooltip>
-      <span className="text-xs text-muted-foreground">
-        {frequencyLabel(sync)} ·{" "}
-        <LastSynced lastSuccessfulSync={sync.lastSuccessfulSync} />
+    <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+      {activity && <span>{activity}</span>}
+      <span>
+        {frequencyLabel(sync)} · {timingLine(sync)}
       </span>
     </div>
   );
@@ -98,38 +109,58 @@ const SyncSummaryCell = ({ row }: { row: IntegrationListItem }) => {
 
 export const columns: ColumnDef<IntegrationRow>[] = [
   {
-    id: "name",
+    id: "integration",
     accessorKey: "name",
-    header: ({ column }) => <SortableHeader header="Name" column={column} />,
-    cell: ({ row }) => (
-      <div className="font-semibold max-w-60 overflow-ellipsis overflow-hidden">
-        {row.original.name}
-      </div>
+    header: ({ column }) => (
+      <SortableHeader header="Integration" column={column} />
     ),
+    cell: ({ row }) => {
+      const integration = row.original;
+      const category = categoryLabelFor(
+        integration.platform,
+        integration.resourceSyncs.map((s) => s.resource),
+      );
+      return (
+        <div className="flex items-start gap-3">
+          <Avatar className="size-8 shrink-0 border">
+            <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
+              {initialsOf(integration.name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="font-semibold overflow-ellipsis overflow-hidden">
+              {integration.name}
+              <span className="font-normal text-muted-foreground">
+                {" "}
+                · {platformLabels[integration.platform]}
+              </span>
+            </div>
+            <span className="text-xs text-muted-foreground">{category}</span>
+            <SyncSummaryCell row={integration} />
+          </div>
+        </div>
+      );
+    },
   },
   {
-    id: "platform",
-    meta: { title: "Platform" },
-    header: "Platform",
-    cell: ({ row }) => platformLabels[row.original.platform],
-  },
-  {
-    id: "resources",
-    meta: { title: "Resources" },
-    header: "Resources",
-    cell: ({ row }) => (
-      <div className="max-w-60 overflow-ellipsis overflow-hidden">
-        {row.original.resourceSyncs
-          .map((s) => resourceTypeLabel(s.resource))
-          .join(", ")}
-      </div>
-    ),
-  },
-  {
-    id: "sync",
-    meta: { title: "Sync Status" },
-    header: "Sync Status",
-    cell: ({ row }) => <SyncSummaryCell row={row.original} />,
+    id: "status",
+    meta: { title: "Status" },
+    header: "Status",
+    cell: ({ row }) => {
+      const { resourceSyncs } = row.original;
+      if (resourceSyncs.length !== 1) return null;
+      const sync = resourceSyncs[0];
+      return (
+        <Tooltip>
+          <TooltipTrigger>
+            <SyncStatusIndicator status={sync.status} />
+          </TooltipTrigger>
+          {sync.status === SyncStatusEnum.Error && sync.errorMessage && (
+            <TooltipContent>{sync.errorMessage}</TooltipContent>
+          )}
+        </Tooltip>
+      );
+    },
   },
   {
     id: "enabled",
@@ -205,7 +236,24 @@ export const resourceColumns: ColumnDef<IntegrationResourceSyncItem>[] = [
   {
     id: "resource",
     header: "Resource",
-    cell: ({ row }) => resourceTypeLabel(row.original.resource),
+    cell: ({ row }) => {
+      const sync = row.original;
+      return (
+        <div className="flex flex-col gap-0.5">
+          <span className="font-medium">
+            {resourceTypeLabel(sync.resource)}
+          </span>
+          {sync.enabled ? (
+            <span className="text-xs text-muted-foreground">
+              {activityLine(sync) && `${activityLine(sync)} · `}
+              {frequencyLabel(sync)} · {timingLine(sync)}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">Disabled</span>
+          )}
+        </div>
+      );
+    },
   },
   {
     id: "status",
@@ -223,18 +271,6 @@ export const resourceColumns: ColumnDef<IntegrationResourceSyncItem>[] = [
         </Tooltip>
       );
     },
-  },
-  {
-    id: "lastSynced",
-    header: "Last Synced",
-    cell: ({ row }) => (
-      <LastSynced lastSuccessfulSync={row.original.lastSuccessfulSync} />
-    ),
-  },
-  {
-    id: "frequency",
-    header: "Frequency",
-    cell: ({ row }) => frequencyLabel(row.original),
   },
   {
     id: "enabled",

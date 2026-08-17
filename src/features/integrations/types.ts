@@ -1,11 +1,6 @@
 import { z } from "zod";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
-import {
-  type Integration,
-  PlatformEnum,
-  ResourceType,
-  SyncStatusEnum,
-} from "@/generated/prisma";
+import { PlatformEnum, ResourceType, SyncStatusEnum } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import { authSchema, userSchema } from "@/lib/schemas";
 
@@ -66,23 +61,64 @@ export function isValidResourceTypeKey(key: string): key is UploadSegment {
 }
 
 /** Human label for a resource type, e.g. for the enabled-integrations table. */
-const resourceTypeLabels: Partial<Record<ResourceType, string>> =
-  Object.fromEntries(
+const resourceTypeLabels: Record<ResourceType, string> = {
+  ...Object.fromEntries(
     Object.values(integrationsMapping).map((r) => [r.type, r.name]),
-  );
+  ),
+  [ResourceType.SourceRecord]: "Notification",
+} as Record<ResourceType, string>;
 export const resourceTypeLabel = (type: ResourceType): string =>
   resourceTypeLabels[type] ?? type;
+
+/** What the activity line calls a newly-synced row of this resource type. */
+const resourceActivityNouns: Record<ResourceType, string> = {
+  [ResourceType.Asset]: "new assets",
+  [ResourceType.Vulnerability]: "new vulnerabilities",
+  [ResourceType.DeviceArtifact]: "new device artifacts",
+  [ResourceType.Remediation]: "new remediations",
+  [ResourceType.WorkOrder]: "tickets created",
+  [ResourceType.SourceRecord]: "notifications synced",
+};
+export const resourceActivityNoun = (type: ResourceType): string =>
+  resourceActivityNouns[type] ?? "new records";
 
 /**
  * Human label for a platform, kept in sync with each module's own
  * `displayName` (see `platforms/{ai,partner}/index.ts`). Duplicated rather than
  * imported: those modules chain into `core/credentials.ts` (`node:crypto`,
  * `server-only`), which would make this client-safe file unusable from one.
+ * FLEET has no `ConnectorModule` yet (`core/registry.ts`, TODO VW-431), so its
+ * label is hand-set here from the existing `teamplay-fleet` constant.
  */
 export const platformLabels: Record<PlatformEnum, string> = {
   [PlatformEnum.AI]: "AI Crawler",
   [PlatformEnum.PARTNER]: "Partner API",
-  [PlatformEnum.FLEET]: "Fleet",
+  [PlatformEnum.FLEET]: "Siemens Healthineers teamplay Fleet",
+};
+
+/**
+ * No `category` field exists on `Integration` or its platform — this is a
+ * synthesized grouping, loosely mirroring the connector-catalog's categories
+ * (`CATEGORY_DEFS` in the design), for display on the enabled-integrations
+ * table only. FLEET is always "Vendor Platforms" regardless of which
+ * resources it happens to sync; a generic AI/PARTNER integration is
+ * categorized by the first resource it syncs.
+ */
+const resourceCategoryLabels: Partial<Record<ResourceType, string>> = {
+  [ResourceType.Vulnerability]: "Vulnerability Management Platforms",
+  [ResourceType.WorkOrder]: "Ticketing Platforms",
+  [ResourceType.SourceRecord]: "Notifications",
+};
+export const categoryLabelFor = (
+  platform: PlatformEnum,
+  resources: ResourceType[],
+): string => {
+  if (platform === PlatformEnum.FLEET) return "Vendor Platforms";
+  const primary = resources[0];
+  if (!primary) return "Integration";
+  return (
+    resourceCategoryLabels[primary] ?? `${resourceTypeLabel(primary)} Sync`
+  );
 };
 
 /**
@@ -100,6 +136,7 @@ export const integrationResourceSyncItemSchema = z.object({
   lastSuccessfulSync: z.date().nullable(),
   nextSyncAt: z.date().nullable(),
   enabled: z.boolean(),
+  lastSyncCreatedCount: z.number().nullable(),
   /** The resource's own override, or null to inherit. */
   syncEvery: z.number().nullable(),
   isOverridden: z.boolean(),
@@ -113,7 +150,6 @@ export const integrationListItemSchema = z.object({
   id: z.string(),
   name: z.string(),
   platform: z.enum(PlatformEnum),
-  config: z.unknown(),
   syncEvery: z.number().nullable(),
   enabled: z.boolean(),
   userId: z.string(),
@@ -127,11 +163,3 @@ export type IntegrationListItem = z.infer<typeof integrationListItemSchema>;
 
 export const paginatedIntegrationsResponseSchema =
   createPaginatedResponseSchema(integrationListItemSchema);
-
-export type IntegrationWithStringDates = Omit<
-  Integration,
-  "createdAt" | "updatedAt"
-> & {
-  createdAt: string;
-  updatedAt: string;
-};

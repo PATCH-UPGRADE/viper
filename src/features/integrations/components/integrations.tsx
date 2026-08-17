@@ -89,15 +89,13 @@ export const IntegrationsContainer = ({
   children: React.ReactNode;
 }) => {
   return (
-    <>
-      <div className={cn(mainPadding, "bg-background flex flex-col gap-4")}>
-        <SettingsSubheader
-          title="Integrations"
-          description="Manage the integrations currently syncing data into VIPER"
-        />
-      </div>
-      <div className={mainPadding}>{children}</div>
-    </>
+    <div className={cn(mainPadding, "flex flex-col gap-4")}>
+      <SettingsSubheader
+        title="Integrations"
+        description="Manage external integrations to sync assets and vulnerabilities"
+      />
+      {children}
+    </div>
   );
 };
 

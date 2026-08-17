@@ -35,12 +35,18 @@ const integrationsInclude = {
       nextSyncAt: true,
       enabled: true,
       syncEvery: true,
+      lastSyncCreatedCount: true,
     },
     orderBy: {
       resource: "asc", // stable ordering; one row per resource
     },
   },
 } as const;
+
+type IntegrationRow = Prisma.IntegrationGetPayload<{
+  include: typeof integrationsInclude;
+  omit: typeof omitCredentials;
+}>;
 
 /**
  * Encrypted credentials must never reach the browser
@@ -139,10 +145,6 @@ export const integrationsRouter = createTRPCRouter({
       // governs it (`effectiveSyncEvery`) and whether that's the resource's
       // own override or something inherited (`isOverridden`) — the table
       // needs both to show "every 5 min" vs "every 5 min (default)".
-      type IntegrationRow = Prisma.IntegrationGetPayload<{
-        include: typeof integrationsInclude;
-        omit: typeof omitCredentials;
-      }>;
       const items = (result.items as IntegrationRow[]).map((integration) => ({
         ...integration,
         resourceSyncs: integration.resourceSyncs.map((sync) => ({
@@ -296,7 +298,7 @@ export const integrationsRouter = createTRPCRouter({
     .input(
       z.object({
         integrationId: z.string(),
-        resource: z.enum(Object.values(ResourceType)),
+        resource: z.enum(ResourceType),
         enabled: z.boolean(),
       }),
     )

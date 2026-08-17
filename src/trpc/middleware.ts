@@ -2,6 +2,20 @@ import { TRPCError } from "@trpc/server";
 import prisma from "@/lib/db";
 import { formatResourceName } from "@/lib/string-utils";
 
+// Models requireOwnership can check: every one has a `userId` field, which is
+// what the `as typeof prisma.asset` cast below assumes. Adding a model here
+// that lacks `userId` fails at compile time on its call site, not silently at
+// runtime (see PR #227 review: passing a model without `userId` produces a
+// Prisma "Unknown field 'userId'" warning and a broken ownership check).
+type OwnableModel =
+  | "artifact"
+  | "artifactWrapper"
+  | "deviceArtifact"
+  | "remediation"
+  | "webhook"
+  | "asset"
+  | "vulnerability";
+
 /**
  * Verifies that a resource belongs to the current user
  * Throws NOT_FOUND if resource doesn't exist
@@ -15,17 +29,17 @@ import { formatResourceName } from "@/lib/string-utils";
 export async function requireOwnership(
   resourceId: string,
   userId: string,
-  modelName: keyof typeof prisma,
+  modelName: OwnableModel,
 ) {
-  // Type assertion needed because Prisma client types are complex
-  const model = prisma[modelName] as any;
+  const model = prisma[modelName] as unknown as typeof prisma.asset;
 
-  const resource = await model.findUnique({
-    where: { id: resourceId },
-    select: { userId: true },
-  });
-
-  requireExistence(resource, String(modelName));
+  const resource = requireExistence(
+    await model.findUnique({
+      where: { id: resourceId },
+      select: { userId: true },
+    }),
+    String(modelName),
+  );
 
   // TODO: Is this secure? Double check.
   if (resource.userId !== userId) {

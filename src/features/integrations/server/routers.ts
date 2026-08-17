@@ -32,6 +32,7 @@ const integrationsInclude = {
       enabled: true,
       syncEvery: true,
       lastSyncCreatedCount: true,
+      lastSyncUpdatedCount: true,
     },
     orderBy: {
       resource: "asc", // stable ordering; one row per resource
@@ -136,18 +137,27 @@ export const integrationsRouter = createTRPCRouter({
         omit: omitCredentials,
       });
 
-      // Add each resource sync's resolved cadence — the table shows "every 5
-      // min" vs "every 5 min (default)" by checking the already-selected
-      // `syncEvery` (null = inherited) alongside this.
+      // Add each resource sync's resolved cadence, plus whether that's the
+      // platform's own default or an operator override — at either the
+      // resource or the integration level. The table can't tell the two
+      // apart from `syncEvery` alone (a nested resource row never sees its
+      // parent integration's `syncEvery`).
+      const now = new Date();
       const items = (result.items as IntegrationRow[]).map((integration) => ({
         ...integration,
         resourceSyncs: integration.resourceSyncs.map((sync) => ({
           ...sync,
+          isOverridden:
+            sync.syncEvery !== null || integration.syncEvery !== null,
           effectiveSyncEvery: effectiveSyncEvery(
             sync.syncEvery,
             integration.syncEvery,
             defaultSyncEveryFor(integration.platform, sync.resource),
           ),
+          // Same "due" check the cron itself uses (fetch-due-resource-syncs
+          // in sync-integrations.ts) — computed against the server's clock,
+          // not the browser's.
+          isDue: sync.nextSyncAt !== null && sync.nextSyncAt <= now,
         })),
       }));
 

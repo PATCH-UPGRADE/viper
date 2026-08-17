@@ -69,6 +69,7 @@ export async function upsertResourceSync(
               lastSuccessfulSync: lastSynced,
               consecutiveFailures: 0,
               lastSyncCreatedCount: response.createdItemsCount,
+              lastSyncUpdatedCount: response.updatedItemsCount,
             }
           : { consecutiveFailures: { increment: 1 } }),
       },
@@ -81,6 +82,7 @@ export async function upsertResourceSync(
           ? {
               lastSuccessfulSync: lastSynced,
               lastSyncCreatedCount: response.createdItemsCount,
+              lastSyncUpdatedCount: response.updatedItemsCount,
             }
           : { consecutiveFailures: 1 }),
       },

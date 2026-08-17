@@ -2,7 +2,7 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
-import { TrashIcon } from "lucide-react";
+import { RefreshCw, TrashIcon } from "lucide-react";
 import ms from "ms";
 import { useState } from "react";
 import {
@@ -25,11 +25,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { SyncStatusEnum } from "@/generated/prisma";
-import { initialsOf } from "@/lib/utils";
+import { initialsOf, plural } from "@/lib/utils";
 import {
   useRemoveIntegration,
   useSetIntegrationEnabled,
   useSetResourceSyncEnabled,
+  useTriggerSync,
 } from "../hooks/use-integrations";
 import type {
   IntegrationListItem,
@@ -49,9 +50,9 @@ type IntegrationRow = IntegrationListItem & {
 
 const frequencyLabel = (sync: {
   effectiveSyncEvery: number;
-  syncEvery: number | null;
+  isOverridden: boolean;
 }) =>
-  `Every ${ms(sync.effectiveSyncEvery * 1000)}${sync.syncEvery === null ? " (default)" : ""}`;
+  `Every ${ms(sync.effectiveSyncEvery * 1000)}${sync.isOverridden ? "" : " (default)"}`;
 
 /** `formatDistanceToNow` with `addSuffix` reads "5 minutes ago" for the past
  * and "in 5 minutes" for the future — one helper covers both last-synced and
@@ -59,10 +60,18 @@ const frequencyLabel = (sync: {
 const relativeTime = (date: Date) =>
   formatDistanceToNow(date, { addSuffix: true });
 
-const activityLine = (sync: IntegrationResourceSyncItem) =>
-  sync.lastSyncCreatedCount != null
-    ? `${sync.lastSyncCreatedCount} ${resourceActivityNoun(sync.resource)}`
-    : null;
+const activityLine = (sync: IntegrationResourceSyncItem) => {
+  if (sync.lastSyncCreatedCount == null) return null;
+  if (sync.lastSyncCreatedCount > 0) {
+    return `${sync.lastSyncCreatedCount} ${resourceActivityNoun(sync.resource, sync.lastSyncCreatedCount)}`;
+  }
+  // 0 new records reads as "idle" even when the sync is actively keeping
+  // existing records fresh — call that out instead of just "0 new X".
+  if (sync.lastSyncUpdatedCount) {
+    return `${sync.lastSyncUpdatedCount} ${plural("update", sync.lastSyncUpdatedCount)}`;
+  }
+  return null;
+};
 
 const timingLine = (sync: IntegrationResourceSyncItem) => {
   if (!sync.lastSuccessfulSync) return "Never synced";
@@ -70,11 +79,11 @@ const timingLine = (sync: IntegrationResourceSyncItem) => {
   if (sync.nextSyncAt && sync.enabled) {
     // A due-but-not-yet-run sync (cron hasn't ticked) reads as "Next sync
     // 5 hours ago", which looks like a typo rather than a schedule. State
-    // it as overdue instead of reusing the past-tense phrasing.
+    // it as overdue instead of reusing the past-tense phrasing. `isDue` is
+    // computed server-side (same check the cron itself uses) rather than
+    // compared against the browser's clock.
     parts.push(
-      sync.nextSyncAt.getTime() <= Date.now()
-        ? "Sync due"
-        : `Next sync ${relativeTime(sync.nextSyncAt)}`,
+      sync.isDue ? "Sync due" : `Next sync ${relativeTime(sync.nextSyncAt)}`,
     );
   }
   return parts.join(" · ");
@@ -95,11 +104,15 @@ const StatusCell = ({
   </Tooltip>
 );
 
-const SyncSummaryCell = ({ row }: { row: IntegrationListItem }) => {
+const SyncSummaryCell = ({ row }: { row: IntegrationRow }) => {
   const { resourceSyncs } = row;
 
-  if (resourceSyncs.length > 1) {
-    const enabledCount = resourceSyncs.filter((s) => s.enabled).length;
+  if (row.expandableResourceSyncs.length > 0) {
+    // The integration's own kill switch overrides every resource's flag —
+    // don't report feeds as active when the whole integration is off.
+    const enabledCount = row.enabled
+      ? resourceSyncs.filter((s) => s.enabled).length
+      : 0;
     return (
       <div className="text-xs text-muted-foreground">
         {enabledCount} of {resourceSyncs.length} feeds active
@@ -161,9 +174,9 @@ export const columns: ColumnDef<IntegrationRow>[] = [
     meta: { title: "Status" },
     header: "Status",
     cell: ({ row }) => {
-      const { resourceSyncs } = row.original;
-      if (resourceSyncs.length !== 1) return null;
-      return <StatusCell sync={resourceSyncs[0]} />;
+      const integration = row.original;
+      if (integration.expandableResourceSyncs.length > 0) return null;
+      return <StatusCell sync={integration.resourceSyncs[0]} />;
     },
   },
   {
@@ -190,10 +203,28 @@ export const columns: ColumnDef<IntegrationRow>[] = [
     cell: ({ row }) => {
       const data = row.original;
       const removeItem = useRemoveIntegration();
+      const triggerSync = useTriggerSync();
       const [confirmOpen, setConfirmOpen] = useState(false);
 
       return (
         <>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                disabled={triggerSync.isPending}
+                onClick={() => triggerSync.mutate({ id: data.id })}
+              >
+                <span className="sr-only">Sync Now</span>
+                <RefreshCw
+                  className={`h-4 w-4 ${triggerSync.isPending ? "animate-spin" : ""}`}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Sync Now</TooltipContent>
+          </Tooltip>
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -221,8 +252,12 @@ export const columns: ColumnDef<IntegrationRow>[] = [
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={async () => {
-                    await removeItem.mutateAsync({ id: data.id });
-                    setConfirmOpen(false);
+                    // onError already toasts; keep the dialog open on
+                    // failure so the user can see it and retry or cancel.
+                    try {
+                      await removeItem.mutateAsync({ id: data.id });
+                      setConfirmOpen(false);
+                    } catch {}
                   }}
                 >
                   Remove

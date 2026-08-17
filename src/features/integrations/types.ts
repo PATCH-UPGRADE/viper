@@ -3,6 +3,7 @@ import { z } from "zod";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { authSchema } from "@/lib/schemas";
+import { plural } from "@/lib/utils";
 import type { trpc } from "@/trpc/server";
 
 /**
@@ -73,17 +74,22 @@ const resourceTypeLabels: Record<ResourceType, string> = {
 export const resourceTypeLabel = (type: ResourceType): string =>
   resourceTypeLabels[type] ?? type;
 
-/** What the activity line calls a newly-synced row of this resource type. */
-const resourceActivityNouns: Record<ResourceType, string> = {
-  [ResourceType.Asset]: "new assets",
-  [ResourceType.Vulnerability]: "new vulnerabilities",
-  [ResourceType.DeviceArtifact]: "new device artifacts",
-  [ResourceType.Remediation]: "new remediations",
-  [ResourceType.WorkOrder]: "tickets created",
-  [ResourceType.SourceRecord]: "notifications synced",
-};
-export const resourceActivityNoun = (type: ResourceType): string =>
-  resourceActivityNouns[type] ?? "new records";
+/** What the activity line calls a newly-synced row of this resource type,
+ * for the given count — e.g. "1 new asset" vs "3 new assets". */
+const resourceActivityPhrase: Record<ResourceType, (count: number) => string> =
+  {
+    [ResourceType.Asset]: (n) => `new ${plural("asset", n)}`,
+    [ResourceType.Vulnerability]: (n) => `new ${plural("vulnerability", n)}`,
+    [ResourceType.DeviceArtifact]: (n) => `new ${plural("device artifact", n)}`,
+    [ResourceType.Remediation]: (n) => `new ${plural("remediation", n)}`,
+    [ResourceType.WorkOrder]: (n) => `${plural("ticket", n)} created`,
+    [ResourceType.SourceRecord]: (n) => `${plural("notification", n)} synced`,
+  };
+export const resourceActivityNoun = (
+  type: ResourceType,
+  count: number,
+): string =>
+  resourceActivityPhrase[type]?.(count) ?? `new ${plural("record", count)}`;
 
 /**
  * Human label for a platform, kept in sync with each module's own

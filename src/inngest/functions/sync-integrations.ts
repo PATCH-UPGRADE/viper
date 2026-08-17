@@ -220,6 +220,13 @@ export const syncIntegration = inngest.createFunction(
           errorMessage: null,
           lastSuccessfulSync: new Date(),
           consecutiveFailures: 0,
+          // This branch is for a direct-pull strategy resolving synchronously
+          // (today, every registered platform hands off instead and takes the
+          // `outcome.pending` branch above). A puller's SyncStrategy doesn't
+          // report item counts, so this is explicit rather than leaving
+          // whatever the field held from before stale here forever.
+          lastSyncCreatedCount: null,
+          lastSyncUpdatedCount: null,
           // Step 2 claimed this attempt with a backed-off `nextSyncAt`, and
           // nothing else rewrites it. Clearing the backoff here is what puts a
           // recovered resource back on its normal interval instead of making

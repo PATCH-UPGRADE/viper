@@ -2,7 +2,6 @@
 
 import { CircleCheck, CircleDot, CircleX } from "lucide-react";
 import {
-  EmptyView,
   EntitySearch,
   ErrorView,
   LoadingView,
@@ -105,8 +104,4 @@ export const IntegrationsLoading = () => {
 
 export const IntegrationsError = () => {
   return <ErrorView message="Error loading integrations" />;
-};
-
-export const IntegrationsEmpty = () => {
-  return <EmptyView message="No Integrations" />;
 };

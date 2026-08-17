@@ -36,7 +36,7 @@ export interface CallbackConfig {
   schema: Record<string, unknown>;
 }
 
-// TODO: VW-431 Fleet should use this on resource modules
+// TODO: VW-433 Fleet should use this on resource modules
 export interface UrlBuilders<TConfig = unknown> {
   /** What's the API URL for this record on their platform? */
   apiUrlFor?(externalId: string, config: TConfig): string | null;
@@ -52,7 +52,7 @@ export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
   extends UrlBuilders<TConfig> {
   // we pull from their platform
   listChanged(cursor: Cursor | null): AsyncIterable<Page<TRaw>>;
-  // TODO: VW-431: can change `listChanged` schema if it doesn't work for fleet
+  // TODO: VW-433: can change `listChanged` schema if it doesn't work for fleet
   get(externalId: string): Promise<TRaw>;
   toCanonical(raw: TRaw, config: TConfig): TCanonical;
 

@@ -22,7 +22,11 @@ describe("registry", () => {
     );
   });
 
-  // TODO: VW-431, test to make sure fleet gets registered
+  it("registers templay Fleet", () => {
+    expect(requirePlatform(PlatformEnum.FLEET).definition.platform).toBe(
+      PlatformEnum.FLEET,
+    );
+  });
 
   it("has no cadence opinion for a platform without ResourceModules", () => {
     expect(defaultSyncEveryFor(PlatformEnum.AI, ResourceType.Asset)).toBeNull();

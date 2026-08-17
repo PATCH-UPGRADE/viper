@@ -101,18 +101,20 @@ export function NotificationRespondTab({
             {canCompare && (
               <ToggleGroup
                 type="single"
-                variant="outline"
-                size="sm"
                 value={view}
                 onValueChange={(next) => next && setView(next as PlanView)}
                 aria-label="Response plan view"
+                className="h-9 rounded-lg bg-accent p-[3px] dark:bg-muted"
               >
-                <ToggleGroupItem value="list" className="px-3">
-                  List
-                </ToggleGroupItem>
-                <ToggleGroupItem value="matrix" className="px-3">
-                  Matrix
-                </ToggleGroupItem>
+                {(["list", "matrix"] as const).map((value) => (
+                  <ToggleGroupItem
+                    key={value}
+                    value={value}
+                    className="h-full rounded-md border border-transparent px-4 capitalize text-foreground/60 hover:bg-transparent hover:text-foreground data-[state=on]:border-border data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm dark:data-[state=on]:border-input dark:data-[state=on]:bg-input"
+                  >
+                    {value}
+                  </ToggleGroupItem>
+                ))}
               </ToggleGroup>
             )}
           </div>

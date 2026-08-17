@@ -26,10 +26,12 @@ const integrationsInclude = {
       resource: true,
       status: true,
       errorMessage: true,
+      lastAttemptAt: true,
       lastSuccessfulSync: true,
       nextSyncAt: true,
       enabled: true,
       syncEvery: true,
+      lastSyncCreatedCount: true,
     },
     orderBy: {
       resource: "asc", // stable ordering; one row per resource
@@ -37,17 +39,9 @@ const integrationsInclude = {
   },
 } as const;
 
-const integrationListSelect = {
-  id: true,
-  name: true,
-  platform: true,
-  syncEvery: true,
-  enabled: true,
-  resourceSyncs: integrationsInclude.resourceSyncs,
-} satisfies Prisma.IntegrationSelect;
-
-type IntegrationListRow = Prisma.IntegrationGetPayload<{
-  select: typeof integrationListSelect;
+type IntegrationRow = Prisma.IntegrationGetPayload<{
+  include: typeof integrationsInclude;
+  omit: typeof omitCredentials;
 }>;
 
 /**
@@ -138,27 +132,26 @@ export const integrationsRouter = createTRPCRouter({
 
       const result = await fetchPaginated(prisma.integration, input, {
         where,
-        select: integrationListSelect,
+        include: integrationsInclude,
+        omit: omitCredentials,
       });
 
       // Add the resolved cadence to each resource sync: what actually
       // governs it (`effectiveSyncEvery`) and whether that's the resource's
       // own override or something inherited (`isOverridden`) — the table
       // needs both to show "every 5 min" vs "every 5 min (default)".
-      const items = (result.items as IntegrationListRow[]).map(
-        (integration) => ({
-          ...integration,
-          resourceSyncs: integration.resourceSyncs.map((sync) => ({
-            ...sync,
-            isOverridden: sync.syncEvery !== null,
-            effectiveSyncEvery: effectiveSyncEvery(
-              sync.syncEvery,
-              integration.syncEvery,
-              defaultSyncEveryFor(integration.platform, sync.resource),
-            ),
-          })),
-        }),
-      );
+      const items = (result.items as IntegrationRow[]).map((integration) => ({
+        ...integration,
+        resourceSyncs: integration.resourceSyncs.map((sync) => ({
+          ...sync,
+          isOverridden: sync.syncEvery !== null,
+          effectiveSyncEvery: effectiveSyncEvery(
+            sync.syncEvery,
+            integration.syncEvery,
+            defaultSyncEveryFor(integration.platform, sync.resource),
+          ),
+        })),
+      }));
 
       return { ...result, items };
     }),

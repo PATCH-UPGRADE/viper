@@ -36,13 +36,20 @@ export const IntegrationsSearch = () => {
 export const IntegrationsList = () => {
   const { data: integrations, isFetching } = useSuspenseIntegrations();
 
+  // Only worth expanding when there's more than one resource to break out.
+  const items = integrations.items.map((integration) => ({
+    ...integration,
+    expandableResourceSyncs:
+      integration.resourceSyncs.length > 1 ? integration.resourceSyncs : [],
+  }));
+
   return (
     <DataTable
       search={<IntegrationsSearch />}
-      paginatedData={integrations}
+      paginatedData={{ ...integrations, items }}
       columns={columns}
       nestedColumns={resourceColumns}
-      nestedDataKey="resourceSyncs"
+      nestedDataKey="expandableResourceSyncs"
       isLoading={isFetching}
     />
   );

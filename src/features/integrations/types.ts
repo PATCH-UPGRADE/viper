@@ -71,6 +71,18 @@ const resourceTypeLabels: Record<ResourceType, string> = {
 export const resourceTypeLabel = (type: ResourceType): string =>
   resourceTypeLabels[type] ?? type;
 
+/** What the activity line calls a newly-synced row of this resource type. */
+const resourceActivityNouns: Record<ResourceType, string> = {
+  [ResourceType.Asset]: "new assets",
+  [ResourceType.Vulnerability]: "new vulnerabilities",
+  [ResourceType.DeviceArtifact]: "new device artifacts",
+  [ResourceType.Remediation]: "new remediations",
+  [ResourceType.WorkOrder]: "tickets created",
+  [ResourceType.SourceRecord]: "notifications synced",
+};
+export const resourceActivityNoun = (type: ResourceType): string =>
+  resourceActivityNouns[type] ?? "new records";
+
 /**
  * Human label for a platform, kept in sync with each module's own
  * `displayName` (see `platforms/{ai,partner}/index.ts`). Duplicated rather than
@@ -85,6 +97,32 @@ export const platformLabels: Record<PlatformEnum, string> = {
   [PlatformEnum.FLEET]: "Siemens Healthineers teamplay Fleet",
 };
 
+/**
+ * No `category` field exists on `Integration` or its platform — this is a
+ * synthesized grouping, loosely mirroring the connector-catalog's categories
+ * (`CATEGORY_DEFS` in the design), for display on the enabled-integrations
+ * table only. FLEET is always "Vendor Platforms" regardless of which
+ * resources it happens to sync; a generic AI/PARTNER integration is
+ * categorized by the first resource it syncs.
+ */
+const resourceCategoryLabels: Partial<Record<ResourceType, string>> = {
+  [ResourceType.Vulnerability]: "Vulnerability Management Platforms",
+  [ResourceType.WorkOrder]: "Ticketing Platforms",
+  [ResourceType.SourceRecord]: "Notifications",
+};
+export const categoryLabelFor = (
+  platform: PlatformEnum,
+  resources: ResourceType[],
+): string => {
+  if (platform === PlatformEnum.FLEET) return "Vendor Platforms";
+  const primary = resources[0];
+  if (!primary) return "Integration";
+  return (
+    resourceCategoryLabels[primary] ?? `${resourceTypeLabel(primary)} Sync`
+  );
+};
+
+/** A row (and its resource syncs) as returned by `integrations.getMany`. */
 export type IntegrationListItem = inferOutput<
   typeof trpc.integrations.getMany
 >["items"][number];

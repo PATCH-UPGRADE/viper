@@ -34,8 +34,17 @@ import type {
   IntegrationListItem,
   IntegrationResourceSyncItem,
 } from "../types";
-import { platformLabels, resourceTypeLabel } from "../types";
+import {
+  categoryLabelFor,
+  platformLabels,
+  resourceActivityNoun,
+  resourceTypeLabel,
+} from "../types";
 import { SyncStatusIndicator } from "./integrations";
+
+type IntegrationRow = IntegrationListItem & {
+  expandableResourceSyncs: IntegrationResourceSyncItem[];
+};
 
 const initialsOf = (name: string) =>
   name
@@ -58,14 +67,41 @@ const frequencyLabel = (sync: {
 const relativeTime = (date: Date) =>
   formatDistanceToNow(date, { addSuffix: true });
 
+const activityLine = (sync: IntegrationResourceSyncItem) =>
+  sync.lastSyncCreatedCount != null
+    ? `${sync.lastSyncCreatedCount} ${resourceActivityNoun(sync.resource)}`
+    : null;
+
 const timingLine = (sync: IntegrationResourceSyncItem) => {
   if (!sync.lastSuccessfulSync) return "Never synced";
   const parts = [`Synced ${relativeTime(sync.lastSuccessfulSync)}`];
   if (sync.nextSyncAt && sync.enabled) {
-    parts.push(`Next sync ${relativeTime(sync.nextSyncAt)}`);
+    // A due-but-not-yet-run sync (cron hasn't ticked) reads as "Next sync
+    // 5 hours ago", which looks like a typo rather than a schedule. State
+    // it as overdue instead of reusing the past-tense phrasing.
+    parts.push(
+      sync.nextSyncAt.getTime() <= Date.now()
+        ? "Sync due"
+        : `Next sync ${relativeTime(sync.nextSyncAt)}`,
+    );
   }
   return parts.join(" · ");
 };
+
+const StatusCell = ({
+  sync,
+}: {
+  sync: Pick<IntegrationResourceSyncItem, "status" | "errorMessage">;
+}) => (
+  <Tooltip>
+    <TooltipTrigger>
+      <SyncStatusIndicator status={sync.status} />
+    </TooltipTrigger>
+    {sync.status === SyncStatusEnum.Error && sync.errorMessage && (
+      <TooltipContent>{sync.errorMessage}</TooltipContent>
+    )}
+  </Tooltip>
+);
 
 const SyncSummaryCell = ({ row }: { row: IntegrationListItem }) => {
   const { resourceSyncs } = row;
@@ -81,26 +117,19 @@ const SyncSummaryCell = ({ row }: { row: IntegrationListItem }) => {
 
   const sync = resourceSyncs[0];
   if (!sync) return null;
+  const activity = activityLine(sync);
 
   return (
-    <div className="text-xs text-muted-foreground">
-      {frequencyLabel(sync)} · {timingLine(sync)}
+    <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+      {activity && <span>{activity}</span>}
+      <span>
+        {frequencyLabel(sync)} · {timingLine(sync)}
+      </span>
     </div>
   );
 };
 
-const SyncStatusCell = ({ sync }: { sync: IntegrationResourceSyncItem }) => (
-  <Tooltip>
-    <TooltipTrigger>
-      <SyncStatusIndicator status={sync.status} />
-    </TooltipTrigger>
-    {sync.status === SyncStatusEnum.Error && sync.errorMessage && (
-      <TooltipContent>{sync.errorMessage}</TooltipContent>
-    )}
-  </Tooltip>
-);
-
-export const columns: ColumnDef<IntegrationListItem>[] = [
+export const columns: ColumnDef<IntegrationRow>[] = [
   {
     id: "integration",
     accessorKey: "name",
@@ -109,6 +138,10 @@ export const columns: ColumnDef<IntegrationListItem>[] = [
     ),
     cell: ({ row }) => {
       const integration = row.original;
+      const category = categoryLabelFor(
+        integration.platform,
+        integration.resourceSyncs.map((s) => s.resource),
+      );
       return (
         <div className="flex items-start gap-3">
           <Avatar className="size-8 shrink-0 border">
@@ -124,6 +157,7 @@ export const columns: ColumnDef<IntegrationListItem>[] = [
                 · {platformLabels[integration.platform]}
               </span>
             </div>
+            <span className="text-xs text-muted-foreground">{category}</span>
             <SyncSummaryCell row={integration} />
           </div>
         </div>
@@ -137,7 +171,7 @@ export const columns: ColumnDef<IntegrationListItem>[] = [
     cell: ({ row }) => {
       const { resourceSyncs } = row.original;
       if (resourceSyncs.length !== 1) return null;
-      return <SyncStatusCell sync={resourceSyncs[0]} />;
+      return <StatusCell sync={resourceSyncs[0]} />;
     },
   },
   {
@@ -216,6 +250,7 @@ export const resourceColumns: ColumnDef<IntegrationResourceSyncItem>[] = [
     header: "Resource",
     cell: ({ row }) => {
       const sync = row.original;
+      const activity = activityLine(sync);
       return (
         <div className="flex flex-col gap-0.5">
           <span className="font-medium">
@@ -223,6 +258,7 @@ export const resourceColumns: ColumnDef<IntegrationResourceSyncItem>[] = [
           </span>
           {sync.enabled ? (
             <span className="text-xs text-muted-foreground">
+              {activity && `${activity} · `}
               {frequencyLabel(sync)} · {timingLine(sync)}
             </span>
           ) : (
@@ -235,7 +271,7 @@ export const resourceColumns: ColumnDef<IntegrationResourceSyncItem>[] = [
   {
     id: "status",
     header: "Status",
-    cell: ({ row }) => <SyncStatusCell sync={row.original} />,
+    cell: ({ row }) => <StatusCell sync={row.original} />,
   },
   {
     id: "enabled",

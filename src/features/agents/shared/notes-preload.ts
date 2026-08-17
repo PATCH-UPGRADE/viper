@@ -13,7 +13,5 @@ export async function loadPersistentNotesMarkdown(): Promise<string> {
   if (notes.length === 0) {
     return "## Notes (hospital-wide)\n\n_No persistent notes saved yet._";
   }
-  return (
-    "## Notes (hospital-wide)\n\n" + notes.map((n) => `- ${n.text}`).join("\n")
-  );
+  return `## Notes (hospital-wide)\n\n${notes.map((n) => `- ${n.text}`).join("\n")}`;
 }

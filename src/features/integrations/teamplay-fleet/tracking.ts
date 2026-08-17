@@ -425,6 +425,7 @@ export async function createFleetWorkOrder(
 
   // Auth (cookie session + Playwright re-auth on 401/403) is handled by the
   // shared FLEET session client; it layers the session header over ours.
+  // TODO MARK
   const response = await FLEET.fetchWithSession(fleetWorkOrderUrl(), {
     method: "POST",
     headers: {

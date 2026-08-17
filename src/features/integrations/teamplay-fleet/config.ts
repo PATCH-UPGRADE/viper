@@ -1,4 +1,4 @@
-import { IntegrationSessionClient } from "../integration-session-client";
+// TODO this file should be deleted.
 import type { SessionLoginConfig } from "./capture";
 
 export const FLEET_LOGIN_CONFIG: SessionLoginConfig = {
@@ -14,9 +14,4 @@ export const FLEET_LOGIN_CONFIG: SessionLoginConfig = {
   authUrl: "https://fleet.siemens-healthineers.com/rest/v1/users/self", // user profile endpoint
 };
 
-export const FLEET = new IntegrationSessionClient(
-  "fleet.siemens-healthineers.com",
-  "FLEET_ADVISORY_USERNAME",
-  "FLEET_ADVISORY_PASSWORD",
-  FLEET_LOGIN_CONFIG,
-);
+export const FLEET = {}

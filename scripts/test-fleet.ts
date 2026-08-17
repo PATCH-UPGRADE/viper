@@ -3,7 +3,7 @@ import {
   createFleetSession,
   grabSessionCookie,
 } from "@/features/integrations/platforms/teamplay-fleet/session";
-import { FLEET_LOGIN_CONFIG } from "@/features/integrations/teamplay-fleet/config";
+import { FLEET_LOGIN_CONFIG } from "@/features/integrations/platforms/teamplay-fleet/session";
 import prisma from "../src/lib/db";
 
 const ADVISORIES_URL =

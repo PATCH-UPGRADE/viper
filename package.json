@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "biome check",
+    "lint": "biome check --error-on-warnings",
     "format": "biome format --write",
     "inngest:dev": "inngest-cli dev",
     "dev:all": "mprocs",

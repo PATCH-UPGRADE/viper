@@ -5,7 +5,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: {} }));
 
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
-import { defaultSyncEveryFor, registry, requirePlatform } from "../registry";
+import { defaultSyncEveryFor, requirePlatform } from "../registry";
 
 /**
  * Importing this module runs the registry's load-time assertion, so simply

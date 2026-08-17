@@ -1,7 +1,7 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { AuthType, ResourceType } from "@/generated/prisma";
+import { AuthType, type Prisma, ResourceType } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
@@ -12,20 +12,17 @@ import {
   authCredentialSchema,
   encodeAuthCredential,
 } from "../core/credentials";
-import { requirePlatform } from "../core/registry";
+import { defaultSyncEveryFor, requirePlatform } from "../core/registry";
+import { effectiveSyncEvery } from "../core/sync/cadence";
 import { resourcesFor } from "../core/sync/resources";
 import type { AnyConnectorModule } from "../core/types";
-import type { IntegrationFormValues } from "../types";
-import { integrationInputSchema } from "../types";
-
-const paginatedIntegrationsInputSchema = paginationInputSchema.extend({
-  resourceType: z.enum(Object.values(ResourceType)),
-});
+import { type IntegrationFormValues, integrationInputSchema } from "../types";
 
 const integrationsInclude = {
   user: userIncludeSelect,
   resourceSyncs: {
     select: {
+      integrationId: true,
       resource: true,
       status: true,
       errorMessage: true,
@@ -33,20 +30,19 @@ const integrationsInclude = {
       lastSuccessfulSync: true,
       nextSyncAt: true,
       enabled: true,
+      syncEvery: true,
+      lastSyncCreatedCount: true,
     },
     orderBy: {
       resource: "asc", // stable ordering; one row per resource
     },
   },
-  _count: {
-    select: {
-      assetMappings: true,
-      deviceArtifactMappings: true,
-      remediationMappings: true,
-      vulnerabilityMappings: true,
-    },
-  },
 } as const;
+
+type IntegrationRow = Prisma.IntegrationGetPayload<{
+  include: typeof integrationsInclude;
+  omit: typeof omitCredentials;
+}>;
 
 /**
  * Encrypted credentials must never reach the browser
@@ -122,26 +118,40 @@ const asBadRequest = <T>(fn: () => T): T => {
 };
 
 export const integrationsRouter = createTRPCRouter({
-  // intentionally fetches all integrations, not just user's
+  // intentionally fetches all integrations, not just user's — one unified
+  // list across every resource type, for the enabled-integrations table.
   getMany: protectedProcedure
-    .input(paginatedIntegrationsInputSchema)
+    .input(paginationInputSchema)
     .query(async ({ input }) => {
-      const { search, resourceType } = input;
-
-      // An integration is "for" a resource if it has a sync row for it
-      const whereFilter = {
-        resourceSyncs: { some: { resource: resourceType } },
+      const where = {
         name: {
-          contains: search,
+          contains: input.search,
           mode: "insensitive" as const,
         },
       };
 
-      return fetchPaginated(prisma.integration, input, {
-        where: whereFilter,
+      const result = await fetchPaginated(prisma.integration, input, {
+        where,
         include: integrationsInclude,
         omit: omitCredentials,
       });
+
+      // Add each resource sync's resolved cadence — the table shows "every 5
+      // min" vs "every 5 min (default)" by checking the already-selected
+      // `syncEvery` (null = inherited) alongside this.
+      const items = (result.items as IntegrationRow[]).map((integration) => ({
+        ...integration,
+        resourceSyncs: integration.resourceSyncs.map((sync) => ({
+          ...sync,
+          effectiveSyncEvery: effectiveSyncEvery(
+            sync.syncEvery,
+            integration.syncEvery,
+            defaultSyncEveryFor(integration.platform, sync.resource),
+          ),
+        })),
+      }));
+
+      return { ...result, items };
     }),
 
   create: protectedProcedure
@@ -256,20 +266,46 @@ export const integrationsRouter = createTRPCRouter({
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
-      const existing = await prisma.integration.findUnique({
-        where: { id: input.id },
-        select: { resourceSyncs: { select: { resource: true } } },
-      });
-
-      const deleted = await prisma.integration.delete({
+      return prisma.integration.delete({
         where: { id: input.id },
         omit: omitCredentials,
       });
+    }),
 
-      return {
-        ...deleted,
-        resources: existing?.resourceSyncs.map((s) => s.resource) ?? [],
-      };
+  // Operator kill switch for the whole integration — distinct from `update`,
+  // which requires a full (and platform-validated) config/credentials payload.
+  setEnabled: protectedProcedure
+    .input(z.object({ id: z.string(), enabled: z.boolean() }))
+    .mutation(async ({ input }) => {
+      // Caller just invalidates and refetches getMany — no need to shape a
+      // full response here, same as `remove` below.
+      return prisma.integration.update({
+        where: { id: input.id },
+        data: { enabled: input.enabled },
+        omit: omitCredentials,
+      });
+    }),
+
+  // Same, but for one resource on a multi-resource integration (e.g. turn off
+  // work orders, keep assets syncing).
+  setResourceSyncEnabled: protectedProcedure
+    .input(
+      z.object({
+        integrationId: z.string(),
+        resource: z.enum(ResourceType),
+        enabled: z.boolean(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return prisma.integrationResourceSync.update({
+        where: {
+          integrationId_resource: {
+            integrationId: input.integrationId,
+            resource: input.resource,
+          },
+        },
+        data: { enabled: input.enabled },
+      });
     }),
 
   triggerSync: protectedProcedure

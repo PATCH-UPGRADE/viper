@@ -1,244 +1,290 @@
-// TODO(VW-499): Fix changes after VW-427
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
-import { RefreshCw, Sparkles, SquarePen, TrashIcon } from "lucide-react";
+import { TrashIcon } from "lucide-react";
 import ms from "ms";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SortableHeader } from "@/components/ui/data-table";
-import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { type ResourceType, SyncStatusEnum } from "@/generated/prisma";
-import type { AuthenticationInputType } from "@/lib/schemas";
+import { SyncStatusEnum } from "@/generated/prisma";
+import { initialsOf } from "@/lib/utils";
 import {
   useRemoveIntegration,
-  useTriggerSync,
-  useUpdateIntegration,
+  useSetIntegrationEnabled,
+  useSetResourceSyncEnabled,
 } from "../hooks/use-integrations";
-import {
-  type IntegrationFormValues,
-  type IntegrationWithRelations,
-  integrationInputSchema,
+import type {
+  IntegrationListItem,
+  IntegrationResourceSyncItem,
 } from "../types";
-import { IntegrationCreateModal, SyncStatusIndicator } from "./integrations";
+import {
+  categoryLabelFor,
+  platformLabels,
+  resourceActivityNoun,
+  resourceTypeLabel,
+} from "../types";
+import { SyncStatusIndicator } from "./integrations";
 
-export const getIntegrationColumns = (
-  resourceType: ResourceType,
-): ColumnDef<IntegrationWithRelations>[] => {
-  return [
-    {
-      id: "sync",
-      header: "Sync",
-      cell: ({ row }) => {
-        const triggerSync = useTriggerSync();
-        const handleSync = async () => {
-          await triggerSync.mutateAsync({ id: row.original.id });
-        };
-        return (
-          <Button
-            onClick={handleSync}
-            disabled={triggerSync.isPending}
-            className="font-semibold"
-          >
-            <RefreshCw
-              className={triggerSync.isPending ? "animate-spin" : ""}
-            />
-            {triggerSync.isPending ? "Syncing..." : "Sync Now"}
-          </Button>
-        );
-      },
-    },
-    {
-      id: "name",
-      accessorKey: "name",
-      header: ({ column }) => <SortableHeader header="Name" column={column} />,
-      cell: ({ row }) => {
-        return (
-          <div className="flex gap-1 items-center">
-            {row.original.integrationType === "AI" && <Sparkles size={15} />}
-            <div className="font-semibold max-w-60 overflow-ellipsis overflow-hidden">
-              {row.original.name}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      meta: { title: "API URL" },
-      header: "API URL",
-      accessorKey: "integrationUri",
-      cell: ({ row }) => {
-        return (
-          <div className="font-mono max-w-80 overflow-ellipsis overflow-hidden">
-            {row.original.integrationUri}
-          </div>
-        );
-      },
-    },
-    {
-      id: "status",
-      accessorFn: (row) => row.syncStatus[0]?.status,
-      meta: { title: "Status" },
-      header: ({ column }) => (
-        <SortableHeader header="Status" column={column} />
-      ),
-      cell: ({ row }) => {
-        const syncStatus = row.original.syncStatus[0];
-        return (
-          <Tooltip>
-            <TooltipTrigger>
-              <SyncStatusIndicator status={syncStatus?.status} />
-            </TooltipTrigger>
-            {syncStatus && syncStatus?.status === SyncStatusEnum.Error && (
-              <TooltipContent>{syncStatus.errorMessage}</TooltipContent>
-            )}
-          </Tooltip>
-        );
-      },
-    },
-    {
-      id: "lastSynced",
-      accessorFn: (row) => row.syncStatus[0]?.syncedAt,
-      meta: { title: "Last Synced" },
-      header: ({ column }) => (
-        <SortableHeader header="Last Synced" column={column} />
-      ),
-      cell: ({ row }) => {
-        const lastSynced = row.original.syncStatus[0]?.syncedAt;
-        return (
-          <Tooltip>
-            <TooltipTrigger>
-              {lastSynced ? `${formatDistanceToNow(lastSynced)} ago` : "Never"}
-            </TooltipTrigger>
-            <TooltipContent>
-              {lastSynced ? lastSynced.toLocaleString() : "Never"}
-            </TooltipContent>
-          </Tooltip>
-        );
-      },
-    },
-    {
-      accessorKey: "syncEvery",
-      meta: { title: "Frequency" },
-      header: "Frequency",
-      // ms is one of those libraries that makes me feel like I'm incurring another left-pad incident
-      // but welcome to modern modular javascript <3
-      accessorFn: (row) => `Every ${ms(1000 * row.syncEvery)}`,
-    },
-    {
-      id: "createdItems",
-      meta: { title: "Created Items" },
-      header: resourceType,
-      cell: ({ row }) => {
-        const counts = row.original._count;
-        switch (resourceType) {
-          case "Asset":
-            return counts.assetMappings;
-          case "DeviceArtifact":
-            return counts.deviceArtifactMappings;
-          case "Remediation":
-            return counts.remediationMappings;
-          case "Vulnerability":
-            return counts.vulnerabilityMappings;
-        }
-      },
-    },
-    {
-      id: "actions",
-      enableHiding: false,
-      cell: ({ row }) => {
-        const data = row.original;
-
-        const removeItem = useRemoveIntegration();
-        const handleRemove = () => {
-          removeItem.mutate({ id: data.id });
-        };
-
-        const updateIntegration = useUpdateIntegration();
-        const [open, setOpen] = useState(false);
-
-        const form = useForm<IntegrationFormValues>({
-          resolver: zodResolver(integrationInputSchema),
-          defaultValues: {
-            name: data.name,
-            platform: data.platform || "",
-            integrationUri: data.integrationUri,
-            integrationType: data.integrationType,
-            prompt: data.prompt || "",
-            authType: data.authType,
-            resourceType: data.resourceType,
-            syncEvery: data.syncEvery || 300,
-            authentication:
-              (data.authentication as AuthenticationInputType) ?? undefined,
-          },
-        });
-
-        const handleUpdate = (item: IntegrationFormValues) => {
-          updateIntegration.mutate(
-            { id: data.id, data: item },
-            {
-              onSuccess: () => {
-                form.reset();
-                setOpen(false);
-              },
-              onError: () => {
-                setOpen(true);
-              },
-            },
-          );
-        };
-
-        return (
-          <>
-            <MoreVerticalDropdownMenu
-              contentClassName="w-[200px]"
-              items={[
-                {
-                  items: [
-                    {
-                      label: updateIntegration.isPending
-                        ? "Updating..."
-                        : "Update",
-                      icon: <SquarePen />,
-                      onClick: () => setOpen(true),
-                      disabled: updateIntegration.isPending,
-                    },
-                  ],
-                },
-                {
-                  items: [
-                    {
-                      label: "Delete Integration",
-                      icon: <TrashIcon strokeWidth={3} />,
-                      onClick: handleRemove,
-                      disabled: removeItem.isPending,
-                      variant: "destructive",
-                    },
-                  ],
-                },
-              ]}
-            />
-
-            {open && (
-              <IntegrationCreateModal
-                form={form}
-                open={open}
-                setOpen={setOpen}
-                handleCreate={handleUpdate}
-                isUpdate={true}
-              />
-            )}
-          </>
-        );
-      },
-    },
-  ];
+type IntegrationRow = IntegrationListItem & {
+  expandableResourceSyncs: IntegrationResourceSyncItem[];
 };
+
+const frequencyLabel = (sync: {
+  effectiveSyncEvery: number;
+  syncEvery: number | null;
+}) =>
+  `Every ${ms(sync.effectiveSyncEvery * 1000)}${sync.syncEvery === null ? " (default)" : ""}`;
+
+/** `formatDistanceToNow` with `addSuffix` reads "5 minutes ago" for the past
+ * and "in 5 minutes" for the future — one helper covers both last-synced and
+ * next-sync-due. */
+const relativeTime = (date: Date) =>
+  formatDistanceToNow(date, { addSuffix: true });
+
+const activityLine = (sync: IntegrationResourceSyncItem) =>
+  sync.lastSyncCreatedCount != null
+    ? `${sync.lastSyncCreatedCount} ${resourceActivityNoun(sync.resource)}`
+    : null;
+
+const timingLine = (sync: IntegrationResourceSyncItem) => {
+  if (!sync.lastSuccessfulSync) return "Never synced";
+  const parts = [`Synced ${relativeTime(sync.lastSuccessfulSync)}`];
+  if (sync.nextSyncAt && sync.enabled) {
+    // A due-but-not-yet-run sync (cron hasn't ticked) reads as "Next sync
+    // 5 hours ago", which looks like a typo rather than a schedule. State
+    // it as overdue instead of reusing the past-tense phrasing.
+    parts.push(
+      sync.nextSyncAt.getTime() <= Date.now()
+        ? "Sync due"
+        : `Next sync ${relativeTime(sync.nextSyncAt)}`,
+    );
+  }
+  return parts.join(" · ");
+};
+
+const StatusCell = ({
+  sync,
+}: {
+  sync: Pick<IntegrationResourceSyncItem, "status" | "errorMessage">;
+}) => (
+  <Tooltip>
+    <TooltipTrigger>
+      <SyncStatusIndicator status={sync.status} />
+    </TooltipTrigger>
+    {sync.status === SyncStatusEnum.Error && sync.errorMessage && (
+      <TooltipContent>{sync.errorMessage}</TooltipContent>
+    )}
+  </Tooltip>
+);
+
+const SyncSummaryCell = ({ row }: { row: IntegrationListItem }) => {
+  const { resourceSyncs } = row;
+
+  if (resourceSyncs.length > 1) {
+    const enabledCount = resourceSyncs.filter((s) => s.enabled).length;
+    return (
+      <div className="text-xs text-muted-foreground">
+        {enabledCount} of {resourceSyncs.length} feeds active
+      </div>
+    );
+  }
+
+  const sync = resourceSyncs[0];
+  if (!sync) return null;
+  const activity = activityLine(sync);
+
+  return (
+    <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+      {activity && <span>{activity}</span>}
+      <span>
+        {frequencyLabel(sync)} · {timingLine(sync)}
+      </span>
+    </div>
+  );
+};
+
+export const columns: ColumnDef<IntegrationRow>[] = [
+  {
+    id: "integration",
+    accessorKey: "name",
+    header: ({ column }) => (
+      <SortableHeader header="Integration" column={column} />
+    ),
+    cell: ({ row }) => {
+      const integration = row.original;
+      const category = categoryLabelFor(
+        integration.platform,
+        integration.resourceSyncs.map((s) => s.resource),
+      );
+      return (
+        <div className="flex items-start gap-3">
+          <Avatar className="size-8 shrink-0 border">
+            <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
+              {initialsOf(integration.name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="font-semibold overflow-ellipsis overflow-hidden">
+              {integration.name}
+              <span className="font-normal text-muted-foreground">
+                {" "}
+                · {platformLabels[integration.platform]}
+              </span>
+            </div>
+            <span className="text-xs text-muted-foreground">{category}</span>
+            <SyncSummaryCell row={integration} />
+          </div>
+        </div>
+      );
+    },
+  },
+  {
+    id: "status",
+    meta: { title: "Status" },
+    header: "Status",
+    cell: ({ row }) => {
+      const { resourceSyncs } = row.original;
+      if (resourceSyncs.length !== 1) return null;
+      return <StatusCell sync={resourceSyncs[0]} />;
+    },
+  },
+  {
+    id: "enabled",
+    meta: { title: "Enabled" },
+    header: "Enabled",
+    cell: ({ row }) => {
+      const setEnabled = useSetIntegrationEnabled();
+      return (
+        <Switch
+          checked={row.original.enabled}
+          disabled={setEnabled.isPending}
+          onCheckedChange={(enabled) =>
+            setEnabled.mutate({ id: row.original.id, enabled })
+          }
+          aria-label={`${row.original.enabled ? "Disable" : "Enable"} ${row.original.name}`}
+        />
+      );
+    },
+  },
+  {
+    id: "actions",
+    enableHiding: false,
+    cell: ({ row }) => {
+      const data = row.original;
+      const removeItem = useRemoveIntegration();
+      const [confirmOpen, setConfirmOpen] = useState(false);
+
+      return (
+        <>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                onClick={() => setConfirmOpen(true)}
+              >
+                <span className="sr-only">Remove Integration</span>
+                <TrashIcon className="h-4 w-4 text-destructive" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Remove Integration</TooltipContent>
+          </Tooltip>
+
+          <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove integration?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This stops <strong>{data.name}</strong> from syncing and
+                  removes it entirely. This can&apos;t be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    await removeItem.mutateAsync({ id: data.id });
+                    setConfirmOpen(false);
+                  }}
+                >
+                  Remove
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      );
+    },
+  },
+];
+
+export const resourceColumns: ColumnDef<IntegrationResourceSyncItem>[] = [
+  {
+    id: "resource",
+    header: "Resource",
+    cell: ({ row }) => {
+      const sync = row.original;
+      const activity = activityLine(sync);
+      return (
+        <div className="flex flex-col gap-0.5">
+          <span className="font-medium">
+            {resourceTypeLabel(sync.resource)}
+          </span>
+          {sync.enabled ? (
+            <span className="text-xs text-muted-foreground">
+              {activity && `${activity} · `}
+              {frequencyLabel(sync)} · {timingLine(sync)}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">Disabled</span>
+          )}
+        </div>
+      );
+    },
+  },
+  {
+    id: "status",
+    header: "Status",
+    cell: ({ row }) => <StatusCell sync={row.original} />,
+  },
+  {
+    id: "enabled",
+    header: "Enabled",
+    cell: ({ row }) => {
+      const sync = row.original;
+      const setResourceEnabled = useSetResourceSyncEnabled();
+      return (
+        <Switch
+          checked={sync.enabled}
+          disabled={setResourceEnabled.isPending}
+          onCheckedChange={(enabled) =>
+            setResourceEnabled.mutate({
+              integrationId: sync.integrationId,
+              resource: sync.resource,
+              enabled,
+            })
+          }
+          aria-label={`${sync.enabled ? "Disable" : "Enable"} ${resourceTypeLabel(sync.resource)} sync`}
+        />
+      );
+    },
+  },
+];

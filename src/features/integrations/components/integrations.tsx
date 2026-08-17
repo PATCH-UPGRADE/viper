@@ -35,20 +35,13 @@ export const IntegrationsSearch = () => {
 export const IntegrationsList = () => {
   const { data: integrations, isFetching } = useSuspenseIntegrations();
 
-  // Only worth expanding when there's more than one resource to break out.
-  const items = integrations.items.map((integration) => ({
-    ...integration,
-    expandableResourceSyncs:
-      integration.resourceSyncs.length > 1 ? integration.resourceSyncs : [],
-  }));
-
   return (
     <DataTable
       search={<IntegrationsSearch />}
-      paginatedData={{ ...integrations, items }}
+      paginatedData={integrations}
       columns={columns}
       nestedColumns={resourceColumns}
-      nestedDataKey="expandableResourceSyncs"
+      nestedDataKey="resourceSyncs"
       isLoading={isFetching}
     />
   );
@@ -91,7 +84,7 @@ export const IntegrationsContainer = ({
     <div className={cn(mainPadding, "flex flex-col gap-4")}>
       <SettingsSubheader
         title="Integrations"
-        description="Manage external integrations to sync assets and vulnerabilities"
+        description="Manage external integrations and their synced resources"
       />
       {children}
     </div>

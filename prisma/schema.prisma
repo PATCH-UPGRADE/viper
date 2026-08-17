@@ -1036,12 +1036,6 @@ model IntegrationResourceSync {
 
   nextSyncAt DateTime? // when this resource is next due. null = due now.
 
-  // How many items processIntegrationSync created/updated on the last
-  // successful attempt (its `response.{created,updated}ItemsCount`).
-  // null = never synced.
-  lastSyncCreatedCount Int?
-  lastSyncUpdatedCount Int?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

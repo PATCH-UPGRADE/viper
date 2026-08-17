@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { SortableHeader } from "@/components/ui/data-table";
 import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
@@ -25,7 +24,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { SyncStatusEnum } from "@/generated/prisma";
-import { initialsOf, plural } from "@/lib/utils";
 import {
   useRemoveIntegration,
   useSetIntegrationEnabled,
@@ -36,17 +34,17 @@ import type {
   IntegrationListItem,
   IntegrationResourceSyncItem,
 } from "../types";
-import {
-  categoryLabelFor,
-  platformLabels,
-  resourceActivityNoun,
-  resourceTypeLabel,
-} from "../types";
+import { platformLabels, resourceTypeLabel } from "../types";
 import { SyncStatusIndicator } from "./integrations";
 
-type IntegrationRow = IntegrationListItem & {
-  expandableResourceSyncs: IntegrationResourceSyncItem[];
-};
+const initialsOf = (name: string) =>
+  name
+    .split(/\s+/)
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
 const frequencyLabel = (sync: {
   effectiveSyncEvery: number;
@@ -59,19 +57,6 @@ const frequencyLabel = (sync: {
  * next-sync-due. */
 const relativeTime = (date: Date) =>
   formatDistanceToNow(date, { addSuffix: true });
-
-const activityLine = (sync: IntegrationResourceSyncItem) => {
-  if (sync.lastSyncCreatedCount == null) return null;
-  if (sync.lastSyncCreatedCount > 0) {
-    return `${sync.lastSyncCreatedCount} ${resourceActivityNoun(sync.resource, sync.lastSyncCreatedCount)}`;
-  }
-  // 0 new records reads as "idle" even when the sync is actively keeping
-  // existing records fresh — call that out instead of just "0 new X".
-  if (sync.lastSyncUpdatedCount) {
-    return `${sync.lastSyncUpdatedCount} ${plural("update", sync.lastSyncUpdatedCount)}`;
-  }
-  return null;
-};
 
 const timingLine = (sync: IntegrationResourceSyncItem) => {
   if (!sync.lastSuccessfulSync) return "Never synced";
@@ -104,10 +89,10 @@ const StatusCell = ({
   </Tooltip>
 );
 
-const SyncSummaryCell = ({ row }: { row: IntegrationRow }) => {
+const SyncSummaryCell = ({ row }: { row: IntegrationListItem }) => {
   const { resourceSyncs } = row;
 
-  if (row.expandableResourceSyncs.length > 0) {
+  if (resourceSyncs.length > 1) {
     // The integration's own kill switch overrides every resource's flag —
     // don't report feeds as active when the whole integration is off.
     const enabledCount = row.enabled
@@ -122,31 +107,21 @@ const SyncSummaryCell = ({ row }: { row: IntegrationRow }) => {
 
   const sync = resourceSyncs[0];
   if (!sync) return null;
-  const activity = activityLine(sync);
 
   return (
-    <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-      {activity && <span>{activity}</span>}
-      <span>
-        {frequencyLabel(sync)} · {timingLine(sync)}
-      </span>
+    <div className="text-xs text-muted-foreground">
+      {frequencyLabel(sync)} · {timingLine(sync)}
     </div>
   );
 };
 
-export const columns: ColumnDef<IntegrationRow>[] = [
+export const columns: ColumnDef<IntegrationListItem>[] = [
   {
     id: "integration",
     accessorKey: "name",
-    header: ({ column }) => (
-      <SortableHeader header="Integration" column={column} />
-    ),
+    header: "Integration",
     cell: ({ row }) => {
       const integration = row.original;
-      const category = categoryLabelFor(
-        integration.platform,
-        integration.resourceSyncs.map((s) => s.resource),
-      );
       return (
         <div className="flex items-start gap-3">
           <Avatar className="size-8 shrink-0 border">
@@ -162,7 +137,6 @@ export const columns: ColumnDef<IntegrationRow>[] = [
                 · {platformLabels[integration.platform]}
               </span>
             </div>
-            <span className="text-xs text-muted-foreground">{category}</span>
             <SyncSummaryCell row={integration} />
           </div>
         </div>
@@ -175,7 +149,7 @@ export const columns: ColumnDef<IntegrationRow>[] = [
     header: "Status",
     cell: ({ row }) => {
       const integration = row.original;
-      if (integration.expandableResourceSyncs.length > 0) return null;
+      if (integration.resourceSyncs.length !== 1) return null;
       return <StatusCell sync={integration.resourceSyncs[0]} />;
     },
   },
@@ -251,13 +225,11 @@ export const columns: ColumnDef<IntegrationRow>[] = [
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
-                  onClick={async () => {
-                    // onError already toasts; keep the dialog open on
-                    // failure so the user can see it and retry or cancel.
-                    try {
-                      await removeItem.mutateAsync({ id: data.id });
-                      setConfirmOpen(false);
-                    } catch {}
+                  disabled={removeItem.isPending}
+                  onClick={async (event) => {
+                    event.preventDefault();
+                    await removeItem.mutateAsync({ id: data.id });
+                    setConfirmOpen(false);
                   }}
                 >
                   Remove
@@ -277,7 +249,6 @@ export const resourceColumns: ColumnDef<IntegrationResourceSyncItem>[] = [
     header: "Resource",
     cell: ({ row }) => {
       const sync = row.original;
-      const activity = activityLine(sync);
       return (
         <div className="flex flex-col gap-0.5">
           <span className="font-medium">
@@ -285,7 +256,6 @@ export const resourceColumns: ColumnDef<IntegrationResourceSyncItem>[] = [
           </span>
           {sync.enabled ? (
             <span className="text-xs text-muted-foreground">
-              {activity && `${activity} · `}
               {frequencyLabel(sync)} · {timingLine(sync)}
             </span>
           ) : (

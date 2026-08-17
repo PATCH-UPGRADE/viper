@@ -6,7 +6,6 @@ import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
-import { userIncludeSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
   authCredentialSchema,
@@ -18,21 +17,20 @@ import { resourcesFor } from "../core/sync/resources";
 import type { AnyConnectorModule } from "../core/types";
 import { type IntegrationFormValues, integrationInputSchema } from "../types";
 
+/** Encrypted credentials must never reach the browser. */
+const omitCredentials = { credentials: true } as const;
+
 const integrationsInclude = {
-  user: userIncludeSelect,
   resourceSyncs: {
     select: {
       integrationId: true,
       resource: true,
       status: true,
       errorMessage: true,
-      lastAttemptAt: true,
       lastSuccessfulSync: true,
       nextSyncAt: true,
       enabled: true,
       syncEvery: true,
-      lastSyncCreatedCount: true,
-      lastSyncUpdatedCount: true,
     },
     orderBy: {
       resource: "asc", // stable ordering; one row per resource
@@ -40,15 +38,18 @@ const integrationsInclude = {
   },
 } as const;
 
-type IntegrationRow = Prisma.IntegrationGetPayload<{
-  include: typeof integrationsInclude;
-  omit: typeof omitCredentials;
-}>;
+const integrationListSelect = {
+  id: true,
+  name: true,
+  platform: true,
+  syncEvery: true,
+  enabled: true,
+  resourceSyncs: integrationsInclude.resourceSyncs,
+} as const satisfies Prisma.IntegrationSelect;
 
-/**
- * Encrypted credentials must never reach the browser
- */
-const omitCredentials = { credentials: true } as const;
+type IntegrationListRow = Prisma.IntegrationGetPayload<{
+  select: typeof integrationListSelect;
+}>;
 
 /**
  * The input carries `config` as opaque JSON which makes the platform module the one and
@@ -133,8 +134,7 @@ export const integrationsRouter = createTRPCRouter({
 
       const result = await fetchPaginated(prisma.integration, input, {
         where,
-        include: integrationsInclude,
-        omit: omitCredentials,
+        select: integrationListSelect,
       });
 
       // Add each resource sync's resolved cadence, plus whether that's the
@@ -143,23 +143,23 @@ export const integrationsRouter = createTRPCRouter({
       // apart from `syncEvery` alone (a nested resource row never sees its
       // parent integration's `syncEvery`).
       const now = new Date();
-      const items = (result.items as IntegrationRow[]).map((integration) => ({
-        ...integration,
-        resourceSyncs: integration.resourceSyncs.map((sync) => ({
-          ...sync,
-          isOverridden:
-            sync.syncEvery !== null || integration.syncEvery !== null,
-          effectiveSyncEvery: effectiveSyncEvery(
-            sync.syncEvery,
-            integration.syncEvery,
-            defaultSyncEveryFor(integration.platform, sync.resource),
-          ),
-          // Same "due" check the cron itself uses (fetch-due-resource-syncs
-          // in sync-integrations.ts) — computed against the server's clock,
-          // not the browser's.
-          isDue: sync.nextSyncAt !== null && sync.nextSyncAt <= now,
-        })),
-      }));
+      const items = (result.items as IntegrationListRow[]).map(
+        ({ syncEvery, ...integration }) => ({
+          ...integration,
+          resourceSyncs: integration.resourceSyncs.map((sync) => ({
+            ...sync,
+            isOverridden: sync.syncEvery !== null || syncEvery !== null,
+            effectiveSyncEvery: effectiveSyncEvery(
+              sync.syncEvery,
+              syncEvery,
+              defaultSyncEveryFor(integration.platform, sync.resource),
+            ),
+            // Same "due" check the cron uses, computed against the server's
+            // clock rather than the browser's.
+            isDue: sync.nextSyncAt !== null && sync.nextSyncAt <= now,
+          })),
+        }),
+      );
 
       return { ...result, items };
     }),
@@ -324,7 +324,7 @@ export const integrationsRouter = createTRPCRouter({
       // any user can trigger any integration
       // but if we change so later, implement that here
       const integration = await prisma.integration.findFirst({
-        where: { id: input.id },
+        where: { id: input.id, enabled: true },
         select: {
           id: true,
           // Same filter the cron uses: a resource the operator switched off

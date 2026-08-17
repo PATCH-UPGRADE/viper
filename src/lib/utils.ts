@@ -88,16 +88,6 @@ export const sendWebhook = async (
   });
 };
 
-export function initialsOf(name?: string | null): string {
-  return (name ?? "?")
-    .split(/\s+/)
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return "0 Bytes";
 

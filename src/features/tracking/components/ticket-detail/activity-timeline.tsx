@@ -14,7 +14,6 @@ import type {
   TicketStatus,
 } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
-import { initialsOf } from "@/lib/utils";
 import type { TicketDetail } from "../../types";
 import { AddCommentForm } from "./add-comment-form";
 import { CollapsibleSectionCard } from "./section-card";
@@ -26,6 +25,15 @@ type Activity = TicketDetail["activities"][number];
 type TimelineEntry =
   | { kind: "activity"; createdAt: Date; row: Activity }
   | { kind: "comment"; createdAt: Date; row: Comment };
+
+const initialsOf = (name?: string | null) =>
+  (name ?? "?")
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
 const isAgentUser = (user: Activity["user"]) => !!user.integrationUser;
 

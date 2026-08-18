@@ -1,3 +1,4 @@
+import type { RollbackLevel } from "@/features/inbox/agent/mitigation/schema";
 import type { PlanTagEnum } from "@/generated/prisma";
 
 export const planTagLabels: Record<PlanTagEnum, string> = {
@@ -39,6 +40,13 @@ export function residualRiskTone(value: string | undefined): RiskTone {
   }
   return "unknown";
 }
+
+export const rollbackToneClass: Record<RollbackLevel, string> = {
+  Easy: "text-green-700 dark:text-green-300",
+  Moderate: "text-yellow-700 dark:text-yellow-300",
+  Hard: "text-red-700 dark:text-red-300",
+  Uncertain: "text-muted-foreground",
+};
 
 export const riskToneClass: Record<RiskTone, string> = {
   low: "text-green-700 dark:text-green-300",

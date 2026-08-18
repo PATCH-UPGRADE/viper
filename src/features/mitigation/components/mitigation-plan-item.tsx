@@ -26,6 +26,7 @@ import {
   planTagLabels,
   residualRiskTone,
   riskToneClass,
+  rollbackToneClass,
 } from "./shared";
 
 export function MitigationPlanItem({
@@ -132,11 +133,27 @@ export function MitigationPlanItem({
                       "mt-1 text-sm font-medium",
                       field === "residual_risk" &&
                         riskToneClass[residualRiskTone(cards[field])],
-                      field === "rollback" && "line-clamp-4",
                     )}
-                    title={field === "rollback" ? cards[field] : undefined}
+                    title={field === "rollback" ? cards.rollback : undefined}
                   >
-                    {cards[field] || "—"}
+                    {field === "rollback" ? (
+                      <>
+                        <span
+                          className={cn(
+                            "font-semibold",
+                            cards.rollback_level &&
+                              rollbackToneClass[cards.rollback_level],
+                          )}
+                        >
+                          {cards.rollback_level ?? "—"}
+                        </span>
+                        {cards.rollback_summary
+                          ? ` — ${cards.rollback_summary}`
+                          : null}
+                      </>
+                    ) : (
+                      cards[field] || "—"
+                    )}
                   </p>
                 </div>
               ))}

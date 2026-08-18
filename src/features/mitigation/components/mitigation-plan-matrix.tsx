@@ -17,7 +17,12 @@ import { planCardsSchema } from "@/features/inbox/agent/mitigation/schema";
 import { cn } from "@/lib/utils";
 import type { MitigationPlanWithWorkOrders } from "../types";
 import { AcceptPlanDrawer } from "./accept-plan-drawer";
-import { planCardFields, residualRiskTone, riskToneClass } from "./shared";
+import {
+  planCardFields,
+  residualRiskTone,
+  riskToneClass,
+  rollbackToneClass,
+} from "./shared";
 
 const ROW_LABEL =
   "w-48 px-4 py-4 align-top text-xs font-medium uppercase tracking-wide text-muted-foreground";
@@ -122,7 +127,21 @@ export function MitigationPlanMatrix({
                         ),
                     )}
                   >
-                    {cards?.[field] || "—"}
+                    {field === "rollback" && cards?.rollback_level ? (
+                      <>
+                        <span
+                          className={cn(
+                            "font-semibold",
+                            rollbackToneClass[cards.rollback_level],
+                          )}
+                        >
+                          {cards.rollback_level}
+                        </span>
+                        {cards.rollback ? ` — ${cards.rollback}` : null}
+                      </>
+                    ) : (
+                      cards?.[field] || "—"
+                    )}
                   </TableCell>
                 ))}
               </TableRow>

@@ -26,8 +26,10 @@ const goldenPlan = {
     residual_risk: "Low",
     coverage: "6 of 6 assets",
     timeline: "Contained today · patched in ~2 weeks",
+    rollback_level: "Easy",
+    rollback_summary: "Revertible by IT in minutes",
     rollback:
-      "Easy — the firewall rules revert from the console in ~10 min. The firmware update needs a vendor session to roll back.",
+      "The firewall rules revert from the console in ~10 min. The firmware update needs a vendor session to roll back.",
   },
   workOrders: [
     {
@@ -95,11 +97,28 @@ describe("buildMitigationPlansSchema", () => {
   });
 
   it("accepts a plan with no rollback card — rows written before the field existed", () => {
-    const { rollback: _rollback, ...cardsWithoutRollback } = goldenPlan.cards;
+    const {
+      rollback: _rollback,
+      rollback_level: _level,
+      rollback_summary: _summary,
+      ...cardsWithoutRollback
+    } = goldenPlan.cards;
     const parsed = schema.safeParse({
       plans: [{ ...goldenPlan, cards: cardsWithoutRollback }],
     });
     expect(parsed.success).toBe(true);
+  });
+
+  it("rejects a rollback level outside the enum", () => {
+    const parsed = schema.safeParse({
+      plans: [
+        {
+          ...goldenPlan,
+          cards: { ...goldenPlan.cards, rollback_level: "Trivial" },
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
   });
 
   it("rejects an opaque ref leaking into the rollback card", () => {

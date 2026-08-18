@@ -9,7 +9,7 @@ import type {
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
-import { ChatNoteInput } from "../types";
+import type { ChatNoteInput } from "../types";
 import { resolveNoteTargetLabel } from "./note-targets";
 
 type ResolvedTarget = {

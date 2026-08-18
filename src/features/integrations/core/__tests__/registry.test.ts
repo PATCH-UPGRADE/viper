@@ -5,7 +5,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: {} }));
 
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
-import { defaultSyncEveryFor, registry, requirePlatform } from "../registry";
+import { defaultSyncEveryFor, requirePlatform } from "../registry";
 
 /**
  * Importing this module runs the registry's load-time assertion, so simply
@@ -22,7 +22,11 @@ describe("registry", () => {
     );
   });
 
-  // TODO: VW-431, test to make sure fleet gets registered
+  it("registers templay Fleet", () => {
+    expect(requirePlatform(PlatformEnum.FLEET).definition.platform).toBe(
+      PlatformEnum.FLEET,
+    );
+  });
 
   it("has no cadence opinion for a platform without ResourceModules", () => {
     expect(defaultSyncEveryFor(PlatformEnum.AI, ResourceType.Asset)).toBeNull();

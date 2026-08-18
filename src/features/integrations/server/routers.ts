@@ -207,6 +207,14 @@ export const integrationsRouter = createTRPCRouter({
           omit: omitCredentials,
         });
       });
+      try {
+        await module.onCreate?.();
+      } catch (err) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: err instanceof Error ? err.message : "Invalid integration",
+        });
+      }
       return integration;
     }),
 

@@ -1,49 +1,58 @@
-import { grabSessionCookie } from "../src/features/integrations/teamplay-fleet/capture";
 import {
-  FLEET,
+  createFleetSession,
   FLEET_LOGIN_CONFIG,
-} from "../src/features/integrations/teamplay-fleet/config";
+  grabSessionCookie,
+} from "@/features/integrations/platforms/teamplay-fleet/session";
+import { PlatformEnum } from "@/generated/prisma";
 import prisma from "../src/lib/db";
 
-const url =
+const ADVISORIES_URL =
   "https://fleet.siemens-healthineers.com/rest/v1/security-advisories/active";
 
-// TODO: VW-431, this most certainly needs to be updated as part of this ticket
+const username = process.env.FLEET_USERNAME ?? "";
+const password = process.env.FLEET_PASSWORD ?? "";
+
 async function main() {
-  const userName = process.env.FLEET_ADVISORY_USERNAME;
-  const password = process.env.FLEET_ADVISORY_PASSWORD;
+  const integration = await prisma.integration.findFirstOrThrow({
+    where: { platform: PlatformEnum.FLEET },
+  });
 
-  if (!userName || !password) {
-    throw new Error(
-      "Set FLEET_ADVISORY_USERNAME and FLEET_ADVISORY_PASSWORD -- run with --env-file=.env",
-    );
-  }
-
-  const session = await grabSessionCookie(
+  console.log("--- grabSessionCookie ---");
+  console.time("login");
+  const captured = await grabSessionCookie(
     FLEET_LOGIN_CONFIG,
-    userName,
+    username,
     password,
   );
-  const cookiePairs = Object.fromEntries(
-    session.value.split("; ").map((pair) => {
-      const equal = pair.indexOf("=");
-      return [pair.slice(0, equal), pair.slice(equal + 1)];
-    }),
+  console.timeEnd("login");
+
+  console.log("header: ", captured.header);
+  console.log("expires: ", captured.expiresAt?.toISOString() ?? "");
+
+  // testing after login, first hitting userprofile endpoing, ensure session established
+  const profile = await fetch(FLEET_LOGIN_CONFIG.authUrl, {
+    headers: { [captured.header]: captured.value },
+  });
+  console.log(
+    "user profile: ",
+    profile.status,
+    profile.ok ? "authenticated" : "",
   );
 
-  console.log("parsed cookies ", cookiePairs);
+  console.log("--- creteFleetSession ---");
+  const session = await createFleetSession(integration.id, {
+    username,
+    password,
+  });
+  console.time("first advisory request");
+  const advisoryFirst = await session.request(ADVISORIES_URL);
+  console.timeEnd("first advisory request");
+  console.log("first advisory request ", advisoryFirst.status);
 
-  const results = await fetch(
-    "https://fleet.siemens-healthineers.com/rest/v1/security-advisories/active",
-    {
-      headers: { [session.header]: session.value },
-    },
-  );
-  const data = await results.json();
-  console.log("data ", data);
-
-  const res = await FLEET.fetchWithSession(url);
-  console.log("status: ", res.status);
+  console.time("second advisory request, reuse cookie");
+  const advisorySecond = await session.request(ADVISORIES_URL);
+  console.timeEnd("second advisory request, reuse cookie");
+  console.log("second advisory request, reuse cookie ", advisorySecond.status);
 }
 
 main()

@@ -44,7 +44,7 @@ export function CorrectionDialog({
     try {
       await onSave(reason.trim() || undefined);
       setReason("");
-    } catch (err) {
+    } catch {
     } finally {
       setSaving(false);
     }

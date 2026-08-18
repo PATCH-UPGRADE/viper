@@ -33,7 +33,7 @@ export const IntegrationsSearch = () => {
 };
 
 export const IntegrationsList = () => {
-  const { data: integrations, isFetching } = useSuspenseIntegrations();
+  const { data: integrations } = useSuspenseIntegrations();
 
   return (
     <DataTable
@@ -42,7 +42,6 @@ export const IntegrationsList = () => {
       columns={columns}
       nestedColumns={resourceColumns}
       nestedDataKey="resourceSyncs"
-      isLoading={isFetching}
     />
   );
 };

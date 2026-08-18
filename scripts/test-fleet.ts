@@ -3,19 +3,19 @@ import {
   FLEET_LOGIN_CONFIG,
   grabSessionCookie,
 } from "@/features/integrations/platforms/teamplay-fleet/session";
-import { AuthType, PlatformEnum } from "@/generated/prisma";
+import { PlatformEnum } from "@/generated/prisma";
 import prisma from "../src/lib/db";
 
 const ADVISORIES_URL =
   "https://fleet.siemens-healthineers.com/rest/v1/security-advisories/active";
 
+const username = process.env.FLEET_USERNAME ?? "";
+const password = process.env.FLEET_PASSWORD ?? "";
+
 async function main() {
   const integration = await prisma.integration.findFirstOrThrow({
     where: { platform: PlatformEnum.FLEET },
   });
-
-  const username = "cassidy.diamond@bugcrowd.com";
-  const password = "you-will-need-to-manually-add-it-for-testing-locally";
 
   console.log("--- grabSessionCookie ---");
   console.time("login");
@@ -41,8 +41,8 @@ async function main() {
 
   console.log("--- creteFleetSession ---");
   const session = await createFleetSession(integration.id, {
-    authType: AuthType.Basic,
-    authentication: { username, password },
+    username,
+    password,
   });
   console.time("first advisory request");
   const advisoryFirst = await session.request(ADVISORIES_URL);

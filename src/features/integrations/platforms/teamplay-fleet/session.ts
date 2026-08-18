@@ -1,9 +1,4 @@
-import {
-  BASE_URL,
-  type FleetCreds,
-  loginCredentials,
-  type SessionLoginConfig,
-} from "./config";
+import { BASE_URL, type FleetCreds, type SessionLoginConfig } from "./config";
 
 const MAX_RETRY_ATTEMPT = 2;
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -110,34 +105,50 @@ function normalizeHeaders(
   return headers ? Object.fromEntries(new Headers(headers)) : {};
 }
 
-// local cache
-const sessionCache = new Map<string, CapturedSession>();
+async function credentialsFor(integrationId: string): Promise<FleetCreds> {
+  const [{ decryptCredentials }, { default: prisma }, { credentialSchema }] =
+    await Promise.all([
+      import("@/features/integrations/core/credentials"),
+      import("@/lib/db"),
+      import("./config"),
+    ]);
 
-export function clearSessionCache(): void {
-  sessionCache.clear();
+  const { credentials } = await prisma.integration.findUniqueOrThrow({
+    where: { id: integrationId },
+    select: { credentials: true },
+  });
+
+  if (!credentials) {
+    throw new Error(`Integration ${integrationId} has no stored credentials`);
+  }
+  return credentialSchema.parse(decryptCredentials(credentials));
 }
 
 export async function createFleetSession(
   integrationId: string,
-  creds: FleetCreds,
+  creds?: FleetCreds,
 ) {
-  const { username, password } = loginCredentials(creds);
+  const { username, password } = creds ?? (await credentialsFor(integrationId));
   const login = async () => {
     const sessionCookie = await grabSessionCookie(
       FLEET_LOGIN_CONFIG,
       username,
       password,
     );
-    sessionCache.set(integrationId, sessionCookie);
     return sessionCookie;
   };
+
+  let session = await login();
+
+  const expired = () =>
+    session.expiresAt !== null && session.expiresAt.getTime() <= Date.now();
 
   const request = async (
     url: string,
     init: RequestInit = {},
     retry = false,
   ): Promise<Response> => {
-    const session = sessionCache.get(integrationId) ?? (await login());
+    if (expired()) session = await login();
 
     const res = await fetch(url, {
       ...init,
@@ -148,7 +159,6 @@ export async function createFleetSession(
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if ((res.status === 401 || res.status === 403) && !retry) {
-      sessionCache.delete(integrationId);
       await login();
       return request(url, init, true);
     }

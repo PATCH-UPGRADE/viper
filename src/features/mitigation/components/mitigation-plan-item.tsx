@@ -137,20 +137,23 @@ export function MitigationPlanItem({
                     title={field === "rollback" ? cards.rollback : undefined}
                   >
                     {field === "rollback" ? (
-                      <>
-                        <span
-                          className={cn(
-                            "font-semibold",
-                            cards.rollback_level &&
+                      cards.rollback_level ? (
+                        <>
+                          <span
+                            className={cn(
+                              "font-semibold",
                               rollbackToneClass[cards.rollback_level],
-                          )}
-                        >
-                          {cards.rollback_level ?? "—"}
-                        </span>
-                        {cards.rollback_summary
-                          ? ` — ${cards.rollback_summary}`
-                          : null}
-                      </>
+                            )}
+                          >
+                            {cards.rollback_level}
+                          </span>
+                          {cards.rollback_summary
+                            ? ` — ${cards.rollback_summary}`
+                            : null}
+                        </>
+                      ) : (
+                        cards.rollback_summary || "—"
+                      )
                     ) : (
                       cards[field] || "—"
                     )}

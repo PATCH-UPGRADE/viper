@@ -48,8 +48,7 @@ export function MitigationPlanMatrix({
       plan,
       cards: parsed.success ? parsed.data : null,
       isRecommended,
-      isHighlighted:
-        plan.isAccepted || (isRecommended && !hasAcceptedPlan) || false,
+      isHighlighted: plan.isAccepted || (isRecommended && !hasAcceptedPlan),
     };
   });
   const drawerPlan = plans.find((plan) => plan.id === drawerPlanId);

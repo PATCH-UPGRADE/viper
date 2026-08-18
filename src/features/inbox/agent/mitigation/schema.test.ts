@@ -24,6 +24,8 @@ const goldenPlan = {
     effort: "2 tickets · ~14 hrs total",
     downtime: "None to contain",
     residual_risk: "Low",
+    residual_risk_note:
+      "Attack path closed immediately; the vulnerable code is fully removed once each machine is patched.",
     coverage: "6 of 6 assets",
     timeline: "Contained today · patched in ~2 weeks",
     rollback_level: "Easy",
@@ -105,6 +107,14 @@ describe("buildMitigationPlansSchema", () => {
     } = goldenPlan.cards;
     const parsed = schema.safeParse({
       plans: [{ ...goldenPlan, cards: cardsWithoutRollback }],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("accepts a plan with no residual risk note — rows written before the field existed", () => {
+    const { residual_risk_note: _note, ...cardsWithoutNote } = goldenPlan.cards;
+    const parsed = schema.safeParse({
+      plans: [{ ...goldenPlan, cards: cardsWithoutNote }],
     });
     expect(parsed.success).toBe(true);
   });

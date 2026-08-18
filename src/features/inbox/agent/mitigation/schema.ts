@@ -18,6 +18,12 @@ export const planCardsSchema = z.object({
   residual_risk: z
     .string()
     .describe("risk remaining after this plan, e.g. 'Low'"),
+  residual_risk_note: z
+    .string()
+    .optional()
+    .describe(
+      "one or two sentences under 200 characters explaining the residual_risk judgement — what stays exposed and until when, or why the path is closed. Rendered after the level as 'Residual risk — Low. <note>', so do not open by repeating the level",
+    ),
   coverage: z
     .string()
     .describe("how much exposure this closes, e.g. '6 of 6 assets'"),

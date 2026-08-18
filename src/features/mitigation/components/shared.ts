@@ -48,6 +48,13 @@ export const rollbackToneClass: Record<RollbackLevel, string> = {
   Uncertain: "text-muted-foreground",
 };
 
+export const riskBannerClass: Record<RiskTone, string> = {
+  low: "border-green-500/30 bg-green-500/10 dark:bg-green-500/15",
+  medium: "border-yellow-500/30 bg-yellow-500/10 dark:bg-yellow-500/15",
+  high: "border-red-500/30 bg-red-500/10 dark:bg-red-500/15",
+  unknown: "border-border bg-muted/50",
+};
+
 export const riskToneClass: Record<RiskTone, string> = {
   low: "text-green-700 dark:text-green-300",
   medium: "text-yellow-700 dark:text-yellow-300",

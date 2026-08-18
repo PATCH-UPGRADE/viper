@@ -5,6 +5,7 @@ import {
   ExternalLinkIcon,
   SquarePenIcon,
   StarIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -25,6 +26,7 @@ import {
   planCardFields,
   planTagLabels,
   residualRiskTone,
+  riskBannerClass,
   riskToneClass,
   rollbackToneClass,
 } from "./shared";
@@ -160,6 +162,34 @@ export function MitigationPlanItem({
                   </p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Residual-risk callout */}
+          {cards?.residual_risk_note && (
+            <div
+              className={cn(
+                "flex items-start gap-2.5 rounded-lg border p-3 text-sm",
+                riskBannerClass[residualRiskTone(cards.residual_risk)],
+              )}
+            >
+              <TriangleAlertIcon
+                className={cn(
+                  "mt-0.5 size-4 shrink-0",
+                  riskToneClass[residualRiskTone(cards.residual_risk)],
+                )}
+              />
+              <p>
+                <span
+                  className={cn(
+                    "font-semibold",
+                    riskToneClass[residualRiskTone(cards.residual_risk)],
+                  )}
+                >
+                  Residual risk — {cards.residual_risk}.
+                </span>{" "}
+                {cards.residual_risk_note}
+              </p>
             </div>
           )}
 

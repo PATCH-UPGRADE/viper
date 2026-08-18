@@ -120,13 +120,28 @@ export function MitigationPlanMatrix({
                       CELL,
                       tint(isHighlighted),
                       field === "residual_risk" &&
+                        !cards?.residual_risk_note &&
                         cn(
                           "font-semibold",
                           riskToneClass[residualRiskTone(cards?.[field])],
                         ),
                     )}
                   >
-                    {field === "rollback" && cards?.rollback_level ? (
+                    {field === "residual_risk" && cards?.residual_risk_note ? (
+                      <>
+                        <span
+                          className={cn(
+                            "font-semibold",
+                            riskToneClass[
+                              residualRiskTone(cards.residual_risk)
+                            ],
+                          )}
+                        >
+                          {cards.residual_risk}
+                        </span>
+                        {` — ${cards.residual_risk_note}`}
+                      </>
+                    ) : field === "rollback" && cards?.rollback_level ? (
                       <>
                         <span
                           className={cn(

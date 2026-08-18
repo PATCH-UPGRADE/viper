@@ -80,7 +80,7 @@ export function HeatMapGrid({
               <td className="sticky left-0 bg-background text-muted-foreground text-right pr-1.5 leading-none py-0.5">
                 {y.label(yIdx)}
               </td>
-              {Array.from({ length: x.count }, (v, xIdx) => {
+              {Array.from({ length: x.count }, (_v, xIdx) => {
                 const cell: HeatmapCell = {
                   x: xIdx,
                   y: yIdx,

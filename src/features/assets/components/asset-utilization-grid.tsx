@@ -172,20 +172,19 @@ export function UtilizationGridList({
 
   return (
     <div className="space-y-5">
-      {assetsWithUtilization &&
-        assetsWithUtilization.map((asset) => (
-          <div key={asset.id} className="space-y-1.5">
-            <p className="text-sm font-semibold">
-              {asset.label}
-              {asset.hostname && (
-                <span className="ml-2 font-normal text-muted-foreground">
-                  {asset.hostname}
-                </span>
-              )}
-            </p>
-            <AssetUtilizationHeatMapGrid utilization={asset.utilization} />
-          </div>
-        ))}
+      {assetsWithUtilization?.map((asset) => (
+        <div key={asset.id} className="space-y-1.5">
+          <p className="text-sm font-semibold">
+            {asset.label}
+            {asset.hostname && (
+              <span className="ml-2 font-normal text-muted-foreground">
+                {asset.hostname}
+              </span>
+            )}
+          </p>
+          <AssetUtilizationHeatMapGrid utilization={asset.utilization} />
+        </div>
+      ))}
       <UtilizationLegend />
     </div>
   );

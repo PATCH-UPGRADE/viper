@@ -8,10 +8,7 @@ import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
 import { userIncludeSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import {
-  authCredentialSchema,
-  encodeAuthCredential,
-} from "../core/credentials";
+import { encryptCredentials } from "../core/credentials";
 import { requirePlatform } from "../core/registry";
 import { resourcesFor } from "../core/sync/resources";
 import type { AnyConnectorModule } from "../core/types";
@@ -76,16 +73,26 @@ const toRowShape = (input: IntegrationFormValues) => {
 };
 
 /**
- * Validate credentials against the platform's own schema, then encode them with
- * the shared one.
+ * Validate credentials against the platform's own schema, then encrypt
+ * whatever that schema produced — not a re-parse against the generic
+ * `{ authType, authentication }` shape, which only some platforms use
+ * (Fleet's credentials are a plain `{ username, password }`).
+ *
+ * `AuthType.None` means "nothing to protect" only for platforms that use the
+ * generic auth shape; every other platform's validated credentials are
+ * always real secrets, so they always get encrypted.
  */
 const toCredentialBlob = (
   module: AnyConnectorModule,
   credentials: IntegrationFormValues["credentials"],
 ) => {
   if (!credentials) return null;
-  module.definition.credentialSchema.parse(credentials);
-  return encodeAuthCredential(authCredentialSchema.parse(credentials));
+  const parsed = module.definition.credentialSchema.parse(credentials);
+  const authType =
+    parsed && typeof parsed === "object" && "authType" in parsed
+      ? (parsed as { authType?: AuthType }).authType
+      : undefined;
+  return authType === AuthType.None ? null : encryptCredentials(parsed);
 };
 
 /**

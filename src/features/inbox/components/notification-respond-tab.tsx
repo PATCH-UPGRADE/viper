@@ -42,6 +42,13 @@ export function NotificationRespondTab({
           isMatrix={isMatrix}
           onViewChange={setView}
         />
+        {/* Rendered twice, not reordered: DOM order must match visual order for 508. */}
+        {isMatrix && (
+          <AffectedAssetsSection
+            notification={notification}
+            className="max-w-[26rem]"
+          />
+        )}
       </div>
     </>
   );

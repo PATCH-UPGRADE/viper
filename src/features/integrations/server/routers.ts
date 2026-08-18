@@ -346,14 +346,18 @@ export const integrationsRouter = createTRPCRouter({
       if (!integration) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
+      if (integration.resourceSyncs.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No enabled resources to sync",
+        });
+      }
 
-      await Promise.all(
-        integration.resourceSyncs.map((sync) =>
-          inngest.send({
-            name: "integration/sync.requested",
-            data: { integrationId: input.id, resource: sync.resource },
-          }),
-        ),
+      await inngest.send(
+        integration.resourceSyncs.map((sync) => ({
+          name: "integration/sync.requested" as const,
+          data: { integrationId: input.id, resource: sync.resource },
+        })),
       );
 
       return { success: true };

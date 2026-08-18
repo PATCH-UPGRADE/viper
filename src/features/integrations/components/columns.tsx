@@ -107,6 +107,9 @@ const SyncSummaryCell = ({ row }: { row: IntegrationListItem }) => {
 
   const sync = resourceSyncs[0];
   if (!sync) return null;
+  if (!row.enabled) {
+    return <div className="text-xs text-muted-foreground">Disabled</div>;
+  }
 
   return (
     <div className="text-xs text-muted-foreground">
@@ -187,7 +190,11 @@ export const columns: ColumnDef<IntegrationListItem>[] = [
               <Button
                 variant="ghost"
                 className="h-8 w-8 p-0"
-                disabled={triggerSync.isPending}
+                disabled={
+                  triggerSync.isPending ||
+                  !data.enabled ||
+                  !data.resourceSyncs.some((sync) => sync.enabled)
+                }
                 onClick={() => triggerSync.mutate({ id: data.id })}
               >
                 <span className="sr-only">Sync Now</span>

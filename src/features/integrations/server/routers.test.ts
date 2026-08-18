@@ -142,6 +142,37 @@ describe("integrationsRouter enable controls", () => {
 });
 
 describe("integrationsRouter.triggerSync", () => {
+  it("enqueues one event for each enabled resource feed", async () => {
+    mockPrisma.integration.findFirst.mockResolvedValue({
+      id: "integration-1",
+      resourceSyncs: [
+        { resource: ResourceType.Asset },
+        { resource: ResourceType.WorkOrder },
+      ],
+    });
+
+    await expect(setup().triggerSync({ id: "integration-1" })).resolves.toEqual(
+      { success: true },
+    );
+
+    expect(mockInngest.send).toHaveBeenCalledWith([
+      {
+        name: "integration/sync.requested",
+        data: {
+          integrationId: "integration-1",
+          resource: ResourceType.Asset,
+        },
+      },
+      {
+        name: "integration/sync.requested",
+        data: {
+          integrationId: "integration-1",
+          resource: ResourceType.WorkOrder,
+        },
+      },
+    ]);
+  });
+
   it("does not enqueue work for a disabled integration", async () => {
     mockPrisma.integration.findFirst.mockResolvedValue(null);
 
@@ -154,6 +185,21 @@ describe("integrationsRouter.triggerSync", () => {
         where: { id: "integration-1", enabled: true },
       }),
     );
+    expect(mockInngest.send).not.toHaveBeenCalled();
+  });
+
+  it("does not report success when every resource feed is disabled", async () => {
+    mockPrisma.integration.findFirst.mockResolvedValue({
+      id: "integration-1",
+      resourceSyncs: [],
+    });
+
+    await expect(
+      setup().triggerSync({ id: "integration-1" }),
+    ).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "No enabled resources to sync",
+    });
     expect(mockInngest.send).not.toHaveBeenCalled();
   });
 });

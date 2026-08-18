@@ -173,16 +173,19 @@ export function MitigationPlanMatrix({
                 >
                   {plan.isAccepted ? (
                     <span className="flex flex-col gap-1">
-                      <span className="flex items-center gap-1.5 font-semibold text-primary">
+                      <span className="flex items-center gap-1.5 font-semibold text-green-700 dark:text-green-300">
                         <CheckIcon className="size-4" />
                         Plan accepted
                       </span>
                       <Link
                         href="/tracking"
-                        className="flex items-center gap-1 text-muted-foreground hover:underline"
+                        className="flex items-center gap-1"
                       >
-                        Track in work orders
-                        <ExternalLinkIcon className="size-3.5" />
+                        Track in
+                        <span className="font-semibold text-primary hover:underline">
+                          Work Orders
+                        </span>
+                        <ExternalLinkIcon className="size-3.5 text-primary" />
                       </Link>
                     </span>
                   ) : (

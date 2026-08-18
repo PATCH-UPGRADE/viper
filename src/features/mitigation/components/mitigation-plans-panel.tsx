@@ -52,6 +52,7 @@ export function MitigationPlansPanel({
       {isMatrix ? (
         <MitigationPlanMatrix plans={plans} notificationId={notificationId} />
       ) : (
+        // plans is nonempty: the Respond tab renders only when the notification has plans.
         <Accordion
           type="single"
           collapsible

@@ -21,7 +21,6 @@ export function NotificationRespondTab({
 }) {
   const { data: plans } = useSuspenseMitigationPlans(notification.id);
   const [view, setView] = useState<PlanView>("list");
-  // assert plans is nonempty, this tab only renders if so
   const isMatrix = view === "matrix" && plans.length > 1;
 
   return (
@@ -42,7 +41,7 @@ export function NotificationRespondTab({
           isMatrix={isMatrix}
           onViewChange={setView}
         />
-        {/* Rendered twice, not reordered: DOM order must match visual order for 508. */}
+        {/* Second slot, not a CSS order swap: DOM order must match visual order for 508. */}
         {isMatrix && (
           <AffectedAssetsSection
             notification={notification}

@@ -2,6 +2,14 @@ import { z } from "zod";
 import type { EntityRefs } from "@/features/inbox/agent/refs";
 import { PlanTagEnum } from "@/generated/prisma";
 
+export const rollbackLevels = [
+  "Easy",
+  "Moderate",
+  "Hard",
+  "Uncertain",
+] as const;
+export type RollbackLevel = (typeof rollbackLevels)[number];
+
 // Stored in MitigationPlan.card
 // TODO: Consider making these strings optional if not enough info
 export const planCardsSchema = z.object({
@@ -10,10 +18,34 @@ export const planCardsSchema = z.object({
   residual_risk: z
     .string()
     .describe("risk remaining after this plan, e.g. 'Low'"),
+  residual_risk_note: z
+    .string()
+    .optional()
+    .describe(
+      "one or two sentences under 200 characters explaining the residual_risk judgement — what stays exposed and until when, or why the path is closed. Rendered after the level as 'Residual risk — Low. <note>', so do not open by repeating the level",
+    ),
   coverage: z
     .string()
     .describe("how much exposure this closes, e.g. '6 of 6 assets'"),
   timeline: z.string().describe("when it lands, e.g. 'Contained today'"),
+  rollback_level: z
+    .enum(rollbackLevels)
+    .optional()
+    .describe(
+      "how hard this plan is to undo once applied: Easy = staff revert it themselves in minutes; Moderate = reversible in-house but slow or disruptive; Hard = needs the manufacturer, or cannot meaningfully be undone; Uncertain = the context does not say",
+    ),
+  rollback_summary: z
+    .string()
+    .optional()
+    .describe(
+      "one short clause under 80 characters summarising why, e.g. 'reverts from the switch config in ~15 min, no vendor needed'. Rendered inline after the level, so it should read on from it. Do not repeat the level word",
+    ),
+  rollback: z
+    .string()
+    .optional()
+    .describe(
+      "explains rollback_level in at most two sentences and under 200 characters: what has to be reverted, roughly how long, and whether the manufacturer has to be involved. Do not repeat the level word — it is shown separately",
+    ),
 });
 
 /**

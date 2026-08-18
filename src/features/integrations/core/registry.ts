@@ -2,6 +2,7 @@ import "server-only";
 import type { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { ai } from "../platforms/ai";
 import { partner } from "../platforms/partner";
+import { teamplayFleet } from "../platforms/teamplay-fleet";
 import { moduleForResource } from "./sync/resources";
 import type { AnyConnectorModule } from "./types";
 
@@ -11,7 +12,7 @@ import type { AnyConnectorModule } from "./types";
 export const registry: Partial<Record<PlatformEnum, AnyConnectorModule>> = {
   AI: ai,
   PARTNER: partner,
-  // TODO: VW-431 add teamplay Fleet here
+  FLEET: teamplayFleet,
 };
 
 export const requirePlatform = (platform: PlatformEnum): AnyConnectorModule => {

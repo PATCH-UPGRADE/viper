@@ -136,6 +136,44 @@ export async function resolveManufacturer(
   }
 }
 
+/**
+ * Find-or-create the canonical Vendor for a name. Matches an existing row by
+ * canonicalName only
+ */
+export async function resolveVendor(
+  name: string,
+  opts: { manufacturerId?: string } = {},
+) {
+  const canonicalName = normalizeName(name);
+  const find = () => prisma.vendor.findUnique({ where: { canonicalName } });
+  const existing = await find();
+  if (existing) {
+    if (opts.manufacturerId && !existing.manufacturerId) {
+      return prisma.vendor.update({
+        where: { id: existing.id },
+        data: { manufacturerId: opts.manufacturerId },
+      });
+    }
+    return existing;
+  }
+
+  try {
+    return await prisma.vendor.create({
+      data: {
+        canonicalName,
+        canonicalDisplayName: name,
+        manufacturerId: opts.manufacturerId ?? null,
+      },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      const row = await find();
+      if (row) return row;
+    }
+    throw error;
+  }
+}
+
 export async function resolveProduct(
   name: string,
   opts: { hasCpe?: boolean } = {},

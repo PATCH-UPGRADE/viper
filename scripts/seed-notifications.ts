@@ -819,13 +819,14 @@ async function coverProducts(
     },
   });
 
-  await prisma.contractAsset.createMany({
-    data: assets.map((asset) => ({
-      contractId: contract.id,
-      assetId: asset.id,
-    })),
-    skipDuplicates: true,
-  });
+  // TODO VW-429
+  // await prisma.contractAsset.createMany({
+  //   data: assets.map((asset) => ({
+  //     contractId: contract.id,
+  //     assetId: asset.id,
+  //   })),
+  //   skipDuplicates: true,
+  // });
 
   console.log(` ✅  ${title}:${assets.length} assets`);
 }

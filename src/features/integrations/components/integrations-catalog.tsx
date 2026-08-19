@@ -17,7 +17,7 @@ import {
 import { mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
 import { PlatformEnum } from "@/generated/prisma";
-import { cn } from "@/lib/utils";
+import { cn, humanize } from "@/lib/utils";
 import { registry } from "../core/registry";
 import { genericConfigSchema } from "../core/sync/resources";
 import type { AnyConnectorModule } from "../core/types";
@@ -68,9 +68,6 @@ const categories: Record<string, PlatformCategory> = {
     platforms: [PlatformEnum.PARTNER, PlatformEnum.AI],
   },
 };
-
-const humanize = (key: string) =>
-  key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
 const shapeOf = (schema: z.ZodTypeAny): Record<string, z.ZodTypeAny> =>
   "shape" in schema ? (schema.shape as Record<string, z.ZodTypeAny>) : {};

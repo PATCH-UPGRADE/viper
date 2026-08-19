@@ -35,6 +35,7 @@ import {
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
 import type { PlatformEnum } from "@/generated/prisma";
 import { authSchema } from "@/lib/schemas";
+import { humanize } from "@/lib/utils";
 import { useCreateIntegration } from "../hooks/use-integrations";
 import type { FieldSpec } from "../types";
 
@@ -53,9 +54,6 @@ const zodForSpec = (spec: FieldSpec): z.ZodTypeAny => {
 const shapeFor = (specs: FieldSpec[]) =>
   Object.fromEntries(specs.map((spec) => [spec.key, zodForSpec(spec)]));
 
-const labelFor = (key: string) =>
-  key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
-
 const inputTypeFor = (kind: FieldSpec["kind"]) =>
   kind === "number" ? "number" : kind === "password" ? "password" : "text";
 
@@ -69,7 +67,7 @@ const DynamicField = ({
   name: string;
   spec: FieldSpec;
 }) => {
-  const label = labelFor(spec.key);
+  const label = humanize(spec.key);
   return (
     <FormField
       control={form.control}

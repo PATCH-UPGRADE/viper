@@ -75,7 +75,7 @@ export function NotificationRespondTab({
               notificationId={notification.id}
             />
           ) : (
-            // plans is nonempty: this tab only renders when the notification has plans.
+            // plans[0] is safe: this tab is only rendered for notifications that have plans.
             <Accordion
               type="single"
               collapsible
@@ -94,7 +94,7 @@ export function NotificationRespondTab({
           )}
         </section>
 
-        {/* Second slot, not a CSS order swap: DOM order must match visual order for 508. */}
+        {/* Written out twice on purpose. Moving it with CSS instead would break keyboard tab order. */}
         {isMatrix && (
           <AffectedAssetsSection
             notification={notification}

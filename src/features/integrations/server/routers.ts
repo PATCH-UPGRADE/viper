@@ -8,6 +8,7 @@ import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
 import { userIncludeSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import type { AuthCredential } from "../core/credentials";
 import { encryptCredentials } from "../core/credentials";
 import { requirePlatform } from "../core/registry";
 import { resourcesFor } from "../core/sync/resources";
@@ -88,11 +89,10 @@ const toCredentialBlob = (
 ) => {
   if (!credentials) return null;
   const parsed = module.definition.credentialSchema.parse(credentials);
-  const authType =
-    parsed && typeof parsed === "object" && "authType" in parsed
-      ? (parsed as { authType?: AuthType }).authType
-      : undefined;
-  return authType === AuthType.None ? null : encryptCredentials(parsed);
+  const isNoneAuth =
+    module.definition.usesGenericAuth &&
+    (parsed as AuthCredential).authType === AuthType.None;
+  return isNoneAuth ? null : encryptCredentials(parsed);
 };
 
 /**

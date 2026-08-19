@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuthenticationFields } from "@/components/auth-form";
@@ -55,7 +55,7 @@ const shapeFor = (specs: FieldSpec[]) =>
   Object.fromEntries(specs.map((spec) => [spec.key, zodForSpec(spec)]));
 
 const inputTypeFor = (kind: FieldSpec["kind"]) =>
-  kind === "number" ? "number" : kind === "password" ? "password" : "text";
+  kind === "number" || kind === "password" ? kind : "text";
 
 const DynamicField = ({
   form,
@@ -134,22 +134,18 @@ export const CreateIntegrationDialog = ({
   const [open, setOpen] = useState(false);
   const createIntegration = useCreateIntegration();
 
-  const formSchema = useMemo(
-    () =>
-      z.object({
-        name: z.string().min(1, "Name is required"),
-        syncEvery: z
-          .number()
-          .int()
-          .positive()
-          .min(INTEGRATION_SYNC_EVERY_MIN * 60),
-        config: z.object(shapeFor(configFields)),
-        credentials: credentialsAreAuthShaped
-          ? authSchema
-          : z.object(shapeFor(credentialFields)),
-      }),
-    [configFields, credentialFields, credentialsAreAuthShaped],
-  );
+  const formSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    syncEvery: z
+      .number()
+      .int()
+      .positive()
+      .min(INTEGRATION_SYNC_EVERY_MIN * 60),
+    config: z.object(shapeFor(configFields)),
+    credentials: credentialsAreAuthShaped
+      ? authSchema
+      : z.object(shapeFor(credentialFields)),
+  });
 
   type FormValues = z.infer<typeof formSchema>;
 

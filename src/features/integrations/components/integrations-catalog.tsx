@@ -98,6 +98,8 @@ const fieldSpecsFor = (schema: z.ZodTypeAny): FieldSpec[] =>
     if (inner.def.type === "number") {
       return { key, kind: "number", required };
     }
+    // No schema-level "this is a secret" flag exists (unlike usesGenericAuth
+    // above) — this is a naming convention, not a contract.
     const kind = /password|secret|token/i.test(key)
       ? ("password" as const)
       : /url|uri/i.test(key)
@@ -128,15 +130,15 @@ const IntegrationsCatalog = () => {
       cards: platforms.flatMap((platform) => {
         const module = registry[platform];
         if (!module) return [];
-        const { credentialSchema } = module.definition;
+        const { definition } = module;
         return [
           {
             platform,
-            displayName: module.definition.displayName,
+            displayName: definition.displayName,
             summary: configSummary(module),
-            configFields: fieldSpecsFor(module.definition.configSchema),
-            credentialFields: fieldSpecsFor(credentialSchema),
-            credentialsAreAuthShaped: "authType" in shapeOf(credentialSchema),
+            configFields: fieldSpecsFor(definition.configSchema),
+            credentialFields: fieldSpecsFor(definition.credentialSchema),
+            credentialsAreAuthShaped: Boolean(definition.usesGenericAuth),
           },
         ];
       }),

@@ -5,6 +5,7 @@ import { createCallback } from "@/features/integrations/core/callback";
 import {
   decryptCredentials,
   parseAuthCredential,
+  usesGenericAuth,
 } from "@/features/integrations/core/credentials";
 import {
   defaultSyncEveryFor,
@@ -152,12 +153,8 @@ export const syncIntegration = inngest.createFunction(
         const decrypted = row?.credentials
           ? decryptCredentials(row.credentials)
           : null;
-        // Only platforms using the generic {authType, authentication} shape
-        // read back through parseAuthCredential's None-fallback — everyone
-        // else's schema validates the decrypted blob directly (mirrors
-        // toCredentialBlob in integrations/server/routers.ts).
         const creds = module.definition.credentialSchema.parse(
-          module.definition.usesGenericAuth
+          usesGenericAuth(module.definition.credentialSchema)
             ? parseAuthCredential(decrypted, integrationId)
             : (decrypted ?? {}),
         );

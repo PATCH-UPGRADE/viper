@@ -19,7 +19,6 @@ export const ai: ConnectorModule<AiConfig, AiCreds> = {
     displayName: "AI Crawler",
     configSchema,
     credentialSchema,
-    usesGenericAuth: true,
   },
   sync: aiSync,
 };

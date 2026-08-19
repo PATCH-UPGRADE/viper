@@ -18,7 +18,6 @@ export const partner: ConnectorModule<PartnerConfig, PartnerCreds> = {
     displayName: "Partner API",
     configSchema,
     credentialSchema,
-    usesGenericAuth: true,
   },
   sync: partnerSync,
 };

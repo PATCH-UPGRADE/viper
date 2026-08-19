@@ -56,11 +56,7 @@ export const integrationInputSchema = z.object({
     .min(INTEGRATION_SYNC_EVERY_MIN * 60),
   config: z.record(z.string(), z.unknown()),
   /**
-   * Opaque for the same reason `config` is — narrowing it to `authSchema`
-   * would assume every platform authenticates that way, and Fleet doesn't
-   * (its credentials are a plain `{ username, password }`). The router
-   * validates it with the platform's own `credentialSchema`.
-   *
+   * Opaque for the same reason `config` is — not every platform uses `authSchema`.
    * Omitted on edit means "keep what is stored" — see the router.
    */
   credentials: z.record(z.string(), z.unknown()).optional(),
@@ -83,12 +79,7 @@ export type IntegrationWithStringDates = Omit<
   updatedAt: string;
 };
 
-/**
- * A `config`/`credentialSchema` field, reduced to plain data so a Server
- * Component can hand it to a Client Component without ever passing the real
- * (server-only-adjacent) Zod schema across that boundary. Drives the dynamic
- * create-integration form.
- */
+/** A config/credentialSchema field, reduced to plain data to cross the Server->Client boundary. */
 export interface FieldSpec {
   key: string;
   kind: "text" | "password" | "url" | "number" | "select";

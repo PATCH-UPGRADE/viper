@@ -9,7 +9,7 @@ import { fetchPaginated } from "@/lib/router-utils";
 import { userIncludeSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import type { AuthCredential } from "../core/credentials";
-import { encryptCredentials } from "../core/credentials";
+import { encryptCredentials, usesGenericAuth } from "../core/credentials";
 import { requirePlatform } from "../core/registry";
 import { resourcesFor } from "../core/sync/resources";
 import type { AnyConnectorModule } from "../core/types";
@@ -73,16 +73,7 @@ const toRowShape = (input: IntegrationFormValues) => {
   };
 };
 
-/**
- * Validate credentials against the platform's own schema, then encrypt
- * whatever that schema produced — not a re-parse against the generic
- * `{ authType, authentication }` shape, which only some platforms use
- * (Fleet's credentials are a plain `{ username, password }`).
- *
- * `AuthType.None` means "nothing to protect" only for platforms that use the
- * generic auth shape; every other platform's validated credentials are
- * always real secrets, so they always get encrypted.
- */
+/** AuthType.None means "nothing to protect" only for generic-auth platforms. */
 const toCredentialBlob = (
   module: AnyConnectorModule,
   credentials: IntegrationFormValues["credentials"],
@@ -90,7 +81,7 @@ const toCredentialBlob = (
   if (!credentials) return null;
   const parsed = module.definition.credentialSchema.parse(credentials);
   const isNoneAuth =
-    module.definition.usesGenericAuth &&
+    usesGenericAuth(module.definition.credentialSchema) &&
     (parsed as AuthCredential).authType === AuthType.None;
   return isNoneAuth ? null : encryptCredentials(parsed);
 };

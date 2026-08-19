@@ -54,9 +54,6 @@ const zodForSpec = (spec: FieldSpec): z.ZodTypeAny => {
 const shapeFor = (specs: FieldSpec[]) =>
   Object.fromEntries(specs.map((spec) => [spec.key, zodForSpec(spec)]));
 
-const inputTypeFor = (kind: FieldSpec["kind"]) =>
-  kind === "number" || kind === "password" ? kind : "text";
-
 const DynamicField = ({
   form,
   name,
@@ -97,7 +94,11 @@ const DynamicField = ({
               </Select>
             ) : (
               <Input
-                type={inputTypeFor(spec.kind)}
+                type={
+                  spec.kind === "number" || spec.kind === "password"
+                    ? spec.kind
+                    : "text"
+                }
                 value={(field.value as string | undefined) ?? ""}
                 onChange={(e) => field.onChange(e.target.value)}
               />

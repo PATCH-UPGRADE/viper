@@ -39,14 +39,17 @@ vi.mock("@/features/integrations/core/registry", () => ({
   defaultSyncEveryFor: () => null,
 }));
 
-const { mockDecryptCredentials, mockParseAuthCredential } = vi.hoisted(() => ({
-  mockDecryptCredentials: vi.fn(),
-  mockParseAuthCredential: vi.fn(),
-}));
+const { mockDecryptCredentials, mockParseAuthCredential, mockUsesGenericAuth } =
+  vi.hoisted(() => ({
+    mockDecryptCredentials: vi.fn(),
+    mockParseAuthCredential: vi.fn(),
+    mockUsesGenericAuth: vi.fn(),
+  }));
 
 vi.mock("@/features/integrations/core/credentials", () => ({
   decryptCredentials: mockDecryptCredentials,
   parseAuthCredential: mockParseAuthCredential,
+  usesGenericAuth: mockUsesGenericAuth,
 }));
 
 import { Prisma, ResourceType, SyncStatusEnum } from "@/generated/prisma";
@@ -146,13 +149,13 @@ describe("syncIntegration — credential parsing", () => {
       username: "svc",
       password: "hunter2",
     });
+    mockUsesGenericAuth.mockReturnValue(false);
     const credentialSchemaParse = vi.fn((value: unknown) => value);
     mockRequirePlatform.mockReturnValue({
       ...PLATFORM_MODULE,
       definition: {
         ...PLATFORM_MODULE.definition,
         credentialSchema: { parse: credentialSchemaParse },
-        // usesGenericAuth intentionally unset, mirroring Fleet's {username, password} shape.
       },
     });
 
@@ -166,13 +169,13 @@ describe("syncIntegration — credential parsing", () => {
   });
 
   it("routes a generic-auth platform's credentials through parseAuthCredential's None-fallback", async () => {
+    mockUsesGenericAuth.mockReturnValue(true);
     const credentialSchemaParse = vi.fn((value: unknown) => value);
     mockRequirePlatform.mockReturnValue({
       ...PLATFORM_MODULE,
       definition: {
         ...PLATFORM_MODULE.definition,
         credentialSchema: { parse: credentialSchemaParse },
-        usesGenericAuth: true,
       },
     });
 

@@ -102,13 +102,6 @@ export interface ConnectorDefinition<TConfig, TCreds> {
   configSchema: z.ZodType<TConfig>;
   /** Validates the decrypted `Integration.credentials`. */
   credentialSchema: z.ZodType<TCreds>;
-  /**
-   * Set when `credentialSchema` is the shared `{ authType, authentication }`
-   * shape (ai, partner), so core and the UI both know without duck-typing
-   * the schema or the parsed result. Unset for a platform with its own
-   * credential shape (Fleet's `{ username, password }`).
-   */
-  usesGenericAuth?: boolean;
 }
 
 export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {

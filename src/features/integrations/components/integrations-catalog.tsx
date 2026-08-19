@@ -18,6 +18,7 @@ import { mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
 import { PlatformEnum } from "@/generated/prisma";
 import { cn, humanize } from "@/lib/utils";
+import { usesGenericAuth } from "../core/credentials";
 import { registry } from "../core/registry";
 import { genericConfigSchema } from "../core/sync/resources";
 import type { AnyConnectorModule } from "../core/types";
@@ -81,12 +82,6 @@ const configSummary = (module: AnyConnectorModule): string => {
     : "No configuration required";
 };
 
-/**
- * Reduce a platform's `configSchema`/`credentialSchema` to plain, serializable
- * field descriptions (Client Components can't receive a real Zod schema —
- * see FieldSpec's own doc comment) so the create-integration dialog can
- * render a field per key without importing platform code itself.
- */
 // biome-ignore-start lint/suspicious/noExplicitAny: introspecting Zod's own internals (shape/unwrap/options) — `unknown` does not expose them, same tradeoff as AnyConnectorModule in core/types.ts.
 const fieldSpecsFor = (schema: z.ZodTypeAny): FieldSpec[] =>
   Object.entries(shapeOf(schema)).map(([key, field]) => {
@@ -99,8 +94,6 @@ const fieldSpecsFor = (schema: z.ZodTypeAny): FieldSpec[] =>
     if (inner.def.type === "number") {
       return { key, kind: "number", required };
     }
-    // No schema-level "this is a secret" flag exists (unlike usesGenericAuth
-    // above) — this is a naming convention, not a contract.
     const kind = /password|secret|token/i.test(key)
       ? ("password" as const)
       : /url|uri/i.test(key)
@@ -139,7 +132,9 @@ const IntegrationsCatalog = () => {
             summary: configSummary(module),
             configFields: fieldSpecsFor(definition.configSchema),
             credentialFields: fieldSpecsFor(definition.credentialSchema),
-            credentialsAreAuthShaped: Boolean(definition.usesGenericAuth),
+            credentialsAreAuthShaped: usesGenericAuth(
+              definition.credentialSchema,
+            ),
           },
         ];
       }),

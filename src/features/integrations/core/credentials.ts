@@ -96,6 +96,9 @@ export const decryptCredentials = (blob: Uint8Array): unknown => {
 export const authCredentialSchema = authSchema;
 export type AuthCredential = z.infer<typeof authCredentialSchema>;
 
+export const usesGenericAuth = (credentialSchema: z.ZodTypeAny): boolean =>
+  credentialSchema === authCredentialSchema;
+
 /**
  * The storage form of a credential. `AuthType.None` means there is nothing to
  * protect, so the column stays null — which is exactly what

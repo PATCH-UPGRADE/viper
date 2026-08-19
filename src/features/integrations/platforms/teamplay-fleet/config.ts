@@ -1,10 +1,12 @@
 import { z } from "zod";
+import { genericConfigSchema } from "@/features/integrations/core/sync/resources";
 import { FLEET_HOST } from "./urls";
 
 export const SIEMENS_HEALTHINEERS = "Siemens Healthineers";
 export const BASE_URL = `https://${FLEET_HOST}`;
 
-export const configSchema = z.object({});
+// No ResourceModules wired up yet, so resourcesFor() needs config.resource.
+export const configSchema = genericConfigSchema;
 export type FleetConfig = z.infer<typeof configSchema>;
 
 export const credentialSchema = z.object({

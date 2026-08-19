@@ -5,6 +5,7 @@ import { createCallback } from "@/features/integrations/core/callback";
 import {
   decryptCredentials,
   parseAuthCredential,
+  usesGenericAuth,
 } from "@/features/integrations/core/credentials";
 import {
   defaultSyncEveryFor,
@@ -149,11 +150,13 @@ export const syncIntegration = inngest.createFunction(
           where: { id: integrationId },
           select: { credentials: true },
         });
+        const decrypted = row?.credentials
+          ? decryptCredentials(row.credentials)
+          : null;
         const creds = module.definition.credentialSchema.parse(
-          parseAuthCredential(
-            row?.credentials ? decryptCredentials(row.credentials) : null,
-            integrationId,
-          ),
+          usesGenericAuth(module.definition.credentialSchema)
+            ? parseAuthCredential(decrypted, integrationId)
+            : (decrypted ?? {}),
         );
 
         const ctx: SyncCtx = {

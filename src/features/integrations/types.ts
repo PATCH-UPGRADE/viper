@@ -6,7 +6,6 @@ import {
   PlatformEnum,
   ResourceType,
 } from "@/generated/prisma";
-import { authSchema } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
 
 /**
@@ -56,8 +55,11 @@ export const integrationInputSchema = z.object({
     .positive()
     .min(INTEGRATION_SYNC_EVERY_MIN * 60),
   config: z.record(z.string(), z.unknown()),
-  /** Omitted on edit means "keep what is stored" — see the router. */
-  credentials: authSchema.optional(),
+  /**
+   * Opaque for the same reason `config` is — not every platform uses `authSchema`.
+   * Omitted on edit means "keep what is stored" — see the router.
+   */
+  credentials: z.record(z.string(), z.unknown()).optional(),
 });
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;
 
@@ -76,3 +78,11 @@ export type IntegrationWithStringDates = Omit<
   createdAt: string;
   updatedAt: string;
 };
+
+/** A config/credentialSchema field, reduced to plain data to cross the Server->Client boundary. */
+export interface FieldSpec {
+  key: string;
+  kind: "text" | "password" | "url" | "number" | "select";
+  required: boolean;
+  options?: string[];
+}

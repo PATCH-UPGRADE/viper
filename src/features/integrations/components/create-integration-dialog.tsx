@@ -99,13 +99,7 @@ const DynamicField = ({
               <Input
                 type={inputTypeFor(spec.kind)}
                 value={(field.value as string | undefined) ?? ""}
-                onChange={(e) =>
-                  field.onChange(
-                    spec.kind === "number"
-                      ? Number(e.target.value)
-                      : e.target.value,
-                  )
-                }
+                onChange={(e) => field.onChange(e.target.value)}
               />
             )}
           </FormControl>
@@ -222,14 +216,12 @@ export const CreateIntegrationDialog = ({
                     <Input
                       type="number"
                       {...field}
-                      onChange={(e) => {
-                        const value = Number(e.target.value);
+                      onChange={(e) =>
                         field.onChange(
-                          Number.isNaN(value)
-                            ? INTEGRATION_SYNC_EVERY_MIN * 60
-                            : value,
-                        );
-                      }}
+                          Number(e.target.value) ||
+                            INTEGRATION_SYNC_EVERY_MIN * 60,
+                        )
+                      }
                     />
                   </FormControl>
                   <FormMessage />

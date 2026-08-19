@@ -90,8 +90,9 @@ const configSummary = (module: AnyConnectorModule): string => {
 // biome-ignore-start lint/suspicious/noExplicitAny: introspecting Zod's own internals (shape/unwrap/options) — `unknown` does not expose them, same tradeoff as AnyConnectorModule in core/types.ts.
 const fieldSpecsFor = (schema: z.ZodTypeAny): FieldSpec[] =>
   Object.entries(shapeOf(schema)).map(([key, field]) => {
-    const required = !field.isOptional();
-    const inner: any = field.isOptional() ? (field as any).unwrap() : field;
+    const optional = field.isOptional();
+    const required = !optional;
+    const inner: any = optional ? (field as any).unwrap() : field;
     if (inner.def.type === "enum") {
       return { key, kind: "select" as const, required, options: inner.options };
     }

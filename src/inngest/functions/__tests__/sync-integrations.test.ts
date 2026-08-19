@@ -39,6 +39,16 @@ vi.mock("@/features/integrations/core/registry", () => ({
   defaultSyncEveryFor: () => null,
 }));
 
+const { mockDecryptCredentials, mockParseAuthCredential } = vi.hoisted(() => ({
+  mockDecryptCredentials: vi.fn(),
+  mockParseAuthCredential: vi.fn(),
+}));
+
+vi.mock("@/features/integrations/core/credentials", () => ({
+  decryptCredentials: mockDecryptCredentials,
+  parseAuthCredential: mockParseAuthCredential,
+}));
+
 import { Prisma, ResourceType, SyncStatusEnum } from "@/generated/prisma";
 import { syncAllIntegrations, syncIntegration } from "../sync-integrations";
 
@@ -100,6 +110,7 @@ beforeEach(() => {
   mockRequirePlatform.mockReturnValue(PLATFORM_MODULE);
   mockPrisma.integration.findUnique.mockResolvedValue(loadedRow());
   mockStrategy.mockResolvedValue({ cursor: null, pending: true });
+  mockParseAuthCredential.mockReturnValue({ authType: "None" });
 });
 
 describe("syncIntegration — loading", () => {
@@ -123,6 +134,52 @@ describe("syncIntegration — loading", () => {
     mockPrisma.integration.findUnique.mockResolvedValue(null);
 
     await expect(runSync(makeStep())).rejects.toThrow(/not found/);
+  });
+});
+
+describe("syncIntegration — credential parsing", () => {
+  it("parses a non-generic-auth platform's decrypted credentials directly, without forcing them through the {authType} shape", async () => {
+    mockPrisma.integration.findUnique.mockResolvedValue(
+      loadedRow({ credentials: new Uint8Array([1]) }),
+    );
+    mockDecryptCredentials.mockReturnValue({
+      username: "svc",
+      password: "hunter2",
+    });
+    const credentialSchemaParse = vi.fn((value: unknown) => value);
+    mockRequirePlatform.mockReturnValue({
+      ...PLATFORM_MODULE,
+      definition: {
+        ...PLATFORM_MODULE.definition,
+        credentialSchema: { parse: credentialSchemaParse },
+        // usesGenericAuth intentionally unset, mirroring Fleet's {username, password} shape.
+      },
+    });
+
+    await runSync(makeStep());
+
+    expect(credentialSchemaParse).toHaveBeenCalledWith({
+      username: "svc",
+      password: "hunter2",
+    });
+    expect(mockParseAuthCredential).not.toHaveBeenCalled();
+  });
+
+  it("routes a generic-auth platform's credentials through parseAuthCredential's None-fallback", async () => {
+    const credentialSchemaParse = vi.fn((value: unknown) => value);
+    mockRequirePlatform.mockReturnValue({
+      ...PLATFORM_MODULE,
+      definition: {
+        ...PLATFORM_MODULE.definition,
+        credentialSchema: { parse: credentialSchemaParse },
+        usesGenericAuth: true,
+      },
+    });
+
+    await runSync(makeStep());
+
+    expect(mockParseAuthCredential).toHaveBeenCalledWith(null, "integration-1");
+    expect(credentialSchemaParse).toHaveBeenCalledWith({ authType: "None" });
   });
 });
 

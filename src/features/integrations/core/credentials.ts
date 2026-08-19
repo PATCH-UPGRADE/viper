@@ -1,9 +1,9 @@
 import "server-only";
 
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { z } from "zod";
+import type { z } from "zod";
 import { AuthType } from "@/generated/prisma";
-import { authenticationSchema } from "@/lib/schemas";
+import { authSchema } from "@/lib/schemas";
 import { parseAuthenticationJson } from "@/lib/utils";
 
 /**
@@ -93,10 +93,7 @@ export const decryptCredentials = (blob: Uint8Array): unknown => {
  * A platform needing something else declares its own `credentialSchema`
  * and encrypts it with the generic functions above.
  */
-export const authCredentialSchema = z.object({
-  authType: z.enum(AuthType),
-  authentication: authenticationSchema.optional(),
-});
+export const authCredentialSchema = authSchema;
 export type AuthCredential = z.infer<typeof authCredentialSchema>;
 
 /**

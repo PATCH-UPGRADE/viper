@@ -149,11 +149,17 @@ export const syncIntegration = inngest.createFunction(
           where: { id: integrationId },
           select: { credentials: true },
         });
+        const decrypted = row?.credentials
+          ? decryptCredentials(row.credentials)
+          : null;
+        // Only platforms using the generic {authType, authentication} shape
+        // read back through parseAuthCredential's None-fallback — everyone
+        // else's schema validates the decrypted blob directly (mirrors
+        // toCredentialBlob in integrations/server/routers.ts).
         const creds = module.definition.credentialSchema.parse(
-          parseAuthCredential(
-            row?.credentials ? decryptCredentials(row.credentials) : null,
-            integrationId,
-          ),
+          module.definition.usesGenericAuth
+            ? parseAuthCredential(decrypted, integrationId)
+            : (decrypted ?? {}),
         );
 
         const ctx: SyncCtx = {

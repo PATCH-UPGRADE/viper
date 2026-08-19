@@ -108,7 +108,6 @@ const credentialsPatch = (
   data: IntegrationFormValues,
 ) => {
   if (!data.credentials) return {};
-  if (data.credentials.authType === AuthType.None) return { credentials: null };
   return { credentials: toCredentialBlob(module, data.credentials) };
 };
 

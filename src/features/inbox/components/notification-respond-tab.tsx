@@ -8,22 +8,11 @@ import { MitigationPlanMatrix } from "@/features/mitigation/components/mitigatio
 import { useSuspenseMitigationPlans } from "@/features/mitigation/hooks/use-mitigation";
 import { cn } from "@/lib/utils";
 import type { NotificationDetailWithRelations } from "../types";
-import {
-  type Bucket,
-  BucketAccordion,
-  firstNonEmptyBucket,
-  NotInInventoryCard,
-} from "./affected-assets-accordion";
+import { AffectedAssetsSection } from "./affected-assets-section";
 import {
   HospitalImpactCard,
   NotificationSummaryCard,
 } from "./notification-impact-cards";
-
-const RESPOND_BUCKETS = [
-  "AFFECTED",
-  "UNDER_INVESTIGATION",
-  "NOT_AFFECTED",
-] as const satisfies readonly Bucket[];
 
 const COLUMN_HEADING = "font-semibold uppercase tracking-wide text-sm";
 
@@ -37,10 +26,7 @@ export function NotificationRespondTab({
   const { data: plans } = useSuspenseMitigationPlans(notification.id);
   const [view, setView] = useState<PlanView>("list");
   const acceptedPlan = plans.find((p) => p.isAccepted);
-  // assert plans is nonempty, this tab only renders if so
 
-  const { affectedAssets, deviceGroupsMatchings } = notification;
-  const hasAnyGroup = RESPOND_BUCKETS.some((b) => affectedAssets[b].length > 0);
   const canCompare = plans.length > 1;
   const isMatrix = canCompare && view === "matrix";
 
@@ -56,43 +42,7 @@ export function NotificationRespondTab({
         )}
       >
         {/* What's affected */}
-        {!isMatrix && (
-          <section>
-            <div className="flex flex-col gap-3 sticky top-0">
-              <h3 className={COLUMN_HEADING}>What&apos;s affected</h3>
-
-              {hasAnyGroup ? (
-                <Accordion
-                  type="single"
-                  collapsible
-                  defaultValue={firstNonEmptyBucket(
-                    affectedAssets,
-                    RESPOND_BUCKETS,
-                  )}
-                  className="flex flex-col gap-3"
-                >
-                  {RESPOND_BUCKETS.map((bucket) => (
-                    <BucketAccordion
-                      key={bucket}
-                      bucket={bucket}
-                      notificationId={notification.id}
-                      groups={affectedAssets[bucket]}
-                      variant="compact"
-                    />
-                  ))}
-                </Accordion>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No triaged assets for this notification.
-                </p>
-              )}
-
-              <NotInInventoryCard
-                deviceGroupsMatchings={deviceGroupsMatchings}
-              />
-            </div>
-          </section>
-        )}
+        {!isMatrix && <AffectedAssetsSection notification={notification} />}
 
         {/* Choose a response plan */}
         <section className="flex flex-col gap-3">
@@ -125,6 +75,7 @@ export function NotificationRespondTab({
               notificationId={notification.id}
             />
           ) : (
+            // plans[0] is safe: this tab is only rendered for notifications that have plans.
             <Accordion
               type="single"
               collapsible
@@ -142,6 +93,14 @@ export function NotificationRespondTab({
             </Accordion>
           )}
         </section>
+
+        {/* Written out twice on purpose. Moving it with CSS instead would break keyboard tab order. */}
+        {isMatrix && (
+          <AffectedAssetsSection
+            notification={notification}
+            className="max-w-[26rem]"
+          />
+        )}
       </div>
     </>
   );

@@ -99,10 +99,6 @@ export const authCredentialSchema = z.object({
 });
 export type AuthCredential = z.infer<typeof authCredentialSchema>;
 
-/** Does this platform's credentialSchema use the shared {authType, authentication} shape? */
-export const usesGenericAuth = (credentialSchema: z.ZodTypeAny): boolean =>
-  credentialSchema === authCredentialSchema;
-
 /**
  * The storage form of a credential. `AuthType.None` means there is nothing to
  * protect, so the column stays null — which is exactly what

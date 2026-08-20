@@ -39,19 +39,6 @@ vi.mock("@/features/integrations/core/registry", () => ({
   defaultSyncEveryFor: () => null,
 }));
 
-const { mockDecryptCredentials, mockParseAuthCredential, mockUsesGenericAuth } =
-  vi.hoisted(() => ({
-    mockDecryptCredentials: vi.fn(),
-    mockParseAuthCredential: vi.fn(),
-    mockUsesGenericAuth: vi.fn(),
-  }));
-
-vi.mock("@/features/integrations/core/credentials", () => ({
-  decryptCredentials: mockDecryptCredentials,
-  parseAuthCredential: mockParseAuthCredential,
-  usesGenericAuth: mockUsesGenericAuth,
-}));
-
 import { Prisma, ResourceType, SyncStatusEnum } from "@/generated/prisma";
 import { syncAllIntegrations, syncIntegration } from "../sync-integrations";
 
@@ -80,17 +67,6 @@ const PLATFORM_MODULE = {
     credentialSchema: { parse: (value: unknown) => value },
   },
   sync: mockStrategy,
-};
-
-// Swaps in a spyable credentialSchema.parse so a test can assert what the
-// strategy step actually parsed, without caring about the rest of the module.
-const mockCredentialSchema = () => {
-  const parse = vi.fn((value: unknown) => value);
-  mockRequirePlatform.mockReturnValue({
-    ...PLATFORM_MODULE,
-    definition: { ...PLATFORM_MODULE.definition, credentialSchema: { parse } },
-  });
-  return parse;
 };
 
 const loadedRow = (overrides: Record<string, unknown> = {}) => ({
@@ -124,7 +100,6 @@ beforeEach(() => {
   mockRequirePlatform.mockReturnValue(PLATFORM_MODULE);
   mockPrisma.integration.findUnique.mockResolvedValue(loadedRow());
   mockStrategy.mockResolvedValue({ cursor: null, pending: true });
-  mockParseAuthCredential.mockReturnValue({ authType: "None" });
 });
 
 describe("syncIntegration — loading", () => {
@@ -148,57 +123,6 @@ describe("syncIntegration — loading", () => {
     mockPrisma.integration.findUnique.mockResolvedValue(null);
 
     await expect(runSync(makeStep())).rejects.toThrow(/not found/);
-  });
-});
-
-describe("syncIntegration — credential parsing", () => {
-  it("parses a non-generic-auth platform's decrypted credentials directly, without forcing them through the {authType} shape", async () => {
-    mockPrisma.integration.findUnique.mockResolvedValue(
-      loadedRow({ credentials: new Uint8Array([1]) }),
-    );
-    mockDecryptCredentials.mockReturnValue({
-      username: "svc",
-      password: "hunter2",
-    });
-    mockUsesGenericAuth.mockReturnValue(false);
-    const credentialSchemaParse = mockCredentialSchema();
-
-    await runSync(makeStep());
-
-    expect(credentialSchemaParse).toHaveBeenCalledWith({
-      username: "svc",
-      password: "hunter2",
-    });
-    expect(mockParseAuthCredential).not.toHaveBeenCalled();
-  });
-
-  it("fails clearly instead of a raw ZodError when a non-generic-auth platform has no stored credentials", async () => {
-    mockPrisma.integration.findUnique.mockResolvedValue(
-      loadedRow({ credentials: null }),
-    );
-    mockUsesGenericAuth.mockReturnValue(false);
-    const credentialSchemaParse = mockCredentialSchema();
-
-    const result = await runSync(makeStep());
-
-    expect(credentialSchemaParse).not.toHaveBeenCalled();
-    expect(
-      mockPrisma.integrationResourceSync.update.mock.calls[0][0].data,
-    ).toMatchObject({
-      status: SyncStatusEnum.Error,
-      errorMessage: "Integration integration-1 has no stored credentials",
-    });
-    expect(result).toEqual({ success: false, pending: false });
-  });
-
-  it("routes a generic-auth platform's credentials through parseAuthCredential's None-fallback", async () => {
-    mockUsesGenericAuth.mockReturnValue(true);
-    const credentialSchemaParse = mockCredentialSchema();
-
-    await runSync(makeStep());
-
-    expect(mockParseAuthCredential).toHaveBeenCalledWith(null, "integration-1");
-    expect(credentialSchemaParse).toHaveBeenCalledWith({ authType: "None" });
   });
 });
 

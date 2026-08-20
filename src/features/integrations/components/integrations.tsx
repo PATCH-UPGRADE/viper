@@ -1,78 +1,177 @@
 "use client";
 
-import { CircleCheck, CircleDot, CircleX } from "lucide-react";
 import {
-  EntitySearch,
+  ArchiveIcon,
+  BellIcon,
+  BugIcon,
+  Building2Icon,
+  InboxIcon,
+  LayoutGridIcon,
+  type LucideIcon,
+  WebhookIcon,
+} from "lucide-react";
+import Link from "next/link";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
+import { Fragment } from "react";
+import {
+  EmptyView,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import { DataTable } from "@/components/ui/data-table";
+import { Card } from "@/components/ui/card";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { Separator } from "@/components/ui/separator";
 import { mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
-import type { SyncStatusEnum } from "@/generated/prisma";
-import { useEntitySearch } from "@/hooks/use-entity-search";
+import { useSuspenseWebhooks } from "@/features/webhooks/hooks/use-webhooks";
 import { usePaginationParams } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 import { useSuspenseIntegrations } from "../hooks/use-integrations";
-import { columns, resourceColumns } from "./columns";
+import { CATEGORIES, categoryLabel, IntegrationCard } from "./integration-row";
 
-export const IntegrationsSearch = () => {
-  const [params, setParams] = usePaginationParams();
-  const { searchValue, onSearchChange } = useEntitySearch({
-    params,
-    setParams,
-  });
+const SECTIONS = ["Overview", ...CATEGORIES] as const;
+type Section = (typeof SECTIONS)[number];
+
+const SECTION_ICONS: Record<Section, LucideIcon> = {
+  Overview: LayoutGridIcon,
+  "Hospital Inventory": ArchiveIcon,
+  "Vulnerability Management Platforms": BugIcon,
+  "Ticketing Platforms": InboxIcon,
+  "Vendor Platforms": Building2Icon,
+  Notifications: BellIcon,
+};
+
+const useSection = () =>
+  useQueryState(
+    "section",
+    parseAsStringLiteral(SECTIONS).withDefault("Overview"),
+  );
+
+const ConnectorsSidebar = () => {
+  const { data } = useSuspenseIntegrations();
+  const { data: webhooks } = useSuspenseWebhooks();
+  const [section, setSection] = useSection();
+
+  const countBySection = data.items.reduce(
+    (counts, item) => {
+      const section = categoryLabel(item);
+      counts[section] = (counts[section] ?? 0) + 1;
+      return counts;
+    },
+    { Overview: data.items.length } as Record<Section, number>,
+  );
 
   return (
-    <EntitySearch
-      value={searchValue}
-      onChange={onSearchChange}
-      placeholder="Search integrations by name"
-    />
+    <nav className="flex flex-col gap-1 w-56 shrink-0">
+      {SECTIONS.map((name) => {
+        const Icon = SECTION_ICONS[name];
+        return (
+          <button
+            key={name}
+            type="button"
+            onClick={() => setSection(name)}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left",
+              section === name
+                ? "bg-accent text-accent-foreground font-medium"
+                : "text-muted-foreground hover:bg-accent/50",
+            )}
+          >
+            <Icon className="size-4 shrink-0" />
+            <span className="flex-1">{name}</span>
+            <span className="text-xs tabular-nums">
+              {countBySection[name] ?? 0}
+            </span>
+          </button>
+        );
+      })}
+      <Separator className="my-1" />
+      <Link
+        href="/settings/webhooks"
+        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent/50"
+      >
+        <WebhookIcon className="size-4 shrink-0" />
+        <span className="flex-1">Webhooks</span>
+        <span className="text-xs tabular-nums">{webhooks.totalCount}</span>
+      </Link>
+    </nav>
   );
 };
 
-export const IntegrationsList = () => {
-  const { data: integrations } = useSuspenseIntegrations();
+const EnabledIntegrations = () => {
+  const { data } = useSuspenseIntegrations();
+  const [{ page }, setParams] = usePaginationParams();
+  const [section] = useSection();
+
+  const items =
+    section === "Overview"
+      ? data.items
+      : data.items.filter((i) => categoryLabel(i) === section);
 
   return (
-    <DataTable
-      search={<IntegrationsSearch />}
-      paginatedData={integrations}
-      columns={columns}
-      nestedColumns={resourceColumns}
-      nestedDataKey="resourceSyncs"
-    />
+    <div className="flex flex-col gap-4 flex-1 min-w-0">
+      <SettingsSubheader
+        title="Enabled Integrations"
+        description="Currently active connections syncing data into VIPER."
+      />
+      {items.length === 0 ? (
+        <EmptyView message={`No enabled integrations in ${section}.`} />
+      ) : (
+        <Card className="p-0 gap-0 overflow-hidden">
+          {items.map((integration, i) => (
+            <Fragment key={integration.id}>
+              {i > 0 && <Separator />}
+              <IntegrationCard integration={integration} />
+            </Fragment>
+          ))}
+        </Card>
+      )}
+
+      {section === "Overview" && data.totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => setParams({ page: Math.max(1, page - 1) })}
+              />
+            </PaginationItem>
+            {[...Array(data.totalPages)].map((_, i) => (
+              <PaginationItem key={i}>
+                <PaginationLink
+                  isActive={page === i + 1}
+                  onClick={() => setParams({ page: i + 1 })}
+                >
+                  {i + 1}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={() =>
+                  setParams({ page: Math.min(data.totalPages, page + 1) })
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
+    </div>
   );
 };
 
-export const SyncStatusIndicator = ({
-  status,
-}: {
-  status?: SyncStatusEnum;
-}) => {
-  const className = "flex gap-1 items-center font-semibold";
-  switch (status) {
-    case "Error":
-      return (
-        <span className={cn(className, "text-destructive")}>
-          <CircleX size={15} /> Error
-        </span>
-      );
-    case "Success":
-      return (
-        <span className={cn(className, "text-emerald-600")}>
-          <CircleCheck size={15} /> Success
-        </span>
-      );
-    default:
-      return (
-        <span className={cn(className, "text-gray-500")}>
-          <CircleDot size={15} /> Pending
-        </span>
-      );
-  }
-};
+export const IntegrationsList = () => (
+  <div className="flex gap-6">
+    <ConnectorsSidebar />
+    <EnabledIntegrations />
+  </div>
+);
 
 export const IntegrationsContainer = ({
   children,
@@ -82,8 +181,8 @@ export const IntegrationsContainer = ({
   return (
     <div className={cn(mainPadding, "flex flex-col gap-4")}>
       <SettingsSubheader
-        title="Integrations"
-        description="Manage external integrations and their synced resources"
+        title="Connectors"
+        description="Connect Viper to the systems your hospital already runs — inventory, vulnerability feeds, ticketing, vendor platforms, and notifications."
       />
       {children}
     </div>

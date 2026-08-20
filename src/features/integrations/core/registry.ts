@@ -27,6 +27,10 @@ export const requirePlatform = (platform: PlatformEnum): AnyConnectorModule => {
   return module;
 };
 
+/** The platform author's own name for this platform. */
+export const displayNameFor = (platform: PlatformEnum): string =>
+  registry[platform]?.definition.displayName ?? platform;
+
 /** The platform author's own sense of how fast this resource moves. */
 export const defaultSyncEveryFor = (
   platform: PlatformEnum,

@@ -5,9 +5,6 @@ import { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { authSchema } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
 
-/**
- * The resources a platform can sync, keyed by the URL segment they upload to.
- */
 export const integrationsMapping = {
   assets: { name: "Asset", type: ResourceType.Asset },
   deviceArtifacts: {
@@ -21,7 +18,6 @@ export const integrationsMapping = {
 
 export type UploadSegment = keyof typeof integrationsMapping;
 
-/** ResourceType -> the URL segment it uploads to. Inverse of the table above. */
 export const uploadSegmentFor = Object.fromEntries(
   Object.entries(integrationsMapping).map(([segment, { type }]) => [
     type,
@@ -35,8 +31,6 @@ export const resourceTypeSchema = z.enum(
 );
 
 /**
- * What `integrations.create` / `.update` accept.
- *
  * `config` stays opaque here on purpose. Narrowing it per-platform would mean
  * importing every platform's `configSchema`, and those reach `core/credentials.ts`
  * (`node:crypto`, `server-only`) — which would make this module unusable from a
@@ -61,7 +55,6 @@ export function isValidResourceTypeKey(key: string): key is UploadSegment {
   return key in integrationsMapping;
 }
 
-/** Human label for a resource type, e.g. for the enabled-integrations table. */
 const resourceTypeLabels: Record<ResourceType, string> = {
   [ResourceType.Asset]: "Asset",
   [ResourceType.DeviceArtifact]: "Device Artifact",
@@ -73,14 +66,6 @@ const resourceTypeLabels: Record<ResourceType, string> = {
 export const resourceTypeLabel = (type: ResourceType): string =>
   resourceTypeLabels[type] ?? type;
 
-/** Kept separate from the server-only platform modules for client use. */
-export const platformLabels: Record<PlatformEnum, string> = {
-  [PlatformEnum.AI]: "AI Crawler",
-  [PlatformEnum.PARTNER]: "Partner API",
-  [PlatformEnum.FLEET]: "Siemens Healthineers teamplay Fleet",
-};
-
-/** A row (and its resource syncs) as returned by `integrations.getMany`. */
 export type IntegrationListItem = inferOutput<
   typeof trpc.integrations.getMany
 >["items"][number];

@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { initialsOf } from "@/lib/string-utils";
 import { cn } from "@/lib/utils";
 
 interface UserAvatarProps {
@@ -15,9 +16,7 @@ export function UserAvatar({ user, className }: UserAvatarProps) {
           alt={user.name?.trim() || "User avatar"}
         />
       )}
-      <AvatarFallback>
-        {user?.name?.trim()?.[0]?.toUpperCase() || "U"}
-      </AvatarFallback>
+      <AvatarFallback>{initialsOf(user?.name)}</AvatarFallback>
     </Avatar>
   );
 }

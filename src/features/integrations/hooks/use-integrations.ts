@@ -4,24 +4,29 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { INTEGRATIONS_POLL_INTERVAL_MS } from "@/config/constants";
+import { INTEGRATIONS_POLL_INTERVAL_MS, PAGINATION } from "@/config/constants";
 import { usePaginationParams } from "@/lib/pagination";
 import { useTRPC } from "@/trpc/client";
 
+// The sidebar's per-category counts and filtering need every integration in
+// hand, not just one page of them — a hospital's connector list is bounded
+// (unlike assets/vulnerabilities), so fetching up to the max page size is
+// effectively "all of them" and keeps the Overview pagination UI as a
+// fallback for the rare case that isn't true.
 export const useSuspenseIntegrations = () => {
   const trpc = useTRPC();
   const [params] = usePaginationParams();
 
   return useSuspenseQuery({
-    ...trpc.integrations.getMany.queryOptions(params),
+    ...trpc.integrations.getMany.queryOptions({
+      ...params,
+      pageSize: PAGINATION.MAX_PAGE_SIZE,
+    }),
     refetchInterval: INTEGRATIONS_POLL_INTERVAL_MS,
     refetchIntervalInBackground: true,
   });
 };
 
-/**
- * Hook to create a new Integration
- */
 export const useCreateIntegration = () => {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
@@ -44,9 +49,6 @@ export const useCreateIntegration = () => {
   );
 };
 
-/**
- * Hook to update Integration
- */
 export const useUpdateIntegration = () => {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
@@ -64,9 +66,6 @@ export const useUpdateIntegration = () => {
   );
 };
 
-/**
- * Hook to remove an Integration
- */
 export const useRemoveIntegration = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -88,9 +87,6 @@ export const useRemoveIntegration = () => {
   );
 };
 
-/**
- * Operator kill switch for a whole integration.
- */
 export const useSetIntegrationEnabled = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -101,16 +97,12 @@ export const useSetIntegrationEnabled = () => {
         queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
       },
       onError: (error) => {
-        toast.error(`Failed to update Integration: ${error.message}`);
+        toast.error(`Failed to enable/disable integration: ${error.message}`);
       },
     }),
   );
 };
 
-/**
- * Toggle one resource on a multi-resource integration (e.g. turn off work
- * orders, keep assets syncing).
- */
 export const useSetResourceSyncEnabled = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -132,9 +124,8 @@ export const useTriggerSync = () => {
 
   return useMutation(
     trpc.integrations.triggerSync.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: () => {
         toast.success("Successfully triggered synchronization");
-        return data;
       },
       onError: (error) => {
         console.error(error);

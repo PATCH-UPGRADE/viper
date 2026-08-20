@@ -12,26 +12,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
-import { Fragment } from "react";
 import {
   EmptyView,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
 import { Card } from "@/components/ui/card";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { Separator } from "@/components/ui/separator";
 import { mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
 import { useSuspenseWebhooks } from "@/features/webhooks/hooks/use-webhooks";
-import { usePaginationParams } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 import { useSuspenseIntegrations } from "../hooks/use-integrations";
 import { CATEGORIES, categoryLabel, IntegrationCard } from "./integration-row";
@@ -107,7 +97,6 @@ const ConnectorsSidebar = () => {
 
 const EnabledIntegrations = () => {
   const { data } = useSuspenseIntegrations();
-  const [{ page }, setParams] = usePaginationParams();
   const [section] = useSection();
 
   const items =
@@ -124,43 +113,11 @@ const EnabledIntegrations = () => {
       {items.length === 0 ? (
         <EmptyView message={`No enabled integrations in ${section}.`} />
       ) : (
-        <Card className="p-0 gap-0 overflow-hidden">
-          {items.map((integration, i) => (
-            <Fragment key={integration.id}>
-              {i > 0 && <Separator />}
-              <IntegrationCard integration={integration} />
-            </Fragment>
+        <Card className="p-0 gap-0 overflow-hidden divide-y">
+          {items.map((integration) => (
+            <IntegrationCard key={integration.id} integration={integration} />
           ))}
         </Card>
-      )}
-
-      {section === "Overview" && data.totalPages > 1 && (
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                onClick={() => setParams({ page: Math.max(1, page - 1) })}
-              />
-            </PaginationItem>
-            {[...Array(data.totalPages)].map((_, i) => (
-              <PaginationItem key={i}>
-                <PaginationLink
-                  isActive={page === i + 1}
-                  onClick={() => setParams({ page: i + 1 })}
-                >
-                  {i + 1}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
-            <PaginationItem>
-              <PaginationNext
-                onClick={() =>
-                  setParams({ page: Math.min(data.totalPages, page + 1) })
-                }
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
       )}
     </div>
   );

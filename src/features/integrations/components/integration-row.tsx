@@ -86,6 +86,13 @@ type TimingInput = Pick<
   | "isDue"
 >;
 
+const nextSyncLabel = (sync: TimingInput): string | null =>
+  sync.nextSyncAt
+    ? sync.isDue
+      ? "Sync due"
+      : `Next sync ${relativeTime(sync.nextSyncAt)}`
+    : null;
+
 const timingLine = (sync: TimingInput): { text: string; isError: boolean } => {
   if (sync.status === SyncStatusEnum.Error) {
     const when = sync.lastAttemptAt ?? sync.lastSuccessfulSync;
@@ -94,23 +101,12 @@ const timingLine = (sync: TimingInput): { text: string; isError: boolean } => {
       isError: true,
     };
   }
+  const next = nextSyncLabel(sync);
   if (!sync.lastSuccessfulSync) {
-    if (sync.nextSyncAt) {
-      return {
-        text: sync.isDue
-          ? "Sync due"
-          : `Next sync ${relativeTime(sync.nextSyncAt)}`,
-        isError: false,
-      };
-    }
-    return { text: "Never synced", isError: false };
+    return { text: next ?? "Never synced", isError: false };
   }
   const parts = [`Synced ${relativeTime(sync.lastSuccessfulSync)}`];
-  if (sync.nextSyncAt) {
-    parts.push(
-      sync.isDue ? "Sync due" : `Next sync ${relativeTime(sync.nextSyncAt)}`,
-    );
-  }
+  if (next) parts.push(next);
   return { text: parts.join(" · "), isError: false };
 };
 
@@ -121,10 +117,14 @@ const aggregateTiming = (
   const enabled = resourceSyncs.filter((s) => s.enabled);
   if (enabled.length === 0) return null;
 
-  const pick = (dates: (Date | null)[], dir: 1 | -1) =>
-    dates
+  const pick = (dates: (Date | null)[], dir: 1 | -1) => {
+    const ts = dates
       .filter((d): d is Date => d != null)
-      .sort((a, b) => dir * (a.getTime() - b.getTime()))[0] ?? null;
+      .map((d) => d.getTime());
+    return ts.length
+      ? new Date(dir === 1 ? Math.min(...ts) : Math.max(...ts))
+      : null;
+  };
 
   const failing = enabled.find((s) => s.status === SyncStatusEnum.Error);
   return {
@@ -269,12 +269,12 @@ const IntegrationActionsMenu = ({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={removeItem.isPending}
-              onClick={async (event) => {
+              onClick={(event) => {
                 event.preventDefault();
-                try {
-                  await removeItem.mutateAsync({ id: integration.id });
-                  setConfirmOpen(false);
-                } catch {}
+                removeItem.mutate(
+                  { id: integration.id },
+                  { onSuccess: () => setConfirmOpen(false) },
+                );
               }}
             >
               Remove

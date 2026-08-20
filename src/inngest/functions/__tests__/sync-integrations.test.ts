@@ -82,6 +82,17 @@ const PLATFORM_MODULE = {
   sync: mockStrategy,
 };
 
+// Swaps in a spyable credentialSchema.parse so a test can assert what the
+// strategy step actually parsed, without caring about the rest of the module.
+const mockCredentialSchema = () => {
+  const parse = vi.fn((value: unknown) => value);
+  mockRequirePlatform.mockReturnValue({
+    ...PLATFORM_MODULE,
+    definition: { ...PLATFORM_MODULE.definition, credentialSchema: { parse } },
+  });
+  return parse;
+};
+
 const loadedRow = (overrides: Record<string, unknown> = {}) => ({
   platform: "PARTNER",
   integrationUserId: "shadow-user",
@@ -150,14 +161,7 @@ describe("syncIntegration — credential parsing", () => {
       password: "hunter2",
     });
     mockUsesGenericAuth.mockReturnValue(false);
-    const credentialSchemaParse = vi.fn((value: unknown) => value);
-    mockRequirePlatform.mockReturnValue({
-      ...PLATFORM_MODULE,
-      definition: {
-        ...PLATFORM_MODULE.definition,
-        credentialSchema: { parse: credentialSchemaParse },
-      },
-    });
+    const credentialSchemaParse = mockCredentialSchema();
 
     await runSync(makeStep());
 
@@ -173,14 +177,7 @@ describe("syncIntegration — credential parsing", () => {
       loadedRow({ credentials: null }),
     );
     mockUsesGenericAuth.mockReturnValue(false);
-    const credentialSchemaParse = vi.fn((value: unknown) => value);
-    mockRequirePlatform.mockReturnValue({
-      ...PLATFORM_MODULE,
-      definition: {
-        ...PLATFORM_MODULE.definition,
-        credentialSchema: { parse: credentialSchemaParse },
-      },
-    });
+    const credentialSchemaParse = mockCredentialSchema();
 
     const result = await runSync(makeStep());
 
@@ -196,14 +193,7 @@ describe("syncIntegration — credential parsing", () => {
 
   it("routes a generic-auth platform's credentials through parseAuthCredential's None-fallback", async () => {
     mockUsesGenericAuth.mockReturnValue(true);
-    const credentialSchemaParse = vi.fn((value: unknown) => value);
-    mockRequirePlatform.mockReturnValue({
-      ...PLATFORM_MODULE,
-      definition: {
-        ...PLATFORM_MODULE.definition,
-        credentialSchema: { parse: credentialSchemaParse },
-      },
-    });
+    const credentialSchemaParse = mockCredentialSchema();
 
     await runSync(makeStep());
 

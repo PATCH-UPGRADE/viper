@@ -156,7 +156,7 @@ export const integrationsRouter = createTRPCRouter({
               defaultSyncEveryFor(integration.platform, sync.resource),
             ),
             // Same "due" check the cron uses, against the server's clock.
-            isDue: sync.nextSyncAt !== null && sync.nextSyncAt <= now,
+            isDue: sync.nextSyncAt === null || sync.nextSyncAt <= now,
           })),
         }),
       );

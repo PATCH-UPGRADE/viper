@@ -83,13 +83,13 @@ type TimingInput = Pick<
 >;
 
 const nextSyncLabel = (sync: TimingInput): string | null =>
-  sync.nextSyncAt
-    ? sync.isDue
-      ? "Sync due"
-      : `Next sync ${relativeTime(sync.nextSyncAt)}`
-    : null;
+  sync.isDue
+    ? "Sync due"
+    : sync.nextSyncAt
+      ? `Next sync ${relativeTime(sync.nextSyncAt)}`
+      : null;
 
-const timingLine = (sync: TimingInput): { text: string; isError: boolean } => {
+export const timingLine = (sync: TimingInput) => {
   if (sync.status === SyncStatusEnum.Error) {
     const when = sync.lastAttemptAt ?? sync.lastSuccessfulSync;
     return {
@@ -107,7 +107,7 @@ const timingLine = (sync: TimingInput): { text: string; isError: boolean } => {
 };
 
 /** Most-recent success, soonest next sync, any-error, across a set of resource syncs. */
-const aggregateTiming = (
+export const aggregateTiming = (
   resourceSyncs: IntegrationResourceSyncItem[],
 ): TimingInput | null => {
   const enabled = resourceSyncs.filter((s) => s.enabled);
@@ -123,15 +123,16 @@ const aggregateTiming = (
   };
 
   const failing = enabled.find((s) => s.status === SyncStatusEnum.Error);
+  const timingSource = failing ? [failing] : enabled;
   return {
     status: failing ? SyncStatusEnum.Error : SyncStatusEnum.Success,
     errorMessage: failing?.errorMessage ?? null,
     lastAttemptAt: pick(
-      enabled.map((s) => s.lastAttemptAt),
+      timingSource.map((s) => s.lastAttemptAt),
       -1,
     ),
     lastSuccessfulSync: pick(
-      enabled.map((s) => s.lastSuccessfulSync),
+      timingSource.map((s) => s.lastSuccessfulSync),
       -1,
     ),
     nextSyncAt: pick(

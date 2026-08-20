@@ -23,58 +23,44 @@ vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/inngest/client", () => ({ inngest: mockInngest }));
 vi.mock("../core/registry", () => ({
   defaultSyncEveryFor: mockDefaultSyncEveryFor,
-  displayNameFor: (platform: string) => platform,
-  requirePlatform: vi.fn(),
+  displayNameFor: () => "Partner API",
 }));
 
-import { PlatformEnum, ResourceType, SyncStatusEnum } from "@/generated/prisma";
+import { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { createCallerFactory } from "@/trpc/init";
 import { integrationsRouter } from "./routers";
 
-const createCaller = createCallerFactory(integrationsRouter);
-const setup = () =>
-  createCaller({ req: undefined, auth: { user: { id: "user-test" } } });
-const PAGE_INPUT = {
-  page: 1,
-  pageSize: 10,
-  search: "partner",
-  sort: "",
-  lastUpdatedStartTime: "",
-  lastUpdatedEndTime: "",
-} as const;
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockPrisma.integration.count.mockResolvedValue(0);
-  mockDefaultSyncEveryFor.mockReturnValue(900);
+const caller = createCallerFactory(integrationsRouter)({
+  req: undefined,
+  auth: { user: { id: "user-test" } },
 });
+const integrationRow = (syncEvery: number | null, nextSyncAt: Date | null) => ({
+  id: "integration-1",
+  name: "Partner feed",
+  platform: PlatformEnum.PARTNER,
+  syncEvery,
+  enabled: true,
+  resourceSyncs: [
+    {
+      resource: ResourceType.Asset,
+      nextSyncAt,
+      syncEvery: null,
+    },
+  ],
+});
+const existingIntegration = { id: "integration-1" };
+
+mockDefaultSyncEveryFor.mockReturnValue(900);
+beforeEach(() => vi.clearAllMocks());
 
 describe("integrationsRouter.getMany", () => {
   it("returns one unified, browser-safe list with resolved resource cadences", async () => {
     mockPrisma.integration.count.mockResolvedValue(1);
     mockPrisma.integration.findMany.mockResolvedValue([
-      {
-        id: "integration-1",
-        name: "Partner feed",
-        platform: PlatformEnum.PARTNER,
-        syncEvery: 600,
-        enabled: true,
-        resourceSyncs: [
-          {
-            integrationId: "integration-1",
-            resource: ResourceType.Asset,
-            status: SyncStatusEnum.Success,
-            errorMessage: null,
-            lastSuccessfulSync: null,
-            nextSyncAt: new Date(Date.now() - 1_000),
-            enabled: true,
-            syncEvery: null,
-          },
-        ],
-      },
+      integrationRow(600, new Date(Date.now() - 1_000)),
     ]);
 
-    const result = await setup().getMany(PAGE_INPUT);
+    const result = await caller.getMany({ search: "partner" });
 
     expect(mockPrisma.integration.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -94,7 +80,7 @@ describe("integrationsRouter.getMany", () => {
         id: "integration-1",
         name: "Partner feed",
         platform: PlatformEnum.PARTNER,
-        platformLabel: PlatformEnum.PARTNER,
+        platformLabel: "Partner API",
         enabled: true,
         resourceSyncs: [
           expect.objectContaining({
@@ -108,48 +94,27 @@ describe("integrationsRouter.getMany", () => {
     ]);
   });
 
-  it("falls back to the platform default cadence and isn't due with no nextSyncAt", async () => {
+  it("falls back to the platform default cadence and is due with no nextSyncAt", async () => {
     mockPrisma.integration.count.mockResolvedValue(1);
     mockPrisma.integration.findMany.mockResolvedValue([
-      {
-        id: "integration-1",
-        name: "Partner feed",
-        platform: PlatformEnum.PARTNER,
-        syncEvery: null,
-        enabled: true,
-        resourceSyncs: [
-          {
-            integrationId: "integration-1",
-            resource: ResourceType.Asset,
-            status: SyncStatusEnum.Success,
-            errorMessage: null,
-            lastSuccessfulSync: null,
-            nextSyncAt: null,
-            enabled: true,
-            syncEvery: null,
-          },
-        ],
-      },
+      integrationRow(null, null),
     ]);
 
-    const result = await setup().getMany(PAGE_INPUT);
+    const result = await caller.getMany({ search: "partner" });
 
     expect(result.items[0].resourceSyncs[0]).toMatchObject({
       effectiveSyncEvery: 900,
       isOverridden: false,
-      isDue: false,
+      isDue: true,
     });
   });
 });
 
 describe("integrationsRouter enable controls", () => {
   it("updates the whole integration without requiring its full config", async () => {
-    mockPrisma.integration.findUnique.mockResolvedValue({
-      id: "integration-1",
-    });
-    mockPrisma.integration.update.mockResolvedValue({ id: "integration-1" });
+    mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
 
-    await setup().setEnabled({ id: "integration-1", enabled: false });
+    await caller.setEnabled({ id: "integration-1", enabled: false });
 
     expect(mockPrisma.integration.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -163,7 +128,7 @@ describe("integrationsRouter enable controls", () => {
     mockPrisma.integration.findUnique.mockResolvedValue(null);
 
     await expect(
-      setup().setEnabled({ id: "missing", enabled: false }),
+      caller.setEnabled({ id: "missing", enabled: false }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(mockPrisma.integration.update).not.toHaveBeenCalled();
   });
@@ -172,9 +137,8 @@ describe("integrationsRouter enable controls", () => {
     mockPrisma.integrationResourceSync.findUnique.mockResolvedValue({
       integrationId: "integration-1",
     });
-    mockPrisma.integrationResourceSync.update.mockResolvedValue({});
 
-    await setup().setResourceSyncEnabled({
+    await caller.setResourceSyncEnabled({
       integrationId: "integration-1",
       resource: ResourceType.Asset,
       enabled: false,
@@ -195,7 +159,7 @@ describe("integrationsRouter enable controls", () => {
     mockPrisma.integrationResourceSync.findUnique.mockResolvedValue(null);
 
     await expect(
-      setup().setResourceSyncEnabled({
+      caller.setResourceSyncEnabled({
         integrationId: "missing",
         resource: ResourceType.Asset,
         enabled: false,
@@ -205,33 +169,28 @@ describe("integrationsRouter enable controls", () => {
   });
 });
 
-describe("integrationsRouter.update", () => {
-  it("404s instead of 500ing when the integration doesn't exist", async () => {
-    mockPrisma.integration.findUnique.mockResolvedValue(null);
+it("integrationsRouter.update 404s when the integration doesn't exist", async () => {
+  mockPrisma.integration.findUnique.mockResolvedValue(null);
 
-    await expect(
-      setup().update({
-        id: "missing",
-        data: {
-          name: "Partner feed",
-          platform: PlatformEnum.PARTNER,
-          syncEvery: 3600,
-          config: {},
-        },
-      }),
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-    expect(mockPrisma.integration.update).not.toHaveBeenCalled();
-  });
+  await expect(
+    caller.update({
+      id: "missing",
+      data: {
+        name: "Partner feed",
+        platform: PlatformEnum.PARTNER,
+        syncEvery: 3600,
+        config: {},
+      },
+    }),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  expect(mockPrisma.integration.update).not.toHaveBeenCalled();
 });
 
 describe("integrationsRouter.remove", () => {
   it("removes an existing integration", async () => {
-    mockPrisma.integration.findUnique.mockResolvedValue({
-      id: "integration-1",
-    });
-    mockPrisma.integration.delete.mockResolvedValue({ id: "integration-1" });
+    mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
 
-    await setup().remove({ id: "integration-1" });
+    await caller.remove({ id: "integration-1" });
 
     expect(mockPrisma.integration.delete).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "integration-1" } }),
@@ -241,7 +200,7 @@ describe("integrationsRouter.remove", () => {
   it("404s instead of 500ing when the integration doesn't exist", async () => {
     mockPrisma.integration.findUnique.mockResolvedValue(null);
 
-    await expect(setup().remove({ id: "missing" })).rejects.toMatchObject({
+    await expect(caller.remove({ id: "missing" })).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
     expect(mockPrisma.integration.delete).not.toHaveBeenCalled();
@@ -258,9 +217,9 @@ describe("integrationsRouter.triggerSync", () => {
       ],
     });
 
-    await expect(setup().triggerSync({ id: "integration-1" })).resolves.toEqual(
-      { success: true },
-    );
+    await expect(caller.triggerSync({ id: "integration-1" })).resolves.toEqual({
+      success: true,
+    });
 
     expect(mockInngest.send).toHaveBeenCalledWith([
       {
@@ -284,7 +243,7 @@ describe("integrationsRouter.triggerSync", () => {
     mockPrisma.integration.findFirst.mockResolvedValue(null);
 
     await expect(
-      setup().triggerSync({ id: "integration-1" }),
+      caller.triggerSync({ id: "integration-1" }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
     expect(mockPrisma.integration.findFirst).toHaveBeenCalledWith(
@@ -302,7 +261,7 @@ describe("integrationsRouter.triggerSync", () => {
     });
 
     await expect(
-      setup().triggerSync({ id: "integration-1" }),
+      caller.triggerSync({ id: "integration-1" }),
     ).rejects.toMatchObject({
       code: "BAD_REQUEST",
       message: "No enabled resources to sync",

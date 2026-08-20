@@ -271,9 +271,6 @@ const IntegrationHeaderRow = ({
             · {integration.platformLabel}
           </span>
         </div>
-        <div className="text-xs text-muted-foreground">
-          {integration.categories.join(" · ")}
-        </div>
         {aggregate && <TimingText timing={aggregate} />}
       </div>
 

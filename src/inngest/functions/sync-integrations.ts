@@ -21,8 +21,9 @@ import { inngest } from "../client";
 
 /**
  * The two Inngest functions that drive integration syncs.
- * TODO VW-437: Document in a CLAUDE.md file somewhere that adding a platform
- *    should not make changes to this file
+ *
+ * Platform-agnostic on purpose: everything specific reaches this file through
+ * the registry. Adding a platform should not make changes here.
  */
 
 export const syncAllIntegrations = inngest.createFunction(

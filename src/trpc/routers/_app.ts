@@ -2,6 +2,7 @@ import { apiKeyConnectorsRouter } from "@/features/api-key-connectors/server/rou
 import { artifactsRouter } from "@/features/artifacts/server/routers";
 import { assetsRouter } from "@/features/assets/server/routers";
 import { chatRouter } from "@/features/chat/server/routers";
+import { debriefRouter } from "@/features/debrief/server/routers";
 import { departmentsRouter } from "@/features/departments/server/routers";
 import { deviceArtifactsRouter } from "@/features/device-artifacts/server/routers";
 import { deviceGroupsRouter } from "@/features/device-groups/server/routers";
@@ -43,6 +44,7 @@ export const appRouter = createTRPCRouter({
   overview: overviewRouter,
   tracking: trackingRouter,
   departments: departmentsRouter,
+  debrief: debriefRouter,
   tagColors: tagColorsRouter,
   vendors: vendorsRouter,
 });

@@ -109,13 +109,7 @@ describe("capPageSize", () => {
   // row. At pageSize 100 with ~18 matchings an advisory that is ~1800
   // concurrent queries against a pool of ~17, which throws P2024 and starves
   // the UI. The catalog says the same thing, but prose does not bind a model.
-  it("clamps an over-large notifications page", () => {
-    expect(capPageSize("notifications.getMany", { pageSize: 100 })).toEqual({
-      pageSize: 10,
-    });
-  });
-
-  it("keeps the rest of the input intact", () => {
+  it("clamps an over-large page and keeps the rest of the input intact", () => {
     expect(
       capPageSize("notifications.getMany", {
         pageSize: 50,

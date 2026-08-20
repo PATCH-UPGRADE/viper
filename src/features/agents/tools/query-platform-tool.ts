@@ -90,13 +90,20 @@ const DEVICE_GROUP_URL_KEYS = [
   "deviceArtifactsUrl",
 ] as const;
 
+function addLinks(
+  // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
+  obj: Record<string, any>,
+  links: Record<string, unknown>,
+): void {
+  obj._links = { ...(obj._links ?? {}), ...links };
+}
+
 // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
 function linkifyDeviceGroup(dg: Record<string, any>): void {
   const id = dg.id;
   for (const key of DEVICE_GROUP_URL_KEYS) delete dg[key];
   if (typeof id !== "string") return;
-  dg._links = {
-    ...(dg._links ?? {}),
+  addLinks(dg, {
     assets: {
       procedure: "assets.getManyByDeviceGroup",
       input: { deviceGroupId: id },
@@ -105,7 +112,7 @@ function linkifyDeviceGroup(dg: Record<string, any>): void {
       procedure: "vulnerabilities.getManyByDeviceGroup",
       input: { deviceGroupId: id },
     },
-  };
+  });
 }
 
 /**
@@ -120,8 +127,7 @@ function linkifyAsset(asset: Record<string, any>): void {
   if (typeof id !== "string") return;
   const hasUtilization = asset.utilization != null;
   delete asset.utilization;
-  asset._links = {
-    ...(asset._links ?? {}),
+  addLinks(asset, {
     workflows: {
       procedure: "workflows.getManyByAsset",
       input: { id },
@@ -134,7 +140,7 @@ function linkifyAsset(asset: Record<string, any>): void {
           },
         }
       : {}),
-  };
+  });
 }
 
 /**
@@ -145,13 +151,12 @@ function linkifyAsset(asset: Record<string, any>): void {
 function linkifyWorkflow(workflow: Record<string, any>): void {
   const id = workflow.id;
   if (typeof id !== "string") return;
-  workflow._links = {
-    ...(workflow._links ?? {}),
+  addLinks(workflow, {
     assets: {
       procedure: "assets.getManyByWorkflow",
       input: { id },
     },
-  };
+  });
 }
 
 /**
@@ -180,6 +185,21 @@ function trimCanonicalRecord(record: Record<string, any>): void {
 }
 
 /**
+ * A NotificationSource carries `raw`: the entire inbound payload, e.g. a whole
+ * Resend email event. It is worth tens of KB of context per row, and the model
+ * never needs it — `markdown` and the parent's own summary already carry the
+ * content.
+ *
+ * Matched on the source's own shape, not its parent, because Notification and
+ * WorkOrderTicket both hold `sources`. Stripped before the child walk, so the
+ * payload is never recursed into.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
+function stripSourcePayload(source: Record<string, any>): void {
+  delete source.raw;
+}
+
+/**
  * Notifications are the hospital's inbox items. getMany returns list rows without
  * the affected-asset breakdown, so point the model at the detail call.
  */
@@ -187,13 +207,12 @@ function trimCanonicalRecord(record: Record<string, any>): void {
 function linkifyNotification(notification: Record<string, any>): void {
   const id = notification.id;
   if (typeof id !== "string") return;
-  notification._links = {
-    ...(notification._links ?? {}),
+  addLinks(notification, {
     detail: {
       procedure: "notifications.getOne",
       input: { id },
     },
-  };
+  });
 }
 
 /**
@@ -213,7 +232,7 @@ export function addNavigationLinks(value: unknown): unknown {
   if (value !== null && typeof value === "object") {
     // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
     const obj = value as Record<string, any>;
-    if ("raw" in obj && "channel" in obj) delete obj.raw;
+    if ("raw" in obj && "channel" in obj) stripSourcePayload(obj);
     for (const key of Object.keys(obj)) addNavigationLinks(obj[key]);
     if ("canonicalName" in obj && "canonicalDisplayName" in obj)
       trimCanonicalRecord(obj);

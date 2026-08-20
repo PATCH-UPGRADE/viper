@@ -1,17 +1,10 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
-import {
-  type Integration,
-  PlatformEnum,
-  ResourceType,
-} from "@/generated/prisma";
+import { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { authSchema } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
 
-/**
- * The resources a platform can sync, keyed by the URL segment they upload to.
- */
 export const integrationsMapping = {
   assets: { name: "Asset", type: ResourceType.Asset },
   deviceArtifacts: {
@@ -25,7 +18,15 @@ export const integrationsMapping = {
 
 export type UploadSegment = keyof typeof integrationsMapping;
 
-/** ResourceType -> the URL segment it uploads to. Inverse of the table above. */
+/** The connectors sidebar's sections. A platform can belong to more than one. */
+export const CATEGORIES = [
+  "Hospital Inventory",
+  "Vulnerability Management Platforms",
+  "Ticketing Platforms",
+  "Notifications",
+] as const;
+export type Category = (typeof CATEGORIES)[number];
+
 export const uploadSegmentFor = Object.fromEntries(
   Object.entries(integrationsMapping).map(([segment, { type }]) => [
     type,
@@ -39,8 +40,6 @@ export const resourceTypeSchema = z.enum(
 );
 
 /**
- * What `integrations.create` / `.update` accept.
- *
  * `config` stays opaque here on purpose. Narrowing it per-platform would mean
  * importing every platform's `configSchema`, and those reach `core/credentials.ts`
  * (`node:crypto`, `server-only`) — which would make this module unusable from a
@@ -65,14 +64,19 @@ export function isValidResourceTypeKey(key: string): key is UploadSegment {
   return key in integrationsMapping;
 }
 
-export type IntegrationWithRelations = inferOutput<
-  typeof trpc.integrations.update
->;
-
-export type IntegrationWithStringDates = Omit<
-  Integration,
-  "createdAt" | "updatedAt"
-> & {
-  createdAt: string;
-  updatedAt: string;
+const resourceTypeLabels: Record<ResourceType, string> = {
+  [ResourceType.Asset]: "Asset",
+  [ResourceType.DeviceArtifact]: "Device Artifact",
+  [ResourceType.Remediation]: "Remediation",
+  [ResourceType.Vulnerability]: "Vulnerability",
+  [ResourceType.WorkOrder]: "Work Order",
+  [ResourceType.SourceRecord]: "Notification",
 };
+export const resourceTypeLabel = (type: ResourceType): string =>
+  resourceTypeLabels[type] ?? type;
+
+export type IntegrationListItem = inferOutput<
+  typeof trpc.integrations.getMany
+>["items"][number];
+export type IntegrationResourceSyncItem =
+  IntegrationListItem["resourceSyncs"][number];

@@ -1,5 +1,5 @@
 import { PlatformEnum } from "@/generated/prisma";
-import { ConnectorModule } from "../../core/types";
+import type { ConnectorModule } from "../../core/types";
 import {
   configSchema,
   credentialSchema,
@@ -18,6 +18,7 @@ export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
   definition: {
     platform: PlatformEnum.FLEET,
     displayName: SIEMENS_HEALTHINEERS,
+    categories: ["Hospital Inventory", "Notifications", "Ticketing Platforms"],
     configSchema,
     credentialSchema,
   },

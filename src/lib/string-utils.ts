@@ -27,3 +27,20 @@ export function capitalize(str: string): string {
 export function formatResourceName(modelName: string | symbol): string {
   return capitalize(String(modelName));
 }
+
+/**
+ * First letter of up to the first two words in a name, uppercased.
+ *
+ * @example
+ * initialsOf('NVD Data') // 'ND'
+ * initialsOf(null) // '?'
+ */
+export function initialsOf(name?: string | null): string {
+  return (name?.trim() || "?")
+    .split(/\s+/)
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}

@@ -4,49 +4,47 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { INTEGRATIONS_POLL_INTERVAL_MS } from "@/config/constants";
-import type { ResourceType } from "@/generated/prisma";
+import { INTEGRATIONS_POLL_INTERVAL_MS, PAGINATION } from "@/config/constants";
 import { usePaginationParams } from "@/lib/pagination";
 import { useTRPC } from "@/trpc/client";
 
-export const useSuspenseIntegrations = (resourceType: ResourceType) => {
+// Category counts/filtering need every integration, not one page of them —
+// a hospital's connector list is bounded, so max page size is effectively "all".
+export const useSuspenseIntegrations = () => {
   const trpc = useTRPC();
   const [params] = usePaginationParams();
-  // TODO: augment params to also include `asset`, right? for the `resourceType`
 
   return useSuspenseQuery({
     ...trpc.integrations.getMany.queryOptions({
       ...params,
-      ...{ resourceType },
+      pageSize: PAGINATION.MAX_PAGE_SIZE,
     }),
     refetchInterval: INTEGRATIONS_POLL_INTERVAL_MS,
     refetchIntervalInBackground: true,
   });
 };
 
-/**
- * Hook to create a new Integration
- */
-export const useCreateIntegration = () => {
-  const queryClient = useQueryClient();
+const useInvalidateIntegrations = () => {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return () =>
+    queryClient.invalidateQueries(trpc.integrations.getMany.pathFilter());
+};
+
+export const useCreateIntegration = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const invalidateIntegrations = useInvalidateIntegrations();
 
   return useMutation(
     trpc.integrations.create.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: () => {
         toast.success("Integration created");
-        for (const sync of data.resourceSyncs) {
-          queryClient.invalidateQueries(
-            trpc.integrations.getMany.queryOptions({
-              resourceType: sync.resource,
-            }),
-          );
-        }
+        invalidateIntegrations();
         // Need to recount # of active ApiKey Connectors
         queryClient.invalidateQueries(
           trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
         );
-        return data;
       },
       onError: (error) => {
         toast.error(`Failed to create Integration: ${error.message}`);
@@ -56,58 +54,51 @@ export const useCreateIntegration = () => {
   );
 };
 
-/**
- * Hook to update Integration
- */
-export const useUpdateIntegration = () => {
-  const queryClient = useQueryClient();
+export const useRemoveIntegration = () => {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const invalidateIntegrations = useInvalidateIntegrations();
 
   return useMutation(
-    trpc.integrations.update.mutationOptions({
-      onSuccess: (data) => {
-        toast.success("Integration updated");
-        for (const sync of data.resourceSyncs) {
-          queryClient.invalidateQueries(
-            trpc.integrations.getMany.queryOptions({
-              resourceType: sync.resource,
-            }),
-          );
-        }
-        return data;
+    trpc.integrations.remove.mutationOptions({
+      onSuccess: () => {
+        toast.success("Integration removed");
+        invalidateIntegrations();
+        // Need to recount # of active ApiKey Connectors
+        queryClient.invalidateQueries(
+          trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
+        );
       },
       onError: (error) => {
-        toast.error(`Failed to update Integration: ${error.message}`);
+        toast.error(`Failed to remove Integration: ${error.message}`);
       },
     }),
   );
 };
 
-/**
- * Hook to remove an Integration
- */
-export const useRemoveIntegration = () => {
+export const useSetIntegrationEnabled = () => {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const invalidateIntegrations = useInvalidateIntegrations();
 
   return useMutation(
-    trpc.integrations.remove.mutationOptions({
-      onSuccess: (data) => {
-        toast.success("Integration removed");
-        // Invalidate all getMany and getOne queries regardless of params
-        for (const resource of data.resources) {
-          queryClient.invalidateQueries(
-            trpc.integrations.getMany.queryOptions({ resourceType: resource }),
-          );
-        }
-        // Need to recount # of active ApiKey Connectors
-        queryClient.invalidateQueries(
-          trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
-        );
-        return data;
-      },
+    trpc.integrations.setEnabled.mutationOptions({
+      onSuccess: invalidateIntegrations,
       onError: (error) => {
-        toast.error(`Failed to remove Integration: ${error.message}`);
+        toast.error(`Failed to enable/disable integration: ${error.message}`);
+      },
+    }),
+  );
+};
+
+export const useSetResourceSyncEnabled = () => {
+  const trpc = useTRPC();
+  const invalidateIntegrations = useInvalidateIntegrations();
+
+  return useMutation(
+    trpc.integrations.setResourceSyncEnabled.mutationOptions({
+      onSuccess: invalidateIntegrations,
+      onError: (error) => {
+        toast.error(`Failed to update resource sync: ${error.message}`);
       },
     }),
   );
@@ -118,9 +109,8 @@ export const useTriggerSync = () => {
 
   return useMutation(
     trpc.integrations.triggerSync.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: () => {
         toast.success("Successfully triggered synchronization");
-        return data;
       },
       onError: (error) => {
         console.error(error);

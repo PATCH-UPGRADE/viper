@@ -6,6 +6,7 @@ import "server-only";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import type { FleetWorkOrderProposal } from "@/features/chat/types";
+// TODO: VW-430 I don't think this file should import anything from fleet
 import {
   FLEET_OPERATIONAL_STATUSES,
   FLEET_PATIENT_DANGERS,
@@ -60,6 +61,8 @@ const askUserQuestions = tool(
   },
 );
 
+
+// TODO: VW-430 potentially get rid of this tool entirely, and just use ManagesRelationship on asset api
 // ─── Siemens Healthineers Fleet work orders ──────────────────────────────────
 
 /**
@@ -89,6 +92,7 @@ const listFleetManagedAssetsTool = tool(
  * order is only filed on Fleet when the user clicks Accept (which calls
  * tracking.createFleetWorkOrder, where the Siemens-managed check runs again).
  */
+// TODO: VW-430 should definitely be platform-independent
 const proposeFleetWorkOrder = tool(
   async ({
     assetIds,

@@ -24,7 +24,6 @@ import { inngest } from "../client";
  *
  * Platform-agnostic on purpose: everything specific reaches this file through
  * the registry. Adding a platform should not make changes here.
- * See `src/features/integrations/CLAUDE.md`.
  */
 
 export const syncAllIntegrations = inngest.createFunction(

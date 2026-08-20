@@ -12,13 +12,14 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
-// Auth is delegated to the shared FLEET session client; stub it so the tests
-// don't pull in Playwright/chromium and can assert the outbound request.
+// These tests were written against a shared FLEET session client that
+// `createFleetWorkOrder` does not actually use yet — it still calls bare
+// `fetch`, so this stub is never invoked and the four assertions below fail
+// with ECONNREFUSED. Pre-existing; see this directory's CLAUDE.md. Wire the
+// production code onto `createFleetSession` when porting, then these pass.
 const { mockFleetSession } = vi.hoisted(() => ({
   mockFleetSession: { fetchWithSession: vi.fn() },
 }));
-
-vi.mock("./config", () => ({ FLEET: mockFleetSession }));
 
 import { TicketCategory } from "@/generated/prisma";
 import {

@@ -124,11 +124,8 @@ async function credentialsFor(integrationId: string): Promise<FleetCreds> {
   return credentialSchema.parse(decryptCredentials(credentials));
 }
 
-export async function createFleetSession(
-  integrationId: string,
-  creds?: FleetCreds,
-) {
-  const { username, password } = creds ?? (await credentialsFor(integrationId));
+export async function createFleetSession(creds: FleetCreds) {
+  const { username, password } = creds;
   const login = async () => {
     const sessionCookie = await grabSessionCookie(
       FLEET_LOGIN_CONFIG,
@@ -159,11 +156,17 @@ export async function createFleetSession(
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if ((res.status === 401 || res.status === 403) && !retry) {
-      await login();
+      session = await login();
       return request(url, init, true);
     }
     return res;
   };
 
   return { request };
+}
+
+export type FleetSession = Awaited<ReturnType<typeof createFleetSession>>;
+
+export async function createFleetSessionForIntegration(integrationId: string) {
+  return createFleetSession(await credentialsFor(integrationId));
 }

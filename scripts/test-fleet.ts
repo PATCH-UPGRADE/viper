@@ -40,10 +40,8 @@ async function main() {
   );
 
   console.log("--- creteFleetSession ---");
-  const session = await createFleetSession(integration.id, {
-    username,
-    password,
-  });
+  console.log("integration:", integration.id);
+  const session = await createFleetSession({ username, password });
   console.time("first advisory request");
   const advisoryFirst = await session.request(ADVISORIES_URL);
   console.timeEnd("first advisory request");

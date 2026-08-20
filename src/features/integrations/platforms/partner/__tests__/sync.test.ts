@@ -20,6 +20,7 @@ const CALLBACK_URL =
 const makeCtx = (
   overrides: Partial<SyncCtx<PartnerConfig, PartnerCreds>> = {},
 ): SyncCtx<PartnerConfig, PartnerCreds> => ({
+  integrationId: "int-1",
   config: {
     integrationUri: "http://blueflow:8000/api/viper/webhook/",
     resource: ResourceType.Asset,

@@ -45,12 +45,8 @@ export const CATEGORIES = [
   "Notifications",
 ] as const;
 
-/**
- * There's no explicit "category" field on an integration — this infers one
- * from what it syncs, matching the Figma mock's apparent pattern. Multi-resource
- * integrations (today, only Fleet-shaped ones) show as "Vendor Platforms".
- * Unconfirmed by design; revisit if a real category field ever lands.
- */
+// No real "category" field exists — this infers one from what's synced.
+// Revisit if a real category field ever lands.
 export const categoryLabel = (
   integration: IntegrationListItem,
 ): (typeof CATEGORIES)[number] => {
@@ -184,42 +180,32 @@ const TimingText = ({
   );
 };
 
-/** Right-aligned frequency + timing for a single-resource integration's header row. */
-const SingleResourceStatus = ({
+// `block` renders the two-line header form; otherwise the inline nested-row form.
+const ResourceStatus = ({
   sync,
   integrationEnabled,
+  block,
 }: {
   sync: IntegrationResourceSyncItem;
   integrationEnabled: boolean;
+  block?: boolean;
 }) => {
-  // The integration's own kill switch overrides every resource's flag —
-  // don't report a feed as active when the whole integration is off.
+  const size = block ? "text-sm" : "text-xs";
   if (!integrationEnabled || !sync.enabled) {
-    return <span className="text-sm text-muted-foreground">Disabled</span>;
+    return <span className={cn("text-muted-foreground", size)}>Disabled</span>;
   }
+  if (!block) return <TimingText timing={sync} prefix={frequencyLabel(sync)} />;
   return (
     <div className="text-right">
-      <div className="flex items-center justify-end gap-1 text-sm font-medium">
+      <div
+        className={cn("flex items-center justify-end gap-1 font-medium", size)}
+      >
         <RefreshCw className="size-3.5 text-muted-foreground" />
         {frequencyLabel(sync)}
       </div>
       <TimingText timing={sync} />
     </div>
   );
-};
-
-/** Frequency + timing for a resource row nested under a multi-resource integration. */
-const ResourceStatus = ({
-  sync,
-  integrationEnabled,
-}: {
-  sync: IntegrationResourceSyncItem;
-  integrationEnabled: boolean;
-}) => {
-  if (!integrationEnabled || !sync.enabled) {
-    return <span className="text-xs text-muted-foreground">Disabled</span>;
-  }
-  return <TimingText timing={sync} prefix={frequencyLabel(sync)} />;
 };
 
 const IntegrationActionsMenu = ({
@@ -324,9 +310,10 @@ const IntegrationHeaderRow = ({
       </div>
 
       {singleSync && (
-        <SingleResourceStatus
+        <ResourceStatus
           sync={singleSync}
           integrationEnabled={integration.enabled}
+          block
         />
       )}
 

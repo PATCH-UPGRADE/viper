@@ -10,9 +10,8 @@ import { prefetchIntegrations } from "@/features/integrations/server/prefetch";
 import { prefetchWebhooks } from "@/features/webhooks/server/prefetch";
 import { createListPage } from "@/lib/page-factory";
 
-// Matches useSuspenseIntegrations' pageSize override (so this prefetch
-// actually hydrates the client's query) and also prefetches the sidebar's
-// webhook count, which the page needs on first paint too.
+// pageSize must match useSuspenseIntegrations' override, or SSR won't
+// hydrate the client query; also prefetches the sidebar's webhook count.
 const prefetchConnectorsPage = async (
   params: Parameters<typeof prefetchIntegrations>[0],
 ) => {

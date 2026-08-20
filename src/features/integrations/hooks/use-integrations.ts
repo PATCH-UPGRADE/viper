@@ -8,10 +8,8 @@ import { INTEGRATIONS_POLL_INTERVAL_MS, PAGINATION } from "@/config/constants";
 import { usePaginationParams } from "@/lib/pagination";
 import { useTRPC } from "@/trpc/client";
 
-// The sidebar's per-category counts and filtering need every integration in
-// hand, not just one page of them — a hospital's connector list is bounded
-// (unlike assets/vulnerabilities), so fetching up to the max page size is
-// effectively "all of them".
+// Category counts/filtering need every integration, not one page of them —
+// a hospital's connector list is bounded, so max page size is effectively "all".
 export const useSuspenseIntegrations = () => {
   const trpc = useTRPC();
   const [params] = usePaginationParams();

@@ -1,5 +1,5 @@
 import { PlatformEnum } from "@/generated/prisma";
-import { ConnectorModule } from "../../core/types";
+import type { ConnectorModule } from "../../core/types";
 import {
   configSchema,
   credentialSchema,

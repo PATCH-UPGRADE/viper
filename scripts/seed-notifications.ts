@@ -792,7 +792,7 @@ The application deserialises untrusted data without sufficient validations that 
 }
 
 async function coverProducts(
-  vendorId: string,
+  //vendorId: string,
   title: string,
   products: string[],
 ) {
@@ -809,7 +809,8 @@ async function coverProducts(
     select: { id: true },
   });
 
-  const contract = await prisma.contract.create({
+  // TODO VW-429
+  /*const contract = await prisma.contract.create({
     data: {
       vendorId,
       title,
@@ -817,7 +818,7 @@ async function coverProducts(
       effectiveTo: new Date("2028-01-01"),
       coverageSummary: `${products.join(", ")} (${assets.length} assets)`,
     },
-  });
+  });*/
 
   // TODO VW-429
   // await prisma.contractAsset.createMany({

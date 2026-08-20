@@ -3,27 +3,30 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockDefaultSyncEveryFor, mockInngest, mockPrisma } = vi.hoisted(() => ({
-  mockDefaultSyncEveryFor: vi.fn(),
-  mockInngest: { send: vi.fn() },
-  mockPrisma: {
-    integration: {
-      count: vi.fn(),
-      delete: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      update: vi.fn(),
+const { mockCategoriesFor, mockDefaultSyncEveryFor, mockInngest, mockPrisma } =
+  vi.hoisted(() => ({
+    mockCategoriesFor: vi.fn(),
+    mockDefaultSyncEveryFor: vi.fn(),
+    mockInngest: { send: vi.fn() },
+    mockPrisma: {
+      integration: {
+        count: vi.fn(),
+        delete: vi.fn(),
+        findFirst: vi.fn(),
+        findMany: vi.fn(),
+        findUnique: vi.fn(),
+        update: vi.fn(),
+      },
+      integrationResourceSync: { findUnique: vi.fn(), update: vi.fn() },
     },
-    integrationResourceSync: { findUnique: vi.fn(), update: vi.fn() },
-  },
-}));
+  }));
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/inngest/client", () => ({ inngest: mockInngest }));
 vi.mock("../core/registry", () => ({
   defaultSyncEveryFor: mockDefaultSyncEveryFor,
   displayNameFor: () => "Partner API",
+  categoriesFor: mockCategoriesFor,
 }));
 
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
@@ -51,6 +54,7 @@ const integrationRow = (syncEvery: number | null, nextSyncAt: Date | null) => ({
 const existingIntegration = { id: "integration-1" };
 
 mockDefaultSyncEveryFor.mockReturnValue(900);
+mockCategoriesFor.mockReturnValue([]);
 beforeEach(() => vi.clearAllMocks());
 
 describe("integrationsRouter.getMany", () => {
@@ -81,6 +85,7 @@ describe("integrationsRouter.getMany", () => {
         name: "Partner feed",
         platform: PlatformEnum.PARTNER,
         platformLabel: "Partner API",
+        categories: [],
         enabled: true,
         resourceSyncs: [
           expect.objectContaining({
@@ -91,6 +96,32 @@ describe("integrationsRouter.getMany", () => {
           }),
         ],
       },
+    ]);
+  });
+
+  it("returns each integration's categories from the platform's own definition", async () => {
+    mockCategoriesFor.mockReturnValue([
+      "Vulnerability Management Platforms",
+      "Notifications",
+    ]);
+    mockPrisma.integration.count.mockResolvedValue(1);
+    mockPrisma.integration.findMany.mockResolvedValue([
+      {
+        id: "integration-1",
+        name: "AI Vuln Crawler",
+        platform: PlatformEnum.AI,
+        syncEvery: null,
+        enabled: true,
+        resourceSyncs: [],
+      },
+    ]);
+
+    const result = await caller.getMany({ search: "" });
+
+    expect(mockCategoriesFor).toHaveBeenCalledWith(PlatformEnum.AI);
+    expect(result.items[0].categories).toEqual([
+      "Vulnerability Management Platforms",
+      "Notifications",
     ]);
   });
 

@@ -22,7 +22,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ResourceType, SyncStatusEnum } from "@/generated/prisma";
+import { SyncStatusEnum } from "@/generated/prisma";
 import { initialsOf } from "@/lib/string-utils";
 import { cn } from "@/lib/utils";
 import {
@@ -36,32 +36,6 @@ import type {
   IntegrationResourceSyncItem,
 } from "../types";
 import { resourceTypeLabel } from "../types";
-
-export const CATEGORIES = [
-  "Hospital Inventory",
-  "Vulnerability Management Platforms",
-  "Ticketing Platforms",
-  "Vendor Platforms",
-  "Notifications",
-] as const;
-
-// No real "category" field exists — this infers one from what's synced.
-// Revisit if a real category field ever lands.
-export const categoryLabel = (
-  integration: IntegrationListItem,
-): (typeof CATEGORIES)[number] => {
-  if (integration.resourceSyncs.length > 1) return "Vendor Platforms";
-  switch (integration.resourceSyncs[0]?.resource) {
-    case ResourceType.Vulnerability:
-      return "Vulnerability Management Platforms";
-    case ResourceType.WorkOrder:
-      return "Ticketing Platforms";
-    case ResourceType.SourceRecord:
-      return "Notifications";
-    default:
-      return "Hospital Inventory";
-  }
-};
 
 const frequencyLabel = (sync: {
   effectiveSyncEvery: number;
@@ -93,7 +67,7 @@ export const timingLine = (sync: TimingInput) => {
   if (sync.status === SyncStatusEnum.Error) {
     const when = sync.lastAttemptAt ?? sync.lastSuccessfulSync;
     return {
-      text: when ? `Failed synced ${relativeTime(when)}` : "Sync failed",
+      text: when ? `Failed sync ${relativeTime(when)}` : "Sync failed",
       isError: true,
     };
   }
@@ -181,26 +155,19 @@ const TimingText = ({
   );
 };
 
-// `block` renders the two-line header form; otherwise the inline nested-row form.
 const ResourceStatus = ({
   sync,
   integrationEnabled,
-  block,
 }: {
   sync: IntegrationResourceSyncItem;
   integrationEnabled: boolean;
-  block?: boolean;
 }) => {
-  const size = block ? "text-sm" : "text-xs";
   if (!integrationEnabled || !sync.enabled) {
-    return <span className={cn("text-muted-foreground", size)}>Disabled</span>;
+    return <span className="text-sm text-muted-foreground">Disabled</span>;
   }
-  if (!block) return <TimingText timing={sync} prefix={frequencyLabel(sync)} />;
   return (
     <div className="text-right">
-      <div
-        className={cn("flex items-center justify-end gap-1 font-medium", size)}
-      >
+      <div className="flex items-center justify-end gap-1 text-sm font-medium">
         <RefreshCw className="size-3.5 text-muted-foreground" />
         {frequencyLabel(sync)}
       </div>
@@ -305,7 +272,7 @@ const IntegrationHeaderRow = ({
           </span>
         </div>
         <div className="text-xs text-muted-foreground">
-          {categoryLabel(integration)}
+          {integration.categories.join(" · ")}
         </div>
         {aggregate && <TimingText timing={aggregate} />}
       </div>
@@ -314,7 +281,6 @@ const IntegrationHeaderRow = ({
         <ResourceStatus
           sync={singleSync}
           integrationEnabled={integration.enabled}
-          block
         />
       )}
 

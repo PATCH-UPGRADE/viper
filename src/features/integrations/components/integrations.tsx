@@ -4,7 +4,6 @@ import {
   ArchiveIcon,
   BellIcon,
   BugIcon,
-  Building2Icon,
   InboxIcon,
   LayoutGridIcon,
   type LucideIcon,
@@ -24,7 +23,8 @@ import { SettingsSubheader } from "@/features/settings/components/settings-layou
 import { useSuspenseWebhooks } from "@/features/webhooks/hooks/use-webhooks";
 import { cn } from "@/lib/utils";
 import { useSuspenseIntegrations } from "../hooks/use-integrations";
-import { CATEGORIES, categoryLabel, IntegrationCard } from "./integration-row";
+import { CATEGORIES } from "../types";
+import { IntegrationCard } from "./integration-row";
 
 const SECTIONS = ["Overview", ...CATEGORIES] as const;
 type Section = (typeof SECTIONS)[number];
@@ -34,7 +34,6 @@ const SECTION_ICONS: Record<Section, LucideIcon> = {
   "Hospital Inventory": ArchiveIcon,
   "Vulnerability Management Platforms": BugIcon,
   "Ticketing Platforms": InboxIcon,
-  "Vendor Platforms": Building2Icon,
   Notifications: BellIcon,
 };
 
@@ -51,8 +50,9 @@ const ConnectorsSidebar = () => {
 
   const countBySection = data.items.reduce(
     (counts, item) => {
-      const section = categoryLabel(item);
-      counts[section] = (counts[section] ?? 0) + 1;
+      for (const category of item.categories) {
+        counts[category] = (counts[category] ?? 0) + 1;
+      }
       return counts;
     },
     { Overview: data.items.length } as Record<Section, number>,
@@ -102,7 +102,7 @@ const EnabledIntegrations = () => {
   const items =
     section === "Overview"
       ? data.items
-      : data.items.filter((i) => categoryLabel(i) === section);
+      : data.items.filter((i) => i.categories.includes(section));
 
   return (
     <div className="flex flex-col gap-4 flex-1 min-w-0">
@@ -139,7 +139,7 @@ export const IntegrationsContainer = ({
     <div className={cn(mainPadding, "flex flex-col gap-4")}>
       <SettingsSubheader
         title="Connectors"
-        description="Connect Viper to the systems your hospital already runs — inventory, vulnerability feeds, ticketing, vendor platforms, and notifications."
+        description="Connect Viper to the systems your hospital already runs — inventory, vulnerability feeds, ticketing, and notifications."
       />
       {children}
     </div>

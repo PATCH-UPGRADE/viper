@@ -6,6 +6,7 @@
 
 import type { z } from "zod";
 import type { PlatformEnum, ResourceType } from "@/generated/prisma";
+import type { Category } from "../types";
 
 /**
  * Opaque to core: round-tripped through `IntegrationResourceSync.cursor` and
@@ -98,6 +99,8 @@ export type SyncStrategy<TConfig = unknown, TCreds = unknown> = (
 export interface ConnectorDefinition<TConfig, TCreds> {
   platform: PlatformEnum;
   displayName: string;
+  /** Which connectors-sidebar sections this platform shows under. */
+  categories: Category[];
   /** Validates `Integration.config`. */
   configSchema: z.ZodType<TConfig>;
   /** Validates the decrypted `Integration.credentials`. */

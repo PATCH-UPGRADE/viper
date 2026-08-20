@@ -13,6 +13,7 @@ import {
   encodeAuthCredential,
 } from "../core/credentials";
 import {
+  categoriesFor,
   defaultSyncEveryFor,
   displayNameFor,
   requirePlatform,
@@ -144,6 +145,7 @@ export const integrationsRouter = createTRPCRouter({
         ({ syncEvery, ...integration }) => ({
           ...integration,
           platformLabel: displayNameFor(integration.platform),
+          categories: categoriesFor(integration.platform),
           resourceSyncs: integration.resourceSyncs.map((sync) => ({
             ...sync,
             // A nested resource row never sees its parent integration's

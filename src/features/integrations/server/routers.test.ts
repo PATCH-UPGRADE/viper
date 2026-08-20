@@ -107,6 +107,39 @@ describe("integrationsRouter.getMany", () => {
       },
     ]);
   });
+
+  it("falls back to the platform default cadence and isn't due with no nextSyncAt", async () => {
+    mockPrisma.integration.count.mockResolvedValue(1);
+    mockPrisma.integration.findMany.mockResolvedValue([
+      {
+        id: "integration-1",
+        name: "Partner feed",
+        platform: PlatformEnum.PARTNER,
+        syncEvery: null,
+        enabled: true,
+        resourceSyncs: [
+          {
+            integrationId: "integration-1",
+            resource: ResourceType.Asset,
+            status: SyncStatusEnum.Success,
+            errorMessage: null,
+            lastSuccessfulSync: null,
+            nextSyncAt: null,
+            enabled: true,
+            syncEvery: null,
+          },
+        ],
+      },
+    ]);
+
+    const result = await setup().getMany(PAGE_INPUT);
+
+    expect(result.items[0].resourceSyncs[0]).toMatchObject({
+      effectiveSyncEvery: 900,
+      isOverridden: false,
+      isDue: false,
+    });
+  });
 });
 
 describe("integrationsRouter enable controls", () => {
@@ -169,6 +202,25 @@ describe("integrationsRouter enable controls", () => {
       }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(mockPrisma.integrationResourceSync.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("integrationsRouter.update", () => {
+  it("404s instead of 500ing when the integration doesn't exist", async () => {
+    mockPrisma.integration.findUnique.mockResolvedValue(null);
+
+    await expect(
+      setup().update({
+        id: "missing",
+        data: {
+          name: "Partner feed",
+          platform: PlatformEnum.PARTNER,
+          syncEvery: 3600,
+          config: {},
+        },
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(mockPrisma.integration.update).not.toHaveBeenCalled();
   });
 });
 

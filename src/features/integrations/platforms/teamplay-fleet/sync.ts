@@ -22,15 +22,30 @@ async function ingestFleetAssets(
     where: { id: integrationId },
     select: { integrationUserId: true },
   });
-  // Serials shared by two Fleet records (Syngo Carbon components) must not
-  // fall back to serial matching, or both would link to one asset.
   const weakSerials = computeWeakSerials(items);
+
+  const assetsAlreadyMapped = await prisma.asset.findMany({
+    where: {
+      externalMappings: { some: { integrationId } },
+      serialNumber: { not: null },
+    },
+    select: { serialNumber: true },
+  });
+  // Fleet could show multiple unique devices (could be parts of 1 device) shares same serial
+  // add to weakSerials to create new assets still
+  for (const asset of assetsAlreadyMapped) {
+    if (asset.serialNumber) {
+      weakSerials.add(asset.serialNumber);
+    }
+  }
 
   return processIntegrationSync(
     prisma,
     {
       model: prisma.asset,
       mappingModel: prisma.externalAssetMapping,
+      // finalize-sync already records this attempt; a second write double-counts consecutiveFailures.
+      shouldRecordSyncOutcome: false,
       transformInputItem: async (item: FleetAssetItem, userId: string) => {
         const deviceGroup = await resolveDeviceGroup({
           manufacturer: SIEMENS_HEALTHINEERS,
@@ -45,8 +60,6 @@ async function ingestFleetAssets(
         };
         return {
           createData: { ...fields, deviceGroupId: deviceGroup.id, userId },
-          // No deviceGroupId: a re-sync must not re-group an asset whose
-          // identity another source (CPE, scanner) already established.
           updateData: fields,
           uniqueFieldConditions:
             item.serialNumber && !weakSerials.has(item.serialNumber)
@@ -79,12 +92,12 @@ export async function fleetSync(
   }
 
   const response = await ingestFleetAssets(items, ctx.integrationId);
-  // Throwing (not returning) is what makes finalize-sync record Error and back
-  // off; a normal return would overwrite the partial failure with Success.
+  await connectManagedAssets(ctx.integrationId);
+
+  // Throwing makes finalize-sync record Error
   if (response.shouldRetry) {
     throw new Error(response.message);
   }
 
-  await connectManagedAssets(ctx.integrationId);
   return { cursor: null };
 }

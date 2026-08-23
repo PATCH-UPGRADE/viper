@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const db = vi.hoisted(() => ({
   integration: { findUniqueOrThrow: vi.fn() },
-  asset: {},
+  asset: { findMany: vi.fn() },
   externalAssetMapping: {},
 }));
 vi.mock("@/lib/db", () => ({ default: db }));
@@ -89,6 +89,7 @@ beforeEach(() => {
   db.integration.findUniqueOrThrow.mockResolvedValue({
     integrationUserId: "shadow-1",
   });
+  db.asset.findMany.mockReset().mockResolvedValue([]);
   vi.mocked(processIntegrationSync).mockReset().mockResolvedValue(okResponse);
   vi.mocked(resolveDeviceGroup)
     .mockReset()
@@ -149,6 +150,19 @@ describe("fleetSync", () => {
     expect(out.uniqueFieldConditions).toEqual([{ serialNumber: "63014" }]);
   });
 
+  it("skips serial matching for a serial this integration already mapped", async () => {
+    db.asset.findMany.mockResolvedValue([{ serialNumber: "63014" }]);
+
+    await fleetSync(makeCtx());
+
+    const [, config, input] = lastSyncCall();
+    const out = await config.transformInputItem(
+      input.items[0] as Parameters<typeof config.transformInputItem>[0],
+      "shadow-1",
+    );
+    expect(out.uniqueFieldConditions).toEqual([]);
+  });
+
   it("skips serial matching for serials shared inside the batch", async () => {
     await fleetSync(makeCtx());
 
@@ -163,7 +177,7 @@ describe("fleetSync", () => {
     expect(out.uniqueFieldConditions).toEqual([]);
   });
 
-  it("fails the attempt when any item failed, and skips the connect", async () => {
+  it("fails the attempt when any item failed, but still connects the mapped assets", async () => {
     vi.mocked(processIntegrationSync).mockResolvedValue({
       ...okResponse,
       shouldRetry: true,
@@ -173,6 +187,6 @@ describe("fleetSync", () => {
     await expect(fleetSync(makeCtx())).rejects.toThrow(
       "3 of 123 items failed: boom",
     );
-    expect(connectManagedAssets).not.toHaveBeenCalled();
+    expect(connectManagedAssets).toHaveBeenCalledWith("int-1");
   });
 });

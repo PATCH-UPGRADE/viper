@@ -46,9 +46,8 @@ export interface UrlBuilders<TConfig = unknown> {
 
 /**
  * One resource on a platform whose protocol *we* speak (Fleet, ServiceNow).
- * A platform owns whatever client its methods need, including session abstratction
+ * A platform owns whatever client its methods need, including the session abstraction
  */
-/** An authenticated connection to an upstream platform, built by the platform's own sync. */
 export interface Session {
   request(url: string, init?: RequestInit): Promise<Response>;
 }

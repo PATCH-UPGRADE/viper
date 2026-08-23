@@ -62,8 +62,7 @@ export const assets: ResourceModule<
     _cursor: Cursor | null,
   ): AsyncIterable<Page<FleetEquipment>> {
     const all = await fetchEquipments(session);
-    // The endpoint has no pagination and no delta filter (probed 2026-08-19):
-    // the whole inventory is one page and the cursor is permanently null.
+    // Fleet's /equipments cannot paginate or filter by change; every sync is the full inventory.
     yield { items: all.filter((e) => e.isActive !== false), cursor: null };
   },
 

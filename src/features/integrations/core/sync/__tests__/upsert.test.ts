@@ -199,6 +199,16 @@ describe("processIntegrationSync — partial failures", () => {
     expect(response.message).toBe("success");
     expect(mockPrisma.integrationResourceSync.upsert).toHaveBeenCalledTimes(1);
   });
+
+  it("leaves the sync row alone when the caller records the outcome", async () => {
+    const response = await run(
+      makeConfig({ shouldRecordSyncOutcome: false }),
+      items(1),
+    );
+
+    expect(response.createdItemsCount).toBe(1);
+    expect(mockPrisma.integrationResourceSync.upsert).not.toHaveBeenCalled();
+  });
 });
 
 describe("processIntegrationSync — mapping URLs", () => {

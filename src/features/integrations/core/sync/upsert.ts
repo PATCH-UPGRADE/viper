@@ -134,6 +134,10 @@ export interface SyncConfig<
   // re-sync updates. Used e.g. to kick off deviceArtifact note extraction.
   // Hook failures are logged, not propagated, so they never fail the sync.
   onItemCreated?: (itemId: string) => Promise<void>;
+
+  // false when the caller runs inside the sync worker, whose finalize-sync step
+  // already records this attempt on the resource row.
+  shouldRecordSyncOutcome?: boolean;
 }
 
 /**
@@ -313,8 +317,9 @@ export async function processIntegrationSync<
     response.message = `${errors.length} of ${input.items.length} items failed: ${errors[0]}`;
   }
 
-  // Close out this (integration, resource) sync attempt
-  await upsertResourceSync(integrationId, resource, response, lastSynced);
+  if (config.shouldRecordSyncOutcome ?? true) {
+    await upsertResourceSync(integrationId, resource, response, lastSynced);
+  }
 
   return response;
 }

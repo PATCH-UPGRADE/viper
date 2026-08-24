@@ -152,7 +152,7 @@ const MAX_BULLETS = 5;
  * exist, renumber the placeholders left behind, and clamp to five bullets.
  *
  * Never throws. A model that invents every id yields bullets with no links
- * rather than a failed run — the prose is still worth showing.
+ * rather than a failed run
  */
 export async function validateBullets(
   draft: DebriefBulletDraft[],

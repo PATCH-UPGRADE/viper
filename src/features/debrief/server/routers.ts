@@ -1,8 +1,9 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
+import { requestDebrief } from "@/inngest/events/debrief";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { type DebriefBullet, debriefBulletsSchema } from "../types";
+import { claimDebriefRun, parseBullets } from "./runs";
 
 /** Columns the client needs. `error` stays server-side; the UI shows a fixed message. */
 const debriefSelect = {
@@ -12,27 +13,6 @@ const debriefSelect = {
   since: true,
   createdAt: true,
 } as const;
-
-function parseBullets(raw: unknown): DebriefBullet[] {
-  const parsed = debriefBulletsSchema.safeParse(raw);
-  if (parsed.success) return parsed.data;
-  console.warn("[debrief] stored bullets failed validation, showing none");
-  return [];
-}
-
-/**
- * How long a run may stay `Generating` before a new request may replace it.
- *
- * An Inngest run can be evicted, time out, or die mid-step, which leaves its
- * row `Generating` forever. Without this bound the in-flight guard below then
- * refuses every later request and the department never gets another debrief.
- *
- * The value is a placeholder: pin it to the observed p99 agent runtime.
- *  Once the function updates the row per step, bound on
- * `updatedAt` instead, so this means "no progress in 15 minutes" rather than
- * "started over 15 minutes ago".
- */
-const IN_FLIGHT_TIMEOUT_MS = 15 * 60 * 1000;
 
 async function callerDepartmentId(userId: string): Promise<string | null> {
   const user = await prisma.user.findUnique({
@@ -79,49 +59,14 @@ export const debriefRouter = createTRPCRouter({
       });
     }
 
-    // Serialise claims for this department for the length of the transaction.
-    // Without it, two callers clicking at the same moment both pass the
-    // in-flight check below and both open a row: the check and the create are
-    // separate statements, so nothing stops the interleave.
-    //
-    // An advisory lock rather than a partial unique index because Prisma cannot
-    // express one — `@@index` has no `where` clause — so the index would have
-    // to be raw SQL that `prisma migrate dev` then reports as drift forever.
-    // The lock releases on commit or rollback.
-    return prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${departmentId}))`;
+    // One place decides whether a run is already active, so this and the
+    // nightly cron cannot disagree about what counts as in flight.
+    const { id, created } = await claimDebriefRun(departmentId);
 
-      // Do not stack runs. If one is already in flight, return it unchanged. A
-      // row older than IN_FLIGHT_TIMEOUT_MS is treated as dead, so a crashed
-      // run cannot wedge the department.
-      const [inFlight, previous] = await Promise.all([
-        tx.debrief.findFirst({
-          where: {
-            departmentId,
-            status: "Generating",
-            createdAt: { gt: new Date(Date.now() - IN_FLIGHT_TIMEOUT_MS) },
-          },
-          orderBy: { createdAt: "desc" },
-          select: { id: true },
-        }),
-        tx.debrief.findFirst({
-          where: { departmentId, status: "Ready" },
-          orderBy: { createdAt: "desc" },
-          select: { createdAt: true },
-        }),
-      ]);
-      if (inFlight) return { id: inFlight.id, queued: false };
+    // Only dispatch for a run this call opened. Joining an active run must not
+    // queue a second agent execution.
+    if (created) await requestDebrief(id, departmentId);
 
-      const debrief = await tx.debrief.create({
-        data: {
-          departmentId,
-          status: "Generating",
-          since: previous?.createdAt ?? null,
-        },
-        select: { id: true },
-      });
-
-      return { id: debrief.id, queued: true };
-    });
+    return { id, queued: created };
   }),
 });

@@ -7,12 +7,23 @@ const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     user: { findUnique: vi.fn() },
     debrief: { findFirst: vi.fn(), create: vi.fn() },
+    // claimDebriefRun takes an advisory lock inside an interactive
+    // transaction. Hand the callback the same mock, so assertions on
+    // debrief.* still see every call.
     $transaction: vi.fn(),
     $executeRaw: vi.fn(),
   },
 }));
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
+
+const { mockRequestDebrief } = vi.hoisted(() => ({
+  mockRequestDebrief: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock("@/inngest/events/debrief", () => ({
+  requestDebrief: mockRequestDebrief,
+}));
 
 import { createCallerFactory } from "@/trpc/init";
 import { debriefBulletsSchema } from "../types";
@@ -204,6 +215,9 @@ describe("debrief.regenerate", () => {
     // Frozen clock so the bound can be asserted exactly. Without it the test can
     // only check "some time in the past", which passes for any offset at all —
     // including one so long the guard never expires.
+    //
+    // Bound on updatedAt, not createdAt: the Inngest function touches the row
+    // as it works, so this means "no progress in 15 minutes".
     vi.useFakeTimers();
     try {
       const now = new Date("2026-08-17T12:00:00.000Z");
@@ -216,7 +230,7 @@ describe("debrief.regenerate", () => {
 
       const [inFlightQuery] = mockPrisma.debrief.findFirst.mock.calls[0];
       expect(inFlightQuery.where.status).toBe("Generating");
-      expect(inFlightQuery.where.createdAt.gt).toEqual(
+      expect(inFlightQuery.where.updatedAt.gt).toEqual(
         new Date(now.getTime() - 15 * 60 * 1000),
       );
     } finally {
@@ -252,6 +266,41 @@ describe("the {{n}} placeholder contract", () => {
 
   it("accepts a well-formed bullet", () => {
     expect(debriefBulletsSchema.safeParse([BULLET]).success).toBe(true);
+  });
+});
+
+describe("debrief.regenerate — Inngest dispatch", () => {
+  it("dispatches exactly once for a run it opened", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
+    mockPrisma.debrief.findFirst.mockResolvedValue(null);
+    mockPrisma.debrief.create.mockResolvedValue({ id: "debrief-new" });
+
+    await caller.regenerate();
+
+    expect(mockRequestDebrief).toHaveBeenCalledTimes(1);
+    expect(mockRequestDebrief).toHaveBeenCalledWith("debrief-new", "dept-1");
+  });
+
+  it("does not dispatch when it joined an active run", async () => {
+    // Otherwise a double-click queues a second agent execution against the
+    // same row — the exact thing the in-flight guard exists to prevent.
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
+    mockPrisma.debrief.findFirst.mockResolvedValueOnce({ id: "debrief-9" });
+
+    await expect(caller.regenerate()).resolves.toEqual({
+      id: "debrief-9",
+      queued: false,
+    });
+    expect(mockRequestDebrief).not.toHaveBeenCalled();
+  });
+
+  it("does not dispatch for a caller with no department", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: null });
+
+    await expect(caller.regenerate()).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+    });
+    expect(mockRequestDebrief).not.toHaveBeenCalled();
   });
 });
 
@@ -296,16 +345,5 @@ describe("debrief.regenerate — concurrent callers", () => {
 
     expect(insideTransaction).toBe(2);
     expect(mockPrisma.debrief.create).toHaveBeenCalledTimes(1);
-  });
-
-  it("returns the active run without creating a second one", async () => {
-    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
-    mockPrisma.debrief.findFirst.mockResolvedValueOnce({ id: "debrief-9" });
-
-    await expect(caller.regenerate()).resolves.toEqual({
-      id: "debrief-9",
-      queued: false,
-    });
-    expect(mockPrisma.debrief.create).not.toHaveBeenCalled();
   });
 });

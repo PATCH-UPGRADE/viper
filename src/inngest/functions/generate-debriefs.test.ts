@@ -39,7 +39,6 @@ vi.mock("../client", () => ({
   },
 }));
 
-import { requestDebrief } from "../events/debrief";
 import {
   generateAllDebriefs,
   generateDepartmentDebrief,

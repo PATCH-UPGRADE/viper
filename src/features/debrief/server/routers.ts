@@ -79,36 +79,49 @@ export const debriefRouter = createTRPCRouter({
       });
     }
 
-    // Do not stack runs. If one is already in flight, return it unchanged. A
-    // row older than IN_FLIGHT_TIMEOUT_MS is treated as dead, so a crashed run
-    // cannot wedge the department.
-    const [inFlight, previous] = await Promise.all([
-      prisma.debrief.findFirst({
-        where: {
+    // Serialise claims for this department for the length of the transaction.
+    // Without it, two callers clicking at the same moment both pass the
+    // in-flight check below and both open a row: the check and the create are
+    // separate statements, so nothing stops the interleave.
+    //
+    // An advisory lock rather than a partial unique index because Prisma cannot
+    // express one — `@@index` has no `where` clause — so the index would have
+    // to be raw SQL that `prisma migrate dev` then reports as drift forever.
+    // The lock releases on commit or rollback.
+    return prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${departmentId}))`;
+
+      // Do not stack runs. If one is already in flight, return it unchanged. A
+      // row older than IN_FLIGHT_TIMEOUT_MS is treated as dead, so a crashed
+      // run cannot wedge the department.
+      const [inFlight, previous] = await Promise.all([
+        tx.debrief.findFirst({
+          where: {
+            departmentId,
+            status: "Generating",
+            createdAt: { gt: new Date(Date.now() - IN_FLIGHT_TIMEOUT_MS) },
+          },
+          orderBy: { createdAt: "desc" },
+          select: { id: true },
+        }),
+        tx.debrief.findFirst({
+          where: { departmentId, status: "Ready" },
+          orderBy: { createdAt: "desc" },
+          select: { createdAt: true },
+        }),
+      ]);
+      if (inFlight) return { id: inFlight.id, queued: false };
+
+      const debrief = await tx.debrief.create({
+        data: {
           departmentId,
           status: "Generating",
-          createdAt: { gt: new Date(Date.now() - IN_FLIGHT_TIMEOUT_MS) },
+          since: previous?.createdAt ?? null,
         },
-        orderBy: { createdAt: "desc" },
         select: { id: true },
-      }),
-      prisma.debrief.findFirst({
-        where: { departmentId, status: "Ready" },
-        orderBy: { createdAt: "desc" },
-        select: { createdAt: true },
-      }),
-    ]);
-    if (inFlight) return { id: inFlight.id, queued: false };
+      });
 
-    const debrief = await prisma.debrief.create({
-      data: {
-        departmentId,
-        status: "Generating",
-        since: previous?.createdAt ?? null,
-      },
-      select: { id: true },
+      return { id: debrief.id, queued: true };
     });
-
-    return { id: debrief.id, queued: true };
   }),
 });

@@ -7,6 +7,8 @@ const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     user: { findUnique: vi.fn() },
     debrief: { findFirst: vi.fn(), create: vi.fn() },
+    $transaction: vi.fn(),
+    $executeRaw: vi.fn(),
   },
 }));
 
@@ -50,6 +52,9 @@ function readyRow(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockPrisma.$transaction.mockImplementation(
+    async (fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma),
+  );
 });
 
 describe("debrief.getForMyDepartment", () => {
@@ -247,5 +252,60 @@ describe("the {{n}} placeholder contract", () => {
 
   it("accepts a well-formed bullet", () => {
     expect(debriefBulletsSchema.safeParse([BULLET]).success).toBe(true);
+  });
+});
+
+describe("debrief.regenerate — concurrent callers", () => {
+  it("takes a per-department lock before deciding whether a run exists", async () => {
+    // The in-flight check and the create are separate statements. Without the
+    // lock, two callers clicking at once both see "nothing in flight" and both
+    // open a row — the exact case the guard is supposed to prevent.
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
+    mockPrisma.debrief.findFirst.mockResolvedValue(null);
+    mockPrisma.debrief.create.mockResolvedValue({ id: "debrief-1" });
+
+    await caller.regenerate();
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.$executeRaw).toHaveBeenCalledTimes(1);
+
+    // The department id is interpolated into the lock key, so departments do
+    // not block each other.
+    const [, ...values] = mockPrisma.$executeRaw.mock.calls[0];
+    expect(values).toContain("dept-1");
+  });
+
+  it("does the whole claim inside one transaction", async () => {
+    // A read outside the transaction would not be covered by the lock.
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
+    mockPrisma.debrief.findFirst.mockResolvedValue(null);
+    mockPrisma.debrief.create.mockResolvedValue({ id: "debrief-1" });
+
+    let insideTransaction = 0;
+    mockPrisma.$transaction.mockImplementation(
+      async (fn: (tx: typeof mockPrisma) => unknown) => {
+        const before = mockPrisma.debrief.findFirst.mock.calls.length;
+        const result = await fn(mockPrisma);
+        insideTransaction =
+          mockPrisma.debrief.findFirst.mock.calls.length - before;
+        return result;
+      },
+    );
+
+    await caller.regenerate();
+
+    expect(insideTransaction).toBe(2);
+    expect(mockPrisma.debrief.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the active run without creating a second one", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
+    mockPrisma.debrief.findFirst.mockResolvedValueOnce({ id: "debrief-9" });
+
+    await expect(caller.regenerate()).resolves.toEqual({
+      id: "debrief-9",
+      queued: false,
+    });
+    expect(mockPrisma.debrief.create).not.toHaveBeenCalled();
   });
 });

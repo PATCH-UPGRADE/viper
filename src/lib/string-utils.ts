@@ -27,3 +27,20 @@ export function capitalize(str: string): string {
 export function formatResourceName(modelName: string | symbol): string {
   return capitalize(String(modelName));
 }
+
+/**
+ * Up to two initials from a name, for avatar fallbacks.
+ *
+ * @example
+ * initialsOf('Ada Lovelace') // 'AL'
+ * initialsOf(null) // '?'
+ */
+export function initialsOf(name?: string | null): string {
+  return (name ?? "?")
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}

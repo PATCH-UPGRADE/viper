@@ -12,19 +12,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
+import { initialsOf } from "@/lib/string-utils";
 import { cn } from "@/lib/utils";
 import type { CatalogEntry } from "../core/catalog";
 import { CATEGORIES, type Category } from "../types";
 import { CreateIntegrationDialog } from "./create-integration-dialog";
-
-const initialsOf = (name: string) =>
-  name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase() || "?";
 
 // Which platforms show under which section is each platform's own call
 // (`categories` on its ConnectorDefinition) — this is UI-only metadata for

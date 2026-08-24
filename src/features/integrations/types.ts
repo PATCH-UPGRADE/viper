@@ -24,6 +24,16 @@ export const integrationsMapping = {
 
 export type UploadSegment = keyof typeof integrationsMapping;
 
+/** The connectors catalog's sections. A platform can belong to more than one. */
+export const CATEGORIES = [
+  "Hospital Inventory",
+  "Vulnerability Management Platforms",
+  "Ticketing Platforms",
+  "Notifications",
+  "Custom Integrations",
+] as const;
+export type Category = (typeof CATEGORIES)[number];
+
 /** ResourceType -> the URL segment it uploads to. Inverse of the table above. */
 export const uploadSegmentFor = Object.fromEntries(
   Object.entries(integrationsMapping).map(([segment, { type }]) => [

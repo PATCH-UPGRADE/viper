@@ -17,6 +17,7 @@ export const ai: ConnectorModule<AiConfig, AiCreds> = {
   definition: {
     platform: PlatformEnum.AI,
     displayName: "AI Crawler",
+    categories: ["Custom Integrations"],
     configSchema,
     credentialSchema,
   },

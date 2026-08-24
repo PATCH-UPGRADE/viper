@@ -18,6 +18,7 @@ export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
   definition: {
     platform: PlatformEnum.FLEET,
     displayName: SIEMENS_HEALTHINEERS,
+    categories: ["Hospital Inventory", "Notifications", "Ticketing Platforms"],
     configSchema,
     credentialSchema,
   },

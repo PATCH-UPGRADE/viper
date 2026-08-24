@@ -16,57 +16,37 @@ import {
 } from "@/components/ui/card";
 import { mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
-import { PlatformEnum } from "@/generated/prisma";
 import { cn, humanize } from "@/lib/utils";
 import { usesGenericAuth } from "../core/credentials";
 import { registry } from "../core/registry";
 import { genericConfigSchema } from "../core/sync/resources";
 import type { AnyConnectorModule } from "../core/types";
-import type { FieldSpec } from "../types";
+import { CATEGORIES, type Category, type FieldSpec } from "../types";
 import { CreateIntegrationDialog } from "./create-integration-dialog";
 
-interface PlatformCategory {
-  icon: LucideIcon;
-  subtitle: string;
-  platforms: PlatformEnum[];
-}
-
-// TODO(VW-458): this categorization — which categories exist, their copy,
-// and which platforms belong where — is this ticket's own read of Cassidy's
-// design and needs her confirmation before shipping.
-//
-// FLEET is listed under 3 categories per the ticket's own example. That
-// can't be derived from teamplayFleet's module today — it has no
-// assets/workOrders/notifications ResourceModules wired up yet (see
-// core/registry.ts + platforms/teamplay-fleet/index.ts), so there's no
-// per-resource signal to split it by. Once those modules land, this should
-// probably derive from `module.assets`/`module.workOrders`/
-// `module.notifications` presence instead of being hand-listed here.
-const categories: Record<string, PlatformCategory> = {
+// Which platforms show under which section is each platform's own call
+// (`categories` on its ConnectorDefinition) — this is UI-only metadata for
+// the sections themselves, not platform membership.
+const SECTION_META: Record<Category, { icon: LucideIcon; subtitle: string }> = {
   "Hospital Inventory": {
     icon: ComputerIcon,
     subtitle: "Import asset and device inventory from hospital vendor systems",
-    platforms: [PlatformEnum.FLEET],
   },
   "Vulnerability Management Platforms": {
     icon: BugIcon,
     subtitle: "Import vulnerability data from scanners and advisory feeds",
-    platforms: [],
   },
   "Ticketing Platforms": {
     icon: ListChecksIcon,
     subtitle: "Send and receive work orders with your ticketing system",
-    platforms: [PlatformEnum.FLEET],
   },
   Notifications: {
     icon: InboxIcon,
     subtitle: "Receive advisories and alerts as they're published",
-    platforms: [PlatformEnum.FLEET],
   },
   "Custom Integrations": {
     icon: PlugIcon,
     subtitle: "Connect any REST API, or let AI figure it out",
-    platforms: [PlatformEnum.PARTNER, PlatformEnum.AI],
   },
 };
 
@@ -116,30 +96,27 @@ export const IntegrationsCatalogContainer = () => {
 };
 
 const IntegrationsCatalog = () => {
-  const sections = Object.entries(categories)
-    .map(([name, { icon, subtitle, platforms }]) => ({
-      name,
-      icon,
-      subtitle,
-      cards: platforms.flatMap((platform) => {
-        const module = registry[platform];
-        if (!module) return [];
+  const modules = Object.values(registry) as AnyConnectorModule[];
+
+  const sections = CATEGORIES.map((name) => ({
+    name,
+    ...SECTION_META[name],
+    cards: modules
+      .filter((module) => module.definition.categories.includes(name))
+      .map((module) => {
         const { definition } = module;
-        return [
-          {
-            platform,
-            displayName: definition.displayName,
-            summary: configSummary(module),
-            configFields: fieldSpecsFor(definition.configSchema),
-            credentialFields: fieldSpecsFor(definition.credentialSchema),
-            credentialsAreAuthShaped: usesGenericAuth(
-              definition.credentialSchema,
-            ),
-          },
-        ];
+        return {
+          platform: definition.platform,
+          displayName: definition.displayName,
+          summary: configSummary(module),
+          configFields: fieldSpecsFor(definition.configSchema),
+          credentialFields: fieldSpecsFor(definition.credentialSchema),
+          credentialsAreAuthShaped: usesGenericAuth(
+            definition.credentialSchema,
+          ),
+        };
       }),
-    }))
-    .filter((section) => section.cards.length > 0);
+  })).filter((section) => section.cards.length > 0);
 
   return (
     <div className="flex flex-col gap-6">

@@ -15,6 +15,7 @@ import {
 } from "./context";
 import { applyVexDeterminations, type VexApplySummary } from "./process_output";
 import { buildVexSchema, type VexResult } from "./tools";
+import { getReachabilityTools } from "../reachability-tools"; // SPIKE VW-425
 
 const MODEL = "claude-sonnet-4-6";
 
@@ -30,6 +31,7 @@ export async function sortVulnerabilities(
       "Record the issue status determination for each issue, keyed by id. Omit issues that are unchanged.",
     schema,
   });
+  const reachTools = getReachabilityTools("vex"); // SPIKE VW-425
 
   // Extended thinking requires tool_choice "auto" (no forcing), so we bind the
   // single tool and read the call args instead of using withStructuredOutput.
@@ -37,7 +39,7 @@ export async function sortVulnerabilities(
     model: MODEL,
     maxTokens: 8000,
     thinking: { type: "enabled", budget_tokens: 4000 },
-  }).bindTools([recordTool]);
+  }).bindTools([recordTool, reachTools]); // SPIKE VW-425
 
   const res = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

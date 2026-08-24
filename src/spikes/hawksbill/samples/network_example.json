@@ -1,0 +1,2090 @@
+{
+  "input_version": "1.0",
+  "meta": {
+    "team": "example",
+    "notes": "sample network: topology + nmap ports + TA3 SARIF, one submission"
+  },
+  "assets": [
+    {
+      "id": "renal_nursing_workstation_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.12",
+          "mac": "fa:16:33:00:00:7f",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.112",
+          "mac": "fa:16:33:00:00:fe",
+          "subnet": "10.1.0.0/24"
+        }
+      ],
+      "open_ports": [
+        {
+          "port": 22,
+          "protocol": "tcp",
+          "state": "open",
+          "service": "ssh",
+          "product": "OpenSSH",
+          "version": "8.9p1",
+          "collection": {
+            "collected_by": "nmap",
+            "confidence": "observed"
+          }
+        }
+      ],
+      "sarif_documents": [
+        {
+          "version": "2.1.0",
+          "runs": [
+            {
+              "tool": {
+                "driver": {
+                  "name": "fuzzer",
+                  "version": "1.0.0",
+                  "rules": [
+                    {
+                      "id": "CWE-787",
+                      "shortDescription": {
+                        "text": "Out-of-bounds Write"
+                      },
+                      "fullDescription": {
+                        "text": "Writing outside allocated buffer bounds."
+                      }
+                    }
+                  ]
+                }
+              },
+              "results": [
+                {
+                  "ruleId": "CWE-787",
+                  "level": "error",
+                  "message": {
+                    "text": "Buffer overflow in parse_header() due to unchecked input length."
+                  },
+                  "locations": [
+                    {
+                      "physicalLocation": {
+                        "artifactLocation": {
+                          "uri": "src/parser.c"
+                        },
+                        "region": {
+                          "startLine": 142,
+                          "startColumn": 5
+                        }
+                      }
+                    }
+                  ],
+                  "codeFlows": [
+                    {
+                      "threadFlows": [
+                        {
+                          "locations": [
+                            {
+                              "location": {
+                                "physicalLocation": {
+                                  "artifactLocation": {
+                                    "uri": "src/main.c"
+                                  },
+                                  "region": {
+                                    "startLine": 10
+                                  }
+                                }
+                              },
+                              "message": {
+                                "text": "Taint source: user input argv[1]."
+                              }
+                            },
+                            {
+                              "location": {
+                                "physicalLocation": {
+                                  "artifactLocation": {
+                                    "uri": "src/parser.c"
+                                  },
+                                  "region": {
+                                    "startLine": 142
+                                  }
+                                }
+                              },
+                              "message": {
+                                "text": "Sink: memcpy with unchecked length."
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "properties": {
+                    "triggerInput": {
+                      "type": "parameter",
+                      "name": "len",
+                      "index": 0,
+                      "value": 200,
+                      "description": "First function parameter; value triggers buffer overflow."
+                    },
+                    "environmentConfiguration": {
+                      "os": "linux",
+                      "distro": "Ubuntu 22.04 LTS",
+                      "kernel": "6.8.0-87-generic",
+                      "architecture": "x86_64",
+                      "aslr": "enabled"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "renal_aya_ppg_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.29",
+          "mac": "fa:16:33:00:00:90",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.126",
+          "mac": "fa:16:33:00:01:0c",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_vitals_monitor_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.131",
+          "mac": "fa:16:33:00:01:11",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.70.36",
+          "mac": "fa:16:33:00:00:97",
+          "subnet": "10.1.70.0/24"
+        }
+      ],
+      "open_ports": [
+        {
+          "port": 443,
+          "protocol": "tcp",
+          "state": "open",
+          "service": "https",
+          "product": "nginx",
+          "version": "1.18.0",
+          "collection": {
+            "collected_by": "nmap",
+            "confidence": "observed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "renal_nursing_tv_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.11",
+          "mac": "fa:16:33:00:00:7e",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.111",
+          "mac": "fa:16:33:00:00:fd",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_physician_workstation_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.115",
+          "mac": "fa:16:33:00:01:01",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.70.15",
+          "mac": "fa:16:33:00:00:82",
+          "subnet": "10.1.70.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_bed_monitor_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.19",
+          "mac": "fa:16:33:00:00:86",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.118",
+          "mac": "fa:16:33:00:01:04",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_vitals_monitor_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.119",
+          "mac": "fa:16:33:00:01:05",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.70.20",
+          "mac": "fa:16:33:00:00:87",
+          "subnet": "10.1.70.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_vitals_monitor_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.128",
+          "mac": "fa:16:33:00:01:0e",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.70.32",
+          "mac": "fa:16:33:00:00:93",
+          "subnet": "10.1.70.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_bed_monitor_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.35",
+          "mac": "fa:16:33:00:00:96",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.130",
+          "mac": "fa:16:33:00:01:10",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_vitals_monitor_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.125",
+          "mac": "fa:16:33:00:01:0b",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.70.28",
+          "mac": "fa:16:33:00:00:8f",
+          "subnet": "10.1.70.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_bed_monitor_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.31",
+          "mac": "fa:16:33:00:00:92",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.127",
+          "mac": "fa:16:33:00:01:0d",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_aya_ppg_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.21",
+          "mac": "fa:16:33:00:00:88",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.120",
+          "mac": "fa:16:33:00:01:06",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_bed_monitor_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.23",
+          "mac": "fa:16:33:00:00:8a",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.121",
+          "mac": "fa:16:33:00:01:07",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_aya_ppg_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.129",
+          "mac": "fa:16:33:00:01:0f",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.70.33",
+          "mac": "fa:16:33:00:00:94",
+          "subnet": "10.1.70.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_vitals_monitor_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.24",
+          "mac": "fa:16:33:00:00:8b",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.122",
+          "mac": "fa:16:33:00:01:08",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_medicine_cabinet_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.110",
+          "mac": "fa:16:33:00:00:fc",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.70.10",
+          "mac": "fa:16:33:00:00:7d",
+          "subnet": "10.1.70.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_physician_workstation_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.16",
+          "mac": "fa:16:33:00:00:83",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.116",
+          "mac": "fa:16:33:00:01:02",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_nursing_workstation_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.13",
+          "mac": "fa:16:33:00:00:80",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.113",
+          "mac": "fa:16:33:00:00:ff",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_nursing_workstation_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.14",
+          "mac": "fa:16:33:00:00:81",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.114",
+          "mac": "fa:16:33:00:01:00",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_bed_monitor_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.27",
+          "mac": "fa:16:33:00:00:8e",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.124",
+          "mac": "fa:16:33:00:01:0a",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_aya_ppg_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.123",
+          "mac": "fa:16:33:00:01:09",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.70.25",
+          "mac": "fa:16:33:00:00:8c",
+          "subnet": "10.1.70.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_nursing_workstation_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.12",
+          "mac": "fa:16:33:00:00:62",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.89",
+          "mac": "fa:16:33:00:00:e7",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_medicine_cabinet_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.87",
+          "mac": "fa:16:33:00:00:e5",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.60.10",
+          "mac": "fa:16:33:00:00:60",
+          "subnet": "10.1.60.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_bed_monitor_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.95",
+          "mac": "fa:16:33:00:00:ed",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.60.19",
+          "mac": "fa:16:33:00:00:69",
+          "subnet": "10.1.60.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_vitals_monitor_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.24",
+          "mac": "fa:16:33:00:00:6e",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.99",
+          "mac": "fa:16:33:00:00:f1",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_aya_ppg_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.100",
+          "mac": "fa:16:33:00:00:f2",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.60.25",
+          "mac": "fa:16:33:00:00:6f",
+          "subnet": "10.1.60.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_bed_monitor_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.27",
+          "mac": "fa:16:33:00:00:71",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.101",
+          "mac": "fa:16:33:00:00:f3",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_aya_ppg_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.33",
+          "mac": "fa:16:33:00:00:77",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.106",
+          "mac": "fa:16:33:00:00:f8",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_nursing_tv_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.11",
+          "mac": "fa:16:33:00:00:61",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.88",
+          "mac": "fa:16:33:00:00:e6",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_vitals_monitor_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.32",
+          "mac": "fa:16:33:00:00:76",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.105",
+          "mac": "fa:16:33:00:00:f7",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_bed_monitor_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.35",
+          "mac": "fa:16:33:00:00:79",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.107",
+          "mac": "fa:16:33:00:00:f9",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_physician_workstation_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.16",
+          "mac": "fa:16:33:00:00:66",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.93",
+          "mac": "fa:16:33:00:00:eb",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_aya_ppg_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.17",
+          "mac": "fa:16:33:00:00:67",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.94",
+          "mac": "fa:16:33:00:00:ec",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_aya_ppg_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.29",
+          "mac": "fa:16:33:00:00:73",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.103",
+          "mac": "fa:16:33:00:00:f5",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_bed_monitor_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.104",
+          "mac": "fa:16:33:00:00:f6",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.60.31",
+          "mac": "fa:16:33:00:00:75",
+          "subnet": "10.1.60.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_vitals_monitor_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.28",
+          "mac": "fa:16:33:00:00:72",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.102",
+          "mac": "fa:16:33:00:00:f4",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_nursing_workstation_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.14",
+          "mac": "fa:16:33:00:00:64",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.91",
+          "mac": "fa:16:33:00:00:e9",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_vitals_monitor_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.108",
+          "mac": "fa:16:33:00:00:fa",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.60.36",
+          "mac": "fa:16:33:00:00:7a",
+          "subnet": "10.1.60.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_physician_workstation_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.92",
+          "mac": "fa:16:33:00:00:ea",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.60.15",
+          "mac": "fa:16:33:00:00:65",
+          "subnet": "10.1.60.0/24"
+        }
+      ]
+    },
+    {
+      "id": "renal_aya_ppg_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.117",
+          "mac": "fa:16:33:00:01:03",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.70.17",
+          "mac": "fa:16:33:00:00:84",
+          "subnet": "10.1.70.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_bed_monitor_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.23",
+          "mac": "fa:16:33:00:00:6d",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.98",
+          "mac": "fa:16:33:00:00:f0",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_nursing_workstation_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.90",
+          "mac": "fa:16:33:00:00:e8",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.60.13",
+          "mac": "fa:16:33:00:00:63",
+          "subnet": "10.1.60.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_aya_ppg_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.21",
+          "mac": "fa:16:33:00:00:6b",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.97",
+          "mac": "fa:16:33:00:00:ef",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "pulmonary_vitals_monitor_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.96",
+          "mac": "fa:16:33:00:00:ee",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.60.20",
+          "mac": "fa:16:33:00:00:6a",
+          "subnet": "10.1.60.0/24"
+        }
+      ]
+    },
+    {
+      "id": "oob",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.10",
+          "mac": "fa:16:33:00:00:98",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_bed_monitor_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.27",
+          "mac": "fa:16:33:00:00:54",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.78",
+          "mac": "fa:16:33:00:00:dc",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_vitals_monitor_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.73",
+          "mac": "fa:16:33:00:00:d7",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.40.20",
+          "mac": "fa:16:33:00:00:4d",
+          "subnet": "10.1.40.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_medicine_cabinet_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.10",
+          "mac": "fa:16:33:00:00:43",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.64",
+          "mac": "fa:16:33:00:00:ce",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_bed_monitor_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.81",
+          "mac": "fa:16:33:00:00:df",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.40.31",
+          "mac": "fa:16:33:00:00:58",
+          "subnet": "10.1.40.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_aya_ppg_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.29",
+          "mac": "fa:16:33:00:00:56",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.80",
+          "mac": "fa:16:33:00:00:de",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_physician_workstation_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.15",
+          "mac": "fa:16:33:00:00:48",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.69",
+          "mac": "fa:16:33:00:00:d3",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_nursing_workstation_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.13",
+          "mac": "fa:16:33:00:00:46",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.67",
+          "mac": "fa:16:33:00:00:d1",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "internet_physician_workstation_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.15",
+          "mac": "fa:16:33:00:00:9d",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.50.10",
+          "mac": "fa:16:33:00:00:05",
+          "subnet": "10.1.50.0/24"
+        }
+      ]
+    },
+    {
+      "id": "mqtt_broker_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.30.10",
+          "mac": "fa:16:33:00:00:00",
+          "subnet": "10.1.30.0/24"
+        },
+        {
+          "ipv4": "10.1.0.11",
+          "mac": "fa:16:33:00:00:99",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_bed_monitor_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.75",
+          "mac": "fa:16:33:00:00:d9",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.40.23",
+          "mac": "fa:16:33:00:00:50",
+          "subnet": "10.1.40.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_nursing_workstation_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.14",
+          "mac": "fa:16:33:00:00:47",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.68",
+          "mac": "fa:16:33:00:00:d2",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_bed_monitor_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.19",
+          "mac": "fa:16:33:00:00:4c",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.72",
+          "mac": "fa:16:33:00:00:d6",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_bed_monitor_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.84",
+          "mac": "fa:16:33:00:00:e2",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.40.35",
+          "mac": "fa:16:33:00:00:5c",
+          "subnet": "10.1.40.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_aya_ppg_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.83",
+          "mac": "fa:16:33:00:00:e1",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.40.33",
+          "mac": "fa:16:33:00:00:5a",
+          "subnet": "10.1.40.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_vitals_monitor_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.32",
+          "mac": "fa:16:33:00:00:59",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.82",
+          "mac": "fa:16:33:00:00:e0",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_aya_ppg_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.77",
+          "mac": "fa:16:33:00:00:db",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.40.25",
+          "mac": "fa:16:33:00:00:52",
+          "subnet": "10.1.40.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_nursing_workstation_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.66",
+          "mac": "fa:16:33:00:00:d0",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.40.12",
+          "mac": "fa:16:33:00:00:45",
+          "subnet": "10.1.40.0/24"
+        }
+      ]
+    },
+    {
+      "id": "internet_physician_workstation_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.50.11",
+          "mac": "fa:16:33:00:00:06",
+          "subnet": "10.1.50.0/24"
+        },
+        {
+          "ipv4": "10.1.0.16",
+          "mac": "fa:16:33:00:00:9e",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_vitals_monitor_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.36",
+          "mac": "fa:16:33:00:00:5d",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.85",
+          "mac": "fa:16:33:00:00:e3",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_physician_workstation_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.70",
+          "mac": "fa:16:33:00:00:d4",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.40.16",
+          "mac": "fa:16:33:00:00:49",
+          "subnet": "10.1.40.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_nursing_tv_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.11",
+          "mac": "fa:16:33:00:00:44",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.65",
+          "mac": "fa:16:33:00:00:cf",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_vitals_monitor_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.24",
+          "mac": "fa:16:33:00:00:51",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.76",
+          "mac": "fa:16:33:00:00:da",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_vitals_monitor_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.28",
+          "mac": "fa:16:33:00:00:55",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.79",
+          "mac": "fa:16:33:00:00:dd",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_bed_monitor_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.20.35",
+          "mac": "fa:16:33:00:00:3f",
+          "subnet": "10.1.20.0/24"
+        },
+        {
+          "ipv4": "10.1.0.61",
+          "mac": "fa:16:33:00:00:cb",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_bed_monitor_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.49",
+          "mac": "fa:16:33:00:00:bf",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.20.19",
+          "mac": "fa:16:33:00:00:2f",
+          "subnet": "10.1.20.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_vitals_monitor_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.20.36",
+          "mac": "fa:16:33:00:00:40",
+          "subnet": "10.1.20.0/24"
+        },
+        {
+          "ipv4": "10.1.0.62",
+          "mac": "fa:16:33:00:00:cc",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_aya_ppg_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.20.29",
+          "mac": "fa:16:33:00:00:39",
+          "subnet": "10.1.20.0/24"
+        },
+        {
+          "ipv4": "10.1.0.57",
+          "mac": "fa:16:33:00:00:c7",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_bed_monitor_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.55",
+          "mac": "fa:16:33:00:00:c5",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.20.27",
+          "mac": "fa:16:33:00:00:37",
+          "subnet": "10.1.20.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_bed_monitor_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.58",
+          "mac": "fa:16:33:00:00:c8",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.20.31",
+          "mac": "fa:16:33:00:00:3b",
+          "subnet": "10.1.20.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_vitals_monitor_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.20.20",
+          "mac": "fa:16:33:00:00:30",
+          "subnet": "10.1.20.0/24"
+        },
+        {
+          "ipv4": "10.1.0.50",
+          "mac": "fa:16:33:00:00:c0",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_nursing_workstation_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.43",
+          "mac": "fa:16:33:00:00:b9",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.20.12",
+          "mac": "fa:16:33:00:00:28",
+          "subnet": "10.1.20.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_physician_workstation_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.46",
+          "mac": "fa:16:33:00:00:bc",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.20.15",
+          "mac": "fa:16:33:00:00:2b",
+          "subnet": "10.1.20.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_nursing_workstation_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.20.13",
+          "mac": "fa:16:33:00:00:29",
+          "subnet": "10.1.20.0/24"
+        },
+        {
+          "ipv4": "10.1.0.44",
+          "mac": "fa:16:33:00:00:ba",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_aya_ppg_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.40.21",
+          "mac": "fa:16:33:00:00:4e",
+          "subnet": "10.1.40.0/24"
+        },
+        {
+          "ipv4": "10.1.0.74",
+          "mac": "fa:16:33:00:00:d8",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_vitals_monitor_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.59",
+          "mac": "fa:16:33:00:00:c9",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.20.32",
+          "mac": "fa:16:33:00:00:3c",
+          "subnet": "10.1.20.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_bed_monitor_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.52",
+          "mac": "fa:16:33:00:00:c2",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.20.23",
+          "mac": "fa:16:33:00:00:33",
+          "subnet": "10.1.20.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_vitals_monitor_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.20.28",
+          "mac": "fa:16:33:00:00:38",
+          "subnet": "10.1.20.0/24"
+        },
+        {
+          "ipv4": "10.1.0.56",
+          "mac": "fa:16:33:00:00:c6",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_aya_ppg_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.20.33",
+          "mac": "fa:16:33:00:00:3d",
+          "subnet": "10.1.20.0/24"
+        },
+        {
+          "ipv4": "10.1.0.60",
+          "mac": "fa:16:33:00:00:ca",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_vitals_monitor_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.20.24",
+          "mac": "fa:16:33:00:00:34",
+          "subnet": "10.1.20.0/24"
+        },
+        {
+          "ipv4": "10.1.0.53",
+          "mac": "fa:16:33:00:00:c3",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_aya_ppg_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.20.17",
+          "mac": "fa:16:33:00:00:2d",
+          "subnet": "10.1.20.0/24"
+        },
+        {
+          "ipv4": "10.1.0.48",
+          "mac": "fa:16:33:00:00:be",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_aya_ppg_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.51",
+          "mac": "fa:16:33:00:00:c1",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.20.21",
+          "mac": "fa:16:33:00:00:31",
+          "subnet": "10.1.20.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_physician_workstation_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.20.16",
+          "mac": "fa:16:33:00:00:2c",
+          "subnet": "10.1.20.0/24"
+        },
+        {
+          "ipv4": "10.1.0.47",
+          "mac": "fa:16:33:00:00:bd",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "icu_aya_ppg_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.71",
+          "mac": "fa:16:33:00:00:d5",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.40.17",
+          "mac": "fa:16:33:00:00:4a",
+          "subnet": "10.1.40.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_nursing_workstation_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.45",
+          "mac": "fa:16:33:00:00:bb",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.20.14",
+          "mac": "fa:16:33:00:00:2a",
+          "subnet": "10.1.20.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_medicine_cabinet_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.41",
+          "mac": "fa:16:33:00:00:b7",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.20.10",
+          "mac": "fa:16:33:00:00:26",
+          "subnet": "10.1.20.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_nursing_tv_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.20.11",
+          "mac": "fa:16:33:00:00:27",
+          "subnet": "10.1.20.0/24"
+        },
+        {
+          "ipv4": "10.1.0.42",
+          "mac": "fa:16:33:00:00:b8",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "gi_aya_ppg_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.54",
+          "mac": "fa:16:33:00:00:c4",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.20.25",
+          "mac": "fa:16:33:00:00:35",
+          "subnet": "10.1.20.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_aya_ppg_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.17",
+          "mac": "fa:16:33:00:00:10",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.25",
+          "mac": "fa:16:33:00:00:a7",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_nursing_workstation_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.13",
+          "mac": "fa:16:33:00:00:0c",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.21",
+          "mac": "fa:16:33:00:00:a3",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_vitals_monitor_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.20",
+          "mac": "fa:16:33:00:00:13",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.27",
+          "mac": "fa:16:33:00:00:a9",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "emr_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.30.12",
+          "mac": "fa:16:33:00:00:02",
+          "subnet": "10.1.30.0/24"
+        },
+        {
+          "ipv4": "10.1.0.13",
+          "mac": "fa:16:33:00:00:9b",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_vitals_monitor_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.32",
+          "mac": "fa:16:33:00:00:1f",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.36",
+          "mac": "fa:16:33:00:00:b2",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_vitals_monitor_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.28",
+          "mac": "fa:16:33:00:00:1b",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.33",
+          "mac": "fa:16:33:00:00:af",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_aya_ppg_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.29",
+          "mac": "fa:16:33:00:00:1c",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.34",
+          "mac": "fa:16:33:00:00:b0",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_nursing_tv_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.11",
+          "mac": "fa:16:33:00:00:0a",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.19",
+          "mac": "fa:16:33:00:00:a1",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_medicine_cabinet_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.10",
+          "mac": "fa:16:33:00:00:09",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.18",
+          "mac": "fa:16:33:00:00:a0",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "database_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.12",
+          "mac": "fa:16:33:00:00:9a",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.30.11",
+          "mac": "fa:16:33:00:00:01",
+          "subnet": "10.1.30.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_physician_workstation_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.15",
+          "mac": "fa:16:33:00:00:0e",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.23",
+          "mac": "fa:16:33:00:00:a5",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_vitals_monitor_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.39",
+          "mac": "fa:16:33:00:00:b5",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.10.36",
+          "mac": "fa:16:33:00:00:23",
+          "subnet": "10.1.10.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_nursing_workstation_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.20",
+          "mac": "fa:16:33:00:00:a2",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.10.12",
+          "mac": "fa:16:33:00:00:0b",
+          "subnet": "10.1.10.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_bed_monitor_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.32",
+          "mac": "fa:16:33:00:00:ae",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.10.27",
+          "mac": "fa:16:33:00:00:1a",
+          "subnet": "10.1.10.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_aya_ppg_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.37",
+          "mac": "fa:16:33:00:00:b3",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.10.33",
+          "mac": "fa:16:33:00:00:20",
+          "subnet": "10.1.10.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_aya_ppg_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.21",
+          "mac": "fa:16:33:00:00:14",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.28",
+          "mac": "fa:16:33:00:00:aa",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_nursing_workstation_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.22",
+          "mac": "fa:16:33:00:00:a4",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.10.14",
+          "mac": "fa:16:33:00:00:0d",
+          "subnet": "10.1.10.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_aya_ppg_03",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.31",
+          "mac": "fa:16:33:00:00:ad",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.10.25",
+          "mac": "fa:16:33:00:00:18",
+          "subnet": "10.1.10.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_bed_monitor_05",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.35",
+          "mac": "fa:16:33:00:00:22",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.38",
+          "mac": "fa:16:33:00:00:b4",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_bed_monitor_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.23",
+          "mac": "fa:16:33:00:00:16",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.29",
+          "mac": "fa:16:33:00:00:ab",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_bed_monitor_04",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.31",
+          "mac": "fa:16:33:00:00:1e",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.35",
+          "mac": "fa:16:33:00:00:b1",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_physician_workstation_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.16",
+          "mac": "fa:16:33:00:00:0f",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.24",
+          "mac": "fa:16:33:00:00:a6",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_bed_monitor_01",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.26",
+          "mac": "fa:16:33:00:00:a8",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.10.19",
+          "mac": "fa:16:33:00:00:12",
+          "subnet": "10.1.10.0/24"
+        }
+      ]
+    },
+    {
+      "id": "cardiac_vitals_monitor_02",
+      "interfaces": [
+        {
+          "ipv4": "10.1.10.24",
+          "mac": "fa:16:33:00:00:17",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.30",
+          "mac": "fa:16:33:00:00:ac",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    },
+    {
+      "id": "control-router",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.1",
+          "subnet": "10.1.0.0/24"
+        }
+      ],
+      "device_type": "router"
+    },
+    {
+      "id": "renal_router",
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.2",
+          "mac": "fa:16:33:00:00:7c",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.109",
+          "mac": "fa:16:33:00:00:fb",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.30.7",
+          "mac": "fa:16:33:00:00:7b",
+          "subnet": "10.1.30.0/24"
+        }
+      ],
+      "device_type": "router"
+    },
+    {
+      "id": "pulmonary_router",
+      "interfaces": [
+        {
+          "ipv4": "10.1.60.2",
+          "mac": "fa:16:33:00:00:5f",
+          "subnet": "10.1.60.0/24"
+        },
+        {
+          "ipv4": "10.1.0.86",
+          "mac": "fa:16:33:00:00:e4",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.30.6",
+          "mac": "fa:16:33:00:00:5e",
+          "subnet": "10.1.30.0/24"
+        }
+      ],
+      "device_type": "router"
+    },
+    {
+      "id": "internet_router",
+      "interfaces": [
+        {
+          "ipv4": "10.1.50.2",
+          "mac": "fa:16:33:00:00:04",
+          "subnet": "10.1.50.0/24"
+        },
+        {
+          "ipv4": "10.1.30.2",
+          "mac": "fa:16:33:00:00:03",
+          "subnet": "10.1.30.0/24"
+        },
+        {
+          "ipv4": "10.1.0.14",
+          "mac": "fa:16:33:00:00:9c",
+          "subnet": "10.1.0.0/24"
+        }
+      ],
+      "device_type": "router"
+    },
+    {
+      "id": "icu_router",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.63",
+          "mac": "fa:16:33:00:00:cd",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.30.5",
+          "mac": "fa:16:33:00:00:41",
+          "subnet": "10.1.30.0/24"
+        },
+        {
+          "ipv4": "10.1.40.2",
+          "mac": "fa:16:33:00:00:42",
+          "subnet": "10.1.40.0/24"
+        }
+      ],
+      "device_type": "router"
+    },
+    {
+      "id": "gi_router",
+      "interfaces": [
+        {
+          "ipv4": "10.1.20.2",
+          "mac": "fa:16:33:00:00:25",
+          "subnet": "10.1.20.0/24"
+        },
+        {
+          "ipv4": "10.1.0.40",
+          "mac": "fa:16:33:00:00:b6",
+          "subnet": "10.1.0.0/24"
+        },
+        {
+          "ipv4": "10.1.30.4",
+          "mac": "fa:16:33:00:00:24",
+          "subnet": "10.1.30.0/24"
+        }
+      ],
+      "device_type": "router"
+    },
+    {
+      "id": "cardiac_router",
+      "interfaces": [
+        {
+          "ipv4": "10.1.30.3",
+          "mac": "fa:16:33:00:00:07",
+          "subnet": "10.1.30.0/24"
+        },
+        {
+          "ipv4": "10.1.10.2",
+          "mac": "fa:16:33:00:00:08",
+          "subnet": "10.1.10.0/24"
+        },
+        {
+          "ipv4": "10.1.0.17",
+          "mac": "fa:16:33:00:00:9f",
+          "subnet": "10.1.0.0/24"
+        }
+      ],
+      "device_type": "router"
+    }
+  ],
+  "routes": [
+    {
+      "src": "control-router",
+      "dst_subnet": "10.1.0.0/24"
+    },
+    {
+      "src": "renal_router",
+      "dst_subnet": "10.1.70.0/24"
+    },
+    {
+      "src": "renal_router",
+      "dst_subnet": "10.1.0.0/24"
+    },
+    {
+      "src": "renal_router",
+      "dst_subnet": "10.1.30.0/24"
+    },
+    {
+      "src": "pulmonary_router",
+      "dst_subnet": "10.1.0.0/24"
+    },
+    {
+      "src": "pulmonary_router",
+      "dst_subnet": "10.1.60.0/24"
+    },
+    {
+      "src": "pulmonary_router",
+      "dst_subnet": "10.1.30.0/24"
+    },
+    {
+      "src": "internet_router",
+      "dst_subnet": "10.1.50.0/24"
+    },
+    {
+      "src": "internet_router",
+      "dst_subnet": "10.1.0.0/24"
+    },
+    {
+      "src": "internet_router",
+      "dst_subnet": "10.1.30.0/24"
+    },
+    {
+      "src": "icu_router",
+      "dst_subnet": "10.1.0.0/24"
+    },
+    {
+      "src": "icu_router",
+      "dst_subnet": "10.1.40.0/24"
+    },
+    {
+      "src": "icu_router",
+      "dst_subnet": "10.1.30.0/24"
+    },
+    {
+      "src": "gi_router",
+      "dst_subnet": "10.1.20.0/24"
+    },
+    {
+      "src": "gi_router",
+      "dst_subnet": "10.1.0.0/24"
+    },
+    {
+      "src": "gi_router",
+      "dst_subnet": "10.1.30.0/24"
+    },
+    {
+      "src": "cardiac_router",
+      "dst_subnet": "10.1.0.0/24"
+    },
+    {
+      "src": "cardiac_router",
+      "dst_subnet": "10.1.10.0/24"
+    },
+    {
+      "src": "cardiac_router",
+      "dst_subnet": "10.1.30.0/24"
+    }
+  ]
+}

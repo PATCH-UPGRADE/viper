@@ -1,0 +1,110 @@
+{
+  "input_version": "1.0",
+  "meta": {
+    "team": "vanderbilt",
+    "collected_at": "2026-07-22T13:00:00Z",
+    "notes": "topology export + nmap -sV + TA3 SARIF. No firewall export this run (reachability will be subnet-inferred)."
+  },
+  "assets": [
+    {
+      "id": "renal_nursing_workstation_01",
+      "name": "Renal Nursing Workstation 01",
+      "cpe": [
+        "cpe:2.3:o:examplecorp:care_os:4.2:*:*:*:*:*:*:*",
+        "cpe:2.3:a:nginx:nginx:1.18.0:*:*:*:*:*:*:*"
+      ],
+      "device_type": "workstation",
+      "role": "free text functional role",
+
+      "interfaces": [
+        {
+          "ipv4": "10.1.70.12",
+          "mac": "fa:16:33:00:00:7f",
+          "subnet": "10.1.70.0/24"
+        },
+        {
+          "ipv4": "10.1.0.112",
+          "mac": "fa:16:33:00:00:fe",
+          "subnet": "10.1.0.0/24"
+        }
+      ],
+      "open_ports": [
+        {
+          "port": 22,
+          "protocol": "tcp",
+          "state": "open",
+          "service": "ssh",
+          "product": "OpenSSH",
+          "version": "8.9p1",
+          "collection": { "collected_by": "nmap", "confidence": "observed" }
+        }
+      ],
+      "sarif_documents": [
+        {
+          "version": "2.1.0",
+          "runs": [
+            {
+              "tool": { "driver": { "name": "fuzzer", "version": "1.0.0" } },
+              "results": [
+                {
+                  "ruleId": "CWE-787",
+                  "level": "error",
+                  "message": {
+                    "text": "Buffer overflow in parse_header() due to unchecked input length."
+                  },
+                  "locations": [
+                    {
+                      "physicalLocation": {
+                        "artifactLocation": { "uri": "src/parser.c" },
+                        "region": { "startLine": 142 }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "criticality": {
+        "level": "high",
+        "rationale": "clinical workstation bridging two care subnets",
+        "collection": { "collected_by": "cmdb", "confidence": "reported" }
+      }
+    },
+    {
+      "id": "renal_router",
+      "name": "Renal Router",
+      "device_type": "router",
+      "interfaces": [
+        { "ipv4": "10.1.70.1", "subnet": "10.1.70.0/24" },
+        { "ipv4": "10.1.0.1", "subnet": "10.1.0.0/24" }
+      ]
+    },
+    {
+      "id": "renal_vitals_monitor_05",
+      "device_type": "monitor",
+      "interfaces": [
+        {
+          "ipv4": "10.1.0.131",
+          "mac": "fa:16:33:00:01:11",
+          "subnet": "10.1.0.0/24"
+        }
+      ]
+    }
+  ],
+  "routes": [
+    { "src": "renal_router", "dst_subnet": "10.1.0.0/24" },
+    { "src": "renal_router", "dst_subnet": "10.1.70.0/24" }
+  ],
+
+  "observed_flows": [
+    {
+      "src": "renal_router",
+      "dst": "renal_nursing_workstation_01",
+      "protocol": "tcp",
+      "port": 22,
+      "collection": { "collected_by": "zeek", "confidence": "observed" }
+    }
+  ]
+}

@@ -55,13 +55,7 @@ const PlatformCard = ({ entry }: { entry: CatalogEntry }) => (
       </div>
     </div>
     <div className="p-4 border-t">
-      <CreateIntegrationDialog
-        platform={entry.platform}
-        displayName={entry.displayName}
-        configFields={entry.configFields}
-        credentialFields={entry.credentialFields}
-        credentialsAreAuthShaped={entry.credentialsAreAuthShaped}
-      />
+      <CreateIntegrationDialog entry={entry} />
     </div>
   </Card>
 );

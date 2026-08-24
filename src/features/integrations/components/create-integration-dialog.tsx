@@ -33,9 +33,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
-import type { PlatformEnum } from "@/generated/prisma";
 import { authSchema } from "@/lib/schemas";
 import { humanize } from "@/lib/utils";
+import type { CatalogEntry } from "../core/catalog";
 import { useCreateIntegration } from "../hooks/use-integrations";
 import type { FieldSpec } from "../types";
 
@@ -111,21 +111,14 @@ const DynamicField = ({
   );
 };
 
-interface CreateIntegrationDialogProps {
-  platform: PlatformEnum;
-  displayName: string;
-  configFields: FieldSpec[];
-  credentialFields: FieldSpec[];
-  credentialsAreAuthShaped: boolean;
-}
-
-export const CreateIntegrationDialog = ({
-  platform,
-  displayName,
-  configFields,
-  credentialFields,
-  credentialsAreAuthShaped,
-}: CreateIntegrationDialogProps) => {
+export const CreateIntegrationDialog = ({ entry }: { entry: CatalogEntry }) => {
+  const {
+    platform,
+    displayName,
+    configFields,
+    credentialFields,
+    credentialsAreAuthShaped,
+  } = entry;
   const [open, setOpen] = useState(false);
   const createIntegration = useCreateIntegration();
 

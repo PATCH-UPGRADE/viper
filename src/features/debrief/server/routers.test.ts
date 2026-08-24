@@ -195,16 +195,28 @@ describe("debrief.regenerate", () => {
   it("ignores a Generating row that is too old to still be running", async () => {
     // A crashed run leaves its row Generating forever. Without the age bound
     // the guard above matches it and the department never gets another debrief.
-    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
-    mockPrisma.debrief.findFirst.mockResolvedValue(null);
-    mockPrisma.debrief.create.mockResolvedValue({ id: "debrief-3" });
+    //
+    // Frozen clock so the bound can be asserted exactly. Without it the test can
+    // only check "some time in the past", which passes for any offset at all —
+    // including one so long the guard never expires.
+    vi.useFakeTimers();
+    try {
+      const now = new Date("2026-08-17T12:00:00.000Z");
+      vi.setSystemTime(now);
+      mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
+      mockPrisma.debrief.findFirst.mockResolvedValue(null);
+      mockPrisma.debrief.create.mockResolvedValue({ id: "debrief-3" });
 
-    await caller.regenerate();
+      await caller.regenerate();
 
-    const [inFlightQuery] = mockPrisma.debrief.findFirst.mock.calls[0];
-    expect(inFlightQuery.where.status).toBe("Generating");
-    expect(inFlightQuery.where.createdAt.gt).toBeInstanceOf(Date);
-    expect(inFlightQuery.where.createdAt.gt.getTime()).toBeLessThan(Date.now());
+      const [inFlightQuery] = mockPrisma.debrief.findFirst.mock.calls[0];
+      expect(inFlightQuery.where.status).toBe("Generating");
+      expect(inFlightQuery.where.createdAt.gt).toEqual(
+        new Date(now.getTime() - 15 * 60 * 1000),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

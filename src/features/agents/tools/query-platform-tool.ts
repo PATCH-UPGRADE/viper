@@ -99,11 +99,13 @@ const DEVICE_GROUP_URL_KEYS = [
  * this; keeping the merge in one place stops a new entity from regressing it.
  */
 function addLinks(
-  // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
-  obj: Record<string, any>,
+  obj: Record<string, unknown>,
   links: Record<string, unknown>,
 ): void {
-  obj._links = { ...(obj._links ?? {}), ...links };
+  // Narrow before spreading: the walker types values as unknown, and an object
+  // reached here may already carry links from an earlier shape rule.
+  const existing = (obj._links ?? {}) as Record<string, unknown>;
+  obj._links = { ...existing, ...links };
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
@@ -202,8 +204,7 @@ function trimCanonicalRecord(record: Record<string, any>): void {
  * WorkOrderTicket both hold `sources`. Stripped before the child walk, so the
  * payload is never recursed into.
  */
-// biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
-function stripSourcePayload(source: Record<string, any>): void {
+function stripSourcePayload(source: Record<string, unknown>): void {
   delete source.raw;
 }
 

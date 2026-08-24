@@ -36,7 +36,6 @@ import {
 } from "@/generated/prisma";
 import { MONTHS_SHORT } from "@/lib/date-utils";
 import prisma from "@/lib/db";
-import { FLEET } from "./config";
 import type {
   FleetOperationalStatus,
   FleetPatientDanger,

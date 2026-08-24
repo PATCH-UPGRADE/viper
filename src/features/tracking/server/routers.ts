@@ -999,6 +999,8 @@ export const trackingRouter = createTRPCRouter({
    * per-asset child of a parent ticket that carries the proposal's
    * toolCallId, same as any other asset attachment.
    */
+  // TODO: VW-432 / VW-430 code to create a fleet work order must live in teamplay-fleet
+  // platform resource module
   createFleetWorkOrder: protectedProcedure
     .input(
       z.object({

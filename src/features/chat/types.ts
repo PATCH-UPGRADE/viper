@@ -1,5 +1,8 @@
 import { z } from "zod";
 import type { AssetWithIssueRelations } from "@/features/assets/types";
+// TODO: VW-430 I don't think this file should import anything from fleet
+// components/types to render work order tickets in chat should call
+// platform-specific methods
 import {
   FLEET_OPERATIONAL_STATUSES,
   FLEET_PATIENT_DANGERS,
@@ -29,6 +32,7 @@ export const fleetProposalAssetSchema = z.object({
   equipmentKey: z.string(),
 });
 
+// TODO: VW-430, platform-specific code needs to live inside the src/features/integrations/platform/teamplay-fleet directory
 export const fleetWorkOrderProposalSchema = z.object({
   type: z.literal("fleet_work_order_proposal"),
   assets: z.array(fleetProposalAssetSchema).min(1),

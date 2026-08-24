@@ -31,6 +31,7 @@ Search for `// SPIKE VW-425` to find all related code.
 We can have a background job writes to a table, updates assets on a schedule, stores verdicts, and lets agents and the UI read from that table. 
 
 Currently, `/reachability` is a debug page that dumps raw JSON data. You should see request being made from REACHTOOL console like the screenshot below
+
 ![](images/REACHTOOL_console.png)
 
 

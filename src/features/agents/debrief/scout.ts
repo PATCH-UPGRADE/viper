@@ -61,5 +61,15 @@ export async function runDebriefScout(): Promise<string> {
 
   // BaseMessage.text flattens content blocks correctly, including the
   // block-type check a hand-rolled version is easy to get subtly wrong.
-  return (result.messages.at(-1)?.text ?? "").slice(0, MAX_FINDINGS_CHARS);
+  const findings = (result.messages.at(-1)?.text ?? "").trim();
+
+  // Fail loudly rather than hand the writer nothing. With no findings the
+  // writer has only the department name to work from, and a model asked for
+  // 3 bullets will produce 3 — invented ones. A thrown error lets the caller
+  // mark the run Failed and leave yesterday's debrief in place.
+  if (findings.length === 0) {
+    throw new Error("Debrief scout returned no findings");
+  }
+
+  return findings.slice(0, MAX_FINDINGS_CHARS);
 }

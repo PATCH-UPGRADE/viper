@@ -139,6 +139,17 @@ function rewrite(
 }
 
 export type ValidateResult = {
+  /**
+   * Repaired bullets, ready to store. MAY BE EMPTY: every bullet's text can
+   * collapse when the model emits nothing but placeholders and every id it
+   * invented is dropped.
+   *
+   * An empty list does not satisfy `debriefBulletsSchema`, which requires at
+   * least one. That is deliberate — the caller decides what an empty survey
+   * means (mark the run Failed, or leave yesterday's debrief in place). This
+   * function repairs a draft; it does not invent a bullet to fill the gap,
+   * because a fabricated bullet is indistinguishable from one the agent wrote.
+   */
   bullets: DebriefBullet[];
   /** Links dropped because their entity id did not resolve to a real row. */
   droppedLinks: number;

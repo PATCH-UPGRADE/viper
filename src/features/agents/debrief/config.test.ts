@@ -28,14 +28,18 @@ describe("writer model configuration", () => {
     );
   });
 
+  // Match the assignment, not the bare word. Both settings are worth explaining
+  // in a comment, and a comment doing so must not fail the test that guards them.
   it("never sends budget_tokens, which Sonnet 5 rejects with a 400", () => {
-    expect(read("writer.ts")).not.toContain("budget_tokens");
-    expect(read("scout.ts")).not.toContain("budget_tokens");
+    for (const file of ["writer.ts", "scout.ts"]) {
+      expect(read(file)).not.toMatch(/budget_tokens\s*:/);
+    }
   });
 
   it("never sets temperature, which Sonnet 5 also rejects", () => {
-    expect(read("writer.ts")).not.toContain("temperature");
-    expect(read("scout.ts")).not.toContain("temperature");
+    for (const file of ["writer.ts", "scout.ts"]) {
+      expect(read(file)).not.toMatch(/temperature\s*:/);
+    }
   });
 });
 
@@ -58,6 +62,15 @@ describe("scout model configuration", () => {
   });
 
   it("raises the recursion limit above LangGraph's default of 25", () => {
-    expect(read("scout.ts")).toContain("recursionLimit");
+    const src = read("scout.ts");
+
+    // The identifier alone proves nothing: a limit of 10 would still "contain"
+    // it while making the run fail sooner than the default it replaced.
+    const declared = src.match(/SCOUT_RECURSION_LIMIT\s*=\s*(\d+)/);
+    expect(declared).not.toBeNull();
+    expect(Number(declared?.[1])).toBeGreaterThan(25);
+
+    // ...and it has to actually reach graph.invoke.
+    expect(src).toMatch(/recursionLimit:\s*SCOUT_RECURSION_LIMIT/);
   });
 });

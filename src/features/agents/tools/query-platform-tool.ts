@@ -90,6 +90,14 @@ const DEVICE_GROUP_URL_KEYS = [
   "deviceArtifactsUrl",
 ] as const;
 
+/**
+ * Merge navigation hints into an object's `_links` map.
+ *
+ * Always merge, never assign. A single object can match more than one shape
+ * rule below, and a plain assignment silently drops the links an earlier rule
+ * added. The "does not clobber links added by another transform" test pins
+ * this; keeping the merge in one place stops a new entity from regressing it.
+ */
 function addLinks(
   // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
   obj: Record<string, any>,

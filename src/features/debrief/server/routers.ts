@@ -13,7 +13,6 @@ const debriefSelect = {
   createdAt: true,
 } as const;
 
-
 function parseBullets(raw: unknown): DebriefBullet[] {
   const parsed = debriefBulletsSchema.safeParse(raw);
   if (parsed.success) return parsed.data;
@@ -21,6 +20,18 @@ function parseBullets(raw: unknown): DebriefBullet[] {
   return [];
 }
 
+/**
+ * How long a run may stay `Generating` before a new request may replace it.
+ *
+ * An Inngest run can be evicted, time out, or die mid-step, which leaves its
+ * row `Generating` forever. Without this bound the in-flight guard below then
+ * refuses every later request and the department never gets another debrief.
+ *
+ * The value is a placeholder: pin it to the observed p99 agent runtime once
+ * VW-455 lands. Once the function updates the row per step, bound on
+ * `updatedAt` instead, so this means "no progress in 15 minutes" rather than
+ * "started over 15 minutes ago".
+ */
 const IN_FLIGHT_TIMEOUT_MS = 15 * 60 * 1000;
 
 async function callerDepartmentId(userId: string): Promise<string | null> {

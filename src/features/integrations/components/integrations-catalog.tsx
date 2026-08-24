@@ -1,10 +1,10 @@
 import {
   BugIcon,
+  Building2Icon,
   ComputerIcon,
   InboxIcon,
   ListChecksIcon,
   type LucideIcon,
-  PlugIcon,
 } from "lucide-react";
 import type { z } from "zod";
 import {
@@ -30,23 +30,24 @@ import { CreateIntegrationDialog } from "./create-integration-dialog";
 const SECTION_META: Record<Category, { icon: LucideIcon; subtitle: string }> = {
   "Hospital Inventory": {
     icon: ComputerIcon,
-    subtitle: "Import asset and device inventory from hospital vendor systems",
+    subtitle: "Bring your asset inventory into VIPER.",
   },
   "Vulnerability Management Platforms": {
     icon: BugIcon,
-    subtitle: "Import vulnerability data from scanners and advisory feeds",
+    subtitle: "Import vulnerability data from scanners and advisory feeds.",
   },
   "Ticketing Platforms": {
     icon: ListChecksIcon,
-    subtitle: "Send and receive work orders with your ticketing system",
+    subtitle: "Route findings and work orders to your ticketing system.",
+  },
+  "Vendor Platforms": {
+    icon: Building2Icon,
+    subtitle: "Sync device and service data directly from device vendors.",
   },
   Notifications: {
     icon: InboxIcon,
-    subtitle: "Receive advisories and alerts as they're published",
-  },
-  "Custom Integrations": {
-    icon: PlugIcon,
-    subtitle: "Connect any REST API, or let AI figure it out",
+    subtitle:
+      "Get notified about new advisories, recalls, and platform events.",
   },
 };
 

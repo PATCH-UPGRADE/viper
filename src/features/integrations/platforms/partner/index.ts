@@ -16,7 +16,11 @@ export const partner: ConnectorModule<PartnerConfig, PartnerCreds> = {
   definition: {
     platform: PlatformEnum.PARTNER,
     displayName: "Partner API",
-    categories: ["Custom Integrations"],
+    categories: [
+      "Hospital Inventory",
+      "Vulnerability Management Platforms",
+      "Ticketing Platforms",
+    ],
     configSchema,
     credentialSchema,
   },

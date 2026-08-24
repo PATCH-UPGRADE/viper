@@ -100,18 +100,6 @@ export const usesGenericAuth = (credentialSchema: z.ZodTypeAny): boolean =>
   credentialSchema === authCredentialSchema;
 
 /**
- * The storage form of a credential. `AuthType.None` means there is nothing to
- * protect, so the column stays null — which is exactly what
- * `parseAuthCredential` below reads back as `None`. The two are inverses; keep
- * them that way, so `credentials IS NULL` is the single honest representation
- * of "this integration has no auth".
- */
-export const encodeAuthCredential = (
-  creds: AuthCredential,
-): Uint8Array<ArrayBuffer> | null =>
-  creds.authType === AuthType.None ? null : encryptCredentials(creds);
-
-/**
  * Narrow decrypted credentials. A row with no credentials is treated as
  * `AuthType.None` rather than an error — that is a valid configuration.
  */

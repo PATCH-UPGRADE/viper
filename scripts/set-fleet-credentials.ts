@@ -10,7 +10,7 @@
 // have drifted — fix them together.
 
 import { createCipheriv, randomBytes } from "node:crypto";
-import { PlatformEnum } from "@/generated/prisma";
+import { AuthType, PlatformEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
 function encrypt(plaintext: unknown): Uint8Array<ArrayBuffer> {
@@ -48,7 +48,12 @@ async function main() {
 
   await prisma.integration.update({
     where: { id: integration.id },
-    data: { credentials: encrypt({ username, password }) },
+    data: {
+      credentials: encrypt({
+        authType: AuthType.Basic,
+        authentication: { username, password },
+      }),
+    },
   });
 
   console.log(`Stored Fleet credentials on ${integration.id}`);

@@ -2,7 +2,10 @@ import "server-only";
 import { NonRetriableError } from "inngest";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
 import { createCallback } from "@/features/integrations/core/callback";
-import { decryptCredentials } from "@/features/integrations/core/credentials";
+import {
+  decryptCredentials,
+  parseAuthCredential,
+} from "@/features/integrations/core/credentials";
 import {
   defaultSyncEveryFor,
   requirePlatform,
@@ -12,7 +15,7 @@ import {
   effectiveSyncEvery,
 } from "@/features/integrations/core/sync/cadence";
 import type { SyncCtx } from "@/features/integrations/core/types";
-import { AuthType, Prisma, SyncStatusEnum } from "@/generated/prisma";
+import { Prisma, SyncStatusEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
 
@@ -147,9 +150,10 @@ export const syncIntegration = inngest.createFunction(
           select: { credentials: true },
         });
         const creds = module.definition.credentialSchema.parse(
-          row?.credentials
-            ? decryptCredentials(row.credentials)
-            : { authType: AuthType.None },
+          parseAuthCredential(
+            row?.credentials ? decryptCredentials(row.credentials) : null,
+            integrationId,
+          ),
         );
 
         const ctx: SyncCtx = {

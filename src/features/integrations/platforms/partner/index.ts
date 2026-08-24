@@ -16,11 +16,9 @@ export const partner: ConnectorModule<PartnerConfig, PartnerCreds> = {
   definition: {
     platform: PlatformEnum.PARTNER,
     displayName: "Partner API",
-    categories: [
-      "Hospital Inventory",
-      "Vulnerability Management Platforms",
-      "Ticketing Platforms",
-    ],
+    description:
+      "For partners that follow the VIPER standard, like Blueflow and Helm.",
+    categories: ["Hospital Inventory"],
     configSchema,
     credentialSchema,
   },

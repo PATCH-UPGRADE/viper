@@ -17,11 +17,8 @@ export const ai: ConnectorModule<AiConfig, AiCreds> = {
   definition: {
     platform: PlatformEnum.AI,
     displayName: "AI Crawler",
-    categories: [
-      "Hospital Inventory",
-      "Vulnerability Management Platforms",
-      "Ticketing Platforms",
-    ],
+    description: "Point it at any URL — an n8n agent works out how to read it.",
+    categories: ["Vulnerability Management Platforms"],
     configSchema,
     credentialSchema,
   },

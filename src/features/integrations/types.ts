@@ -29,7 +29,6 @@ export const CATEGORIES = [
   "Hospital Inventory",
   "Vulnerability Management Platforms",
   "Ticketing Platforms",
-  "Vendor Platforms",
   "Notifications",
 ] as const;
 export type Category = (typeof CATEGORIES)[number];

@@ -1,28 +1,30 @@
+"use client";
+
 import {
   BugIcon,
-  Building2Icon,
   ComputerIcon,
   InboxIcon,
   ListChecksIcon,
   type LucideIcon,
 } from "lucide-react";
-import type { z } from "zod";
-import {
-  Card,
-  CardAction,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useEffect, useRef, useState } from "react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
-import { cn, humanize } from "@/lib/utils";
-import { usesGenericAuth } from "../core/credentials";
-import { registry } from "../core/registry";
-import { genericConfigSchema } from "../core/sync/resources";
-import type { AnyConnectorModule } from "../core/types";
-import { CATEGORIES, type Category, type FieldSpec } from "../types";
+import { cn } from "@/lib/utils";
+import type { CatalogEntry } from "../core/catalog";
+import { CATEGORIES, type Category } from "../types";
 import { CreateIntegrationDialog } from "./create-integration-dialog";
+
+const initialsOf = (name: string) =>
+  name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase() || "?";
 
 // Which platforms show under which section is each platform's own call
 // (`categories` on its ConnectorDefinition) — this is UI-only metadata for
@@ -40,10 +42,6 @@ const SECTION_META: Record<Category, { icon: LucideIcon; subtitle: string }> = {
     icon: ListChecksIcon,
     subtitle: "Route findings and work orders to your ticketing system.",
   },
-  "Vendor Platforms": {
-    icon: Building2Icon,
-    subtitle: "Sync device and service data directly from device vendors.",
-  },
   Notifications: {
     icon: InboxIcon,
     subtitle:
@@ -51,117 +49,154 @@ const SECTION_META: Record<Category, { icon: LucideIcon; subtitle: string }> = {
   },
 };
 
-const shapeOf = (schema: z.ZodTypeAny): Record<string, z.ZodTypeAny> =>
-  "shape" in schema ? (schema.shape as Record<string, z.ZodTypeAny>) : {};
+const PlatformCard = ({ entry }: { entry: CatalogEntry }) => (
+  <Card className="p-0 gap-0 overflow-hidden">
+    <div className="flex items-center gap-3 p-4">
+      <Avatar className="size-9 shrink-0 rounded-md border">
+        <AvatarFallback className="rounded-md bg-accent text-accent-foreground text-xs font-semibold">
+          {initialsOf(entry.displayName)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <CardTitle>{entry.displayName}</CardTitle>
+        <CardDescription>{entry.description}</CardDescription>
+      </div>
+    </div>
+    <div className="p-4 border-t">
+      <CreateIntegrationDialog
+        platform={entry.platform}
+        displayName={entry.displayName}
+        configFields={entry.configFields}
+        credentialFields={entry.credentialFields}
+        credentialsAreAuthShaped={entry.credentialsAreAuthShaped}
+      />
+    </div>
+  </Card>
+);
 
-const configSummary = (module: AnyConnectorModule): string => {
-  const fields = Object.keys(shapeOf(module.definition.configSchema)).filter(
-    (key) => !(key in genericConfigSchema.shape),
-  );
-  return fields.length > 0
-    ? `Requires ${fields.map(humanize).join(", ")}`
-    : "No configuration required";
+/** Scrollspy: highlights whichever section's top is closest to (but above) the viewport top. */
+const useScrollSpy = (sections: readonly Category[]) => {
+  const [active, setActive] = useState<Category>(sections[0]);
+  const elements = useRef(new Map<Category, HTMLDivElement>());
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting);
+        if (visible.length === 0) return;
+        const topmost = visible.reduce((a, b) =>
+          a.boundingClientRect.top <= b.boundingClientRect.top ? a : b,
+        );
+        const section = topmost.target.getAttribute("data-section") as Category;
+        setActive(section);
+      },
+      { rootMargin: "-96px 0px -70% 0px", threshold: 0 },
+    );
+    for (const el of elements.current.values()) observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const register = (section: Category) => (el: HTMLDivElement | null) => {
+    if (el) elements.current.set(section, el);
+    else elements.current.delete(section);
+  };
+
+  const scrollTo = (section: Category) => {
+    setActive(section);
+    elements.current
+      .get(section)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  return { active, register, scrollTo };
 };
 
-// biome-ignore-start lint/suspicious/noExplicitAny: introspecting Zod's own internals (shape/unwrap/options) — `unknown` does not expose them, same tradeoff as AnyConnectorModule in core/types.ts.
-const fieldSpecsFor = (schema: z.ZodTypeAny): FieldSpec[] =>
-  Object.entries(shapeOf(schema)).map(([key, field]) => {
-    const optional = field.isOptional();
-    const required = !optional;
-    const inner: any = optional ? (field as any).unwrap() : field;
-    if (inner.def.type === "enum") {
-      return { key, kind: "select" as const, required, options: inner.options };
-    }
-    if (inner.def.type === "number") {
-      return { key, kind: "number", required };
-    }
-    const kind = /password|secret|token/i.test(key)
-      ? ("password" as const)
-      : /url|uri/i.test(key)
-        ? ("url" as const)
-        : ("text" as const);
-    return { key, kind, required };
-  });
-// biome-ignore-end lint/suspicious/noExplicitAny: see comment above
+const CatalogSidebar = ({
+  active,
+  onSelect,
+}: {
+  active: Category;
+  onSelect: (section: Category) => void;
+}) => (
+  <nav className="flex flex-col gap-1 w-56 shrink-0 sticky top-4 self-start">
+    {CATEGORIES.map((name) => {
+      const Icon = SECTION_META[name].icon;
+      return (
+        <button
+          key={name}
+          type="button"
+          onClick={() => onSelect(name)}
+          className={cn(
+            "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left",
+            active === name
+              ? "bg-accent text-primary font-semibold"
+              : "text-muted-foreground hover:bg-accent/50",
+          )}
+        >
+          <Icon className="size-4 shrink-0" />
+          <span className="flex-1">{name}</span>
+        </button>
+      );
+    })}
+  </nav>
+);
 
-export const IntegrationsCatalogContainer = () => {
+const CategorySection = ({
+  category,
+  catalog,
+}: {
+  category: Category;
+  catalog: CatalogEntry[];
+}) => {
+  const meta = SECTION_META[category];
+  const entries = catalog.filter((entry) =>
+    entry.categories.includes(category),
+  );
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <SettingsSubheader title={category} description={meta.subtitle} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {entries.map((entry) => (
+          <PlatformCard key={entry.platform} entry={entry} />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const IntegrationsCatalog = ({ catalog }: { catalog: CatalogEntry[] }) => {
+  const { active, register, scrollTo } = useScrollSpy(CATEGORIES);
+
+  return (
+    <div className="flex gap-6">
+      <CatalogSidebar active={active} onSelect={scrollTo} />
+      <div className="flex flex-col gap-10 flex-1 min-w-0">
+        {CATEGORIES.map((category) => (
+          <div key={category} ref={register(category)} data-section={category}>
+            <CategorySection category={category} catalog={catalog} />
+          </div>
+        ))}
+        {/* Lets the last section scroll all the way to the top, like the others. */}
+        <div className="min-h-[70vh]" aria-hidden="true" />
+      </div>
+    </div>
+  );
+};
+
+export const IntegrationsCatalogContainer = ({
+  catalog,
+}: {
+  catalog: CatalogEntry[];
+}) => {
   return (
     <div className={cn(mainPadding, "flex flex-col gap-4")}>
       <SettingsSubheader
         title="Integrations"
         description="Manage external integrations to sync assets and vulnerabilities"
       />
-      <IntegrationsCatalog />
-    </div>
-  );
-};
-
-const IntegrationsCatalog = () => {
-  const modules = Object.values(registry) as AnyConnectorModule[];
-
-  const sections = CATEGORIES.map((name) => ({
-    name,
-    ...SECTION_META[name],
-    cards: modules
-      .filter((module) => module.definition.categories.includes(name))
-      .map((module) => {
-        const { definition } = module;
-        return {
-          platform: definition.platform,
-          displayName: definition.displayName,
-          summary: configSummary(module),
-          configFields: fieldSpecsFor(definition.configSchema),
-          credentialFields: fieldSpecsFor(definition.credentialSchema),
-          credentialsAreAuthShaped: usesGenericAuth(
-            definition.credentialSchema,
-          ),
-        };
-      }),
-  })).filter((section) => section.cards.length > 0);
-
-  return (
-    <div className="flex flex-col gap-6">
-      {sections.map((section) => (
-        <div key={section.name} className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <section.icon className="size-4" aria-hidden="true" />
-            <div>
-              <h3 className="font-semibold text-sm">{section.name}</h3>
-              <p className="text-sm text-muted-foreground">
-                {section.subtitle}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {section.cards.map(
-              ({
-                platform,
-                displayName,
-                summary,
-                configFields,
-                credentialFields,
-                credentialsAreAuthShaped,
-              }) => (
-                <Card key={platform}>
-                  <CardHeader>
-                    <CardTitle>{displayName}</CardTitle>
-                    <CardDescription>{summary}</CardDescription>
-                    <CardAction>
-                      <CreateIntegrationDialog
-                        platform={platform}
-                        displayName={displayName}
-                        configFields={configFields}
-                        credentialFields={credentialFields}
-                        credentialsAreAuthShaped={credentialsAreAuthShaped}
-                      />
-                    </CardAction>
-                  </CardHeader>
-                </Card>
-              ),
-            )}
-          </div>
-        </div>
-      ))}
+      <IntegrationsCatalog catalog={catalog} />
     </div>
   );
 };

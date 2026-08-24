@@ -99,6 +99,8 @@ export type SyncStrategy<TConfig = unknown, TCreds = unknown> = (
 export interface ConnectorDefinition<TConfig, TCreds> {
   platform: PlatformEnum;
   displayName: string;
+  /** Shown on the platform's catalog card. */
+  description: string;
   /** Which connectors-catalog sections this platform shows under. */
   categories: Category[];
   /** Validates `Integration.config`. */

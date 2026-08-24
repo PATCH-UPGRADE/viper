@@ -27,8 +27,8 @@ function parseBullets(raw: unknown): DebriefBullet[] {
  * row `Generating` forever. Without this bound the in-flight guard below then
  * refuses every later request and the department never gets another debrief.
  *
- * The value is a placeholder: pin it to the observed p99 agent runtime once
- * VW-455 lands. Once the function updates the row per step, bound on
+ * The value is a placeholder: pin it to the observed p99 agent runtime.
+ *  Once the function updates the row per step, bound on
  * `updatedAt` instead, so this means "no progress in 15 minutes" rather than
  * "started over 15 minutes ago".
  */

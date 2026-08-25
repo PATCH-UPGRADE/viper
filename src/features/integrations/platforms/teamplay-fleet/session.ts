@@ -105,25 +105,6 @@ function normalizeHeaders(
   return headers ? Object.fromEntries(new Headers(headers)) : {};
 }
 
-async function credentialsFor(integrationId: string): Promise<FleetCreds> {
-  const [{ decryptCredentials }, { default: prisma }, { credentialSchema }] =
-    await Promise.all([
-      import("@/features/integrations/core/credentials"),
-      import("@/lib/db"),
-      import("./config"),
-    ]);
-
-  const { credentials } = await prisma.integration.findUniqueOrThrow({
-    where: { id: integrationId },
-    select: { credentials: true },
-  });
-
-  if (!credentials) {
-    throw new Error(`Integration ${integrationId} has no stored credentials`);
-  }
-  return credentialSchema.parse(decryptCredentials(credentials));
-}
-
 export async function createFleetSession(creds: FleetCreds) {
   const { username, password } = creds.authentication;
   const login = async () => {
@@ -166,7 +147,3 @@ export async function createFleetSession(creds: FleetCreds) {
 }
 
 export type FleetSession = Awaited<ReturnType<typeof createFleetSession>>;
-
-export async function createFleetSessionForIntegration(integrationId: string) {
-  return createFleetSession(await credentialsFor(integrationId));
-}

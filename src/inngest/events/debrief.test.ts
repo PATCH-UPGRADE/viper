@@ -37,14 +37,29 @@ describe("requestDebrief", () => {
     await expect(requestDebrief("run-1", "d1")).resolves.toBe(false);
   });
 
-  it("imports nothing that reaches the tRPC appRouter", async () => {
+  it("declares no import that reaches the tRPC appRouter", async () => {
     // This module exists to break an import cycle: router -> event -> handler
     // -> scout -> query_platform_data -> agent-caller -> appRouter. A cycle
-    // through appRouter leaves every tRPC procedure undefined at runtime.
-    const src = await import("node:fs").then((fs) =>
-      fs.readFileSync("src/inngest/events/debrief.ts", "utf8"),
+    // through appRouter leaves every tRPC procedure undefined at runtime, and
+    // the whole API returns 500.
+    //
+    // Scope: DIRECT imports only. A transitive reintroduction through a helper
+    // would pass here, so this is a guard rail, not a proof — a real check
+    // needs graph analysis in the lint step.
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    // Resolved against this file, not the process cwd, so the test does not
+    // depend on where the runner was launched.
+    const here = fileURLToPath(new URL("./debrief.ts", import.meta.url));
+
+    const src = readFileSync(here, "utf8");
+    const imports = [...src.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
+
+    expect(imports).not.toContain(
+      expect.stringMatching(/@\/features\/agents|@\/trpc/),
     );
-    expect(src).not.toMatch(/from "@\/features\/agents/);
-    expect(src).not.toMatch(/from "@\/trpc/);
+    for (const spec of imports) {
+      expect(spec).not.toMatch(/@\/features\/agents|@\/trpc/);
+    }
   });
 });

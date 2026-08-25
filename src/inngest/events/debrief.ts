@@ -21,6 +21,13 @@ export type DebriefEventData = {
   departmentId: string;
   /** Absent on the manual path; the handler then runs its own scout. */
   findings?: string;
+  /**
+   * Deduplication key for `idempotency: "event.data.key"` on the handler.
+   * Typed here rather than left inline: the Inngest client does not check the
+   * payload shape, so dropping this field would silently disable deduplication
+   * and let one claimed run execute twice.
+   */
+  key: string;
 };
 
 /**
@@ -30,16 +37,32 @@ export type DebriefEventData = {
  * pending state immediately, and so the row id is a natural idempotency key:
  * one requested run, one execution.
  */
+/**
+ * Build the event payload. Both senders go through this — the mutation below
+ * and the nightly cron — so a missing field is a compile error at either. The
+ * Inngest client is constructed without `schemas`, so nothing else checks it.
+ */
+export function debriefEvent(
+  debriefId: string,
+  departmentId: string,
+  findings?: string,
+) {
+  const data: DebriefEventData = {
+    debriefId,
+    departmentId,
+    findings,
+    key: debriefId,
+  };
+  return { name: DEBRIEF_EVENT, data } as const;
+}
+
 export async function requestDebrief(
   debriefId: string,
   departmentId: string,
   findings?: string,
 ): Promise<boolean> {
   try {
-    await inngest.send({
-      name: DEBRIEF_EVENT,
-      data: { debriefId, departmentId, findings, key: debriefId },
-    });
+    await inngest.send(debriefEvent(debriefId, departmentId, findings));
     return true;
   } catch (err) {
     console.error(

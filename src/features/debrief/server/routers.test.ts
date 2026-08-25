@@ -6,7 +6,7 @@ vi.mock("server-only", () => ({}));
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     user: { findUnique: vi.fn() },
-    debrief: { findFirst: vi.fn(), create: vi.fn() },
+    debrief: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     // claimDebriefRun takes an advisory lock inside an interactive
     // transaction. Hand the callback the same mock, so assertions on
     // debrief.* still see every call.
@@ -18,7 +18,7 @@ const { mockPrisma } = vi.hoisted(() => ({
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
 const { mockRequestDebrief } = vi.hoisted(() => ({
-  mockRequestDebrief: vi.fn().mockResolvedValue(true),
+  mockRequestDebrief: vi.fn(),
 }));
 
 vi.mock("@/inngest/events/debrief", () => ({
@@ -63,6 +63,7 @@ function readyRow(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockRequestDebrief.mockResolvedValue(true);
   mockPrisma.$transaction.mockImplementation(
     async (fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma),
   );
@@ -345,5 +346,42 @@ describe("debrief.regenerate — concurrent callers", () => {
 
     expect(insideTransaction).toBe(2);
     expect(mockPrisma.debrief.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("debrief.regenerate — when the dispatch fails", () => {
+  it("releases the claim instead of leaving a row nothing will write", async () => {
+    // requestDebrief reports failure rather than throwing. Unchecked, the row
+    // stays Generating: it blocks retries until the staleness bound expires and
+    // hides the department's last good debrief, because the newest row wins.
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
+    mockPrisma.debrief.findFirst.mockResolvedValue(null);
+    mockPrisma.debrief.create.mockResolvedValue({ id: "debrief-1" });
+    mockPrisma.debrief.update.mockResolvedValue({ id: "debrief-1" });
+    mockRequestDebrief.mockResolvedValue(false);
+
+    await expect(caller.regenerate()).rejects.toMatchObject({
+      code: "INTERNAL_SERVER_ERROR",
+    });
+
+    expect(mockPrisma.debrief.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "debrief-1" },
+        data: expect.objectContaining({ status: "Failed" }),
+      }),
+    );
+  });
+
+  it("leaves the row alone when the dispatch succeeds", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
+    mockPrisma.debrief.findFirst.mockResolvedValue(null);
+    mockPrisma.debrief.create.mockResolvedValue({ id: "debrief-1" });
+    mockRequestDebrief.mockResolvedValue(true);
+
+    await expect(caller.regenerate()).resolves.toEqual({
+      id: "debrief-1",
+      queued: true,
+    });
+    expect(mockPrisma.debrief.update).not.toHaveBeenCalled();
   });
 });

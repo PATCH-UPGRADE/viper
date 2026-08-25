@@ -65,8 +65,24 @@ export const debriefRouter = createTRPCRouter({
 
     // Only dispatch for a run this call opened. Joining an active run must not
     // queue a second agent execution.
-    if (created) await requestDebrief(id, departmentId);
+    if (!created) return { id, queued: false };
 
-    return { id, queued: created };
+    // requestDebrief reports failure rather than throwing, so an unchecked call
+    // would leave a Generating row that nothing will ever write: it blocks
+    // retries until the staleness bound expires AND hides the department's last
+    // good debrief, because the newest row wins. Release the claim instead.
+    const dispatched = await requestDebrief(id, departmentId);
+    if (!dispatched) {
+      await prisma.debrief.update({
+        where: { id },
+        data: { status: "Failed", error: "Could not queue the debrief run." },
+      });
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Could not queue the debrief run. Please try again.",
+      });
+    }
+
+    return { id, queued: true };
   }),
 });

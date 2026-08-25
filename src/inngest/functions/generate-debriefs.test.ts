@@ -3,19 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockPrisma, mockScout, mockWriter, mockClaim, mockSend } = vi.hoisted(
-  () => ({
-    mockPrisma: {
-      department: { findMany: vi.fn(), findUnique: vi.fn() },
-      debrief: { findFirst: vi.fn(), update: vi.fn() },
-      workOrderTicket: { findMany: vi.fn() },
-    },
-    mockScout: vi.fn(),
-    mockWriter: vi.fn(),
-    mockClaim: vi.fn(),
-    mockSend: vi.fn().mockResolvedValue(undefined),
-  }),
-);
+const { mockPrisma, mockScout, mockWriter, mockClaim } = vi.hoisted(() => ({
+  mockPrisma: {
+    department: { findMany: vi.fn(), findUnique: vi.fn() },
+    debrief: { findFirst: vi.fn(), update: vi.fn() },
+    workOrderTicket: { findMany: vi.fn() },
+  },
+  mockScout: vi.fn(),
+  mockWriter: vi.fn(),
+  mockClaim: vi.fn(),
+}));
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/features/agents/debrief/scout", () => ({
@@ -30,7 +27,6 @@ vi.mock("@/features/debrief/server/runs", () => ({
 }));
 vi.mock("../client", () => ({
   inngest: {
-    send: mockSend,
     createFunction: (config: unknown, trigger: unknown, handler: unknown) => ({
       config,
       trigger,
@@ -70,7 +66,7 @@ function makeStep() {
         sent.push(events);
       },
     },
-    logger: { info: vi.fn(), error: vi.fn() },
+    logger: { info: vi.fn() },
   };
 }
 
@@ -78,7 +74,6 @@ const BULLET = { text: "One thing.", links: [] };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockSend.mockResolvedValue(undefined);
 });
 
 describe("generateAllDebriefs — the daily cron", () => {
@@ -242,6 +237,20 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     );
   });
 
+  it("passes yesterday's bullets through to the writer", async () => {
+    // Exercises the parseBullets branch: every other test leaves the previous
+    // debrief null, so the stored-JSON path was never run.
+    contextResolves([BULLET]);
+    mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
+    const { step } = makeStep();
+
+    await deptDebrief.handler({ event: event({ findings: "f" }), step });
+
+    expect(mockWriter).toHaveBeenCalledWith(
+      expect.objectContaining({ previousBullets: [BULLET] }),
+    );
+  });
+
   it("passes an empty previousBullets on a department's first run", async () => {
     contextResolves([]);
     mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
@@ -255,6 +264,20 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     expect(mockWriter).toHaveBeenCalledWith(
       expect.objectContaining({ previousBullets: [] }),
     );
+  });
+
+  it("clears the previous run's bullets when marking Failed", async () => {
+    // The two persist branches drifted once: only the Ready branch reset
+    // bullets, so a re-run that collapsed left yesterday's bullets on a Failed
+    // row for the card to render.
+    contextResolves();
+    mockWriter.mockResolvedValue({ bullets: [], model: "m" });
+    const { step } = makeStep();
+
+    await deptDebrief.handler({ event: event({ findings: "f" }), step });
+
+    const persisted = mockPrisma.debrief.update.mock.calls.at(-1)?.[0];
+    expect(persisted.data).toMatchObject({ status: "Failed", bullets: [] });
   });
 
   it("marks Failed rather than Ready when every bullet collapsed", async () => {
@@ -292,22 +315,67 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
       error: "model refused",
     });
   });
+});
 
-  it("marks Failed when the department disappeared mid-run", async () => {
-    mockPrisma.department.findUnique.mockResolvedValue(null);
+describe("generateDepartmentDebrief — progress and failure reporting", () => {
+  const event = (data: Record<string, unknown>) => ({
+    data: { debriefId: "run-1", departmentId: "d1", ...data },
+  });
+
+  function contextResolves() {
+    mockPrisma.department.findUnique.mockResolvedValue({
+      name: "Biomed",
+      description: null,
+    });
     mockPrisma.debrief.findFirst.mockResolvedValue(null);
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
     mockPrisma.debrief.update.mockResolvedValue({ id: "run-1" });
+  }
+
+  it("beats before the scout, not only after it", async () => {
+    // The staleness bound reads updatedAt. A touch that lands only after a
+    // multi-minute scout measures age, not progress, and a second click
+    // meanwhile opens a duplicate run that pays for its own scout and writer.
+    contextResolves();
+    const order: string[] = [];
+    mockScout.mockImplementation(async () => {
+      order.push("scout");
+      return "findings";
+    });
+    mockPrisma.debrief.update.mockImplementation(
+      async (args: { data: { status?: string } }) => {
+        if (args.data.status === "Generating") order.push("beat");
+        return { id: "run-1" };
+      },
+    );
+    mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
+    const { step } = makeStep();
+
+    await deptDebrief.handler({ event: event({}), step });
+
+    expect(order.indexOf("beat")).toBeLessThan(order.indexOf("scout"));
+  });
+
+  it("surfaces the real error when the row was deleted mid-run", async () => {
+    // A department deleted mid-run cascades to its debriefs, so the mark-failed
+    // update throws P2025. That must not replace the cause with "record not
+    // found".
+    contextResolves();
+    mockWriter.mockRejectedValue(new Error("model refused"));
+    mockPrisma.debrief.update.mockImplementation(
+      async (args: { data: { status?: string } }) => {
+        if (args.data.status === "Failed") {
+          throw new Error(
+            "An operation failed because it depends on one or more records that were required but not found",
+          );
+        }
+        return { id: "run-1" };
+      },
+    );
     const { step } = makeStep();
 
     await expect(
-      deptDebrief.handler({
-        event: event({ findings: "f" }),
-        step,
-      }),
-    ).rejects.toThrow(/not found/);
-
-    const persisted = mockPrisma.debrief.update.mock.calls.at(-1)?.[0];
-    expect(persisted.data.status).toBe("Failed");
+      deptDebrief.handler({ event: event({ findings: "f" }), step }),
+    ).rejects.toThrow("model refused");
   });
 });

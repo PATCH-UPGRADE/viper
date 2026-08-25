@@ -41,9 +41,9 @@ export type DebriefClaim = {
  * and the nightly cron cannot disagree. Returns the active run untouched when
  * one exists, otherwise opens a fresh `Generating` row carrying `since`.
  *
- * Not atomic: two genuinely concurrent callers can both pass the in-flight
- * check and create a row. Closing that needs a partial unique index on
- * (departmentId) where status = 'Generating' — a migration, tracked separately.
+ * Serialised per department by an advisory lock, so two concurrent callers
+ * cannot both open a run — see the body for why a lock rather than a partial
+ * unique index.
  */
 export async function claimDebriefRun(
   departmentId: string,

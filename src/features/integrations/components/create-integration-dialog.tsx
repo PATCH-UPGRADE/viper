@@ -47,7 +47,9 @@ const zodForSpec = (spec: FieldSpec): z.ZodTypeAny => {
         ? z.coerce.number()
         : spec.kind === "url"
           ? z.string().url()
-          : z.string().min(1);
+          : spec.required
+            ? z.string().min(1)
+            : z.string();
   return spec.required ? field : field.optional();
 };
 

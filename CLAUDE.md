@@ -57,13 +57,16 @@ npm run format
 
 ## Technology Stack
 
-- **Framework**: Next.js 15.5.4 with App Router, React 19, TypeScript (strict mode)
-- **API Layer**: tRPC 11.6.0 for end-to-end type-safe APIs
-- **Database**: Prisma 6.16.3 with PostgreSQL
-- **Authentication**: Better Auth 1.3.26
-- **Background Jobs**: Inngest 3.44.1
+> `package.json` is the source of truth for version info
+
+- **Framework**: Next.js 15 with App Router, React 19, TypeScript (strict mode)
+- **API Layer**: tRPC 11 for end-to-end type-safe APIs
+- **Database**: Prisma 6 with PostgreSQL
+- **Authentication**: Better Auth 1.x
+- **Background Jobs**: Inngest 3.x
+- **Testing**: Vitest 4 (jsdom for unit/component, node for server-side)
 - **State Management**: Jotai (global), TanStack Query (server), nuqs (URL)
-- **Visual Editor**: XYFlow React 12.8.6
+- **Visual Editor**: XYFlow React 12
 - **UI**: Radix UI + Tailwind CSS 4 + shadcn/ui (New York style)
 - **AI / Chat**: LangGraph + LangChain (`ChatAnthropic`) for the chat & recommendations agents, streamed to the client via Vercel AI SDK UI (`useChat`)
 - **AI Providers**: Vercel AI SDK with Anthropic, OpenAI, Google
@@ -201,20 +204,12 @@ expired-token cleanup. The AI chat does **not** run in Inngest — see "AI Agent
 - Use `step.sleep()` for delays
 - Automatic retry and observability built-in
 
-**API Route** (`src/app/api/inngest/route.ts`):
+**API Route** (`src/app/api/inngest/route.ts`): every function must be added to the `functions`
+array passed to `serve()`, or it will never run.
 
-```typescript
-export const { GET, POST, PUT } = serve({
-  client: inngest,
-  functions: [
-    syncAllIntegrations,
-    syncIntegration,
-    enrichVulnerability,
-    enrichAllVulnerabilities,
-    purgeExpiredTokensFn,
-  ],
-});
-```
+Integration syncs are the one group that is *not* extended by editing these files: adding a
+platform never touches `src/inngest/functions/sync-integrations.ts`. See
+`src/features/integrations/CLAUDE.md` if necessary.
 
 **Development**: Run `npm run inngest:dev` (or `npm run dev:all`) to start the Inngest dev server
 
@@ -371,34 +366,56 @@ of the conversation.
 - `prisma/schema.prisma` - Database schema definition
 - `src/lib/db.ts` - Prisma client singleton
 
-**VMP Documentation**:
-
-- `docs/technical-overview.md` - VMP technical architecture and node design
-- `docs/upgrade-baa.pdf` - ARPA-H BAA funding requirements and mission
-
 ## VMP-Specific Development Guidelines
 
 ### Healthcare Data Compliance
 
 - **PHI/PII Protection**: All patient and facility data must comply with HIPAA
-- **Clinical Safety**: Life-safety workflows (identified by `life_safety=true` flag) require additional approval gates
-- **Audit Trail**: All workflow executions, approvals, and decisions must be logged
 - **Section 508**: All UI components must meet accessibility requirements
-
-### Hospital Digital Twin Modeling
-
-When modeling hospital systems:
-
-- **Nodes represent clinical functions**, not just network devices
-- **Edges represent dependencies** (data flow or workflow dependencies)
-- **Attributes include**:
-  - Vulnerability scores (CVSS)
-  - Patch status
-  - Uptime requirements (SLA)
-  - Regulatory criticality
-  - Clinical impact (life_safety flag)
 
 ### Testing Requirements
 
 - **Unit tests**: All AI prompts with golden samples
 - **Validation**: Time calculations, risk metrics, downtime estimates must be deterministic and testable
+
+## Testing
+
+Most of the suite is ordinary unit tests, but the API tests in `src/app/api/v1/__tests__/` drive a
+**live server over HTTP** with supertest. They are not excluded from the default vitest project, so
+a bare `npm run test` without `API_KEY` throws at import time. The full local run:
+
+```bash
+npm run db:create-test-api-key
+```
+
+That prints `API_KEY=<key>`. It requires the seed user (`user@example.com`). The key lasts 24 hours.
+
+The server must be started, since the API tests hit `http://localhost:3000`:
+
+```bash
+API_KEY=<key> npm run test -- --run
+```
+
+`npm run test` is bare `vitest`, i.e. **watch mode** — pass `-- --run` for a terminating one-shot
+run. `.github/workflows/ci.yml` (job `run-npm-tests`) is the canonical version of this recipe.
+
+**Integration suite**: `npm run test:integration` runs `tests/integration/` under
+`vitest.integration.config.mts` (node environment). It is a separate cross-service suite against
+Blueflow with its own env vars — `VIPER_API_URL`, `VIPER_API_KEY`, `BLUEFLOW_URL`,
+`VIPER_CALLBACK_URL` — and its own token script, `npm run db:create-blueflow-integration`.
+
+**Conventions**:
+
+- `vitest.config.mts` is jsdom, sets a 60s timeout, aliases `@` → `src`, and stubs `server-only`.
+- Files are `*.test.ts` / `*.test.tsx`; integration suites are `*.integration.test.ts`. Both
+  colocation styles exist — a `__tests__/` sibling directory or the file next to its source.
+- Server-side tests opt out of jsdom per file:
+
+```typescript
+// @vitest-environment node
+vi.mock("server-only", () => ({}));
+```
+
+  `src/inngest/functions/__tests__/sync-integrations.test.ts` is a good model — it mocks `@/lib/db`
+  and stubs `createFunction` to return the raw handler, so an Inngest function can be driven with a
+  fake `step`.

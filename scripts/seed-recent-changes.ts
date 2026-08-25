@@ -252,7 +252,7 @@ async function seed() {
                   create: {
                     integrationId: integration.id,
                     externalId: `${TAG}-${groupIndex}-${i}`,
-                    upstreamApi: "seed"
+                    upstreamApi: "seed",
                   },
                 },
               }

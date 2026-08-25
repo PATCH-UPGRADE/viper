@@ -13,6 +13,7 @@ import { FLEET_HOST } from "./constants";
  * code, not in the database. So a Fleet URL change is a one-line edit here, and
  * never a data migration.
  */
+// TODO: VW-432, move this to apiUrlFor / webUrlFor on work order resource module
 export function fleetWorkOrderDetailUrl(externalId: string): string {
   return `https://${FLEET_HOST}/activities/${encodeURIComponent(externalId)}/overview`;
 }

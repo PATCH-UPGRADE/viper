@@ -14,6 +14,22 @@ import {
 import { connectManagedAssets } from "./manages-relationship";
 import { createFleetSession } from "./session";
 
+// A device group carrying a CPE was built by a richer source (a network scanner,
+// a TA3 upload) and outranks the name-derived group Fleet can offer.
+async function equipmentKeysWeMayRegroup(
+  integrationId: string,
+): Promise<Set<string>> {
+  const mappingsToNameDerivedGroups =
+    await prisma.externalAssetMapping.findMany({
+      where: {
+        integrationId,
+        item: { deviceGroup: { cpe: { isEmpty: true } } },
+      },
+      select: { externalId: true },
+    });
+  return new Set(mappingsToNameDerivedGroups.map((m) => m.externalId));
+}
+
 async function ingestFleetAssets(
   items: FleetAssetItem[],
   integrationId: string,
@@ -23,6 +39,8 @@ async function ingestFleetAssets(
     select: { integrationUserId: true },
   });
   const weakSerials = computeWeakSerials(items);
+  const regroupableEquipmentKeys =
+    await equipmentKeysWeMayRegroup(integrationId);
 
   const assetsAlreadyMapped = await prisma.asset.findMany({
     where: {
@@ -60,7 +78,9 @@ async function ingestFleetAssets(
         };
         return {
           createData: { ...fields, deviceGroupId: deviceGroup.id, userId },
-          updateData: fields,
+          updateData: regroupableEquipmentKeys.has(item.vendorId)
+            ? { ...fields, deviceGroupId: deviceGroup.id }
+            : fields,
           uniqueFieldConditions:
             item.serialNumber && !weakSerials.has(item.serialNumber)
               ? [{ serialNumber: item.serialNumber }]

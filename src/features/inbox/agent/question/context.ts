@@ -41,6 +41,7 @@ function renderQuestionPrompt(args: {
     matching: MatchingWithRefs;
     assetCount: number;
     statusNotes: string | null;
+    managingVendors: string[];
   }>;
   notes: NoteRow[];
   labels: NoteTargetLabels;
@@ -78,6 +79,7 @@ function renderQuestionPrompt(args: {
             `- Issue  ${r.issueId} - ${r.cve}`,
             `- Device: ${deviceGroupMatchingLabel(r.matching)}`,
             ` - Assets affected: ${r.assetCount}`,
+            ` - Managed by: ${r.managingVendors.length ? r.managingVendors.join(", ") : "(nobody on file - no vendor manages these assets)"}`,
             ` - Why this is under investigation: ${r.statusNotes ?? "(no reason recorded)"}`,
           ].join("\n"),
         )
@@ -115,6 +117,48 @@ function buildNoteLabels(args: {
       ),
     ),
   };
+}
+
+async function gatherManagingVendors(
+  assetIdsByMatching: Map<string, Set<string>>,
+): Promise<Map<string, string[]>> {
+  const allAssetIds = new Set<string>();
+
+  for (const assetIds of assetIdsByMatching.values()) {
+    for (const assetId of assetIds) {
+      allAssetIds.add(assetId);
+    }
+  }
+  const result = new Map<string, string[]>();
+
+  if (allAssetIds.size === 0) return result;
+
+  const relationships = await prisma.managesRelationship.findMany({
+    where: {
+      vendorId: { not: null },
+      assets: { some: { id: { in: [...allAssetIds] } } },
+    },
+    select: {
+      vendor: { select: { canonicalDisplayName: true } },
+      assets: { where: { id: { in: [...allAssetIds] } }, select: { id: true } },
+    },
+  });
+
+  for (const [matchingId, assetIds] of assetIdsByMatching) {
+    const names = new Set<string>();
+    for (const rel of relationships) {
+      if (!rel.vendor) continue;
+      const coversThisMatching = rel.assets.some((asset) =>
+        assetIds.has(asset.id),
+      );
+
+      if (coversThisMatching) {
+        names.add(rel.vendor.canonicalDisplayName);
+      }
+    }
+    result.set(matchingId, [...names].sort());
+  }
+  return result;
 }
 
 export async function gatherQuestionContext(
@@ -183,9 +227,19 @@ export async function gatherQuestionContext(
   for (const matching of matchings) {
     groupsByMatching.set(
       matching.id,
-      candidateGroups.filter((g) => matchingAppliesToDeviceGroup(matching, g)),
+      candidateGroups.filter((grp) =>
+        matchingAppliesToDeviceGroup(matching, grp),
+      ),
     );
   }
+
+  const assetIdsByMatching = new Map<string, Set<string>>();
+  for (const [matchingId, groups] of groupsByMatching) {
+    const ids = groups.flatMap((g) => g.assets.map((a) => a.id));
+    assetIdsByMatching.set(matchingId, new Set<string>(ids));
+  }
+
+  const vendorsByMatching = await gatherManagingVendors(assetIdsByMatching);
 
   const issues: QuestionIssueContext[] = [];
   type IssueRender = {
@@ -194,6 +248,7 @@ export async function gatherQuestionContext(
     matching: MatchingWithRefs;
     assetCount: number;
     statusNotes: string | null;
+    managingVendors: string[];
   };
   const issueRenders: IssueRender[] = [];
 
@@ -206,6 +261,8 @@ export async function gatherQuestionContext(
       const groups = groupsByMatching.get(matching.id) ?? [];
 
       issues.push({ issueId: issue.id, vulnerabilityId: v.id });
+      const managingVendors: string[] =
+        vendorsByMatching.get(matching.id) ?? [];
 
       issueRenders.push({
         issueId: issue.id,
@@ -216,6 +273,7 @@ export async function gatherQuestionContext(
           0,
         ),
         statusNotes: issue.statusNotes,
+        managingVendors,
       });
     }
   }
@@ -251,7 +309,7 @@ export async function gatherQuestionContext(
 
 export const SYSTEM_PROMPT = `You are drafting clarifying questions for a hospital security engineer, for vulnerability issues a triage agent already marked "under investigation" because it lacked enough information to decide if the vulnerability is exploitable.
 For each issue, use the stated reason it's under investigation to write ONE specific, answerable question - never a vague "please provide more information." Include 2-6 short suggested answers a user could pick instead of typing. Ground every question in the evidence given; never invent facts about the device or vulnerability.
-For each question also record who could answer it: MANUFACTURER if the company that built the device could answer from product knowledge alone, VENDOR if it depends on how this hospital's own units are deployed or configured.
+For each question also record who could answer it: MANUFACTURER if the company that built the device could answer from product knowledge alone, VENDOR if it depends on how this hospital's own units are deployed, configured or serviced. Each issue lists who manages its assets - when nobody is on file, a VENDOR question has nowhere to be sent, so choose MANUFACTURER unless the question is genuinely unanswerable without deployment knowledge.
 Omit any issue you don't have a good, specific question for.`;
 
 export async function gatherQuestionContextForIssue(
@@ -295,6 +353,11 @@ export async function gatherQuestionContextForIssue(
   const assetIds = [
     ...new Set(groups.flatMap((g) => g.assets.map((a) => a.id))),
   ];
+  const assetIdsByMatching = new Map<string, Set<string>>();
+  assetIdsByMatching.set(matching.id, new Set<string>(assetIds));
+
+  const vendorsByMatching = await gatherManagingVendors(assetIdsByMatching);
+  const managingVendors: string[] = vendorsByMatching.get(matching.id) ?? [];
 
   const notes = await getRelevantNotes({
     vulnerabilityIds: [issue.vulnerabilityId],
@@ -322,6 +385,7 @@ export async function gatherQuestionContextForIssue(
           matching,
           assetCount: groups.reduce((n, g) => n + g.assets.length, 0),
           statusNotes: issue.statusNotes,
+          managingVendors,
         },
       ],
       notes,

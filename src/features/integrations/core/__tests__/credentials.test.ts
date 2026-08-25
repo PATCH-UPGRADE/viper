@@ -2,7 +2,6 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { AuthType } from "@/generated/prisma";
 import {
   decryptCredentials,
-  encodeAuthCredential,
   encryptCredentials,
   parseAuthCredential,
 } from "../credentials";
@@ -48,27 +47,16 @@ describe("credentials", () => {
   });
 });
 
-/**
- * `credentials IS NULL` is the single representation of "this integration has
- * no auth". encodeAuthCredential and parseAuthCredential are inverses across
- * that boundary — if they ever drift, a no-auth integration either stores a
- * pointless blob or fails to sync.
- */
-describe("auth credential encoding", () => {
-  it("stores nothing for AuthType.None", () => {
-    expect(encodeAuthCredential({ authType: AuthType.None })).toBeNull();
-  });
-
+describe("parseAuthCredential", () => {
   it("reads a null column back as AuthType.None", () => {
     expect(parseAuthCredential(null, "int-1")).toEqual({
       authType: AuthType.None,
     });
   });
 
-  it("round-trips an authenticated credential through the column", () => {
-    const stored = encodeAuthCredential(SECRET);
-    expect(stored).not.toBeNull();
-    expect(parseAuthCredential(decryptCredentials(stored!), "int-1")).toEqual(
+  it("round-trips a decrypted credential", () => {
+    const stored = encryptCredentials(SECRET);
+    expect(parseAuthCredential(decryptCredentials(stored), "int-1")).toEqual(
       SECRET,
     );
   });

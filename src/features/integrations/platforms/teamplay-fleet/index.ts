@@ -18,6 +18,8 @@ export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
   definition: {
     platform: PlatformEnum.FLEET,
     displayName: SIEMENS_HEALTHINEERS,
+    description: "Sync device and service data from teamplay Fleet.",
+    categories: ["Hospital Inventory", "Notifications", "Ticketing Platforms"],
     configSchema,
     credentialSchema,
   },

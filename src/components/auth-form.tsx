@@ -1,5 +1,4 @@
-import type { UseFormReturn } from "react-hook-form";
-import type { z } from "zod";
+import type { FieldValues, Path, UseFormReturn } from "react-hook-form";
 import {
   FormControl,
   FormDescription,
@@ -19,29 +18,36 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AuthType } from "@/generated/prisma";
-import type { authSchema } from "@/lib/schemas";
 
-type AuthenticationFormValues = z.infer<typeof authSchema>;
-
-interface AuthenticationFieldsProps {
-  form: UseFormReturn<AuthenticationFormValues>;
+interface AuthenticationFieldsProps<TFieldValues extends FieldValues> {
+  form: UseFormReturn<TFieldValues>;
+  name?: string;
 }
 
-export const AuthenticationFields = ({ form }: AuthenticationFieldsProps) => {
-  const authType = form.watch("authType");
+export const AuthenticationFields = <TFieldValues extends FieldValues>({
+  form,
+  name,
+}: AuthenticationFieldsProps<TFieldValues>) => {
+  const path = (field: string) =>
+    (name ? `${name}.${field}` : field) as Path<TFieldValues>;
+
+  const authType = form.watch(path("authType")) as AuthType;
 
   return (
     <>
       <FormField
         control={form.control}
-        name="authType"
+        name={path("authType")}
         render={({ field }) => (
           <FormItem>
             <FormLabel>Authentication Type *</FormLabel>
             <FormDescription>
               Authentication method for API access
             </FormDescription>
-            <Select value={field.value} onValueChange={field.onChange}>
+            <Select
+              value={field.value as AuthType}
+              onValueChange={field.onChange}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select authentication type" />
               </SelectTrigger>
@@ -65,7 +71,7 @@ export const AuthenticationFields = ({ form }: AuthenticationFieldsProps) => {
         <>
           <FormField
             control={form.control}
-            name="authentication.username"
+            name={path("authentication.username")}
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Username *</FormLabel>
@@ -78,7 +84,7 @@ export const AuthenticationFields = ({ form }: AuthenticationFieldsProps) => {
           />
           <FormField
             control={form.control}
-            name="authentication.password"
+            name={path("authentication.password")}
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Password *</FormLabel>
@@ -95,7 +101,7 @@ export const AuthenticationFields = ({ form }: AuthenticationFieldsProps) => {
       {authType === "Bearer" && (
         <FormField
           control={form.control}
-          name="authentication.token"
+          name={path("authentication.token")}
           render={({ field }) => (
             <FormItem>
               <FormLabel>Token *</FormLabel>
@@ -112,7 +118,7 @@ export const AuthenticationFields = ({ form }: AuthenticationFieldsProps) => {
         <>
           <FormField
             control={form.control}
-            name="authentication.header"
+            name={path("authentication.header")}
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Header Name *</FormLabel>
@@ -125,7 +131,7 @@ export const AuthenticationFields = ({ form }: AuthenticationFieldsProps) => {
           />
           <FormField
             control={form.control}
-            name="authentication.value"
+            name={path("authentication.value")}
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Header Value *</FormLabel>

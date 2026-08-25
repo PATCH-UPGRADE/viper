@@ -13,6 +13,7 @@
     "db:seed": "prisma db seed",
     "db:create-test-api-key": "tsx scripts/create-test-api-key.ts",
     "db:create-blueflow-integration": "tsx scripts/create-blueflow-integration.ts",
+    "db:set-fleet-credentials": "tsx --env-file=.env scripts/set-fleet-credentials.ts",
     "openapi:generate": "tsx scripts/generate-openapi.ts",
     "postinstall": "prisma generate",
     "test": "vitest",

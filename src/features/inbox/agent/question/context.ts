@@ -88,7 +88,9 @@ function renderQuestionPrompt(args: {
 }
 
 function buildNoteLabels(args: {
-  groups: { assets: { id: string; hostname: string | null; ip: string }[] }[];
+  groups: {
+    assets: { id: string; hostname: string | null; ip: string | null }[];
+  }[];
   matchings: MatchingWithRefs[];
   vulnerabilities: { id: string; cveId: string | null }[];
 }): NoteTargetLabels {

@@ -1391,18 +1391,30 @@ async function seedFleetIntegration(userId: string) {
       data: {
         name: "Siemens Healthineers teamplay Fleet",
         platform: PlatformEnum.FLEET,
-        // TODO VW-431 ensure this works with teamplay fleet config
-        // or modify as needed
-        config: {
-          integrationUri:
-            "https://fleet.siemens-healthineers.com/rest/v1/activities?tz=-05:00",
-        },
+        config: {},
         syncEvery: 3600,
         userId,
         integrationUserId: integrationUser.id,
-        resourceSyncs: { create: { resource: ResourceType.WorkOrder } },
+        resourceSyncs: {
+          create: [
+            { resource: ResourceType.WorkOrder },
+            { resource: ResourceType.Asset },
+          ],
+        },
       },
     }));
+
+  // A re-seed against an existing integration must still gain any sync rows
+  // added since it was first created (e.g. Asset, VW-434).
+  for (const resource of [ResourceType.WorkOrder, ResourceType.Asset]) {
+    await prisma.integrationResourceSync.upsert({
+      where: {
+        integrationId_resource: { integrationId: integration.id, resource },
+      },
+      create: { integrationId: integration.id, resource },
+      update: {},
+    });
+  }
 
   let linked = 0;
   for (const equipment of SEED_FLEET_EQUIPMENT) {

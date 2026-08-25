@@ -60,7 +60,7 @@ export const assetArrayInputSchema = z.object({
 
 export const assetResponseSchema = z.object({
   id: z.string(),
-  ip: z.string(),
+  ip: z.string().nullable(),
   deviceGroup: deviceGroupWithUrlsSchema,
   role: z.string().nullable(),
   externalMappings: z.array(

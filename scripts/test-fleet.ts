@@ -3,7 +3,7 @@ import {
   FLEET_LOGIN_CONFIG,
   grabSessionCookie,
 } from "@/features/integrations/platforms/teamplay-fleet/session";
-import { PlatformEnum } from "@/generated/prisma";
+import { AuthType, PlatformEnum } from "@/generated/prisma";
 import prisma from "../src/lib/db";
 
 const ADVISORIES_URL =
@@ -40,9 +40,10 @@ async function main() {
   );
 
   console.log("--- creteFleetSession ---");
-  const session = await createFleetSession(integration.id, {
-    username,
-    password,
+  console.log("integration:", integration.id);
+  const session = await createFleetSession({
+    authType: AuthType.Basic,
+    authentication: { username, password },
   });
   console.time("first advisory request");
   const advisoryFirst = await session.request(ADVISORIES_URL);

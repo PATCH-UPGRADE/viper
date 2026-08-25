@@ -1140,7 +1140,7 @@ export const trackingRouter = createTRPCRouter({
           filed.push({ asset, result });
         } catch (error) {
           failures.push({
-            asset: asset.hostname ?? asset.ip,
+            asset: asset.hostname ?? asset.ip ?? asset.assetId,
             message: error instanceof Error ? error.message : "Unknown error",
           });
         }

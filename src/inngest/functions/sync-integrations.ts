@@ -161,6 +161,7 @@ export const syncIntegration = inngest.createFunction(
         );
 
         const ctx: SyncCtx = {
+          integrationId,
           config,
           creds,
           resource,

@@ -318,7 +318,7 @@ const assigneeItemSchema = z.object({
 const linkedAssetSchema = z.object({
   id: z.string(),
   hostname: z.string().nullable(),
-  ip: z.string(),
+  ip: z.string().nullable(),
   role: z.string().nullable(),
 });
 

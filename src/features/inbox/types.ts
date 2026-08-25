@@ -78,7 +78,7 @@ type NotificationDetailBasePayload = Prisma.NotificationGetPayload<{
 
 export type ResolvedDeviceGroupAsset = {
   id: string;
-  ip: string;
+  ip: string | null;
   hostname: string | null;
   location: unknown;
   version: string | null;

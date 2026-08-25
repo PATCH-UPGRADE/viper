@@ -89,7 +89,7 @@ export async function getFleetWorkOrderIntegration() {
 export interface FleetManagedAsset {
   assetId: string;
   hostname: string | null;
-  ip: string;
+  ip: string | null;
   role: string | null;
   /** Fleet's identifier for the physical device (activities carry it too). */
   equipmentKey: string;

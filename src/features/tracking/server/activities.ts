@@ -284,7 +284,7 @@ export async function recordAssetActivity(
   userId: string,
   assetId: string,
   action: "attached" | "detached",
-  asset: { hostname: string | null; ip: string },
+  asset: { hostname: string | null; ip: string | null },
 ): Promise<void> {
   await tx.ticketActivity.create({
     data: {

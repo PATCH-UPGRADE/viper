@@ -47,19 +47,29 @@ export interface UrlBuilders<TConfig = unknown> {
 
 /**
  * One resource on a platform whose protocol *we* speak (Fleet, ServiceNow).
- * A platform owns whatever client its methods need, including session abstratction
+ * A platform owns whatever client its methods need, including the session abstraction
  */
+export interface Session {
+  request(url: string, init?: RequestInit): Promise<Response>;
+}
+
 export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
   extends UrlBuilders<TConfig> {
   // we pull from their platform
-  listChanged(cursor: Cursor | null): AsyncIterable<Page<TRaw>>;
-  // TODO: VW-433: can change `listChanged` schema if it doesn't work for fleet
-  get(externalId: string): Promise<TRaw>;
+  listChanged(
+    session: Session,
+    cursor: Cursor | null,
+  ): AsyncIterable<Page<TRaw>>;
+  get(session: Session, externalId: string): Promise<TRaw>;
   toCanonical(raw: TRaw, config: TConfig): TCanonical;
 
   // we push to their platform
-  create?(draft: TCanonical): Promise<{ externalId: string; raw: TRaw }>;
+  create?(
+    session: Session,
+    draft: TCanonical,
+  ): Promise<{ externalId: string; raw: TRaw }>;
   update?(
+    session: Session,
     externalId: string,
     patch: Partial<TCanonical>,
   ): Promise<{ externalId: string; raw: TRaw }>;
@@ -72,6 +82,7 @@ export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
  * Everything one `(integration, resource)` sync attempt needs.
  */
 export interface SyncCtx<TConfig = unknown, TCreds = unknown> {
+  integrationId: string;
   config: TConfig;
   /** `ai` forwards these to n8n, which authenticates as us. That is the point. */
   creds: TCreds;

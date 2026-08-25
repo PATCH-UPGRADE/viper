@@ -38,12 +38,24 @@ export type DebriefLink = z.infer<typeof debriefLinkSchema>;
 
 export const DEBRIEF_PLACEHOLDER = /\{\{(\d+)\}\}/g;
 
-export const debriefBulletSchema = z
-  .object({
-    text: z.string().min(1).max(400),
-    links: z.array(debriefLinkSchema).max(3),
-  })
-  .superRefine((bullet, ctx) => {
+/**
+ * Structural shape only, without the placeholder invariant.
+ *
+ * This is what the writer agent is asked to emit. `superRefine` cannot be
+ * expressed in JSON Schema, so a refinement here would not constrain the model
+ * — it would only throw after the fact and lose the whole run. The agent emits
+ * a draft, `validate.ts` repairs it, and the repaired result must then satisfy
+ * `debriefBulletSchema` below before anything is stored.
+ */
+export const debriefBulletDraftSchema = z.object({
+  text: z.string().min(1).max(400),
+  links: z.array(debriefLinkSchema).max(3),
+});
+
+export type DebriefBulletDraft = z.infer<typeof debriefBulletDraftSchema>;
+
+export const debriefBulletSchema = debriefBulletDraftSchema.superRefine(
+  (bullet, ctx) => {
     const used = new Set(
       [...bullet.text.matchAll(DEBRIEF_PLACEHOLDER)].map((m) => Number(m[1])),
     );
@@ -65,7 +77,8 @@ export const debriefBulletSchema = z
         });
       }
     });
-  });
+  },
+);
 
 export type DebriefBullet = z.infer<typeof debriefBulletSchema>;
 

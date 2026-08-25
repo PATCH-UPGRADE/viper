@@ -14,8 +14,6 @@ import {
 import { connectManagedAssets } from "./manages-relationship";
 import { createFleetSession } from "./session";
 
-// A device group carrying a CPE was built by a richer source (a network scanner,
-// a TA3 upload) and outranks the name-derived group Fleet can offer.
 async function equipmentKeysWeMayRegroup(
   integrationId: string,
 ): Promise<Set<string>> {

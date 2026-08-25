@@ -1136,8 +1136,35 @@ model Department {
   users              User[]
   tickets            WorkOrderTicket[]   @relation("WorkOrderTicketDepartments")
   ticketDescriptions TicketDescription[]
+  debriefs           Debrief[]
 
   @@map("department")
+}
+
+enum DebriefStatus {
+  Generating
+  Ready
+  Failed
+}
+
+model Debrief {
+  id           String        @id @default(cuid())
+  departmentId String
+  department   Department    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  status       DebriefStatus @default(Generating)
+  /// DebriefBullet[] — validated by debriefBulletsSchema in src/features/debrief/types.ts
+  bullets      Json          @default("[]")
+  /// Model id that produced this debrief, for tracing quality changes.
+  model        String?
+  /// createdAt of the previous Ready debrief for this department.
+  since        DateTime?
+  /// Failure message when status is Failed.
+  error        String?       @db.Text
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([departmentId, createdAt])
+  @@map("debrief")
 }
 
 model CategoryColor {

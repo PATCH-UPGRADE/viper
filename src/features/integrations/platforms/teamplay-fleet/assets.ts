@@ -33,6 +33,16 @@ export interface FleetAssetItem {
 const blank = (value: string | null | undefined): string | null =>
   value ? value : null;
 
+// Fleet records carry placeholders in the serial field. Treating them as real
+// would match every placeholder-carrying machine onto one asset.
+const PLACEHOLDER_SERIALS = new Set(["n/a", "na", "none", "unknown", "-", "0"]);
+
+const serialNumberOf = (raw: string | null | undefined): string | null => {
+  const trimmed = raw?.trim();
+  if (!trimmed || PLACEHOLDER_SERIALS.has(trimmed.toLowerCase())) return null;
+  return trimmed;
+};
+
 async function fetchEquipments(session: Session): Promise<FleetEquipment[]> {
   const res = await session.request(EQUIPMENTS_URL);
   if (!res.ok) {
@@ -85,7 +95,7 @@ export const assets: ResourceModule<
       .join(", ");
     return {
       vendorId: raw.equipmentKey,
-      serialNumber: blank(raw.serialNumber),
+      serialNumber: serialNumberOf(raw.serialNumber),
       role: blank(raw.modalityTranslation),
       location: {
         ...(blank(raw.customerName)

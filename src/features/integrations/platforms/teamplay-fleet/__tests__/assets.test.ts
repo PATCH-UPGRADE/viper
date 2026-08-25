@@ -78,6 +78,23 @@ describe("listChanged", () => {
   });
 });
 
+describe("serial numbers", () => {
+  it("trims surrounding whitespace", () => {
+    expect(
+      canonical({ ...SAMPLE[0], serialNumber: "  63014 " }).serialNumber,
+    ).toBe("63014");
+  });
+
+  it.each(["N/A", "n/a", "UNKNOWN", "none", "-", "0", "   "])(
+    "treats %s as no serial at all",
+    (placeholder) => {
+      expect(
+        canonical({ ...SAMPLE[0], serialNumber: placeholder }).serialNumber,
+      ).toBeNull();
+    },
+  );
+});
+
 describe("computeWeakSerials", () => {
   it("flags serials shared by two Fleet records", () => {
     // Syngo Carbon installs share one serial across components (real tenant data).

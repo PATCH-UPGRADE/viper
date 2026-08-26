@@ -24,7 +24,7 @@ export function buildEscalationEmailSchema(
     contactIds: z
       .array(contactId)
       .describe(
-        "Contact ids belonging to the relationship you chose. Empty array when no listed contact clearly fits, and always when vendorId is null.",
+        "Contact ids belonging to the relationship you chose. Empty array when no listed contact clearly fits, and always when managesRelationshipId is null.",
       ),
     reasonWhy: z
       .string()

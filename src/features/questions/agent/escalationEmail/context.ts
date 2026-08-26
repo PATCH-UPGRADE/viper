@@ -122,7 +122,7 @@ function renderEscalationPrompt({
   const targetSection =
     audience === "VENDOR"
       ? [
-          "## Who manges these assets",
+          "## Who mangaes these assets",
           "Each entry is a management relationship the hospital has on file. Pick the one whose responsibilities cover the subject of the question.",
           "",
           ...relationships.map((rel) => {
@@ -177,9 +177,6 @@ export async function gatherEscalationContext(
   const device = await resolveIssueDevice(question.issue);
   if (!device) return null;
 
-  const matching = question.issue.deviceGroupMatching;
-  if (!matching) return null;
-
   const relationships =
     audience === "VENDOR" ? await gatherRelationships(device.assetIds) : [];
 
@@ -191,7 +188,7 @@ export async function gatherEscalationContext(
     productName: device.productName,
     relationships,
     markdown: renderEscalationPrompt({
-      audience,
+      audience: finalAudience,,
       device,
       question,
       relationships,

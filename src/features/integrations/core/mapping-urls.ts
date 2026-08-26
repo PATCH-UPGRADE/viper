@@ -7,16 +7,31 @@ import { resolveUpstreamApi, resolveWebUrl } from "./urls";
  *
  * Helper for a prisma query extension.
  *
- * Prisma query extensions fire on the *top-level* operation only, so rather
- * than hooking every model that can nest one of these (issue -> asset ->
- * externalMappings, and so on) this reads the query's own `select` / `include`
- * tree to find where mappings will land.
+ * Walk Prisma's DMMF (Data Model Meta Format), which lists which specific models
+ * are used by each field explicitly
+ * If we did not use DMMF, that would be a problem, we wouldn't know what model
+ * we're working with from field name alone. For example, two fields may be called `assets`,
+ * but one may refer to `Asset[]`, the other `AssetTicket[]`, or `NotificationAssetMapping[]`
+ * 
+ * For each model, see if we need to update the upstreamApiUrl /webUrl by keying on
+ * RESOURCE_BY_MAPPING_MODEL. If we don't get anything (most fields are like this) we 
+ * just skip. If we *do* have something we need to change, then:
+ * * use loadIntegrations to get the integrations from a cache
+ * * get the platforms an integration uses, and load its url builders
+ *    * we do this by importing registry.ts lazily, so non-server modules don't 
+ *      throw an error.
+ * * use resolveUpstreamApi / resolveWebUrl to replace the url in place
+ * * profit.
  *
- * The tree is walked against Prisma's DMMF rather than by matching relation
- * names, because names are ambiguous in this schema: `assets` is `Asset[]` on
- * `Issue`, `AssetTicket[]` on `WorkOrderTicket` and `NotificationAssetMapping[]`
- * on `SourceRecord`. Resolving each hop through the DMMF gives the mapping
- * model exactly, and the table below is then keyed on something unambiguous.
+ * Why do all of this? This means that if an integration changes its url schemas,
+ * we can just update the platform url resolver functions instead of having to
+ * migrate our db or do a backfill. By leaving this logic in a client extension,
+ * we know that anything that gets these urls from our db have the right urls.
+ * No need to have to call some resolve function every time we want to use
+ * an upstreamApiUrl / remember to do that, or import server-only functions
+ *
+ * Hopefully this leads to a better developer experience, while giving us a lot
+ * of control over what urls we render
  */
 
 /** Mapping model -> the resource whose module builds its urls. Total over the schema. */
@@ -65,6 +80,7 @@ const relationTarget = (model: string, field: string): string | undefined => {
   return relationIndex.get(`${model}.${field}`);
 };
 
+// Walks 
 const walk = (
   model: string,
   args: unknown,

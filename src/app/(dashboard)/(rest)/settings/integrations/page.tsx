@@ -5,7 +5,6 @@ import {
   IntegrationsList,
   IntegrationsLoading,
 } from "@/features/integrations/components/integrations";
-import { IntegrationsCatalog } from "@/features/integrations/components/integrations-catalog";
 import { catalogEntries } from "@/features/integrations/core/catalog";
 import { paginationParamsLoader } from "@/features/integrations/server/params-loader";
 import { prefetchIntegrations } from "@/features/integrations/server/prefetch";
@@ -25,12 +24,7 @@ const prefetchConnectorsPage = async (
 
 const CATALOG = catalogEntries();
 
-const ConnectorsPageContent = () => (
-  <div className="flex flex-col gap-10">
-    <IntegrationsList />
-    <IntegrationsCatalog catalog={CATALOG} />
-  </div>
-);
+const ConnectorsPageContent = () => <IntegrationsList catalog={CATALOG} />;
 
 export default createListPage({
   Container: IntegrationsContainer,

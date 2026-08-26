@@ -22,9 +22,11 @@ import { mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
 import { useSuspenseWebhooks } from "@/features/webhooks/hooks/use-webhooks";
 import { cn } from "@/lib/utils";
+import type { CatalogEntry } from "../core/catalog";
 import { useSuspenseIntegrations } from "../hooks/use-integrations";
 import { CATEGORIES } from "../types";
 import { IntegrationCard } from "./integration-row";
+import { IntegrationsCatalog } from "./integrations-catalog";
 
 const SECTIONS = ["Overview", ...CATEGORIES] as const;
 type Section = (typeof SECTIONS)[number];
@@ -123,12 +125,20 @@ const EnabledIntegrations = () => {
   );
 };
 
-export const IntegrationsList = () => (
-  <div className="flex gap-6">
-    <ConnectorsSidebar />
-    <EnabledIntegrations />
-  </div>
-);
+export const IntegrationsList = ({ catalog }: { catalog: CatalogEntry[] }) => {
+  const [section] = useSection();
+  const category = section === "Overview" ? undefined : section;
+
+  return (
+    <div className="flex gap-6">
+      <ConnectorsSidebar />
+      <div className="flex flex-col gap-10 flex-1 min-w-0">
+        <EnabledIntegrations />
+        <IntegrationsCatalog catalog={catalog} category={category} />
+      </div>
+    </div>
+  );
+};
 
 export const IntegrationsContainer = ({
   children,

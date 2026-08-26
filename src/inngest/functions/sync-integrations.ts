@@ -5,6 +5,7 @@ import { createCallback } from "@/features/integrations/core/callback";
 import {
   decryptCredentials,
   parseAuthCredential,
+  usesGenericAuth,
 } from "@/features/integrations/core/credentials";
 import {
   defaultSyncEveryFor,
@@ -14,15 +15,17 @@ import {
   computeNextSyncAt,
   effectiveSyncEvery,
 } from "@/features/integrations/core/sync/cadence";
-import type { SyncCtx } from "@/features/integrations/core/types";
+import { moduleForResource } from "@/features/integrations/core/sync/resources";
+import type { SyncCtx, SyncOutcome } from "@/features/integrations/core/types";
 import { Prisma, SyncStatusEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
 
 /**
  * The two Inngest functions that drive integration syncs.
- * TODO VW-437: Document in a CLAUDE.md file somewhere that adding a platform
- *    should not make changes to this file
+ *
+ * Platform-agnostic on purpose: everything specific reaches this file through
+ * the registry. Adding a platform should not make changes here.
  */
 
 export const syncAllIntegrations = inngest.createFunction(
@@ -149,14 +152,17 @@ export const syncIntegration = inngest.createFunction(
           where: { id: integrationId },
           select: { credentials: true },
         });
+        const decrypted = row?.credentials
+          ? decryptCredentials(row.credentials)
+          : null;
         const creds = module.definition.credentialSchema.parse(
-          parseAuthCredential(
-            row?.credentials ? decryptCredentials(row.credentials) : null,
-            integrationId,
-          ),
+          usesGenericAuth(module.definition.credentialSchema)
+            ? parseAuthCredential(decrypted, integrationId)
+            : (decrypted ?? {}),
         );
 
         const ctx: SyncCtx = {
+          integrationId,
           config,
           creds,
           resource,
@@ -167,7 +173,18 @@ export const syncIntegration = inngest.createFunction(
           callback: () => createCallback(loaded.integrationUserId, resource),
         };
 
-        const result = await module.sync(ctx);
+        // A resource module knows how to sync itself; a platform without one syncs
+        // at the platform level. Neither means the module is misconfigured, not
+        // that this tick should be quietly absorbed.
+        const resourceModule = moduleForResource(module, resource);
+        let result: SyncOutcome;
+        if (resourceModule) {
+          result = await resourceModule.sync(ctx);
+        } else if (module.sync) {
+          result = await module.sync(ctx);
+        } else {
+          throw new Error(`${loaded.platform} has no sync for ${resource}`);
+        }
         return {
           ok: true as const,
           cursor: (result.cursor ?? null) as unknown,

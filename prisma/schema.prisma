@@ -434,7 +434,7 @@ enum AssetStatus {
 
 model Asset {
   id             String  @id @default(cuid())
-  ip             String
+  ip             String?
   networkSegment String?
   role           String?
 

@@ -47,40 +47,35 @@ export interface UrlBuilders<TConfig = unknown> {
 
 /**
  * One resource on a platform whose protocol *we* speak (Fleet, ServiceNow).
- * A platform owns whatever client its methods need, including session abstratction
+ * A platform owns whatever client its methods need, including the session abstraction
  */
-export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
-  extends UrlBuilders<TConfig> {
-  // we pull from their platform
-  listChanged(cursor: Cursor | null): AsyncIterable<Page<TRaw>>;
-  // TODO: VW-433: can change `listChanged` schema if it doesn't work for fleet
-  get(externalId: string): Promise<TRaw>;
-  toCanonical(raw: TRaw, config: TConfig): TCanonical;
-
-  // we push to their platform
-  create?(draft: TCanonical): Promise<{ externalId: string; raw: TRaw }>;
-  update?(
-    externalId: string,
-    patch: Partial<TCanonical>,
-  ): Promise<{ externalId: string; raw: TRaw }>;
-
-  /** how often this resource should sync, in seconds. null = no opinion. */
-  defaultSyncEvery: number | null;
+export interface Session {
+  request(url: string, init?: RequestInit): Promise<Response>;
 }
 
 /**
- * Everything one `(integration, resource)` sync attempt needs.
+ * Everything one resource-module sync attempt needs.
+ * Assumed it uses the platform createSession module
  */
-export interface SyncCtx<TConfig = unknown, TCreds = unknown> {
+export interface ResourceSyncCtx<TConfig = unknown, TCreds = unknown> {
+  integrationId: string;
   config: TConfig;
   /** `ai` forwards these to n8n, which authenticates as us. That is the point. */
   creds: TCreds;
-  resource: ResourceType;
   cursor: Cursor | null;
   /** Where `partner`'s `since` comes from. */
   lastSuccessfulSync: Date | null;
   /** Mints a one-time upload token scoped to the shadow user + resource. */
   callback(): Promise<CallbackConfig>;
+}
+
+/**
+ * Everything one platform-level `(integration, resource)` sync attempt needs.
+ * Extend with resource for generic platforms
+ */
+export interface SyncCtx<TConfig = unknown, TCreds = unknown>
+  extends ResourceSyncCtx<TConfig, TCreds> {
+  resource: ResourceType;
 }
 
 /**
@@ -91,15 +86,56 @@ export interface SyncOutcome {
   pending?: boolean;
 }
 
-/** A strategy owns one `(integration, resource)` sync attempt end to end. */
+/**
+ * A platform-level strategy owns one `(integration, resource)` sync attempt end
+ * to end. Only for platforms with no resource modules — a platform that has them
+ * syncs per resource instead.
+ */
 export type SyncStrategy<TConfig = unknown, TCreds = unknown> = (
   ctx: SyncCtx<TConfig, TCreds>,
 ) => Promise<SyncOutcome>;
 
+/**
+ * The per-resource half of a platform whose protocol *we* speak.
+ */
+export interface ResourceModule<
+  TCanonical,
+  TRaw = unknown,
+  TConfig = unknown,
+  TCreds = unknown,
+> extends UrlBuilders<TConfig> {
+  /** How this resource syncs, end to end. May use the below as helpers */
+  sync(ctx: ResourceSyncCtx<TConfig, TCreds>): Promise<SyncOutcome>;
+
+  // we pull from their platform
+  listChanged?(
+    session: Session,
+    cursor: Cursor | null,
+  ): AsyncIterable<Page<TRaw>>;
+  get?(session: Session, externalId: string): Promise<TRaw>;
+  toCanonical?(raw: TRaw, config: TConfig): TCanonical;
+
+  // we push to their platform
+  create?(
+    session: Session,
+    draft: TCanonical,
+  ): Promise<{ externalId: string; raw: TRaw }>;
+  update?(
+    session: Session,
+    externalId: string,
+    patch: Partial<TCanonical>,
+  ): Promise<{ externalId: string; raw: TRaw }>;
+
+  /** how often this resource should sync, in seconds. null = no opinion. */
+  defaultSyncEvery: number | null;
+}
+
 export interface ConnectorDefinition<TConfig, TCreds> {
   platform: PlatformEnum;
   displayName: string;
-  /** Which connectors-sidebar sections this platform shows under. */
+  /** Shown on the platform's catalog card. */
+  description: string;
+  /** Which connectors-dashboard sections this platform shows under. */
   categories: Category[];
   /** Validates `Integration.config`. */
   configSchema: z.ZodType<TConfig>;
@@ -107,20 +143,24 @@ export interface ConnectorDefinition<TConfig, TCreds> {
   credentialSchema: z.ZodType<TCreds>;
 }
 
+/**
+ * A platform must supply *either* `sync` or at least one resource module. With
+ * resource modules, core dispatches to the one that owns the resource; without
+ * them, it falls back to `sync`.
+ */
 export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
   definition: ConnectorDefinition<TConfig, TCreds>;
 
   /**
-   * How this platform syncs, end to end. Whether it pulls or hands off is the
-   * strategy's business: a puller loops and returns the cursor it reached, a
+   * How this platform syncs, end to end, when it has no resource modules. A
    * pusher fires one request and returns `pending: true` so the row stays
    * `Pending` until the callback lands.
    */
-  sync: SyncStrategy<TConfig, TCreds>;
+  sync?: SyncStrategy<TConfig, TCreds>;
   onCreate?(): Promise<void>;
-  workOrders?: ResourceModule<unknown, unknown, TConfig>;
-  assets?: ResourceModule<unknown, unknown, TConfig>;
-  notifications?: ResourceModule<unknown, unknown, TConfig>;
+  workOrders?: ResourceModule<unknown, unknown, TConfig, TCreds>;
+  assets?: ResourceModule<unknown, unknown, TConfig, TCreds>;
+  notifications?: ResourceModule<unknown, unknown, TConfig, TCreds>;
 }
 
 /**

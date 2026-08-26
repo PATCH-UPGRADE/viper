@@ -8,10 +8,8 @@ import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
-import {
-  authCredentialSchema,
-  encodeAuthCredential,
-} from "../core/credentials";
+import type { AuthCredential } from "../core/credentials";
+import { encryptCredentials, usesGenericAuth } from "../core/credentials";
 import {
   categoriesFor,
   defaultSyncEveryFor,
@@ -76,13 +74,17 @@ const toRowShape = (input: IntegrationFormValues) => {
   };
 };
 
+/** AuthType.None means "nothing to protect" only for generic-auth platforms. */
 const toCredentialBlob = (
   module: AnyConnectorModule,
   credentials: IntegrationFormValues["credentials"],
 ) => {
   if (!credentials) return null;
-  module.definition.credentialSchema.parse(credentials);
-  return encodeAuthCredential(authCredentialSchema.parse(credentials));
+  const parsed = module.definition.credentialSchema.parse(credentials);
+  const isNoneAuth =
+    usesGenericAuth(module.definition.credentialSchema) &&
+    (parsed as AuthCredential).authType === AuthType.None;
+  return isNoneAuth ? null : encryptCredentials(parsed);
 };
 
 const credentialsPatch = (
@@ -90,7 +92,6 @@ const credentialsPatch = (
   data: IntegrationFormValues,
 ) => {
   if (!data.credentials) return {};
-  if (data.credentials.authType === AuthType.None) return { credentials: null };
   return { credentials: toCredentialBlob(module, data.credentials) };
 };
 

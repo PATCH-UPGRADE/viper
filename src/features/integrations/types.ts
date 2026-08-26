@@ -2,7 +2,6 @@ import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
-import { authSchema } from "@/lib/schemas";
 import type { trpc } from "@/trpc/server";
 
 export const integrationsMapping = {
@@ -18,7 +17,7 @@ export const integrationsMapping = {
 
 export type UploadSegment = keyof typeof integrationsMapping;
 
-/** The connectors sidebar's sections. A platform can belong to more than one. */
+/** The connectors dashboard's sections. A platform can belong to more than one. */
 export const CATEGORIES = [
   "Hospital Inventory",
   "Vulnerability Management Platforms",
@@ -27,6 +26,7 @@ export const CATEGORIES = [
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
 
+/** ResourceType -> the URL segment it uploads to. Inverse of the table above. */
 export const uploadSegmentFor = Object.fromEntries(
   Object.entries(integrationsMapping).map(([segment, { type }]) => [
     type,
@@ -55,8 +55,11 @@ export const integrationInputSchema = z.object({
     .positive()
     .min(INTEGRATION_SYNC_EVERY_MIN * 60),
   config: z.record(z.string(), z.unknown()),
-  /** Omitted on edit means "keep what is stored" — see the router. */
-  credentials: authSchema.optional(),
+  /**
+   * Opaque for the same reason `config` is — not every platform uses `authSchema`.
+   * Omitted on edit means "keep what is stored" — see the router.
+   */
+  credentials: z.record(z.string(), z.unknown()).optional(),
 });
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;
 
@@ -80,3 +83,11 @@ export type IntegrationListItem = inferOutput<
 >["items"][number];
 export type IntegrationResourceSyncItem =
   IntegrationListItem["resourceSyncs"][number];
+
+/** A config/credentialSchema field, reduced to plain data to cross the Server->Client boundary. */
+export interface FieldSpec {
+  key: string;
+  kind: "text" | "password" | "url" | "number" | "select";
+  required: boolean;
+  options?: string[];
+}

@@ -5,6 +5,8 @@ import {
   IntegrationsList,
   IntegrationsLoading,
 } from "@/features/integrations/components/integrations";
+import { IntegrationsCatalog } from "@/features/integrations/components/integrations-catalog";
+import { catalogEntries } from "@/features/integrations/core/catalog";
 import { paginationParamsLoader } from "@/features/integrations/server/params-loader";
 import { prefetchIntegrations } from "@/features/integrations/server/prefetch";
 import { prefetchWebhooks } from "@/features/webhooks/server/prefetch";
@@ -21,11 +23,20 @@ const prefetchConnectorsPage = async (
   ]);
 };
 
+const CATALOG = catalogEntries();
+
+const ConnectorsPageContent = () => (
+  <div className="flex flex-col gap-10">
+    <IntegrationsList />
+    <IntegrationsCatalog catalog={CATALOG} />
+  </div>
+);
+
 export default createListPage({
   Container: IntegrationsContainer,
   paramsLoader: paginationParamsLoader,
   prefetch: prefetchConnectorsPage,
-  List: IntegrationsList,
+  List: ConnectorsPageContent,
   Loading: IntegrationsLoading,
   Error: IntegrationsError,
 });

@@ -36,7 +36,6 @@ import {
 } from "@/generated/prisma";
 import { MONTHS_SHORT } from "@/lib/date-utils";
 import prisma from "@/lib/db";
-import { FLEET } from "./config";
 import type {
   FleetOperationalStatus,
   FleetPatientDanger,
@@ -90,7 +89,7 @@ export async function getFleetWorkOrderIntegration() {
 export interface FleetManagedAsset {
   assetId: string;
   hostname: string | null;
-  ip: string;
+  ip: string | null;
   role: string | null;
   /** Fleet's identifier for the physical device (activities carry it too). */
   equipmentKey: string;

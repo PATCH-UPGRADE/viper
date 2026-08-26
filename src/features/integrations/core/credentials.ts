@@ -1,9 +1,9 @@
 import "server-only";
 
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { z } from "zod";
+import type { z } from "zod";
 import { AuthType } from "@/generated/prisma";
-import { authenticationSchema } from "@/lib/schemas";
+import { authSchema } from "@/lib/schemas";
 import { parseAuthenticationJson } from "@/lib/utils";
 
 /**
@@ -93,23 +93,11 @@ export const decryptCredentials = (blob: Uint8Array): unknown => {
  * A platform needing something else declares its own `credentialSchema`
  * and encrypts it with the generic functions above.
  */
-export const authCredentialSchema = z.object({
-  authType: z.enum(AuthType),
-  authentication: authenticationSchema.optional(),
-});
+export const authCredentialSchema = authSchema;
 export type AuthCredential = z.infer<typeof authCredentialSchema>;
 
-/**
- * The storage form of a credential. `AuthType.None` means there is nothing to
- * protect, so the column stays null — which is exactly what
- * `parseAuthCredential` below reads back as `None`. The two are inverses; keep
- * them that way, so `credentials IS NULL` is the single honest representation
- * of "this integration has no auth".
- */
-export const encodeAuthCredential = (
-  creds: AuthCredential,
-): Uint8Array<ArrayBuffer> | null =>
-  creds.authType === AuthType.None ? null : encryptCredentials(creds);
+export const usesGenericAuth = (credentialSchema: z.ZodTypeAny): boolean =>
+  credentialSchema === authCredentialSchema;
 
 /**
  * Narrow decrypted credentials. A row with no credentials is treated as

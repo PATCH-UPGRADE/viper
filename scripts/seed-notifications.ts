@@ -791,11 +791,7 @@ The application deserialises untrusted data without sufficient validations that 
   console.log(`  ✅ Created: ${title}`);
 }
 
-async function coverProducts(
-  vendorId: string,
-  title: string,
-  products: string[],
-) {
+async function assetIdsForProducts(products: string[]): Promise<string[]> {
   const assets = await prisma.asset.findMany({
     where: {
       deviceGroup: {
@@ -809,26 +805,38 @@ async function coverProducts(
     select: { id: true },
   });
 
-  const contract = await prisma.contract.create({
+  return assets.map((asset) => asset.id);
+}
+
+async function seedManageBy(args: {
+  vendorId: string;
+  responsibilities: string;
+  products: string[];
+  contract?: { title: string; from: string; to: string };
+}) {
+  const assetIds = await assetIdsForProducts(args.products);
+  const relationship = await prisma.managesRelationship.create({
     data: {
-      vendorId,
-      title,
-      effectiveFrom: new Date("2023-01-01"),
-      effectiveTo: new Date("2028-01-01"),
-      coverageSummary: `${products.join(", ")} (${assets.length} assets)`,
+      responsibilities: args.responsibilities,
+      vendorId: args.vendorId,
+      assets: { connect: assetIds.map((id) => ({ id })) },
     },
   });
 
-  // TODO VW-429
-  // await prisma.contractAsset.createMany({
-  //   data: assets.map((asset) => ({
-  //     contractId: contract.id,
-  //     assetId: asset.id,
-  //   })),
-  //   skipDuplicates: true,
-  // });
-
-  console.log(` ✅  ${title}:${assets.length} assets`);
+  if (args.contract) {
+    await prisma.contract.create({
+      data: {
+        vendorId: args.vendorId,
+        title: args.contract.title,
+        effectiveFrom: new Date(args.contract.from),
+        effectiveTo: new Date(args.contract.to),
+        coverageSummary: `${args.products.join(", ")} (${assetIds.length} assets)`,
+        managesRelationshipId: relationship.id,
+      },
+    });
+  }
+  console.log(`${args.responsibilities}: ${assetIds.length} assets`);
+  return relationship;
 }
 
 async function seedQuestion() {
@@ -978,17 +986,37 @@ async function seedVendorCoverage() {
     ],
   });
 
-  await coverProducts(shVendor.id, "Manages imaging fleet for radiology", [
-    "syngo.via",
-  ]);
-  await coverProducts(
-    geVendor.id,
-    "Multivendor managed service across the imaging fleet",
-    ["syngo.via"],
-  );
-  await coverProducts(phillipVendor.id, "MRI Fleet Managed Service Agreement", [
-    "MAGNETOM FAMILY",
-  ]);
+  await seedManageBy({
+    vendorId: shVendor.id,
+    responsibilities: "",
+    products: ["syngo.via"],
+    contract: {
+      title: "Manages imaging fleet for radiology",
+      from: "2023-01-01",
+      to: "2030-01-01",
+    },
+  });
+
+  await seedManageBy({
+    vendorId: geVendor.id,
+    responsibilities: "manage field service",
+    products: ["Symbia Intevo"],
+    contract: {
+      title: "Multivendor managed service across the imaging fleet",
+      from: "2024-01-01",
+      to: "2028-01-01",
+    },
+  });
+  await seedManageBy({
+    vendorId: phillipVendor.id,
+    responsibilities: "manage field service",
+    products: ["MAGNETOM FAMILY"],
+    contract: {
+      title: "MRI Fleet Managed Service Agreement",
+      from: "2021-01-01",
+      to: "2026-01-01",
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------

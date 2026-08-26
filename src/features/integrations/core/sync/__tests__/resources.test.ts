@@ -12,6 +12,7 @@ import { moduleForResource, resourcesFor } from "../resources";
  */
 
 const stubResourceModule = (): ResourceModule<unknown, unknown, unknown> => ({
+  sync: async () => ({ cursor: null }),
   listChanged: async function* () {},
   get: async () => ({}),
   toCanonical: (raw) => raw,

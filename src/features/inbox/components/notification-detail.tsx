@@ -64,10 +64,8 @@ function formatSourceChannel(source: NotificationDetailSource): string {
   switch (source.channel) {
     case "Email":
       return "email";
-    case "PolledApi":
-      return "polled api";
-    case "Crawl":
-      return "crawl";
+    case "Integration":
+      return "integration";
     case "TA4":
       return "TA4";
   }
@@ -133,15 +131,12 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
     (sum, group) => sum + group.assetCount,
     0,
   );
+  const sources = notification.sourceLinks.map((link) => link.sourceRecord);
 
   const firstReceived =
-    notification.sources.length > 0
+    sources.length > 0
       ? new Date(
-          Math.min(
-            ...notification.sources.map((s) =>
-              new Date(s.receivedAt).getTime(),
-            ),
-          ),
+          Math.min(...sources.map((s) => new Date(s.observedAt).getTime())),
         )
       : notification.createdAt;
 
@@ -308,15 +303,12 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
       {/* Meta line */}
       <p className="text-sm text-muted-foreground -mt-3">
         {formatDistanceToNow(notification.createdAt, { addSuffix: true })}
-        {notification.sources.length > 0 && (
+        {sources.length > 0 && (
           <>
             {" · "}
-            {notification.sources.length} source
-            {notification.sources.length !== 1 ? "s" : ""} (
-            {[...new Set(notification.sources.map(formatSourceChannel))].join(
-              ", ",
-            )}
-            )
+            {sources.length} source
+            {sources.length !== 1 ? "s" : ""} (
+            {[...new Set(sources.map(formatSourceChannel))].join(", ")})
           </>
         )}
       </p>

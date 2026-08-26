@@ -23,6 +23,10 @@ export function plural(s: string, count: number): string {
   return `${s}s`;
 }
 
+export function humanize(key: string): string {
+  return key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+}
+
 /**
  * Build an auth header from an `{ authType, authentication }` pair.
  *

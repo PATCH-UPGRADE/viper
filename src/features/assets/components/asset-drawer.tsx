@@ -273,7 +273,7 @@ function buildSankeyData(
 
 interface SankeyTooltip {
   label: string;
-  ip: string;
+  ip: string | null;
   x: number;
   y: number;
 }

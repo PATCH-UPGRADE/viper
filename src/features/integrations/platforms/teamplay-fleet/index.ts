@@ -1,5 +1,6 @@
 import { PlatformEnum } from "@/generated/prisma";
 import type { ConnectorModule } from "../../core/types";
+import { assets } from "./assets";
 import {
   configSchema,
   credentialSchema,
@@ -9,19 +10,15 @@ import {
 } from "./config";
 import { onCreate } from "./on-create";
 
-// TODO for advisory
-const mockFleetSync = async (): Promise<never> => {
-  throw new Error("eamplay fleet sync later");
-};
-
 export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
   definition: {
     platform: PlatformEnum.FLEET,
     displayName: SIEMENS_HEALTHINEERS,
+    description: "Sync device and service data from teamplay Fleet.",
     categories: ["Hospital Inventory", "Notifications", "Ticketing Platforms"],
     configSchema,
     credentialSchema,
   },
-  sync: mockFleetSync,
   onCreate,
+  assets,
 };

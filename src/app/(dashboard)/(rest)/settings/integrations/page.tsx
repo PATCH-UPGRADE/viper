@@ -22,15 +22,11 @@ const prefetchConnectorsPage = async (
   ]);
 };
 
-const CATALOG = catalogEntries();
-
-const ConnectorsPageContent = () => <IntegrationsList catalog={CATALOG} />;
-
 export default createListPage({
   Container: IntegrationsContainer,
   paramsLoader: paginationParamsLoader,
   prefetch: prefetchConnectorsPage,
-  List: ConnectorsPageContent,
+  List: () => <IntegrationsList catalog={catalogEntries()} />,
   Loading: IntegrationsLoading,
   Error: IntegrationsError,
 });

@@ -1,16 +1,7 @@
 "use client";
 
-import {
-  ArchiveIcon,
-  BellIcon,
-  BugIcon,
-  InboxIcon,
-  LayoutGridIcon,
-  type LucideIcon,
-  WebhookIcon,
-} from "lucide-react";
-import Link from "next/link";
-import { parseAsStringLiteral, useQueryState } from "nuqs";
+import { LayoutGridIcon, type LucideIcon, WebhookIcon } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
 import {
   EmptyView,
   ErrorView,
@@ -20,121 +11,160 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { mainPadding } from "@/config/constants";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
+import {
+  AddWebhookButton,
+  WebhooksList,
+} from "@/features/webhooks/components/webhooks";
 import { useSuspenseWebhooks } from "@/features/webhooks/hooks/use-webhooks";
 import { cn } from "@/lib/utils";
 import type { CatalogEntry } from "../core/catalog";
 import { useSuspenseIntegrations } from "../hooks/use-integrations";
-import { CATEGORIES } from "../types";
+import { CATEGORIES, type IntegrationListItem } from "../types";
 import { IntegrationCard } from "./integration-row";
-import { IntegrationsCatalog } from "./integrations-catalog";
+import { CategoryCatalog, SECTION_META } from "./integrations-catalog";
 
-const SECTIONS = ["Overview", ...CATEGORIES] as const;
+const SECTIONS = ["Overview", ...CATEGORIES, "Webhooks"] as const;
 type Section = (typeof SECTIONS)[number];
 
-const SECTION_ICONS: Record<Section, LucideIcon> = {
-  Overview: LayoutGridIcon,
-  "Hospital Inventory": ArchiveIcon,
-  "Vulnerability Management Platforms": BugIcon,
-  "Ticketing Platforms": InboxIcon,
-  Notifications: BellIcon,
+const iconFor = (section: Section): LucideIcon => {
+  if (section === "Overview") return LayoutGridIcon;
+  if (section === "Webhooks") return WebhookIcon;
+  return SECTION_META[section].icon;
 };
 
-const useSection = () =>
-  useQueryState(
-    "section",
-    parseAsStringLiteral(SECTIONS).withDefault("Overview"),
-  );
-
-const ConnectorsSidebar = () => {
-  const { data } = useSuspenseIntegrations();
-  const { data: webhooks } = useSuspenseWebhooks();
-  const [section, setSection] = useSection();
-
-  const countBySection = data.items.reduce(
-    (counts, item) => {
-      for (const category of item.categories) {
-        counts[category] = (counts[category] ?? 0) + 1;
-      }
-      return counts;
-    },
-    { Overview: data.items.length } as Record<Section, number>,
-  );
-
+const ConnectorsSidebar = ({
+  active,
+  integrations,
+  onSelect,
+  webhookCount,
+}: {
+  active: Section;
+  integrations: IntegrationListItem[];
+  onSelect: (section: Section) => void;
+  webhookCount: number;
+}) => {
   return (
-    <nav className="flex flex-col gap-1 w-56 shrink-0">
+    <nav className="flex flex-col gap-1 w-56 shrink-0 sticky top-4 self-start">
       {SECTIONS.map((name) => {
-        const Icon = SECTION_ICONS[name];
+        const Icon = iconFor(name);
+        const count =
+          name === "Overview"
+            ? integrations.length
+            : name === "Webhooks"
+              ? webhookCount
+              : integrations.filter((item) => item.categories.includes(name))
+                  .length;
         return (
-          <button
-            key={name}
-            type="button"
-            onClick={() => setSection(name)}
-            className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left",
-              section === name
-                ? "bg-accent text-accent-foreground font-medium"
-                : "text-muted-foreground hover:bg-accent/50",
-            )}
-          >
-            <Icon className="size-4 shrink-0" />
-            <span className="flex-1">{name}</span>
-            <span className="text-xs tabular-nums">
-              {countBySection[name] ?? 0}
-            </span>
-          </button>
+          <Fragment key={name}>
+            {name === "Webhooks" && <Separator className="my-1" />}
+            <button
+              type="button"
+              onClick={() => onSelect(name)}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left",
+                active === name
+                  ? "bg-accent text-primary font-semibold"
+                  : "text-muted-foreground hover:bg-accent/50",
+              )}
+            >
+              <Icon className="size-4 shrink-0" />
+              <span className="flex-1">{name}</span>
+              <span className="text-xs tabular-nums">{count}</span>
+            </button>
+          </Fragment>
         );
       })}
-      <Separator className="my-1" />
-      <Link
-        href="/settings/webhooks"
-        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent/50"
-      >
-        <WebhookIcon className="size-4 shrink-0" />
-        <span className="flex-1">Webhooks</span>
-        <span className="text-xs tabular-nums">{webhooks.totalCount}</span>
-      </Link>
     </nav>
   );
 };
 
-const EnabledIntegrations = () => {
-  const { data } = useSuspenseIntegrations();
-  const [section] = useSection();
+/** Scrollspy: highlights whichever section's top is closest to (but above) the viewport top. */
+const useScrollSpy = () => {
+  const [active, setActive] = useState<Section>("Overview");
 
-  const items =
-    section === "Overview"
-      ? data.items
-      : data.items.filter((i) => i.categories.includes(section));
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting);
+        if (visible.length === 0) return;
+        const topmost = visible.reduce((a, b) =>
+          a.boundingClientRect.top <= b.boundingClientRect.top ? a : b,
+        );
+        setActive(topmost.target.getAttribute("data-section") as Section);
+      },
+      { rootMargin: "-96px 0px -70% 0px" },
+    );
+    for (const element of document.querySelectorAll("[data-section]")) {
+      observer.observe(element);
+    }
+    return () => observer.disconnect();
+  }, []);
 
-  return (
-    <div className="flex flex-col gap-4 flex-1 min-w-0">
-      <SettingsSubheader
-        title="Enabled Integrations"
-        description="Currently active connections syncing data into VIPER."
-      />
-      {items.length === 0 ? (
-        <EmptyView message={`No enabled integrations in ${section}.`} />
-      ) : (
-        <Card className="p-0 gap-0 overflow-hidden divide-y">
-          {items.map((integration) => (
-            <IntegrationCard key={integration.id} integration={integration} />
-          ))}
-        </Card>
-      )}
-    </div>
-  );
+  const scrollTo = (section: Section) => {
+    setActive(section);
+    document
+      .querySelector(`[data-section="${section}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  return { active, scrollTo };
 };
 
 export const IntegrationsList = ({ catalog }: { catalog: CatalogEntry[] }) => {
-  const [section] = useSection();
-  const category = section === "Overview" ? undefined : section;
+  const { data } = useSuspenseIntegrations();
+  const { data: webhooks } = useSuspenseWebhooks();
+  const { active, scrollTo } = useScrollSpy();
 
   return (
     <div className="flex gap-6">
-      <ConnectorsSidebar />
+      <ConnectorsSidebar
+        active={active}
+        integrations={data.items}
+        onSelect={scrollTo}
+        webhookCount={webhooks.totalCount}
+      />
       <div className="flex flex-col gap-10 flex-1 min-w-0">
-        <EnabledIntegrations />
-        <IntegrationsCatalog catalog={catalog} category={category} />
+        <div className="flex flex-col gap-4" data-section="Overview">
+          <SettingsSubheader
+            title="Enabled Integrations"
+            description="Currently active connections syncing data into VIPER."
+          />
+          {data.items.length === 0 ? (
+            <EmptyView message="No enabled integrations yet." />
+          ) : (
+            <Card className="p-0 gap-0 overflow-hidden divide-y">
+              {data.items.map((integration) => (
+                <IntegrationCard
+                  key={integration.id}
+                  integration={integration}
+                />
+              ))}
+            </Card>
+          )}
+        </div>
+        {CATEGORIES.map((category) => (
+          <div key={category} data-section={category}>
+            <CategoryCatalog
+              category={category}
+              catalog={catalog}
+              integrations={data.items}
+            />
+          </div>
+        ))}
+        <div data-section="Webhooks">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start justify-between">
+              <SettingsSubheader
+                title="Webhooks"
+                description="Send VIPER events to your own endpoints."
+              />
+              <AddWebhookButton />
+            </div>
+            <WebhooksList search={false} />
+          </div>
+        </div>
+        {/* Lets the last section scroll all the way to the top, like the others. */}
+        <div className="min-h-[70vh]" aria-hidden="true" />
       </div>
     </div>
   );
@@ -144,22 +174,20 @@ export const IntegrationsContainer = ({
   children,
 }: {
   children: React.ReactNode;
-}) => {
-  return (
-    <div className={cn(mainPadding, "flex flex-col gap-4")}>
-      <SettingsSubheader
-        title="Connectors"
-        description="Connect Viper to the systems your hospital already runs — inventory, vulnerability feeds, ticketing, and notifications."
-      />
-      {children}
-    </div>
-  );
-};
+}) => (
+  <div className={cn(mainPadding, "flex flex-col gap-4")}>
+    <SettingsSubheader
+      title="Connectors"
+      description="Connect Viper to the systems your hospital already runs — inventory, vulnerability feeds, ticketing, and notifications."
+    />
+    {children}
+  </div>
+);
 
-export const IntegrationsLoading = () => {
-  return <LoadingView message="Loading integrations..." />;
-};
+export const IntegrationsLoading = () => (
+  <LoadingView message="Loading integrations..." />
+);
 
-export const IntegrationsError = () => {
-  return <ErrorView message="Error loading integrations" />;
-};
+export const IntegrationsError = () => (
+  <ErrorView message="Error loading integrations" />
+);

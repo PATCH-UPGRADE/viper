@@ -17,7 +17,7 @@ export const integrationsMapping = {
 
 export type UploadSegment = keyof typeof integrationsMapping;
 
-/** The connectors dashboard's sections. A platform can belong to more than one. */
+/** The connectors sections. A platform can belong to more than one. */
 export const CATEGORIES = [
   "Hospital Inventory",
   "Vulnerability Management Platforms",

@@ -1,7 +1,8 @@
 import { z } from "zod";
-import type { Cursor, Page, ResourceModule, Session } from "../../core/types";
-import type { FleetConfig } from "./config";
-import { EQUIPMENTS_URL } from "./urls";
+import type { Cursor, Page, Session } from "../../../core/types";
+import { EQUIPMENTS_URL } from "../urls";
+
+// used by index.ts and sync.ts, in a separate file to avoid a loop
 
 // Permissive view of a Fleet /rest/v1/equipments record. Only fields we consume
 // are declared; unknown fields are stripped.
@@ -62,53 +63,46 @@ export function computeWeakSerials(items: FleetAssetItem[]): Set<string> {
   return weak;
 }
 
-export const assets: ResourceModule<
-  FleetAssetItem,
-  FleetEquipment,
-  FleetConfig
-> = {
-  async *listChanged(
-    session: Session,
-    _cursor: Cursor | null,
-  ): AsyncIterable<Page<FleetEquipment>> {
-    const all = await fetchEquipments(session);
-    // Fleet's /equipments cannot paginate or filter by change; every sync is the full inventory.
-    yield { items: all.filter((e) => e.isActive !== false), cursor: null };
-  },
+export async function* listChanged(
+  session: Session,
+  _cursor: Cursor | null,
+): AsyncIterable<Page<FleetEquipment>> {
+  const all = await fetchEquipments(session);
+  // Fleet's /equipments cannot paginate or filter by change; every sync is the full inventory.
+  yield { items: all.filter((e) => e.isActive !== false), cursor: null };
+}
 
-  async get(session: Session, externalId: string): Promise<FleetEquipment> {
-    const all = await fetchEquipments(session);
-    const found = all.find((e) => e.equipmentKey === externalId);
-    if (!found) {
-      throw new Error(`Fleet has no equipment ${externalId}`);
-    }
-    return found;
-  },
+export async function get(
+  session: Session,
+  externalId: string,
+): Promise<FleetEquipment> {
+  const all = await fetchEquipments(session);
+  const found = all.find((e) => e.equipmentKey === externalId);
+  if (!found) {
+    throw new Error(`Fleet has no equipment ${externalId}`);
+  }
+  return found;
+}
 
-  toCanonical(raw: FleetEquipment): FleetAssetItem {
-    const address = [
-      blank(raw.street),
-      blank(raw.city),
-      [blank(raw.state), blank(raw.zip)].filter(Boolean).join(" ") || null,
-    ]
-      .filter(Boolean)
-      .join(", ");
-    return {
-      vendorId: raw.equipmentKey,
-      serialNumber: serialNumberOf(raw.serialNumber),
-      role: blank(raw.modalityTranslation),
-      location: {
-        ...(blank(raw.customerName)
-          ? { facility: raw.customerName as string }
-          : {}),
-        ...(address ? { building: address } : {}),
-      },
-      productName: blank(raw.productName) ?? "Unknown Siemens device",
-      softwareVersion: blank(raw.softwareVersion),
-    };
-  },
-
-  apiUrlFor: () => EQUIPMENTS_URL,
-
-  defaultSyncEvery: 86400,
-};
+export function toCanonical(raw: FleetEquipment): FleetAssetItem {
+  const address = [
+    blank(raw.street),
+    blank(raw.city),
+    [blank(raw.state), blank(raw.zip)].filter(Boolean).join(" ") || null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return {
+    vendorId: raw.equipmentKey,
+    serialNumber: serialNumberOf(raw.serialNumber),
+    role: blank(raw.modalityTranslation),
+    location: {
+      ...(blank(raw.customerName)
+        ? { facility: raw.customerName as string }
+        : {}),
+      ...(address ? { building: address } : {}),
+    },
+    productName: blank(raw.productName) ?? "Unknown Siemens device",
+    softwareVersion: blank(raw.softwareVersion),
+  };
+}

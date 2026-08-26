@@ -4,15 +4,20 @@ import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { resolveDeviceGroup } from "@/lib/router-utils";
 import type { IntegrationResponse } from "@/lib/schemas";
-import type { SyncCtx, SyncOutcome } from "../../core/types";
-import { assets, computeWeakSerials, type FleetAssetItem } from "./assets";
+import type { ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import {
   type FleetConfig,
   type FleetCreds,
   SIEMENS_HEALTHINEERS,
-} from "./config";
+} from "../config";
+import { createFleetSession } from "../session";
+import {
+  computeWeakSerials,
+  type FleetAssetItem,
+  listChanged,
+  toCanonical,
+} from "./equipments";
 import { connectManagedAssets } from "./manages-relationship";
-import { createFleetSession } from "./session";
 
 async function equipmentKeysWeMayRegroup(
   integrationId: string,
@@ -94,19 +99,13 @@ async function ingestFleetAssets(
   );
 }
 
-export async function fleetSync(
-  ctx: SyncCtx<FleetConfig, FleetCreds>,
+export async function syncAssets(
+  ctx: ResourceSyncCtx<FleetConfig, FleetCreds>,
 ): Promise<SyncOutcome> {
-  if (ctx.resource !== ResourceType.Asset) {
-    throw new Error(
-      `teamplay Fleet has no ${ctx.resource} sync yet (work orders: VW-432/VW-433; advisories are a separate ticket)`,
-    );
-  }
-
   const session = await createFleetSession(ctx.creds);
   const items: FleetAssetItem[] = [];
-  for await (const page of assets.listChanged(session, ctx.cursor)) {
-    items.push(...page.items.map((raw) => assets.toCanonical(raw, ctx.config)));
+  for await (const page of listChanged(session, ctx.cursor)) {
+    items.push(...page.items.map((raw) => toCanonical(raw)));
   }
 
   const response = await ingestFleetAssets(items, ctx.integrationId);

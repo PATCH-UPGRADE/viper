@@ -12,17 +12,17 @@ vi.mock("@/features/integrations/core/sync/upsert", () => ({
   processIntegrationSync: vi.fn(),
 }));
 vi.mock("@/lib/router-utils", () => ({ resolveDeviceGroup: vi.fn() }));
-vi.mock("../session", () => ({ createFleetSession: vi.fn() }));
+vi.mock("../../session", () => ({ createFleetSession: vi.fn() }));
 vi.mock("../manages-relationship", () => ({ connectManagedAssets: vi.fn() }));
 
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import { resolveDeviceGroup } from "@/lib/router-utils";
-import type { SyncCtx } from "../../../core/types";
-import type { FleetConfig, FleetCreds } from "../config";
+import type { ResourceSyncCtx } from "../../../../core/types";
+import type { FleetConfig, FleetCreds } from "../../config";
+import { createFleetSession } from "../../session";
 import { connectManagedAssets } from "../manages-relationship";
-import { createFleetSession } from "../session";
-import { fleetSync } from "../sync";
+import { syncAssets } from "../sync";
 
 const EQUIPMENT = {
   equipmentKey: "US_1006103273",
@@ -64,15 +64,14 @@ const okResponse = {
 };
 
 const makeCtx = (
-  overrides: Partial<SyncCtx<FleetConfig, FleetCreds>> = {},
-): SyncCtx<FleetConfig, FleetCreds> => ({
+  overrides: Partial<ResourceSyncCtx<FleetConfig, FleetCreds>> = {},
+): ResourceSyncCtx<FleetConfig, FleetCreds> => ({
   integrationId: "int-1",
   config: {},
   creds: {
     authType: "Basic",
     authentication: { username: "svc@example.com", password: "pw" },
   },
-  resource: ResourceType.Asset,
   cursor: null,
   lastSuccessfulSync: null,
   callback: async () => {
@@ -106,16 +105,9 @@ beforeEach(() => {
 
 const lastSyncCall = () => vi.mocked(processIntegrationSync).mock.calls[0];
 
-describe("fleetSync", () => {
-  it("refuses resources it has no module for", async () => {
-    await expect(
-      fleetSync(makeCtx({ resource: ResourceType.WorkOrder })),
-    ).rejects.toThrow("teamplay Fleet has no WorkOrder sync yet");
-    expect(processIntegrationSync).not.toHaveBeenCalled();
-  });
-
+describe("syncAssets", () => {
   it("ingests the mapped inventory under the shadow user", async () => {
-    const outcome = await fleetSync(makeCtx());
+    const outcome = await syncAssets(makeCtx());
 
     const [prismaArg, , input, userId, integrationId, resource] =
       lastSyncCall();
@@ -134,7 +126,7 @@ describe("fleetSync", () => {
   });
 
   it("derives the device group from Fleet's product and version names", async () => {
-    await fleetSync(makeCtx());
+    await syncAssets(makeCtx());
 
     const [, config, input] = lastSyncCall();
     const out = await config.transformInputItem(
@@ -159,7 +151,7 @@ describe("fleetSync", () => {
       { externalId: "US_1006103273" },
     ]);
 
-    await fleetSync(makeCtx());
+    await syncAssets(makeCtx());
 
     const [, config, input] = lastSyncCall();
     const out = await config.transformInputItem(
@@ -172,7 +164,7 @@ describe("fleetSync", () => {
   it("leaves the device group alone when a CPE-derived group owns the asset", async () => {
     db.externalAssetMapping.findMany.mockResolvedValue([]);
 
-    await fleetSync(makeCtx());
+    await syncAssets(makeCtx());
 
     const [, config, input] = lastSyncCall();
     const out = await config.transformInputItem(
@@ -183,7 +175,7 @@ describe("fleetSync", () => {
   });
 
   it("only asks for assets sitting in a group with no CPE", async () => {
-    await fleetSync(makeCtx());
+    await syncAssets(makeCtx());
 
     expect(db.externalAssetMapping.findMany).toHaveBeenCalledWith({
       where: {
@@ -197,7 +189,7 @@ describe("fleetSync", () => {
   it("skips serial matching for a serial this integration already mapped", async () => {
     db.asset.findMany.mockResolvedValue([{ serialNumber: "63014" }]);
 
-    await fleetSync(makeCtx());
+    await syncAssets(makeCtx());
 
     const [, config, input] = lastSyncCall();
     const out = await config.transformInputItem(
@@ -208,7 +200,7 @@ describe("fleetSync", () => {
   });
 
   it("skips serial matching for serials shared inside the batch", async () => {
-    await fleetSync(makeCtx());
+    await syncAssets(makeCtx());
 
     const [, config, input] = lastSyncCall();
     const gateway = input.items.find(
@@ -228,7 +220,7 @@ describe("fleetSync", () => {
       message: "3 of 123 items failed: boom",
     });
 
-    await expect(fleetSync(makeCtx())).rejects.toThrow(
+    await expect(syncAssets(makeCtx())).rejects.toThrow(
       "3 of 123 items failed: boom",
     );
     expect(connectManagedAssets).toHaveBeenCalledWith("int-1");

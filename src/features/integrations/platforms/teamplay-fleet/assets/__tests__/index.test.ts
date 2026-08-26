@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { assets, computeWeakSerials } from "../assets";
+import { computeWeakSerials, listChanged, toCanonical } from "../equipments";
+import { assets } from "../index";
 
 // Representative records from a real Fleet /rest/v1/equipments response.
 const SAMPLE = [
@@ -33,7 +34,7 @@ const SAMPLE = [
   },
 ];
 
-const canonical = (raw: (typeof SAMPLE)[number]) => assets.toCanonical(raw, {});
+const canonical = (raw: (typeof SAMPLE)[number]) => toCanonical(raw);
 
 describe("toCanonical", () => {
   it("maps a real equipment record onto the asset draft", () => {
@@ -64,7 +65,7 @@ describe("listChanged", () => {
 
   it("yields the whole inventory as one page with no cursor", async () => {
     const pages = [];
-    for await (const page of assets.listChanged(session(SAMPLE), null))
+    for await (const page of listChanged(session(SAMPLE), null))
       pages.push(page);
     expect(pages).toHaveLength(1);
     expect(pages[0].items).toHaveLength(2);
@@ -73,7 +74,7 @@ describe("listChanged", () => {
 
   it("drops inactive equipment", async () => {
     const retired = [{ ...SAMPLE[0], isActive: false }, SAMPLE[1]];
-    for await (const page of assets.listChanged(session(retired), null))
+    for await (const page of listChanged(session(retired), null))
       expect(page.items.map((r) => r.equipmentKey)).toEqual(["US_1064669350"]);
   });
 });
@@ -112,5 +113,15 @@ describe("apiUrlFor", () => {
     expect(assets.apiUrlFor?.("US_1006103273", {})).toBe(
       "https://fleet.siemens-healthineers.com/rest/v1/equipments",
     );
+  });
+});
+
+describe("the resource module", () => {
+  it("wires up the sync core dispatches to", () => {
+    expect(assets.sync).toBeTypeOf("function");
+  });
+
+  it("asks for a daily sync", () => {
+    expect(assets.defaultSyncEvery).toBe(86400);
   });
 });

@@ -1,7 +1,7 @@
 import "server-only";
 import prisma from "@/lib/db";
 import { resolveVendor } from "@/lib/router-utils";
-import { SIEMENS_HEALTHINEERS } from "./config";
+import { SIEMENS_HEALTHINEERS } from "../config";
 
 export const FLEET_RESPONSIBILITIES =
   "Serviced by Siemens Healthineers — synced from the teamplay Fleet equipment inventory.";

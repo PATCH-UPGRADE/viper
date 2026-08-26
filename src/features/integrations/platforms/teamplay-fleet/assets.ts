@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Cursor, Page, ResourceModule, Session } from "../../core/types";
-import type { FleetConfig } from "./config";
+import { BASE_URL, type FleetConfig } from "./config";
 import { EQUIPMENTS_URL } from "./urls";
 
 // Permissive view of a Fleet /rest/v1/equipments record. Only fields we consume
@@ -109,6 +109,9 @@ export const assets: ResourceModule<
   },
 
   apiUrlFor: () => EQUIPMENTS_URL,
+
+  webUrlFor: (externalId) =>
+    `${BASE_URL}/equipment/${encodeURIComponent(externalId)}/info`,
 
   defaultSyncEvery: 86400,
 };

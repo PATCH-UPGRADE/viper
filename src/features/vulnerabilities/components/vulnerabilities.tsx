@@ -20,6 +20,7 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { ExternalMappingList } from "@/components/external-mappings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -447,20 +448,14 @@ export function VulnerabilityDrawer({
               </div>
             )}
 
-            {vulnerability.upstreamApi && (
+            {vulnerability.externalMappings.length > 0 && (
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Upstream API
+                  Integrations
                 </div>
-                <a
-                  href={vulnerability.upstreamApi ?? undefined}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                >
-                  {vulnerability.upstreamApi}
-                  <ExternalLinkIcon className="size-3" />
-                </a>
+                <ExternalMappingList
+                  mappings={vulnerability.externalMappings}
+                />
               </div>
             )}
           </div>

@@ -1,3 +1,8 @@
+import {
+  attachMappingUrls,
+  type IntegrationUrlContext,
+  selectsExternalMappings,
+} from "@/features/integrations/core/mapping-urls";
 import { Prisma, TriggerEnum } from "@/generated/prisma";
 import type { PayloadToResult } from "@/generated/prisma/runtime/library";
 import { inngest } from "@/inngest/client";
@@ -248,6 +253,45 @@ export const updateConnectorExtension = Prisma.defineExtension((client) =>
                 );
               });
           }
+
+          return result;
+        },
+      },
+    },
+  }),
+);
+
+/**
+ * Fills each `External*Mapping`'s `upstreamApi` / `webUrl` from the platform
+ * module that owns the record, falling back to whatever the sync stored.
+ *
+ * Hooks every model rather than just the five that own mappings, because these
+ * are usually reached through a nested include (`issue -> asset ->
+ * externalMappings`) and a query extension only fires on the top-level model.
+ * The `selectsExternalMappings` guard keeps every other query untouched.
+ */
+export const mappingUrlExtension = Prisma.defineExtension((client) =>
+  client.$extends({
+    name: "externalMappingUrls",
+    query: {
+      $allModels: {
+        async $allOperations({ model, args, query }) {
+          const result = await query(args);
+          // Also stops this extension recursing through its own lookup below.
+          if (!selectsExternalMappings(args)) return result;
+
+          await attachMappingUrls(result, model, async (ids) => {
+            const rows = await client.integration.findMany({
+              where: { id: { in: ids } },
+              select: { id: true, platform: true, config: true },
+            });
+            return new Map<string, IntegrationUrlContext>(
+              rows.map((row) => [
+                row.id,
+                { platform: row.platform, config: row.config },
+              ]),
+            );
+          });
 
           return result;
         },

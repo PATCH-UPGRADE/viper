@@ -1,6 +1,7 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 import { AssetStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
+import type { ExtendedPrismaClient } from "@/lib/db";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   cpeSchema,
@@ -115,7 +116,18 @@ export const assetInclude = {
       integration: { select: { id: true, name: true, platform: true } },
     },
   },
-};
+} satisfies Prisma.AssetInclude;
+
+/**
+ * Derived from the *extended* client, not `Prisma.AssetGetPayload` — the device
+ * group's `url` / `sbomUrl` / ... are computed by `deviceGroupExtension`, and
+ * the base payload helper resolves them to `never`.
+ */
+export type AssetWithRelations = Prisma.Result<
+  ExtendedPrismaClient["asset"],
+  { include: typeof assetInclude },
+  "findUniqueOrThrow"
+>;
 
 export const assetDashboardInclude = {
   user: userIncludeSelect,

@@ -53,15 +53,77 @@ export interface Session {
   request(url: string, init?: RequestInit): Promise<Response>;
 }
 
-export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
-  extends UrlBuilders<TConfig> {
+/**
+ * Everything one resource-module sync attempt needs. No `resource`: a resource
+ * module already knows which one it is.
+ *
+ * No session either. A resource module builds its own from `creds` using its
+ * platform's auth helpers; if a platform wants one login shared across its
+ * resources, memoizing is that platform's business, not core's.
+ */
+export interface ResourceSyncCtx<TConfig = unknown, TCreds = unknown> {
+  integrationId: string;
+  config: TConfig;
+  /** `ai` forwards these to n8n, which authenticates as us. That is the point. */
+  creds: TCreds;
+  cursor: Cursor | null;
+  /** Where `partner`'s `since` comes from. */
+  lastSuccessfulSync: Date | null;
+  /** Mints a one-time upload token scoped to the shadow user + resource. */
+  callback(): Promise<CallbackConfig>;
+}
+
+/**
+ * Everything one platform-level `(integration, resource)` sync attempt needs.
+ *
+ * Extends the resource-level context so core can build one object and hand it to
+ * either kind of sync.
+ */
+export interface SyncCtx<TConfig = unknown, TCreds = unknown>
+  extends ResourceSyncCtx<TConfig, TCreds> {
+  resource: ResourceType;
+}
+
+/**
+ * What a strategy reports back.
+ */
+export interface SyncOutcome {
+  cursor: Cursor | null;
+  pending?: boolean;
+}
+
+/**
+ * A platform-level strategy owns one `(integration, resource)` sync attempt end
+ * to end. Only for platforms with no resource modules — a platform that has them
+ * syncs per resource instead.
+ */
+export type SyncStrategy<TConfig = unknown, TCreds = unknown> = (
+  ctx: SyncCtx<TConfig, TCreds>,
+) => Promise<SyncOutcome>;
+
+/**
+ * The per-resource half of a platform whose protocol *we* speak.
+ *
+ * `sync` is the contract: declaring a resource module means that module knows how
+ * to sync itself. The pull helpers below are the pieces a `sync` is usually built
+ * out of, not required 
+ */
+export interface ResourceModule<
+  TCanonical,
+  TRaw = unknown,
+  TConfig = unknown,
+  TCreds = unknown,
+> extends UrlBuilders<TConfig> {
+  /** How this resource syncs, end to end. */
+  sync(ctx: ResourceSyncCtx<TConfig, TCreds>): Promise<SyncOutcome>;
+
   // we pull from their platform
-  listChanged(
+  listChanged?(
     session: Session,
     cursor: Cursor | null,
   ): AsyncIterable<Page<TRaw>>;
-  get(session: Session, externalId: string): Promise<TRaw>;
-  toCanonical(raw: TRaw, config: TConfig): TCanonical;
+  get?(session: Session, externalId: string): Promise<TRaw>;
+  toCanonical?(raw: TRaw, config: TConfig): TCanonical;
 
   // we push to their platform
   create?(
@@ -78,35 +140,6 @@ export interface ResourceModule<TCanonical, TRaw = unknown, TConfig = unknown>
   defaultSyncEvery: number | null;
 }
 
-/**
- * Everything one `(integration, resource)` sync attempt needs.
- */
-export interface SyncCtx<TConfig = unknown, TCreds = unknown> {
-  integrationId: string;
-  config: TConfig;
-  /** `ai` forwards these to n8n, which authenticates as us. That is the point. */
-  creds: TCreds;
-  resource: ResourceType;
-  cursor: Cursor | null;
-  /** Where `partner`'s `since` comes from. */
-  lastSuccessfulSync: Date | null;
-  /** Mints a one-time upload token scoped to the shadow user + resource. */
-  callback(): Promise<CallbackConfig>;
-}
-
-/**
- * What a strategy reports back.
- */
-export interface SyncOutcome {
-  cursor: Cursor | null;
-  pending?: boolean;
-}
-
-/** A strategy owns one `(integration, resource)` sync attempt end to end. */
-export type SyncStrategy<TConfig = unknown, TCreds = unknown> = (
-  ctx: SyncCtx<TConfig, TCreds>,
-) => Promise<SyncOutcome>;
-
 export interface ConnectorDefinition<TConfig, TCreds> {
   platform: PlatformEnum;
   displayName: string;
@@ -120,20 +153,24 @@ export interface ConnectorDefinition<TConfig, TCreds> {
   credentialSchema: z.ZodType<TCreds>;
 }
 
+/**
+ * A platform must supply *either* `sync` or at least one resource module. With
+ * resource modules, core dispatches to the one that owns the resource; without
+ * them, it falls back to `sync`.
+ */
 export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
   definition: ConnectorDefinition<TConfig, TCreds>;
 
   /**
-   * How this platform syncs, end to end. Whether it pulls or hands off is the
-   * strategy's business: a puller loops and returns the cursor it reached, a
+   * How this platform syncs, end to end, when it has no resource modules. A
    * pusher fires one request and returns `pending: true` so the row stays
    * `Pending` until the callback lands.
    */
-  sync: SyncStrategy<TConfig, TCreds>;
+  sync?: SyncStrategy<TConfig, TCreds>;
   onCreate?(): Promise<void>;
-  workOrders?: ResourceModule<unknown, unknown, TConfig>;
-  assets?: ResourceModule<unknown, unknown, TConfig>;
-  notifications?: ResourceModule<unknown, unknown, TConfig>;
+  workOrders?: ResourceModule<unknown, unknown, TConfig, TCreds>;
+  assets?: ResourceModule<unknown, unknown, TConfig, TCreds>;
+  notifications?: ResourceModule<unknown, unknown, TConfig, TCreds>;
 }
 
 /**

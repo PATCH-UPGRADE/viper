@@ -30,11 +30,11 @@ export const hasResourceModules = (module: AnyConnectorModule): boolean =>
 export const moduleForResource = (
   module: AnyConnectorModule,
   resource: ResourceType,
-): ResourceModule<unknown, unknown, unknown> | undefined => {
+): ResourceModule<unknown, unknown, unknown, unknown> | undefined => {
   const entry = MODULE_FIELDS.find((f) => f.resource === resource);
   if (!entry) return undefined;
   return module[entry.field] as
-    | ResourceModule<unknown, unknown, unknown>
+    | ResourceModule<unknown, unknown, unknown, unknown>
     | undefined;
 };
 

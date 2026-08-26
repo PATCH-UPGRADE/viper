@@ -1,7 +1,13 @@
 import { z } from "zod";
-import type { Cursor, Page, ResourceModule, Session } from "../../core/types";
-import type { FleetConfig } from "./config";
-import { EQUIPMENTS_URL } from "./urls";
+import type {
+  Cursor,
+  Page,
+  ResourceModule,
+  Session,
+} from "../../../core/types";
+import type { FleetConfig, FleetCreds } from "../config";
+import { EQUIPMENTS_URL } from "../urls";
+import { syncAssets } from "./sync";
 
 // Permissive view of a Fleet /rest/v1/equipments record. Only fields we consume
 // are declared; unknown fields are stripped.
@@ -62,51 +68,63 @@ export function computeWeakSerials(items: FleetAssetItem[]): Set<string> {
   return weak;
 }
 
+// Exported here to avoid cyclic dependency with sync.ts
+
+export async function* listChanged(
+  session: Session,
+  _cursor: Cursor | null,
+): AsyncIterable<Page<FleetEquipment>> {
+  const all = await fetchEquipments(session);
+  // Fleet's /equipments cannot paginate or filter by change; every sync is the full inventory.
+  yield { items: all.filter((e) => e.isActive !== false), cursor: null };
+}
+
+export async function get(
+  session: Session,
+  externalId: string,
+): Promise<FleetEquipment> {
+  const all = await fetchEquipments(session);
+  const found = all.find((e) => e.equipmentKey === externalId);
+  if (!found) {
+    throw new Error(`Fleet has no equipment ${externalId}`);
+  }
+  return found;
+}
+
+export function toCanonical(raw: FleetEquipment): FleetAssetItem {
+  const address = [
+    blank(raw.street),
+    blank(raw.city),
+    [blank(raw.state), blank(raw.zip)].filter(Boolean).join(" ") || null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return {
+    vendorId: raw.equipmentKey,
+    serialNumber: serialNumberOf(raw.serialNumber),
+    role: blank(raw.modalityTranslation),
+    location: {
+      ...(blank(raw.customerName)
+        ? { facility: raw.customerName as string }
+        : {}),
+      ...(address ? { building: address } : {}),
+    },
+    productName: blank(raw.productName) ?? "Unknown Siemens device",
+    softwareVersion: blank(raw.softwareVersion),
+  };
+}
+
 export const assets: ResourceModule<
   FleetAssetItem,
   FleetEquipment,
-  FleetConfig
+  FleetConfig,
+  FleetCreds
 > = {
-  async *listChanged(
-    session: Session,
-    _cursor: Cursor | null,
-  ): AsyncIterable<Page<FleetEquipment>> {
-    const all = await fetchEquipments(session);
-    // Fleet's /equipments cannot paginate or filter by change; every sync is the full inventory.
-    yield { items: all.filter((e) => e.isActive !== false), cursor: null };
-  },
+  sync: syncAssets,
 
-  async get(session: Session, externalId: string): Promise<FleetEquipment> {
-    const all = await fetchEquipments(session);
-    const found = all.find((e) => e.equipmentKey === externalId);
-    if (!found) {
-      throw new Error(`Fleet has no equipment ${externalId}`);
-    }
-    return found;
-  },
-
-  toCanonical(raw: FleetEquipment): FleetAssetItem {
-    const address = [
-      blank(raw.street),
-      blank(raw.city),
-      [blank(raw.state), blank(raw.zip)].filter(Boolean).join(" ") || null,
-    ]
-      .filter(Boolean)
-      .join(", ");
-    return {
-      vendorId: raw.equipmentKey,
-      serialNumber: serialNumberOf(raw.serialNumber),
-      role: blank(raw.modalityTranslation),
-      location: {
-        ...(blank(raw.customerName)
-          ? { facility: raw.customerName as string }
-          : {}),
-        ...(address ? { building: address } : {}),
-      },
-      productName: blank(raw.productName) ?? "Unknown Siemens device",
-      softwareVersion: blank(raw.softwareVersion),
-    };
-  },
+  listChanged,
+  get,
+  toCanonical,
 
   apiUrlFor: () => EQUIPMENTS_URL,
 

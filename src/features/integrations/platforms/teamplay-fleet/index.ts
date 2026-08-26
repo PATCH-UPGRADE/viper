@@ -9,7 +9,6 @@ import {
   SIEMENS_HEALTHINEERS,
 } from "./config";
 import { onCreate } from "./on-create";
-import { fleetSync } from "./sync";
 
 export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
   definition: {
@@ -20,7 +19,6 @@ export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
     configSchema,
     credentialSchema,
   },
-  sync: fleetSync,
   onCreate,
   assets,
 };

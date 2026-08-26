@@ -2,7 +2,6 @@
 import { describe, expect, it } from "vitest";
 import { assetDashboardInclude, assetInclude } from "@/features/assets/types";
 import { deviceArtifactInclude } from "@/features/device-artifacts/types";
-import { notificationDetailInclude } from "@/features/inbox/types";
 import { remediationInclude } from "@/features/remediations/types";
 import { ticketDetailInclude } from "@/features/tracking/types";
 import {

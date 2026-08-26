@@ -12,13 +12,13 @@ import { resolveUpstreamApi, resolveWebUrl } from "./urls";
  * If we did not use DMMF, that would be a problem, we wouldn't know what model
  * we're working with from field name alone. For example, two fields may be called `assets`,
  * but one may refer to `Asset[]`, the other `AssetTicket[]`, or `NotificationAssetMapping[]`
- * 
+ *
  * For each model, see if we need to update the upstreamApiUrl /webUrl by keying on
- * RESOURCE_BY_MAPPING_MODEL. If we don't get anything (most fields are like this) we 
+ * RESOURCE_BY_MAPPING_MODEL. If we don't get anything (most fields are like this) we
  * just skip. If we *do* have something we need to change, then:
  * * use loadIntegrations to get the integrations from a cache
  * * get the platforms an integration uses, and load its url builders
- *    * we do this by importing registry.ts lazily, so non-server modules don't 
+ *    * we do this by importing registry.ts lazily, so non-server modules don't
  *      throw an error.
  * * use resolveUpstreamApi / resolveWebUrl to replace the url in place
  * * profit.
@@ -80,7 +80,7 @@ const relationTarget = (model: string, field: string): string | undefined => {
   return relationIndex.get(`${model}.${field}`);
 };
 
-// Walks 
+// Walks
 const walk = (
   model: string,
   args: unknown,

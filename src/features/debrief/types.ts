@@ -40,19 +40,27 @@ export const DEBRIEF_PLACEHOLDER = /\{\{(\d+)\}\}/g;
 
 export const DEBRIEF_MAX_BULLET_SENTENCES = 3;
 
+export const DEBRIEF_MAX_BULLET_LINKS = 3;
+
 /**
  * Character backstop for a run-on, not the working limit.
  */
 export const DEBRIEF_MAX_BULLET_CHARS = 800;
 
 /**
- * Sentence boundary: a terminator followed by whitespace AND a capital.
+ * Sentence boundary: a terminator followed by whitespace AND a sentence start.
  *
  * Both conditions are load-bearing in this domain, which is full of dots that
  * are not sentence ends — firmware "M.02.07", products like "syngo.plaza",
- * scores like "CVSS 9.8", and "etc. devices" all stay intact.
+ * scores like "CVSS 9.8", and "etc. devices" all stay intact. The whitespace
+ * requirement protects the first three, and the start class protects the last.
+ *
+ * A sentence start is a capital, a digit, or "{" — bullets here regularly open
+ * a sentence with a device count ("11 monitors are exposed.") or with a link
+ * marker ("{{0}} affects the ICU."). Without those two the sentence limit
+ * silently under-counts and an over-long bullet reaches the reader.
  */
-export const DEBRIEF_SENTENCE_BOUNDARY = /(?<=[.!?])\s+(?=[A-Z])/;
+export const DEBRIEF_SENTENCE_BOUNDARY = /(?<=[.!?])\s+(?=[A-Z0-9{])/;
 
 /**
  * Structural shape only, without the placeholder invariant.
@@ -65,13 +73,16 @@ export const DEBRIEF_SENTENCE_BOUNDARY = /(?<=[.!?])\s+(?=[A-Z])/;
  */
 export const debriefBulletDraftSchema = z.object({
   text: z.string().min(1),
-  links: z.array(debriefLinkSchema).max(3),
+  links: z.array(debriefLinkSchema),
 });
 
 export type DebriefBulletDraft = z.infer<typeof debriefBulletDraftSchema>;
 
 export const debriefBulletSchema = debriefBulletDraftSchema
-  .extend({ text: z.string().min(1).max(DEBRIEF_MAX_BULLET_CHARS) })
+  .extend({
+    text: z.string().min(1).max(DEBRIEF_MAX_BULLET_CHARS),
+    links: z.array(debriefLinkSchema).max(DEBRIEF_MAX_BULLET_LINKS),
+  })
   .superRefine((bullet, ctx) => {
     const used = new Set(
       [...bullet.text.matchAll(DEBRIEF_PLACEHOLDER)].map((m) => Number(m[1])),

@@ -16,9 +16,11 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
+import { z } from "zod";
 import {
   DEBRIEF_MAX_BULLET_CHARS,
   debriefBulletDraftSchema,
+  debriefBulletSchema,
   debriefBulletsSchema,
 } from "@/features/debrief/types";
 import { validateBullets } from "./validate";
@@ -302,6 +304,37 @@ describe("validateBullets — bullet length", () => {
     expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
   });
 
+  it("counts a sentence that opens with a number or with a marker", async () => {
+    // Bullets here regularly start a sentence with a device count or a link.
+    // A capital-only boundary misses both, so the limit silently stops binding.
+    idsExist("vulnerability");
+    const text =
+      "First one here. 11 monitors are exposed. {{0}} is the cause. Fourth is one too many.";
+
+    const { bullets } = await validateBullets([{ text, links: [vulnLink()] }]);
+
+    expect(bullets[0].text).toBe(
+      "First one here. 11 monitors are exposed. {{0}} is the cause.",
+    );
+  });
+
+  it("stays inside the limit after an invented link's label is inlined", async () => {
+    // A label is up to 80 characters and a marker is five. Inlining after the
+    // trim pushes a clamped bullet back over the cap, and one over-long bullet
+    // makes parseBullets blank the whole debrief, not just that bullet.
+    idsMissing("vulnerability");
+    const text = `{{0}} ${"word ".repeat(200)}tail.`;
+
+    const { bullets } = await validateBullets([
+      { text, links: [{ ...vulnLink(), label: "x".repeat(80) }] },
+    ]);
+
+    expect(bullets[0].text.length).toBeLessThanOrEqual(
+      DEBRIEF_MAX_BULLET_CHARS,
+    );
+    expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
+  });
+
   it("falls back to an ellipsis only for a single run-on sentence", async () => {
     // Reachable only when the model ignored the sentence instruction outright.
     idsExist("vulnerability");
@@ -349,5 +382,113 @@ describe("the draft schema must not reject what the model writes", () => {
     };
 
     expect(debriefBulletsSchema.safeParse([overlong]).success).toBe(false);
+  });
+});
+
+describe("validateBullets — caps the model cannot obey", () => {
+  it("accepts a draft with more links than a bullet may store", () => {
+    const many = {
+      text: "One {{0}} two {{1}} three {{2}} four {{3}}.",
+      links: [vulnLink("a"), vulnLink("b"), vulnLink("c"), vulnLink("d")],
+    };
+
+    expect(debriefBulletDraftSchema.safeParse(many).success).toBe(true);
+  });
+
+  it("accepts a draft with more bullets than a debrief may store", () => {
+    const one = { text: "Fine.", links: [] };
+
+    expect(
+      z.array(debriefBulletDraftSchema).safeParse(Array(9).fill(one)).success,
+    ).toBe(true);
+  });
+
+  it("keeps the first three links and folds the rest into the sentence", async () => {
+    idsExist("vulnerability");
+
+    const { bullets } = await validateBullets([
+      {
+        text: "One {{0}} two {{1}} three {{2}} four {{3}}.",
+        links: [vulnLink("a"), vulnLink("b"), vulnLink("c"), vulnLink("d")],
+      },
+    ]);
+
+    expect(bullets[0].links.map((l) => l.entityId)).toEqual(["a", "b", "c"]);
+    // The fourth is not lost — its label is inlined.
+    expect(bullets[0].text).toContain("the Nephrotek flaw");
+    expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
+  });
+
+  it("clamps to five bullets instead of throwing", async () => {
+    idsExist("vulnerability");
+    const draft = Array.from({ length: 9 }, (_, i) => ({
+      text: `Item ${i}.`,
+      links: [],
+    }));
+
+    const { bullets } = await validateBullets(draft);
+
+    expect(bullets).toHaveLength(5);
+  });
+});
+
+describe("validateBullets — the last gate before storage", () => {
+  it("drops a bullet the storable contract would reject", async () => {
+    // Without this gate a hole in rewrite writes a row marked Ready that
+    // renders as an empty card, and the only other check is parseBullets at
+    // READ time, which fails open hours later in the wrong subsystem.
+    idsExist("vulnerability");
+
+    const { bullets } = await validateBullets([
+      { text: "Good one {{0}}.", links: [vulnLink()] },
+      // 900 chars in a single sentence with no spaces: the clamp cannot cut it
+      // at a word, so it is the shape most likely to slip past repair.
+      { text: "x".repeat(900), links: [] },
+    ]);
+
+    for (const b of bullets) {
+      expect(debriefBulletSchema.safeParse(b).success).toBe(true);
+    }
+    expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
+  });
+});
+
+describe("validateBullets — a label that contains marker syntax", () => {
+  // Inlining a dropped link's label injects that label into the text. A label
+  // holding "{{9}}" would then point at a link that does not exist, and the
+  // storage gate would drop the whole bullet — losing a real fact over a
+  // stray brace.
+  const ODD = {
+    text: "See {{0}} now.",
+    links: [
+      {
+        label: "odd {{9}} label",
+        entityType: "vulnerability" as const,
+        entityId: "ghost",
+      },
+    ],
+  };
+
+  it("keeps the bullet, with the stray marker stripped", async () => {
+    idsMissing("vulnerability");
+
+    const { bullets } = await validateBullets([ODD]);
+
+    expect(bullets).toHaveLength(1);
+    expect(bullets[0].text).toBe("See odd label now.");
+    expect(bullets[0].links).toHaveLength(0);
+    expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
+  });
+
+  it("never stores a bullet the strict contract would reject", async () => {
+    // The storage gate is the backstop if the strip above ever regresses.
+    idsMissing("vulnerability");
+
+    const { bullets } = await validateBullets([ODD]);
+
+    for (const b of bullets) {
+      expect(debriefBulletSchema.safeParse(b).success).toBe(true);
+      expect(b.links.every(Boolean)).toBe(true);
+    }
   });
 });

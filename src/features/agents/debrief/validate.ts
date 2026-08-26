@@ -1,13 +1,14 @@
 import "server-only";
 import {
   DEBRIEF_MAX_BULLET_CHARS,
+  DEBRIEF_MAX_BULLET_LINKS,
   DEBRIEF_MAX_BULLET_SENTENCES,
   DEBRIEF_PLACEHOLDER,
-  DEBRIEF_SENTENCE_BOUNDARY,
   type DebriefBullet,
   type DebriefBulletDraft,
   type DebriefLink,
   type DebriefLinkEntity,
+  debriefBulletSchema,
 } from "@/features/debrief/types";
 import prisma from "@/lib/db";
 
@@ -89,85 +90,109 @@ async function resolveExistingIds(
 }
 
 /**
- * Shorten a bullet by dropping whole sentences, never by cutting one.
+ * Sentence boundary: a terminator, then whitespace, then a sentence opener.
  *
- * Runs before the placeholder pass, so a marker in a dropped sentence simply
- * loses its link rather than leaving the text pointing past the array.
+ * Every part is load-bearing in this domain, which is full of dots that are not
+ * sentence ends — firmware "M.02.07", products like "syngo.plaza", and scores
+ * like "CVSS 9.8" all stay intact because none is followed by whitespace, and
+ * "etc. devices" stays intact because a lowercase word is not an opener.
+ *
+ * The opener class includes digits and `{` because a bullet often starts with a
+ * device count ("11 monitors...") or a link marker ("{{0}} is already...").
  */
-function trimToLimit(text: string): string {
-  const sentences = text.split(DEBRIEF_SENTENCE_BOUNDARY);
+const SENTENCE_BOUNDARY = /(?<=[.!?])\s+(?=[A-Z0-9{])/;
 
-  const kept =
-    sentences.length > DEBRIEF_MAX_BULLET_SENTENCES
-      ? sentences.slice(0, DEBRIEF_MAX_BULLET_SENTENCES).join(" ")
-      : text;
+/**
+ * Enforce the readability rule: at most DEBRIEF_MAX_BULLET_SENTENCES sentences.
+ *
+ * Drops whole sentences, so every surviving one stays grammatical. Joining with
+ * a single space also normalises any newline the writer put between sentences.
+ */
+function dropExtraSentences(text: string): string {
+  const sentences = text.split(SENTENCE_BOUNDARY);
+  if (sentences.length <= DEBRIEF_MAX_BULLET_SENTENCES) return text;
+  return sentences.slice(0, DEBRIEF_MAX_BULLET_SENTENCES).join(" ");
+}
 
-  if (kept.length <= DEBRIEF_MAX_BULLET_CHARS) return kept;
+/**
+ * Enforce the storage contract: never exceed DEBRIEF_MAX_BULLET_CHARS.
+ *
+ * A different rule from the sentence limit, with a different failure mode — an
+ * over-long bullet fails `debriefBulletSchema`, and one bad bullet blanks the
+ * whole card. Only reachable when a single sentence runs past the backstop,
+ * i.e. the writer ignored the sentence instruction. The text is malformed
+ * already, so an ellipsis is the honest result.
+ */
+function clampToChars(text: string): string {
+  if (text.length <= DEBRIEF_MAX_BULLET_CHARS) return text;
 
-  // Only reachable when a single sentence runs past the backstop,
-  // The text is already malformed, so an ellipsis is the
-  // honest result rather than a regression.
-  const head = kept.slice(0, DEBRIEF_MAX_BULLET_CHARS - 1);
+  const head = text.slice(0, DEBRIEF_MAX_BULLET_CHARS - 1);
   const word = head.lastIndexOf(" ");
   const cut = word > 0 ? head.slice(0, word) : head;
-  // Drop any partial markers e.g "{{1" at the end.
-  return `${cut.replace(/\{\{?\d*$/, "").trimEnd()}\u2026`;
+  // A cut can land inside a marker and leave "{{1" behind, which would render
+  // as literal text.
+  const partialMarker = /\{\{?\d*$/;
+  return `${cut.replace(partialMarker, "").trimEnd()}\u2026`;
 }
 
 /**
  * Rewrite one bullet so its text and its links agree.
  *
- * A link survives only if BOTH its id resolves and the text points at it. That
- * single rule is decided once, before any rewriting: renumbering against one
- * set of survivors and then filtering the array against another is how the two
- * drift apart and leave a placeholder pointing past the end of the array.
+ * Three passes, in this order, and the order is the whole design:
  *
- * Survivors are renumbered in order, so dropping `{{1}}` turns the old `{{2}}`
- * into `{{1}}`. A placeholder whose link did not survive is replaced by the
- * label the model wrote, so the sentence still reads correctly — the fact
- * survives even when the link does not.
+ * 1. Inline. A marker whose link did not resolve is replaced by the label the
+ *    writer wrote, so the fact survives even when the link does not. This runs
+ *    FIRST because a label is longer than a marker, and the length rules below
+ *    must measure the text that will actually be stored.
+ * 2. Shorten. Sentence rule, then the storage backstop.
+ * 3. Renumber. Only markers that survived the shortening keep a link, and they
+ *    are renumbered in order, so a new index is never wider than the old one
+ *    and the clamped length still holds.
+ *
+ * After pass 1, a `{{n}}` can only remain where the link resolved — every other
+ * marker, including an out-of-range one, was already replaced. So the surviving
+ * markers ARE the surviving links, and no second predicate is needed.
  */
 function rewrite(
   bullet: DebriefBulletDraft,
-  keep: (link: DebriefLink) => boolean,
+  resolves: (link: DebriefLink) => boolean,
 ): DebriefBullet {
-  // Trim first, so the placeholder pass below reads the text that will
-  // actually be stored.
-  const trimmed = trimToLimit(bullet.text);
-
-  // Read from the trimmed text, before any substitution.
-  const referenced = new Set(
-    [...trimmed.matchAll(DEBRIEF_PLACEHOLDER)].map((m) => Number(m[1])),
+  // A link past the cap is treated exactly like one whose id does not exist:
+  // its marker inlines as a label, so the sentence still reads correctly.
+  const idResolves = bullet.links.map(
+    (link, index) => index < DEBRIEF_MAX_BULLET_LINKS && resolves(link),
   );
 
-  const survivors: DebriefLink[] = [];
-  const newIndexByOld = new Map<number, number>();
-
-  bullet.links.forEach((link, oldIndex) => {
-    // Call keep() for every link, so the caller still counts each one whose id
-    // did not resolve — including links the text never pointed at.
-    const idResolves = keep(link);
-    if (idResolves && referenced.has(oldIndex)) {
-      newIndexByOld.set(oldIndex, survivors.length);
-      survivors.push(link);
-    }
-  });
-
-  const text = trimmed.replace(
+  const inlined = bullet.text.replace(
     DEBRIEF_PLACEHOLDER,
-    (_match, digits: string) => {
-      const oldIndex = Number(digits);
-      const newIndex = newIndexByOld.get(oldIndex);
-      if (newIndex !== undefined) return `{{${newIndex}}}`;
-      // Orphaned marker: inline the label the model wrote, or drop it when the
-      // index pointed at no link at all.
-      return bullet.links[oldIndex]?.label ?? "";
+    (marker, digits: string) => {
+      if (idResolves[Number(digits)]) return marker;
+      // Strip marker syntax out of the label before inlining it. A label
+      // containing "{{9}}" would otherwise inject a marker pointing at a link
+      // that does not exist, and the whole bullet gets dropped at the storage
+      // gate below — losing a fact over a stray brace.
+      const label = bullet.links[Number(digits)]?.label ?? "";
+      return label.replace(DEBRIEF_PLACEHOLDER, "");
     },
+  );
+
+  const shortened = clampToChars(dropExtraSentences(inlined));
+
+  // Read in order, so renumbering is ascending by construction.
+  const kept = [
+    ...new Set(
+      [...shortened.matchAll(DEBRIEF_PLACEHOLDER)].map((m) => Number(m[1])),
+    ),
+  ].sort((a, b) => a - b);
+
+  const text = shortened.replace(
+    DEBRIEF_PLACEHOLDER,
+    (_marker, digits: string) => `{{${kept.indexOf(Number(digits))}}}`,
   );
 
   return {
     text: text.replace(/\s{2,}/g, " ").trim(),
-    links: survivors,
+    links: kept.map((oldIndex) => bullet.links[oldIndex]),
   };
 }
 
@@ -202,18 +227,19 @@ export async function validateBullets(
   draft: DebriefBulletDraft[],
 ): Promise<ValidateResult> {
   const existing = await resolveExistingIds(draft);
-  let droppedLinks = 0;
+  const resolves = (link: DebriefLink) => existing.has(idKey(link));
+
+  // Counted over the draft, not inside rewrite, so the number does not depend
+  // on how many times the rewrite loop happens to consult the predicate.
+  const droppedLinks = draft
+    .flatMap((bullet) => bullet.links)
+    .filter((link) => !resolves(link)).length;
 
   const bullets = draft
-    .map((bullet) =>
-      rewrite(bullet, (link) => {
-        const ok = existing.has(idKey(link));
-        if (!ok) droppedLinks += 1;
-        return ok;
-      }),
-    )
+    .map((bullet) => rewrite(bullet, resolves))
     // A bullet whose text collapsed to nothing has no content left to show.
     .filter((bullet) => bullet.text.length > 0)
+    .filter((bullet) => debriefBulletSchema.safeParse(bullet).success)
     .slice(0, MAX_BULLETS);
 
   if (droppedLinks > 0) {

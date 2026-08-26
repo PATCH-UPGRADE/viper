@@ -460,3 +460,35 @@ describe("generateDepartmentDebrief — run outcome logging", () => {
     );
   });
 });
+
+describe("generateAllDebriefs — connection pressure", () => {
+  it("claims departments one at a time, not all at once", async () => {
+    // Each claim opens a Prisma interactive transaction, which holds a pool
+    // connection for its lifetime. Claiming in parallel needs as many
+    // connections as there are departments; past the pool size (2 x cpus + 1)
+    // the surplus fail on maxWait and take the whole nightly fan-out with them.
+    const departments = Array.from({ length: 12 }, (_, i) => ({
+      id: `d${i}`,
+      name: `Dept ${i}`,
+    }));
+    mockPrisma.department.findMany.mockResolvedValue(departments);
+    mockScout.mockResolvedValue("findings");
+
+    let inFlight = 0;
+    let peak = 0;
+    mockClaim.mockImplementation(async (departmentId: string) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      // Yield, so genuinely parallel callers would overlap here.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      inFlight -= 1;
+      return { id: `run-${departmentId}`, created: true };
+    });
+
+    const { step, logger } = makeStep();
+    await allDebriefs.handler({ step, logger });
+
+    expect(mockClaim).toHaveBeenCalledTimes(12);
+    expect(peak).toBe(1);
+  });
+});

@@ -1,6 +1,7 @@
 import "server-only";
 import { PLATFORM_CATALOG } from "@/features/agents/tools/query-platform-tool";
 import {
+  DEBRIEF_MAX_BULLET_LINKS,
   DEBRIEF_MAX_BULLET_SENTENCES,
   DEBRIEF_PLACEHOLDER,
   type DebriefBullet,
@@ -150,6 +151,9 @@ of the marker.
 Two rules, both enforced:
 1. Every marker you write must have a link at that position.
 2. Every link you supply must have a marker that points at it.
+
+At most ${DEBRIEF_MAX_BULLET_LINKS} links per bullet. Extra ones are removed
+before the reader sees them, and their text is folded back into the sentence.
 
 Each link needs a "label" the reader sees, an "entityType", and an "entityId"
 copied exactly from the findings. Never invent an entityId. A link whose id

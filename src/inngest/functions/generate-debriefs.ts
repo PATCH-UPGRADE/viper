@@ -1,7 +1,11 @@
 import "server-only";
 import { runDebriefScout } from "@/features/agents/debrief/scout";
 import { writeDepartmentDebrief } from "@/features/agents/debrief/writer";
-import { claimDebriefRun, parseBullets } from "@/features/debrief/server/runs";
+import {
+  claimDebriefRun,
+  type DebriefClaim,
+  parseBullets,
+} from "@/features/debrief/server/runs";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
 import {
@@ -49,14 +53,22 @@ export const generateAllDebriefs = inngest.createFunction(
     // scout costs nothing rather than fanning out N writers with no input.
     const findings = await step.run("scout", () => runDebriefScout());
 
-    const claims = await step.run("claim-runs", async () =>
-      Promise.all(
-        departments.map(async (department) => ({
+    // Sequential, not Promise.all: every claim opens an interactive
+    // transaction that holds a pooled connection for its whole body. Firing one
+    // per department at once needs as many connections as there are
+    // departments. As soon as a hospital has more of them than the Prisma pool
+    // (default: 2 x cpus + 1), the surplus transactions fail on `maxWait` and
+    // take the whole nightly fan-out down with them.
+    const claims = await step.run("claim-runs", async () => {
+      const opened: { department: { id: string }; claim: DebriefClaim }[] = [];
+      for (const department of departments) {
+        opened.push({
           department,
           claim: await claimDebriefRun(department.id),
-        })),
-      ),
-    );
+        });
+      }
+      return opened;
+    });
 
     // A department whose previous run is still active keeps it; re-requesting
     // would be deduplicated by the idempotency key anyway.
@@ -99,8 +111,6 @@ export const generateDepartmentDebrief = inngest.createFunction(
   async ({ event, step, logger }) => {
     const { debriefId, departmentId, findings } =
       event.data as DebriefEventData;
-    // Each step needs a distinct id, so number the beats.
-    let beatCount = 0;
 
     try {
       const context = await step.run("load-context", async () => {
@@ -141,8 +151,8 @@ export const generateDepartmentDebrief = inngest.createFunction(
       // reads `updatedAt`, so a touch that happens only after a multi-minute
       // scout measures age rather than progress, and a second click meanwhile
       // opens a duplicate run that pays for its own scout and writer.
-      const beat = () =>
-        step.run(`heartbeat-${beatCount++}`, () =>
+      const beat = (label: string) =>
+        step.run(`heartbeat-${label}`, () =>
           prisma.debrief.update({
             where: { id: debriefId },
             data: { status: "Generating" },
@@ -150,14 +160,14 @@ export const generateDepartmentDebrief = inngest.createFunction(
           }),
         );
 
-      await beat();
+      await beat("context-loaded");
 
       // Only the manual path arrives without findings, because its caller has
       // no fleet-wide survey to share.
       const surveyed =
         findings ?? (await step.run("scout", () => runDebriefScout()));
 
-      await beat();
+      await beat("survey-ready");
 
       const written = await step.run("write", () =>
         writeDepartmentDebrief({ ...context, findings: surveyed }),

@@ -55,9 +55,9 @@ describe("requestDebrief", () => {
     const src = readFileSync(here, "utf8");
     const imports = [...src.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1]);
 
-    expect(imports).not.toContain(
-      expect.stringMatching(/@\/features\/agents|@\/trpc/),
-    );
+    // Asserted per spec rather than over the array: this reports which
+    // import broke the rule, where a whole-array matcher only says that
+    // one did.
     for (const spec of imports) {
       expect(spec).not.toMatch(/@\/features\/agents|@\/trpc/);
     }

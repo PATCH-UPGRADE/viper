@@ -66,7 +66,7 @@ function makeStep() {
         sent.push(events);
       },
     },
-    logger: { info: vi.fn() },
+    logger: { info: vi.fn(), error: vi.fn() },
   };
 }
 
@@ -189,11 +189,12 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
       bullets: [BULLET],
       model: "claude-sonnet-5",
     });
-    const { step } = makeStep();
+    const { step, logger } = makeStep();
 
     const result = await deptDebrief.handler({
       event: event({ findings: "shared findings" }),
       step,
+      logger,
     });
 
     expect(result).toMatchObject({ status: "Ready", bulletCount: 1 });
@@ -209,11 +210,12 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
   it("reuses the shared findings instead of surveying again", async () => {
     contextResolves();
     mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
-    const { step } = makeStep();
+    const { step, logger } = makeStep();
 
     await deptDebrief.handler({
       event: event({ findings: "shared findings" }),
       step,
+      logger,
     });
 
     expect(mockScout).not.toHaveBeenCalled();
@@ -227,9 +229,9 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     contextResolves();
     mockScout.mockResolvedValue("its own findings");
     mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
-    const { step } = makeStep();
+    const { step, logger } = makeStep();
 
-    await deptDebrief.handler({ event: event({}), step });
+    await deptDebrief.handler({ event: event({}), step, logger });
 
     expect(mockScout).toHaveBeenCalledTimes(1);
     expect(mockWriter).toHaveBeenCalledWith(
@@ -242,9 +244,13 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     // debrief null, so the stored-JSON path was never run.
     contextResolves([BULLET]);
     mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
-    const { step } = makeStep();
+    const { step, logger } = makeStep();
 
-    await deptDebrief.handler({ event: event({ findings: "f" }), step });
+    await deptDebrief.handler({
+      event: event({ findings: "f" }),
+      step,
+      logger,
+    });
 
     expect(mockWriter).toHaveBeenCalledWith(
       expect.objectContaining({ previousBullets: [BULLET] }),
@@ -254,11 +260,12 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
   it("passes an empty previousBullets on a department's first run", async () => {
     contextResolves([]);
     mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
-    const { step } = makeStep();
+    const { step, logger } = makeStep();
 
     await deptDebrief.handler({
       event: event({ findings: "f" }),
       step,
+      logger,
     });
 
     expect(mockWriter).toHaveBeenCalledWith(
@@ -272,9 +279,13 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     // row for the card to render.
     contextResolves();
     mockWriter.mockResolvedValue({ bullets: [], model: "m" });
-    const { step } = makeStep();
+    const { step, logger } = makeStep();
 
-    await deptDebrief.handler({ event: event({ findings: "f" }), step });
+    await deptDebrief.handler({
+      event: event({ findings: "f" }),
+      step,
+      logger,
+    });
 
     const persisted = mockPrisma.debrief.update.mock.calls.at(-1)?.[0];
     expect(persisted.data).toMatchObject({ status: "Failed", bullets: [] });
@@ -284,11 +295,12 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     // Ready with no bullets renders an empty card.
     contextResolves();
     mockWriter.mockResolvedValue({ bullets: [], model: "m" });
-    const { step } = makeStep();
+    const { step, logger } = makeStep();
 
     const result = await deptDebrief.handler({
       event: event({ findings: "f" }),
       step,
+      logger,
     });
 
     expect(result).toMatchObject({ status: "Failed", bulletCount: 0 });
@@ -300,13 +312,10 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     // A stuck row blocks the department until the staleness bound expires.
     contextResolves();
     mockWriter.mockRejectedValue(new Error("model refused"));
-    const { step } = makeStep();
+    const { step, logger } = makeStep();
 
     await expect(
-      deptDebrief.handler({
-        event: event({ findings: "f" }),
-        step,
-      }),
+      deptDebrief.handler({ event: event({ findings: "f" }), step, logger }),
     ).rejects.toThrow("model refused");
 
     const persisted = mockPrisma.debrief.update.mock.calls.at(-1)?.[0];
@@ -349,9 +358,9 @@ describe("generateDepartmentDebrief — progress and failure reporting", () => {
       },
     );
     mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
-    const { step } = makeStep();
+    const { step, logger } = makeStep();
 
-    await deptDebrief.handler({ event: event({}), step });
+    await deptDebrief.handler({ event: event({}), step, logger });
 
     expect(order.indexOf("beat")).toBeLessThan(order.indexOf("scout"));
   });
@@ -372,10 +381,82 @@ describe("generateDepartmentDebrief — progress and failure reporting", () => {
         return { id: "run-1" };
       },
     );
-    const { step } = makeStep();
+    const { step, logger } = makeStep();
 
     await expect(
-      deptDebrief.handler({ event: event({ findings: "f" }), step }),
+      deptDebrief.handler({ event: event({ findings: "f" }), step, logger }),
     ).rejects.toThrow("model refused");
+  });
+});
+
+describe("generateDepartmentDebrief — run outcome logging", () => {
+  const event = (data: Record<string, unknown>) => ({
+    data: { debriefId: "run-1", departmentId: "d1", ...data },
+  });
+
+  function contextResolves() {
+    mockPrisma.department.findUnique.mockResolvedValue({
+      name: "Biomed",
+      description: null,
+    });
+    mockPrisma.debrief.findFirst.mockResolvedValue(null);
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+    mockPrisma.debrief.update.mockResolvedValue({ id: "run-1" });
+  }
+
+  it("logs the terminal outcome with ids, status and count", async () => {
+    contextResolves();
+    mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
+    const { step, logger } = makeStep();
+
+    await deptDebrief.handler({
+      event: event({ findings: "f" }),
+      step,
+      logger,
+    });
+
+    expect(logger.info).toHaveBeenCalledWith("Debrief run finished", {
+      debriefId: "run-1",
+      departmentId: "d1",
+      bulletCount: 1,
+      status: "Ready",
+    });
+  });
+
+  it("never puts bullet text in the logs", async () => {
+    // Bullets are clinical content about a named hospital. Counts and ids are
+    // enough to trace a run.
+    contextResolves();
+    mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
+    const { step, logger } = makeStep();
+
+    await deptDebrief.handler({
+      event: event({ findings: "f" }),
+      step,
+      logger,
+    });
+
+    const logged = JSON.stringify(logger.info.mock.calls);
+    expect(logged).not.toContain(BULLET.text);
+  });
+
+  it("logs a failure with its cause before rethrowing", async () => {
+    contextResolves();
+    mockWriter.mockRejectedValue(new Error("model refused"));
+    const { step, logger } = makeStep();
+
+    await expect(
+      deptDebrief.handler({ event: event({ findings: "f" }), step, logger }),
+    ).rejects.toThrow("model refused");
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "Debrief run failed",
+      expect.objectContaining({
+        debriefId: "run-1",
+        departmentId: "d1",
+        status: "Failed",
+        error: "model refused",
+      }),
+    );
   });
 });

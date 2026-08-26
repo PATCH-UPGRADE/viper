@@ -31,13 +31,6 @@ export type DebriefEventData = {
 };
 
 /**
- * Ask for a debrief to be generated into an already-claimed row.
- *
- * The caller claims the row first (see `claimDebriefRun`) so the UI can show a
- * pending state immediately, and so the row id is a natural idempotency key:
- * one requested run, one execution.
- */
-/**
  * Build the event payload. Both senders go through this — the mutation below
  * and the nightly cron — so a missing field is a compile error at either. The
  * Inngest client is constructed without `schemas`, so nothing else checks it.
@@ -56,6 +49,13 @@ export function debriefEvent(
   return { name: DEBRIEF_EVENT, data } as const;
 }
 
+/**
+ * Ask for a debrief to be generated into an already-claimed row.
+ *
+ * The caller claims the row first (see `claimDebriefRun`) so the UI can show a
+ * pending state immediately, and so the row id is a natural idempotency key:
+ * one requested run, one execution.
+ */
 export async function requestDebrief(
   debriefId: string,
   departmentId: string,

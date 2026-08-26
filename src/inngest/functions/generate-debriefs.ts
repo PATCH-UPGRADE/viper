@@ -96,7 +96,7 @@ export const generateDepartmentDebrief = inngest.createFunction(
     concurrency: { key: "event.data.departmentId", limit: 1 },
   },
   { event: DEBRIEF_EVENT },
-  async ({ event, step }) => {
+  async ({ event, step, logger }) => {
     const { debriefId, departmentId, findings } =
       event.data as DebriefEventData;
     // Each step needs a distinct id, so number the beats.
@@ -188,16 +188,30 @@ export const generateDepartmentDebrief = inngest.createFunction(
               },
         });
 
-        return {
+        const outcome = {
           debriefId,
+          departmentId,
           bulletCount: written.bullets.length,
           status: ok ? ("Ready" as const) : ("Failed" as const),
         };
+
+        // Counts and ids only. Bullet text is clinical content about a named
+        // hospital, and logs are not the place for it.
+        logger.info("Debrief run finished", outcome);
+
+        return outcome;
       });
     } catch (err) {
       // Never leave a row stuck on Generating: the in-flight guard would then
       // block this department until the staleness bound expires.
       const message = err instanceof Error ? err.message : String(err);
+      logger.error("Debrief run failed", {
+        debriefId,
+        departmentId,
+        status: "Failed",
+        error: message,
+      });
+
       await step.run("mark-failed", async () => {
         try {
           await prisma.debrief.update({

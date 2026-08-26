@@ -147,10 +147,6 @@ export const generateDepartmentDebrief = inngest.createFunction(
         };
       });
 
-      // Claim progress before the slow work, not after. The staleness bound
-      // reads `updatedAt`, so a touch that happens only after a multi-minute
-      // scout measures age rather than progress, and a second click meanwhile
-      // opens a duplicate run that pays for its own scout and writer.
       const beat = (label: string) =>
         step.run(`heartbeat-${label}`, () =>
           prisma.debrief.update({
@@ -162,8 +158,6 @@ export const generateDepartmentDebrief = inngest.createFunction(
 
       await beat("context-loaded");
 
-      // Only the manual path arrives without findings, because its caller has
-      // no fleet-wide survey to share.
       const surveyed =
         findings ?? (await step.run("scout", () => runDebriefScout()));
 
@@ -205,8 +199,6 @@ export const generateDepartmentDebrief = inngest.createFunction(
           status: ok ? ("Ready" as const) : ("Failed" as const),
         };
 
-        // Counts and ids only. Bullet text is clinical content about a named
-        // hospital, and logs are not the place for it.
         logger.info("Debrief run finished", outcome);
 
         return outcome;

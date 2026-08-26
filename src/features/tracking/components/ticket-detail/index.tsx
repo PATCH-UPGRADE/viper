@@ -177,7 +177,7 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
             <OverviewCard data={data} />
             <DescriptionCard data={data} />
             {data.mitigationPlanId && (
-              <CollapsibleSectionCard title="Briefing">
+              <CollapsibleSectionCard title="Briefing" defaultOpen={false}>
                 <BriefingPanel planId={data.mitigationPlanId} />
               </CollapsibleSectionCard>
             )}

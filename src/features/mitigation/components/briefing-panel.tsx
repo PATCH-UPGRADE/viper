@@ -4,7 +4,7 @@ import { Loader2Icon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBriefing } from "../hooks/use-mitigation";
 
 const AUDIENCES = [
@@ -54,9 +54,9 @@ export function BriefingPanel({ planId }: { planId: string }) {
           </TabsTrigger>
         ))}
       </TabsList>
-      <div className="pt-4 text-sm">
+      <TabsContent value={audience} className="pt-4 text-sm">
         <MarkdownWithTablesWrapper>{data[audience]}</MarkdownWithTablesWrapper>
-      </div>
+      </TabsContent>
     </Tabs>
   );
 }

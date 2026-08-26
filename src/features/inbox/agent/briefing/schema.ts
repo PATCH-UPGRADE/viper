@@ -45,9 +45,10 @@ function renderSection(section: z.infer<typeof briefingSectionSchema>): string {
 }
 
 export function renderBriefing(generated: GeneratedBriefing): Briefing {
-  return {
-    ciso: renderSection(generated.ciso),
-    cmio: renderSection(generated.cmio),
-    deptHead: renderSection(generated.deptHead),
-  };
+  return Object.fromEntries(
+    Object.entries(generated).map(([audience, section]) => [
+      audience,
+      renderSection(section),
+    ]),
+  ) as Briefing;
 }

@@ -22,6 +22,7 @@ import { Prisma } from "@/generated/prisma";
 import { getAutomationUser } from "@/lib/automation-user";
 import prisma from "@/lib/db";
 import { normalizeMd5, uploadBufferToS3 } from "@/lib/s3";
+import { sourceContentHash } from "@/lib/source-hash";
 import { inngest } from "../client";
 
 const turndown = new TurndownService();
@@ -190,12 +191,13 @@ export const processInboxEmail = inngest.createFunction(
       // });
 
       try {
-        const source = await prisma.notificationSource.create({
+        const source = await prisma.sourceRecord.create({
           data: {
             channel: "Email",
             externalId: emailId,
             raw,
             markdown,
+            contentHash: sourceContentHash(raw, markdown),
             attachments: {
               create: (
                 uploadedAttachments as NonNullable<
@@ -278,7 +280,7 @@ export const processInboxEmail = inngest.createFunction(
               },
               // Links the email NotificationSource to this ticket (sets its
               // workOrderTicketId; notificationId stays null).
-              sources: { connect: { id: sourceId } },
+              //sources: { connect: { id: sourceId } },
             },
           });
           return ticket.id;
@@ -328,23 +330,23 @@ export const processInboxEmail = inngest.createFunction(
       );
 
       if (result.action === "update") {
-        await prisma.$transaction(async (tx) => {
-          await tx.notification.update({
-            where: { id: result.notificationId },
-            data: {
-              type: result.type,
-              title: result.title,
-              summary: result.summary,
-              ...(result.tlp !== null ? { tlp: result.tlp } : {}),
-              sources: { connect: { id: sourceId } },
+        await prisma.notification.update({
+          where: { id: result.notificationId },
+          data: {
+            type: result.type,
+            title: result.title,
+            summary: result.summary,
+            ...(result.tlp !== null ? { tlp: result.tlp } : {}),
+            sourceLinks: {
+              create: {
+                sourceRecordId: sourceId,
+                sourceType: "Link",
+                reasonWhy: result.reasonWhy,
+              },
             },
-          });
-
-          await tx.notificationSource.update({
-            where: { id: sourceId },
-            data: { sourceType: "Link", reasonWhy: result.reasonWhy },
-          });
+          },
         });
+
         return result.notificationId;
       }
 
@@ -354,7 +356,9 @@ export const processInboxEmail = inngest.createFunction(
           title: result.title,
           summary: result.summary,
           ...(result.tlp !== null ? { tlp: result.tlp } : {}),
-          sources: { connect: { id: sourceId } },
+          sourceLinks: {
+            create: { sourceRecordId: sourceId, sourceType: "Source" },
+          },
         },
       });
       return notification.id;

@@ -22,7 +22,16 @@ export const questionInclude = {
           version: { select: { canonicalDisplayName: true } },
         },
       },
-      asset: true,
+      asset: {
+        include: {
+          deviceGroup: {
+            include: {
+              manufacturer: { select: { canonicalDisplayName: true } },
+              product: { select: { canonicalDisplayName: true } },
+            },
+          },
+        },
+      },
     },
   },
 } satisfies Prisma.QuestionInclude;

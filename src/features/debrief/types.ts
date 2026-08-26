@@ -38,14 +38,6 @@ export type DebriefLink = z.infer<typeof debriefLinkSchema>;
 
 export const DEBRIEF_PLACEHOLDER = /\{\{(\d+)\}\}/g;
 
-/**
- * How many sentences a bullet may hold.
- *
- * Sentences, not characters, because this is what the writer is asked for. A
- * model cannot count characters but reliably writes "at most three sentences",
- * and enforcing the same unit means a bullet is shortened by dropping a whole
- * sentence rather than cut mid-clause.
- */
 export const DEBRIEF_MAX_BULLET_SENTENCES = 3;
 
 /**

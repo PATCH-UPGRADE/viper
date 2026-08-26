@@ -91,12 +91,6 @@ async function resolveExistingIds(
 /**
  * Shorten a bullet by dropping whole sentences, never by cutting one.
  *
- * The writer is asked for at most DEBRIEF_MAX_BULLET_SENTENCES sentences, so
- * enforcing the same unit keeps every surviving sentence complete. Cutting on
- * characters produced dangling clauses like "...are actually in place, not..."
- * because a two-sentence bullet has no cut point that is both short enough and
- * grammatical.
- *
  * Runs before the placeholder pass, so a marker in a dropped sentence simply
  * loses its link rather than leaving the text pointing past the array.
  */
@@ -110,14 +104,13 @@ function trimToLimit(text: string): string {
 
   if (kept.length <= DEBRIEF_MAX_BULLET_CHARS) return kept;
 
-  // Only reachable when a single sentence runs past the backstop, i.e. the
-  // model ignored the instruction. The text is already malformed, so an
-  // ellipsis is the honest result rather than a regression.
+  // Only reachable when a single sentence runs past the backstop,
+  // The text is already malformed, so an ellipsis is the
+  // honest result rather than a regression.
   const head = kept.slice(0, DEBRIEF_MAX_BULLET_CHARS - 1);
   const word = head.lastIndexOf(" ");
   const cut = word > 0 ? head.slice(0, word) : head;
-  // A cut can land inside a marker and leave "{{1" behind, which renders as
-  // literal text. Drop any partial marker at the end.
+  // Drop any partial markers e.g "{{1" at the end.
   return `${cut.replace(/\{\{?\d*$/, "").trimEnd()}\u2026`;
 }
 

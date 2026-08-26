@@ -59,18 +59,10 @@ export const debriefRouter = createTRPCRouter({
       });
     }
 
-    // One place decides whether a run is already active, so this and the
-    // nightly cron cannot disagree about what counts as in flight.
     const { id, created } = await claimDebriefRun(departmentId);
 
-    // Only dispatch for a run this call opened. Joining an active run must not
-    // queue a second agent execution.
     if (!created) return { id, queued: false };
 
-    // requestDebrief reports failure rather than throwing, so an unchecked call
-    // would leave a Generating row that nothing will ever write: it blocks
-    // retries until the staleness bound expires AND hides the department's last
-    // good debrief, because the newest row wins. Release the claim instead.
     const dispatched = await requestDebrief(id, departmentId);
     if (!dispatched) {
       await prisma.debrief.update({

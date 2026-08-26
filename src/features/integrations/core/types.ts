@@ -106,7 +106,7 @@ export type SyncStrategy<TConfig = unknown, TCreds = unknown> = (
  *
  * `sync` is the contract: declaring a resource module means that module knows how
  * to sync itself. The pull helpers below are the pieces a `sync` is usually built
- * out of, not required 
+ * out of, not required
  */
 export interface ResourceModule<
   TCanonical,

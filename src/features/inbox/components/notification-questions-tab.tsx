@@ -24,7 +24,9 @@ export function NotificationQuestionTab({
   const approve = useApproveEscalation(notificationId);
   const dismiss = useDismissEscalation();
 
-  const pending = questions.filter((q) => q.status === "PENDING");
+  const pending = questions.filter(
+    (q) => q.status === "PENDING" || q.status === "UNSURE",
+  );
 
   if (pending.length === 0 && suggestedEmails.length === 0) {
     if (questions.length === 0 && suggestedEmails.length === 0) {
@@ -45,7 +47,7 @@ export function NotificationQuestionTab({
   const bannerText: string[] = [];
   if (pending.length > 0) {
     bannerText.push(
-      `${pending.length} question${pending.length === 1 ? "" : "s"}`,
+      `${pending.length - suggestedEmails.length} question${pending.length === 1 ? "" : "s"}`,
     );
   }
   if (suggestedEmails.length > 0) {

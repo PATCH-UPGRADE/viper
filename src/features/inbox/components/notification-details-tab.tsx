@@ -77,7 +77,7 @@ function EmailSourceModal({
                     { label: "Subject", value: raw.data?.subject ?? "—" },
                     {
                       label: "Date",
-                      value: format(source.receivedAt, "PPP p"),
+                      value: format(source.observedAt, "PPP p"),
                     },
                   ] satisfies { label: string; value: string }[]
                 ).map(({ label, value }) => (
@@ -112,11 +112,14 @@ function EmailSourceModal({
 
 function SourceReference({ source }: { source: NotificationDetailSource }) {
   const [open, setOpen] = useState(false);
-  const raw =
-    source.channel === "Email"
-      ? (source.raw as unknown as RawEmailPayload)
-      : null;
-  const label = raw?.data?.subject ?? source.referenceUrl ?? source.channel;
+  // TODO VW-449 uncomment below and update, remove line 122 hardcoded label
+  // const raw =
+  //   source.channel === "Email"
+  //     ? (source.raw as unknown as RawEmailPayload)
+  //     : null;
+  // const label = raw?.data?.subject ?? source.referenceUrl ?? source.channel;
+
+  const label = "Email";
 
   if (source.channel === "Email") {
     return (
@@ -133,10 +136,11 @@ function SourceReference({ source }: { source: NotificationDetailSource }) {
       </>
     );
   }
-
+  // TODO VW-449 remove line 140, update href={source.referenceUrl ?? "#"}
+  const tempUrl = "#";
   return (
     <a
-      href={source.referenceUrl ?? "#"}
+      href={tempUrl}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-center gap-1 text-sm text-primary hover:underline"
@@ -162,6 +166,7 @@ export function NotificationDetailsTab({
   const [comment, setComment] = useState("");
   const markMatchIncorrect = useMarkMatchIncorrect();
 
+  const sources = notification.sourceLinks.map((link) => link.sourceRecord);
   const detailRows: { label: string; content: ReactNode }[] = [
     {
       label: "TLP",
@@ -174,11 +179,11 @@ export function NotificationDetailsTab({
     {
       label: "References",
       content:
-        notification.sources.length === 0 ? (
+        sources.length === 0 ? (
           <span className="text-muted-foreground">—</span>
         ) : (
           <div className="flex flex-col gap-1.5">
-            {notification.sources.map((source) => (
+            {sources.map((source) => (
               <SourceReference key={source.id} source={source} />
             ))}
           </div>

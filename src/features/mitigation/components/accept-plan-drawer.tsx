@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { DepartmentMultiSelect } from "@/features/tracking/components/ticket-detail/department-multi-select";
 import {
@@ -37,6 +38,7 @@ import { useBeforeUnload } from "@/hooks/use-before-unload";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAcceptMitigationPlan } from "../hooks/use-mitigation";
 import type { MitigationPlanWithWorkOrders, PlanWorkOrder } from "../types";
+import { BriefingPanel } from "./briefing-panel";
 
 const UNASSIGNED = "__unassigned__";
 
@@ -150,141 +152,35 @@ export function AcceptPlanDrawer({
           </DrawerDescription>
         </DrawerHeader>
 
-        <ScrollArea className="min-h-0 flex-1 bg-muted">
-          <div className="flex flex-col gap-4 p-4">
-            {edits.map((edit, index) => {
-              const workOrder = plan.workOrders[index];
-              return (
-                <div
-                  key={edit.id}
-                  className="flex flex-col gap-4 rounded-lg border p-4 bg-background"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-semibold">
-                        {workOrder?.sourceLabel ?? "Work order"}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {workOrder?.suggestedAssignee ??
-                          "Draft — not yet created"}
-                      </span>
-                    </div>
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {index + 1}/{count}
-                    </span>
-                  </div>
+        <Tabs defaultValue="workItems" className="min-h-0 flex-1 gap-0">
+          <TabsList className="mx-4 mt-3 self-start">
+            <TabsTrigger value="workItems">Work Items</TabsTrigger>
+            <TabsTrigger value="briefing">Briefing</TabsTrigger>
+          </TabsList>
 
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor={`wo-summary-${edit.id}`}>
-                      Short description
-                    </Label>
-                    <Input
-                      id={`wo-summary-${edit.id}`}
-                      value={edit.summary}
-                      onChange={(e) =>
-                        patch(edit.id, { summary: e.target.value })
-                      }
-                      required
-                      maxLength={255}
-                    />
-                  </div>
+          <TabsContent value="briefing" className="min-h-0 overflow-y-auto p-4">
+            <BriefingPanel planId={plan.id} />
+          </TabsContent>
 
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor={`wo-body-${edit.id}`}>
-                      Detailed description
-                    </Label>
-                    <Textarea
-                      id={`wo-body-${edit.id}`}
-                      value={edit.body}
-                      onChange={(e) => patch(edit.id, { body: e.target.value })}
-                      rows={6}
-                      maxLength={10_000}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor={`wo-category-${edit.id}`}>Category</Label>
-                      <Select
-                        value={edit.category}
-                        onValueChange={(v) =>
-                          patch(edit.id, { category: v as TicketCategory })
-                        }
-                      >
-                        <SelectTrigger id={`wo-category-${edit.id}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(
-                            Object.keys(categoryLabels) as TicketCategory[]
-                          ).map((c) => (
-                            <SelectItem key={c} value={c}>
-                              <CategoryChip category={c} />
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor={`wo-priority-${edit.id}`}>Priority</Label>
-                      <Select
-                        value={edit.priority}
-                        onValueChange={(v) =>
-                          patch(edit.id, { priority: v as Priority })
-                        }
-                      >
-                        <SelectTrigger id={`wo-priority-${edit.id}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.values(Priority).map((p) => (
-                            <SelectItem key={p} value={p}>
-                              <PriorityBadge priority={p} />
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <Label>Team</Label>
-                      <DepartmentMultiSelect
-                        options={departments ?? []}
-                        selectedIds={edit.departmentIds}
-                        onChange={(ids) =>
-                          patch(edit.id, { departmentIds: ids })
-                        }
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor={`wo-assignee-${edit.id}`}>
-                        Assigned to
-                      </Label>
-                      <Select
-                        value={edit.assigneeId}
-                        onValueChange={(v) => patch(edit.id, { assigneeId: v })}
-                      >
-                        <SelectTrigger id={`wo-assignee-${edit.id}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-                          {users?.map((u) => (
-                            <SelectItem key={u.id} value={u.id}>
-                              {u.name ?? u.email ?? u.id}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </ScrollArea>
+          <TabsContent value="workItems" className="min-h-0 flex-1">
+            <ScrollArea className="h-full bg-muted">
+              <div className="flex flex-col gap-4 p-4">
+                {edits.map((edit, index) => (
+                  <WorkOrderEditCard
+                    key={edit.id}
+                    edit={edit}
+                    workOrder={plan.workOrders[index]}
+                    index={index}
+                    count={count}
+                    patch={patch}
+                    departments={departments}
+                    users={users}
+                  />
+                ))}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
 
         <DrawerFooter className="flex-row justify-end border-t">
           <Button
@@ -309,5 +205,134 @@ export function AcceptPlanDrawer({
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
+  );
+}
+
+function WorkOrderEditCard({
+  edit,
+  workOrder,
+  index,
+  count,
+  patch,
+  departments,
+  users,
+}: {
+  edit: WorkOrderEdit;
+  workOrder: PlanWorkOrder | undefined;
+  index: number;
+  count: number;
+  patch: (id: string, changes: Partial<WorkOrderEdit>) => void;
+  departments: ReturnType<typeof useDepartments>["data"];
+  users: ReturnType<typeof useAssignableUsers>["data"];
+}) {
+  return (
+    <div className="flex flex-col gap-4 rounded-lg border p-4 bg-background">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold">
+            {workOrder?.sourceLabel ?? "Work order"}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {workOrder?.suggestedAssignee ?? "Draft — not yet created"}
+          </span>
+        </div>
+        <span className="text-xs font-medium text-muted-foreground">
+          {index + 1}/{count}
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={`wo-summary-${edit.id}`}>Short description</Label>
+        <Input
+          id={`wo-summary-${edit.id}`}
+          value={edit.summary}
+          onChange={(e) => patch(edit.id, { summary: e.target.value })}
+          required
+          maxLength={255}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={`wo-body-${edit.id}`}>Detailed description</Label>
+        <Textarea
+          id={`wo-body-${edit.id}`}
+          value={edit.body}
+          onChange={(e) => patch(edit.id, { body: e.target.value })}
+          rows={6}
+          maxLength={10_000}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`wo-category-${edit.id}`}>Category</Label>
+          <Select
+            value={edit.category}
+            onValueChange={(v) =>
+              patch(edit.id, { category: v as TicketCategory })
+            }
+          >
+            <SelectTrigger id={`wo-category-${edit.id}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(categoryLabels) as TicketCategory[]).map((c) => (
+                <SelectItem key={c} value={c}>
+                  <CategoryChip category={c} />
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`wo-priority-${edit.id}`}>Priority</Label>
+          <Select
+            value={edit.priority}
+            onValueChange={(v) => patch(edit.id, { priority: v as Priority })}
+          >
+            <SelectTrigger id={`wo-priority-${edit.id}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.values(Priority).map((p) => (
+                <SelectItem key={p} value={p}>
+                  <PriorityBadge priority={p} />
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label>Team</Label>
+          <DepartmentMultiSelect
+            options={departments ?? []}
+            selectedIds={edit.departmentIds}
+            onChange={(ids) => patch(edit.id, { departmentIds: ids })}
+          />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`wo-assignee-${edit.id}`}>Assigned to</Label>
+          <Select
+            value={edit.assigneeId}
+            onValueChange={(v) => patch(edit.id, { assigneeId: v })}
+          >
+            <SelectTrigger id={`wo-assignee-${edit.id}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+              {users?.map((u) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.name ?? u.email ?? u.id}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
   );
 }

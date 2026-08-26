@@ -1432,6 +1432,7 @@ model MitigationPlan {
   order      Int // 0-based; order 0 is the recommended plan
 
   workOrders WorkOrderTicket[]
+  briefing   PlanBriefing?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1439,6 +1440,21 @@ model MitigationPlan {
   @@unique([notificationId, order])
   @@index([notificationId])
   @@map("mitigation_plan")
+}
+
+model PlanBriefing {
+  id String @id @default(cuid())
+
+  mitigationPlanId String         @unique
+  mitigationPlan   MitigationPlan @relation(fields: [mitigationPlanId], references: [id], onDelete: Cascade)
+
+  // { ciso: BriefingSection, cmio: BriefingSection, deptHead: BriefingSection }
+  content Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("plan_briefing")
 }
 
 model NotificationSource {

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BriefingPanel } from "@/features/mitigation/components/briefing-panel";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
 import {
   useMarkTicketSeen,
@@ -32,6 +33,7 @@ import { TicketEditForm } from "./edit-form";
 import { LinkedAssetsTabContent } from "./linked-assets";
 import { OverviewCard } from "./overview-card";
 import { RawJsonListCard } from "./raw-json-list-card";
+import { CollapsibleSectionCard } from "./section-card";
 import { SubTicketsSection } from "./sub-tickets";
 
 // Re-exports so existing import sites (`./ticket-detail`) keep working.
@@ -174,6 +176,11 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
           <TabsContent value="details" className="mt-4 flex flex-col gap-4">
             <OverviewCard data={data} />
             <DescriptionCard data={data} />
+            {data.mitigationPlanId && (
+              <CollapsibleSectionCard title="Briefing">
+                <BriefingPanel planId={data.mitigationPlanId} />
+              </CollapsibleSectionCard>
+            )}
             <SubTicketsSection
               parentId={data.id}
               childTickets={data.children}

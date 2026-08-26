@@ -1,6 +1,9 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { generateBriefing } from "@/features/inbox/agent/briefing";
+import { persistBriefing } from "@/features/inbox/agent/briefing/persist";
+import { briefingSchema } from "@/features/inbox/agent/briefing/schema";
 import { attachMatchingAssets } from "@/features/tracking/server/asset-tickets";
 import { Priority, TicketCategory } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -158,5 +161,63 @@ export const mitigationRouter = createTRPCRouter({
           include: mitigationPlanInclude,
         });
       });
+    }),
+
+  // The audience-tailored explanation of why a plan makes sense. Generated
+  // once on first request and cached on the plan; a plan's case for itself
+  // doesn't change just because its draft work orders get tweaked later.
+  getBriefing: protectedProcedure
+    .input(z.object({ planId: z.string() }))
+    .query(async ({ input }) => {
+      const existing = await prisma.planBriefing.findUnique({
+        where: { mitigationPlanId: input.planId },
+      });
+      if (existing) return briefingSchema.parse(existing.content);
+
+      // Only summary/body/order/etc are needed for the prompt, so this uses
+      // its own narrow select instead of mitigationPlanInclude (which also
+      // pulls assignee/department joins the agent never reads). The
+      // recommended plan (for a non-recommended plan's comparison) is
+      // fetched in the same round trip via the notification relation.
+      const plan = await prisma.mitigationPlan.findUniqueOrThrow({
+        where: { id: input.planId },
+        select: {
+          id: true,
+          title: true,
+          summary: true,
+          compareLine: true,
+          cards: true,
+          order: true,
+          workOrders: { select: { summary: true, body: true } },
+          notification: {
+            select: {
+              mitigationPlans: {
+                where: { order: 0 },
+                select: { title: true, summary: true },
+              },
+            },
+          },
+        },
+      });
+
+      const isRecommended = plan.order === 0;
+      const recommendedPlan = isRecommended
+        ? null
+        : (plan.notification.mitigationPlans[0] ?? null);
+
+      const content = await generateBriefing({
+        title: plan.title,
+        summary: plan.summary,
+        compareLine: plan.compareLine,
+        cards: plan.cards,
+        isRecommended,
+        recommendedPlan,
+        workOrders: plan.workOrders.map((w) => ({
+          summary: w.summary,
+          body: w.body,
+        })),
+      });
+      const saved = await persistBriefing(plan.id, content);
+      return briefingSchema.parse(saved.content);
     }),
 });

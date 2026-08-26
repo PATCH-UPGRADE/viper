@@ -5,9 +5,7 @@ import { resolveUpstreamApi, resolveWebUrl } from "./urls";
 /**
  * Fill in each `External*Mapping`'s urls from the platform module that owns it.
  *
- * Pure: the caller injects both the integration lookup and the platform
- * builders, so nothing here reaches the `server-only` registry — importing this
- * must not drag it (and the client it loads) into a plain Node script.
+ * Helper for a prisma query extension.
  *
  * Prisma query extensions fire on the *top-level* operation only, so rather
  * than hooking every model that can nest one of these (issue -> asset ->
@@ -195,11 +193,12 @@ export const attachMappingUrls = async (
       ];
       const config = context.config ?? {};
 
+      // replace the returned upstream api, if present, according to the url
+      // builder for the platform if present
       if ("upstreamApi" in mapping) {
         mapping.upstreamApi = resolveUpstreamApi(stored, builders, config);
       }
       if ("webUrl" in mapping) {
-        // No API fallback: the two are rendered as separate links.
         mapping.webUrl = resolveWebUrl(stored, builders, config, {
           fallbackToUpstreamApi: false,
         });

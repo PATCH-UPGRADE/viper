@@ -112,14 +112,11 @@ function EmailSourceModal({
 
 function SourceReference({ source }: { source: NotificationDetailSource }) {
   const [open, setOpen] = useState(false);
-  // TODO VW-449 uncomment below and update, remove line 122 hardcoded label
-  // const raw =
-  //   source.channel === "Email"
-  //     ? (source.raw as unknown as RawEmailPayload)
-  //     : null;
-  // const label = raw?.data?.subject ?? source.referenceUrl ?? source.channel;
-
-  const label = "Email";
+  const raw =
+    source.channel === "Email"
+      ? (source.raw as unknown as RawEmailPayload)
+      : null;
+  const label = raw?.data?.subject ?? source.channel;
 
   if (source.channel === "Email") {
     return (
@@ -136,11 +133,17 @@ function SourceReference({ source }: { source: NotificationDetailSource }) {
       </>
     );
   }
-  // TODO VW-449 remove line 140, update href={source.referenceUrl ?? "#"}
-  const tempUrl = "#";
+  // Resolved by mappingUrlExtension from the platform's `notifications`
+  // resource module. If one doesn't exist, render the label unlinked
+  // rather than an anchor to nowhere.
+  const href = source.mapping?.webUrl;
+  if (!href) {
+    return <span className="truncate max-w-xs text-sm">{label}</span>;
+  }
+
   return (
     <a
-      href={tempUrl}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-center gap-1 text-sm text-primary hover:underline"

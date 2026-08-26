@@ -1,5 +1,6 @@
 import type { EmailReceivedEvent } from "resend";
 import { z } from "zod";
+import { externalMappingSelect } from "@/features/integrations/core/urls";
 import {
   type AssetStatus,
   type Prisma,
@@ -43,7 +44,6 @@ export type NotificationWithRelations = Omit<
     assetCount: number;
   })[];
 };
-// TODO VW-449 few changes in this file
 export type NotificationSource =
   NotificationWithRelations["sourceLinks"][number];
 
@@ -73,6 +73,9 @@ export const notificationDetailInclude = {
           raw: true,
           markdown: true,
           observedAt: true,
+          // Urls are filled in by `mappingUrlExtension`; the integration id it
+          // needs to do that is part of `externalMappingSelect`.
+          mapping: externalMappingSelect,
         },
       },
     },

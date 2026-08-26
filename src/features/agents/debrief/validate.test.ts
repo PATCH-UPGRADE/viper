@@ -16,7 +16,11 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
-import { debriefBulletsSchema } from "@/features/debrief/types";
+import {
+  DEBRIEF_MAX_BULLET_CHARS,
+  debriefBulletDraftSchema,
+  debriefBulletsSchema,
+} from "@/features/debrief/types";
 import { validateBullets } from "./validate";
 
 /** Make every id the caller lists resolve as existing. */
@@ -242,5 +246,108 @@ describe("validateBullets — text and links stay in step", () => {
       }
       expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
     }
+  });
+});
+
+describe("validateBullets — bullet length", () => {
+  const REAL_BULLET = {
+    text: "The most urgent item is a near-certain-to-be-exploited flaw ({{0}}) sitting on 5 aging Windows machines used for stroke and trauma imaging, including the CT workstation and PACS server. There's already an active work order to remediate this, but you need to verify today that the protective steps (blocking the vulnerable network port, isolating the affected machines) are actually in place, not just planned.",
+    links: [vulnLink("cmst26nay002z9uzptzux3w16")],
+  };
+
+  it("leaves a real two-sentence bullet completely untouched", async () => {
+    idsExist("vulnerability");
+
+    const { bullets } = await validateBullets([REAL_BULLET]);
+
+    expect(bullets[0].text).toBe(REAL_BULLET.text);
+    expect(bullets[0].text).not.toContain("\u2026");
+    expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
+  });
+
+  it("drops the extra sentence whole, never mid-clause", async () => {
+    idsExist("vulnerability");
+    const text =
+      "First sentence about {{0}} here. Second sentence follows on. Third sentence adds detail. Fourth sentence is one too many.";
+
+    const { bullets } = await validateBullets([{ text, links: [vulnLink()] }]);
+
+    expect(bullets[0].text).toBe(
+      "First sentence about {{0}} here. Second sentence follows on. Third sentence adds detail.",
+    );
+    // The tell that nothing was cut mid-sentence.
+    expect(bullets[0].text.endsWith(".")).toBe(true);
+    expect(bullets[0].text).not.toContain("\u2026");
+  });
+
+  it("does not split on dots that are not sentence ends", async () => {
+    // This domain is full of them: firmware versions, product names, scores.
+    idsExist("vulnerability");
+    const text =
+      "Eleven {{0}} monitors run firmware M.02.07 and syngo.plaza at CVSS 9.8. Patch them. Then recheck.";
+
+    const { bullets } = await validateBullets([{ text, links: [vulnLink()] }]);
+
+    expect(bullets[0].text).toBe(text);
+  });
+
+  it("drops the link when its marker was in a dropped sentence", async () => {
+    idsExist("vulnerability");
+    const text = "One. Two. Three. Fourth mentions {{0}} but gets dropped.";
+
+    const { bullets } = await validateBullets([{ text, links: [vulnLink()] }]);
+
+    expect(bullets[0].text).toBe("One. Two. Three.");
+    expect(bullets[0].links).toHaveLength(0);
+    expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
+  });
+
+  it("falls back to an ellipsis only for a single run-on sentence", async () => {
+    // Reachable only when the model ignored the sentence instruction outright.
+    idsExist("vulnerability");
+    const text = `Runaway {{0}} ${"word ".repeat(200)}end.`;
+
+    const { bullets } = await validateBullets([{ text, links: [vulnLink()] }]);
+
+    expect(bullets[0].text.length).toBeLessThanOrEqual(800);
+    expect(bullets[0].text.endsWith("\u2026")).toBe(true);
+    expect(bullets[0].text).toContain("{{0}}");
+  });
+
+  it("never leaves a half-written marker behind on that fallback", async () => {
+    // No spaces, so the word-boundary cut cannot remove the partial marker —
+    // the only path where the cleanup is load-bearing.
+    idsExist("vulnerability");
+    const text = `${"x".repeat(796)}{{0}}${"y".repeat(60)}`;
+
+    const { bullets } = await validateBullets([{ text, links: [vulnLink()] }]);
+
+    expect(bullets[0].text).not.toContain("{{0");
+    expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
+  });
+});
+
+describe("the draft schema must not reject what the model writes", () => {
+  // withStructuredOutput validates against the draft schema and THROWS on a
+  // mismatch, losing the whole run. A length cap there is unenforceable — the
+  // model cannot count characters — so the cap belongs on the strict schema
+  // and the trim, not here. This is the regression that discarded five good
+  // bullets on the first live run.
+  it("accepts a bullet far longer than the storable limit", () => {
+    const overlong = {
+      text: `${"a".repeat(DEBRIEF_MAX_BULLET_CHARS * 3)} {{0}}`,
+      links: [vulnLink()],
+    };
+
+    expect(debriefBulletDraftSchema.safeParse(overlong).success).toBe(true);
+  });
+
+  it("still rejects it at the storable contract", () => {
+    const overlong = {
+      text: `${"a".repeat(DEBRIEF_MAX_BULLET_CHARS * 3)} {{0}}`,
+      links: [vulnLink()],
+    };
+
+    expect(debriefBulletsSchema.safeParse([overlong]).success).toBe(false);
   });
 });

@@ -1,6 +1,9 @@
 import "server-only";
 import {
+  DEBRIEF_MAX_BULLET_CHARS,
+  DEBRIEF_MAX_BULLET_SENTENCES,
   DEBRIEF_PLACEHOLDER,
+  DEBRIEF_SENTENCE_BOUNDARY,
   type DebriefBullet,
   type DebriefBulletDraft,
   type DebriefLink,
@@ -86,6 +89,39 @@ async function resolveExistingIds(
 }
 
 /**
+ * Shorten a bullet by dropping whole sentences, never by cutting one.
+ *
+ * The writer is asked for at most DEBRIEF_MAX_BULLET_SENTENCES sentences, so
+ * enforcing the same unit keeps every surviving sentence complete. Cutting on
+ * characters produced dangling clauses like "...are actually in place, not..."
+ * because a two-sentence bullet has no cut point that is both short enough and
+ * grammatical.
+ *
+ * Runs before the placeholder pass, so a marker in a dropped sentence simply
+ * loses its link rather than leaving the text pointing past the array.
+ */
+function trimToLimit(text: string): string {
+  const sentences = text.split(DEBRIEF_SENTENCE_BOUNDARY);
+
+  const kept =
+    sentences.length > DEBRIEF_MAX_BULLET_SENTENCES
+      ? sentences.slice(0, DEBRIEF_MAX_BULLET_SENTENCES).join(" ")
+      : text;
+
+  if (kept.length <= DEBRIEF_MAX_BULLET_CHARS) return kept;
+
+  // Only reachable when a single sentence runs past the backstop, i.e. the
+  // model ignored the instruction. The text is already malformed, so an
+  // ellipsis is the honest result rather than a regression.
+  const head = kept.slice(0, DEBRIEF_MAX_BULLET_CHARS - 1);
+  const word = head.lastIndexOf(" ");
+  const cut = word > 0 ? head.slice(0, word) : head;
+  // A cut can land inside a marker and leave "{{1" behind, which renders as
+  // literal text. Drop any partial marker at the end.
+  return `${cut.replace(/\{\{?\d*$/, "").trimEnd()}\u2026`;
+}
+
+/**
  * Rewrite one bullet so its text and its links agree.
  *
  * A link survives only if BOTH its id resolves and the text points at it. That
@@ -102,9 +138,13 @@ function rewrite(
   bullet: DebriefBulletDraft,
   keep: (link: DebriefLink) => boolean,
 ): DebriefBullet {
-  // Read from the ORIGINAL text, before any substitution.
+  // Trim first, so the placeholder pass below reads the text that will
+  // actually be stored.
+  const trimmed = trimToLimit(bullet.text);
+
+  // Read from the trimmed text, before any substitution.
   const referenced = new Set(
-    [...bullet.text.matchAll(DEBRIEF_PLACEHOLDER)].map((m) => Number(m[1])),
+    [...trimmed.matchAll(DEBRIEF_PLACEHOLDER)].map((m) => Number(m[1])),
   );
 
   const survivors: DebriefLink[] = [];
@@ -120,7 +160,7 @@ function rewrite(
     }
   });
 
-  const text = bullet.text.replace(
+  const text = trimmed.replace(
     DEBRIEF_PLACEHOLDER,
     (_match, digits: string) => {
       const oldIndex = Number(digits);

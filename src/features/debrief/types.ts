@@ -39,6 +39,30 @@ export type DebriefLink = z.infer<typeof debriefLinkSchema>;
 export const DEBRIEF_PLACEHOLDER = /\{\{(\d+)\}\}/g;
 
 /**
+ * How many sentences a bullet may hold.
+ *
+ * Sentences, not characters, because this is what the writer is asked for. A
+ * model cannot count characters but reliably writes "at most three sentences",
+ * and enforcing the same unit means a bullet is shortened by dropping a whole
+ * sentence rather than cut mid-clause.
+ */
+export const DEBRIEF_MAX_BULLET_SENTENCES = 3;
+
+/**
+ * Character backstop for a run-on, not the working limit.
+ */
+export const DEBRIEF_MAX_BULLET_CHARS = 800;
+
+/**
+ * Sentence boundary: a terminator followed by whitespace AND a capital.
+ *
+ * Both conditions are load-bearing in this domain, which is full of dots that
+ * are not sentence ends — firmware "M.02.07", products like "syngo.plaza",
+ * scores like "CVSS 9.8", and "etc. devices" all stay intact.
+ */
+export const DEBRIEF_SENTENCE_BOUNDARY = /(?<=[.!?])\s+(?=[A-Z])/;
+
+/**
  * Structural shape only, without the placeholder invariant.
  *
  * This is what the writer agent is asked to emit. `superRefine` cannot be
@@ -48,14 +72,15 @@ export const DEBRIEF_PLACEHOLDER = /\{\{(\d+)\}\}/g;
  * `debriefBulletSchema` below before anything is stored.
  */
 export const debriefBulletDraftSchema = z.object({
-  text: z.string().min(1).max(400),
+  text: z.string().min(1),
   links: z.array(debriefLinkSchema).max(3),
 });
 
 export type DebriefBulletDraft = z.infer<typeof debriefBulletDraftSchema>;
 
-export const debriefBulletSchema = debriefBulletDraftSchema.superRefine(
-  (bullet, ctx) => {
+export const debriefBulletSchema = debriefBulletDraftSchema
+  .extend({ text: z.string().min(1).max(DEBRIEF_MAX_BULLET_CHARS) })
+  .superRefine((bullet, ctx) => {
     const used = new Set(
       [...bullet.text.matchAll(DEBRIEF_PLACEHOLDER)].map((m) => Number(m[1])),
     );
@@ -77,8 +102,7 @@ export const debriefBulletSchema = debriefBulletDraftSchema.superRefine(
         });
       }
     });
-  },
-);
+  });
 
 export type DebriefBullet = z.infer<typeof debriefBulletSchema>;
 

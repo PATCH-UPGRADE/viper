@@ -47,8 +47,10 @@ platforms/teamplay-fleet/
 └── assets/
     ├── index.ts                # the ResourceModule
     ├── sync.ts                 # how assets sync, end to end
-    └── manages-relationship.ts # asset-specific, so it lives here
 ```
+
+`index.ts` and `sync.ts` name each other, so nothing they *share* can live in either: put the
+schemas, canonical types and pull helpers in a third leaf module and have both import from it.
 
 Anything only one resource needs belongs in that resource's directory, not the root. Adding
 work orders should mean adding `work-orders/`, not editing anything under `assets/`.

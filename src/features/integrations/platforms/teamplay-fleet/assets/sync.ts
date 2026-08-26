@@ -16,7 +16,7 @@ import {
   type FleetAssetItem,
   listChanged,
   toCanonical,
-} from "./index";
+} from "./equipments";
 import { connectManagedAssets } from "./manages-relationship";
 
 async function equipmentKeysWeMayRegroup(

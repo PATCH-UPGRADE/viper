@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { assets, computeWeakSerials, listChanged, toCanonical } from "../index";
+import { computeWeakSerials, listChanged, toCanonical } from "../equipments";
+import { assets } from "../index";
 
 // Representative records from a real Fleet /rest/v1/equipments response.
 const SAMPLE = [

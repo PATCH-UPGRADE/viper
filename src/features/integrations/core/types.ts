@@ -54,12 +54,8 @@ export interface Session {
 }
 
 /**
- * Everything one resource-module sync attempt needs. No `resource`: a resource
- * module already knows which one it is.
- *
- * No session either. A resource module builds its own from `creds` using its
- * platform's auth helpers; if a platform wants one login shared across its
- * resources, memoizing is that platform's business, not core's.
+ * Everything one resource-module sync attempt needs.
+ * Assumed it uses the platform createSession module
  */
 export interface ResourceSyncCtx<TConfig = unknown, TCreds = unknown> {
   integrationId: string;
@@ -75,9 +71,7 @@ export interface ResourceSyncCtx<TConfig = unknown, TCreds = unknown> {
 
 /**
  * Everything one platform-level `(integration, resource)` sync attempt needs.
- *
- * Extends the resource-level context so core can build one object and hand it to
- * either kind of sync.
+ * Extend with resource for generic platforms
  */
 export interface SyncCtx<TConfig = unknown, TCreds = unknown>
   extends ResourceSyncCtx<TConfig, TCreds> {
@@ -103,10 +97,6 @@ export type SyncStrategy<TConfig = unknown, TCreds = unknown> = (
 
 /**
  * The per-resource half of a platform whose protocol *we* speak.
- *
- * `sync` is the contract: declaring a resource module means that module knows how
- * to sync itself. The pull helpers below are the pieces a `sync` is usually built
- * out of, not required
  */
 export interface ResourceModule<
   TCanonical,
@@ -114,7 +104,7 @@ export interface ResourceModule<
   TConfig = unknown,
   TCreds = unknown,
 > extends UrlBuilders<TConfig> {
-  /** How this resource syncs, end to end. */
+  /** How this resource syncs, end to end. May use the below as helpers */
   sync(ctx: ResourceSyncCtx<TConfig, TCreds>): Promise<SyncOutcome>;
 
   // we pull from their platform

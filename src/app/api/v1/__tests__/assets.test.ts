@@ -443,7 +443,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset1.networkSegment).toBe(assetPayload1.networkSegment);
     expect(foundAsset1.role).toBe(assetPayload1.role);
-    expect(mapping1.upstreamApi).toBe(assetPayload1.upstreamApi);
     expect(foundAsset1.hostname).toBe(assetPayload1.hostname);
     expect(foundAsset1.macAddress).toBe(assetPayload1.macAddress);
     expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
@@ -472,7 +471,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
     expect(foundAsset2.role).toBe(assetPayload2.role);
-    expect(mapping2.upstreamApi).toBe(assetPayload2.upstreamApi);
     expect(foundAsset2.hostname).toBe(assetPayload2.hostname);
     expect(foundAsset2.macAddress).toBe(assetPayload2.macAddress);
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
@@ -536,14 +534,11 @@ describe("Assets Endpoint (/assets)", () => {
     expect(createAssetsReq.body.shouldRetry).toBe(false);
     expect(createAssetsReq.body.message).toBe("success");
 
-    // update some field before updating
+    // re-send the same items: the sync should take the update path, not create
     const updateAssetsPayload = {
       ...assetIntegrationPayload,
       ...assetIntegrationPayload.items,
     };
-    const newUpstreamApi = "https://mock-upstream-api.com/v2";
-    updateAssetsPayload.items[0].upstreamApi = newUpstreamApi;
-    updateAssetsPayload.items[1].upstreamApi = newUpstreamApi;
 
     const updateToken = await createIntegrationToken(
       createdIntegration.integrationUserId,
@@ -581,7 +576,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset1.networkSegment).toBe(assetPayload1.networkSegment);
     expect(foundAsset1.role).toBe(assetPayload1.role);
-    expect(mapping1.upstreamApi).toBe(newUpstreamApi); // this field should be updated
     expect(foundAsset1.hostname).toBe(assetPayload1.hostname);
     expect(foundAsset1.macAddress).toBe(assetPayload1.macAddress);
     expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
@@ -616,7 +610,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
     expect(foundAsset2.role).toBe(assetPayload2.role);
-    expect(mapping2.upstreamApi).toBe(newUpstreamApi); // this field should be updated
     expect(foundAsset2.hostname).toBe(assetPayload2.hostname);
     expect(foundAsset2.macAddress).toBe(assetPayload2.macAddress);
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
@@ -680,8 +673,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     // now create another asset and update the existing one
     const createWithUpdateAssets = { ...assetIntegrationPayload };
-    const newUpstreamApi = "https://mock-upstream-api.com/v2";
-    createWithUpdateAssets.items[0].upstreamApi = newUpstreamApi;
 
     const updateToken = await createIntegrationToken(
       createdIntegration.integrationUserId,
@@ -719,7 +710,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset1.networkSegment).toBe(assetPayload1.networkSegment);
     expect(foundAsset1.role).toBe(assetPayload1.role);
-    expect(mapping1.upstreamApi).toBe(newUpstreamApi); // this field should be updated
     expect(foundAsset1.hostname).toBe(assetPayload1.hostname);
     expect(foundAsset1.macAddress).toBe(assetPayload1.macAddress);
     expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
@@ -748,7 +738,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
     expect(foundAsset2.role).toBe(assetPayload2.role);
-    expect(mapping2.upstreamApi).toBe(assetPayload2.upstreamApi);
     expect(foundAsset2.hostname).toBe(assetPayload2.hostname);
     expect(foundAsset2.macAddress).toBe(assetPayload2.macAddress);
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
@@ -814,8 +803,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     // setup an update for the asset
     const updatedAsset = assetIntegrationPayload.items[0];
-    const newUpstreamApi = "https://mock-upstream-api.com/v2";
-    updatedAsset.upstreamApi = newUpstreamApi;
     const updateAssetPayload = {
       ...assetIntegrationPayload,
       items: [updatedAsset],
@@ -858,7 +845,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset1.networkSegment).toBe(updatedAsset.networkSegment);
     expect(foundAsset1.role).toBe(updatedAsset.role);
-    expect(mapping1.upstreamApi).toBe(updatedAsset.upstreamApi); // this field should be updated
     expect(foundAsset1.hostname).toBe(updatedAsset.hostname);
     expect(foundAsset1.macAddress).toBe(updatedAsset.macAddress);
     expect(foundAsset1.serialNumber).toBe(updatedAsset.serialNumber);
@@ -982,8 +968,6 @@ describe("Assets Endpoint (/assets)", () => {
       });
     });
 
-    const newUpstreamApi = "https://mock-upstream-api.com/v2";
-
     // create our unfindable asset by overriding all unique fields
     const createdAssetRes = await request(BASE_URL)
       .post("/assets")
@@ -999,7 +983,6 @@ describe("Assets Endpoint (/assets)", () => {
       ...assetIntegrationPayload.items[0],
       hostname: undefined,
       macAddress: undefined,
-      upstreamApi: newUpstreamApi,
     };
 
     // this should produce an update based on serialNumber match
@@ -1027,14 +1010,8 @@ describe("Assets Endpoint (/assets)", () => {
       },
     });
 
-    // The sync matched on serialNumber, so the mapping was created on this pass.
-    const matchedMapping = await prisma.externalAssetMapping.findFirstOrThrow({
-      where: { itemId: foundAsset.id, integrationId: integration.id },
-    });
-
     expect(foundAsset.networkSegment).toBe(matchableAsset.networkSegment);
     expect(foundAsset.role).toBe(matchableAsset.role);
-    expect(matchedMapping.upstreamApi).toBe(matchableAsset.upstreamApi); // this should be updated
     expect(foundAsset.hostname).toBeNullable();
     expect(foundAsset.macAddress).toBeNullable();
     expect(foundAsset.serialNumber).toBe(matchableAsset.serialNumber);

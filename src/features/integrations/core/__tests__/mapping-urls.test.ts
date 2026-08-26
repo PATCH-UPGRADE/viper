@@ -1,19 +1,125 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { PlatformEnum } from "@/generated/prisma";
+import { PlatformEnum, ResourceType } from "@/generated/prisma";
 import {
   attachMappingUrls,
   type IntegrationUrlContext,
-  selectsExternalMappings,
+  type MappingPath,
+  mappingPaths,
 } from "../mapping-urls";
+import type { UrlBuilders } from "../types";
 
-const FLEET_INTEGRATION: IntegrationUrlContext = {
+describe("mappingPaths", () => {
+  it("finds mappings selected on the operation's own model", () => {
+    expect(
+      mappingPaths("Asset", { include: { externalMappings: true } }),
+    ).toEqual([{ path: ["externalMappings"], resource: ResourceType.Asset }]);
+  });
+
+  it("follows a nested relation, which renames the resource", () => {
+    // The walk starts at Issue, which owns no mappings; the DMMF is what says
+    // the `asset` hop lands on ExternalAssetMapping.
+    expect(
+      mappingPaths("Issue", {
+        include: { asset: { include: { externalMappings: true } } },
+      }),
+    ).toEqual([
+      { path: ["asset", "externalMappings"], resource: ResourceType.Asset },
+    ]);
+  });
+
+  it("walks `select` as well as `include`", () => {
+    expect(
+      mappingPaths("Asset", {
+        select: {
+          id: true,
+          externalMappings: { select: { externalId: true } },
+        },
+      }),
+    ).toEqual([{ path: ["externalMappings"], resource: ResourceType.Asset }]);
+  });
+
+  it("resolves each hop by model, not by relation name", () => {
+    // `assets` is Asset[] on Issue but AssetTicket[] here, and only the second
+    // hop reaches a real Asset. Name-matching would mislabel the first.
+    expect(
+      mappingPaths("WorkOrderTicket", {
+        include: {
+          assets: {
+            include: { asset: { include: { externalMappings: true } } },
+          },
+          externalMappings: true,
+        },
+      }),
+    ).toEqual([
+      {
+        path: ["assets", "asset", "externalMappings"],
+        resource: ResourceType.Asset,
+      },
+      { path: ["externalMappings"], resource: ResourceType.WorkOrder },
+    ]);
+  });
+
+  it("finds a mapping relation that is not called `externalMappings`", () => {
+    expect(
+      mappingPaths("SourceRecord", { include: { mapping: true } }),
+    ).toEqual([{ path: ["mapping"], resource: ResourceType.SourceRecord }]);
+  });
+
+  it("treats a mapping model queried directly as the root", () => {
+    expect(mappingPaths("ExternalAssetMapping", {})).toEqual([
+      { path: [], resource: ResourceType.Asset },
+    ]);
+  });
+
+  it("ignores a relation named only in `where` — it is not in the result", () => {
+    expect(
+      mappingPaths("Asset", {
+        where: { externalMappings: { some: { integrationId: "int-1" } } },
+      }),
+    ).toEqual([]);
+  });
+
+  it("ignores a relation written in `data` but never selected back", () => {
+    expect(
+      mappingPaths("Asset", {
+        data: { externalMappings: { create: { externalId: "US_1" } } },
+      }),
+    ).toEqual([]);
+  });
+
+  it("ignores a deselected relation, and a query with no model", () => {
+    expect(
+      mappingPaths("Asset", { include: { externalMappings: false } }),
+    ).toEqual([]);
+    expect(
+      mappingPaths(undefined, { include: { externalMappings: true } }),
+    ).toEqual([]);
+  });
+});
+
+// A stand-in platform module. The point is that resolution is wired up, not
+// what any particular platform's URLs look like — those are tested next to the
+// platform that owns them.
+const BUILDERS: UrlBuilders<unknown> = {
+  apiUrlFor: (externalId) => `https://fake.test/api/${externalId}`,
+  webUrlFor: (externalId) => `https://fake.test/ui/${externalId}`,
+};
+
+const FLEET_CONTEXT: IntegrationUrlContext = {
   platform: PlatformEnum.FLEET,
   config: {},
 };
 
 const loader = (context: IntegrationUrlContext | undefined) => async () =>
   new Map(context ? [["int-1", context]] : []);
+
+const resolver = (builders: UrlBuilders<unknown> | undefined) => async () =>
+  builders;
+
+const ASSET_MAPPINGS: MappingPath[] = [
+  { path: ["externalMappings"], resource: ResourceType.Asset },
+];
 
 const mapping = (overrides: Record<string, unknown> = {}) => ({
   externalId: "US_3000438672",
@@ -23,41 +129,40 @@ const mapping = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const WEB_URL =
-  "https://fleet.siemens-healthineers.com/equipment/US_3000438672/info";
-const API_URL = "https://fleet.siemens-healthineers.com/rest/v1/equipments";
-
-describe("selectsExternalMappings", () => {
-  it("finds the key at any depth of the query args", () => {
-    expect(
-      selectsExternalMappings({
-        include: { deviceGroup: { include: { externalMappings: true } } },
-      }),
-    ).toBe(true);
-  });
-
-  it("is false for a query that never mentions them", () => {
-    expect(selectsExternalMappings({ where: { id: "a" } })).toBe(false);
-    expect(selectsExternalMappings(undefined)).toBe(false);
-  });
-});
-
 describe("attachMappingUrls", () => {
-  it("resolves a top-level asset's mappings from the Fleet module", async () => {
+  it("resolves a mapping from the owning platform's module", async () => {
     const result = { id: "asset-1", externalMappings: [mapping()] };
-    await attachMappingUrls(result, "Asset", loader(FLEET_INTEGRATION));
+    await attachMappingUrls(
+      result,
+      ASSET_MAPPINGS,
+      loader(FLEET_CONTEXT),
+      resolver(BUILDERS),
+    );
 
-    expect(result.externalMappings[0].webUrl).toBe(WEB_URL);
-    expect(result.externalMappings[0].upstreamApi).toBe(API_URL);
+    expect(result.externalMappings[0].webUrl).toBe(
+      "https://fake.test/ui/US_3000438672",
+    );
+    expect(result.externalMappings[0].upstreamApi).toBe(
+      "https://fake.test/api/US_3000438672",
+    );
   });
 
-  it("resolves through a nested relation, which renames the resource", async () => {
-    // The walk starts at Issue, which owns no mappings; the `asset` key is what
-    // tells it these belong to the Asset resource module.
-    const result = { id: "issue-1", asset: { externalMappings: [mapping()] } };
-    await attachMappingUrls(result, "Issue", loader(FLEET_INTEGRATION));
+  it("resolves every row of a findMany, and through a nested relation", async () => {
+    const result = [
+      { asset: { externalMappings: [mapping()] } },
+      { asset: { externalMappings: [mapping({ externalId: "US_2" })] } },
+    ];
+    await attachMappingUrls(
+      result,
+      [{ path: ["asset", "externalMappings"], resource: ResourceType.Asset }],
+      loader(FLEET_CONTEXT),
+      resolver(BUILDERS),
+    );
 
-    expect(result.asset.externalMappings[0].webUrl).toBe(WEB_URL);
+    expect(result.map((r) => r.asset.externalMappings[0].webUrl)).toEqual([
+      "https://fake.test/ui/US_3000438672",
+      "https://fake.test/ui/US_2",
+    ]);
   });
 
   it("keeps a narrower select's shape, writing only the chosen fields", async () => {
@@ -66,25 +171,72 @@ describe("attachMappingUrls", () => {
       integration: { id: "int-1" },
     };
     const result = { externalMappings: [narrow] };
-    await attachMappingUrls(result, "Asset", loader(FLEET_INTEGRATION));
+    await attachMappingUrls(
+      result,
+      ASSET_MAPPINGS,
+      loader(FLEET_CONTEXT),
+      resolver(BUILDERS),
+    );
 
     expect(result.externalMappings[0]).not.toHaveProperty("webUrl");
     expect(result.externalMappings[0]).not.toHaveProperty("upstreamApi");
   });
 
+  it("leaves webUrl null rather than repeating the API url", async () => {
+    // The two render as separate links, so falling back would show the same
+    // url twice.
+    const result = { externalMappings: [mapping()] };
+    await attachMappingUrls(
+      result,
+      ASSET_MAPPINGS,
+      loader(FLEET_CONTEXT),
+      resolver({ apiUrlFor: BUILDERS.apiUrlFor }),
+    );
+
+    expect(result.externalMappings[0].upstreamApi).toBe(
+      "https://fake.test/api/US_3000438672",
+    );
+    expect(result.externalMappings[0].webUrl).toBeNull();
+  });
+
   it("leaves stored values in place when the integration is unknown", async () => {
     const stored = mapping({ webUrl: "https://stored.example.com/x" });
     const result = { externalMappings: [stored] };
-    await attachMappingUrls(result, "Asset", loader(undefined));
+    await attachMappingUrls(
+      result,
+      ASSET_MAPPINGS,
+      loader(undefined),
+      resolver(BUILDERS),
+    );
 
     expect(result.externalMappings[0].webUrl).toBe(
       "https://stored.example.com/x",
     );
   });
 
-  it("ignores a result with no mappings at all", async () => {
+  it("leaves stored values in place when the platform has no module for the resource", async () => {
+    const stored = mapping({ webUrl: "https://stored.example.com/x" });
+    const result = { externalMappings: [stored] };
+    await attachMappingUrls(
+      result,
+      ASSET_MAPPINGS,
+      loader(FLEET_CONTEXT),
+      resolver(undefined),
+    );
+
+    expect(result.externalMappings[0].webUrl).toBe(
+      "https://stored.example.com/x",
+    );
+  });
+
+  it("ignores a result that carries nothing at the given path", async () => {
     const result = { id: "asset-1", ip: "10.0.0.1" };
-    await attachMappingUrls(result, "Asset", loader(FLEET_INTEGRATION));
+    await attachMappingUrls(
+      result,
+      ASSET_MAPPINGS,
+      loader(FLEET_CONTEXT),
+      resolver(BUILDERS),
+    );
 
     expect(result).toEqual({ id: "asset-1", ip: "10.0.0.1" });
   });

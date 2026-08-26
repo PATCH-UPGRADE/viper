@@ -5,7 +5,8 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: {} }));
 
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
-import { defaultSyncEveryFor, requirePlatform } from "../registry";
+import { defaultSyncEveryFor, registry, requirePlatform } from "../registry";
+import { moduleForResource } from "../sync/resources";
 
 /**
  * Importing this module runs the registry's load-time assertion, so simply
@@ -30,6 +31,41 @@ describe("registry", () => {
 
   it("has no cadence opinion for a platform without ResourceModules", () => {
     expect(defaultSyncEveryFor(PlatformEnum.AI, ResourceType.Asset)).toBeNull();
+  });
+
+  // Core dispatches to a resource module's sync, else the platform's. A module
+  // with neither is registered but can never sync, and nothing else would say so.
+  it.each(Object.keys(registry) as PlatformEnum[])(
+    "%s can actually sync something",
+    (platform) => {
+      const module = requirePlatform(platform);
+      const resourceModules = [
+        module.assets,
+        module.workOrders,
+        module.notifications,
+      ].filter((m) => m !== undefined);
+
+      expect(module.sync ?? resourceModules.length).toBeTruthy();
+      for (const resourceModule of resourceModules) {
+        expect(resourceModule.sync).toBeTypeOf("function");
+      }
+    },
+  );
+});
+
+describe("teamplay Fleet", () => {
+  it("syncs assets through its resource module, not a platform sync", () => {
+    const module = requirePlatform(PlatformEnum.FLEET);
+    expect(module.sync).toBeUndefined();
+    expect(moduleForResource(module, ResourceType.Asset)?.sync).toBeTypeOf(
+      "function",
+    );
+  });
+
+  it("takes its asset cadence from the resource module", () => {
+    expect(defaultSyncEveryFor(PlatformEnum.FLEET, ResourceType.Asset)).toBe(
+      86400,
+    );
   });
 });
 

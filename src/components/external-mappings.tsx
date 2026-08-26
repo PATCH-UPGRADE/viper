@@ -6,10 +6,7 @@ import type { ReactNode } from "react";
 import type { UrlBearingMapping } from "@/features/integrations/core/urls";
 
 /**
- * The common shape of every `External*Mapping` select in the app. `id` and
- * `lastSynced` are only selected by some includes, so neither is required —
- * `(integrationId, externalId)` is the model's unique constraint and is always
- * available to key on.
+ * The common shape of every `External*Mapping` select in the app.
  */
 export interface ExternalMappingLike extends UrlBearingMapping {
   externalId: string;
@@ -29,7 +26,7 @@ const MappingLink = ({ label, href }: { label: string; href: string }) => (
       className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
     >
       {href}
-      <ExternalLinkIcon className="size-3 flex-shrink-0" />
+      <ExternalLinkIcon className="size-3 shrink-0" />
     </a>
   </div>
 );
@@ -37,8 +34,7 @@ const MappingLink = ({ label, href }: { label: string; href: string }) => (
 /**
  * One row per integration this record is mapped into, with that mapping's own
  * urls. Both fields arrive already resolved against the owning platform's
- * resource module by `mappingUrlExtension` — the builders it needs live behind
- * the `server-only` registry, so nothing can be derived here.
+ * resource module by `mappingUrlExtension`
  */
 export const ExternalMappingList = ({
   mappings,

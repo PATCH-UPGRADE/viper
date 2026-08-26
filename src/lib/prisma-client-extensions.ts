@@ -1,9 +1,15 @@
 import {
   attachMappingUrls,
   type IntegrationUrlContext,
-  selectsExternalMappings,
+  mappingPaths,
 } from "@/features/integrations/core/mapping-urls";
-import { Prisma, TriggerEnum } from "@/generated/prisma";
+import { moduleForResource } from "@/features/integrations/core/sync/resources";
+import {
+  type PlatformEnum,
+  Prisma,
+  type ResourceType,
+  TriggerEnum,
+} from "@/generated/prisma";
 import type { PayloadToResult } from "@/generated/prisma/runtime/library";
 import { inngest } from "@/inngest/client";
 import prisma from "./db";
@@ -261,41 +267,142 @@ export const updateConnectorExtension = Prisma.defineExtension((client) =>
   }),
 );
 
+const WRITE_OPERATIONS = new Set([
+  "create",
+  "createMany",
+  "createManyAndReturn",
+  "update",
+  "updateMany",
+  "updateManyAndReturn",
+  "upsert",
+  "delete",
+  "deleteMany",
+]);
+
+/**
+ * Platform config for every integration, cached because the row count is tiny
+ * and the alternative is a lookup on each qualifying query — including the ones
+ * issued from inside an interactive `$transaction`, where a second connection
+ * would be taken while the transaction still holds the first.
+ */
+const INTEGRATION_CACHE_TTL_MS = 30_000;
+let integrationCache: {
+  loadedAt: number;
+  contexts: Map<string, IntegrationUrlContext>;
+} | null = null;
+
+let inFlight: Promise<Map<string, IntegrationUrlContext>> | null = null;
+
+export const invalidateIntegrationUrlCache = () => {
+  integrationCache = null;
+};
+
+type Registry = Awaited<
+  typeof import("@/features/integrations/core/registry")
+>["registry"];
+
+/** Latched after the first failure so the warning is printed once, not per row. */
+let registryUnavailable = false;
+
 /**
  * Fills each `External*Mapping`'s `upstreamApi` / `webUrl` from the platform
  * module that owns the record, falling back to whatever the sync stored.
  *
- * Hooks every model rather than just the five that own mappings, because these
+ * Hooks every model rather than just the six that own mappings, because these
  * are usually reached through a nested include (`issue -> asset ->
  * externalMappings`) and a query extension only fires on the top-level model.
- * The `selectsExternalMappings` guard keeps every other query untouched.
+ * `mappingPaths` reads the query's own `select` / `include` tree to decide
+ * whether there is anything to do, so every other query is untouched.
  */
-export const mappingUrlExtension = Prisma.defineExtension((client) =>
-  client.$extends({
+
+export const mappingUrlExtension = Prisma.defineExtension((client) => {
+  const loadIntegrations = async () => {
+    if (
+      integrationCache &&
+      Date.now() - integrationCache.loadedAt < INTEGRATION_CACHE_TTL_MS
+    ) {
+      return integrationCache.contexts;
+    }
+    // Held as the in-flight promise, so queries arriving on a cold cache share
+    // one lookup instead of each issuing their own.
+    if (inFlight) return inFlight;
+
+    inFlight = (async () => {
+      // Every row, not just the ids asked for: the table is small and one
+      // shared snapshot serves every query in the window.
+      const rows = await client.integration.findMany({
+        select: { id: true, platform: true, config: true },
+      });
+      const contexts = new Map<string, IntegrationUrlContext>(
+        rows.map((row) => [
+          row.id,
+          { platform: row.platform, config: row.config },
+        ]),
+      );
+      integrationCache = { loadedAt: Date.now(), contexts };
+      return contexts;
+    })().finally(() => {
+      inFlight = null;
+    });
+
+    return inFlight;
+  };
+
+  const resolveBuilders = async (
+    platform: PlatformEnum,
+    resource: ResourceType,
+  ) => {
+    if (registryUnavailable) return undefined;
+
+    let registry: Registry;
+    try {
+      // Lazy on purpose: registry -> platform modules -> @/lib/db -> this file.
+      ({ registry } = await import("@/features/integrations/core/registry"));
+    } catch (error) {
+      // The registry is `server-only`, so a plain Node context (seed scripts,
+      // one-off tooling) cannot load it. Derivation is skipped there rather
+      // than taking down every query that selects a mapping; whatever the sync
+      // stored still renders.
+      registryUnavailable = true;
+      console.warn(
+        "externalMappingUrls: platform registry unavailable, falling back to stored urls",
+        error,
+      );
+      return undefined;
+    }
+
+    const platformModule = registry[platform];
+    return platformModule
+      ? moduleForResource(platformModule, resource)
+      : undefined;
+  };
+
+  return client.$extends({
     name: "externalMappingUrls",
     query: {
+      // Deliberately only `$allModels`: a model-specific handler in the same
+      // extension would take precedence over this one, and `Integration` owns
+      // mapping relations of its own.
       $allModels: {
-        async $allOperations({ model, args, query }) {
+        async $allOperations({ model, operation, args, query }) {
           const result = await query(args);
-          // Also stops this extension recursing through its own lookup below.
-          if (!selectsExternalMappings(args)) return result;
 
-          await attachMappingUrls(result, model, async (ids) => {
-            const rows = await client.integration.findMany({
-              where: { id: { in: ids } },
-              select: { id: true, platform: true, config: true },
-            });
-            return new Map<string, IntegrationUrlContext>(
-              rows.map((row) => [
-                row.id,
-                { platform: row.platform, config: row.config },
-              ]),
-            );
-          });
+          if (model === "Integration" && WRITE_OPERATIONS.has(operation)) {
+            invalidateIntegrationUrlCache();
+          }
 
+          const paths = mappingPaths(model, args);
+          if (paths.length === 0) return result;
+
+          await attachMappingUrls(
+            result,
+            paths,
+            loadIntegrations,
+            resolveBuilders,
+          );
           return result;
         },
       },
     },
-  }),
-);
+  });
+});

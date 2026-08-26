@@ -1,5 +1,9 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
+import {
+  externalMappingSelect,
+  externalMappingWithSyncSelect,
+} from "@/features/integrations/core/urls";
 import { AssetStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
 import type { ExtendedPrismaClient } from "@/lib/db";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
@@ -108,14 +112,7 @@ export type AssetsVulnsInput = z.infer<typeof assetsVulnsInputSchema>;
 export const assetInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
-  externalMappings: {
-    select: {
-      externalId: true,
-      upstreamApi: true,
-      webUrl: true,
-      integration: { select: { id: true, name: true, platform: true } },
-    },
-  },
+  externalMappings: externalMappingSelect,
 } satisfies Prisma.AssetInclude;
 
 /**
@@ -132,16 +129,7 @@ export type AssetWithRelations = Prisma.Result<
 export const assetDashboardInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
-  externalMappings: {
-    select: {
-      id: true,
-      externalId: true,
-      lastSynced: true,
-      upstreamApi: true,
-      webUrl: true,
-      integration: { select: { id: true, name: true, platform: true } },
-    },
-  },
+  externalMappings: externalMappingWithSyncSelect,
   issues: {
     include: {
       vulnerability: {

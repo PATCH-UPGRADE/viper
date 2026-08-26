@@ -29,14 +29,21 @@ vi.mock("../../client", () => ({
   },
 }));
 
-const { mockStrategy, mockRequirePlatform } = vi.hoisted(() => ({
-  mockStrategy: vi.fn(),
-  mockRequirePlatform: vi.fn(),
-}));
+const { mockStrategy, mockRequirePlatform, mockModuleForResource } = vi.hoisted(
+  () => ({
+    mockStrategy: vi.fn(),
+    mockRequirePlatform: vi.fn(),
+    mockModuleForResource: vi.fn(),
+  }),
+);
 
 vi.mock("@/features/integrations/core/registry", () => ({
   requirePlatform: mockRequirePlatform,
   defaultSyncEveryFor: () => null,
+}));
+
+vi.mock("@/features/integrations/core/sync/resources", () => ({
+  moduleForResource: mockModuleForResource,
 }));
 
 const { mockDecryptCredentials, mockParseAuthCredential, mockUsesGenericAuth } =
@@ -111,9 +118,89 @@ const runSync = (step: ReturnType<typeof makeStep>) =>
 beforeEach(() => {
   vi.clearAllMocks();
   mockRequirePlatform.mockReturnValue(PLATFORM_MODULE);
+  // No resource module by default: the platform owns the sync, as `partner` does.
+  mockModuleForResource.mockReturnValue(undefined);
   mockPrisma.integration.findUnique.mockResolvedValue(loadedRow());
   mockStrategy.mockResolvedValue({ cursor: null, pending: true });
   mockParseAuthCredential.mockReturnValue({ authType: "None" });
+});
+
+/**
+ * Where a sync attempt is routed. A resource module knows how to sync itself; a
+ * platform without one syncs at the platform level. Route it wrong and the sync
+ * either runs the wrong code or silently never runs.
+ */
+describe("syncIntegration — dispatch", () => {
+  it("hands the attempt to the resource module that owns the resource", async () => {
+    const resourceSync = vi.fn().mockResolvedValue({ cursor: { at: 7 } });
+    mockModuleForResource.mockReturnValue({ sync: resourceSync });
+
+    const result = await runSync(makeStep());
+
+    expect(resourceSync).toHaveBeenCalledTimes(1);
+    expect(mockStrategy).not.toHaveBeenCalled();
+    expect(result).toEqual({ success: true, pending: false });
+  });
+
+  it("gives the resource module the same context a platform sync gets", async () => {
+    const resourceSync = vi.fn().mockResolvedValue({ cursor: null });
+    mockModuleForResource.mockReturnValue({ sync: resourceSync });
+
+    await runSync(makeStep());
+
+    expect(resourceSync.mock.calls[0][0]).toMatchObject({
+      integrationId: "integration-1",
+      config: { integrationUri: "https://p.example.com", resource: "Asset" },
+      cursor: null,
+      lastSuccessfulSync: null,
+    });
+  });
+
+  it("falls back to the platform sync when no resource module owns it", async () => {
+    await runSync(makeStep());
+
+    expect(mockStrategy).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes out a resource module's outcome exactly like a platform sync's", async () => {
+    mockModuleForResource.mockReturnValue({
+      sync: async () => ({ cursor: { page: 2 }, pending: false }),
+    });
+
+    await runSync(makeStep());
+
+    expect(mockPrisma.integrationResourceSync.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: SyncStatusEnum.Success,
+          consecutiveFailures: 0,
+          cursor: { page: 2 },
+        }),
+      }),
+    );
+  });
+
+  // A module with neither is a registration bug. Recording Error surfaces it on
+  // the row instead of letting the resource look perpetually up to date.
+  it("records Error when the platform can sync neither way", async () => {
+    mockModuleForResource.mockReturnValue(undefined);
+    mockRequirePlatform.mockReturnValue({
+      ...PLATFORM_MODULE,
+      sync: undefined,
+    });
+
+    const result = await runSync(makeStep());
+
+    expect(mockPrisma.integrationResourceSync.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: SyncStatusEnum.Error,
+          errorMessage: "PARTNER has no sync for Asset",
+        }),
+      }),
+    );
+    expect(result).toEqual({ success: false, pending: false });
+  });
 });
 
 describe("syncIntegration — loading", () => {

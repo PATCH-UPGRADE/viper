@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveEscalationTarget } from "../escalationEmail/process_output";
-import type { EscalationVendorCandidate } from "../escalationEmail/types";
+import type { EscalationRelationshipCandidate } from "../escalationEmail/types";
 
 const mockContact_1 = {
   id: "vendorContact_1",
@@ -23,33 +23,37 @@ const mockContact_3 = {
   email: "jamesdoe@example.com",
 };
 
-const siemens: EscalationVendorCandidate = {
+const siemens: EscalationRelationshipCandidate = {
   id: "siemensID_1",
-  displayName: "Siemens healthineers Service",
+  vendorName: "Siemens healthineers Service",
+  responsibilities: "Managed security and maintenance",
+  assetCount: 34,
   contacts: [mockContact_1, mockContact_2, mockContact_3],
 };
 
-const mockVendor_1: EscalationVendorCandidate = {
+const mockVendor_1: EscalationRelationshipCandidate = {
   id: "vendor_1",
-  displayName: "Vendor 1 Service",
+  vendorName: "Acme Network Co",
+  responsibilities: "Network segmentation",
+  assetCount: 6,
   contacts: [mockContact_1, mockContact_2, mockContact_3],
 };
 
 const context = {
   manufacturerName: "Siemens healthineers Service",
-  vendors: [siemens, mockVendor_1],
+  relationships: [siemens, mockVendor_1],
 };
 
 const noVendorContext = {
   manufacturerName: "Siemens healthineers Service",
-  vendors: [],
+  relationships: [],
 };
 
 describe("resolveEscalationTarget", () => {
   it("names the chosen vendor and returns the chosen contacts' emails", () => {
     const result = resolveEscalationTarget(
       {
-        vendorId: "siemensID_1",
+        managesRelationshipId: "siemensID_1",
         contactIds: ["vendorContact_1", "vendorContact_2", "vendorContact_3"],
       },
       context,
@@ -65,7 +69,7 @@ describe("resolveEscalationTarget", () => {
   it("leaves toEmails empty when the model picks no contact, but keeps the options", () => {
     const result = resolveEscalationTarget(
       {
-        vendorId: "siemensID_1",
+        managesRelationshipId: "siemensID_1",
         contactIds: [],
       },
       context,
@@ -78,7 +82,7 @@ describe("resolveEscalationTarget", () => {
   it("uses the manufacturer name and no contacts for a MANUFACTURER", () => {
     const result = resolveEscalationTarget(
       {
-        vendorId: null,
+        managesRelationshipId: null,
         contactIds: [],
       },
       context,
@@ -93,7 +97,7 @@ describe("resolveEscalationTarget", () => {
   it("falls back to MANUFACTURER when no vendors were offered", () => {
     const result = resolveEscalationTarget(
       {
-        vendorId: "vendor_unknown",
+        managesRelationshipId: "vendor_unknown",
         contactIds: ["mockContact_1"],
       },
       noVendorContext,
@@ -106,7 +110,7 @@ describe("resolveEscalationTarget", () => {
   it("drops correct ids that belong to a different vendor", () => {
     const result = resolveEscalationTarget(
       {
-        vendorId: "siemensID_1",
+        managesRelationshipId: "siemensID_1",
         contactIds: ["mockContact_5"],
       },
       context,

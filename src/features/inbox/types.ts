@@ -19,8 +19,12 @@ export const notificationInclude = {
       },
     },
   },
-  sources: {
-    select: { id: true, channel: true, raw: true, receivedAt: true },
+  sourceLinks: {
+    select: {
+      sourceRecord: {
+        select: { id: true, channel: true, raw: true, observedAt: true },
+      },
+    },
   },
   reads: {
     select: { id: true },
@@ -39,8 +43,9 @@ export type NotificationWithRelations = Omit<
     assetCount: number;
   })[];
 };
-
-export type NotificationSource = NotificationWithRelations["sources"][number];
+// TODO VW-449 few changes in this file
+export type NotificationSource =
+  NotificationWithRelations["sourceLinks"][number];
 
 export const notificationDetailInclude = {
   deviceGroupsMatchings: {
@@ -57,14 +62,19 @@ export const notificationDetailInclude = {
   vulnerabilities: {
     select: { vulnerabilityId: true },
   },
-  sources: {
+  sourceLinks: {
     select: {
-      id: true,
-      channel: true,
-      raw: true,
-      markdown: true,
-      receivedAt: true,
-      referenceUrl: true,
+      sourceType: true,
+      reasonWhy: true,
+      sourceRecord: {
+        select: {
+          id: true,
+          channel: true,
+          raw: true,
+          markdown: true,
+          observedAt: true,
+        },
+      },
     },
   },
   reads: {
@@ -121,7 +131,7 @@ export type NotificationDetailWithRelations = Omit<
 };
 
 export type NotificationDetailSource =
-  NotificationDetailWithRelations["sources"][number];
+  NotificationDetailWithRelations["sourceLinks"][number]["sourceRecord"];
 
 /**
  * The value stored in `NotificationSource.raw` for email sources

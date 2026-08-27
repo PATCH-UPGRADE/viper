@@ -1,6 +1,8 @@
 import "server-only";
 import { PLATFORM_CATALOG } from "@/features/agents/tools/query-platform-tool";
 import {
+  DEBRIEF_MAX_BULLET_LINKS,
+  DEBRIEF_MAX_BULLET_SENTENCES,
   DEBRIEF_PLACEHOLDER,
   type DebriefBullet,
 } from "@/features/debrief/types";
@@ -129,6 +131,12 @@ Write plain language. A reader who is not technical must understand each bullet
 without help. Use short sentences. Give the number of devices when you know it.
 Do not use jargon, and do not use a CVE id as the subject of a sentence.
 
+Write at most ${DEBRIEF_MAX_BULLET_SENTENCES} sentences per bullet. This is a
+hard limit, not a style note: extra sentences are dropped before the reader sees
+them, so put the most important thing first and the action second. If a bullet
+needs more room than that, it is really two bullets, or it is carrying detail
+the reader can get by following its link.
+
 Say what is true and no more. Never invent a device count, a date, or an id.
 </how_to_write>
 
@@ -143,6 +151,9 @@ of the marker.
 Two rules, both enforced:
 1. Every marker you write must have a link at that position.
 2. Every link you supply must have a marker that points at it.
+
+At most ${DEBRIEF_MAX_BULLET_LINKS} links per bullet. Extra ones are removed
+before the reader sees them, and their text is folded back into the sentence.
 
 Each link needs a "label" the reader sees, an "entityType", and an "entityId"
 copied exactly from the findings. Never invent an entityId. A link whose id

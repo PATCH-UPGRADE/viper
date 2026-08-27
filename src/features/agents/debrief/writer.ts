@@ -15,7 +15,7 @@ const WRITER_MODEL = "claude-sonnet-5";
  * `debriefBulletDraftSchema` for why. `validateBullets` repairs the result.
  */
 const writerOutputSchema = z.object({
-  bullets: z.array(debriefBulletDraftSchema).min(1).max(5),
+  bullets: z.array(debriefBulletDraftSchema),
 });
 
 export type WriteDebriefResult = {

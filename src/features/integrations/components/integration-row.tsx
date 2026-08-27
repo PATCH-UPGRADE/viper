@@ -31,11 +31,11 @@ import {
   useSetResourceSyncEnabled,
   useTriggerSync,
 } from "../hooks/use-integrations";
-import {
-  type IntegrationListItem,
-  type IntegrationResourceSyncItem,
-  resourceTypeLabel,
+import type {
+  IntegrationListItem,
+  IntegrationResourceSyncItem,
 } from "../types";
+import { resourceTypeLabel } from "../types";
 
 const frequencyLabel = (sync: {
   effectiveSyncEvery: number;

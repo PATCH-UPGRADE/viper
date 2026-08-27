@@ -8,11 +8,8 @@ import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
-import {
-  type AuthCredential,
-  encryptCredentials,
-  usesGenericAuth,
-} from "../core/credentials";
+import type { AuthCredential } from "../core/credentials";
+import { encryptCredentials, usesGenericAuth } from "../core/credentials";
 import {
   categoriesFor,
   defaultSyncEveryFor,

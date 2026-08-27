@@ -149,12 +149,12 @@ export const WebhooksSearch = () => {
   );
 };
 
-export const WebhooksList = ({ search = true }: { search?: boolean }) => {
+export const WebhooksList = () => {
   const { data: webhooks, isFetching } = useSuspenseWebhooks();
 
   return (
     <DataTable
-      search={search ? <WebhooksSearch /> : undefined}
+      search={<WebhooksSearch />}
       paginatedData={webhooks}
       columns={columns}
       isLoading={isFetching}
@@ -310,7 +310,7 @@ export const WebhookCreateModal = ({
   );
 };
 
-export const AddWebhookButton = () => {
+export const WebhooksHeader = () => {
   const createWebhook = useCreateWebhook();
   const [open, setOpen] = useState(false);
 
@@ -338,9 +338,20 @@ export const AddWebhookButton = () => {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>
-        <PlusIcon /> New Webhook
-      </Button>
+      <div
+        className={cn(
+          mainPadding,
+          "bg-background flex justify-between items-center",
+        )}
+      >
+        <SettingsSubheader
+          title="Webhooks"
+          description="Manage where VIPER communicates data to"
+        />
+        <Button onClick={() => setOpen(true)}>
+          <PlusIcon /> New Webhook
+        </Button>
+      </div>
       <WebhookCreateModal
         form={form}
         open={open}
@@ -350,21 +361,6 @@ export const AddWebhookButton = () => {
     </>
   );
 };
-
-export const WebhooksHeader = () => (
-  <div
-    className={cn(
-      mainPadding,
-      "bg-background flex justify-between items-center",
-    )}
-  >
-    <SettingsSubheader
-      title="Webhooks"
-      description="Manage where VIPER communicates data to"
-    />
-    <AddWebhookButton />
-  </div>
-);
 
 export const WebhooksContainer = ({ children }: PropsWithChildren) => {
   return (

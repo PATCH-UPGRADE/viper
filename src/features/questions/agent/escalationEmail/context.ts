@@ -188,7 +188,7 @@ export async function gatherEscalationContext(
     productName: device.productName,
     relationships,
     markdown: renderEscalationPrompt({
-      audience: finalAudience,,
+      audience: finalAudience,
       device,
       question,
       relationships,

@@ -455,6 +455,11 @@ export function VulnerabilityDrawer({
                 </div>
                 <ExternalMappingList
                   mappings={vulnerability.externalMappings}
+                  emptyMessage={
+                    <p className="text-sm text-muted-foreground">
+                      Not mapped to any integration.
+                    </p>
+                  }
                 />
               </div>
             )}

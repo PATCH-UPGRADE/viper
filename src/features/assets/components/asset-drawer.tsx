@@ -637,7 +637,14 @@ function AssetInfoColumn({ asset }: { asset: AssetWithIssueRelations }) {
               {
                 header: "Integrations",
                 content: (
-                  <ExternalMappingList mappings={asset.externalMappings} />
+                  <ExternalMappingList
+                    mappings={asset.externalMappings}
+                    emptyMessage={
+                      <p className="text-sm text-muted-foreground">
+                        Not mapped to any integration.
+                      </p>
+                    }
+                  />
                 ),
               },
             ]

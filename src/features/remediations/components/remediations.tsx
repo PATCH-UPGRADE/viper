@@ -263,7 +263,11 @@ function RemediationDrawer({
                 </div>
                 <ExternalMappingList
                   mappings={remediation.externalMappings}
-                  emptyMessage={<p>None set</p>}
+                  emptyMessage={
+                    <p className="text-sm text-muted-foreground">
+                      Not mapped to any integration.
+                    </p>
+                  }
                 />
               </div>
             </div>

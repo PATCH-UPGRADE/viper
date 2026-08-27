@@ -15,7 +15,7 @@ export interface ExternalMappingLike extends UrlBearingMapping {
 }
 
 const MappingLink = ({ label, href }: { label: string; href: string }) => (
-  <div>
+  <>
     <div className="text-xs font-medium text-muted-foreground mb-1">
       {label}
     </div>
@@ -28,7 +28,7 @@ const MappingLink = ({ label, href }: { label: string; href: string }) => (
       {href}
       <ExternalLinkIcon className="size-3 shrink-0" />
     </a>
-  </div>
+  </>
 );
 
 /**

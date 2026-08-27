@@ -1,6 +1,4 @@
 import { z } from "zod";
-import { AuthType } from "@/generated/prisma";
-import { basicAuthSchema } from "@/lib/schemas";
 import { FLEET_HOST } from "./urls";
 
 export const SIEMENS_HEALTHINEERS = "Siemens Healthineers";
@@ -10,8 +8,8 @@ export const configSchema = z.object({});
 export type FleetConfig = z.infer<typeof configSchema>;
 
 export const credentialSchema = z.object({
-  authType: z.literal(AuthType.Basic),
-  authentication: basicAuthSchema,
+  username: z.string().min(1),
+  password: z.string().min(1),
 });
 
 export type FleetCreds = z.infer<typeof credentialSchema>;

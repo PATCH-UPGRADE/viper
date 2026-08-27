@@ -162,7 +162,7 @@ export function AcceptPlanDrawer({
           </TabsList>
 
           <TabsContent value="briefing" className="min-h-0 overflow-y-auto p-4">
-            <BriefingPanel planId={plan.id} />
+            <BriefingPanel planId={plan.id} title={plan.title} />
           </TabsContent>
 
           {/* forceMount preserves scroll position across tab switches. */}

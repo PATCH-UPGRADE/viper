@@ -93,7 +93,8 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
     meta: { title: "Summary" },
     header: "Summary",
     cell: ({ row }) => {
-      const { title, summary, type, createdAt, updatedAt, reads } = row.original;
+      const { title, summary, type, createdAt, updatedAt, reads } =
+        row.original;
       const displayText = title ?? summary ?? "—";
       const isUnread = reads.length === 0;
       return (

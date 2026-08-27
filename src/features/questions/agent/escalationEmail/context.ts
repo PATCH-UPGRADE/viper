@@ -177,7 +177,8 @@ export async function gatherEscalationContext(
   const device = await resolveIssueDevice(question.issue);
   if (!device) return null;
 
-  const relationships = audience === "VENDOR" ? await gatherRelationships(device.assetIds) : [];
+  const relationships =
+    audience === "VENDOR" ? await gatherRelationships(device.assetIds) : [];
 
   const finalAudience = effectiveAudience(audience, relationships.length);
 

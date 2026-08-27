@@ -106,7 +106,7 @@ function normalizeHeaders(
 }
 
 export async function createFleetSession(creds: FleetCreds) {
-  const { username, password } = creds.authentication;
+  const { username, password } = creds;
   const login = async () => {
     const sessionCookie = await grabSessionCookie(
       FLEET_LOGIN_CONFIG,

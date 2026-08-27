@@ -68,10 +68,7 @@ const makeCtx = (
 ): ResourceSyncCtx<FleetConfig, FleetCreds> => ({
   integrationId: "int-1",
   config: {},
-  creds: {
-    authType: "Basic",
-    authentication: { username: "svc@example.com", password: "pw" },
-  },
+  creds: { username: "svc@example.com", password: "pw" },
   cursor: null,
   lastSuccessfulSync: null,
   callback: async () => {

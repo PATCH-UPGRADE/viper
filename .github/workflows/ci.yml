@@ -6,7 +6,7 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop,'feature/**']
     types: [opened, edited, reopened, synchronize]
 
 jobs:
@@ -26,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Dependency security audit
-        run: npm audit --omit=dev --audit-level critical 
+      # - name: Dependency security audit
+      #   run: npm audit --omit=dev --audit-level critical 
 
       - name: Check formatting/lint
         run: npx biome ci
@@ -37,6 +37,22 @@ jobs:
 
       - name: Type check
         run: npx tsc --noEmit
+
+  security-audit:
+    name: Security audit
+    if: github.event_name == 'push' || contains(fromJSON('["main", "develop"]'), github_base_ref)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Dependency security audit
+        run: npm audit --omit=dev --audit-level critical 
 
   run-npm-tests:
     name: Run npm tests
@@ -102,4 +118,3 @@ jobs:
         uses: deepakputhraya/action-pr-title@v1.0.2
         with:
           regex: '^\[VW-[0-9]+\]\s.+'
-

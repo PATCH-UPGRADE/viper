@@ -38,6 +38,11 @@ export type BriefingPlanInput = {
 function renderPlanPrompt(plan: BriefingPlanInput): string {
   const cardsParse = planCardsSchema.safeParse(plan.cards);
   const cards = cardsParse.success ? cardsParse.data : null;
+  if (!cardsParse.success) {
+    console.warn(
+      `generateBriefing: plan "${plan.title}" has unparsable cards, omitting plan metrics from the prompt`,
+    );
+  }
 
   const sections = [
     `## Plan${plan.isRecommended ? " (recommended)" : " (alternative — not the recommended plan)"}\n\n### ${plan.title}\n\n${plan.summary}`,

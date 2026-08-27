@@ -168,56 +168,87 @@ export const mitigationRouter = createTRPCRouter({
   // doesn't change just because its draft work orders get tweaked later.
   getBriefing: protectedProcedure
     .input(z.object({ planId: z.string() }))
-    .query(async ({ input }) => {
-      const existing = await prisma.planBriefing.findUnique({
-        where: { mitigationPlanId: input.planId },
-      });
-      if (existing) return briefingSchema.parse(existing.content);
+    .query(({ input }) =>
+      // An advisory lock (same technique as debrief's `regenerate`) serializes
+      // concurrent first-loads for this plan, so only one ever calls the
+      // agent. Held for the whole generate+persist call, not just a claim —
+      // simpler than debrief's async-job/status-column split, and fine here
+      // since this is a single low-traffic review flow, not a fan-out job.
+      prisma.$transaction(
+        async (tx) => {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.planId}))`;
 
-      // Only summary/body/order/etc are needed for the prompt, so this uses
-      // its own narrow select instead of mitigationPlanInclude (which also
-      // pulls assignee/department joins the agent never reads). The
-      // recommended plan (for a non-recommended plan's comparison) is
-      // fetched in the same round trip via the notification relation.
-      const plan = await prisma.mitigationPlan.findUniqueOrThrow({
-        where: { id: input.planId },
-        select: {
-          id: true,
-          title: true,
-          summary: true,
-          compareLine: true,
-          cards: true,
-          order: true,
-          workOrders: { select: { summary: true, body: true } },
-          notification: {
+          const existing = await tx.planBriefing.findUnique({
+            where: { mitigationPlanId: input.planId },
+          });
+          if (existing) {
+            const parsed = briefingSchema.safeParse(existing.content);
+            if (parsed.success) return parsed.data;
+            // Stored shape no longer matches the schema (e.g. it changed
+            // after this row was written) — treat it like a cache miss
+            // instead of throwing forever.
+            console.warn(
+              `getBriefing: stored content for plan ${input.planId} failed validation, regenerating`,
+            );
+          }
+
+          // Only summary/body/order/etc are needed for the prompt, so this
+          // uses its own narrow select instead of mitigationPlanInclude
+          // (which also pulls assignee/department joins the agent never
+          // reads). The recommended plan (for a non-recommended plan's
+          // comparison) is fetched in the same round trip via the
+          // notification relation.
+          const plan = await tx.mitigationPlan.findUnique({
+            where: { id: input.planId },
             select: {
-              mitigationPlans: {
-                where: { order: 0 },
-                select: { title: true, summary: true },
+              id: true,
+              title: true,
+              summary: true,
+              compareLine: true,
+              cards: true,
+              order: true,
+              workOrders: {
+                select: { summary: true, body: true },
+                orderBy: { createdAt: "asc" },
+              },
+              notification: {
+                select: {
+                  mitigationPlans: {
+                    where: { order: 0 },
+                    select: { title: true, summary: true },
+                  },
+                },
               },
             },
-          },
+          });
+          if (!plan) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Plan not found",
+            });
+          }
+
+          const isRecommended = plan.order === 0;
+          const recommendedPlan = isRecommended
+            ? null
+            : (plan.notification.mitigationPlans[0] ?? null);
+
+          const content = await generateBriefing({
+            title: plan.title,
+            summary: plan.summary,
+            compareLine: plan.compareLine,
+            cards: plan.cards,
+            isRecommended,
+            recommendedPlan,
+            workOrders: plan.workOrders.map((w) => ({
+              summary: w.summary,
+              body: w.body,
+            })),
+          });
+          const saved = await persistBriefing(tx, plan.id, content);
+          return briefingSchema.parse(saved.content);
         },
-      });
-
-      const isRecommended = plan.order === 0;
-      const recommendedPlan = isRecommended
-        ? null
-        : (plan.notification.mitigationPlans[0] ?? null);
-
-      const content = await generateBriefing({
-        title: plan.title,
-        summary: plan.summary,
-        compareLine: plan.compareLine,
-        cards: plan.cards,
-        isRecommended,
-        recommendedPlan,
-        workOrders: plan.workOrders.map((w) => ({
-          summary: w.summary,
-          body: w.body,
-        })),
-      });
-      const saved = await persistBriefing(plan.id, content);
-      return briefingSchema.parse(saved.content);
-    }),
+        { timeout: 30_000 }, // generateBriefing is a real LLM call, not instant
+      ),
+    ),
 });

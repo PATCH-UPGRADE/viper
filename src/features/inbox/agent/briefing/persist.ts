@@ -1,12 +1,13 @@
 import "server-only";
-import prisma from "@/lib/db";
+import type { TransactionClient } from "@/lib/db";
 import type { Briefing } from "./schema";
 
 export async function persistBriefing(
+  tx: TransactionClient,
   mitigationPlanId: string,
   content: Briefing,
 ) {
-  return prisma.planBriefing.upsert({
+  return tx.planBriefing.upsert({
     where: { mitigationPlanId },
     create: { mitigationPlanId, content },
     update: { content },

@@ -1,7 +1,7 @@
 "use client";
 
 import { SendIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { PriorityBadge } from "@/components/priority-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -98,10 +98,13 @@ export function AcceptPlanDrawer({
 
   const count = plan.workOrders.length;
 
-  const patch = (id: string, changes: Partial<WorkOrderEdit>) =>
-    setEdits((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, ...changes } : e)),
-    );
+  const patch = useCallback(
+    (id: string, changes: Partial<WorkOrderEdit>) =>
+      setEdits((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, ...changes } : e)),
+      ),
+    [],
+  );
 
   const handleClose = () => {
     if (
@@ -162,7 +165,14 @@ export function AcceptPlanDrawer({
             <BriefingPanel planId={plan.id} />
           </TabsContent>
 
-          <TabsContent value="workItems" className="min-h-0 flex-1">
+          {/* forceMount keeps this panel (and its scroll position) alive
+              while the Briefing tab is active, instead of unmounting and
+              losing scroll on every switch back. */}
+          <TabsContent
+            value="workItems"
+            forceMount
+            className="min-h-0 flex-1 data-[state=inactive]:hidden"
+          >
             <ScrollArea className="h-full bg-muted">
               <div className="flex flex-col gap-4 p-4">
                 {edits.map((edit, index) => (
@@ -208,7 +218,7 @@ export function AcceptPlanDrawer({
   );
 }
 
-function WorkOrderEditCard({
+const WorkOrderEditCard = memo(function WorkOrderEditCard({
   edit,
   workOrder,
   index,
@@ -335,4 +345,4 @@ function WorkOrderEditCard({
       </div>
     </div>
   );
-}
+});

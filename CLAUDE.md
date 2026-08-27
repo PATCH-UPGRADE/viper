@@ -270,11 +270,18 @@ Single-shot calls that classify, extract, or score one record. No graph, no tool
 loop, no streaming — they are invoked from Inngest background jobs rather than from
 a user turn, so they stay beside the feature that owns the data:
 
-- `inbox/agent/` — classify, extract, match, triage, vex, mitigation, question
+- `inbox/agent/` — classify, extract, match, triage, vex, mitigation, question, briefing
 - `notes/agent/` — extract-notes, noteAction
 - `questions/agent/escalationEmail/`
 
 Typical shape: `new ChatAnthropic({ … }).withStructuredOutput(zodSchema)`.
+
+**Known exception:** `inbox/agent/briefing` is invoked lazily from a tRPC
+`query` (`mitigationRouter.getBriefing`) the first time a user opens the
+Briefing tab for a plan, not from an Inngest job — a deliberate product
+decision (generate on demand, cache on the plan) rather than a missed
+convention. It still fits here because it's beside `MitigationPlan`, the
+data it operates on.
 
 **Constraint that shapes both shapes:** Anthropic extended thinking requires
 `tool_choice: "auto"`, and `withStructuredOutput()` forces `tool_choice` — so the two

@@ -42,6 +42,14 @@ describe("without a platform module (ai / partner)", () => {
     expect(resolveWebUrl([])).toBeNull();
   });
 
+  it("returns null instead of the API url when the fallback is opted out", () => {
+    expect(
+      resolveWebUrl([mapping({ upstreamApi: API })], undefined, undefined, {
+        fallbackToUpstreamApi: false,
+      }),
+    ).toBeNull();
+  });
+
   it("takes the first mapping that actually carries a url", () => {
     expect(resolveUpstreamApi([mapping(), mapping({ upstreamApi: API })])).toBe(
       API,

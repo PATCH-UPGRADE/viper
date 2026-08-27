@@ -24,9 +24,7 @@ export function NotificationQuestionTab({
   const approve = useApproveEscalation(notificationId);
   const dismiss = useDismissEscalation();
 
-  const pending = questions.filter(
-    (q) => q.status === "PENDING",
-  );
+  const pending = questions.filter((q) => q.status === "PENDING");
 
   if (pending.length === 0 && suggestedEmails.length === 0) {
     if (questions.length === 0 && suggestedEmails.length === 0) {

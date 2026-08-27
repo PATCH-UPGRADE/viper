@@ -1,5 +1,5 @@
 import type { ResourceModule } from "../../../core/types";
-import type { FleetConfig, FleetCreds } from "../config";
+import { BASE_URL, type FleetConfig, type FleetCreds } from "../config";
 import { EQUIPMENTS_URL } from "../urls";
 import {
   type FleetAssetItem,
@@ -23,6 +23,9 @@ export const assets: ResourceModule<
   toCanonical,
 
   apiUrlFor: () => EQUIPMENTS_URL,
+
+  webUrlFor: (externalId) =>
+    `${BASE_URL}/equipment/${encodeURIComponent(externalId)}/info`,
 
   defaultSyncEvery: 86400,
 };

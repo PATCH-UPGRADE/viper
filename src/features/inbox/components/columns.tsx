@@ -20,7 +20,6 @@ import { NotificationTypeBadge } from "./notification-type-badge";
 // ---------------------------------------------------------------------------
 // Source display helper
 // ---------------------------------------------------------------------------
-// TODO VW-449 few changes with all the NotificationWithRelations["sources], source.receivedAt -> source.observedAt
 
 function SourceDisplay({
   source,

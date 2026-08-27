@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { externalMappingSelect } from "@/features/integrations/core/urls";
 import { PlatformEnum, type Prisma } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
@@ -111,14 +112,7 @@ export const remediationInclude = {
   deviceGroupMatchings: matchingInclude,
   vulnerability: remediationVulnerabilitySelect,
   artifacts: artifactWrapperSelect,
-  externalMappings: {
-    select: {
-      externalId: true,
-      upstreamApi: true,
-      webUrl: true,
-      integration: { select: { id: true, name: true, platform: true } },
-    },
-  },
+  externalMappings: externalMappingSelect,
 };
 
 export const remediationCardInclude = {

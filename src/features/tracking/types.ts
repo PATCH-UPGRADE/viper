@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { externalMappingWithSyncSelect } from "@/features/integrations/core/urls";
 import {
   AssetStatus,
   IssueStatus,
@@ -213,18 +214,7 @@ export const ticketDetailInclude = {
     },
     orderBy: { createdAt: "desc" as const },
   },
-  externalMappings: {
-    select: {
-      id: true,
-      externalId: true,
-      lastSynced: true,
-      upstreamApi: true,
-      webUrl: true,
-      integration: {
-        select: { id: true, name: true, platform: true },
-      },
-    },
-  },
+  externalMappings: externalMappingWithSyncSelect,
   notification: { select: { id: true, title: true, type: true } },
 } satisfies Prisma.WorkOrderTicketInclude;
 

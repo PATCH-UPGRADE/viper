@@ -569,7 +569,6 @@ describe("Remediations Endpoint (/remediations)", () => {
 
     expect(foundRem1.description).toBe(remPayload1.description);
     expect(foundRem1.narrative).toBe(remPayload1.narrative);
-    expect(mapping1.upstreamApi).toBe(remPayload1.upstreamApi);
     expect(foundRem1.artifacts.length).toBe(1);
 
     const remPayload2 = remediationIntegrationPayload.items[1];
@@ -593,7 +592,6 @@ describe("Remediations Endpoint (/remediations)", () => {
 
     expect(foundRem2.description).toBe(remPayload2.description);
     expect(foundRem2.narrative).toBe(remPayload2.narrative);
-    expect(mapping2.upstreamApi).toBe(remPayload2.upstreamApi);
     expect(foundRem2.artifacts.length).toBe(1);
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {

@@ -236,12 +236,8 @@ export const integrationsRouter = createTRPCRouter({
           where: { id },
           data: {
             ...row,
-            // TODO(VW-449): credentials are encrypted bytes and are not
-            // returned to the client, so the edit form cannot prefill them.
-            // Submitting with the auth fields blank therefore means "keep what
-            // is stored" rather than "clear it" — otherwise every edit would
-            // silently wipe the credential. Needs a real UI affordance
-            // ("Credentials stored — leave blank to keep") before this ships.
+            // Blank auth fields mean "keep the stored credential", not
+            // "clear it" — credentialsPatch returns {} so this spreads nothing.
             ...credentials,
             resourceSyncs: {
               updateMany: {

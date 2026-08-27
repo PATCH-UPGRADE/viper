@@ -6,7 +6,6 @@ import {
   CircleArrowDown,
   CircleArrowUp,
   CircleMinus,
-  ExternalLinkIcon,
   ServerIcon,
   ShieldAlert,
   ShieldCheck,
@@ -23,6 +22,7 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { ExternalMappingList } from "@/components/external-mappings";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { Severity } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
-import type { AssetWithDeviceGroup, AssetWithIssues } from "@/lib/db";
 import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useAssetsParams } from "../hooks/use-asset-params";
@@ -61,10 +60,11 @@ import {
 import type {
   AssetIssueMetricsCounts,
   AssetWithIssueRelations,
+  AssetWithRelations,
 } from "../types";
 import { getAssetRoleLabel } from "../utils";
 import { AssetDashboardDrawer } from "./asset-drawer";
-import { columns, columnsWithActions } from "./columns";
+import { columns } from "./columns";
 import { assetIssueColumns, dashboardColumns } from "./dashboard-columns";
 
 const SeveritiesExplained = {
@@ -229,31 +229,6 @@ export const AssetsList = () => {
   );
 };
 
-// if we use this again may be better to wrap ^AssetsList with drawer logic
-export const AssetsListWithDrawer = () => {
-  const { data: assets, isFetching } = useSuspenseAssets();
-  const [asset, setAsset] = useState<AssetWithIssues | undefined>(undefined);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  return (
-    <>
-      {asset && (
-        <AssetDrawer asset={asset} open={drawerOpen} setOpen={setDrawerOpen} />
-      )}
-      <DataTable
-        paginatedData={assets}
-        columns={columnsWithActions}
-        isLoading={isFetching}
-        search={<AssetsSearch />}
-        rowOnclick={(row) => {
-          setDrawerOpen(true);
-          setAsset(row.original);
-        }}
-      />
-    </>
-  );
-};
-
 export const NewVulnerableAssetsAlert = ({
   items,
   totalCount,
@@ -392,17 +367,11 @@ export const AssetsEmpty = () => {
   );
 };
 
-function isAssetWithIssues(
-  data: AssetWithDeviceGroup | AssetWithIssues,
-): data is AssetWithIssues {
-  return (data as AssetWithIssues).issues !== undefined;
+function isAssetWithIssues(data: DrawerAsset): data is AssetWithIssueRelations {
+  return (data as AssetWithIssueRelations).issues !== undefined;
 }
 
-export const AssetItem = ({
-  data,
-}: {
-  data: AssetWithIssues | AssetWithDeviceGroup;
-}) => {
+export const AssetItem = ({ data }: { data: DrawerAsset }) => {
   const removeAsset = useRemoveAsset();
 
   const handleRemove = () => {
@@ -444,8 +413,14 @@ export const AssetItem = ({
   );
 };
 
+/**
+ * Both members carry `externalMappings`; only the dashboard payload also
+ * selects `issues`, which `isAssetWithIssues` narrows to.
+ */
+type DrawerAsset = AssetWithRelations | AssetWithIssueRelations;
+
 interface AssetDrawerProps extends Omit<EntityDrawerProps, "trigger"> {
-  asset: AssetWithIssues | AssetWithDeviceGroup;
+  asset: DrawerAsset;
 }
 
 export function AssetDrawer({
@@ -537,24 +512,18 @@ export function AssetDrawer({
 
         <Separator />
 
-        {/* API Integration */}
+        {/* Integrations */}
         <div className="flex flex-col gap-3">
-          <h3 className="font-semibold">API Integration</h3>
+          <h3 className="font-semibold">Integrations</h3>
 
-          <div>
-            <div className="text-xs font-medium text-muted-foreground mb-1">
-              Upstream API
-            </div>
-            <a
-              href={asset.upstreamApi}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-            >
-              {asset.upstreamApi}
-              <ExternalLinkIcon className="size-3 flex-shrink-0" />
-            </a>
-          </div>
+          <ExternalMappingList
+            mappings={asset.externalMappings}
+            emptyMessage={
+              <p className="text-sm text-muted-foreground">
+                Not mapped to any integration.
+              </p>
+            }
+          />
         </div>
 
         <Separator />

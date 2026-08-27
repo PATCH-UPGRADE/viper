@@ -1,5 +1,6 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
+import { externalMappingSelect } from "@/features/integrations/core/urls";
 import {
   PlatformEnum,
   Priority,
@@ -125,27 +126,13 @@ export const vulnerabilitiesByPriorityInputSchema =
 export const vulnerabilityInclude = {
   user: userIncludeSelect,
   deviceGroupMatchings: deviceGroupMatchingInclude,
-  externalMappings: {
-    select: {
-      externalId: true,
-      upstreamApi: true,
-      webUrl: true,
-      integration: { select: { id: true, name: true, platform: true } },
-    },
-  },
+  externalMappings: externalMappingSelect,
 };
 
 export const vulnerabilityByPriorityInclude = {
   user: userIncludeSelect,
   deviceGroupMatchings: deviceGroupMatchingInclude,
-  externalMappings: {
-    select: {
-      externalId: true,
-      upstreamApi: true,
-      webUrl: true,
-      integration: { select: { id: true, name: true, platform: true } },
-    },
-  },
+  externalMappings: externalMappingSelect,
   issues: {
     include: {
       asset: {

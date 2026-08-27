@@ -2,12 +2,8 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
-import { CopyIcon, TrashIcon } from "lucide-react";
-import { toast } from "sonner";
 import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
-import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
-import { handleCopy } from "@/lib/copy";
 import { deviceGroupCpeList } from "@/lib/markdown";
 import type { AssetResponse } from "../types";
 
@@ -48,55 +44,3 @@ export const columns: ColumnDef<AssetResponse>[] = [
       formatDistanceToNow(row.original.updatedAt, { addSuffix: true }),
   },
 ];
-
-const actionsColumn: ColumnDef<AssetResponse> = {
-  id: "actions",
-  enableHiding: false,
-  cell: ({ row }) => {
-    const asset = row.original;
-
-    return (
-      <MoreVerticalDropdownMenu
-        contentClassName="w-[200px]"
-        items={[
-          {
-            items: [
-              { label: "Go to Asset Details", href: `/assets/${asset.id}` },
-            ],
-          },
-          {
-            label: "Quick Actions",
-            items: [
-              {
-                label: "Copy CPE",
-                icon: <CopyIcon strokeWidth={3} />,
-                onClick: () =>
-                  handleCopy(deviceGroupCpeList(asset.deviceGroup), () =>
-                    toast.success("Copied!"),
-                  ),
-              },
-              {
-                label: "Copy Asset ID",
-                icon: <CopyIcon strokeWidth={3} />,
-                onClick: () =>
-                  handleCopy(asset.id, () => toast.success("Copied!")),
-              },
-            ],
-          },
-          {
-            items: [
-              {
-                label: "Delete Asset",
-                icon: <TrashIcon strokeWidth={3} />,
-                onClick: () => console.log("TODO"),
-                variant: "destructive",
-              },
-            ],
-          },
-        ]}
-      />
-    );
-  },
-};
-
-export const columnsWithActions = [...columns, actionsColumn];

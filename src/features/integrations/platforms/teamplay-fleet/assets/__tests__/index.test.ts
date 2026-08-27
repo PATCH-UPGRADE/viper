@@ -116,6 +116,20 @@ describe("apiUrlFor", () => {
   });
 });
 
+describe("webUrlFor", () => {
+  it("points at the equipment's info page on Fleet", () => {
+    expect(assets.webUrlFor?.("US_3000438672", {})).toBe(
+      "https://fleet.siemens-healthineers.com/equipment/US_3000438672/info",
+    );
+  });
+
+  it("escapes an equipment key that would otherwise alter the path", () => {
+    expect(assets.webUrlFor?.("US_1/../admin", {})).toBe(
+      "https://fleet.siemens-healthineers.com/equipment/US_1%2F..%2Fadmin/info",
+    );
+  });
+});
+
 describe("the resource module", () => {
   it("wires up the sync core dispatches to", () => {
     expect(assets.sync).toBeTypeOf("function");

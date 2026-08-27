@@ -48,10 +48,9 @@ describe("PLATFORM_CATALOG stays in sync with PLATFORM_QUERY_PROCEDURES", () => 
   });
 
   // The description opens with a prose list of domains before it pastes the
-  // catalog. That sentence went stale once already: it named four domains while
-  // the catalog listed sixteen procedures, and an agent that trusts the summary
-  // will refuse a request the tool would have served. Assert against the
-  // preamble only — testing the whole string passes via the pasted catalog.
+  // catalog. An agent that trusts a stale summary refuses a request the tool
+  // would have served. Assert against the preamble only — testing the whole
+  // string passes via the pasted catalog.
   it("names every allowlisted domain in the tool description preamble", () => {
     const description =
       makeQueryPlatformDataTool("test-user").description ?? "";

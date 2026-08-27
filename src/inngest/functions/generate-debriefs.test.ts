@@ -274,9 +274,8 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
   });
 
   it("clears the previous run's bullets when marking Failed", async () => {
-    // The two persist branches drifted once: only the Ready branch reset
-    // bullets, so a re-run that collapsed left yesterday's bullets on a Failed
-    // row for the card to render.
+    // A Failed row must not keep the bullets of an earlier Ready run, or the
+    // card renders stale content under a failure state.
     contextResolves();
     mockWriter.mockResolvedValue({ bullets: [], model: "m" });
     const { step, logger } = makeStep();

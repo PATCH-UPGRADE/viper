@@ -2,6 +2,7 @@ import "server-only";
 import { TRPCError } from "@trpc/server";
 import { requestDebrief } from "@/inngest/events/debrief";
 import prisma from "@/lib/db";
+import { firstNameOf } from "@/lib/utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { claimDebriefRun, parseBullets } from "./runs";
 
@@ -43,6 +44,10 @@ export const debriefRouter = createTRPCRouter({
     return {
       id: debrief.id,
       department: debrief.department,
+      // For addressing the reader by name. Null on the API-key auth path,
+      // which carries an id but no display name, so the card falls back to
+      // the department rather than greeting nobody.
+      viewerFirstName: firstNameOf(ctx.auth.user.name),
       status: debrief.status,
       bullets: debrief.status === "Ready" ? parseBullets(debrief.bullets) : [],
       since: debrief.since,

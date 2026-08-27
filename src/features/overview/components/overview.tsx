@@ -7,6 +7,8 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { DebriefCard } from "@/features/debrief/components/debrief-card";
+import { firstNameOf } from "@/lib/utils";
 import { RecentUpdatesCard } from "./recent-updates-card";
 import { SuggestedInboxCard } from "./suggested-inbox-card";
 import { SuggestedWorkOrdersCard } from "./suggested-work-orders-card";
@@ -28,7 +30,7 @@ export const OverviewGreeting = ({ name }: { name: string }) => {
   useEffect(() => {
     setNow(new Date());
   }, []);
-  const firstName = name.trim().split(/\s+/)[0] || name;
+  const firstName = firstNameOf(name) ?? name;
 
   return (
     <div className="flex flex-col gap-1">
@@ -58,12 +60,15 @@ export const OverviewContainer = ({
 );
 
 export const OverviewPanels = () => (
-  <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-    <div className="flex flex-col gap-6 lg:col-span-2">
-      <SuggestedInboxCard />
-      <SuggestedWorkOrdersCard />
+  <div className="flex flex-col gap-6">
+    <DebriefCard />
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+      <div className="flex flex-col gap-6 lg:col-span-2">
+        <SuggestedInboxCard />
+        <SuggestedWorkOrdersCard />
+      </div>
+      <RecentUpdatesCard />
     </div>
-    <RecentUpdatesCard />
   </div>
 );
 

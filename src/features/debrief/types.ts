@@ -48,21 +48,6 @@ export const DEBRIEF_MAX_BULLET_LINKS = 3;
 export const DEBRIEF_MAX_BULLET_CHARS = 800;
 
 /**
- * Sentence boundary: a terminator followed by whitespace AND a sentence start.
- *
- * Both conditions are load-bearing in this domain, which is full of dots that
- * are not sentence ends — firmware "M.02.07", products like "syngo.plaza",
- * scores like "CVSS 9.8", and "etc. devices" all stay intact. The whitespace
- * requirement protects the first three, and the start class protects the last.
- *
- * A sentence start is a capital, a digit, or "{" — bullets here regularly open
- * a sentence with a device count ("11 monitors are exposed.") or with a link
- * marker ("{{0}} affects the ICU."). Without those two the sentence limit
- * silently under-counts and an over-long bullet reaches the reader.
- */
-export const DEBRIEF_SENTENCE_BOUNDARY = /(?<=[.!?])\s+(?=[A-Z0-9{])/;
-
-/**
  * Structural shape only, without the placeholder invariant.
  *
  * This is what the writer agent is asked to emit. `superRefine` cannot be

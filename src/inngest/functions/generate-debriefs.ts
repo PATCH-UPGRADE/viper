@@ -171,9 +171,8 @@ export const generateDepartmentDebrief = inngest.createFunction(
         // An empty result means every bullet collapsed during repair. There is
         // nothing to show, and Ready with no bullets renders an empty card.
         //
-        // One update either way: two branches drifted once already, leaving the
-        // previous run's bullets on a Failed row because only the Ready branch
-        // reset them.
+        // One update either way, so a Failed row cannot keep the bullets of an
+        // earlier Ready run.
         const ok = written.bullets.length > 0;
 
         await prisma.debrief.update({

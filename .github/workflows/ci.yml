@@ -6,7 +6,7 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main, develop,'feature/**']
+    branches: [main, develop, 'feature/**']
     types: [opened, edited, reopened, synchronize]
 
 jobs:
@@ -25,9 +25,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      # - name: Dependency security audit
-      #   run: npm audit --omit=dev --audit-level critical 
 
       - name: Check formatting/lint
         run: npx biome ci
@@ -56,6 +53,7 @@ jobs:
 
   run-npm-tests:
     name: Run npm tests
+    if: github.event_name == 'push' || contains(fromJSON('["main", "develop"]'), github_base_ref)
     runs-on: ubuntu-latest
     services:
       postgres:

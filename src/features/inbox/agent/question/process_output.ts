@@ -45,7 +45,7 @@ export async function applyQuestionWrites(
           suggestedAnswers: op.suggestedAnswers,
           status: "PENDING",
           parentQuestionId: opts?.parentQuestionId,
-          audience: op.audience,
+          audience: op.audience,,
         },
         select: { id: true, issueId: true },
       }),

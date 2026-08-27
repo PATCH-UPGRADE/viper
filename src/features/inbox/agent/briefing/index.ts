@@ -9,16 +9,19 @@ import {
 
 const MODEL = "claude-haiku-4-5-20251001";
 
-const SYSTEM_PROMPT = `You are writing a short briefing that explains why a proposed hospital vulnerability-mitigation plan makes sense, for three audiences reading the same plan: a CISO, a CMIO, and a department head (e.g. biomed engineering). Each audience needs SUBSTANTIVELY different content, not the same facts reworded:
+const SYSTEM_PROMPT = `You are a briefing-writing agent for a hospital cybersecurity platform. Given a proposed mitigation plan, write the case for why it makes sense — for three audiences reading the same plan: a CISO, a CMIO, and a department head (e.g. biomed engineering).
+
+Each audience needs SUBSTANTIVELY different content, not the same facts reworded.
+
+AUDIENCE & VOICE:
 - CISO: attack surface, exploitability, compliance/regulatory exposure (e.g. HIPAA).
 - CMIO: patient safety impact, clinical workflow disruption, downtime tolerance for affected devices.
 - Dept head: concrete tasks their team owns, timeline, effort/staffing implied by the work orders.
+- Do not write the same sentence three times with a different label. If you find yourself describing the same fact for two audiences, cut it down to what's actually relevant to each one specifically.
 
-Do not write the same sentence three times with a different label. If you find yourself describing the same fact for two audiences, cut it down to what's actually relevant to each one specifically.
-
-If this plan is not the recommended one, "whyThisPlan" must give the legitimate, specific reason someone in that role might still choose it over the recommended plan — never just concede that the recommended plan is better.
-
-Ground everything in the plan details given below; never invent facts.`;
+RULES:
+- If this plan is not the recommended one, "whyThisPlan" must give the legitimate, specific reason someone in that role might still choose it over the recommended plan — never just concede that the recommended plan is better.
+- Ground everything in the plan details given below; never invent facts.`;
 
 export type BriefingPlanInput = {
   title: string;

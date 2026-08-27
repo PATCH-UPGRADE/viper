@@ -169,11 +169,8 @@ export const mitigationRouter = createTRPCRouter({
   getBriefing: protectedProcedure
     .input(z.object({ planId: z.string() }))
     .query(({ input }) =>
-      // An advisory lock (same technique as debrief's `regenerate`) serializes
-      // concurrent first-loads for this plan, so only one ever calls the
-      // agent. Held for the whole generate+persist call, not just a claim —
-      // simpler than debrief's async-job/status-column split, and fine here
-      // since this is a single low-traffic review flow, not a fan-out job.
+      // Advisory lock: serializes concurrent first-loads for this plan so
+      // only one ever calls the agent.
       prisma.$transaction(
         async (tx) => {
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.planId}))`;
@@ -184,9 +181,6 @@ export const mitigationRouter = createTRPCRouter({
           if (existing) {
             const parsed = briefingSchema.safeParse(existing.content);
             if (parsed.success) return parsed.data;
-            // Stored shape no longer matches the schema (e.g. it changed
-            // after this row was written) — treat it like a cache miss
-            // instead of throwing forever.
             console.warn(
               `getBriefing: stored content for plan ${input.planId} failed validation, regenerating`,
             );
@@ -248,7 +242,7 @@ export const mitigationRouter = createTRPCRouter({
           const saved = await persistBriefing(tx, plan.id, content);
           return briefingSchema.parse(saved.content);
         },
-        { timeout: 30_000 }, // generateBriefing is a real LLM call, not instant
+        { timeout: 30_000 },
       ),
     ),
 });

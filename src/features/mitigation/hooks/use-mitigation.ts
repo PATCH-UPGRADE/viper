@@ -20,9 +20,7 @@ export const useBriefing = (planId: string) => {
   const trpc = useTRPC();
   return useQuery({
     ...trpc.mitigation.getBriefing.queryOptions({ planId }),
-    // Each attempt is a real, paid LLM call — don't let a transient failure
-    // silently triple it. The UI's own Retry button covers a manual re-try.
-    retry: false,
+    retry: false, // each attempt is a real, paid LLM call
   });
 };
 

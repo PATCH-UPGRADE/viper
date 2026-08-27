@@ -165,9 +165,7 @@ export function AcceptPlanDrawer({
             <BriefingPanel planId={plan.id} />
           </TabsContent>
 
-          {/* forceMount keeps this panel (and its scroll position) alive
-              while the Briefing tab is active, instead of unmounting and
-              losing scroll on every switch back. */}
+          {/* forceMount preserves scroll position across tab switches. */}
           <TabsContent
             value="workItems"
             forceMount

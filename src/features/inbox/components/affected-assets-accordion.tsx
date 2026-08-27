@@ -42,7 +42,7 @@ import type {
   ResolvedDeviceGroupAsset,
 } from "../types";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = a;
 
 export type Bucket = keyof AffectedAssetsSummary;
 

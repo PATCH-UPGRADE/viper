@@ -37,12 +37,6 @@ import type {
 } from "../types";
 import { resourceTypeLabel } from "../types";
 
-const frequencyLabel = (sync: {
-  effectiveSyncEvery: number;
-  isOverridden: boolean;
-}) =>
-  `Every ${ms(sync.effectiveSyncEvery * 1000)}${sync.isOverridden ? "" : " (default)"}`;
-
 const relativeTime = (date: Date) =>
   formatDistanceToNow(date, { addSuffix: true });
 
@@ -56,13 +50,6 @@ type TimingInput = Pick<
   | "isDue"
 >;
 
-const nextSyncLabel = (sync: TimingInput): string | null =>
-  sync.isDue
-    ? "Sync due"
-    : sync.nextSyncAt
-      ? `Next sync ${relativeTime(sync.nextSyncAt)}`
-      : null;
-
 export const timingLine = (sync: TimingInput) => {
   if (sync.status === SyncStatusEnum.Error) {
     const when = sync.lastAttemptAt ?? sync.lastSuccessfulSync;
@@ -71,7 +58,11 @@ export const timingLine = (sync: TimingInput) => {
       isError: true,
     };
   }
-  const next = nextSyncLabel(sync);
+  const next = sync.isDue
+    ? "Sync due"
+    : sync.nextSyncAt
+      ? `Next sync ${relativeTime(sync.nextSyncAt)}`
+      : null;
   if (!sync.lastSuccessfulSync) {
     return { text: next ?? "Never synced", isError: false };
   }
@@ -169,7 +160,8 @@ const ResourceStatus = ({
     <div className="text-right">
       <div className="flex items-center justify-end gap-1 text-sm font-medium">
         <RefreshCw className="size-3.5 text-muted-foreground" />
-        {frequencyLabel(sync)}
+        Every {ms(sync.effectiveSyncEvery * 1000)}
+        {sync.isOverridden ? "" : " (default)"}
       </div>
       <TimingText timing={sync} />
     </div>

@@ -195,14 +195,15 @@ function trimCanonicalRecord(record: Record<string, any>): void {
 }
 
 /**
- * A NotificationSource carries `raw`: the entire inbound payload, e.g. a whole
+ * A source record carries `raw`: the entire inbound payload, e.g. a whole
  * Resend email event. It is worth tens of KB of context per row, and the model
  * never needs it — `markdown` and the parent's own summary already carry the
  * content.
  *
- * Matched on the source's own shape, not its parent, because Notification and
- * WorkOrderTicket both hold `sources`. Stripped before the child walk, so the
- * payload is never recursed into.
+ * Matched on the row's own shape, not its parent: Notification and
+ * WorkOrderTicket both hold `sources`, so the parent is not a reliable signal.
+ *
+ * Stripped before the child walk, so the payload is never recursed into.
  */
 function stripSourcePayload(source: Record<string, unknown>): void {
   delete source.raw;

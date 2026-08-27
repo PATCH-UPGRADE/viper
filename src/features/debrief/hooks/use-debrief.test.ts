@@ -5,7 +5,7 @@ import { debriefPollInterval } from "./use-debrief";
 
 describe("debriefPollInterval", () => {
   it("polls while a run is in flight", () => {
-    expect(debriefPollInterval({ status: "Generating" })).toBe(
+    expect(debriefPollInterval({ pending: true })).toBe(
       DEBRIEF_POLL_INTERVAL_MS,
     );
   });
@@ -13,8 +13,7 @@ describe("debriefPollInterval", () => {
   it("stops once the run reaches a terminal state", () => {
     // Polling a finished debrief is a request per interval per open tab, for
     // a result that cannot change until someone asks for a new run.
-    expect(debriefPollInterval({ status: "Ready" })).toBe(false);
-    expect(debriefPollInterval({ status: "Failed" })).toBe(false);
+    expect(debriefPollInterval({ pending: false })).toBe(false);
   });
 
   it("does not poll when there is no debrief", () => {

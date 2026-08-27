@@ -93,3 +93,51 @@ export async function claimDebriefRun(
     return { id: opened.id, created: true };
   });
 }
+
+/**
+ * How many runs to keep per department.
+ *
+ * One run a day plus the occasional manual regenerate, so this is roughly two
+ * weeks of history. Only the newest Ready run is ever shown, and only the one
+ * before it is read back as context, so older rows serve nothing.
+ */
+export const DEBRIEF_RETAINED_PER_DEPARTMENT = 20;
+
+/**
+ * Delete every debrief past the newest DEBRIEF_RETAINED_PER_DEPARTMENT for each
+ * department.
+ *
+ * Rows accumulate forever otherwise: one per department per day, plus every
+ * manual regenerate, each carrying a bullets JSON blob.
+ *
+ * Deletes per department rather than with one global cutoff date, so a
+ * department that has been quiet keeps its history instead of losing it to
+ * busier neighbours.
+ */
+export async function purgeOldDebriefs(): Promise<number> {
+  const departments = await prisma.debrief.groupBy({
+    by: ["departmentId"],
+    _count: { _all: true },
+    having: {
+      departmentId: { _count: { gt: DEBRIEF_RETAINED_PER_DEPARTMENT } },
+    },
+  });
+
+  let deleted = 0;
+
+  for (const { departmentId } of departments) {
+    const keep = await prisma.debrief.findMany({
+      where: { departmentId },
+      orderBy: { createdAt: "desc" },
+      take: DEBRIEF_RETAINED_PER_DEPARTMENT,
+      select: { id: true },
+    });
+
+    const { count } = await prisma.debrief.deleteMany({
+      where: { departmentId, id: { notIn: keep.map((row) => row.id) } },
+    });
+    deleted += count;
+  }
+
+  return deleted;
+}

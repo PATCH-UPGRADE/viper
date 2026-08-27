@@ -35,7 +35,8 @@ const makeDebrief = (overrides: Partial<Debrief> = {}): Debrief =>
   ({
     id: "debrief-1",
     department: { id: "dept-1", name: "Biomedical Engineering" },
-    status: "Ready",
+    pending: false,
+    lastRunFailed: false,
     bullets: [
       { text: "Two machines are exposed by {{0}}.", links: [VULN_LINK] },
       { text: "Facilities is buying 24 infusion pumps.", links: [] },
@@ -138,27 +139,17 @@ describe("DebriefCard — states", () => {
   });
 
   it("shows a generating state instead of bullets", () => {
-    setDebrief(makeDebrief({ status: "Generating", bullets: [] }));
+    setDebrief(makeDebrief({ pending: true, bullets: [] }));
     render(<DebriefCard />);
 
     expect(screen.getByText(/Generating your debrief/)).toBeInTheDocument();
-  });
-
-  it("says the previous brief is unchanged when a run failed", () => {
-    setDebrief(makeDebrief({ status: "Failed", bullets: [] }));
-    render(<DebriefCard />);
-
-    expect(screen.getByText(/could not be generated/)).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /try again/i }),
-    ).toBeInTheDocument();
   });
 
   it("never shows a headline with no bullets under it", () => {
     // parseBullets returns an empty list for a stored row that fails the
     // current schema, and leaves the status Ready. Without this branch the
     // reader gets a card that announces a brief and then shows nothing.
-    setDebrief(makeDebrief({ status: "Ready", bullets: [] }));
+    setDebrief(makeDebrief({ bullets: [] }));
     render(<DebriefCard />);
 
     expect(screen.getByText(/could not be generated/)).toBeInTheDocument();
@@ -182,23 +173,25 @@ describe("DebriefCard — regenerate", () => {
 
   it("cannot be clicked twice while a run is in flight", async () => {
     // The server dedupes too, but a disabled control is the honest signal.
-    setDebrief(makeDebrief({ status: "Generating", bullets: [] }));
+    setDebrief(makeDebrief({ pending: true, bullets: [] }));
     render(<DebriefCard />);
 
     const button = screen.getByRole("button", { name: /regenerate debrief/i });
     expect(button).toBeDisabled();
   });
 
-  it("is disabled while the request itself is in flight", async () => {
-    // The row still reads Ready until the server opens the new run, so the
-    // mutation's own pending state is the only signal during that window.
+  it("is disabled while the request itself is in flight", () => {
+    // The mutation is in flight before the server reports pending, so the
+    // button must react to its own state, not only to the query.
     mockUseRegenerate.mockReturnValue({ mutate: mockMutate, isPending: true });
     setDebrief(makeDebrief());
     render(<DebriefCard />);
 
-    const button = screen.getByRole("button", { name: /regenerate debrief/i });
-    expect(button).toBeDisabled();
-    expect(screen.getByText(/Generating your debrief/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /regenerate debrief/i }),
+    ).toBeDisabled();
+    // The brief stays on screen throughout.
+    expect(screen.getByText(/Facilities is buying/)).toBeInTheDocument();
   });
 });
 
@@ -216,5 +209,32 @@ describe("DebriefCard — collapse", () => {
     expect(
       screen.getByRole("button", { name: /expand debrief/i }),
     ).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+describe("DebriefCard — a rerun does not erase the current brief", () => {
+  it("keeps yesterday's bullets on screen while a new run works", () => {
+    // The reader pressed Regenerate. Replacing a good brief with skeletons
+    // takes away the answer they already had, for a minute or more.
+    setDebrief(makeDebrief({ pending: true }));
+    render(<DebriefCard />);
+
+    expect(screen.getByText(/Facilities is buying/)).toBeInTheDocument();
+    expect(screen.getByText(/refreshing/)).toBeInTheDocument();
+  });
+
+  it("keeps them when the newest run failed, and says so", () => {
+    setDebrief(makeDebrief({ lastRunFailed: true }));
+    render(<DebriefCard />);
+
+    expect(screen.getByText(/Facilities is buying/)).toBeInTheDocument();
+    expect(screen.getByText(/last refresh failed/)).toBeInTheDocument();
+  });
+
+  it("shows skeletons only when there is no brief to keep", () => {
+    setDebrief(makeDebrief({ pending: true, bullets: [] }));
+    render(<DebriefCard />);
+
+    expect(screen.getByText(/Generating your debrief/)).toBeInTheDocument();
   });
 });

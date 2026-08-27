@@ -235,7 +235,7 @@ describe("addNavigationLinks — notifications", () => {
 });
 
 describe("addNavigationLinks — source payload stripping", () => {
-  // NotificationSource.raw is the whole inbound email event, tens of KB per row.
+  // A source record's `raw` is the whole inbound email event, tens of KB per row.
   // The notification's own title and summary carry what the model reads, and on
   // the detail call the source keeps its markdown.
   const source = () => ({
@@ -272,7 +272,7 @@ describe("addNavigationLinks — source payload stripping", () => {
   });
 
   it("strips raw from work order ticket sources too", () => {
-    // WorkOrderTicket.sources is the same NotificationSource shape under a
+    // WorkOrderTicket.sources holds the same shape under a
     // different parent, which is why this keys off the source, not the parent.
     const ticket = { id: "wot_1", summary: "Patch pumps", sources: [source()] };
 

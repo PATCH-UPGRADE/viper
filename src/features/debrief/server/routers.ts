@@ -27,26 +27,37 @@ export const debriefRouter = createTRPCRouter({
     const departmentId = await callerDepartmentId(ctx.auth.user.id);
     if (!departmentId) return null;
 
-    // Read the department through the relation, so it costs nothing on the
-    // common early path where the department has no debrief yet.
-    const debrief = await prisma.debrief.findFirst({
-      where: { departmentId },
-      orderBy: { createdAt: "desc" },
-      select: {
-        ...debriefSelect,
-        department: { select: { id: true, name: true } },
-      },
-    });
+    // Two rows, because they answer different questions. The newest Ready run
+    // is what the reader should see; the newest run of any status is what the
+    // card reports about. Reading only the newest row would hide the last good
+    // brief the moment someone presses Regenerate.
+    const [ready, latest] = await Promise.all([
+      prisma.debrief.findFirst({
+        where: { departmentId, status: "Ready" },
+        orderBy: { createdAt: "desc" },
+        select: debriefSelect,
+      }),
+      prisma.debrief.findFirst({
+        where: { departmentId },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          status: true,
+          department: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
 
-    if (!debrief) return null;
+    if (!latest) return null;
 
     return {
-      id: debrief.id,
-      department: debrief.department,
-      status: debrief.status,
-      bullets: debrief.status === "Ready" ? parseBullets(debrief.bullets) : [],
-      since: debrief.since,
-      generatedAt: debrief.createdAt,
+      id: ready?.id ?? latest.id,
+      department: latest.department,
+      bullets: ready ? parseBullets(ready.bullets) : [],
+      since: ready?.since ?? null,
+      generatedAt: ready?.createdAt ?? null,
+      pending: latest.status === "Generating",
+      lastRunFailed: latest.status === "Failed",
     };
   }),
 

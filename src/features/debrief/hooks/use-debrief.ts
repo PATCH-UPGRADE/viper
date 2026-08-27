@@ -17,9 +17,8 @@ import { useTRPC } from "@/trpc/client";
  * until the reader reloads. A finished debrief needs no further refetch.
  */
 export const debriefPollInterval = (
-  data: { status: string } | null | undefined,
-): number | false =>
-  data?.status === "Generating" ? DEBRIEF_POLL_INTERVAL_MS : false;
+  data: { pending: boolean } | null | undefined,
+): number | false => (data?.pending ? DEBRIEF_POLL_INTERVAL_MS : false);
 
 export const useSuspenseDebrief = () => {
   const trpc = useTRPC();

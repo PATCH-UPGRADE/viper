@@ -79,7 +79,8 @@ export const DebriefCard = () => {
 
   if (!data) return null;
 
-  const pending = data.status === "Generating" || regenerate.isPending;
+  const pending = data.pending || regenerate.isPending;
+  const hasBrief = data.bullets.length > 0;
 
   return (
     <Card className="gap-0 py-0 shadow-none">
@@ -98,7 +99,18 @@ export const DebriefCard = () => {
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              {`Personalized brief for ${firstNameOf(session?.user.name) ?? data.department.name} · generated ${formatDistanceToNow(data.generatedAt, { addSuffix: true })}`}
+              {[
+                `Personalized brief for ${firstNameOf(session?.user.name) ?? data.department.name}`,
+                data.generatedAt
+                  ? `generated ${formatDistanceToNow(data.generatedAt, { addSuffix: true })}`
+                  : null,
+                pending ? "refreshing…" : null,
+                !pending && data.lastRunFailed && hasBrief
+                  ? "last refresh failed"
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           </div>
         </div>
@@ -136,15 +148,17 @@ export const DebriefCard = () => {
 
       {open && (
         <div className="border-t">
-          {pending ? (
+          {hasBrief ? (
+            // Keep the last good brief on screen while a new run works. A
+            // reader who presses Regenerate should not lose today's answer.
+            <ReadyBody bullets={data.bullets} />
+          ) : pending ? (
             <PendingBody />
-          ) : data.bullets.length === 0 ? (
+          ) : (
             <FailedBody
               onRetry={() => regenerate.mutate()}
               retrying={regenerate.isPending}
             />
-          ) : (
-            <ReadyBody bullets={data.bullets} />
           )}
 
           <p className="flex items-center gap-1.5 border-t px-5 py-3 text-xs text-muted-foreground">

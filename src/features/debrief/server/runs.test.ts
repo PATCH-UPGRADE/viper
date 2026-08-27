@@ -5,7 +5,13 @@ vi.mock("server-only", () => ({}));
 
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
-    debrief: { findFirst: vi.fn(), create: vi.fn() },
+    debrief: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      deleteMany: vi.fn(),
+      groupBy: vi.fn(),
+    },
     $transaction: vi.fn(),
     $executeRaw: vi.fn(),
   },
@@ -13,7 +19,13 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
-import { claimDebriefRun, IN_FLIGHT_TIMEOUT_MS, parseBullets } from "./runs";
+import {
+  claimDebriefRun,
+  DEBRIEF_RETAINED_PER_DEPARTMENT,
+  IN_FLIGHT_TIMEOUT_MS,
+  parseBullets,
+  purgeOldDebriefs,
+} from "./runs";
 
 const BULLET = {
   text: "Two machines are exposed by {{0}}.",
@@ -162,5 +174,51 @@ describe("parseBullets", () => {
   it("returns nothing for an empty array, which the schema rejects", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(parseBullets([])).toEqual([]);
+  });
+});
+
+describe("purgeOldDebriefs", () => {
+  it("does nothing when no department is over the limit", async () => {
+    mockPrisma.debrief.groupBy.mockResolvedValue([]);
+
+    await expect(purgeOldDebriefs()).resolves.toBe(0);
+    expect(mockPrisma.debrief.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("keeps the newest runs and deletes the rest, per department", async () => {
+    // Per department rather than one global cutoff, so a quiet department
+    // keeps its history instead of losing it to busier neighbours.
+    mockPrisma.debrief.groupBy.mockResolvedValue([{ departmentId: "dept-1" }]);
+    mockPrisma.debrief.findMany.mockResolvedValue([
+      { id: "keep-1" },
+      { id: "keep-2" },
+    ]);
+    mockPrisma.debrief.deleteMany.mockResolvedValue({ count: 7 });
+
+    await expect(purgeOldDebriefs()).resolves.toBe(7);
+
+    const [kept] = mockPrisma.debrief.findMany.mock.calls[0];
+    expect(kept.take).toBe(DEBRIEF_RETAINED_PER_DEPARTMENT);
+    expect(kept.orderBy).toEqual({ createdAt: "desc" });
+
+    expect(mockPrisma.debrief.deleteMany).toHaveBeenCalledWith({
+      where: { departmentId: "dept-1", id: { notIn: ["keep-1", "keep-2"] } },
+    });
+  });
+
+  it("scopes every delete to one department", async () => {
+    // A delete without the departmentId would take other departments' rows.
+    mockPrisma.debrief.groupBy.mockResolvedValue([
+      { departmentId: "dept-1" },
+      { departmentId: "dept-2" },
+    ]);
+    mockPrisma.debrief.findMany.mockResolvedValue([{ id: "keep" }]);
+    mockPrisma.debrief.deleteMany.mockResolvedValue({ count: 1 });
+
+    await expect(purgeOldDebriefs()).resolves.toBe(2);
+
+    for (const [args] of mockPrisma.debrief.deleteMany.mock.calls) {
+      expect(args.where.departmentId).toBeDefined();
+    }
   });
 });

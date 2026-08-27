@@ -28,11 +28,9 @@ export const requirePlatform = (platform: PlatformEnum): AnyConnectorModule => {
   return module;
 };
 
-/** The platform author's own name for this platform. */
 export const displayNameFor = (platform: PlatformEnum): string =>
   registry[platform]?.definition.displayName ?? platform;
 
-/** Which connectors-sidebar sections this platform's author says it belongs to. */
 export const categoriesFor = (platform: PlatformEnum): Category[] =>
   registry[platform]?.definition.categories ?? [];
 

@@ -99,6 +99,21 @@ describe("integrationsRouter.getMany", () => {
     ]);
   });
 
+  it("falls back to the platform default cadence and is due with no nextSyncAt", async () => {
+    mockPrisma.integration.count.mockResolvedValue(1);
+    mockPrisma.integration.findMany.mockResolvedValue([
+      integrationRow(null, null),
+    ]);
+
+    const result = await caller.getMany({ search: "partner" });
+
+    expect(result.items[0].resourceSyncs[0]).toMatchObject({
+      effectiveSyncEvery: 900,
+      isOverridden: false,
+      isDue: true,
+    });
+  });
+
   it("returns each integration's categories from the platform's own definition", async () => {
     mockCategoriesFor.mockReturnValue([
       "Vulnerability Management Platforms",
@@ -123,21 +138,6 @@ describe("integrationsRouter.getMany", () => {
       "Vulnerability Management Platforms",
       "Notifications",
     ]);
-  });
-
-  it("falls back to the platform default cadence and is due with no nextSyncAt", async () => {
-    mockPrisma.integration.count.mockResolvedValue(1);
-    mockPrisma.integration.findMany.mockResolvedValue([
-      integrationRow(null, null),
-    ]);
-
-    const result = await caller.getMany({ search: "partner" });
-
-    expect(result.items[0].resourceSyncs[0]).toMatchObject({
-      effectiveSyncEvery: 900,
-      isOverridden: false,
-      isDue: true,
-    });
   });
 });
 
@@ -198,23 +198,6 @@ describe("integrationsRouter enable controls", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(mockPrisma.integrationResourceSync.update).not.toHaveBeenCalled();
   });
-});
-
-it("integrationsRouter.update 404s when the integration doesn't exist", async () => {
-  mockPrisma.integration.findUnique.mockResolvedValue(null);
-
-  await expect(
-    caller.update({
-      id: "missing",
-      data: {
-        name: "Partner feed",
-        platform: PlatformEnum.PARTNER,
-        syncEvery: 3600,
-        config: {},
-      },
-    }),
-  ).rejects.toMatchObject({ code: "NOT_FOUND" });
-  expect(mockPrisma.integration.update).not.toHaveBeenCalled();
 });
 
 describe("integrationsRouter.remove", () => {

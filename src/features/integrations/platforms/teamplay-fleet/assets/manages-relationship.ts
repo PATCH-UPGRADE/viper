@@ -8,11 +8,16 @@ export const FLEET_RESPONSIBILITIES =
 
 export async function connectManagedAssets(
   integrationId: string,
+  contractedAssetIds: ReadonlySet<string> = new Set(),
 ): Promise<void> {
   const vendor = await resolveVendor(SIEMENS_HEALTHINEERS);
 
   const existingRelationship = await prisma.managesRelationship.findFirst({
-    where: { vendorId: vendor.id, workOrderIntegrationId: integrationId },
+    where: {
+      vendorId: vendor.id,
+      workOrderIntegrationId: integrationId,
+      contract: { is: null },
+    },
     include: { assets: { select: { id: true } } },
   });
 
@@ -37,12 +42,24 @@ export async function connectManagedAssets(
   const syncedAssetIds = assetsSyncedFromFleet.map((mapping) => mapping.itemId);
 
   const assetIdsToConnect = syncedAssetIds.filter(
-    (assetId) => !alreadyConnectedAssetIds.has(assetId),
+    (assetId) =>
+      !alreadyConnectedAssetIds.has(assetId) &&
+      !contractedAssetIds.has(assetId),
   );
-  if (assetIdsToConnect.length === 0) return;
+  const assetIdsToDisconnect = [...alreadyConnectedAssetIds].filter((assetId) =>
+    contractedAssetIds.has(assetId),
+  );
+  if (assetIdsToConnect.length === 0 && assetIdsToDisconnect.length === 0) {
+    return;
+  }
 
   await prisma.managesRelationship.update({
     where: { id: relationship.id },
-    data: { assets: { connect: assetIdsToConnect.map((id) => ({ id })) } },
+    data: {
+      assets: {
+        connect: assetIdsToConnect.map((id) => ({ id })),
+        disconnect: assetIdsToDisconnect.map((id) => ({ id })),
+      },
+    },
   });
 }

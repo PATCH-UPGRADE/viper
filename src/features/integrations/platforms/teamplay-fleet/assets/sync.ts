@@ -11,6 +11,7 @@ import {
   SIEMENS_HEALTHINEERS,
 } from "../config";
 import { createFleetSession } from "../session";
+import { syncFleetContracts } from "./contracts";
 import {
   computeWeakSerials,
   type FleetAssetItem,
@@ -109,9 +110,13 @@ export async function syncAssets(
   }
 
   const response = await ingestFleetAssets(items, ctx.integrationId);
-  await connectManagedAssets(ctx.integrationId);
+  const contracts = await syncFleetContracts(session, ctx.integrationId);
+  await connectManagedAssets(ctx.integrationId, contracts.contractedAssetIds);
 
   // Throwing makes finalize-sync record Error
+  if (contracts.errorMessage) {
+    throw new Error(contracts.errorMessage);
+  }
   if (response.shouldRetry) {
     throw new Error(response.message);
   }

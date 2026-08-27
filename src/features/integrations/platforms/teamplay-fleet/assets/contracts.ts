@@ -1,7 +1,10 @@
 import "server-only";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma";
+import prisma from "@/lib/db";
+import { resolveVendor } from "@/lib/router-utils";
 import type { Session } from "../../../core/types";
+import { SIEMENS_HEALTHINEERS } from "../config";
 import { CONTRACTS_URL } from "../urls";
 
 const fleetContractRowSchema = z.object({
@@ -115,4 +118,112 @@ export function buildTermsJson(
   terms: FleetContractTerm[],
 ): Prisma.InputJsonValue {
   return { contract: row, terms } as Prisma.InputJsonValue;
+}
+
+export interface FleetContractsOutcome {
+  contractedAssetIds: Set<string>;
+  errorMessage: string | null;
+}
+
+export async function syncFleetContracts(
+  session: Session,
+  integrationId: string,
+): Promise<FleetContractsOutcome> {
+  let rows: FleetContractRow[];
+  let vendorId: string;
+  try {
+    rows = await listContracts(session);
+    if (rows.length === 0) {
+      return { contractedAssetIds: new Set(), errorMessage: null };
+    }
+    vendorId = (await resolveVendor(SIEMENS_HEALTHINEERS)).id;
+  } catch (error) {
+    return {
+      contractedAssetIds: new Set(),
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+
+  const contractedAssetIds = new Set<string>();
+  const errors: string[] = [];
+
+  for (const row of rows) {
+    try {
+      const mapping = await prisma.externalAssetMapping.findFirst({
+        where: { integrationId, externalId: row.equipmentKey },
+        select: { itemId: true },
+      });
+      if (!mapping) continue;
+
+      const terms = await getContractTerms(
+        session,
+        row.contractNumber,
+        row.equipmentKey,
+      );
+      const responsibilities = buildResponsibilities(row, terms);
+
+      const existingContract = await prisma.contract.findUnique({
+        where: { contractNumber: row.contractNumber },
+        select: { managesRelationshipId: true },
+      });
+      const relationshipId =
+        existingContract?.managesRelationshipId ??
+        (
+          await prisma.managesRelationship.create({
+            data: {
+              responsibilities,
+              vendorId,
+              workOrderIntegrationId: integrationId,
+            },
+          })
+        ).id;
+
+      const contractFields = {
+        title: normalizeContractText(row.contractName),
+        contractType: row.contractTypeDescription ?? row.contractGroup ?? null,
+        effectiveFrom: fleetContractDate(row.startDate),
+        effectiveTo: fleetContractDate(row.expirationDate),
+        termsJson: buildTermsJson(row, terms),
+        managesRelationshipId: relationshipId,
+      };
+      await prisma.contract.upsert({
+        where: { contractNumber: row.contractNumber },
+        create: {
+          contractNumber: row.contractNumber,
+          vendorId,
+          ...contractFields,
+        },
+        update: contractFields,
+      });
+
+      const assetAlreadyConnected = await prisma.managesRelationship.findFirst({
+        where: { id: relationshipId, assets: { some: { id: mapping.itemId } } },
+        select: { id: true },
+      });
+      await prisma.managesRelationship.update({
+        where: { id: relationshipId },
+        data: {
+          responsibilities,
+          ...(assetAlreadyConnected
+            ? {}
+            : { assets: { connect: { id: mapping.itemId } } }),
+        },
+      });
+      contractedAssetIds.add(mapping.itemId);
+    } catch (error) {
+      console.error("fleet contract sync failed", {
+        contractNumber: row.contractNumber,
+        error,
+      });
+      errors.push(error instanceof Error ? error.message : "Unknown error");
+    }
+  }
+
+  return {
+    contractedAssetIds,
+    errorMessage:
+      errors.length > 0
+        ? `${errors.length} of ${rows.length} contracts failed: ${errors[0]}`
+        : null,
+  };
 }

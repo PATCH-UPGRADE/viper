@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { authClient } from "@/lib/auth-client";
+import { cn, firstNameOf } from "@/lib/utils";
 import { useRegenerateDebrief, useSuspenseDebrief } from "../hooks/use-debrief";
 import { DebriefBulletText } from "./debrief-bullet";
 
@@ -68,11 +69,11 @@ const ReadyBody = ({ bullets }: { bullets: Debrief["bullets"] }) => (
 /**
  * The daily AI brief for the reader's department.
  *
- * Renders nothing when the user has no department, or when their department has
- * no debrief yet — an empty shell tells the reader less than no card at all.
+ * An empty shell tells the reader less than no card at all.
  */
 export const DebriefCard = () => {
   const { data } = useSuspenseDebrief();
+  const { data: session } = authClient.useSession();
   const regenerate = useRegenerateDebrief();
   const [open, setOpen] = useState(true);
 
@@ -97,7 +98,7 @@ export const DebriefCard = () => {
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              {`Personalized brief for ${data.viewerFirstName ?? data.department.name} · generated ${formatDistanceToNow(data.generatedAt, { addSuffix: true })}`}
+              {`Personalized brief for ${firstNameOf(session?.user.name) ?? data.department.name} · generated ${formatDistanceToNow(data.generatedAt, { addSuffix: true })}`}
             </p>
           </div>
         </div>
@@ -137,7 +138,7 @@ export const DebriefCard = () => {
         <div className="border-t">
           {pending ? (
             <PendingBody />
-          ) : data.status === "Failed" ? (
+          ) : data.bullets.length === 0 ? (
             <FailedBody
               onRetry={() => regenerate.mutate()}
               retrying={regenerate.isPending}

@@ -2,20 +2,21 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockMutate, mockUseSuspenseDebrief, mockIsPending } = vi.hoisted(
-  () => ({
+const { mockMutate, mockUseSuspenseDebrief, mockUseRegenerate, mockSession } =
+  vi.hoisted(() => ({
     mockMutate: vi.fn(),
     mockUseSuspenseDebrief: vi.fn(),
-    mockIsPending: { value: false },
-  }),
-);
+    mockUseRegenerate: vi.fn(),
+    mockSession: { value: null as { user: { name: string } } | null },
+  }));
+
+vi.mock("@/lib/auth-client", () => ({
+  authClient: { useSession: () => ({ data: mockSession.value }) },
+}));
 
 vi.mock("../hooks/use-debrief", () => ({
   useSuspenseDebrief: mockUseSuspenseDebrief,
-  useRegenerateDebrief: () => ({
-    mutate: mockMutate,
-    isPending: mockIsPending.value,
-  }),
+  useRegenerateDebrief: mockUseRegenerate,
 }));
 
 import { DebriefCard } from "./debrief-card";
@@ -34,7 +35,6 @@ const makeDebrief = (overrides: Partial<Debrief> = {}): Debrief =>
   ({
     id: "debrief-1",
     department: { id: "dept-1", name: "Biomedical Engineering" },
-    viewerFirstName: "Cassidy",
     status: "Ready",
     bullets: [
       { text: "Two machines are exposed by {{0}}.", links: [VULN_LINK] },
@@ -50,7 +50,8 @@ const setDebrief = (data: Debrief | null) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockIsPending.value = false;
+  mockSession.value = { user: { name: "Cassidy Rivera" } };
+  mockUseRegenerate.mockReturnValue({ mutate: mockMutate, isPending: false });
 });
 
 describe("DebriefCard — what the reader sees", () => {
@@ -68,14 +69,21 @@ describe("DebriefCard — what the reader sees", () => {
   });
 
   it("never shows a raw placeholder to the reader", () => {
-    // A literal "{{0}}" in a clinical brief is worse than a missing link.
-    setDebrief(makeDebrief());
+    // The fixture points at a link that is not there, which is the only way
+    // braces can reach the reader. A literal "{{3}}" in a clinical brief is
+    // worse than a missing link.
+    setDebrief(
+      makeDebrief({
+        bullets: [{ text: "Exposed by {{0}} and {{3}}.", links: [VULN_LINK] }],
+      }),
+    );
     const { container } = render(<DebriefCard />);
 
     expect(container.textContent).not.toContain("{{");
+    expect(screen.getAllByRole("link")).toHaveLength(1);
   });
 
-  it("addresses the reader by first name", async () => {
+  it("addresses the reader by first name", () => {
     setDebrief(makeDebrief());
     render(<DebriefCard />);
 
@@ -84,10 +92,11 @@ describe("DebriefCard — what the reader sees", () => {
     ).toBeInTheDocument();
   });
 
-  it("falls back to the department when there is no display name", async () => {
+  it("falls back to the department when there is no display name", () => {
     // The API-key auth path carries an id but no name, so the card must not
     // greet an empty string.
-    setDebrief(makeDebrief({ viewerFirstName: null }));
+    mockSession.value = null;
+    setDebrief(makeDebrief());
     render(<DebriefCard />);
 
     expect(
@@ -144,6 +153,19 @@ describe("DebriefCard — states", () => {
       screen.getByRole("button", { name: /try again/i }),
     ).toBeInTheDocument();
   });
+
+  it("never shows a headline with no bullets under it", () => {
+    // parseBullets returns an empty list for a stored row that fails the
+    // current schema, and leaves the status Ready. Without this branch the
+    // reader gets a card that announces a brief and then shows nothing.
+    setDebrief(makeDebrief({ status: "Ready", bullets: [] }));
+    render(<DebriefCard />);
+
+    expect(screen.getByText(/could not be generated/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /try again/i }),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("DebriefCard — regenerate", () => {
@@ -165,9 +187,18 @@ describe("DebriefCard — regenerate", () => {
 
     const button = screen.getByRole("button", { name: /regenerate debrief/i });
     expect(button).toBeDisabled();
+  });
 
-    await userEvent.click(button);
-    expect(mockMutate).not.toHaveBeenCalled();
+  it("is disabled while the request itself is in flight", async () => {
+    // The row still reads Ready until the server opens the new run, so the
+    // mutation's own pending state is the only signal during that window.
+    mockUseRegenerate.mockReturnValue({ mutate: mockMutate, isPending: true });
+    setDebrief(makeDebrief());
+    render(<DebriefCard />);
+
+    const button = screen.getByRole("button", { name: /regenerate debrief/i });
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/Generating your debrief/)).toBeInTheDocument();
   });
 });
 

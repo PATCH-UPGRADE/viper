@@ -16,8 +16,7 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * The leading word of a display name, for addressing someone directly.
  *
- * Falls back to the whole string when there is no whitespace to split on, and
- * returns null for an absent or blank name so callers can choose their own
+ * Returns null for an absent or blank name, so callers choose their own
  * wording rather than greet an empty string.
  */
 export function firstNameOf(name: string | null | undefined): string | null {

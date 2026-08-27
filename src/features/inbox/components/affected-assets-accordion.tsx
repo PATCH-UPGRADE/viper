@@ -29,6 +29,7 @@ import {
 import { deviceGroupMatchingLabel, parseLocation } from "@/lib/markdown";
 import { displayName } from "@/lib/markdown/device-group";
 import { cn } from "@/lib/utils";
+import DropdownCell from "./DropdownCell";
 import {
   useAffectedAssetsPage,
   useAnswerAssetVersion,
@@ -40,7 +41,6 @@ import type {
   NotificationDetailWithRelations,
   ResolvedDeviceGroupAsset,
 } from "../types";
-import DropdownCell from "./DropdownCell";
 
 const PAGE_SIZE = 10;
 

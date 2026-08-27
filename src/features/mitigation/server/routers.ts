@@ -245,4 +245,29 @@ export const mitigationRouter = createTRPCRouter({
         { timeout: 30_000 },
       ),
     ),
+
+  // Edits one audience's briefing text in place. Never regenerates — this is
+  // an independent kind of edit from editing a plan's work orders, and
+  // neither should trigger the other.
+  updateBriefing: protectedProcedure
+    .input(
+      z.object({
+        planId: z.string(),
+        audience: briefingSchema.keyof(),
+        content: z.string().trim().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const existing = await prisma.planBriefing.findUniqueOrThrow({
+        where: { mitigationPlanId: input.planId },
+      });
+      const content = {
+        ...briefingSchema.parse(existing.content),
+        [input.audience]: input.content,
+      };
+      return prisma.planBriefing.update({
+        where: { mitigationPlanId: input.planId },
+        data: { content },
+      });
+    }),
 });

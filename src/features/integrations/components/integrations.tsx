@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
+import { useMemo } from "react";
 import {
   EmptyView,
   ErrorView,
@@ -50,14 +51,18 @@ const ConnectorsSidebar = () => {
   const { data: webhooks } = useSuspenseWebhooks();
   const [section, setSection] = useSection();
 
-  const countBySection = data.items.reduce(
-    (counts, item) => {
-      for (const category of item.categories) {
-        counts[category] = (counts[category] ?? 0) + 1;
-      }
-      return counts;
-    },
-    { Overview: data.items.length } as Record<Section, number>,
+  const countBySection = useMemo(
+    () =>
+      data.items.reduce(
+        (counts, item) => {
+          for (const category of item.categories) {
+            counts[category] = (counts[category] ?? 0) + 1;
+          }
+          return counts;
+        },
+        { Overview: data.items.length } as Record<Section, number>,
+      ),
+    [data.items],
   );
 
   return (

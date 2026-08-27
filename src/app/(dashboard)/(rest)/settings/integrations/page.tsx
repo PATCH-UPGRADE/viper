@@ -11,6 +11,10 @@ import { prefetchIntegrations } from "@/features/integrations/server/prefetch";
 import { prefetchWebhooks } from "@/features/webhooks/server/prefetch";
 import { createListPage } from "@/lib/page-factory";
 
+// Static (derived from the registry, not from any request), so this can be
+// computed once at module load rather than per-request.
+const CATALOG = catalogEntries();
+
 // pageSize must match useSuspenseIntegrations' override, or SSR won't
 // hydrate the client query; also prefetches the sidebar's webhook count.
 const prefetchConnectorsPage = async (
@@ -26,7 +30,7 @@ export default createListPage({
   Container: IntegrationsContainer,
   paramsLoader: paginationParamsLoader,
   prefetch: prefetchConnectorsPage,
-  List: () => <IntegrationsList catalog={catalogEntries()} />,
+  List: () => <IntegrationsList catalog={CATALOG} />,
   Loading: IntegrationsLoading,
   Error: IntegrationsError,
 });

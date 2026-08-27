@@ -67,16 +67,15 @@ export function isValidResourceTypeKey(key: string): key is UploadSegment {
   return key in integrationsMapping;
 }
 
+/** Derived from the table (plus SourceRecord, which has no UploadSegment), so the two can't drift. */
 const resourceTypeLabels: Record<ResourceType, string> = {
-  [ResourceType.Asset]: "Asset",
-  [ResourceType.DeviceArtifact]: "Device Artifact",
-  [ResourceType.Remediation]: "Remediation",
-  [ResourceType.Vulnerability]: "Vulnerability",
-  [ResourceType.WorkOrder]: "Work Order",
+  ...(Object.fromEntries(
+    Object.values(integrationsMapping).map((r) => [r.type, r.name]),
+  ) as Record<(typeof integrationsMapping)[UploadSegment]["type"], string>),
   [ResourceType.SourceRecord]: "Notification",
 };
 export const resourceTypeLabel = (type: ResourceType): string =>
-  resourceTypeLabels[type] ?? type;
+  resourceTypeLabels[type];
 
 export type IntegrationListItem = inferOutput<
   typeof trpc.integrations.getMany

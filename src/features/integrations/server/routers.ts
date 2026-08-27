@@ -115,16 +115,6 @@ const requireIntegration = async (id: string) => {
   requireExistence(existing, "Integration");
 };
 
-const requireResourceSync = async (
-  where: Prisma.IntegrationResourceSyncWhereUniqueInput,
-) => {
-  const existing = await prisma.integrationResourceSync.findUnique({
-    where,
-    select: { integrationId: true },
-  });
-  requireExistence(existing, "Resource sync");
-};
-
 export const integrationsRouter = createTRPCRouter({
   getMany: protectedProcedure
     .input(paginationInputSchema)
@@ -308,7 +298,11 @@ export const integrationsRouter = createTRPCRouter({
           resource: input.resource,
         },
       };
-      await requireResourceSync(where);
+      const existing = await prisma.integrationResourceSync.findUnique({
+        where,
+        select: { integrationId: true },
+      });
+      requireExistence(existing, "Resource sync");
       return prisma.integrationResourceSync.update({
         where,
         data: { enabled: input.enabled },

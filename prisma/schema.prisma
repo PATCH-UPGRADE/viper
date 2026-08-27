@@ -284,7 +284,10 @@ model Contract {
   title           String?
   effectiveFrom   DateTime?
   effectiveTo     DateTime?
-  coverageSummary String?
+
+  contractNumber String? @unique
+  contractType   String?
+  termsJson      Json?
 
   vendorId String
   vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)

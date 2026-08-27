@@ -2312,7 +2312,6 @@ async function seedVendors() {
       title: "Imaging Fleet Managed Service Agreement",
       effectiveFrom: new Date("2024-01-01"),
       effectiveTo: new Date("2027-12-31"),
-      coverageSummary: `Managed security and maintenance across imaging (${assets.length} assets)`,
       managesRelationshipId: managesRelationship.id,
     },
   });

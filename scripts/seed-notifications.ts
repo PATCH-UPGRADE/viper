@@ -830,7 +830,6 @@ async function seedManageBy(args: {
         title: args.contract.title,
         effectiveFrom: new Date(args.contract.from),
         effectiveTo: new Date(args.contract.to),
-        coverageSummary: `${args.products.join(", ")} (${assetIds.length} assets)`,
         managesRelationshipId: relationship.id,
       },
     });

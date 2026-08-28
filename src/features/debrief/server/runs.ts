@@ -26,12 +26,15 @@ const staleBefore = () => new Date(Date.now() - IN_FLIGHT_TIMEOUT_MS);
  * The claim path and the read path must agree. If the reader called a run
  * abandoned while `claimDebriefRun` still counted it as active, the card would
  * offer a Regenerate button that silently joins the run it just declared dead.
+ *
+ * Inclusive of the cutoff, because `claimDebriefRun` holds a run active only
+ * while `updatedAt` is strictly greater than it.
  */
 export function isDebriefAbandoned(run: {
   status: DebriefStatus;
   updatedAt: Date;
 }): boolean {
-  return run.status === "Generating" && run.updatedAt < staleBefore();
+  return run.status === "Generating" && run.updatedAt <= staleBefore();
 }
 
 /**

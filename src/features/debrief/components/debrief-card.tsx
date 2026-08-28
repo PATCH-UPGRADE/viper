@@ -2,7 +2,7 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { ChevronDownIcon, RefreshCwIcon, SparklesIcon } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -76,6 +76,7 @@ export const DebriefCard = () => {
   const { data: session } = authClient.useSession();
   const regenerate = useRegenerateDebrief();
   const [open, setOpen] = useState(true);
+  const panelId = useId();
 
   if (!data) return null;
 
@@ -136,6 +137,7 @@ export const DebriefCard = () => {
             size="icon"
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
+            aria-controls={panelId}
             aria-label={open ? "Collapse debrief" : "Expand debrief"}
           >
             <ChevronDownIcon
@@ -150,7 +152,7 @@ export const DebriefCard = () => {
       </div>
 
       {open && (
-        <div className="border-t">
+        <div id={panelId} className="border-t">
           {hasBrief ? (
             // Keep the last good brief on screen while a new run works. A
             // reader who presses Regenerate should not lose today's answer.

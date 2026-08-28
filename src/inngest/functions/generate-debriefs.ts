@@ -199,6 +199,7 @@ export const generateDepartmentDebrief = inngest.createFunction(
           departmentId,
           bulletCount: written.bullets.length,
           status: ok ? ("Ready" as const) : ("Failed" as const),
+          findingsSource: findings ? ("event" as const) : ("scout" as const),
         };
 
         logger.info("Debrief run finished", outcome);

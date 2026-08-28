@@ -202,6 +202,10 @@ describe("DebriefCard — collapse", () => {
 
     const toggle = screen.getByRole("button", { name: /collapse debrief/i });
     expect(toggle).toHaveAttribute("aria-expanded", "true");
+    // The toggle must name the panel it controls, not just its own state.
+    const panelId = toggle.getAttribute("aria-controls");
+    expect(panelId).toBeTruthy();
+    expect(document.getElementById(panelId as string)).toBeInTheDocument();
 
     await userEvent.click(toggle);
 

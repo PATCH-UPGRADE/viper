@@ -237,6 +237,10 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     expect(mockWriter).toHaveBeenCalledWith(
       expect.objectContaining({ findings: "its own findings" }),
     );
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ findingsSource: "scout" }),
+    );
   });
 
   it("passes yesterday's bullets through to the writer", async () => {
@@ -419,6 +423,7 @@ describe("generateDepartmentDebrief — run outcome logging", () => {
       departmentId: "d1",
       bulletCount: 1,
       status: "Ready",
+      findingsSource: "event",
     });
   });
 

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -161,25 +161,52 @@ describe("claimDebriefRun — staleness", () => {
 });
 
 describe("isDebriefAbandoned", () => {
-  const stale = new Date(Date.now() - IN_FLIGHT_TIMEOUT_MS - 1000);
-  const fresh = new Date(Date.now() - 1000);
+  // Frozen clock so the cutoff itself can be asserted. Against a live clock the
+  // boundary case cannot be expressed at all.
+  const now = new Date("2026-08-25T12:00:00.000Z");
+  const cutoff = new Date(now.getTime() - IN_FLIGHT_TIMEOUT_MS);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it("calls a Generating run that stopped reporting abandoned", () => {
+    const stale = new Date(cutoff.getTime() - 1000);
+
     expect(isDebriefAbandoned({ status: "Generating", updatedAt: stale })).toBe(
       true,
     );
   });
 
   it("leaves a Generating run that is still reporting alone", () => {
+    const fresh = new Date(cutoff.getTime() + 1000);
+
     expect(isDebriefAbandoned({ status: "Generating", updatedAt: fresh })).toBe(
       false,
     );
+  });
+
+  it("counts a run sitting exactly on the cutoff as abandoned", () => {
+    // claimDebriefRun holds a run active only while updatedAt is strictly
+    // greater than the cutoff, so this run is one the claim path would replace.
+    // Reading it as still pending would leave the card polling a run that the
+    // next Regenerate press is free to take over.
+    expect(
+      isDebriefAbandoned({ status: "Generating", updatedAt: cutoff }),
+    ).toBe(true);
   });
 
   it("never calls a finished run abandoned, however old", () => {
     // Only a Generating run can stall. Without the status check every brief
     // older than the timeout reads as a failure, so the card would report
     // "last refresh failed" over yesterday's perfectly good debrief.
+    const stale = new Date(cutoff.getTime() - 1000);
+
     expect(isDebriefAbandoned({ status: "Ready", updatedAt: stale })).toBe(
       false,
     );

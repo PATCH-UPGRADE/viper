@@ -8,6 +8,7 @@ import { SIEMENS_HEALTHINEERS } from "../config";
 import { CONTRACTS_URL } from "../urls";
 
 const fleetContractRowSchema = z.object({
+  contractId: z.string(),
   contractNumber: z.string(),
   contractName: z.string().nullish(),
   equipmentKey: z.string(),
@@ -72,9 +73,10 @@ export function buildResponsibilities(
   row: FleetContractRow,
   terms: FleetContractTerm[],
 ): string {
-  const contractName =
-    normalizeContractText(row.contractName) ?? "service contract";
-  const header = `Serviced by Siemens Healthineers under Fleet contract ${row.contractNumber} (${contractName}).`;
+  const contractName = normalizeContractText(row.contractName);
+  const header = contractName
+    ? `Serviced by Siemens Healthineers under Fleet contract ${row.contractNumber} (${contractName}).`
+    : `Serviced by Siemens Healthineers under Fleet contract ${row.contractNumber}, which Fleet lists without a name.`;
   if (terms.length === 0) return header;
 
   const termValue = (label: string): string | null => {
@@ -162,52 +164,52 @@ export async function syncFleetContracts(
       );
       const responsibilities = buildResponsibilities(row, terms);
 
-      const existingContract = await prisma.contract.findUnique({
-        where: { contractNumber: row.contractNumber },
-        select: { managesRelationshipId: true },
-      });
-      const relationshipId =
-        existingContract?.managesRelationshipId ??
-        (
-          await prisma.managesRelationship.create({
-            data: {
-              responsibilities,
-              vendorId,
-              workOrderIntegrationId: integrationId,
-            },
-          })
-        ).id;
+      await prisma.$transaction(async (tx) => {
+        const existingContract = await tx.contract.findUnique({
+          where: { id: row.contractId },
+          select: { managesRelationshipId: true },
+        });
+        const relationshipId =
+          existingContract?.managesRelationshipId ??
+          (
+            await tx.managesRelationship.create({
+              data: {
+                responsibilities,
+                vendorId,
+                workOrderIntegrationId: integrationId,
+              },
+            })
+          ).id;
 
-      const contractFields = {
-        title: normalizeContractText(row.contractName),
-        contractType: row.contractTypeDescription ?? row.contractGroup ?? null,
-        effectiveFrom: fleetContractDate(row.startDate),
-        effectiveTo: fleetContractDate(row.expirationDate),
-        termsJson: buildTermsJson(row, terms),
-        managesRelationshipId: relationshipId,
-      };
-      await prisma.contract.upsert({
-        where: { contractNumber: row.contractNumber },
-        create: {
-          contractNumber: row.contractNumber,
-          vendorId,
-          ...contractFields,
-        },
-        update: contractFields,
-      });
+        const contractFields = {
+          title: normalizeContractText(row.contractName),
+          effectiveFrom: fleetContractDate(row.startDate),
+          effectiveTo: fleetContractDate(row.expirationDate),
+          termsJson: buildTermsJson(row, terms),
+          managesRelationshipId: relationshipId,
+        };
+        await tx.contract.upsert({
+          where: { id: row.contractId },
+          create: { id: row.contractId, vendorId, ...contractFields },
+          update: contractFields,
+        });
 
-      const assetAlreadyConnected = await prisma.managesRelationship.findFirst({
-        where: { id: relationshipId, assets: { some: { id: mapping.itemId } } },
-        select: { id: true },
-      });
-      await prisma.managesRelationship.update({
-        where: { id: relationshipId },
-        data: {
-          responsibilities,
-          ...(assetAlreadyConnected
-            ? {}
-            : { assets: { connect: { id: mapping.itemId } } }),
-        },
+        const assetAlreadyConnected = await tx.managesRelationship.findFirst({
+          where: {
+            id: relationshipId,
+            assets: { some: { id: mapping.itemId } },
+          },
+          select: { id: true },
+        });
+        await tx.managesRelationship.update({
+          where: { id: relationshipId },
+          data: {
+            responsibilities,
+            ...(assetAlreadyConnected
+              ? {}
+              : { assets: { connect: { id: mapping.itemId } } }),
+          },
+        });
       });
       contractedAssetIds.add(mapping.itemId);
     } catch (error) {

@@ -285,9 +285,7 @@ model Contract {
   effectiveFrom   DateTime?
   effectiveTo     DateTime?
 
-  contractNumber String? @unique
-  contractType   String?
-  termsJson      Json?
+  termsJson Json?
 
   vendorId String
   vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)

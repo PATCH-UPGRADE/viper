@@ -13,7 +13,9 @@ vi.mock("@/features/integrations/core/sync/upsert", () => ({
 }));
 vi.mock("@/lib/router-utils", () => ({ resolveDeviceGroup: vi.fn() }));
 vi.mock("../../session", () => ({ createFleetSession: vi.fn() }));
-vi.mock("../manages-relationship", () => ({ connectManagedAssets: vi.fn() }));
+vi.mock("../manages-relationship", () => ({
+  connectUncontractedAssets: vi.fn(),
+}));
 vi.mock("../contracts", () => ({ syncFleetContracts: vi.fn() }));
 
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
@@ -23,7 +25,7 @@ import type { ResourceSyncCtx } from "../../../../core/types";
 import type { FleetConfig, FleetCreds } from "../../config";
 import { createFleetSession } from "../../session";
 import { syncFleetContracts } from "../contracts";
-import { connectManagedAssets } from "../manages-relationship";
+import { connectUncontractedAssets } from "../manages-relationship";
 import { syncAssets } from "../sync";
 
 const EQUIPMENT = {
@@ -99,7 +101,7 @@ beforeEach(() => {
     .mockResolvedValue({ id: "dg-1" } as Awaited<
       ReturnType<typeof resolveDeviceGroup>
     >);
-  vi.mocked(connectManagedAssets).mockReset().mockResolvedValue(undefined);
+  vi.mocked(connectUncontractedAssets).mockReset().mockResolvedValue(undefined);
   vi.mocked(syncFleetContracts).mockReset().mockResolvedValue({
     contractedAssetIds: new Set(),
     errorMessage: null,
@@ -124,7 +126,7 @@ describe("syncAssets", () => {
     expect(userId).toBe("shadow-1");
     expect(integrationId).toBe("int-1");
     expect(resource).toBe(ResourceType.Asset);
-    expect(connectManagedAssets).toHaveBeenCalledWith("int-1", new Set());
+    expect(connectUncontractedAssets).toHaveBeenCalledWith("int-1", new Set());
     expect(outcome).toEqual({ cursor: null });
   });
 
@@ -226,7 +228,7 @@ describe("syncAssets", () => {
     await expect(syncAssets(makeCtx())).rejects.toThrow(
       "3 of 123 items failed: boom",
     );
-    expect(connectManagedAssets).toHaveBeenCalledWith("int-1", new Set());
+    expect(connectUncontractedAssets).toHaveBeenCalledWith("int-1", new Set());
   });
   it("hands the contracted asset ids to the relationship step", async () => {
     vi.mocked(syncFleetContracts).mockResolvedValue({
@@ -236,7 +238,7 @@ describe("syncAssets", () => {
 
     await syncAssets(makeCtx());
 
-    expect(connectManagedAssets).toHaveBeenCalledWith(
+    expect(connectUncontractedAssets).toHaveBeenCalledWith(
       "int-1",
       new Set(["asset-1"]),
     );
@@ -251,6 +253,6 @@ describe("syncAssets", () => {
     await expect(syncAssets(makeCtx())).rejects.toThrow(
       "1 of 11 contracts failed: boom",
     );
-    expect(connectManagedAssets).toHaveBeenCalledWith("int-1", new Set());
+    expect(connectUncontractedAssets).toHaveBeenCalledWith("int-1", new Set());
   });
 });

@@ -18,7 +18,7 @@ import {
   listChanged,
   toCanonical,
 } from "./equipments";
-import { connectManagedAssets } from "./manages-relationship";
+import { connectUncontractedAssets } from "./manages-relationship";
 
 async function equipmentKeysWeMayRegroup(
   integrationId: string,
@@ -111,7 +111,10 @@ export async function syncAssets(
 
   const response = await ingestFleetAssets(items, ctx.integrationId);
   const contracts = await syncFleetContracts(session, ctx.integrationId);
-  await connectManagedAssets(ctx.integrationId, contracts.contractedAssetIds);
+  await connectUncontractedAssets(
+    ctx.integrationId,
+    contracts.contractedAssetIds,
+  );
 
   // Throwing makes finalize-sync record Error
   if (contracts.errorMessage) {

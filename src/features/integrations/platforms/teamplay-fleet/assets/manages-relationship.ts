@@ -3,29 +3,30 @@ import prisma from "@/lib/db";
 import { resolveVendor } from "@/lib/router-utils";
 import { SIEMENS_HEALTHINEERS } from "../config";
 
-export const FLEET_RESPONSIBILITIES =
+export const FLEET_UNCONTRACTED_RESPONSIBILITIES =
   "Serviced by Siemens Healthineers — synced from the teamplay Fleet equipment inventory.";
 
-export async function connectManagedAssets(
+export async function connectUncontractedAssets(
   integrationId: string,
   contractedAssetIds: ReadonlySet<string> = new Set(),
 ): Promise<void> {
   const vendor = await resolveVendor(SIEMENS_HEALTHINEERS);
 
-  const existingRelationship = await prisma.managesRelationship.findFirst({
-    where: {
-      vendorId: vendor.id,
-      workOrderIntegrationId: integrationId,
-      contract: { is: null },
-    },
-    include: { assets: { select: { id: true } } },
-  });
+  const existingUncontractedRelationship =
+    await prisma.managesRelationship.findFirst({
+      where: {
+        vendorId: vendor.id,
+        workOrderIntegrationId: integrationId,
+        contract: { is: null },
+      },
+      include: { assets: { select: { id: true } } },
+    });
 
-  const relationship =
-    existingRelationship ??
+  const uncontractedRelationship =
+    existingUncontractedRelationship ??
     (await prisma.managesRelationship.create({
       data: {
-        responsibilities: FLEET_RESPONSIBILITIES,
+        responsibilities: FLEET_UNCONTRACTED_RESPONSIBILITIES,
         vendorId: vendor.id,
         workOrderIntegrationId: integrationId,
       },
@@ -33,7 +34,7 @@ export async function connectManagedAssets(
     }));
 
   const alreadyConnectedAssetIds = new Set(
-    relationship.assets.map((a) => a.id),
+    uncontractedRelationship.assets.map((a) => a.id),
   );
   const assetsSyncedFromFleet = await prisma.externalAssetMapping.findMany({
     where: { integrationId },
@@ -54,7 +55,7 @@ export async function connectManagedAssets(
   }
 
   await prisma.managesRelationship.update({
-    where: { id: relationship.id },
+    where: { id: uncontractedRelationship.id },
     data: {
       assets: {
         connect: assetIdsToConnect.map((id) => ({ id })),

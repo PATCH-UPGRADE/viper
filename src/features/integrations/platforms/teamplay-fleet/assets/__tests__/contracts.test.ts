@@ -2,15 +2,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-const db = vi.hoisted(() => ({
-  externalAssetMapping: { findFirst: vi.fn() },
-  contract: { findUnique: vi.fn(), upsert: vi.fn() },
-  managesRelationship: {
-    create: vi.fn(),
-    update: vi.fn(),
-    findFirst: vi.fn(),
-  },
-}));
+const db = vi.hoisted(() => {
+  const client = {
+    externalAssetMapping: { findFirst: vi.fn() },
+    contract: { findUnique: vi.fn(), upsert: vi.fn() },
+    managesRelationship: {
+      create: vi.fn(),
+      update: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    // biome-ignore lint/suspicious/noExplicitAny: callback shape varies
+    $transaction: vi.fn(async (cb: (tx: any) => Promise<unknown>) =>
+      cb(client),
+    ),
+  };
+  return client;
+});
 vi.mock("@/lib/db", () => ({ default: db }));
 vi.mock("@/lib/router-utils", () => ({ resolveVendor: vi.fn() }));
 
@@ -106,6 +113,16 @@ describe("buildResponsibilities", () => {
       "Serviced by Siemens Healthineers under Fleet contract 0035244333002160 (Sales Courtesy Contract - KIN).",
     );
   });
+
+  it("says so rather than inventing a name when Fleet has none", () => {
+    const unnamed = { ...KIN_ROW, contractName: "........." };
+    expect(buildResponsibilities(unnamed, [])).toBe(
+      "Serviced by Siemens Healthineers under Fleet contract 0035244333002160, which Fleet lists without a name.",
+    );
+    expect(buildResponsibilities({ ...KIN_ROW, contractName: null }, [])).toBe(
+      "Serviced by Siemens Healthineers under Fleet contract 0035244333002160, which Fleet lists without a name.",
+    );
+  });
 });
 
 describe("listContracts", () => {
@@ -174,19 +191,18 @@ describe("syncFleetContracts", () => {
       },
     });
     const upsert = db.contract.upsert.mock.calls[0][0];
-    expect(upsert.where).toEqual({ contractNumber: "0035244333002160" });
+    expect(upsert.where).toEqual({ id: "US_0035244333002160" });
     expect(upsert.create).toMatchObject({
-      contractNumber: "0035244333002160",
+      id: "US_0035244333002160",
       vendorId: "vendor-1",
       title: "Sales Courtesy Contract - KIN",
-      contractType: "COURTESY",
       managesRelationshipId: "rel-1",
     });
     expect(upsert.create.effectiveFrom?.toISOString()).toBe(
       "2026-04-01T00:00:00.000Z",
     );
     expect(upsert.create.termsJson).toMatchObject({
-      contract: { contractNumber: "0035244333002160" },
+      contract: { contractId: "US_0035244333002160" },
     });
     expect(db.managesRelationship.update).toHaveBeenCalledWith({
       where: { id: "rel-1" },
@@ -245,5 +261,17 @@ describe("syncFleetContracts", () => {
 
     expect(outcome.contractedAssetIds).toEqual(new Set());
     expect(outcome.errorMessage).toBe("Fleet /contracts returned 500");
+  });
+  it("leaves no relationship behind when the contract write fails", async () => {
+    db.contract.upsert.mockRejectedValue(new Error("column does not exist"));
+    db.$transaction.mockImplementationOnce(async (cb) => {
+      await cb(db);
+    });
+
+    const outcome = await syncFleetContracts(bothEndpoints, "int-1");
+
+    expect(outcome.contractedAssetIds).toEqual(new Set());
+    expect(outcome.errorMessage).toContain("1 of 1 contracts failed");
+    expect(db.$transaction).toHaveBeenCalled();
   });
 });

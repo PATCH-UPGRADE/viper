@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  AlertTriangleIcon,
-  PlusIcon,
-  SquareCheckBigIcon,
-  XIcon,
-} from "lucide-react";
-import Link from "next/link";
+import { AlertTriangleIcon, PlusIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +28,7 @@ import {
 } from "../../hooks/use-tracking";
 import type { TicketDetail } from "../../types";
 import { CollapsibleSectionCard } from "./section-card";
-import { StatusChip } from "./shared";
+import { StatusChip, TicketRefRow } from "./shared";
 
 const AttachChildPopover = ({ parentId }: { parentId: string }) => {
   const [open, setOpen] = useState(false);
@@ -113,36 +107,25 @@ export const SubTicketsSection = ({
       {childTickets.length > 0 ? (
         <ul className="flex flex-col divide-y">
           {childTickets.map((child) => (
-            <li
+            <TicketRefRow
               key={child.id}
-              className="group relative flex items-center py-2.5"
-            >
-              <Link
-                href={`/tracking/${child.id}`}
-                className="flex min-w-0 flex-1 items-center gap-3 transition-[padding] group-hover:pr-8 group-focus-within:pr-8"
-              >
-                <SquareCheckBigIcon className="size-4 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium group-hover:underline">
-                  {child.summary}
-                </span>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="text-xs text-muted-foreground">
-                    {child.assignee?.name ?? "Unassigned"}
-                  </span>
-                  <StatusChip status={child.status} />
-                </div>
-              </Link>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-0 top-1/2 size-7 -translate-y-1/2 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
-                onClick={() => detach.mutate({ ticketId: child.id })}
-                disabled={detach.isPending}
-                aria-label={`Detach ${child.summary}`}
-              >
-                <XIcon className="size-4" />
-              </Button>
-            </li>
+              id={child.id}
+              summary={child.summary}
+              status={child.status}
+              assigneeName={child.assignee?.name ?? null}
+              action={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-1/2 size-7 -translate-y-1/2 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+                  onClick={() => detach.mutate({ ticketId: child.id })}
+                  disabled={detach.isPending}
+                  aria-label={`Detach ${child.summary}`}
+                >
+                  <XIcon className="size-4" />
+                </Button>
+              }
+            />
           ))}
         </ul>
       ) : (

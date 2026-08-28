@@ -6,7 +6,7 @@ import { handleCopy, useFlash } from "@/lib/copy";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 
-export const Copy = ({ content }: { content: string }) => {
+const Copy = ({ content }: { content: string }) => {
   const [copied, flash] = useFlash();
 
   return (

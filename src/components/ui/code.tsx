@@ -1,23 +1,17 @@
 "use client";
 
 import { CopyIcon } from "lucide-react";
-import * as React from "react";
-import { handleCopy } from "@/lib/copy";
+import type * as React from "react";
+import { handleCopy, useFlash } from "@/lib/copy";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 
-const Copy = ({ content }: { content: string }) => {
-  const [copied, setCopied] = React.useState(false);
-  const handleCopyOuter = async () => {
-    await handleCopy(content, () => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
+export const Copy = ({ content }: { content: string }) => {
+  const [copied, flash] = useFlash();
 
   return (
     <Tooltip>
-      <TooltipTrigger onClick={handleCopyOuter}>
+      <TooltipTrigger onClick={() => handleCopy(content, flash)}>
         <CopyIcon className="stroke-blue-500" size={16} />
       </TooltipTrigger>
       <TooltipContent>{copied ? "Copied!" : "Copy"}</TooltipContent>

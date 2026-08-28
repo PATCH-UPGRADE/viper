@@ -27,7 +27,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { handleCopy } from "@/lib/copy";
+import { handleCopy, useFlash } from "@/lib/copy";
 import { cn } from "@/lib/utils";
 import { useBriefing, useUpdateBriefing } from "../hooks/use-mitigation";
 import {
@@ -44,7 +44,6 @@ const AUDIENCES = [
 ] as const;
 
 type Audience = (typeof AUDIENCES)[number]["value"];
-type Feedback = "copy" | "pdf";
 
 const successBtnClass =
   "border-green-600 bg-green-50 text-green-600 hover:bg-green-50 dark:bg-green-950/40";
@@ -62,7 +61,8 @@ export function BriefingPanel({
   const [audience, setAudience] = useState<Audience>("ciso");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [copyDone, flashCopy] = useFlash();
+  const [pdfDone, flashPdf] = useFlash();
 
   const wrap = (body: ReactNode) => (
     <Card className="gap-4 py-5">
@@ -122,13 +122,8 @@ export function BriefingPanel({
     );
   };
 
-  const flashFeedback = (kind: Feedback) => {
-    setFeedback(kind);
-    setTimeout(() => setFeedback(null), 1800);
-  };
-
   const copyContent = () => {
-    handleCopy(toPlainText(content), () => flashFeedback("copy"));
+    handleCopy(toPlainText(content), flashCopy);
   };
 
   const exportPdf = async () => {
@@ -138,29 +133,29 @@ export function BriefingPanel({
     );
     const fileBase = title.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
     downloadBlob(blob, `${fileBase}-briefing-${audience}.pdf`);
-    flashFeedback("pdf");
+    flashPdf();
   };
 
   const actions = [
     {
-      key: null,
       icon: PencilIcon,
       onClick: startEdit,
       label: "Edit this briefing",
+      done: false,
       doneLabel: "",
     },
     {
-      key: "copy",
       icon: CopyIcon,
       onClick: copyContent,
       label: "Copy as text",
+      done: copyDone,
       doneLabel: "Copied!",
     },
     {
-      key: "pdf",
       icon: DownloadIcon,
       onClick: exportPdf,
       label: "Download as PDF",
+      done: pdfDone,
       doneLabel: "Downloaded!",
     },
   ] as const;
@@ -218,8 +213,7 @@ export function BriefingPanel({
               </>
             ) : (
               actions.map((action) => {
-                const done = action.key !== null && feedback === action.key;
-                const Icon = done ? CheckIcon : action.icon;
+                const Icon = action.done ? CheckIcon : action.icon;
                 return (
                   <Tooltip key={action.label}>
                     <TooltipTrigger asChild>
@@ -227,13 +221,13 @@ export function BriefingPanel({
                         variant="outline"
                         size="icon-sm"
                         onClick={action.onClick}
-                        className={cn(done && successBtnClass)}
+                        className={cn(action.done && successBtnClass)}
                       >
                         <Icon className="size-[15px]" strokeWidth={1.9} />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      {done ? action.doneLabel : action.label}
+                      {action.done ? action.doneLabel : action.label}
                     </TooltipContent>
                   </Tooltip>
                 );

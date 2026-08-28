@@ -71,8 +71,6 @@ export function fleetContractDate(raw: string | null | undefined): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-const SCHEDULE_LABEL = /(START TIME|END TIME|HOURS PER WEEK)$/;
-
 export function buildResponsibilities(
   row: FleetContractRow,
   terms: FleetContractTerm[],
@@ -81,40 +79,26 @@ export function buildResponsibilities(
   const header = contractName
     ? `Serviced by Siemens Healthineers under Fleet contract ${row.contractNumber} (${contractName}).`
     : `Serviced by Siemens Healthineers under Fleet contract ${row.contractNumber}, which Fleet lists without a name.`;
-  if (terms.length === 0) return header;
 
-  const termValue = (label: string): string | null => {
-    const term = terms.find(
-      (candidate) => normalizeContractText(candidate.label) === label,
-    );
-    return term ? term.value.join(", ") : null;
-  };
-
-  const sentences = [header];
-  const coverageWindow = termValue("COVERAGE CODE");
-  if (coverageWindow) sentences.push(`Coverage: ${coverageWindow}.`);
-  const callBack = termValue("Call Back Response");
-  if (callBack) sentences.push(`Call-back within ${callBack}.`);
-  const onSite = termValue("On site Response");
-  if (onSite) sentences.push(`On-site response ${onSite}.`);
-  const uptime = termValue("Performance Guarantee");
-  if (uptime) sentences.push(`Uptime guarantee ${uptime}.`);
-
-  const covered: string[] = [];
-  const notCovered: string[] = [];
+  const dutiesCovered: string[] = [];
+  const dutiesExcluded: string[] = [];
   for (const term of terms) {
-    const label = normalizeContractText(term.label);
-    if (!label || SCHEDULE_LABEL.test(label)) continue;
-    const value = term.value.join(", ");
-    if (/not covered/i.test(value)) {
-      notCovered.push(label);
-    } else if (/covered|included/i.test(value)) {
-      covered.push(label);
+    const duty = normalizeContractText(term.label);
+    if (!duty) continue;
+    const coverage = term.value.join(", ");
+    if (/not covered/i.test(coverage)) {
+      dutiesExcluded.push(duty);
+    } else if (/covered|included/i.test(coverage)) {
+      dutiesCovered.push(duty);
     }
   }
-  if (covered.length > 0) sentences.push(`Covered: ${covered.join(", ")}.`);
-  if (notCovered.length > 0) {
-    sentences.push(`Not covered: ${notCovered.join(", ")}.`);
+
+  const sentences = [header];
+  if (dutiesCovered.length > 0) {
+    sentences.push(`Covers ${dutiesCovered.join(", ")}.`);
+  }
+  if (dutiesExcluded.length > 0) {
+    sentences.push(`Excludes ${dutiesExcluded.join(", ")}.`);
   }
   return sentences.join(" ");
 }

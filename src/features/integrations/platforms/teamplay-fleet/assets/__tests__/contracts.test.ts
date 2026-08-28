@@ -96,16 +96,24 @@ describe("fleetContractDate", () => {
 });
 
 describe("buildResponsibilities", () => {
-  it("renders the guarantees and coverage flags from real terms", () => {
+  it("states what the vendor does for the device and what it does not", () => {
     expect(buildResponsibilities(KIN_ROW, KIN_TERMS)).toBe(
       "Serviced by Siemens Healthineers under Fleet contract 0035244333002160 (Sales Courtesy Contract - KIN). " +
-        "Coverage: MONDAY TO SUNDAY 24 HOURS. " +
-        "Call-back within 30 Minutes. " +
-        "On-site response 4 HOURS - P1. " +
-        "Uptime guarantee 95 %. " +
-        "Covered: Labor, Updates. " +
-        "Not covered: Emergency Repairs.",
+        "Covers Labor, Updates. " +
+        "Excludes Emergency Repairs.",
     );
+  });
+
+  it("leaves response times and the uptime guarantee out, since those belong to a future ContractSla", () => {
+    const responsibilities = buildResponsibilities(KIN_ROW, KIN_TERMS);
+    for (const slaValue of [
+      "MONDAY TO SUNDAY 24 HOURS",
+      "30 Minutes",
+      "4 HOURS - P1",
+      "95 %",
+    ]) {
+      expect(responsibilities).not.toContain(slaValue);
+    }
   });
 
   it("falls back to the header alone when the terms are empty", () => {
@@ -212,7 +220,7 @@ describe("syncFleetContracts", () => {
     expect(db.managesRelationship.update).toHaveBeenCalledWith({
       where: { id: "rel-1" },
       data: {
-        responsibilities: expect.stringContaining("Covered"),
+        responsibilities: expect.stringContaining("Covers"),
         assets: { connect: { id: "asset-1" } },
       },
     });

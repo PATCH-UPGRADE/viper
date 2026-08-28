@@ -1448,7 +1448,7 @@ model PlanBriefing {
   mitigationPlanId String         @unique
   mitigationPlan   MitigationPlan @relation(fields: [mitigationPlanId], references: [id], onDelete: Cascade)
 
-  // { ciso: BriefingSection, cmio: BriefingSection, deptHead: BriefingSection }
+  // Markdown strings keyed by audience: { ciso, cmio, deptHead }
   content Json
 
   createdAt DateTime @default(now())

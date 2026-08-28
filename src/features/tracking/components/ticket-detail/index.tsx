@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BriefingPanel } from "@/features/mitigation/components/briefing-panel";
+import { BriefingPanel } from "@/features/mitigation/components/accept-plan-drawer/briefing-panel";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
 import {
   useMarkTicketSeen,

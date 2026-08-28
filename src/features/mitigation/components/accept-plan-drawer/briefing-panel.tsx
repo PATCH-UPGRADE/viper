@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useBriefing } from "../hooks/use-mitigation";
+import { useBriefing } from "../../hooks/use-mitigation";
 
 const AUDIENCES = [
   { value: "ciso", label: "CISO" },

@@ -16,7 +16,7 @@ import { useBeforeUnload } from "@/hooks/use-before-unload";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAcceptMitigationPlan } from "../../hooks/use-mitigation";
 import type { MitigationPlanWithWorkOrders } from "../../types";
-import { BriefingPanel } from "../briefing-panel";
+import { BriefingPanel } from "./briefing-panel";
 import {
   buildEdits,
   UNASSIGNED,

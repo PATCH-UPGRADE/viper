@@ -129,6 +129,36 @@ describe("DebriefCard — what the reader sees", () => {
   });
 });
 
+describe("DebriefCard — link icons", () => {
+  // A reader should know what a link opens before clicking it. Each icon is
+  // the one the sidebar or the detail page already uses for that record.
+  const cases = [
+    ["vulnerability", "lucide-bug"],
+    ["asset", "lucide-computer"],
+    ["notification", "lucide-inbox"],
+    ["remediation", "lucide-wrench"],
+    ["issue", "lucide-shield-alert"],
+    ["workOrder", "lucide-list-checks"],
+  ] as const;
+
+  it.each(cases)("marks a %s link with its own icon", (entityType, icon) => {
+    setDebrief(
+      makeDebrief({
+        bullets: [
+          {
+            text: "See {{0}}.",
+            links: [{ label: "The record", entityType, entityId: "x1" }],
+          },
+        ],
+      }),
+    );
+    render(<DebriefCard />);
+
+    const link = screen.getByRole("link", { name: "The record" });
+    expect(link.querySelector("svg")).toHaveClass(icon);
+  });
+});
+
 describe("DebriefCard — states", () => {
   it("renders nothing when the user has no department", () => {
     // An empty shell tells the reader less than no card at all.

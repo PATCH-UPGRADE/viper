@@ -5,13 +5,7 @@ vi.mock("server-only", () => ({}));
 
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
-    debrief: {
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      deleteMany: vi.fn(),
-      groupBy: vi.fn(),
-    },
+    debrief: { findFirst: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
     $transaction: vi.fn(),
     $executeRaw: vi.fn(),
   },
@@ -21,11 +15,10 @@ vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
 import {
   claimDebriefRun,
-  DEBRIEF_RETAINED_PER_DEPARTMENT,
   IN_FLIGHT_TIMEOUT_MS,
   isDebriefAbandoned,
   parseBullets,
-  purgeOldDebriefs,
+  pruneSupersededDebriefs,
 } from "./runs";
 
 const BULLET = {
@@ -234,76 +227,20 @@ describe("parseBullets", () => {
   });
 });
 
-describe("purgeOldDebriefs", () => {
-  it("does nothing when no department is over the limit", async () => {
-    mockPrisma.debrief.groupBy.mockResolvedValue([]);
+describe("pruneSupersededDebriefs", () => {
+  const kept = new Date("2026-08-25T05:00:00.000Z");
 
-    await expect(purgeOldDebriefs()).resolves.toBe(0);
-    expect(mockPrisma.debrief.deleteMany).not.toHaveBeenCalled();
-  });
+  it("deletes only what is older than the run just written", async () => {
+    // Three rules in one exact match. The bound is strict, so the run survives
+    // its own prune. A Regenerate press landing between the write and this
+    // delete opens a newer row, which the bound also spares. And the delete
+    // carries a departmentId, so it cannot reach another department's history.
+    mockPrisma.debrief.deleteMany.mockResolvedValue({ count: 4 });
 
-  it("keeps the newest runs and deletes the rest, per department", async () => {
-    // Per department rather than one global cutoff, so a quiet department
-    // keeps its history instead of losing it to busier neighbours.
-    const oldest = new Date("2026-08-01T00:00:00.000Z");
-    mockPrisma.debrief.groupBy.mockResolvedValue([{ departmentId: "dept-1" }]);
-    mockPrisma.debrief.findMany.mockResolvedValue([
-      { id: "keep-1", createdAt: new Date("2026-08-02T00:00:00.000Z") },
-      { id: "keep-2", createdAt: oldest },
-    ]);
-    mockPrisma.debrief.findFirst.mockResolvedValue({ id: "keep-1" });
-    mockPrisma.debrief.deleteMany.mockResolvedValue({ count: 7 });
-
-    await expect(purgeOldDebriefs()).resolves.toBe(7);
-
-    const [kept] = mockPrisma.debrief.findMany.mock.calls[0];
-    expect(kept.take).toBe(DEBRIEF_RETAINED_PER_DEPARTMENT);
-    expect(kept.orderBy).toEqual({ createdAt: "desc" });
+    await expect(pruneSupersededDebriefs("dept-1", kept)).resolves.toBe(4);
 
     expect(mockPrisma.debrief.deleteMany).toHaveBeenCalledWith({
-      where: {
-        departmentId: "dept-1",
-        // A run opened after the read above is newer than every retained row,
-        // so this bound keeps the purge off it.
-        createdAt: { lt: oldest },
-        id: { not: "keep-1" },
-      },
+      where: { departmentId: "dept-1", createdAt: { lt: kept } },
     });
-  });
-
-  it("keeps the newest Ready run even when it falls outside the window", async () => {
-    // A department whose runs keep failing pushes its last good brief past the
-    // retained window. Deleting it takes away the brief the reader sees and
-    // the context the next run reads back.
-    mockPrisma.debrief.groupBy.mockResolvedValue([{ departmentId: "dept-1" }]);
-    mockPrisma.debrief.findMany.mockResolvedValue([
-      { id: "failed-1", createdAt: new Date("2026-08-02T00:00:00.000Z") },
-    ]);
-    mockPrisma.debrief.findFirst.mockResolvedValue({ id: "ready-old" });
-    mockPrisma.debrief.deleteMany.mockResolvedValue({ count: 3 });
-
-    await purgeOldDebriefs();
-
-    const [args] = mockPrisma.debrief.deleteMany.mock.calls[0];
-    expect(args.where.id).toEqual({ not: "ready-old" });
-  });
-
-  it("scopes every delete to one department", async () => {
-    // A delete without the departmentId would take other departments' rows.
-    mockPrisma.debrief.groupBy.mockResolvedValue([
-      { departmentId: "dept-1" },
-      { departmentId: "dept-2" },
-    ]);
-    mockPrisma.debrief.findMany.mockResolvedValue([
-      { id: "keep", createdAt: new Date("2026-08-01T00:00:00.000Z") },
-    ]);
-    mockPrisma.debrief.findFirst.mockResolvedValue(null);
-    mockPrisma.debrief.deleteMany.mockResolvedValue({ count: 1 });
-
-    await expect(purgeOldDebriefs()).resolves.toBe(2);
-
-    for (const [args] of mockPrisma.debrief.deleteMany.mock.calls) {
-      expect(args.where.departmentId).toBeDefined();
-    }
   });
 });

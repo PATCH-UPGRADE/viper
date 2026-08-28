@@ -38,9 +38,9 @@ export function isDebriefAbandoned(run: {
 }
 
 /**
- * The newest Ready run for a department: the brief the reader sees, and the
- * context the next run reads back. Shared so the three callers cannot disagree
- * about which row that is.
+ * The newest Ready run for a department: the brief the reader sees, the
+ * context the next run reads back, and the `since` the next claim carries.
+ * Shared so the three callers cannot disagree about which row that is.
  */
 export const newestReadyRun = (departmentId: string) =>
   ({
@@ -126,70 +126,24 @@ export async function claimDebriefRun(
 }
 
 /**
- * How many runs to keep per department.
+ * Delete the debriefs a department no longer has a reader for.
  *
- * One run a day plus the occasional manual regenerate, so this is roughly two
- * weeks of history. Only the newest Ready run is ever shown, and only the one
- * before it is read back as context, so older rows serve nothing.
+ * Only the newest Ready run is shown, and the next run reads that same row back
+ * as its context, so once a run reaches Ready nothing older serves anything.
+ *
+ * Bounded on `createdAt` rather than deleting by id, because a run claimed
+ * between the write and this delete is newer than the row just written. Without
+ * the bound the prune would take that row out from under the job writing it.
+ *
+ * Call this only for a run that reached Ready. A failed run must leave the
+ * previous brief in place — it is the one the card keeps showing.
  */
-export const DEBRIEF_RETAINED_PER_DEPARTMENT = 20;
-
-/**
- * Delete every debrief past the newest DEBRIEF_RETAINED_PER_DEPARTMENT for each
- * department.
- *
- * Rows accumulate forever otherwise: one per department per day, plus every
- * manual regenerate, each carrying a bullets JSON blob.
- *
- * Deletes per department rather than with one global cutoff date, so a
- * department that has been quiet keeps its history instead of losing it to
- * busier neighbours.
- */
-export async function purgeOldDebriefs(): Promise<number> {
-  const departments = await prisma.debrief.groupBy({
-    by: ["departmentId"],
-    _count: { _all: true },
-    having: {
-      departmentId: { _count: { gt: DEBRIEF_RETAINED_PER_DEPARTMENT } },
-    },
+export async function pruneSupersededDebriefs(
+  departmentId: string,
+  keptCreatedAt: Date,
+): Promise<number> {
+  const { count } = await prisma.debrief.deleteMany({
+    where: { departmentId, createdAt: { lt: keptCreatedAt } },
   });
-
-  let deleted = 0;
-
-  for (const { departmentId } of departments) {
-    const [keep, newestReady] = await Promise.all([
-      prisma.debrief.findMany({
-        where: { departmentId },
-        orderBy: { createdAt: "desc" },
-        take: DEBRIEF_RETAINED_PER_DEPARTMENT,
-        select: { createdAt: true },
-      }),
-      // A department whose runs keep failing can push its last good brief past
-      // the retained window, so keep that row whatever its age.
-      prisma.debrief.findFirst({
-        ...newestReadyRun(departmentId),
-        select: { id: true },
-      }),
-    ]);
-
-    // The groupBy above returns only departments over the limit, so this is
-    // never empty. Guard anyway: Prisma drops an `undefined` filter, so an
-    // empty list would widen the delete to the department's whole history.
-    const oldestKept = keep.at(-1)?.createdAt;
-    if (!oldestKept) continue;
-
-    const { count } = await prisma.debrief.deleteMany({
-      where: {
-        departmentId,
-        // The read above and this delete are separate statements. A run opened
-        // between them is newer than every row just read, so without this bound
-        // it gets deleted under the job that is writing it.
-        createdAt: { lt: oldestKept },
-        ...(newestReady && { id: { not: newestReady.id } }),
-      },
-    });
-    deleted += count;
-  }
-
-  return deleted;
+  return count;
 }

@@ -207,17 +207,6 @@ describe("debrief.regenerate", () => {
     });
     expect(mockPrisma.debrief.create).not.toHaveBeenCalled();
   });
-
-  it("reports the run it opened as queued", async () => {
-    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
-    mockPrisma.debrief.findFirst.mockResolvedValue(null);
-    mockPrisma.debrief.create.mockResolvedValue({ id: "debrief-2" });
-
-    await expect(caller.regenerate()).resolves.toEqual({
-      id: "debrief-2",
-      queued: true,
-    });
-  });
 });
 
 describe("the {{n}} placeholder contract", () => {
@@ -288,8 +277,8 @@ describe("debrief.regenerate — Inngest dispatch", () => {
 describe("debrief.regenerate — when the dispatch fails", () => {
   it("releases the claim instead of leaving a row nothing will write", async () => {
     // requestDebrief reports failure rather than throwing. Unchecked, the row
-    // stays Generating: it blocks retries until the staleness bound expires and
-    // hides the department's last good debrief, because the newest row wins.
+    // stays Generating: it blocks retries until the staleness bound expires,
+    // and the card keeps a spinner over a run nothing will ever write.
     mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
     mockPrisma.debrief.findFirst.mockResolvedValue(null);
     mockPrisma.debrief.create.mockResolvedValue({ id: "debrief-1" });

@@ -10,15 +10,6 @@ import {
   parseBullets,
 } from "./runs";
 
-/** Columns the client needs. `error` stays server-side; the UI shows a fixed message. */
-const debriefSelect = {
-  id: true,
-  status: true,
-  bullets: true,
-  since: true,
-  createdAt: true,
-} as const;
-
 async function callerDepartmentId(userId: string): Promise<string | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -37,15 +28,15 @@ export const debriefRouter = createTRPCRouter({
     // card reports about. Reading only the newest row would hide the last good
     // brief the moment someone presses Regenerate.
     const [ready, latest] = await Promise.all([
+      // `error` stays server-side; the UI shows a fixed message.
       prisma.debrief.findFirst({
         ...newestReadyRun(departmentId),
-        select: debriefSelect,
+        select: { bullets: true, createdAt: true },
       }),
       prisma.debrief.findFirst({
         where: { departmentId },
         orderBy: { createdAt: "desc" },
         select: {
-          id: true,
           status: true,
           updatedAt: true,
           department: { select: { id: true, name: true } },
@@ -61,10 +52,8 @@ export const debriefRouter = createTRPCRouter({
     const status = isDebriefAbandoned(latest) ? "Failed" : latest.status;
 
     return {
-      id: ready?.id ?? latest.id,
       department: latest.department,
       bullets: ready ? parseBullets(ready.bullets) : [],
-      since: ready?.since ?? null,
       generatedAt: ready?.createdAt ?? null,
       pending: status === "Generating",
       lastRunFailed: status === "Failed",

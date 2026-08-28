@@ -13,7 +13,6 @@ import {
 import { actionNotesFn } from "@/inngest/functions/notes-action";
 import { processInboxEmail } from "@/inngest/functions/process-inbox-email";
 import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-user-tokens";
-import { purgeOldDebriefsFn } from "@/inngest/functions/purge-old-debriefs";
 import { reevaluateIssueOnAnswer } from "@/inngest/functions/reevaluate-issue-on-answer";
 import {
   resolveAllEntityFilters,
@@ -33,7 +32,6 @@ export const { GET, POST, PUT } = serve({
     enrichVulnerability,
     enrichAllVulnerabilities,
     purgeExpiredTokensFn,
-    purgeOldDebriefsFn,
     processInboxEmail,
     analyzeRemediation,
     resolveAllEntityFilters,

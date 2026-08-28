@@ -202,7 +202,12 @@ describe("syncFleetContracts", () => {
       "2026-04-01T00:00:00.000Z",
     );
     expect(upsert.create.termsJson).toMatchObject({
-      contract: { contractId: "US_0035244333002160" },
+      contract: {
+        contractId: "US_0035244333002160",
+        contractNumberConsolidated: "35244333002160",
+        contractStatusId: "1",
+        contractTypeId: "6",
+      },
     });
     expect(db.managesRelationship.update).toHaveBeenCalledWith({
       where: { id: "rel-1" },

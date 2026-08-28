@@ -10,9 +10,13 @@ import { CONTRACTS_URL } from "../urls";
 const fleetContractRowSchema = z.object({
   contractId: z.string(),
   contractNumber: z.string(),
+  contractNumberConsolidated: z.string().nullish(),
   contractName: z.string().nullish(),
   equipmentKey: z.string(),
   contractGroup: z.string().nullish(),
+  contractStatusId: z.string().nullish(),
+  contractStatusDescription: z.string().nullish(),
+  contractTypeId: z.string().nullish(),
   contractTypeDescription: z.string().nullish(),
   startDate: z.string().nullish(),
   expirationDate: z.string().nullish(),

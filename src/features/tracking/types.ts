@@ -220,9 +220,8 @@ export const ticketDetailInclude = {
     },
   },
   notification: { select: { id: true, title: true, type: true } },
-  // Sibling drafts from the same mitigation plan, for the "Related work
-  // orders" section — the current ticket is filtered out at render time
-  // since a Prisma include can't reference its own parent's id.
+  // Self isn't excluded here — a Prisma include can't reference its own
+  // parent's id — so callers filter it out (see related-work-orders.tsx).
   mitigationPlan: {
     select: {
       workOrders: {

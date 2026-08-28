@@ -76,9 +76,8 @@ export const StatusChip = ({
   </Badge>
 );
 
-// One row linking to another ticket — icon, truncated summary, assignee,
-// status. Shared by sub-tickets.tsx (with a hover-reveal detach action) and
-// related-work-orders.tsx (read-only, no action).
+// Row linking to another ticket; `action` is the optional hover-reveal
+// button sub-tickets.tsx uses that related-work-orders.tsx doesn't need.
 export const TicketRefRow = ({
   id,
   summary,

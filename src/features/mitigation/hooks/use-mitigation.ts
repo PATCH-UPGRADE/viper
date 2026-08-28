@@ -29,8 +29,7 @@ export const useUpdateBriefing = (planId: string) => {
   const queryClient = useQueryClient();
   return useMutation(
     trpc.mitigation.updateBriefing.mutationOptions({
-      // The mutation only ever changes the one audience the caller passed —
-      // patch it into the cache instead of refetching the whole briefing.
+      // Patch the one changed audience into the cache instead of refetching.
       onSuccess: (_data, variables) => {
         queryClient.setQueryData(
           trpc.mitigation.getBriefing.queryKey({ planId }),

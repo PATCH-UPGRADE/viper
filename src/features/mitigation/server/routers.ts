@@ -246,9 +246,7 @@ export const mitigationRouter = createTRPCRouter({
       ),
     ),
 
-  // Edits one audience's briefing text in place. Never regenerates — this is
-  // an independent kind of edit from editing a plan's work orders, and
-  // neither should trigger the other.
+  // Edits one audience's briefing text in place; never regenerates it.
   updateBriefing: protectedProcedure
     .input(
       z.object({
@@ -258,9 +256,8 @@ export const mitigationRouter = createTRPCRouter({
       }),
     )
     .mutation(({ input }) =>
-      // Same lock as getBriefing: serializes this against a concurrent edit
-      // to another audience (and against an in-flight regeneration), so one
-      // save's read-modify-write can't clobber another's.
+      // Same lock as getBriefing, so a concurrent edit or regeneration can't
+      // clobber this read-modify-write.
       prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.planId}))`;
 

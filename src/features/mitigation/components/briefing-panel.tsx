@@ -37,7 +37,6 @@ import {
   toPlainText,
 } from "./briefing-export";
 
-// Labels/sub-labels match the reference mock's AudienceSwitch exactly.
 const AUDIENCES = [
   { value: "ciso", label: "CISO", sub: "Security leadership" },
   { value: "cmio", label: "CMIO", sub: "Clinical leadership" },
@@ -119,8 +118,7 @@ export function BriefingPanel({
   };
   const cancelEdit = () => setEditing(false);
   const saveEdit = () => {
-    // Trim before sending so the cache patch below (via mutation variables)
-    // matches exactly what the server persists (it also trims).
+    // Trimmed to match what the server persists and the cache patch reuses.
     updateBriefing.mutate(
       { planId, audience, content: draft.trim() },
       { onSuccess: () => setEditing(false) },
@@ -181,9 +179,7 @@ export function BriefingPanel({
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Written for
           </p>
-          {/* TabsList/TabsTrigger (not raw buttons) so the switch keeps
-              tab semantics and keyboard nav — styled to the pill/two-line
-              look instead of the app's default Tabs chrome. */}
+          {/* TabsList/TabsTrigger, not raw buttons — keeps tab a11y/keyboard nav. */}
           <TabsList
             className={cn(
               "h-auto w-full gap-1 rounded-[9px] bg-muted p-[3px]",
@@ -270,9 +266,8 @@ export function BriefingPanel({
   );
 }
 
-// Renders each "Heading / body" section with a leading bullet, matching the
-// reference mock. Falls back to plain markdown for content that no longer
-// matches the shape (e.g. after a manual edit).
+// Falls back to plain markdown if a manual edit no longer matches the
+// "**Header**\nBody" shape every section is expected to have.
 function BriefingContent({ content }: { content: string }) {
   const sections = parseSections(content);
   if (sections.some((section) => !section.header)) {
@@ -290,10 +285,8 @@ function BriefingContent({ content }: { content: string }) {
           <span className="mt-[7px] size-1.5 shrink-0 rounded-[2px] bg-primary" />
           <div>
             <p className="font-bold text-foreground">{section.header}</p>
-            {/* Body is a single sentence or two, not a document — render
-                inline (not through MarkdownWithTablesWrapper's block/table
-                styling) so stray emphasis in the model's prose still shows
-                as italics instead of literal asterisks. */}
+            {/* Inline, not MarkdownWithTablesWrapper, so *emphasis* renders
+                as italics instead of literal asterisks in this short body. */}
             <p className="mt-0.5 leading-relaxed text-muted-foreground">
               <Markdown remarkPlugins={[remarkGfm]} components={{ p: "span" }}>
                 {section.body}

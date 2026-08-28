@@ -8,11 +8,9 @@ const TITLE_SIZE = 15;
 const HEADER_SIZE = 12;
 const BODY_SIZE = 11;
 
-// Splits the agent's "**Header**\nBody" markdown blocks (see renderSection in
-// src/features/inbox/agent/briefing/schema.ts) into {header, body} pairs.
-// Shared by the PDF export and plain-text copy below, and by briefing-panel's
-// bulleted layout — schema.ts can't export this itself since it's
-// server-only and briefing-panel is a client component.
+// Splits the agent's "**Header**\nBody" blocks into {header, body} pairs.
+// Duplicated from renderSection's format in schema.ts rather than imported:
+// that file is server-only, and this also runs in the client (briefing-panel).
 export function parseSections(
   markdown: string,
 ): { header: string | null; body: string }[] {
@@ -34,12 +32,9 @@ export function toPlainText(markdown: string): string {
     .join("\n\n");
 }
 
-// Standard PDF fonts only support WinAnsi (win1252) — the agent's prose can
-// include smart quotes/em-dashes/emoji, which would otherwise throw at draw
-// time. win1252 covers all of Latin-1 (U+00A0-U+00FF, e.g. "é"), so only
-// U+0100+ needs the "?" fallback. Control characters (\x00-\x1F, \x7F-\x9F)
-// aren't in win1252 either and would throw the same way — stripped here,
-// except \n which wrapText below still splits paragraphs on.
+// Standard PDF fonts only support WinAnsi (win1252), which covers all of
+// Latin-1 (U+00A0-U+00FF) — only U+0100+ needs the "?" fallback. Control
+// characters aren't supported either, so they're stripped (except \n).
 export function sanitize(text: string): string {
   return (
     text

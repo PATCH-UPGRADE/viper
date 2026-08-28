@@ -75,6 +75,12 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
     markSeen({ ticketId: id });
   }, [id, markSeen]);
 
+  // A stale/shared ?tab=briefing URL for a ticket with no plan would otherwise
+  // select a tab with no matching trigger or content — a blank panel.
+  useEffect(() => {
+    if (tab === "briefing" && !data.mitigationPlanId) setTab("details");
+  }, [tab, data.mitigationPlanId, setTab]);
+
   return (
     <EntityContainer
       header={

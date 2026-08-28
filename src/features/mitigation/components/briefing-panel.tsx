@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,7 +20,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -118,8 +119,10 @@ export function BriefingPanel({
   };
   const cancelEdit = () => setEditing(false);
   const saveEdit = () => {
+    // Trim before sending so the cache patch below (via mutation variables)
+    // matches exactly what the server persists (it also trims).
     updateBriefing.mutate(
-      { planId, audience, content: draft },
+      { planId, audience, content: draft.trim() },
       { onSuccess: () => setEditing(false) },
     );
   };
@@ -178,46 +181,31 @@ export function BriefingPanel({
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Written for
           </p>
-          {/* Segmented audience switch — matches the reference mock's
-              AudienceSwitch (pill container, two-line label + sub-label,
-              dimmed and inert while editing) rather than the app's default
-              Tabs chrome. */}
-          <div
+          {/* TabsList/TabsTrigger (not raw buttons) so the switch keeps
+              tab semantics and keyboard nav — styled to the pill/two-line
+              look instead of the app's default Tabs chrome. */}
+          <TabsList
             className={cn(
-              "flex gap-1 rounded-[9px] bg-muted p-[3px]",
+              "h-auto w-full gap-1 rounded-[9px] bg-muted p-[3px]",
               editing && "pointer-events-none opacity-55",
             )}
           >
-            {AUDIENCES.map((a) => {
-              const on = a.value === audience;
-              return (
-                <button
-                  key={a.value}
-                  type="button"
-                  title={a.sub}
-                  onClick={() => setAudience(a.value)}
-                  className={cn(
-                    "flex-1 rounded-[7px] px-2 py-1.5 text-center transition-colors",
-                    on
-                      ? "bg-background text-foreground shadow-[0_1px_3px_rgba(16,24,40,0.12)]"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "text-[12.5px] leading-tight",
-                      on ? "font-bold" : "font-semibold",
-                    )}
-                  >
-                    {a.label}
-                  </div>
-                  <div className="mt-0.5 text-[10.5px] leading-tight text-muted-foreground/80">
-                    {a.sub}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+            {AUDIENCES.map((a) => (
+              <TabsTrigger
+                key={a.value}
+                value={a.value}
+                title={a.sub}
+                className="group h-auto flex-col gap-0 rounded-[7px] border-none px-2 py-1.5 shadow-none data-[state=active]:bg-background data-[state=active]:shadow-[0_1px_3px_rgba(16,24,40,0.12)] data-[state=inactive]:text-muted-foreground"
+              >
+                <span className="text-[12.5px] font-semibold leading-tight group-data-[state=active]:font-bold group-data-[state=active]:text-foreground">
+                  {a.label}
+                </span>
+                <span className="mt-0.5 text-[10.5px] leading-tight text-muted-foreground/80">
+                  {a.sub}
+                </span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
           <TabsContent
             value={audience}
@@ -307,7 +295,9 @@ function BriefingContent({ content }: { content: string }) {
                 styling) so stray emphasis in the model's prose still shows
                 as italics instead of literal asterisks. */}
             <p className="mt-0.5 leading-relaxed text-muted-foreground">
-              <Markdown components={{ p: "span" }}>{section.body}</Markdown>
+              <Markdown remarkPlugins={[remarkGfm]} components={{ p: "span" }}>
+                {section.body}
+              </Markdown>
             </p>
           </div>
         </div>

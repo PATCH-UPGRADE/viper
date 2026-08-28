@@ -34,16 +34,22 @@ export function toPlainText(markdown: string): string {
     .join("\n\n");
 }
 
-// Standard PDF fonts only support WinAnsi — the agent's prose can include
-// smart quotes/em-dashes/emoji, which would otherwise throw at draw time.
-// Replacing from U+00A0 (not U+0000) keeps the C0/C1 control blocks out of
-// the character class below — a literal control character there trips the linter.
-function sanitize(text: string): string {
-  return text
-    .replace(/[‘’]/g, "'")
-    .replace(/[“”]/g, '"')
-    .replace(/[–—]/g, "-")
-    .replace(/[ -￿]/g, "?");
+// Standard PDF fonts only support WinAnsi (win1252) — the agent's prose can
+// include smart quotes/em-dashes/emoji, which would otherwise throw at draw
+// time. win1252 covers all of Latin-1 (U+00A0-U+00FF, e.g. "é"), so only
+// U+0100+ needs the "?" fallback. Control characters (\x00-\x1F, \x7F-\x9F)
+// aren't in win1252 either and would throw the same way — stripped here,
+// except \n which wrapText below still splits paragraphs on.
+export function sanitize(text: string): string {
+  return (
+    text
+      .replace(/[‘’]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/[–—]/g, "-")
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping the control chars WinAnsi can't encode, \n excluded
+      .replace(/[\x00-\x09\x0B-\x1F\x7F-\x9F]/g, "")
+      .replace(/[Ā-￿]/g, "?")
+  );
 }
 
 function wrapText(
@@ -96,21 +102,15 @@ export async function buildBriefingPdf(
   const drawLines = (lines: string[], size: number, f: PDFFont) => {
     for (const line of lines) draw(line, size, f);
   };
+  const drawWrapped = (text: string, size: number, f: PDFFont) =>
+    drawLines(wrapText(sanitize(text), f, size, maxWidth), size, f);
 
-  drawLines(
-    wrapText(sanitize(title), bold, TITLE_SIZE, maxWidth),
-    TITLE_SIZE,
-    bold,
-  );
+  drawWrapped(title, TITLE_SIZE, bold);
   y -= LEADING / 2;
 
   for (const section of parseSections(markdown)) {
-    if (section.header) draw(sanitize(section.header), HEADER_SIZE, bold);
-    drawLines(
-      wrapText(sanitize(section.body), font, BODY_SIZE, maxWidth),
-      BODY_SIZE,
-      font,
-    );
+    if (section.header) drawWrapped(section.header, HEADER_SIZE, bold);
+    drawWrapped(section.body, BODY_SIZE, font);
     y -= LEADING / 2;
   }
 

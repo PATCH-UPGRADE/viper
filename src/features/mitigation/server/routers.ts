@@ -257,17 +257,31 @@ export const mitigationRouter = createTRPCRouter({
         content: z.string().trim().min(1),
       }),
     )
-    .mutation(async ({ input }) => {
-      const existing = await prisma.planBriefing.findUniqueOrThrow({
-        where: { mitigationPlanId: input.planId },
-      });
-      const content = {
-        ...briefingSchema.parse(existing.content),
-        [input.audience]: input.content,
-      };
-      return prisma.planBriefing.update({
-        where: { mitigationPlanId: input.planId },
-        data: { content },
-      });
-    }),
+    .mutation(({ input }) =>
+      // Same lock as getBriefing: serializes this against a concurrent edit
+      // to another audience (and against an in-flight regeneration), so one
+      // save's read-modify-write can't clobber another's.
+      prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.planId}))`;
+
+        const existing = await tx.planBriefing.findUnique({
+          where: { mitigationPlanId: input.planId },
+        });
+        if (!existing) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Briefing not found",
+          });
+        }
+
+        const content = {
+          ...briefingSchema.parse(existing.content),
+          [input.audience]: input.content,
+        };
+        return tx.planBriefing.update({
+          where: { mitigationPlanId: input.planId },
+          data: { content },
+        });
+      }),
+    ),
 });

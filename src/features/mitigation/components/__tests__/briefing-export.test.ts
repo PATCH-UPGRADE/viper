@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { buildBriefingPdf, toPlainText } from "../briefing-export";
+import { buildBriefingPdf, sanitize, toPlainText } from "../briefing-export";
 
 const SAMPLE_MARKDOWN = [
   "**Security exposure**\nBoth pumps are reachable from the clinical network.",
@@ -24,6 +24,24 @@ describe("toPlainText", () => {
   });
 });
 
+describe("sanitize", () => {
+  it("leaves Latin-1 accented characters alone — WinAnsi natively supports them", () => {
+    expect(sanitize("Société Générale — café")).toBe("Société Générale - café");
+  });
+
+  it("strips control characters WinAnsi can't encode, e.g. a pasted tab", () => {
+    expect(sanitize("Column A\tColumn B")).toBe("Column AColumn B");
+  });
+
+  it("preserves newlines so wrapText's paragraph splitting still works", () => {
+    expect(sanitize("Line one\nLine two")).toBe("Line one\nLine two");
+  });
+
+  it('still falls back to "?" for characters truly outside WinAnsi', () => {
+    expect(sanitize("emoji 🎉 here")).toBe("emoji ?? here");
+  });
+});
+
 describe("buildBriefingPdf", () => {
   it("renders a valid PDF for a real briefing section", async () => {
     const blob = await buildBriefingPdf(
@@ -38,6 +56,14 @@ describe("buildBriefingPdf", () => {
     const blob = await buildBriefingPdf(
       "Title",
       "**Why now**\nThe vendor's fix — confirmed “critical” — ships tonight.",
+    );
+    expect(blob.size).toBeGreaterThan(0);
+  });
+
+  it("does not throw on a pasted control character (e.g. a tab)", async () => {
+    const blob = await buildBriefingPdf(
+      "Title",
+      "**Security exposure**\nColumn A\tColumn B\tColumn C",
     );
     expect(blob.size).toBeGreaterThan(0);
   });

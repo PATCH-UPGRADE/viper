@@ -12,6 +12,23 @@ export async function connectUncontractedAssets(
 ): Promise<void> {
   const vendor = await resolveVendor(SIEMENS_HEALTHINEERS);
 
+  const contractBackedRelationships = await prisma.managesRelationship.findMany(
+    {
+      where: {
+        vendorId: vendor.id,
+        workOrderIntegrationId: integrationId,
+        contract: { isNot: null },
+      },
+      select: { assets: { select: { id: true } } },
+    },
+  );
+  const assetIdsUnderContract = new Set(contractedAssetIds);
+  for (const relationship of contractBackedRelationships) {
+    for (const asset of relationship.assets) {
+      assetIdsUnderContract.add(asset.id);
+    }
+  }
+
   const existingUncontractedRelationship =
     await prisma.managesRelationship.findFirst({
       where: {
@@ -45,10 +62,10 @@ export async function connectUncontractedAssets(
   const assetIdsToConnect = syncedAssetIds.filter(
     (assetId) =>
       !alreadyConnectedAssetIds.has(assetId) &&
-      !contractedAssetIds.has(assetId),
+      !assetIdsUnderContract.has(assetId),
   );
   const assetIdsToDisconnect = [...alreadyConnectedAssetIds].filter((assetId) =>
-    contractedAssetIds.has(assetId),
+    assetIdsUnderContract.has(assetId),
   );
   if (assetIdsToConnect.length === 0 && assetIdsToDisconnect.length === 0) {
     return;

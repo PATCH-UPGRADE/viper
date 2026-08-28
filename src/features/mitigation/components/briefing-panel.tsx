@@ -8,7 +8,7 @@ import {
   PencilIcon,
   SparklesIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
@@ -64,47 +64,44 @@ export function BriefingPanel({
   const [draft, setDraft] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
-  const header = (
-    <CardHeader className="gap-1 px-5">
-      <CardTitle className="flex items-center gap-2 text-sm font-bold">
-        <SparklesIcon className="size-4 text-primary" />
-        Make the case for this plan
-      </CardTitle>
-      <CardDescription className="text-xs">
-        Drafted by Viper from this plan and the evidence behind it · review
-        before sending.
-      </CardDescription>
-    </CardHeader>
+  const wrap = (body: ReactNode) => (
+    <Card className="gap-4 py-5">
+      <CardHeader className="gap-1 px-5">
+        <CardTitle className="flex items-center gap-2 text-sm font-bold">
+          <SparklesIcon className="size-4 text-primary" />
+          Make the case for this plan
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Drafted by Viper from this plan and the evidence behind it · review
+          before sending.
+        </CardDescription>
+      </CardHeader>
+      {body}
+    </Card>
   );
 
   if (isLoading) {
-    return (
-      <Card className="gap-4 py-5">
-        {header}
-        <CardContent className="flex flex-col items-center gap-2 px-5 py-10 text-sm text-muted-foreground">
-          <Loader2Icon className="size-5 animate-spin" />
-          Generating briefing...
-        </CardContent>
-      </Card>
+    return wrap(
+      <CardContent className="flex flex-col items-center gap-2 px-5 py-10 text-sm text-muted-foreground">
+        <Loader2Icon className="size-5 animate-spin" />
+        Generating briefing...
+      </CardContent>,
     );
   }
 
   if (isError || !data) {
-    return (
-      <Card className="gap-4 py-5">
-        {header}
-        <CardContent className="flex flex-col items-center gap-3 px-5 py-10 text-sm text-muted-foreground">
-          <p>Couldn&apos;t load the briefing.</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isRefetching}
-          >
-            {isRefetching ? "Retrying..." : "Retry"}
-          </Button>
-        </CardContent>
-      </Card>
+    return wrap(
+      <CardContent className="flex flex-col items-center gap-3 px-5 py-10 text-sm text-muted-foreground">
+        <p>Couldn&apos;t load the briefing.</p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isRefetching}
+        >
+          {isRefetching ? "Retrying..." : "Retry"}
+        </Button>
+      </CardContent>,
     );
   }
 
@@ -168,101 +165,95 @@ export function BriefingPanel({
     },
   ] as const;
 
-  return (
-    <Card className="gap-4 py-5">
-      {header}
-      <CardContent className="px-5">
-        <Tabs
-          value={audience}
-          onValueChange={(v) => setAudience(v as Audience)}
+  return wrap(
+    <CardContent className="px-5">
+      <Tabs value={audience} onValueChange={(v) => setAudience(v as Audience)}>
+        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Written for
+        </p>
+        {/* TabsList/TabsTrigger, not raw buttons — keeps tab a11y/keyboard nav. */}
+        <TabsList
+          className={cn(
+            "h-auto w-full gap-1 rounded-[9px] bg-muted p-[3px]",
+            editing && "pointer-events-none opacity-55",
+          )}
         >
-          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Written for
-          </p>
-          {/* TabsList/TabsTrigger, not raw buttons — keeps tab a11y/keyboard nav. */}
-          <TabsList
-            className={cn(
-              "h-auto w-full gap-1 rounded-[9px] bg-muted p-[3px]",
-              editing && "pointer-events-none opacity-55",
-            )}
-          >
-            {AUDIENCES.map((a) => (
-              <TabsTrigger
-                key={a.value}
-                value={a.value}
-                title={a.sub}
-                className="group h-auto flex-col gap-0 rounded-[7px] border-none px-2 py-1.5 shadow-none data-[state=active]:bg-background data-[state=active]:shadow-[0_1px_3px_rgba(16,24,40,0.12)] data-[state=inactive]:text-muted-foreground"
-              >
-                <span className="text-[12.5px] font-semibold leading-tight group-data-[state=active]:font-bold group-data-[state=active]:text-foreground">
-                  {a.label}
-                </span>
-                <span className="mt-0.5 text-[10.5px] leading-tight text-muted-foreground/80">
-                  {a.sub}
-                </span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          {AUDIENCES.map((a) => (
+            <TabsTrigger
+              key={a.value}
+              value={a.value}
+              title={a.sub}
+              className="group h-auto flex-col gap-0 rounded-[7px] border-none px-2 py-1.5 shadow-none data-[state=active]:bg-background data-[state=active]:shadow-[0_1px_3px_rgba(16,24,40,0.12)] data-[state=inactive]:text-muted-foreground"
+            >
+              <span className="text-[12.5px] font-semibold leading-tight group-data-[state=active]:font-bold group-data-[state=active]:text-foreground">
+                {a.label}
+              </span>
+              <span className="mt-0.5 text-[10.5px] leading-tight text-muted-foreground/80">
+                {a.sub}
+              </span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-          <TabsContent
-            value={audience}
-            className="flex flex-col gap-[13px] pt-[13px]"
-          >
-            <div className="flex items-center gap-2">
-              {editing ? (
-                <>
-                  <Button variant="outline" size="sm" onClick={cancelEdit}>
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={saveEdit}
-                    disabled={
-                      updateBriefing.isPending || draft.trim().length === 0
-                    }
-                  >
-                    <CheckIcon className="size-3.5" strokeWidth={2.1} />
-                    Save
-                  </Button>
-                </>
-              ) : (
-                actions.map((action) => {
-                  const done = action.key !== null && feedback === action.key;
-                  const Icon = done ? CheckIcon : action.icon;
-                  return (
-                    <Tooltip key={action.label}>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon-sm"
-                          onClick={action.onClick}
-                          className={cn(done && successBtnClass)}
-                        >
-                          <Icon className="size-[15px]" strokeWidth={1.9} />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {done ? action.doneLabel : action.label}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })
-              )}
-            </div>
-
+        <TabsContent
+          value={audience}
+          className="flex flex-col gap-[13px] pt-[13px]"
+        >
+          <div className="flex items-center gap-2">
             {editing ? (
-              <Textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                rows={16}
-                className="min-h-[280px] resize-y rounded-[9px] border-primary px-3.5 py-3 text-[12.5px] leading-[1.7]"
-              />
+              <>
+                <Button variant="outline" size="sm" onClick={cancelEdit}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={saveEdit}
+                  disabled={
+                    updateBriefing.isPending || draft.trim().length === 0
+                  }
+                >
+                  <CheckIcon className="size-3.5" strokeWidth={2.1} />
+                  Save
+                </Button>
+              </>
             ) : (
-              <BriefingContent content={content} />
+              actions.map((action) => {
+                const done = action.key !== null && feedback === action.key;
+                const Icon = done ? CheckIcon : action.icon;
+                return (
+                  <Tooltip key={action.label}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        onClick={action.onClick}
+                        className={cn(done && successBtnClass)}
+                      >
+                        <Icon className="size-[15px]" strokeWidth={1.9} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {done ? action.doneLabel : action.label}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })
             )}
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+          </div>
+
+          {editing ? (
+            <Textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={16}
+              className="min-h-[280px] resize-y rounded-[9px] border-primary px-3.5 py-3 text-[12.5px] leading-[1.7]"
+            />
+          ) : (
+            <BriefingContent content={content} />
+          )}
+        </TabsContent>
+      </Tabs>
+    </CardContent>,
   );
 }
 

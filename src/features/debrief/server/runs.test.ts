@@ -23,6 +23,7 @@ import {
   claimDebriefRun,
   DEBRIEF_RETAINED_PER_DEPARTMENT,
   IN_FLIGHT_TIMEOUT_MS,
+  isDebriefAbandoned,
   parseBullets,
   purgeOldDebriefs,
 } from "./runs";
@@ -159,6 +160,35 @@ describe("claimDebriefRun — staleness", () => {
   });
 });
 
+describe("isDebriefAbandoned", () => {
+  const stale = new Date(Date.now() - IN_FLIGHT_TIMEOUT_MS - 1000);
+  const fresh = new Date(Date.now() - 1000);
+
+  it("calls a Generating run that stopped reporting abandoned", () => {
+    expect(isDebriefAbandoned({ status: "Generating", updatedAt: stale })).toBe(
+      true,
+    );
+  });
+
+  it("leaves a Generating run that is still reporting alone", () => {
+    expect(isDebriefAbandoned({ status: "Generating", updatedAt: fresh })).toBe(
+      false,
+    );
+  });
+
+  it("never calls a finished run abandoned, however old", () => {
+    // Only a Generating run can stall. Without the status check every brief
+    // older than the timeout reads as a failure, so the card would report
+    // "last refresh failed" over yesterday's perfectly good debrief.
+    expect(isDebriefAbandoned({ status: "Ready", updatedAt: stale })).toBe(
+      false,
+    );
+    expect(isDebriefAbandoned({ status: "Failed", updatedAt: stale })).toBe(
+      false,
+    );
+  });
+});
+
 describe("parseBullets", () => {
   it("returns stored bullets that satisfy the contract", () => {
     expect(parseBullets([BULLET])).toEqual([BULLET]);
@@ -188,11 +218,13 @@ describe("purgeOldDebriefs", () => {
   it("keeps the newest runs and deletes the rest, per department", async () => {
     // Per department rather than one global cutoff, so a quiet department
     // keeps its history instead of losing it to busier neighbours.
+    const oldest = new Date("2026-08-01T00:00:00.000Z");
     mockPrisma.debrief.groupBy.mockResolvedValue([{ departmentId: "dept-1" }]);
     mockPrisma.debrief.findMany.mockResolvedValue([
-      { id: "keep-1" },
-      { id: "keep-2" },
+      { id: "keep-1", createdAt: new Date("2026-08-02T00:00:00.000Z") },
+      { id: "keep-2", createdAt: oldest },
     ]);
+    mockPrisma.debrief.findFirst.mockResolvedValue({ id: "keep-1" });
     mockPrisma.debrief.deleteMany.mockResolvedValue({ count: 7 });
 
     await expect(purgeOldDebriefs()).resolves.toBe(7);
@@ -202,8 +234,31 @@ describe("purgeOldDebriefs", () => {
     expect(kept.orderBy).toEqual({ createdAt: "desc" });
 
     expect(mockPrisma.debrief.deleteMany).toHaveBeenCalledWith({
-      where: { departmentId: "dept-1", id: { notIn: ["keep-1", "keep-2"] } },
+      where: {
+        departmentId: "dept-1",
+        // A run opened after the read above is newer than every retained row,
+        // so this bound keeps the purge off it.
+        createdAt: { lt: oldest },
+        id: { not: "keep-1" },
+      },
     });
+  });
+
+  it("keeps the newest Ready run even when it falls outside the window", async () => {
+    // A department whose runs keep failing pushes its last good brief past the
+    // retained window. Deleting it takes away the brief the reader sees and
+    // the context the next run reads back.
+    mockPrisma.debrief.groupBy.mockResolvedValue([{ departmentId: "dept-1" }]);
+    mockPrisma.debrief.findMany.mockResolvedValue([
+      { id: "failed-1", createdAt: new Date("2026-08-02T00:00:00.000Z") },
+    ]);
+    mockPrisma.debrief.findFirst.mockResolvedValue({ id: "ready-old" });
+    mockPrisma.debrief.deleteMany.mockResolvedValue({ count: 3 });
+
+    await purgeOldDebriefs();
+
+    const [args] = mockPrisma.debrief.deleteMany.mock.calls[0];
+    expect(args.where.id).toEqual({ not: "ready-old" });
   });
 
   it("scopes every delete to one department", async () => {
@@ -212,7 +267,10 @@ describe("purgeOldDebriefs", () => {
       { departmentId: "dept-1" },
       { departmentId: "dept-2" },
     ]);
-    mockPrisma.debrief.findMany.mockResolvedValue([{ id: "keep" }]);
+    mockPrisma.debrief.findMany.mockResolvedValue([
+      { id: "keep", createdAt: new Date("2026-08-01T00:00:00.000Z") },
+    ]);
+    mockPrisma.debrief.findFirst.mockResolvedValue(null);
     mockPrisma.debrief.deleteMany.mockResolvedValue({ count: 1 });
 
     await expect(purgeOldDebriefs()).resolves.toBe(2);

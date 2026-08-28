@@ -158,10 +158,13 @@ export const generateDepartmentDebrief = inngest.createFunction(
 
       await beat("context-loaded");
 
-      const surveyed =
-        findings ?? (await step.run("scout", () => runDebriefScout()));
-
-      await beat("survey-ready");
+      let surveyed = findings;
+      if (!surveyed) {
+        surveyed = await step.run("scout", () => runDebriefScout());
+        // The scout is the long step, so mark progress after it. On the fan-out
+        // path the findings arrive with the event and nothing has elapsed.
+        await beat("survey-ready");
+      }
 
       const written = await step.run("write", () =>
         writeDepartmentDebrief({ ...context, findings: surveyed }),

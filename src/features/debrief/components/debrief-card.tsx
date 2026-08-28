@@ -98,7 +98,10 @@ export const DebriefCard = () => {
                 AI
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p
+              className="text-sm text-muted-foreground"
+              suppressHydrationWarning
+            >
               {[
                 `Personalized brief for ${firstNameOf(session?.user.name) ?? data.department.name}`,
                 data.generatedAt

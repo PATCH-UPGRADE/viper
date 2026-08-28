@@ -3,7 +3,12 @@ import { TRPCError } from "@trpc/server";
 import { requestDebrief } from "@/inngest/events/debrief";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { claimDebriefRun, parseBullets } from "./runs";
+import {
+  claimDebriefRun,
+  isDebriefAbandoned,
+  newestReadyRun,
+  parseBullets,
+} from "./runs";
 
 /** Columns the client needs. `error` stays server-side; the UI shows a fixed message. */
 const debriefSelect = {
@@ -33,8 +38,7 @@ export const debriefRouter = createTRPCRouter({
     // brief the moment someone presses Regenerate.
     const [ready, latest] = await Promise.all([
       prisma.debrief.findFirst({
-        where: { departmentId, status: "Ready" },
-        orderBy: { createdAt: "desc" },
+        ...newestReadyRun(departmentId),
         select: debriefSelect,
       }),
       prisma.debrief.findFirst({
@@ -43,6 +47,7 @@ export const debriefRouter = createTRPCRouter({
         select: {
           id: true,
           status: true,
+          updatedAt: true,
           department: { select: { id: true, name: true } },
         },
       }),
@@ -50,14 +55,19 @@ export const debriefRouter = createTRPCRouter({
 
     if (!latest) return null;
 
+    // A worker that dies between heartbeats leaves its row on `Generating`
+    // forever. Read it as the failure it is, so the card stops polling and its
+    // Regenerate button re-enables.
+    const status = isDebriefAbandoned(latest) ? "Failed" : latest.status;
+
     return {
       id: ready?.id ?? latest.id,
       department: latest.department,
       bullets: ready ? parseBullets(ready.bullets) : [],
       since: ready?.since ?? null,
       generatedAt: ready?.createdAt ?? null,
-      pending: latest.status === "Generating",
-      lastRunFailed: latest.status === "Failed",
+      pending: status === "Generating",
+      lastRunFailed: status === "Failed",
     };
   }),
 

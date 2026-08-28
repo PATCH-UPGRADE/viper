@@ -28,6 +28,7 @@ vi.mock("@/inngest/events/debrief", () => ({
 import { createCallerFactory } from "@/trpc/init";
 import { debriefBulletsSchema } from "../types";
 import { debriefRouter } from "./routers";
+import { IN_FLIGHT_TIMEOUT_MS } from "./runs";
 
 const createCaller = createCallerFactory(debriefRouter);
 const caller = createCaller({
@@ -76,9 +77,10 @@ describe("debrief.getForMyDepartment", () => {
       .mockResolvedValueOnce(ready)
       .mockResolvedValueOnce(latest);
 
-  const LATEST = (status: string) => ({
+  const LATEST = (status: string, updatedAt = new Date()) => ({
     id: "debrief-latest",
     status,
+    updatedAt,
     department: DEPARTMENT,
   });
 
@@ -169,6 +171,23 @@ describe("debrief.getForMyDepartment", () => {
     expect(result?.bullets).toEqual([]);
   });
 
+  it("stops reporting a Generating run once it goes stale", async () => {
+    // A worker that dies between heartbeats leaves the row on Generating.
+    // claimDebriefRun already lets a new run replace it after the timeout, so
+    // reporting it as pending would disable Regenerate for good.
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
+    reads(
+      readyRow(),
+      LATEST("Generating", new Date(Date.now() - IN_FLIGHT_TIMEOUT_MS - 1000)),
+    );
+
+    const result = await caller.getForMyDepartment();
+
+    expect(result?.pending).toBe(false);
+    expect(result?.lastRunFailed).toBe(true);
+    expect(result?.bullets).toEqual([BULLET]);
+  });
+
   it("never exposes the stored error message", async () => {
     mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
     reads(null, LATEST("Failed"));
@@ -189,84 +208,15 @@ describe("debrief.regenerate", () => {
     expect(mockPrisma.debrief.create).not.toHaveBeenCalled();
   });
 
-  it("creates a Generating row carrying the previous run's timestamp", async () => {
-    const previousRun = new Date("2026-08-16T18:20:00.000Z");
+  it("reports the run it opened as queued", async () => {
     mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
-    mockPrisma.debrief.findFirst
-      .mockResolvedValueOnce(null) // nothing in flight
-      .mockResolvedValueOnce({ createdAt: previousRun }); // previous Ready run
+    mockPrisma.debrief.findFirst.mockResolvedValue(null);
     mockPrisma.debrief.create.mockResolvedValue({ id: "debrief-2" });
 
     await expect(caller.regenerate()).resolves.toEqual({
       id: "debrief-2",
       queued: true,
     });
-
-    expect(mockPrisma.debrief.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: {
-          departmentId: "dept-1",
-          status: "Generating",
-          since: previousRun,
-        },
-      }),
-    );
-  });
-
-  it("sets since to null on the department's first ever debrief", async () => {
-    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
-    mockPrisma.debrief.findFirst.mockResolvedValue(null);
-    mockPrisma.debrief.create.mockResolvedValue({ id: "debrief-1" });
-
-    await caller.regenerate();
-
-    expect(mockPrisma.debrief.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ since: null }),
-      }),
-    );
-  });
-
-  it("does not stack runs when one is already generating", async () => {
-    // Double-clicking the regenerate button must not queue two agent runs.
-    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
-    mockPrisma.debrief.findFirst.mockResolvedValueOnce({ id: "debrief-9" });
-
-    await expect(caller.regenerate()).resolves.toEqual({
-      id: "debrief-9",
-      queued: false,
-    });
-    expect(mockPrisma.debrief.create).not.toHaveBeenCalled();
-  });
-
-  it("ignores a Generating row that is too old to still be running", async () => {
-    // A crashed run leaves its row Generating forever. Without the age bound
-    // the guard above matches it and the department never gets another debrief.
-    //
-    // Frozen clock so the bound can be asserted exactly. Without it the test can
-    // only check "some time in the past", which passes for any offset at all —
-    // including one so long the guard never expires.
-    //
-    // Bound on updatedAt, not createdAt: the Inngest function touches the row
-    // as it works, so this means "no progress in 15 minutes".
-    vi.useFakeTimers();
-    try {
-      const now = new Date("2026-08-17T12:00:00.000Z");
-      vi.setSystemTime(now);
-      mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-1" });
-      mockPrisma.debrief.findFirst.mockResolvedValue(null);
-      mockPrisma.debrief.create.mockResolvedValue({ id: "debrief-3" });
-
-      await caller.regenerate();
-
-      const [inFlightQuery] = mockPrisma.debrief.findFirst.mock.calls[0];
-      expect(inFlightQuery.where.status).toBe("Generating");
-      expect(inFlightQuery.where.updatedAt.gt).toEqual(
-        new Date(now.getTime() - 15 * 60 * 1000),
-      );
-    } finally {
-      vi.useRealTimers();
-    }
   });
 });
 

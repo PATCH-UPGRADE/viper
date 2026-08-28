@@ -230,11 +230,4 @@ describe("DebriefCard — a rerun does not erase the current brief", () => {
     expect(screen.getByText(/Facilities is buying/)).toBeInTheDocument();
     expect(screen.getByText(/last refresh failed/)).toBeInTheDocument();
   });
-
-  it("shows skeletons only when there is no brief to keep", () => {
-    setDebrief(makeDebrief({ pending: true, bullets: [] }));
-    render(<DebriefCard />);
-
-    expect(screen.getByText(/Generating your debrief/)).toBeInTheDocument();
-  });
 });

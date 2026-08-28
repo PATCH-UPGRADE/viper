@@ -1,4 +1,5 @@
 import "server-only";
+import type { DebriefStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { type DebriefBullet, debriefBulletsSchema } from "../types";
 
@@ -15,6 +16,34 @@ import { type DebriefBullet, debriefBulletsSchema } from "../types";
  * debrief.
  */
 export const IN_FLIGHT_TIMEOUT_MS = 15 * 60 * 1000;
+
+/** Cutoff a run must have been touched after to still count as running. */
+const staleBefore = () => new Date(Date.now() - IN_FLIGHT_TIMEOUT_MS);
+
+/**
+ * Has this run stopped making progress?
+ *
+ * The claim path and the read path must agree. If the reader called a run
+ * abandoned while `claimDebriefRun` still counted it as active, the card would
+ * offer a Regenerate button that silently joins the run it just declared dead.
+ */
+export function isDebriefAbandoned(run: {
+  status: DebriefStatus;
+  updatedAt: Date;
+}): boolean {
+  return run.status === "Generating" && run.updatedAt < staleBefore();
+}
+
+/**
+ * The newest Ready run for a department: the brief the reader sees, and the
+ * context the next run reads back. Shared so the three callers cannot disagree
+ * about which row that is.
+ */
+export const newestReadyRun = (departmentId: string) =>
+  ({
+    where: { departmentId, status: "Ready" },
+    orderBy: { createdAt: "desc" },
+  }) as const;
 
 /**
  * Parse a stored `bullets` column. A row written by an older schema, or by
@@ -65,14 +94,13 @@ export async function claimDebriefRun(
         where: {
           departmentId,
           status: "Generating",
-          updatedAt: { gt: new Date(Date.now() - IN_FLIGHT_TIMEOUT_MS) },
+          updatedAt: { gt: staleBefore() },
         },
         orderBy: { createdAt: "desc" },
         select: { id: true },
       }),
       tx.debrief.findFirst({
-        where: { departmentId, status: "Ready" },
-        orderBy: { createdAt: "desc" },
+        ...newestReadyRun(departmentId),
         select: { createdAt: true },
       }),
     ]);
@@ -126,15 +154,36 @@ export async function purgeOldDebriefs(): Promise<number> {
   let deleted = 0;
 
   for (const { departmentId } of departments) {
-    const keep = await prisma.debrief.findMany({
-      where: { departmentId },
-      orderBy: { createdAt: "desc" },
-      take: DEBRIEF_RETAINED_PER_DEPARTMENT,
-      select: { id: true },
-    });
+    const [keep, newestReady] = await Promise.all([
+      prisma.debrief.findMany({
+        where: { departmentId },
+        orderBy: { createdAt: "desc" },
+        take: DEBRIEF_RETAINED_PER_DEPARTMENT,
+        select: { createdAt: true },
+      }),
+      // A department whose runs keep failing can push its last good brief past
+      // the retained window, so keep that row whatever its age.
+      prisma.debrief.findFirst({
+        ...newestReadyRun(departmentId),
+        select: { id: true },
+      }),
+    ]);
+
+    // The groupBy above returns only departments over the limit, so this is
+    // never empty. Guard anyway: Prisma drops an `undefined` filter, so an
+    // empty list would widen the delete to the department's whole history.
+    const oldestKept = keep.at(-1)?.createdAt;
+    if (!oldestKept) continue;
 
     const { count } = await prisma.debrief.deleteMany({
-      where: { departmentId, id: { notIn: keep.map((row) => row.id) } },
+      where: {
+        departmentId,
+        // The read above and this delete are separate statements. A run opened
+        // between them is newer than every row just read, so without this bound
+        // it gets deleted under the job that is writing it.
+        createdAt: { lt: oldestKept },
+        ...(newestReady && { id: { not: newestReady.id } }),
+      },
     });
     deleted += count;
   }

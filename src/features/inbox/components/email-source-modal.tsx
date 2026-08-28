@@ -34,8 +34,8 @@ export function EmailSourceModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl lg:max-w-5xl 2xl:max-w-7xl max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+        <DialogHeader className="shrink-0">
+          <DialogTitle className="flex flex-wrap items-center gap-2 wrap-anywhere">
             <MailIcon className="size-4 text-muted-foreground" />
             Email from {senderName ?? "unknown sender"}
             <Badge variant="secondary">raw</Badge>
@@ -59,7 +59,7 @@ export function EmailSourceModal({
                     <dt className="font-medium text-muted-foreground">
                       {label}
                     </dt>
-                    <dd>{value}</dd>
+                    <dd className="wrap-anywhere">{value}</dd>
                   </Fragment>
                 ))}
               </dl>
@@ -97,7 +97,7 @@ export function EmailSourceModal({
           {source.markdown && (
             <Card className="overflow-auto">
               <CardContent>
-                <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">
+                <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
                   {source.markdown}
                 </pre>
               </CardContent>

@@ -9,7 +9,7 @@ import {
 
 const MODEL = "claude-haiku-4-5-20251001";
 
-const SYSTEM_PROMPT = `You are a briefing-writing agent for a hospital cybersecurity platform. Given a proposed mitigation plan, write the case for why it makes sense — for three audiences reading the same plan: a CISO, a CMIO, and a department head (e.g. biomed engineering).
+const SYSTEM_PROMPT = `You are a briefing-writing agent for a hospital cybersecurity platform. Given a proposed mitigation plan, write the case for why it makes sense — for three audiences reading the same plan: a CISO, a CMIO, and a department head (e.g. radiology head, imaging head).
 
 Each audience needs SUBSTANTIVELY different content, not the same facts reworded.
 

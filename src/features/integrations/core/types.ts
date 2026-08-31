@@ -135,7 +135,7 @@ export interface ConnectorDefinition<TConfig, TCreds> {
   displayName: string;
   /** Shown on the platform's catalog card. */
   description: string;
-  /** Which connectors-catalog sections this platform shows under. */
+  /** Which connectors-dashboard sections this platform shows under. */
   categories: Category[];
   /** Validates `Integration.config`. */
   configSchema: z.ZodType<TConfig>;

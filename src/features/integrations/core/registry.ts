@@ -3,6 +3,7 @@ import type { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { ai } from "../platforms/ai";
 import { partner } from "../platforms/partner";
 import { teamplayFleet } from "../platforms/teamplay-fleet";
+import type { Category } from "../types";
 import { moduleForResource } from "./sync/resources";
 import type { AnyConnectorModule } from "./types";
 
@@ -26,6 +27,12 @@ export const requirePlatform = (platform: PlatformEnum): AnyConnectorModule => {
   }
   return module;
 };
+
+export const displayNameFor = (platform: PlatformEnum): string =>
+  registry[platform]?.definition.displayName ?? platform;
+
+export const categoriesFor = (platform: PlatformEnum): Category[] =>
+  registry[platform]?.definition.categories ?? [];
 
 /** The platform author's own sense of how fast this resource moves. */
 export const defaultSyncEveryFor = (

@@ -29,16 +29,16 @@ export function formatResourceName(modelName: string | symbol): string {
 }
 
 /**
- * Up to two initials from a name, for avatar fallbacks.
+ * First letter of up to the first two words in a name, uppercased.
  *
  * @example
- * initialsOf('Ada Lovelace') // 'AL'
+ * initialsOf('NVD Data') // 'ND'
  * initialsOf(null) // '?'
  */
 export function initialsOf(name?: string | null): string {
-  return (name ?? "?")
+  return (name?.trim() || "?")
     .split(/\s+/)
-    .map((p) => p[0])
+    .map((part) => part[0])
     .filter(Boolean)
     .slice(0, 2)
     .join("")

@@ -1,16 +1,9 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
-import {
-  type Integration,
-  PlatformEnum,
-  ResourceType,
-} from "@/generated/prisma";
+import { PlatformEnum, ResourceType } from "@/generated/prisma";
 import type { trpc } from "@/trpc/server";
 
-/**
- * The resources a platform can sync, keyed by the URL segment they upload to.
- */
 export const integrationsMapping = {
   assets: { name: "Asset", type: ResourceType.Asset },
   deviceArtifacts: {
@@ -24,7 +17,7 @@ export const integrationsMapping = {
 
 export type UploadSegment = keyof typeof integrationsMapping;
 
-/** The connectors catalog's sections. A platform can belong to more than one. */
+/** The connectors dashboard's sections. A platform can belong to more than one. */
 export const CATEGORIES = [
   "Hospital Inventory",
   "Vulnerability Management Platforms",
@@ -47,8 +40,6 @@ export const resourceTypeSchema = z.enum(
 );
 
 /**
- * What `integrations.create` / `.update` accept.
- *
  * `config` stays opaque here on purpose. Narrowing it per-platform would mean
  * importing every platform's `configSchema`, and those reach `core/credentials.ts`
  * (`node:crypto`, `server-only`) — which would make this module unusable from a
@@ -76,17 +67,21 @@ export function isValidResourceTypeKey(key: string): key is UploadSegment {
   return key in integrationsMapping;
 }
 
-export type IntegrationWithRelations = inferOutput<
-  typeof trpc.integrations.update
->;
-
-export type IntegrationWithStringDates = Omit<
-  Integration,
-  "createdAt" | "updatedAt"
-> & {
-  createdAt: string;
-  updatedAt: string;
+/** Derived from the table (plus SourceRecord, which has no UploadSegment), so the two can't drift. */
+const resourceTypeLabels: Record<ResourceType, string> = {
+  ...(Object.fromEntries(
+    Object.values(integrationsMapping).map((r) => [r.type, r.name]),
+  ) as Record<(typeof integrationsMapping)[UploadSegment]["type"], string>),
+  [ResourceType.SourceRecord]: "Notification",
 };
+export const resourceTypeLabel = (type: ResourceType): string =>
+  resourceTypeLabels[type];
+
+export type IntegrationListItem = inferOutput<
+  typeof trpc.integrations.getMany
+>["items"][number];
+export type IntegrationResourceSyncItem =
+  IntegrationListItem["resourceSyncs"][number];
 
 /** A config/credentialSchema field, reduced to plain data to cross the Server->Client boundary. */
 export interface FieldSpec {

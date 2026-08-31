@@ -1,29 +1,33 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { AuthType, ResourceType } from "@/generated/prisma";
+import { AuthType, type Prisma, ResourceType } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
-import { userIncludeSelect } from "@/lib/schemas";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { requireExistence } from "@/trpc/middleware";
 import type { AuthCredential } from "../core/credentials";
 import { encryptCredentials, usesGenericAuth } from "../core/credentials";
-import { requirePlatform } from "../core/registry";
+import {
+  categoriesFor,
+  defaultSyncEveryFor,
+  displayNameFor,
+  requirePlatform,
+} from "../core/registry";
+import { effectiveSyncEvery } from "../core/sync/cadence";
 import { resourcesFor } from "../core/sync/resources";
 import type { AnyConnectorModule } from "../core/types";
-import type { IntegrationFormValues } from "../types";
-import { integrationInputSchema } from "../types";
+import { type IntegrationFormValues, integrationInputSchema } from "../types";
 
-const paginatedIntegrationsInputSchema = paginationInputSchema.extend({
-  resourceType: z.enum(Object.values(ResourceType)),
-});
+/** Encrypted credentials must never reach the browser. */
+const omitCredentials = { credentials: true } as const;
 
 const integrationsInclude = {
-  user: userIncludeSelect,
   resourceSyncs: {
     select: {
+      integrationId: true,
       resource: true,
       status: true,
       errorMessage: true,
@@ -31,30 +35,27 @@ const integrationsInclude = {
       lastSuccessfulSync: true,
       nextSyncAt: true,
       enabled: true,
+      syncEvery: true,
     },
     orderBy: {
-      resource: "asc", // stable ordering; one row per resource
-    },
-  },
-  _count: {
-    select: {
-      assetMappings: true,
-      deviceArtifactMappings: true,
-      remediationMappings: true,
-      vulnerabilityMappings: true,
+      resource: "asc",
     },
   },
 } as const;
 
-/**
- * Encrypted credentials must never reach the browser
- */
-const omitCredentials = { credentials: true } as const;
+const integrationListSelect = {
+  id: true,
+  name: true,
+  platform: true,
+  syncEvery: true,
+  enabled: true,
+  resourceSyncs: integrationsInclude.resourceSyncs,
+} as const satisfies Prisma.IntegrationSelect;
 
-/**
- * The input carries `config` as opaque JSON which makes the platform module the one and
- * only validator.
- */
+type IntegrationListRow = Prisma.IntegrationGetPayload<{
+  select: typeof integrationListSelect;
+}>;
+
 const toRowShape = (input: IntegrationFormValues) => {
   const module = requirePlatform(input.platform);
   const { definition } = module;
@@ -86,14 +87,6 @@ const toCredentialBlob = (
   return isNoneAuth ? null : encryptCredentials(parsed);
 };
 
-/**
- * What an edit should do to the stored credentials.
- *
- * The form cannot prefill them (encrypted, and not returned to the client), so
- * omitting the whole `credentials` object means "keep what is stored". Sending
- * `AuthType.None` is therefore the *only* way to clear them — without that
- * branch, switching from Bearer back to None would leave the old token on the row.
- */
 const credentialsPatch = (
   module: AnyConnectorModule,
   data: IntegrationFormValues,
@@ -102,10 +95,6 @@ const credentialsPatch = (
   return { credentials: toCredentialBlob(module, data.credentials) };
 };
 
-/**
- * Surface a rejected platform (no module registered) or a config that its
- * platform won't accept as a 400, not a 500 — both are the caller's problem.
- */
 const asBadRequest = <T>(fn: () => T): T => {
   try {
     return fn();
@@ -118,27 +107,54 @@ const asBadRequest = <T>(fn: () => T): T => {
   }
 };
 
-export const integrationsRouter = createTRPCRouter({
-  // intentionally fetches all integrations, not just user's
-  getMany: protectedProcedure
-    .input(paginatedIntegrationsInputSchema)
-    .query(async ({ input }) => {
-      const { search, resourceType } = input;
+const requireIntegration = async (id: string) => {
+  const existing = await prisma.integration.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  requireExistence(existing, "Integration");
+};
 
-      // An integration is "for" a resource if it has a sync row for it
-      const whereFilter = {
-        resourceSyncs: { some: { resource: resourceType } },
+export const integrationsRouter = createTRPCRouter({
+  getMany: protectedProcedure
+    .input(paginationInputSchema)
+    .query(async ({ input }) => {
+      const where = {
         name: {
-          contains: search,
+          contains: input.search,
           mode: "insensitive" as const,
         },
       };
 
-      return fetchPaginated(prisma.integration, input, {
-        where: whereFilter,
-        include: integrationsInclude,
-        omit: omitCredentials,
+      const result = await fetchPaginated(prisma.integration, input, {
+        where,
+        select: integrationListSelect,
       });
+
+      const now = new Date();
+      const items = (result.items as IntegrationListRow[]).map(
+        ({ syncEvery, ...integration }) => ({
+          ...integration,
+          platformLabel: displayNameFor(integration.platform),
+          categories: categoriesFor(integration.platform),
+          resourceSyncs: integration.resourceSyncs.map((sync) => ({
+            ...sync,
+            // A nested resource row never sees its parent integration's
+            // `syncEvery`, so the table can't tell "resource override" from
+            // "integration-level override" apart from `syncEvery` alone.
+            isOverridden: sync.syncEvery !== null || syncEvery !== null,
+            effectiveSyncEvery: effectiveSyncEvery(
+              sync.syncEvery,
+              syncEvery,
+              defaultSyncEveryFor(integration.platform, sync.resource),
+            ),
+            // Same "due" check the cron uses, against the server's clock.
+            isDue: sync.nextSyncAt === null || sync.nextSyncAt <= now,
+          })),
+        }),
+      );
+
+      return { ...result, items };
     }),
 
   create: protectedProcedure
@@ -149,7 +165,6 @@ export const integrationsRouter = createTRPCRouter({
       const credentials = asBadRequest(() =>
         toCredentialBlob(module, input.credentials),
       );
-      // For a generic platform this is exactly [config.resource]
       const resources = asBadRequest(() => resourcesFor(module, config));
 
       const integration = await prisma.$transaction(async (tx) => {
@@ -167,12 +182,9 @@ export const integrationsRouter = createTRPCRouter({
             userId: ctx.auth.user.id,
             integrationUserId: integrationUser.id,
             resourceSyncs: {
-              // nextSyncAt stays null => due on the next cron tick.
               create: resources.map((resource) => ({ resource })),
             },
             apiKeyConnector: {
-              // ApiKeyConnector is still single-resource (TODO VW-435); a
-              // multi-resource platform gets the first of its resources here.
               create: {
                 name,
                 resourceType: resources[0],
@@ -195,7 +207,6 @@ export const integrationsRouter = createTRPCRouter({
       return integration;
     }),
 
-  // any user can intentionally update any integration
   update: protectedProcedure
     .input(
       z.object({
@@ -205,6 +216,7 @@ export const integrationsRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       const { id, data } = input;
+      await requireIntegration(id);
       const { row, module, config } = asBadRequest(() => toRowShape(data));
       const credentials = asBadRequest(() => credentialsPatch(module, data));
       const resources = asBadRequest(() => resourcesFor(module, config));
@@ -218,10 +230,6 @@ export const integrationsRouter = createTRPCRouter({
             // "clear it" — credentialsPatch returns {} so this spreads nothing.
             ...credentials,
             resourceSyncs: {
-              // Rows are never deleted, so cursors survive a switch away and
-              // back. `enabled` is what decides whether the cron and
-              // `triggerSync` still pick them up. The two writes touch
-              // disjoint rows, so their order doesn't matter.
               updateMany: {
                 where: { resource: { notIn: resources } },
                 data: { enabled: false },
@@ -239,7 +247,6 @@ export const integrationsRouter = createTRPCRouter({
           omit: omitCredentials,
         });
 
-        // If integration has a linked user, update their name
         if (integration.integrationUserId && data.name) {
           await tx.user.update({
             where: { id: integration.integrationUserId },
@@ -253,37 +260,62 @@ export const integrationsRouter = createTRPCRouter({
       });
     }),
 
-  // any user can intentionally remove any integration
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
-      const existing = await prisma.integration.findUnique({
-        where: { id: input.id },
-        select: { resourceSyncs: { select: { resource: true } } },
-      });
-
-      const deleted = await prisma.integration.delete({
+      await requireIntegration(input.id);
+      return prisma.integration.delete({
         where: { id: input.id },
         omit: omitCredentials,
       });
+    }),
 
-      return {
-        ...deleted,
-        resources: existing?.resourceSyncs.map((s) => s.resource) ?? [],
+  // Operator kill switch for the whole integration — distinct from `update`,
+  // which requires a full (and platform-validated) config/credentials payload.
+  setEnabled: protectedProcedure
+    .input(z.object({ id: z.string(), enabled: z.boolean() }))
+    .mutation(async ({ input }) => {
+      await requireIntegration(input.id);
+      return prisma.integration.update({
+        where: { id: input.id },
+        data: { enabled: input.enabled },
+        omit: omitCredentials,
+      });
+    }),
+
+  setResourceSyncEnabled: protectedProcedure
+    .input(
+      z.object({
+        integrationId: z.string(),
+        resource: z.enum(ResourceType),
+        enabled: z.boolean(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const where = {
+        integrationId_resource: {
+          integrationId: input.integrationId,
+          resource: input.resource,
+        },
       };
+      const existing = await prisma.integrationResourceSync.findUnique({
+        where,
+        select: { integrationId: true },
+      });
+      requireExistence(existing, "Resource sync");
+      return prisma.integrationResourceSync.update({
+        where,
+        data: { enabled: input.enabled },
+      });
     }),
 
   triggerSync: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
-      // any user can trigger any integration
-      // but if we change so later, implement that here
       const integration = await prisma.integration.findFirst({
-        where: { id: input.id },
+        where: { id: input.id, enabled: true },
         select: {
           id: true,
-          // Same filter the cron uses: a resource the operator switched off
-          // shouldn't sync just because someone hit the button.
           resourceSyncs: {
             where: { enabled: true },
             select: { resource: true },
@@ -293,14 +325,18 @@ export const integrationsRouter = createTRPCRouter({
       if (!integration) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
+      if (integration.resourceSyncs.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No enabled resources to sync",
+        });
+      }
 
-      await Promise.all(
-        integration.resourceSyncs.map((sync) =>
-          inngest.send({
-            name: "integration/sync.requested",
-            data: { integrationId: input.id, resource: sync.resource },
-          }),
-        ),
+      await inngest.send(
+        integration.resourceSyncs.map((sync) => ({
+          name: "integration/sync.requested" as const,
+          data: { integrationId: input.id, resource: sync.resource },
+        })),
       );
 
       return { success: true };

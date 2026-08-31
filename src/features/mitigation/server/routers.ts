@@ -8,6 +8,7 @@ import { attachMatchingAssets } from "@/features/tracking/server/asset-tickets";
 import { Priority, TicketCategory } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { requireExistence } from "@/trpc/middleware";
 
 // Draft work orders proposed by a plan, in the shape the plan UI renders and
 // the accept drawer edits.
@@ -189,32 +190,32 @@ export const mitigationRouter = createTRPCRouter({
       // pulls assignee/department joins the agent never reads). The
       // recommended plan (for a non-recommended plan's comparison) is
       // fetched in the same round trip via the notification relation.
-      const plan = await prisma.mitigationPlan.findUnique({
-        where: { id: input.planId },
-        select: {
-          id: true,
-          title: true,
-          summary: true,
-          compareLine: true,
-          cards: true,
-          order: true,
-          workOrders: {
-            select: { summary: true, body: true },
-            orderBy: { createdAt: "asc" },
-          },
-          notification: {
-            select: {
-              mitigationPlans: {
-                where: { order: 0 },
-                select: { title: true, summary: true },
+      const plan = requireExistence(
+        await prisma.mitigationPlan.findUnique({
+          where: { id: input.planId },
+          select: {
+            id: true,
+            title: true,
+            summary: true,
+            compareLine: true,
+            cards: true,
+            order: true,
+            workOrders: {
+              select: { summary: true, body: true },
+              orderBy: { createdAt: "asc" },
+            },
+            notification: {
+              select: {
+                mitigationPlans: {
+                  where: { order: 0 },
+                  select: { title: true, summary: true },
+                },
               },
             },
           },
-        },
-      });
-      if (!plan) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
-      }
+        }),
+        "plan",
+      );
 
       const isRecommended = plan.order === 0;
       const recommendedPlan = isRecommended
@@ -249,9 +250,12 @@ export const mitigationRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
-      const existing = await prisma.planBriefing.findUniqueOrThrow({
-        where: { mitigationPlanId: input.planId },
-      });
+      const existing = requireExistence(
+        await prisma.planBriefing.findUnique({
+          where: { mitigationPlanId: input.planId },
+        }),
+        "briefing",
+      );
       const content = {
         ...briefingSchema.parse(existing.content),
         [input.audience]: input.content,

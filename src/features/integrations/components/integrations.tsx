@@ -5,13 +5,11 @@ import {
   BellIcon,
   BugIcon,
   InboxIcon,
-  LayoutGridIcon,
   type LucideIcon,
   WebhookIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { parseAsStringLiteral, useQueryState } from "nuqs";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   EmptyView,
   ErrorView,
@@ -25,31 +23,62 @@ import { useSuspenseWebhooks } from "@/features/webhooks/hooks/use-webhooks";
 import { cn } from "@/lib/utils";
 import type { CatalogEntry } from "../core/catalog";
 import { useSuspenseIntegrations } from "../hooks/use-integrations";
-import { CATEGORIES } from "../types";
+import { CATEGORIES, type Category } from "../types";
 import { IntegrationCard } from "./integration-row";
 import { IntegrationsCatalog } from "./integrations-catalog";
 
-const SECTIONS = ["Overview", ...CATEGORIES] as const;
-type Section = (typeof SECTIONS)[number];
-
-const SECTION_ICONS: Record<Section, LucideIcon> = {
-  Overview: LayoutGridIcon,
+const SECTION_ICONS: Record<Category, LucideIcon> = {
   "Hospital Inventory": ArchiveIcon,
   "Vulnerability Management Platforms": BugIcon,
   "Ticketing Platforms": InboxIcon,
   Notifications: BellIcon,
 };
 
-const useSection = () =>
-  useQueryState(
-    "section",
-    parseAsStringLiteral(SECTIONS).withDefault("Overview"),
-  );
+/** Highlights whichever catalog section's top is closest to (but above) the viewport top. */
+const useScrollSpy = () => {
+  const [active, setActive] = useState<Category>(CATEGORIES[0]);
+  const elements = useRef(new Map<Category, HTMLDivElement>());
 
-const ConnectorsSidebar = () => {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting);
+        if (visible.length === 0) return;
+        const topmost = visible.reduce((a, b) =>
+          a.boundingClientRect.top <= b.boundingClientRect.top ? a : b,
+        );
+        setActive(topmost.target.getAttribute("data-section") as Category);
+      },
+      { rootMargin: "-96px 0px -70% 0px", threshold: 0 },
+    );
+    for (const el of elements.current.values()) observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const register = (section: Category) => (el: HTMLDivElement | null) => {
+    if (el) elements.current.set(section, el);
+    else elements.current.delete(section);
+  };
+
+  const scrollTo = (section: Category) => {
+    setActive(section);
+    elements.current
+      .get(section)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  return { active, register, scrollTo };
+};
+
+const ConnectorsSidebar = ({
+  active,
+  onSelect,
+}: {
+  active: Category;
+  onSelect: (section: Category) => void;
+}) => {
   const { data } = useSuspenseIntegrations();
   const { data: webhooks } = useSuspenseWebhooks();
-  const [section, setSection] = useSection();
 
   const countBySection = useMemo(
     () =>
@@ -60,23 +89,23 @@ const ConnectorsSidebar = () => {
           }
           return counts;
         },
-        { Overview: data.items.length } as Record<Section, number>,
+        {} as Record<Category, number>,
       ),
     [data.items],
   );
 
   return (
-    <nav className="flex flex-col gap-1 w-56 shrink-0">
-      {SECTIONS.map((name) => {
+    <nav className="flex flex-col gap-1 w-56 shrink-0 sticky top-4 self-start">
+      {CATEGORIES.map((name) => {
         const Icon = SECTION_ICONS[name];
         return (
           <button
             key={name}
             type="button"
-            onClick={() => setSection(name)}
+            onClick={() => onSelect(name)}
             className={cn(
               "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left",
-              section === name
+              active === name
                 ? "bg-accent text-accent-foreground font-medium"
                 : "text-muted-foreground hover:bg-accent/50",
             )}
@@ -104,12 +133,6 @@ const ConnectorsSidebar = () => {
 
 const EnabledIntegrations = () => {
   const { data } = useSuspenseIntegrations();
-  const [section] = useSection();
-
-  const items =
-    section === "Overview"
-      ? data.items
-      : data.items.filter((i) => i.categories.includes(section));
 
   return (
     <div className="flex flex-col gap-4 flex-1 min-w-0">
@@ -117,11 +140,11 @@ const EnabledIntegrations = () => {
         title="Enabled Integrations"
         description="Currently active connections syncing data into VIPER."
       />
-      {items.length === 0 ? (
-        <EmptyView message={`No enabled integrations in ${section}.`} />
+      {data.items.length === 0 ? (
+        <EmptyView message="No integrations enabled yet." />
       ) : (
         <Card className="p-0 gap-0 overflow-hidden divide-y">
-          {items.map((integration) => (
+          {data.items.map((integration) => (
             <IntegrationCard key={integration.id} integration={integration} />
           ))}
         </Card>
@@ -131,17 +154,14 @@ const EnabledIntegrations = () => {
 };
 
 export const IntegrationsList = ({ catalog }: { catalog: CatalogEntry[] }) => {
-  const [section] = useSection();
+  const { active, register, scrollTo } = useScrollSpy();
 
   return (
     <div className="flex gap-6">
-      <ConnectorsSidebar />
+      <ConnectorsSidebar active={active} onSelect={scrollTo} />
       <div className="flex flex-col gap-10 flex-1 min-w-0">
         <EnabledIntegrations />
-        <IntegrationsCatalog
-          catalog={catalog}
-          category={section === "Overview" ? undefined : section}
-        />
+        <IntegrationsCatalog catalog={catalog} register={register} />
       </div>
     </div>
   );

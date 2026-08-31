@@ -66,18 +66,18 @@ const CategorySection = ({
 
 export const IntegrationsCatalog = ({
   catalog,
-  category,
+  register,
 }: {
   catalog: CatalogEntry[];
-  category?: Category;
-}) => {
-  const categories = category ? [category] : CATEGORIES;
-
-  return (
-    <div className="flex flex-col gap-10 flex-1 min-w-0">
-      {categories.map((name) => (
-        <CategorySection key={name} category={name} catalog={catalog} />
-      ))}
-    </div>
-  );
-};
+  register: (category: Category) => (el: HTMLDivElement | null) => void;
+}) => (
+  <div className="flex flex-col gap-10 flex-1 min-w-0">
+    {CATEGORIES.map((name) => (
+      <div key={name} ref={register(name)} data-section={name}>
+        <CategorySection category={name} catalog={catalog} />
+      </div>
+    ))}
+    {/* Lets the last section scroll all the way to the top, like the others. */}
+    <div className="min-h-[70vh]" aria-hidden="true" />
+  </div>
+);

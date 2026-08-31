@@ -7,10 +7,15 @@ import type {
   NotificationDetailWithRelations,
 } from "../types";
 import { EmailSourceModal } from "./email-source-modal";
-import { attachmentDownloadPath, emailSenderName, nvdUrl } from "./shared";
+import {
+  attachmentDownloadPath,
+  emailSenderName,
+  emailSubject,
+  nvdUrl,
+} from "./shared";
 
 const PILL =
-  "inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium hover:bg-accent";
+  "inline-flex min-w-0 max-w-64 items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium hover:bg-accent";
 
 export function NotificationSourcePills({
   notification,
@@ -48,10 +53,14 @@ export function NotificationSourcePills({
         <a
           key={attachment.id}
           href={attachmentDownloadPath(attachment.id)}
+          target="_blank"
+          rel="noopener noreferrer"
           className={PILL}
         >
-          {attachment.filename ?? "Attachment"}
-          <PaperclipIcon className="size-3 text-muted-foreground" />
+          <span className="truncate">
+            {attachment.filename ?? "Attachment"}
+          </span>
+          <PaperclipIcon className="size-3 shrink-0 text-muted-foreground" />
         </a>
       ))}
       {cveIds.map((cveId) => (
@@ -66,17 +75,27 @@ export function NotificationSourcePills({
           <ExternalLinkIcon className="size-3 text-muted-foreground" />
         </a>
       ))}
-      {emailSources.map((source) => (
-        <button
-          key={source.id}
-          type="button"
-          onClick={() => setOpenedSource(source)}
-          className={PILL}
-        >
-          {emailSenderName(source.raw) ?? "Email"}
-          <MailIcon className="size-3 text-muted-foreground" />
-        </button>
-      ))}
+      {emailSources.map((source) => {
+        const senderName = emailSenderName(source.raw) ?? "Email";
+        const subject = emailSubject(source.raw);
+        return (
+          <button
+            key={source.id}
+            type="button"
+            onClick={() => setOpenedSource(source)}
+            className={PILL}
+            title={subject ?? undefined}
+            aria-label={
+              subject
+                ? `Open email from ${senderName}: ${subject}`
+                : `Open email from ${senderName}`
+            }
+          >
+            <span className="truncate">{senderName}</span>
+            <MailIcon className="size-3 shrink-0 text-muted-foreground" />
+          </button>
+        );
+      })}
       {openedSource !== null && (
         <EmailSourceModal
           source={openedSource}

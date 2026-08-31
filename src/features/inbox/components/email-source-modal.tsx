@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatFileSize } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
 import type { NotificationDetailSource, RawEmailPayload } from "../types";
 import {
   attachmentDownloadPath,
@@ -68,28 +68,36 @@ export function EmailSourceModal({
                   <span className="font-medium text-muted-foreground">
                     Attached
                   </span>
-                  {source.attachments.map((attachment) => (
-                    <a
-                      key={attachment.id}
-                      href={attachmentDownloadPath(attachment.id)}
-                      className="inline-flex items-center gap-2 rounded-lg border bg-muted/50 px-2.5 py-1.5 hover:bg-accent"
-                    >
-                      <Badge
-                        variant="outline"
-                        className="text-red-700 dark:text-red-300"
+                  {source.attachments.map((attachment) => {
+                    const typeLabel = fileExtensionLabel(attachment.filename);
+                    return (
+                      <a
+                        key={attachment.id}
+                        href={attachmentDownloadPath(attachment.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 rounded-lg border bg-muted/50 px-2.5 py-1.5 hover:bg-accent"
                       >
-                        {fileExtensionLabel(attachment.filename)}
-                      </Badge>
-                      <span className="font-medium">
-                        {attachment.filename ?? "Attachment"}
-                      </span>
-                      {attachment.size !== null && (
-                        <span className="text-muted-foreground">
-                          {formatFileSize(attachment.size)}
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            typeLabel === "PDF" &&
+                              "text-red-700 dark:text-red-300",
+                          )}
+                        >
+                          {typeLabel}
+                        </Badge>
+                        <span className="font-medium">
+                          {attachment.filename ?? "Attachment"}
                         </span>
-                      )}
-                    </a>
-                  ))}
+                        {attachment.size !== null && (
+                          <span className="text-muted-foreground">
+                            {formatFileSize(attachment.size)}
+                          </span>
+                        )}
+                      </a>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

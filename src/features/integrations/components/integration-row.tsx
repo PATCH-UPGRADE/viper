@@ -108,13 +108,7 @@ export const aggregateTiming = (
   };
 };
 
-const TimingText = ({
-  timing,
-  prefix,
-}: {
-  timing: TimingInput;
-  prefix?: string;
-}) => {
+const TimingText = ({ timing }: { timing: TimingInput }) => {
   const { text, isError } = timingLine(timing);
   const label = (
     <span
@@ -133,7 +127,7 @@ const TimingText = ({
               : "bg-muted-foreground/40",
         )}
       />
-      {prefix ? `${prefix} · ${text}` : text}
+      {text}
     </span>
   );
 
@@ -263,14 +257,19 @@ const IntegrationHeaderRow = ({
             · {integration.platformLabel}
           </span>
         </div>
-        {aggregate && <TimingText timing={aggregate} />}
       </div>
 
-      {singleSync && (
+      {singleSync ? (
         <ResourceStatus
           sync={singleSync}
           integrationEnabled={integration.enabled}
         />
+      ) : (
+        aggregate && (
+          <div className="text-right">
+            <TimingText timing={aggregate} />
+          </div>
+        )
       )}
 
       <Switch

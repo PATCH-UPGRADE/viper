@@ -364,8 +364,7 @@ describe("the draft schema must not reject what the model writes", () => {
   // withStructuredOutput validates against the draft schema and THROWS on a
   // mismatch, losing the whole run. A length cap there is unenforceable — the
   // model cannot count characters — so the cap belongs on the strict schema
-  // and the trim, not here. This is the regression that discarded five good
-  // bullets on the first live run.
+  // and the trim, not here.
   it("accepts a bullet far longer than the storable limit", () => {
     const overlong = {
       text: `${"a".repeat(DEBRIEF_MAX_BULLET_CHARS * 3)} {{0}}`,

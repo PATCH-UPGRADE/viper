@@ -3,16 +3,12 @@ import { TRPCError } from "@trpc/server";
 import { requestDebrief } from "@/inngest/events/debrief";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
-import { claimDebriefRun, parseBullets } from "./runs";
-
-/** Columns the client needs. `error` stays server-side; the UI shows a fixed message. */
-const debriefSelect = {
-  id: true,
-  status: true,
-  bullets: true,
-  since: true,
-  createdAt: true,
-} as const;
+import {
+  claimDebriefRun,
+  isDebriefAbandoned,
+  newestReadyRun,
+  parseBullets,
+} from "./runs";
 
 async function callerDepartmentId(userId: string): Promise<string | null> {
   const user = await prisma.user.findUnique({
@@ -27,26 +23,40 @@ export const debriefRouter = createTRPCRouter({
     const departmentId = await callerDepartmentId(ctx.auth.user.id);
     if (!departmentId) return null;
 
-    // Read the department through the relation, so it costs nothing on the
-    // common early path where the department has no debrief yet.
-    const debrief = await prisma.debrief.findFirst({
-      where: { departmentId },
-      orderBy: { createdAt: "desc" },
-      select: {
-        ...debriefSelect,
-        department: { select: { id: true, name: true } },
-      },
-    });
+    // Two rows, because they answer different questions. The newest Ready run
+    // is what the reader should see; the newest run of any status is what the
+    // card reports about. Reading only the newest row would hide the last good
+    // brief the moment someone presses Regenerate.
+    const [ready, latest] = await Promise.all([
+      // `error` stays server-side; the UI shows a fixed message.
+      prisma.debrief.findFirst({
+        ...newestReadyRun(departmentId),
+        select: { bullets: true, createdAt: true },
+      }),
+      prisma.debrief.findFirst({
+        where: { departmentId },
+        orderBy: { createdAt: "desc" },
+        select: {
+          status: true,
+          updatedAt: true,
+          department: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
 
-    if (!debrief) return null;
+    if (!latest) return null;
+
+    // A worker that dies between heartbeats leaves its row on `Generating`
+    // forever. Read it as the failure it is, so the card stops polling and its
+    // Regenerate button re-enables.
+    const status = isDebriefAbandoned(latest) ? "Failed" : latest.status;
 
     return {
-      id: debrief.id,
-      department: debrief.department,
-      status: debrief.status,
-      bullets: debrief.status === "Ready" ? parseBullets(debrief.bullets) : [],
-      since: debrief.since,
-      generatedAt: debrief.createdAt,
+      department: latest.department,
+      bullets: ready ? parseBullets(ready.bullets) : [],
+      generatedAt: ready?.createdAt ?? null,
+      pending: status === "Generating",
+      lastRunFailed: status === "Failed",
     };
   }),
 

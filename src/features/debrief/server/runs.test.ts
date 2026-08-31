@@ -1,11 +1,11 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
-    debrief: { findFirst: vi.fn(), create: vi.fn() },
+    debrief: { findFirst: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
     $transaction: vi.fn(),
     $executeRaw: vi.fn(),
   },
@@ -13,7 +13,13 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
-import { claimDebriefRun, IN_FLIGHT_TIMEOUT_MS, parseBullets } from "./runs";
+import {
+  claimDebriefRun,
+  IN_FLIGHT_TIMEOUT_MS,
+  isDebriefAbandoned,
+  parseBullets,
+  pruneSupersededDebriefs,
+} from "./runs";
 
 const BULLET = {
   text: "Two machines are exposed by {{0}}.",
@@ -147,6 +153,62 @@ describe("claimDebriefRun — staleness", () => {
   });
 });
 
+describe("isDebriefAbandoned", () => {
+  // Frozen clock so the cutoff itself can be asserted. Against a live clock the
+  // boundary case cannot be expressed at all.
+  const now = new Date("2026-08-25T12:00:00.000Z");
+  const cutoff = new Date(now.getTime() - IN_FLIGHT_TIMEOUT_MS);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("calls a Generating run that stopped reporting abandoned", () => {
+    const stale = new Date(cutoff.getTime() - 1000);
+
+    expect(isDebriefAbandoned({ status: "Generating", updatedAt: stale })).toBe(
+      true,
+    );
+  });
+
+  it("leaves a Generating run that is still reporting alone", () => {
+    const fresh = new Date(cutoff.getTime() + 1000);
+
+    expect(isDebriefAbandoned({ status: "Generating", updatedAt: fresh })).toBe(
+      false,
+    );
+  });
+
+  it("counts a run sitting exactly on the cutoff as abandoned", () => {
+    // claimDebriefRun holds a run active only while updatedAt is strictly
+    // greater than the cutoff, so this run is one the claim path would replace.
+    // Reading it as still pending would leave the card polling a run that the
+    // next Regenerate press is free to take over.
+    expect(
+      isDebriefAbandoned({ status: "Generating", updatedAt: cutoff }),
+    ).toBe(true);
+  });
+
+  it("never calls a finished run abandoned, however old", () => {
+    // Only a Generating run can stall. Without the status check every brief
+    // older than the timeout reads as a failure, so the card would report
+    // "last refresh failed" over yesterday's perfectly good debrief.
+    const stale = new Date(cutoff.getTime() - 1000);
+
+    expect(isDebriefAbandoned({ status: "Ready", updatedAt: stale })).toBe(
+      false,
+    );
+    expect(isDebriefAbandoned({ status: "Failed", updatedAt: stale })).toBe(
+      false,
+    );
+  });
+});
+
 describe("parseBullets", () => {
   it("returns stored bullets that satisfy the contract", () => {
     expect(parseBullets([BULLET])).toEqual([BULLET]);
@@ -162,5 +224,23 @@ describe("parseBullets", () => {
   it("returns nothing for an empty array, which the schema rejects", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(parseBullets([])).toEqual([]);
+  });
+});
+
+describe("pruneSupersededDebriefs", () => {
+  const kept = new Date("2026-08-25T05:00:00.000Z");
+
+  it("deletes only what is older than the run just written", async () => {
+    // Three rules in one exact match. The bound is strict, so the run survives
+    // its own prune. A Regenerate press landing between the write and this
+    // delete opens a newer row, which the bound also spares. And the delete
+    // carries a departmentId, so it cannot reach another department's history.
+    mockPrisma.debrief.deleteMany.mockResolvedValue({ count: 4 });
+
+    await expect(pruneSupersededDebriefs("dept-1", kept)).resolves.toBe(4);
+
+    expect(mockPrisma.debrief.deleteMany).toHaveBeenCalledWith({
+      where: { departmentId: "dept-1", createdAt: { lt: kept } },
+    });
   });
 });

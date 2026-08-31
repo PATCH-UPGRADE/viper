@@ -3,16 +3,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockPrisma, mockScout, mockWriter, mockClaim } = vi.hoisted(() => ({
-  mockPrisma: {
-    department: { findMany: vi.fn(), findUnique: vi.fn() },
-    debrief: { findFirst: vi.fn(), update: vi.fn() },
-    workOrderTicket: { findMany: vi.fn() },
-  },
-  mockScout: vi.fn(),
-  mockWriter: vi.fn(),
-  mockClaim: vi.fn(),
-}));
+const { mockPrisma, mockScout, mockWriter, mockClaim, mockPrune } = vi.hoisted(
+  () => ({
+    mockPrisma: {
+      department: { findMany: vi.fn(), findUnique: vi.fn() },
+      debrief: { findFirst: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+      workOrderTicket: { findMany: vi.fn() },
+    },
+    mockScout: vi.fn(),
+    mockWriter: vi.fn(),
+    mockClaim: vi.fn(),
+    mockPrune: vi.fn(),
+  }),
+);
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/features/agents/debrief/scout", () => ({
@@ -23,7 +26,12 @@ vi.mock("@/features/agents/debrief/writer", () => ({
 }));
 vi.mock("@/features/debrief/server/runs", () => ({
   claimDebriefRun: mockClaim,
+  newestReadyRun: (departmentId: string) => ({
+    where: { departmentId, status: "Ready" },
+    orderBy: { createdAt: "desc" },
+  }),
   parseBullets: (raw: unknown) => (Array.isArray(raw) ? raw : []),
+  pruneSupersededDebriefs: mockPrune,
 }));
 vi.mock("../client", () => ({
   inngest: {
@@ -71,9 +79,34 @@ function makeStep() {
 }
 
 const BULLET = { text: "One thing.", links: [] };
+const WRITTEN_AT = new Date("2026-08-25T05:00:00.000Z");
+
+const event = (data: Record<string, unknown> = {}) => ({
+  data: { debriefId: "run-1", departmentId: "d1", ...data },
+});
+
+/** Resolve every read the load-context step makes. */
+function contextResolves(previousBullets: unknown[] = []) {
+  mockPrisma.department.findUnique.mockResolvedValue({
+    name: "Biomed",
+    description: "Services clinical devices.",
+  });
+  mockPrisma.debrief.findFirst.mockResolvedValue(
+    previousBullets.length ? { bullets: previousBullets } : null,
+  );
+  mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+    { summary: "Replace line sets", status: "TO_DO" },
+  ]);
+  mockPrisma.debrief.update.mockResolvedValue({
+    id: "run-1",
+    createdAt: WRITTEN_AT,
+  });
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockPrune.mockResolvedValue(0);
+  mockPrisma.debrief.updateMany.mockResolvedValue({ count: 1 });
 });
 
 describe("generateAllDebriefs — the daily cron", () => {
@@ -156,24 +189,6 @@ describe("generateAllDebriefs — the daily cron", () => {
 });
 
 describe("generateDepartmentDebrief — writing one department's brief", () => {
-  const event = (data: Record<string, unknown>) => ({
-    data: { debriefId: "run-1", departmentId: "d1", ...data },
-  });
-
-  function contextResolves(previousBullets: unknown[] = []) {
-    mockPrisma.department.findUnique.mockResolvedValue({
-      name: "Biomed",
-      description: "Services clinical devices.",
-    });
-    mockPrisma.debrief.findFirst.mockResolvedValue(
-      previousBullets.length ? { bullets: previousBullets } : null,
-    );
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      { summary: "Replace line sets", status: "TO_DO" },
-    ]);
-    mockPrisma.debrief.update.mockResolvedValue({ id: "run-1" });
-  }
-
   it("is keyed for idempotency and serialised per department", () => {
     // Two runs for one department must not interleave their writes, and a
     // duplicated event must not trigger a second agent call.
@@ -237,6 +252,10 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     expect(mockWriter).toHaveBeenCalledWith(
       expect.objectContaining({ findings: "its own findings" }),
     );
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ findingsSource: "scout" }),
+    );
   });
 
   it("passes yesterday's bullets through to the writer", async () => {
@@ -274,9 +293,8 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
   });
 
   it("clears the previous run's bullets when marking Failed", async () => {
-    // The two persist branches drifted once: only the Ready branch reset
-    // bullets, so a re-run that collapsed left yesterday's bullets on a Failed
-    // row for the card to render.
+    // A Failed row must not keep the bullets of an earlier Ready run, or the
+    // card renders stale content under a failure state.
     contextResolves();
     mockWriter.mockResolvedValue({ bullets: [], model: "m" });
     const { step, logger } = makeStep();
@@ -289,6 +307,38 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
 
     const persisted = mockPrisma.debrief.update.mock.calls.at(-1)?.[0];
     expect(persisted.data).toMatchObject({ status: "Failed", bullets: [] });
+  });
+
+  it("prunes the department's older runs once the brief is Ready", async () => {
+    // Nothing reads a run once a newer Ready one exists, so a department keeps
+    // exactly one stored brief between runs.
+    contextResolves();
+    mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
+    const { step, logger } = makeStep();
+
+    await deptDebrief.handler({
+      event: event({ findings: "f" }),
+      step,
+      logger,
+    });
+
+    expect(mockPrune).toHaveBeenCalledWith("d1", WRITTEN_AT);
+  });
+
+  it("prunes nothing when the run failed", async () => {
+    // The previous brief is what the card keeps showing. Pruning on a failure
+    // would delete it and leave the reader with nothing.
+    contextResolves();
+    mockWriter.mockResolvedValue({ bullets: [], model: "m" });
+    const { step, logger } = makeStep();
+
+    await deptDebrief.handler({
+      event: event({ findings: "f" }),
+      step,
+      logger,
+    });
+
+    expect(mockPrune).not.toHaveBeenCalled();
   });
 
   it("marks Failed rather than Ready when every bullet collapsed", async () => {
@@ -318,29 +368,16 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
       deptDebrief.handler({ event: event({ findings: "f" }), step, logger }),
     ).rejects.toThrow("model refused");
 
-    const persisted = mockPrisma.debrief.update.mock.calls.at(-1)?.[0];
-    expect(persisted.data).toMatchObject({
-      status: "Failed",
-      error: "model refused",
+    expect(mockPrisma.debrief.updateMany).toHaveBeenCalledWith({
+      // Only a run still Generating may be marked Failed: an error raised after
+      // the brief reached Ready must not undo it.
+      where: { id: "run-1", status: "Generating" },
+      data: { status: "Failed", error: "model refused" },
     });
   });
 });
 
 describe("generateDepartmentDebrief — progress and failure reporting", () => {
-  const event = (data: Record<string, unknown>) => ({
-    data: { debriefId: "run-1", departmentId: "d1", ...data },
-  });
-
-  function contextResolves() {
-    mockPrisma.department.findUnique.mockResolvedValue({
-      name: "Biomed",
-      description: null,
-    });
-    mockPrisma.debrief.findFirst.mockResolvedValue(null);
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
-    mockPrisma.debrief.update.mockResolvedValue({ id: "run-1" });
-  }
-
   it("beats before the scout, not only after it", async () => {
     // The staleness bound reads updatedAt. A touch that lands only after a
     // multi-minute scout measures age, not progress, and a second click
@@ -366,21 +403,12 @@ describe("generateDepartmentDebrief — progress and failure reporting", () => {
   });
 
   it("surfaces the real error when the row was deleted mid-run", async () => {
-    // A department deleted mid-run cascades to its debriefs, so the mark-failed
-    // update throws P2025. That must not replace the cause with "record not
-    // found".
+    // A department deleted mid-run cascades to its debriefs. Marking by id
+    // alone would throw P2025 and replace the cause with "record not found";
+    // updateMany matches no rows instead.
     contextResolves();
     mockWriter.mockRejectedValue(new Error("model refused"));
-    mockPrisma.debrief.update.mockImplementation(
-      async (args: { data: { status?: string } }) => {
-        if (args.data.status === "Failed") {
-          throw new Error(
-            "An operation failed because it depends on one or more records that were required but not found",
-          );
-        }
-        return { id: "run-1" };
-      },
-    );
+    mockPrisma.debrief.updateMany.mockResolvedValue({ count: 0 });
     const { step, logger } = makeStep();
 
     await expect(
@@ -390,23 +418,10 @@ describe("generateDepartmentDebrief — progress and failure reporting", () => {
 });
 
 describe("generateDepartmentDebrief — run outcome logging", () => {
-  const event = (data: Record<string, unknown>) => ({
-    data: { debriefId: "run-1", departmentId: "d1", ...data },
-  });
-
-  function contextResolves() {
-    mockPrisma.department.findUnique.mockResolvedValue({
-      name: "Biomed",
-      description: null,
-    });
-    mockPrisma.debrief.findFirst.mockResolvedValue(null);
-    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
-    mockPrisma.debrief.update.mockResolvedValue({ id: "run-1" });
-  }
-
   it("logs the terminal outcome with ids, status and count", async () => {
     contextResolves();
     mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
+    mockPrune.mockResolvedValue(2);
     const { step, logger } = makeStep();
 
     await deptDebrief.handler({
@@ -420,6 +435,8 @@ describe("generateDepartmentDebrief — run outcome logging", () => {
       departmentId: "d1",
       bulletCount: 1,
       status: "Ready",
+      findingsSource: "event",
+      pruned: 2,
     });
   });
 

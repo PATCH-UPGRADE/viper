@@ -45,9 +45,8 @@ function proseBlocks(prompt: string) {
 }
 
 describe("recommendations prompt stays in step with the tool allowlist", () => {
-  // This prompt already went stale once: `<grounding_rules>` listed four
-  // domains while the tool served six, and an agent that trusts the summary
-  // declines work the tool would have answered. Nothing failed when it drifted.
+  // An agent that trusts a stale summary declines work the tool would have
+  // answered, and nothing else fails when the two drift apart.
   it("names every allowlisted domain in <grounding_rules>", () => {
     const { grounding } = proseBlocks(buildSystemPrompt("CISO"));
 

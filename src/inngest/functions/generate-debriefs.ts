@@ -4,7 +4,9 @@ import { writeDepartmentDebrief } from "@/features/agents/debrief/writer";
 import {
   claimDebriefRun,
   type DebriefClaim,
+  newestReadyRun,
   parseBullets,
+  pruneSupersededDebriefs,
 } from "@/features/debrief/server/runs";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
@@ -120,8 +122,7 @@ export const generateDepartmentDebrief = inngest.createFunction(
             select: { name: true, description: true },
           }),
           prisma.debrief.findFirst({
-            where: { departmentId, status: "Ready" },
-            orderBy: { createdAt: "desc" },
+            ...newestReadyRun(departmentId),
             select: { bullets: true },
           }),
           prisma.workOrderTicket.findMany({
@@ -158,10 +159,13 @@ export const generateDepartmentDebrief = inngest.createFunction(
 
       await beat("context-loaded");
 
-      const surveyed =
-        findings ?? (await step.run("scout", () => runDebriefScout()));
-
-      await beat("survey-ready");
+      let surveyed = findings;
+      if (!surveyed) {
+        surveyed = await step.run("scout", () => runDebriefScout());
+        // The scout is the long step, so mark progress after it. On the fan-out
+        // path the findings arrive with the event and nothing has elapsed.
+        await beat("survey-ready");
+      }
 
       const written = await step.run("write", () =>
         writeDepartmentDebrief({ ...context, findings: surveyed }),
@@ -171,12 +175,11 @@ export const generateDepartmentDebrief = inngest.createFunction(
         // An empty result means every bullet collapsed during repair. There is
         // nothing to show, and Ready with no bullets renders an empty card.
         //
-        // One update either way: two branches drifted once already, leaving the
-        // previous run's bullets on a Failed row because only the Ready branch
-        // reset them.
+        // One update either way, so a Failed row cannot keep the bullets of an
+        // earlier Ready run.
         const ok = written.bullets.length > 0;
 
-        await prisma.debrief.update({
+        const persisted = await prisma.debrief.update({
           where: { id: debriefId },
           data: ok
             ? {
@@ -190,13 +193,39 @@ export const generateDepartmentDebrief = inngest.createFunction(
                 bullets: [],
                 error: "Writer produced no usable bullets",
               },
+          select: { createdAt: true },
         });
+
+        // Nothing reads a run once a newer Ready one exists. Pruning here
+        // rather than on a schedule keeps a department to one stored brief.
+        //
+        // Housekeeping only, so a failure must not fail this step. The brief is
+        // already written and Ready. If the step exhausted its retries, the
+        // catch below would mark that good brief Failed, and the card shows
+        // bullets only from a Ready row.
+        let pruned = 0;
+        if (ok) {
+          try {
+            pruned = await pruneSupersededDebriefs(
+              departmentId,
+              persisted.createdAt,
+            );
+          } catch (err) {
+            logger.warn("Debrief prune failed", {
+              debriefId,
+              departmentId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
 
         const outcome = {
           debriefId,
           departmentId,
           bulletCount: written.bullets.length,
           status: ok ? ("Ready" as const) : ("Failed" as const),
+          findingsSource: findings ? ("event" as const) : ("scout" as const),
+          pruned,
         };
 
         logger.info("Debrief run finished", outcome);
@@ -214,19 +243,17 @@ export const generateDepartmentDebrief = inngest.createFunction(
         error: message,
       });
 
-      await step.run("mark-failed", async () => {
-        try {
-          await prisma.debrief.update({
-            where: { id: debriefId },
-            data: { status: "Failed", error: message },
-            select: { id: true },
-          });
-        } catch {
-          // The row can be gone — a department deleted mid-run cascades to its
-          // debriefs, and Prisma then throws P2025. Swallow it so the original
-          // failure below is what surfaces, not a confusing "record not found".
-        }
-      });
+      // Only a run still Generating may be marked Failed. An error raised
+      // after the brief reached Ready must not undo it, and the row can be
+      // gone entirely — a department deleted mid-run cascades to its debriefs.
+      // updateMany matches nothing in both cases instead of throwing, so the
+      // original failure is what surfaces.
+      await step.run("mark-failed", () =>
+        prisma.debrief.updateMany({
+          where: { id: debriefId, status: "Generating" },
+          data: { status: "Failed", error: message },
+        }),
+      );
       throw err;
     }
   },

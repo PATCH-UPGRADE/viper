@@ -238,9 +238,7 @@ export const mitigationRouter = createTRPCRouter({
       return briefingSchema.parse(saved.content);
     }),
 
-  // Edits one audience's briefing text in place. Never regenerates — this is
-  // an independent kind of edit from editing a plan's work orders, and
-  // neither should trigger the other.
+  // Edits one audience's briefing text in place; never regenerates it.
   updateBriefing: protectedProcedure
     .input(
       z.object({
@@ -249,20 +247,27 @@ export const mitigationRouter = createTRPCRouter({
         content: z.string().trim().min(1),
       }),
     )
-    .mutation(async ({ input }) => {
-      const existing = requireExistence(
-        await prisma.planBriefing.findUnique({
+    .mutation(({ input }) =>
+      // Locked so two concurrent edits (e.g. different audiences) can't
+      // clobber each other's read-modify-write of the shared content blob.
+      prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.planId}))`;
+
+        const existing = requireExistence(
+          await tx.planBriefing.findUnique({
+            where: { mitigationPlanId: input.planId },
+          }),
+          "briefing",
+        );
+
+        const content = {
+          ...briefingSchema.parse(existing.content),
+          [input.audience]: input.content,
+        };
+        return tx.planBriefing.update({
           where: { mitigationPlanId: input.planId },
-        }),
-        "briefing",
-      );
-      const content = {
-        ...briefingSchema.parse(existing.content),
-        [input.audience]: input.content,
-      };
-      return prisma.planBriefing.update({
-        where: { mitigationPlanId: input.planId },
-        data: { content },
-      });
-    }),
+          data: { content },
+        });
+      }),
+    ),
 });

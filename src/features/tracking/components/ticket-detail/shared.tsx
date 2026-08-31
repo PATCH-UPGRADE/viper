@@ -1,6 +1,9 @@
 "use client";
 
 import { format } from "date-fns";
+import { SquareCheckBigIcon } from "lucide-react";
+import Link from "next/link";
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   SelectContent,
@@ -71,6 +74,45 @@ export const StatusChip = ({
   >
     {statusLabels[status]}
   </Badge>
+);
+
+// Row linking to another ticket; `action` is the optional hover-reveal
+// button sub-tickets.tsx uses that related-work-orders.tsx doesn't need.
+export const TicketRefRow = ({
+  id,
+  summary,
+  status,
+  assigneeName,
+  action,
+}: {
+  id: string;
+  summary: string;
+  status: TicketStatus;
+  assigneeName: string | null;
+  action?: ReactNode;
+}) => (
+  <li className="group relative flex items-center py-2.5">
+    <Link
+      href={`/tracking/${id}`}
+      className={cn(
+        "flex min-w-0 flex-1 items-center gap-3",
+        action &&
+          "transition-[padding] group-hover:pr-8 group-focus-within:pr-8",
+      )}
+    >
+      <SquareCheckBigIcon className="size-4 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 flex-1 truncate text-sm font-medium group-hover:underline">
+        {summary}
+      </span>
+      <div className="flex shrink-0 items-center gap-3">
+        <span className="text-xs text-muted-foreground">
+          {assigneeName ?? "Unassigned"}
+        </span>
+        <StatusChip status={status} />
+      </div>
+    </Link>
+    {action}
+  </li>
 );
 
 // Trigger + option list for a ticket-status Select. Callers still own the

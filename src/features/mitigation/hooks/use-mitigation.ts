@@ -24,6 +24,26 @@ export const useBriefing = (planId: string) => {
   });
 };
 
+export const useUpdateBriefing = (planId: string) => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.mitigation.updateBriefing.mutationOptions({
+      // Patch the one changed audience into the cache instead of refetching.
+      onSuccess: (_data, variables) => {
+        queryClient.setQueryData(
+          trpc.mitigation.getBriefing.queryKey({ planId }),
+          (prev) =>
+            prev && { ...prev, [variables.audience]: variables.content },
+        );
+      },
+      onError: (error) => {
+        toast.error(`Failed to save briefing: ${error.message}`);
+      },
+    }),
+  );
+};
+
 export const useAcceptMitigationPlan = (notificationId: string) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

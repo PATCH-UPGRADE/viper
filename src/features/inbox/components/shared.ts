@@ -3,9 +3,17 @@ import type { RawEmailPayload } from "../types";
 export function emailSenderName(raw: unknown): string | null {
   const from = (raw as RawEmailPayload | null)?.data?.from;
   if (!from) return null;
-  const displayName = from.split("<")[0]?.trim();
-  const bareAddress = from.replace(/[<>]/g, "").trim();
+  const quotedDisplayName = from.split("<")[0]?.trim() ?? "";
+  const displayName = quotedDisplayName.replace(/^"(.*)"$/, "$1").trim();
+  const bareAddress = from
+    .replace(/^[^<]*</, "")
+    .replace(/[<>]/g, "")
+    .trim();
   return displayName || bareAddress || null;
+}
+
+export function emailSubject(raw: unknown): string | null {
+  return (raw as RawEmailPayload | null)?.data?.subject ?? null;
 }
 
 export function nvdUrl(cveId: string): string {
@@ -17,6 +25,6 @@ export function attachmentDownloadPath(attachmentId: string): string {
 }
 
 export function fileExtensionLabel(filename: string | null): string {
-  const extension = filename?.includes(".") ? filename.split(".").pop() : null;
+  const extension = filename?.match(/\.([a-z0-9]{1,5})$/i)?.[1];
   return extension ? extension.toUpperCase() : "FILE";
 }

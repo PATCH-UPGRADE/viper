@@ -220,6 +220,22 @@ export const ticketDetailInclude = {
     },
   },
   notification: { select: { id: true, title: true, type: true } },
+  // Sibling drafts from the same mitigation plan, for the "Related work
+  // orders" section — the current ticket is filtered out at render time
+  // since a Prisma include can't reference its own parent's id.
+  mitigationPlan: {
+    select: {
+      workOrders: {
+        select: {
+          id: true,
+          summary: true,
+          status: true,
+          assignee: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "asc" as const },
+      },
+    },
+  },
 } satisfies Prisma.WorkOrderTicketInclude;
 
 // What clients receive from the detail endpoints: the per-user `watchers`
@@ -366,13 +382,20 @@ const ticketParentRefSchema = z
   .object({ id: z.string(), summary: z.string() })
   .nullable();
 
-const ticketChildRefSchema = z.object({
+const siblingWorkOrderSchema = z.object({
   id: z.string(),
   summary: z.string(),
   status: z.enum(TicketStatus),
   assignee: z.object({ id: z.string(), name: z.string() }).nullable(),
+});
+
+const ticketChildRefSchema = siblingWorkOrderSchema.extend({
   departments: z.array(departmentItemSchema),
   _count: z.object({ comments: z.number() }),
+});
+
+const ticketMitigationPlanSchema = z.object({
+  workOrders: z.array(siblingWorkOrderSchema),
 });
 
 const detailAssigneeSchema = assigneeItemSchema.extend({
@@ -534,4 +557,5 @@ export const workOrderDetailResponseSchema = z.object({
   sources: z.array(ticketSourceSchema),
   externalMappings: z.array(ticketExternalMappingSchema),
   notification: ticketNotificationRefSchema.nullable(),
+  mitigationPlan: ticketMitigationPlanSchema.nullable(),
 });

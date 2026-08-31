@@ -2,6 +2,7 @@
 
 import {
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query";
@@ -13,6 +14,14 @@ export const useSuspenseMitigationPlans = (notificationId: string) => {
   return useSuspenseQuery(
     trpc.mitigation.getForNotification.queryOptions({ notificationId }),
   );
+};
+
+export const useBriefing = (planId: string) => {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.mitigation.getBriefing.queryOptions({ planId }),
+    retry: false, // each attempt is a real, paid LLM call
+  });
 };
 
 export const useAcceptMitigationPlan = (notificationId: string) => {

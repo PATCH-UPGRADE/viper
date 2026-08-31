@@ -138,6 +138,7 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   sources: [],
   externalMappings: [],
   notification: null,
+  mitigationPlan: null,
   ...overrides,
 });
 

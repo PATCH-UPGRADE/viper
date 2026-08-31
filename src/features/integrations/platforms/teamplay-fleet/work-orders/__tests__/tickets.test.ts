@@ -18,28 +18,29 @@ import {
 } from "../tickets";
 
 const CONTACT = {
-  email: "mark.glose@bugcrowd.com",
-  firstName: "Mark",
-  lastName: "Glose",
-  phone: "4055555555",
+  email: "test.user@example.org",
+  firstName: "Test",
+  lastName: "User",
+  // 555-01xx is the reserved fictional range.
+  phone: "5555550100",
 };
 
 // The Fleet address record Siemens dispatches to.
 const SITE_ADDRESS: FleetSiteAddress = {
   type: "existing",
-  addressId: 16318179,
-  locationName: "ADVANCED MOBILITY BY KENTUCKY",
-  street: "611 COMMERCE CENTER DRIVE",
-  city: "UNIVERSITY PARK",
+  addressId: 10000001,
+  locationName: "EXAMPLE REGIONAL HOSPITAL",
+  street: "1 EXAMPLE WAY",
+  city: "SPRINGFIELD",
   state: "IL",
-  zip: "60484",
+  zip: "60000",
   tzCode: "",
   tzOffset: "",
 };
 
 const CONFIG: FleetWorkOrderConfig = {
   createUrl: "http://localhost:4010/workorders",
-  contactPhone: "4055555555",
+  contactPhone: "5555550100",
   siteAddress: SITE_ADDRESS,
 };
 
@@ -66,10 +67,10 @@ describe("toFleetCreatePayload", () => {
       "Firmware update: MR-MAGNETOM-001",
     );
     expect(payload.contact).toEqual({
-      contactEmail: "mark.glose@bugcrowd.com",
-      contactFirstName: "Mark",
-      contactLastName: "Glose",
-      contactPhone: "4055555555",
+      contactEmail: "test.user@example.org",
+      contactFirstName: "Test",
+      contactLastName: "User",
+      contactPhone: "5555550100",
       contactSalutation: null,
       contactTitle: null,
     });
@@ -163,6 +164,35 @@ describe("formatCltDateTime", () => {
 
   it("returns null for an unparseable value rather than a wrong date", () => {
     expect(formatCltDateTime("next tuesday")).toBeNull();
+  });
+
+  it("rejects a day the month does not have", () => {
+    // Otherwise Siemens is sent "31-Feb-2026" as a real service window.
+    expect(formatCltDateTime("2026-02-31T09:00:00-05:00")).toBeNull();
+    expect(formatCltDateTime("2026-04-31T09:00:00-05:00")).toBeNull();
+    expect(formatCltDateTime("2026-01-00T09:00:00-05:00")).toBeNull();
+  });
+
+  it("rejects an impossible time", () => {
+    expect(formatCltDateTime("2026-02-31T29:75:00-05:00")).toBeNull();
+    expect(formatCltDateTime("2026-07-13T24:00:00-05:00")).toBeNull();
+    expect(formatCltDateTime("2026-07-13T09:60:00-05:00")).toBeNull();
+  });
+
+  it("keeps the leap day in a leap year and drops it otherwise", () => {
+    expect(formatCltDateTime("2028-02-29T09:00:00-05:00")).toBe(
+      "29-Feb-2028, 09:00",
+    );
+    expect(formatCltDateTime("2026-02-29T09:00:00-05:00")).toBeNull();
+  });
+
+  it("accepts the boundaries", () => {
+    expect(formatCltDateTime("2026-12-31T23:59:00-05:00")).toBe(
+      "31-Dec-2026, 23:59",
+    );
+    expect(formatCltDateTime("2026-01-01T00:00:00-05:00")).toBe(
+      "01-Jan-2026, 00:00",
+    );
   });
 });
 

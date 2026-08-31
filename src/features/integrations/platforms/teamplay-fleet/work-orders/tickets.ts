@@ -12,6 +12,7 @@
  * ticket rather than duplicating it.
  */
 
+import "server-only";
 import { z } from "zod";
 import type { TicketCategory } from "@/generated/prisma";
 import { MONTHS_SHORT } from "@/lib/date-utils";
@@ -105,8 +106,25 @@ export function formatCltDateTime(iso: string): string | null {
   const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   if (!match) return null;
   const [, year, month, day, hour, minute] = match;
+
   const monthName = MONTHS_SHORT[Number(month) - 1];
   if (!monthName) return null;
+  if (Number(hour) > 23 || Number(minute) > 59) return null;
+
+  // The pattern matches any four digits, so reject a day the month does not
+  // have. Otherwise "2026-02-31" reaches Siemens as a real service window.
+  // Building the date rolls an overflowing day into the next month, which the
+  // comparison below catches. Leap years come out of that for free.
+  const asDate = new Date(
+    Date.UTC(Number(year), Number(month) - 1, Number(day)),
+  );
+  if (
+    asDate.getUTCMonth() !== Number(month) - 1 ||
+    asDate.getUTCDate() !== Number(day)
+  ) {
+    return null;
+  }
+
   return `${day}-${monthName}-${year}, ${hour}:${minute}`;
 }
 

@@ -1108,19 +1108,23 @@ export const trackingRouter = createTRPCRouter({
         throw error;
       }
 
-      const integration = await workOrderIntegration();
-
-      // Signing in to Fleet drives a headless browser, so the session is opened
-      // once and every asset is filed through it. A sign-in failure files
-      // nothing, so release the claim exactly as a total failure below does.
+      // Both of these run after the claim row exists, so either failing must
+      // release it. A surviving claim is worse than a leak: the next attempt
+      // takes the already-accepted fast path and reports success for an order
+      // that was never filed.
+      //
+      // Signing in drives a headless browser, so the session is opened once and
+      // every asset is filed through it.
+      let integration: Awaited<ReturnType<typeof workOrderIntegration>>;
       let filer: Awaited<ReturnType<typeof openFleetWorkOrderFiler>>;
       try {
+        integration = await workOrderIntegration();
         filer = await openFleetWorkOrderFiler(integration);
       } catch (error) {
         await prisma.workOrderTicket.delete({ where: { id: root.id } });
         throw new TRPCError({
           code: "BAD_GATEWAY",
-          message: `Could not reach Siemens Healthineers Fleet: ${error instanceof Error ? error.message : "Unknown error"}`,
+          message: `Could not file the work order on Siemens Healthineers Fleet: ${error instanceof Error ? error.message : "Unknown error"}`,
         });
       }
 

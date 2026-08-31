@@ -9,7 +9,8 @@ import { safeUrlSchema } from "@/lib/schemas";
  * (`type: "existing"` + `addressId`), which VIPER has no way to derive.
  */
 export const fleetSiteAddressSchema = z.object({
-  type: z.string().default("existing"),
+  // Fleet only accepts a reference to one of its own address records.
+  type: z.literal("existing").default("existing"),
   addressId: z.number(),
   locationName: z.string(),
   street: z.string(),

@@ -1846,4 +1846,44 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     });
     expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledTimes(1);
   });
+
+  it("drops the claim when no Fleet integration is configured to file against", async () => {
+    const caller = setup();
+    mockFleet.workOrderIntegration.mockRejectedValue(
+      new Error("No Siemens Healthineers Fleet integration is configured"),
+    );
+
+    await expect(caller.createFleetWorkOrder(proposal)).rejects.toThrow(
+      /No Siemens Healthineers Fleet integration is configured/,
+    );
+
+    // The claim must not survive. If it does, the retry below takes the
+    // already-accepted fast path and reports success for an order that was
+    // never filed.
+    expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({
+      where: { id: "t-new" },
+    });
+    expect(mockFleet.file).not.toHaveBeenCalled();
+  });
+
+  it("files on a retry once the integration is configured", async () => {
+    const caller = setup();
+    mockFleet.workOrderIntegration.mockRejectedValueOnce(
+      new Error("No Siemens Healthineers Fleet integration is configured"),
+    );
+
+    await expect(caller.createFleetWorkOrder(proposal)).rejects.toThrow(
+      /No Siemens Healthineers Fleet integration is configured/,
+    );
+
+    // The claim was released, so the proposal is still unaccepted and the same
+    // toolCallId can be filed for real.
+    const result = await caller.createFleetWorkOrder(proposal);
+
+    expect(result).toMatchObject({
+      externalIds: ["US_400501937577"],
+      alreadyAccepted: false,
+    });
+    expect(mockFleet.file).toHaveBeenCalledTimes(1);
+  });
 });

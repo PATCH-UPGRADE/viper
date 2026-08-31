@@ -20,15 +20,27 @@ export async function GET(
     return new Response("Attachment not found", { status: 404 });
   }
 
-  const buffer = await downloadBufferFromS3(
-    keyFromDownloadUrl(attachment.downloadUrl),
-  );
+  let buffer: Buffer;
+  try {
+    buffer = await downloadBufferFromS3(
+      keyFromDownloadUrl(attachment.downloadUrl),
+    );
+  } catch (err) {
+    console.warn(`Attachment ${attachmentId} has no readable file:`, err);
+    return new Response("Attachment not found", { status: 404 });
+  }
   const safeFilename =
     (attachment.filename ?? "attachment").replace(/[^\w. -]/g, "") ||
     "attachment";
+  const responseContentType =
+    attachment.contentType &&
+    /^[\w.+-]+\/[\w.+-]+$/.test(attachment.contentType)
+      ? attachment.contentType
+      : "application/octet-stream";
   return new Response(new Uint8Array(buffer), {
     headers: {
-      "Content-Type": attachment.contentType ?? "application/octet-stream",
+      "Content-Type": responseContentType,
+      "X-Content-Type-Options": "nosniff",
       "Content-Disposition": `attachment; filename="${safeFilename}"`,
     },
   });

@@ -3,24 +3,47 @@ import prisma from "@/lib/db";
 import { resolveVendor } from "@/lib/router-utils";
 import { SIEMENS_HEALTHINEERS } from "../config";
 
-export const FLEET_RESPONSIBILITIES =
+export const FLEET_UNCONTRACTED_RESPONSIBILITIES =
   "Serviced by Siemens Healthineers — synced from the teamplay Fleet equipment inventory.";
 
-export async function connectManagedAssets(
+export async function connectUncontractedAssets(
   integrationId: string,
+  contractedAssetIds: ReadonlySet<string> = new Set(),
 ): Promise<void> {
   const vendor = await resolveVendor(SIEMENS_HEALTHINEERS);
 
-  const existingRelationship = await prisma.managesRelationship.findFirst({
-    where: { vendorId: vendor.id, workOrderIntegrationId: integrationId },
-    include: { assets: { select: { id: true } } },
-  });
+  const contractBackedRelationships = await prisma.managesRelationship.findMany(
+    {
+      where: {
+        vendorId: vendor.id,
+        workOrderIntegrationId: integrationId,
+        contract: { isNot: null },
+      },
+      select: { assets: { select: { id: true } } },
+    },
+  );
+  const assetIdsUnderContract = new Set(contractedAssetIds);
+  for (const relationship of contractBackedRelationships) {
+    for (const asset of relationship.assets) {
+      assetIdsUnderContract.add(asset.id);
+    }
+  }
 
-  const relationship =
-    existingRelationship ??
+  const existingUncontractedRelationship =
+    await prisma.managesRelationship.findFirst({
+      where: {
+        vendorId: vendor.id,
+        workOrderIntegrationId: integrationId,
+        contract: { is: null },
+      },
+      include: { assets: { select: { id: true } } },
+    });
+
+  const uncontractedRelationship =
+    existingUncontractedRelationship ??
     (await prisma.managesRelationship.create({
       data: {
-        responsibilities: FLEET_RESPONSIBILITIES,
+        responsibilities: FLEET_UNCONTRACTED_RESPONSIBILITIES,
         vendorId: vendor.id,
         workOrderIntegrationId: integrationId,
       },
@@ -28,7 +51,7 @@ export async function connectManagedAssets(
     }));
 
   const alreadyConnectedAssetIds = new Set(
-    relationship.assets.map((a) => a.id),
+    uncontractedRelationship.assets.map((a) => a.id),
   );
   const assetsSyncedFromFleet = await prisma.externalAssetMapping.findMany({
     where: { integrationId },
@@ -37,12 +60,24 @@ export async function connectManagedAssets(
   const syncedAssetIds = assetsSyncedFromFleet.map((mapping) => mapping.itemId);
 
   const assetIdsToConnect = syncedAssetIds.filter(
-    (assetId) => !alreadyConnectedAssetIds.has(assetId),
+    (assetId) =>
+      !alreadyConnectedAssetIds.has(assetId) &&
+      !assetIdsUnderContract.has(assetId),
   );
-  if (assetIdsToConnect.length === 0) return;
+  const assetIdsToDisconnect = [...alreadyConnectedAssetIds].filter((assetId) =>
+    assetIdsUnderContract.has(assetId),
+  );
+  if (assetIdsToConnect.length === 0 && assetIdsToDisconnect.length === 0) {
+    return;
+  }
 
   await prisma.managesRelationship.update({
-    where: { id: relationship.id },
-    data: { assets: { connect: assetIdsToConnect.map((id) => ({ id })) } },
+    where: { id: uncontractedRelationship.id },
+    data: {
+      assets: {
+        connect: assetIdsToConnect.map((id) => ({ id })),
+        disconnect: assetIdsToDisconnect.map((id) => ({ id })),
+      },
+    },
   });
 }

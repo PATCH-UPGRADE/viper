@@ -5,7 +5,7 @@ vi.mock("server-only", () => ({}));
 const db = vi.hoisted(() => {
   const client = {
     externalAssetMapping: { findFirst: vi.fn() },
-    contract: { findUnique: vi.fn(), upsert: vi.fn() },
+    contract: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     managesRelationship: {
       create: vi.fn(),
       update: vi.fn(),
@@ -181,8 +181,9 @@ describe("syncFleetContracts", () => {
       ReturnType<typeof resolveVendor>
     >);
     db.externalAssetMapping.findFirst.mockResolvedValue({ itemId: "asset-1" });
-    db.contract.findUnique.mockResolvedValue(null);
-    db.contract.upsert.mockResolvedValue({ id: "contract-1" });
+    db.contract.findFirst.mockResolvedValue(null);
+    db.contract.create.mockResolvedValue({ id: "US_0035244333002160" });
+    db.contract.update.mockResolvedValue({ id: "US_0035244333002160" });
     db.managesRelationship.create.mockResolvedValue({ id: "rel-1" });
     db.managesRelationship.findFirst.mockResolvedValue(null);
     db.managesRelationship.update.mockResolvedValue({ id: "rel-1" });
@@ -198,18 +199,21 @@ describe("syncFleetContracts", () => {
         workOrderIntegrationId: "int-1",
       },
     });
-    const upsert = db.contract.upsert.mock.calls[0][0];
-    expect(upsert.where).toEqual({ id: "US_0035244333002160" });
-    expect(upsert.create).toMatchObject({
+    expect(db.contract.findFirst).toHaveBeenCalledWith({
+      where: { id: "US_0035244333002160", vendorId: "vendor-1" },
+      select: { managesRelationshipId: true },
+    });
+    const created = db.contract.create.mock.calls[0][0].data;
+    expect(created).toMatchObject({
       id: "US_0035244333002160",
       vendorId: "vendor-1",
       title: "Sales Courtesy Contract - KIN",
       managesRelationshipId: "rel-1",
     });
-    expect(upsert.create.effectiveFrom?.toISOString()).toBe(
+    expect(created.effectiveFrom?.toISOString()).toBe(
       "2026-04-01T00:00:00.000Z",
     );
-    expect(upsert.create.termsJson).toMatchObject({
+    expect(created.termsJson).toMatchObject({
       contract: {
         contractId: "US_0035244333002160",
         contractNumberConsolidated: "35244333002160",
@@ -235,7 +239,7 @@ describe("syncFleetContracts", () => {
 
     const outcome = await syncFleetContracts(bothEndpoints, "int-1");
 
-    expect(db.contract.upsert).not.toHaveBeenCalled();
+    expect(db.contract.create).not.toHaveBeenCalled();
     expect(outcome).toEqual({
       contractedAssetIds: new Set(),
       errorMessage: null,
@@ -243,14 +247,14 @@ describe("syncFleetContracts", () => {
   });
 
   it("reuses the relationship an existing contract already points at", async () => {
-    db.contract.findUnique.mockResolvedValue({
+    db.contract.findFirst.mockResolvedValue({
       managesRelationshipId: "rel-9",
     });
 
     await syncFleetContracts(bothEndpoints, "int-1");
 
     expect(db.managesRelationship.create).not.toHaveBeenCalled();
-    expect(db.contract.upsert.mock.calls[0][0].update).toMatchObject({
+    expect(db.contract.update.mock.calls[0][0].data).toMatchObject({
       managesRelationshipId: "rel-9",
     });
   });
@@ -276,7 +280,7 @@ describe("syncFleetContracts", () => {
     expect(outcome.errorMessage).toBe("Fleet /contracts returned 500");
   });
   it("leaves no relationship behind when the contract write fails", async () => {
-    db.contract.upsert.mockRejectedValue(new Error("column does not exist"));
+    db.contract.create.mockRejectedValue(new Error("column does not exist"));
     db.$transaction.mockImplementationOnce(async (cb) => {
       await cb(db);
     });

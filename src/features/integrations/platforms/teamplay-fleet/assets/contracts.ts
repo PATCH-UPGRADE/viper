@@ -153,8 +153,8 @@ export async function syncFleetContracts(
       const responsibilities = buildResponsibilities(row, terms);
 
       await prisma.$transaction(async (tx) => {
-        const existingContract = await tx.contract.findUnique({
-          where: { id: row.contractId },
+        const existingContract = await tx.contract.findFirst({
+          where: { id: row.contractId, vendorId },
           select: { managesRelationshipId: true },
         });
         const relationshipId =
@@ -176,11 +176,16 @@ export async function syncFleetContracts(
           termsJson: buildTermsJson(row, terms),
           managesRelationshipId: relationshipId,
         };
-        await tx.contract.upsert({
-          where: { id: row.contractId },
-          create: { id: row.contractId, vendorId, ...contractFields },
-          update: contractFields,
-        });
+        if (existingContract) {
+          await tx.contract.update({
+            where: { id: row.contractId },
+            data: contractFields,
+          });
+        } else {
+          await tx.contract.create({
+            data: { id: row.contractId, vendorId, ...contractFields },
+          });
+        }
 
         const assetAlreadyConnected = await tx.managesRelationship.findFirst({
           where: {

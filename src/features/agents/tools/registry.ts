@@ -11,12 +11,12 @@ import {
   FLEET_OPERATIONAL_STATUSES,
   FLEET_PATIENT_DANGERS,
   FLEET_SUPPORT_TYPES,
-} from "@/features/integrations/teamplay-fleet/constants";
+} from "@/features/integrations/platforms/teamplay-fleet/work-orders/constants";
 import {
   listFleetManagedAssets,
   resolveFleetAssets,
   UnmanagedAssetsError,
-} from "@/features/integrations/teamplay-fleet/tracking";
+} from "@/features/integrations/platforms/teamplay-fleet/work-orders/managed-assets";
 import { TicketCategory } from "@/generated/prisma";
 import { TOOL_REJECTED_PREFIX } from "../shared/build-graph";
 import { makeRecordNoteTool } from "./note-tool";

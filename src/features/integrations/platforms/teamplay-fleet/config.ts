@@ -1,10 +1,13 @@
 import { z } from "zod";
 import { FLEET_HOST } from "./urls";
+import { workOrderConfigSchema } from "./work-orders/config";
 
 export const SIEMENS_HEALTHINEERS = "Siemens Healthineers";
 export const BASE_URL = `https://${FLEET_HOST}`;
 
-export const configSchema = z.object({});
+// Each resource contributes its own settings. Assets need none: their endpoint
+// is a constant and their mapping is derived.
+export const configSchema = z.object({}).extend(workOrderConfigSchema.shape);
 export type FleetConfig = z.infer<typeof configSchema>;
 
 export const credentialSchema = z.object({

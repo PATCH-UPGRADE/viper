@@ -5,18 +5,17 @@ import { z } from "zod";
 import {
   FLEET_OPERATIONAL_STATUSES,
   FLEET_PATIENT_DANGERS,
-  FLEET_SUPPORT_TYPES,
-} from "@/features/integrations/teamplay-fleet/constants";
-import {
-  createFleetWorkOrder,
   FLEET_SOURCE_LABEL,
-  type FleetContact,
+  FLEET_SUPPORT_TYPES,
+} from "@/features/integrations/platforms/teamplay-fleet/work-orders/constants";
+import {
   type FleetManagedAsset,
-  type FleetWorkOrderResult,
-  getFleetWorkOrderIntegration,
   resolveFleetAssets,
   UnmanagedAssetsError,
-} from "@/features/integrations/teamplay-fleet/tracking";
+  workOrderIntegration,
+} from "@/features/integrations/platforms/teamplay-fleet/work-orders/managed-assets";
+import { openFleetWorkOrderFiler } from "@/features/integrations/platforms/teamplay-fleet/work-orders/submit";
+import type { FleetContact } from "@/features/integrations/platforms/teamplay-fleet/work-orders/tickets";
 import {
   Priority,
   type Prisma,
@@ -65,19 +64,19 @@ import { cascadeDoneStatus, createAssetTicket } from "./asset-tickets";
 
 /**
  * Siemens calls whoever approved the work order, so the contact is the accepting
- * user. Their phone isn't in the user record; FLEET_CONTACT_PHONE is the
- * hospital's callback number for VIPER-raised orders.
+ * user. The user record holds no phone number, so the integration's configured
+ * `contactPhone` is the hospital's callback number for VIPER-raised orders.
  */
-function fleetContactFor(user: {
-  name?: string | null;
-  email?: string | null;
-}): FleetContact {
+function fleetContactFor(
+  user: { name?: string | null; email?: string | null },
+  contactPhone: string | undefined,
+): FleetContact {
   const [firstName, ...rest] = (user.name ?? "").trim().split(/\s+/);
   return {
     email: user.email ?? "",
     firstName: firstName || "VIPER",
     lastName: rest.join(" ") || "User",
-    phone: process.env.FLEET_CONTACT_PHONE ?? "",
+    phone: contactPhone ?? "",
   };
 }
 
@@ -1109,21 +1108,37 @@ export const trackingRouter = createTRPCRouter({
         throw error;
       }
 
-      const integration = await getFleetWorkOrderIntegration();
-      const contact = fleetContactFor(ctx.auth.user);
+      const integration = await workOrderIntegration();
+
+      // Signing in to Fleet drives a headless browser, so the session is opened
+      // once and every asset is filed through it. A sign-in failure files
+      // nothing, so release the claim exactly as a total failure below does.
+      let filer: Awaited<ReturnType<typeof openFleetWorkOrderFiler>>;
+      try {
+        filer = await openFleetWorkOrderFiler(integration);
+      } catch (error) {
+        await prisma.workOrderTicket.delete({ where: { id: root.id } });
+        throw new TRPCError({
+          code: "BAD_GATEWAY",
+          message: `Could not reach Siemens Healthineers Fleet: ${error instanceof Error ? error.message : "Unknown error"}`,
+        });
+      }
+
+      const contact = fleetContactFor(ctx.auth.user, filer.config.contactPhone);
 
       // Now that we hold the claim, file on Fleet. Failures are collected per
       // asset rather than aborting: an order Fleet did accept must still be
       // tracked here.
       const filed: {
         asset: FleetManagedAsset;
-        result: FleetWorkOrderResult;
+        externalId: string;
       }[] = [];
       const failures: Failure[] = [];
 
       for (const asset of assets) {
         try {
-          const result = await createFleetWorkOrder(asset, {
+          const result = await filer.file({
+            equipmentKey: asset.equipmentKey,
             summary: input.summary,
             description: input.description,
             category: input.category,
@@ -1137,7 +1152,7 @@ export const trackingRouter = createTRPCRouter({
             // to the proposal it came from.
             ownIncidentNumber: input.toolCallId,
           });
-          filed.push({ asset, result });
+          filed.push({ asset, externalId: result.externalId });
         } catch (error) {
           failures.push({
             asset: asset.hostname ?? asset.ip ?? asset.assetId,
@@ -1158,14 +1173,14 @@ export const trackingRouter = createTRPCRouter({
       const childIds: string[] = [];
       await prisma.$transaction(
         async (tx) => {
-          for (const { asset, result } of filed) {
+          for (const { asset, externalId } of filed) {
             const childTicketId = await createAssetTicket(tx, {
               parentTicketId: root.id,
               assetId: asset.assetId,
               actorId: userId,
               externalMapping: {
                 integrationId: integration.id,
-                externalId: result.externalId,
+                externalId,
                 lastSynced: new Date(),
               },
             });
@@ -1185,7 +1200,7 @@ export const trackingRouter = createTRPCRouter({
 
       return {
         ticketId: root.id,
-        externalIds: filed.map(({ result }) => result.externalId),
+        externalIds: filed.map((f) => f.externalId),
         alreadyAccepted: false,
         failures,
       };

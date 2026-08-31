@@ -70,28 +70,39 @@ vi.mock("@/lib/auth-utils", () => ({
   verifyApiKey: vi.fn(),
 }));
 
-// The Fleet client is exercised directly in teamplay-fleet/tracking.test.ts;
-// here we stub its network + lookup surface and keep the real
-// UnmanagedAssetsError so the router's rejection path is the one that runs.
+// The Fleet work order module is exercised directly in its own __tests__; here
+// we stub its network + lookup surface and keep the real UnmanagedAssetsError so
+// the router's rejection path is the one that runs.
 const { mockFleet } = vi.hoisted(() => ({
   mockFleet: {
     resolveFleetAssets: vi.fn(),
-    createFleetWorkOrder: vi.fn(),
-    getFleetWorkOrderIntegration: vi.fn(),
+    workOrderIntegration: vi.fn(),
+    file: vi.fn(),
   },
 }));
 
 vi.mock(
-  "@/features/integrations/teamplay-fleet/tracking",
+  "@/features/integrations/platforms/teamplay-fleet/work-orders/managed-assets",
   async (importOriginal) => ({
     ...(await importOriginal<
-      typeof import("@/features/integrations/teamplay-fleet/tracking")
+      typeof import("@/features/integrations/platforms/teamplay-fleet/work-orders/managed-assets")
     >()),
-    ...mockFleet,
+    resolveFleetAssets: mockFleet.resolveFleetAssets,
+    workOrderIntegration: mockFleet.workOrderIntegration,
   }),
 );
 
-import { UnmanagedAssetsError } from "@/features/integrations/teamplay-fleet/tracking";
+vi.mock(
+  "@/features/integrations/platforms/teamplay-fleet/work-orders/submit",
+  () => ({
+    openFleetWorkOrderFiler: async () => ({
+      config: { contactPhone: "4055555555" },
+      file: mockFleet.file,
+    }),
+  }),
+);
+
+import { UnmanagedAssetsError } from "@/features/integrations/platforms/teamplay-fleet/work-orders/managed-assets";
 import { createCallerFactory } from "@/trpc/init";
 import { trackingRouter } from "./routers";
 
@@ -135,7 +146,7 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   comments: [],
   watchers: [],
   activities: [],
-  sources: [],
+  sourceLinks: [],
   externalMappings: [],
   notification: null,
   ...overrides,
@@ -1686,11 +1697,9 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     mockPrisma.workOrderTicket.create.mockImplementation(async () => ({
       id: createCallCount++ === 0 ? "t-new" : "child-new",
     }));
-    mockFleet.getFleetWorkOrderIntegration.mockResolvedValue(INTEGRATION);
+    mockFleet.workOrderIntegration.mockResolvedValue(INTEGRATION);
     mockFleet.resolveFleetAssets.mockResolvedValue([MRI]);
-    mockFleet.createFleetWorkOrder.mockResolvedValue({
-      equipmentKey: MRI.equipmentKey,
-      assetId: MRI.assetId,
+    mockFleet.file.mockResolvedValue({
       externalId: "US_400501937577",
       raw: {},
     });
@@ -1701,7 +1710,7 @@ describe("trackingRouter.createFleetWorkOrder", () => {
 
     const result = await caller.createFleetWorkOrder(proposal);
 
-    expect(mockFleet.createFleetWorkOrder).toHaveBeenCalledTimes(1);
+    expect(mockFleet.file).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
       ticketId: "t-new",
       externalIds: ["US_400501937577"],
@@ -1754,7 +1763,7 @@ describe("trackingRouter.createFleetWorkOrder", () => {
       alreadyAccepted: true,
     });
     // The race loser must not file its own Fleet order.
-    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
+    expect(mockFleet.file).not.toHaveBeenCalled();
   });
 
   it("refuses to file a patient-safety issue online (Fleet requires a phone call)", async () => {
@@ -1764,7 +1773,7 @@ describe("trackingRouter.createFleetWorkOrder", () => {
       caller.createFleetWorkOrder({ ...proposal, dangerForPatient: "yes" }),
     ).rejects.toThrow(/phone/i);
 
-    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
+    expect(mockFleet.file).not.toHaveBeenCalled();
     expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
   });
 
@@ -1778,7 +1787,7 @@ describe("trackingRouter.createFleetWorkOrder", () => {
       caller.createFleetWorkOrder({ ...proposal, assetIds: ["rad-pump-001"] }),
     ).rejects.toThrow(/PUMP-SIGMA-001/);
 
-    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
+    expect(mockFleet.file).not.toHaveBeenCalled();
     expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
   });
 
@@ -1797,7 +1806,7 @@ describe("trackingRouter.createFleetWorkOrder", () => {
       externalIds: ["US_400501937577"],
       alreadyAccepted: true,
     });
-    expect(mockFleet.createFleetWorkOrder).not.toHaveBeenCalled();
+    expect(mockFleet.file).not.toHaveBeenCalled();
     expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
   });
 
@@ -1805,10 +1814,8 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     const caller = setup();
     const CT = { ...MRI, assetId: "rad-ct-002", hostname: "CT-SOMATOM-001" };
     mockFleet.resolveFleetAssets.mockResolvedValue([MRI, CT]);
-    mockFleet.createFleetWorkOrder
+    mockFleet.file
       .mockResolvedValueOnce({
-        equipmentKey: MRI.equipmentKey,
-        assetId: MRI.assetId,
         externalId: "US_400501937577",
         raw: {},
       })
@@ -1829,9 +1836,7 @@ describe("trackingRouter.createFleetWorkOrder", () => {
 
   it("fails loudly and drops the claim when Fleet accepts nothing", async () => {
     const caller = setup();
-    mockFleet.createFleetWorkOrder.mockRejectedValue(
-      new Error("401 Forbidden"),
-    );
+    mockFleet.file.mockRejectedValue(new Error("401 Forbidden"));
 
     await expect(caller.createFleetWorkOrder(proposal)).rejects.toThrow(
       /401 Forbidden/,

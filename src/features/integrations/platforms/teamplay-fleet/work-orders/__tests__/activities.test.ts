@@ -1,5 +1,7 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
 
 import { TicketCategory, TicketStatus } from "@/generated/prisma";
 import { type FleetActivity, toCanonical } from "../activities";
@@ -102,5 +104,35 @@ describe("toCanonical", () => {
     expect(body).toContain("400501937577");
     expect(body).toContain("US_1064669350");
     expect(body).toContain("UI-MR049/24/P NX VA60A-SP02");
+  });
+});
+
+describe("mapCategory precedence", () => {
+  const activity = (type: string | null, shortText: string): FleetActivity => ({
+    ...UPDATE_SERVICE,
+    type,
+    shortText,
+  });
+
+  it("trusts Fleet's type code over the wording", () => {
+    // Type 2 is maintenance, whatever the short text happens to say.
+    expect(toCanonical(activity("2", "Update maintenance")).category).toBe(
+      TicketCategory.MAINTENANCE,
+    );
+    expect(toCanonical(activity("3", "Scheduled maintenance")).category).toBe(
+      TicketCategory.FIRMWARE_UPDATE,
+    );
+  });
+
+  it("falls back to the wording only when the code is unknown", () => {
+    expect(toCanonical(activity("9", "Update service")).category).toBe(
+      TicketCategory.FIRMWARE_UPDATE,
+    );
+    expect(toCanonical(activity(null, "Annual maintenance")).category).toBe(
+      TicketCategory.MAINTENANCE,
+    );
+    expect(toCanonical(activity(null, "Site visit")).category).toBe(
+      TicketCategory.OTHER,
+    );
   });
 });

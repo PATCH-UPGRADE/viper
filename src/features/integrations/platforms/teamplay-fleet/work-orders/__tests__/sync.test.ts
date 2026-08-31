@@ -55,7 +55,11 @@ describe("reconcileProvisionalMappings", () => {
   });
 
   it("leaves a provisional mapping alone when no activity claims it", async () => {
-    mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([]);
+    // A provisional row is returned, but it belongs to a reference no activity
+    // in this poll carries, so the loop must reach its guard and skip it.
+    mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
+      { id: "m1", externalId: "pending:call_abc:US_1064669350" },
+    ]);
 
     await reconcileProvisionalMappings(
       [item("US_400501937577", "call_other")],

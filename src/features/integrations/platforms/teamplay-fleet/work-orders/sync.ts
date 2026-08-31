@@ -248,10 +248,18 @@ export async function syncWorkOrders(
 ): Promise<SyncOutcome> {
   const session = await createFleetSession(ctx.creds);
 
-  const items: FleetWorkOrderItem[] = [];
+  // Keyed by vendorId so one activity appearing twice in a response is carried
+  // once. A repeat would otherwise write two identical snapshots, only one of
+  // which gets a SourceLink, because the hash comparison reads the newest
+  // stored record and cannot see a sibling created in the same pass.
+  const byVendorId = new Map<string, FleetWorkOrderItem>();
   for await (const page of listChanged(session, ctx.cursor)) {
-    items.push(...page.items.map(toCanonical));
+    for (const raw of page.items) {
+      const item = toCanonical(raw);
+      byVendorId.set(item.vendorId, item);
+    }
   }
+  const items = [...byVendorId.values()];
 
   await reconcileProvisionalMappings(items, ctx.integrationId);
   const response = await ingestFleetWorkOrders(items, ctx.integrationId);

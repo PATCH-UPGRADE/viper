@@ -1,5 +1,6 @@
 // Used by index.ts and sync.ts, in a separate file to avoid a loop.
 
+import "server-only";
 import { z } from "zod";
 import { TicketCategory, TicketStatus } from "@/generated/prisma";
 import type { Cursor, Page, Session } from "../../../core/types";
@@ -60,14 +61,21 @@ function mapStatus(a: FleetActivity): TicketStatus {
 
 // "Update Service" (type 3) → software/firmware update. "Maintenance" (type 2),
 // including preventive maintenance and safety-related tests, → MAINTENANCE.
+const CATEGORY_BY_TYPE: Record<string, TicketCategory> = {
+  "2": TicketCategory.MAINTENANCE,
+  "3": TicketCategory.FIRMWARE_UPDATE,
+};
+
+// The type code is what Fleet documents, so it decides. Reading the wording
+// first would file type 2 "Update maintenance" as a firmware update. The text is
+// only a fallback for an activity carrying no code we recognise.
 function mapCategory(a: FleetActivity): TicketCategory {
+  const byType = a.type ? CATEGORY_BY_TYPE[a.type] : undefined;
+  if (byType) return byType;
+
   const text = (a.shortText ?? "").toLowerCase();
-  if (a.type === "3" || text.includes("update")) {
-    return TicketCategory.FIRMWARE_UPDATE;
-  }
-  if (a.type === "2" || text.includes("maintenance")) {
-    return TicketCategory.MAINTENANCE;
-  }
+  if (text.includes("update")) return TicketCategory.FIRMWARE_UPDATE;
+  if (text.includes("maintenance")) return TicketCategory.MAINTENANCE;
   return TicketCategory.OTHER;
 }
 

@@ -29,13 +29,13 @@ import {
 } from "@/components/ui/tooltip";
 import { handleCopy, useFlash } from "@/lib/copy";
 import { cn } from "@/lib/utils";
-import { useBriefing, useUpdateBriefing } from "../hooks/use-mitigation";
+import { useBriefing, useUpdateBriefing } from "../../hooks/use-mitigation";
 import {
   buildBriefingPdf,
   downloadBlob,
   parseSections,
   toPlainText,
-} from "./briefing-export";
+} from "../briefing-export";
 
 const AUDIENCES = [
   { value: "ciso", label: "CISO", sub: "Security leadership" },

@@ -8,6 +8,7 @@ import { attachMatchingAssets } from "@/features/tracking/server/asset-tickets";
 import { Priority, TicketCategory } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { requireExistence } from "@/trpc/middleware";
 
 // Draft work orders proposed by a plan, in the shape the plan UI renders and
 // the accept drawer edits.
@@ -166,85 +167,76 @@ export const mitigationRouter = createTRPCRouter({
   // The audience-tailored explanation of why a plan makes sense. Generated
   // once on first request and cached on the plan; a plan's case for itself
   // doesn't change just because its draft work orders get tweaked later.
+  // Not wrapped in a transaction: generateBriefing is an LLM call, and
+  // holding a DB transaction open for it risks Prisma's transaction timeout
+  // and ties up a pooled connection for no reason — a rare duplicate
+  // generation on a concurrent first-load is a cheap, self-correcting race.
   getBriefing: protectedProcedure
     .input(z.object({ planId: z.string() }))
-    .query(({ input }) =>
-      // Advisory lock: serializes concurrent first-loads for this plan so
-      // only one ever calls the agent.
-      prisma.$transaction(
-        async (tx) => {
-          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.planId}))`;
+    .query(async ({ input }) => {
+      const existing = await prisma.planBriefing.findUnique({
+        where: { mitigationPlanId: input.planId },
+      });
+      if (existing) {
+        const parsed = briefingSchema.safeParse(existing.content);
+        if (parsed.success) return parsed.data;
+        console.warn(
+          `getBriefing: stored content for plan ${input.planId} failed validation, regenerating`,
+        );
+      }
 
-          const existing = await tx.planBriefing.findUnique({
-            where: { mitigationPlanId: input.planId },
-          });
-          if (existing) {
-            const parsed = briefingSchema.safeParse(existing.content);
-            if (parsed.success) return parsed.data;
-            console.warn(
-              `getBriefing: stored content for plan ${input.planId} failed validation, regenerating`,
-            );
-          }
-
-          // Only summary/body/order/etc are needed for the prompt, so this
-          // uses its own narrow select instead of mitigationPlanInclude
-          // (which also pulls assignee/department joins the agent never
-          // reads). The recommended plan (for a non-recommended plan's
-          // comparison) is fetched in the same round trip via the
-          // notification relation.
-          const plan = await tx.mitigationPlan.findUnique({
-            where: { id: input.planId },
-            select: {
-              id: true,
-              title: true,
-              summary: true,
-              compareLine: true,
-              cards: true,
-              order: true,
-              workOrders: {
-                select: { summary: true, body: true },
-                orderBy: { createdAt: "asc" },
-              },
-              notification: {
-                select: {
-                  mitigationPlans: {
-                    where: { order: 0 },
-                    select: { title: true, summary: true },
-                  },
+      // Only summary/body/order/etc are needed for the prompt, so this uses
+      // its own narrow select instead of mitigationPlanInclude (which also
+      // pulls assignee/department joins the agent never reads). The
+      // recommended plan (for a non-recommended plan's comparison) is
+      // fetched in the same round trip via the notification relation.
+      const plan = requireExistence(
+        await prisma.mitigationPlan.findUnique({
+          where: { id: input.planId },
+          select: {
+            id: true,
+            title: true,
+            summary: true,
+            compareLine: true,
+            cards: true,
+            order: true,
+            workOrders: {
+              select: { summary: true, body: true },
+              orderBy: { createdAt: "asc" },
+            },
+            notification: {
+              select: {
+                mitigationPlans: {
+                  where: { order: 0 },
+                  select: { title: true, summary: true },
                 },
               },
             },
-          });
-          if (!plan) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Plan not found",
-            });
-          }
+          },
+        }),
+        "plan",
+      );
 
-          const isRecommended = plan.order === 0;
-          const recommendedPlan = isRecommended
-            ? null
-            : (plan.notification.mitigationPlans[0] ?? null);
+      const isRecommended = plan.order === 0;
+      const recommendedPlan = isRecommended
+        ? null
+        : (plan.notification.mitigationPlans[0] ?? null);
 
-          const content = await generateBriefing({
-            title: plan.title,
-            summary: plan.summary,
-            compareLine: plan.compareLine,
-            cards: plan.cards,
-            isRecommended,
-            recommendedPlan,
-            workOrders: plan.workOrders.map((w) => ({
-              summary: w.summary,
-              body: w.body,
-            })),
-          });
-          const saved = await persistBriefing(tx, plan.id, content);
-          return briefingSchema.parse(saved.content);
-        },
-        { timeout: 30_000 },
-      ),
-    ),
+      const content = await generateBriefing({
+        title: plan.title,
+        summary: plan.summary,
+        compareLine: plan.compareLine,
+        cards: plan.cards,
+        isRecommended,
+        recommendedPlan,
+        workOrders: plan.workOrders.map((w) => ({
+          summary: w.summary,
+          body: w.body,
+        })),
+      });
+      const saved = await persistBriefing(prisma, plan.id, content);
+      return briefingSchema.parse(saved.content);
+    }),
 
   // Edits one audience's briefing text in place; never regenerates it.
   updateBriefing: protectedProcedure
@@ -256,20 +248,17 @@ export const mitigationRouter = createTRPCRouter({
       }),
     )
     .mutation(({ input }) =>
-      // Same lock as getBriefing, so a concurrent edit or regeneration can't
-      // clobber this read-modify-write.
+      // Locked so two concurrent edits (e.g. different audiences) can't
+      // clobber each other's read-modify-write of the shared content blob.
       prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.planId}))`;
 
-        const existing = await tx.planBriefing.findUnique({
-          where: { mitigationPlanId: input.planId },
-        });
-        if (!existing) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Briefing not found",
-          });
-        }
+        const existing = requireExistence(
+          await tx.planBriefing.findUnique({
+            where: { mitigationPlanId: input.planId },
+          }),
+          "briefing",
+        );
 
         const content = {
           ...briefingSchema.parse(existing.content),

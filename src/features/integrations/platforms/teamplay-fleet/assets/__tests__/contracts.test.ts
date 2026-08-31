@@ -182,8 +182,12 @@ describe("syncFleetContracts", () => {
     >);
     db.externalAssetMapping.findFirst.mockResolvedValue({ itemId: "asset-1" });
     db.contract.findFirst.mockResolvedValue(null);
-    db.contract.create.mockResolvedValue({ id: "US_0035244333002160" });
-    db.contract.update.mockResolvedValue({ id: "US_0035244333002160" });
+    db.contract.create.mockResolvedValue({
+      id: "US_0035244333002160:US_1064792319",
+    });
+    db.contract.update.mockResolvedValue({
+      id: "US_0035244333002160:US_1064792319",
+    });
     db.managesRelationship.create.mockResolvedValue({ id: "rel-1" });
     db.managesRelationship.findFirst.mockResolvedValue(null);
     db.managesRelationship.update.mockResolvedValue({ id: "rel-1" });
@@ -200,12 +204,15 @@ describe("syncFleetContracts", () => {
       },
     });
     expect(db.contract.findFirst).toHaveBeenCalledWith({
-      where: { id: "US_0035244333002160", vendorId: "vendor-1" },
+      where: {
+        id: "US_0035244333002160:US_1064792319",
+        vendorId: "vendor-1",
+      },
       select: { managesRelationshipId: true },
     });
     const created = db.contract.create.mock.calls[0][0].data;
     expect(created).toMatchObject({
-      id: "US_0035244333002160",
+      id: "US_0035244333002160:US_1064792319",
       vendorId: "vendor-1",
       title: "Sales Courtesy Contract - KIN",
       managesRelationshipId: "rel-1",
@@ -290,5 +297,31 @@ describe("syncFleetContracts", () => {
     expect(outcome.contractedAssetIds).toEqual(new Set());
     expect(outcome.errorMessage).toContain("1 of 1 contracts failed");
     expect(db.$transaction).toHaveBeenCalled();
+  });
+  it("gives each asset its own contract row, so one Fleet contract covering two machines cannot overwrite itself", async () => {
+    const secondMachine = { ...KIN_ROW, equipmentKey: "US_9999999999" };
+    const twoMachinesOneContract = {
+      request: async (url: string) =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () =>
+            url.includes("statusFilter") ? [KIN_ROW, secondMachine] : KIN_TERMS,
+        }) as unknown as Response,
+    };
+    db.externalAssetMapping.findFirst
+      .mockResolvedValueOnce({ itemId: "asset-1" })
+      .mockResolvedValueOnce({ itemId: "asset-2" });
+
+    const outcome = await syncFleetContracts(twoMachinesOneContract, "int-1");
+
+    expect(
+      db.contract.create.mock.calls.map((call) => call[0].data.id),
+    ).toEqual([
+      "US_0035244333002160:US_1064792319",
+      "US_0035244333002160:US_9999999999",
+    ]);
+    expect(outcome.contractedAssetIds).toEqual(new Set(["asset-1", "asset-2"]));
+    expect(outcome.errorMessage).toBeNull();
   });
 });

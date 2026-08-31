@@ -151,10 +151,11 @@ export async function syncFleetContracts(
         row.equipmentKey,
       );
       const responsibilities = buildResponsibilities(row, terms);
+      const contractIdForAsset = `${row.contractId}:${row.equipmentKey}`;
 
       await prisma.$transaction(async (tx) => {
         const existingContract = await tx.contract.findFirst({
-          where: { id: row.contractId, vendorId },
+          where: { id: contractIdForAsset, vendorId },
           select: { managesRelationshipId: true },
         });
         const relationshipId =
@@ -178,12 +179,12 @@ export async function syncFleetContracts(
         };
         if (existingContract) {
           await tx.contract.update({
-            where: { id: row.contractId },
+            where: { id: contractIdForAsset },
             data: contractFields,
           });
         } else {
           await tx.contract.create({
-            data: { id: row.contractId, vendorId, ...contractFields },
+            data: { id: contractIdForAsset, vendorId, ...contractFields },
           });
         }
 

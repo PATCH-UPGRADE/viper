@@ -17,6 +17,7 @@ import { z } from "zod";
 import type { TicketCategory } from "@/generated/prisma";
 import { MONTHS_SHORT } from "@/lib/date-utils";
 import type { Session } from "../../../core/types";
+import { WORK_ORDER_CREATE_URL } from "../urls";
 import {
   type FleetSiteAddress,
   type FleetWorkOrderConfig,
@@ -247,18 +248,13 @@ export async function create(
 ): Promise<{ externalId: string; raw: unknown }> {
   assertSubmittable(draft);
 
-  const url = requireSetting(
-    config,
-    "createUrl",
-    "VIPER does not know where to file Siemens Healthineers work orders.",
-  );
   const siteAddress = requireSetting(
     config,
     "siteAddress",
     "Siemens needs a dispatch address to open a work order.",
   );
 
-  const response = await session.request(url, {
+  const response = await session.request(WORK_ORDER_CREATE_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

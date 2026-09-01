@@ -5,6 +5,7 @@ vi.mock("server-only", () => ({}));
 
 import { TicketCategory } from "@/generated/prisma";
 import type { Session } from "../../../../core/types";
+import { WORK_ORDER_CREATE_URL } from "../../urls";
 import type { FleetSiteAddress, FleetWorkOrderConfig } from "../config";
 import { requireSetting } from "../config";
 import {
@@ -39,7 +40,6 @@ const SITE_ADDRESS: FleetSiteAddress = {
 };
 
 const CONFIG: FleetWorkOrderConfig = {
-  createUrl: "http://localhost:4010/workorders",
   contactPhone: "5555550100",
   siteAddress: SITE_ADDRESS,
 };
@@ -225,9 +225,6 @@ describe("extractFleetTicketKey", () => {
 
 describe("requireSetting", () => {
   it("returns the configured value", () => {
-    expect(requireSetting(CONFIG, "createUrl", "why")).toBe(
-      "http://localhost:4010/workorders",
-    );
     expect(requireSetting(CONFIG, "siteAddress", "why")).toEqual(SITE_ADDRESS);
   });
 
@@ -281,7 +278,7 @@ describe("create", () => {
 
     expect(result.externalId).toBe("US_400501937577");
     const [url, init] = vi.mocked(session.request).mock.calls[0];
-    expect(url).toBe("http://localhost:4010/workorders");
+    expect(url).toBe(WORK_ORDER_CREATE_URL);
     expect(init?.method).toBe("POST");
     expect(JSON.parse(String(init?.body)).equipmentKey).toBe("US_1064669350");
   });
@@ -326,12 +323,12 @@ describe("create", () => {
     expect(session.request).not.toHaveBeenCalled();
   });
 
-  it("fails before calling Fleet when the create endpoint is not configured", async () => {
+  it("fails before calling Fleet when no dispatch address is configured", async () => {
     const session = stubSession({ ok: true, json: async () => ({}) });
 
     await expect(
-      create(session, filed, { ...CONFIG, createUrl: undefined }),
-    ).rejects.toThrow(/"createUrl" configured/);
+      create(session, filed, { ...CONFIG, siteAddress: undefined }),
+    ).rejects.toThrow(/"siteAddress" configured/);
     expect(session.request).not.toHaveBeenCalled();
   });
 });

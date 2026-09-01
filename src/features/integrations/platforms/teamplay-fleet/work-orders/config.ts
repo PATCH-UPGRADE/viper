@@ -2,7 +2,6 @@
 // server-only may be added.
 
 import { z } from "zod";
-import { safeUrlSchema } from "@/lib/schemas";
 
 /**
  * The site Siemens dispatches to. Fleet expects one of its own address records
@@ -46,12 +45,8 @@ const decodeSiteAddress = (value: unknown): unknown => {
  * Every field is optional, because a Fleet integration that syncs only assets
  * needs none of them. Each is required at its point of use instead, where the
  * error can name what is missing and why Fleet needs it.
- *
- * `createUrl` is not derivable: the activities collection is the read endpoint,
- * and Fleet does not create tickets there.
  */
 export const workOrderConfigSchema = z.object({
-  createUrl: safeUrlSchema.optional(),
   contactPhone: z.string().optional(),
   siteAddress: z
     .preprocess(decodeSiteAddress, fleetSiteAddressSchema.optional())

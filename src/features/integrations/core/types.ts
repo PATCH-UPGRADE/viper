@@ -97,12 +97,18 @@ export type SyncStrategy<TConfig = unknown, TCreds = unknown> = (
 
 /**
  * The per-resource half of a platform whose protocol *we* speak.
+ *
+ * `TDraft` is what we send when we create a record, and it defaults to
+ * `TCanonical` for a resource that reads and writes the same shape. They differ
+ * whenever the canonical shape carries facts that only exist after the record
+ * does — an external id, or the raw record the platform returned.
  */
 export interface ResourceModule<
   TCanonical,
   TRaw = unknown,
   TConfig = unknown,
   TCreds = unknown,
+  TDraft = TCanonical,
 > extends UrlBuilders<TConfig> {
   /** How this resource syncs, end to end. May use the below as helpers */
   sync(ctx: ResourceSyncCtx<TConfig, TCreds>): Promise<SyncOutcome>;
@@ -118,13 +124,15 @@ export interface ResourceModule<
   // we push to their platform
   create?(
     session: Session,
-    draft: TCanonical,
-  ): Promise<{ externalId: string; raw: TRaw }>;
+    draft: TDraft,
+    config: TConfig,
+  ): Promise<{ externalId: string; raw: unknown }>;
   update?(
     session: Session,
     externalId: string,
-    patch: Partial<TCanonical>,
-  ): Promise<{ externalId: string; raw: TRaw }>;
+    patch: Partial<TDraft>,
+    config: TConfig,
+  ): Promise<{ externalId: string; raw: unknown }>;
 
   /** how often this resource should sync, in seconds. null = no opinion. */
   defaultSyncEvery: number | null;

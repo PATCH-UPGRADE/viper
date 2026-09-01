@@ -9,6 +9,7 @@ import {
   SIEMENS_HEALTHINEERS,
 } from "./config";
 import { onCreate } from "./on-create";
+import { workOrders } from "./work-orders";
 
 export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
   definition: {
@@ -21,4 +22,5 @@ export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
   },
   onCreate,
   assets,
+  workOrders,
 };

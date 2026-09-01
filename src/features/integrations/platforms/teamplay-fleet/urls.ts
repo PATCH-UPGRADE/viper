@@ -13,7 +13,10 @@ export const WORK_ORDER_CREATE_URL = `https://${FLEET_HOST}/rest/v1/tickets/crea
  * the `tz` query parameter.
  */
 export const FLEET_TZ_OFFSET = "-05:00";
-export const ACTIVITIES_URL = `https://${FLEET_HOST}/rest/v1/activities?tz=${FLEET_TZ_OFFSET}`;
+/**
+ * `statusFilter=3` is every status, open and closed.
+ */
+export const ACTIVITIES_URL = `https://${FLEET_HOST}/rest/v1/activities?tz=${FLEET_TZ_OFFSET}&statusFilter=3`;
 
 /**
  * Fleet exposes each work order as an "activity", keyed by the external id on

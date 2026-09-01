@@ -5,7 +5,7 @@ import { ResourceType, SourceChannel } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import type { IntegrationResponse } from "@/lib/schemas";
 import { sourceContentHash } from "@/lib/source-hash";
-import type { ResourceSyncCtx, SyncOutcome } from "../../../core/types";
+import type { Cursor, ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import type { FleetConfig, FleetCreds } from "../config";
 import { createFleetSession } from "../session";
 import {
@@ -253,11 +253,13 @@ export async function syncWorkOrders(
   // which gets a SourceLink, because the hash comparison reads the newest
   // stored record and cannot see a sibling created in the same pass.
   const byVendorId = new Map<string, FleetWorkOrderItem>();
+  let cursor: Cursor | null = null;
   for await (const page of listChanged(session, ctx.cursor)) {
     for (const raw of page.items) {
       const item = toCanonical(raw);
       byVendorId.set(item.vendorId, item);
     }
+    cursor = page.cursor;
   }
   const items = [...byVendorId.values()];
 
@@ -270,5 +272,5 @@ export async function syncWorkOrders(
     throw new Error(response.message);
   }
 
-  return { cursor: null };
+  return { cursor };
 }

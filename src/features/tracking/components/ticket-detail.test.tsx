@@ -319,7 +319,7 @@ const makeTicket = (
     isWatching: false,
     activities: [],
     externalMappings: [],
-    sources: [],
+    sourceLinks: [],
     notification: null,
     ...overrides,
     // biome-ignore lint/suspicious/noExplicitAny: test stub for TicketDetail shape
@@ -814,7 +814,7 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
   isWatching: false,
   activities: [],
   externalMappings: [],
-  sources: [],
+  sourceLinks: [],
   notification: null,
   ...overrides,
 });

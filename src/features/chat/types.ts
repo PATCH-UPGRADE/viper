@@ -7,7 +7,7 @@ import {
   FLEET_OPERATIONAL_STATUSES,
   FLEET_PATIENT_DANGERS,
   FLEET_SUPPORT_TYPES,
-} from "@/features/integrations/teamplay-fleet/constants";
+} from "@/features/integrations/platforms/teamplay-fleet/work-orders/constants";
 import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
 import { type Prisma, TicketCategory } from "@/generated/prisma";
 

@@ -3,12 +3,11 @@
 
 import { format } from "date-fns";
 import { ExternalLinkIcon, MailIcon, Unlink } from "lucide-react";
-import { Fragment, type ReactNode, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { TlpBadge } from "@/components/tlp-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   CollapsibleCard,
   CollapsibleCardContent,
@@ -21,7 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
 import {
   Table,
   TableBody,
@@ -39,6 +37,7 @@ import type {
   NotificationDetailWithRelations,
   RawEmailPayload,
 } from "../types";
+import { EmailSourceModal } from "./email-source-modal";
 import {
   HospitalImpactCard,
   NotificationSummaryCard,
@@ -46,65 +45,6 @@ import {
 
 type DeviceGroupMapping =
   NotificationDetailWithRelations["deviceGroupsMatchings"][number];
-
-// ---------------------------------------------------------------------------
-// EmailSourceModal
-// ---------------------------------------------------------------------------
-
-function EmailSourceModal({
-  source,
-  open,
-  onOpenChange,
-}: {
-  source: NotificationDetailSource;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const raw = source.raw as unknown as RawEmailPayload;
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Original source email</DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col gap-4 overflow-auto min-h-0">
-          <Card>
-            <CardContent>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-                {(
-                  [
-                    { label: "From", value: raw.data?.from ?? "—" },
-                    { label: "Subject", value: raw.data?.subject ?? "—" },
-                    {
-                      label: "Date",
-                      value: format(source.observedAt, "PPP p"),
-                    },
-                  ] satisfies { label: string; value: string }[]
-                ).map(({ label, value }) => (
-                  <Fragment key={label}>
-                    <dt className="font-medium text-muted-foreground">
-                      {label}
-                    </dt>
-                    <dd>{value}</dd>
-                  </Fragment>
-                ))}
-              </dl>
-            </CardContent>
-          </Card>
-          {source.markdown && (
-            <Card className="overflow-auto">
-              <CardContent>
-                <MarkdownWithTablesWrapper>
-                  {source.markdown}
-                </MarkdownWithTablesWrapper>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // SourceReference

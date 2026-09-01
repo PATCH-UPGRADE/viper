@@ -60,7 +60,10 @@ export const notificationDetailInclude = {
     },
   },
   vulnerabilities: {
-    select: { vulnerabilityId: true },
+    select: {
+      vulnerabilityId: true,
+      vulnerability: { select: { cveId: true } },
+    },
   },
   sourceLinks: {
     select: {
@@ -73,6 +76,10 @@ export const notificationDetailInclude = {
           raw: true,
           markdown: true,
           observedAt: true,
+          attachments: {
+            where: { downloadUrl: { not: null } },
+            select: { id: true, filename: true, contentType: true, size: true },
+          },
           // Urls are filled in by `mappingUrlExtension`; the integration id it
           // needs to do that is part of `externalMappingSelect`.
           mapping: externalMappingSelect,

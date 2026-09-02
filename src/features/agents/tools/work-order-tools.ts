@@ -30,12 +30,18 @@ import { TOOL_REJECTED_PREFIX } from "../shared/build-graph";
  * halt the turn nor produce a card.
  */
 
+/** ISO-8601 ending in Z or an explicit +hh:mm / -hh:mm offset. */
+const HAS_EXPLICIT_ZONE = /([Zz]|[+-]\d{2}:?\d{2})$/;
+
 const makeListTargets = () =>
   tool(
     async ({ assetIds }) => {
-      const { targets, unmanaged } = keepFileableTargets(
+      const { targets, unmanaged, unknownIds } = keepFileableTargets(
         await resolveWorkOrderTargets(assetIds),
       );
+      // Reported apart from `unmanaged`: an id with no asset behind it is a
+      // mistake to correct, not a device to file for.
+      const known = new Set(unknownIds);
 
       const described = targets.map((t) => ({
         integrationId: t.integrationId,
@@ -54,7 +60,8 @@ const makeListTargets = () =>
       return JSON.stringify(
         {
           targets: described,
-          unmanaged,
+          unmanaged: unmanaged.filter((u) => !known.has(u.id)),
+          unknownIds,
           guidance: unmanaged.length
             ? "Assets under `unmanaged` have no platform that files for them. A work order for those is still worth proposing — it is tracked in VIPER and nothing is sent to a vendor."
             : undefined,
@@ -87,6 +94,15 @@ const makeProposeWorkOrder = (userId: string) =>
       const { targets, unmanaged, unknownIds } = keepFileableTargets(
         await resolveWorkOrderTargets(requested),
       );
+
+      // Checked before anything reasons about coverage: an id with no asset
+      // behind it is not "outside the target", it does not exist, and saying so
+      // is what lets the model correct itself. Left later, it would also reach
+      // the child-ticket create as a foreign key that does not resolve and throw
+      // out of the tool without the rejection prefix.
+      if (unknownIds.length > 0) {
+        return `${TOOL_REJECTED_PREFIX} No asset exists with id ${unknownIds.join(", ")}. Use the full ids from list_work_order_targets or query_platform_data.`;
+      }
 
       let payload: Record<string, unknown> = {};
       let target: FileableTarget | null = null;
@@ -127,19 +143,18 @@ const makeProposeWorkOrder = (userId: string) =>
 
       const covered = requested;
 
-      // An invented id would reach the child-ticket create as a foreign key
-      // that does not resolve, and throw out of the tool rather than come back
-      // correctable. Resolving the targets already established which ids exist.
-      if (unknownIds.length > 0) {
-        return `${TOOL_REJECTED_PREFIX} No asset exists with id ${unknownIds.join(", ")}. Use the full ids from list_work_order_targets or query_platform_data.`;
-      }
-
       // The model writes this as free text, so an unparsable value would reach
       // Prisma as an Invalid Date and throw out of the tool. A throw does not
       // carry the rejection prefix, so the graph would halt the turn with no
       // card and no explanation. Refuse it correctably instead.
       let scheduledAt: Date | null = null;
       if (input.scheduledAt) {
+        // A zone-less datetime is read as the server's local time, which is not
+        // the window anyone agreed to: it is stored shifted, and the vendor is
+        // told a different hour than the approver saw on the card.
+        if (!HAS_EXPLICIT_ZONE.test(input.scheduledAt)) {
+          return `${TOOL_REJECTED_PREFIX} "${input.scheduledAt}" has no timezone, so the hour is ambiguous. Give scheduledAt with an offset or Z, for example 2026-09-15T14:00:00-05:00, or omit it.`;
+        }
         scheduledAt = new Date(input.scheduledAt);
         if (Number.isNaN(scheduledAt.getTime())) {
           return `${TOOL_REJECTED_PREFIX} "${input.scheduledAt}" is not a datetime. Give scheduledAt as ISO-8601, for example 2026-09-15T14:00:00-05:00, or omit it.`;

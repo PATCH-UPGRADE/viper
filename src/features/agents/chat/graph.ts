@@ -78,7 +78,7 @@ in one short sentence (e.g. "I've noted that these ventilators run firmware 3.2"
 The sentence is what carries the fact forward in this conversation.
 `;
 
-function buildSystemPrompt(role: UserRole): string {
+export function buildSystemPrompt(role: UserRole): string {
   return [
     BASE_PROMPT,
     `<user_role>The user's role is: ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</user_role>`,

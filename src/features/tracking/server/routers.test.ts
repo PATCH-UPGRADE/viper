@@ -72,11 +72,13 @@ vi.mock("@/lib/auth-utils", () => ({
 
 // The submitter and the payload check are exercised in their own tests; here we
 // stub them so the router's own decisions are what runs.
-const { mockValidatePayload, mockClaim, mockInngestSend } = vi.hoisted(() => ({
-  mockValidatePayload: vi.fn(),
-  mockClaim: vi.fn(),
-  mockInngestSend: vi.fn(),
-}));
+const { mockValidatePayload, mockClaim, mockRelease, mockInngestSend } =
+  vi.hoisted(() => ({
+    mockValidatePayload: vi.fn(),
+    mockClaim: vi.fn(),
+    mockRelease: vi.fn(),
+    mockInngestSend: vi.fn(),
+  }));
 
 vi.mock("@/features/work-orders/server/payload", () => ({
   validatePlatformPayload: mockValidatePayload,
@@ -84,6 +86,7 @@ vi.mock("@/features/work-orders/server/payload", () => ({
 
 vi.mock("@/features/work-orders/server/submit", () => ({
   claimForSubmission: mockClaim,
+  releaseClaim: mockRelease,
 }));
 
 vi.mock("@/inngest/client", () => ({
@@ -1747,6 +1750,19 @@ describe("trackingRouter.approveWorkOrder", () => {
     ).rejects.toThrow(/mitigation plan/);
     expect(mockPrisma.workOrderTicket.updateMany).not.toHaveBeenCalled();
     expect(mockInngestSend).not.toHaveBeenCalled();
+  });
+
+  it("hands the claim back when the job cannot be queued", async () => {
+    // The claim is held from the moment it is taken. If nothing queues the job
+    // and nothing releases it, the ticket sits in SUBMITTING, which
+    // claimForSubmission will not take again — no filing, and no retry.
+    mockInngestSend.mockRejectedValue(new Error("event bus unavailable"));
+
+    await expect(
+      setup().approveWorkOrder({ ticketId: "t-draft" }),
+    ).rejects.toThrow(/event bus unavailable/);
+
+    expect(mockRelease).toHaveBeenCalledWith("t-draft", expect.any(Error));
   });
 
   it("does not file twice when a second approval loses the claim", async () => {

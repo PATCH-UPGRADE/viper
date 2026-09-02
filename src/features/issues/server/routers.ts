@@ -12,6 +12,7 @@ import {
 } from "@/lib/pagination";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
+import { resolveEffectiveIssuesByAsset } from "./effective-issues";
 
 const issuePaginationInput = paginationInputSchema.extend({
   assetId: z.string(),
@@ -82,24 +83,23 @@ export const issuesRouter = createTRPCRouter({
     .input(issuePaginationInput)
     .query(async ({ input }) => {
       const { assetId, issueStatus } = input;
-      const where = {
-        assetId,
-        status: issueStatus,
-      };
 
-      // Get total count and build pagination metadata
-      const totalCount = await prisma.issue.count({ where: where });
-      const meta = buildPaginationMeta(input, totalCount);
-
-      // Fetch paginated items
-      const issues = await prisma.issue.findMany({
-        skip: meta.skip,
-        take: meta.take,
-        where: where,
-        include: { vulnerability: true },
-        orderBy: { createdAt: "desc" },
+      const asset = await prisma.asset.findUnique({
+        where: { id: assetId },
+        select: { id: true, deviceGroupId: true },
       });
+      const found = requireExistence(asset, "Asset");
 
-      return createPaginatedResponse(issues, meta);
+      const effectiveIssuesByAssetId = await resolveEffectiveIssuesByAsset(
+        [found],
+        { vulnerability: true },
+      );
+      const effectiveIssues = (effectiveIssuesByAssetId.get(found.id) ?? [])
+        .filter((issue) => issue.status === issueStatus)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+      const meta = buildPaginationMeta(input, effectiveIssues.length);
+      const items = effectiveIssues.slice(meta.skip, meta.skip + meta.take);
+      return createPaginatedResponse(items, meta);
     }),
 });

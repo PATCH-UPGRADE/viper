@@ -63,19 +63,19 @@ import {
   useViperChat,
   type ViperChat,
 } from "@/features/chat/hooks/use-viper-chat";
-import {
-  type FleetWorkOrderProposal,
-  parseFleetProposal,
-  type UseChatAgentConfig,
-} from "@/features/chat/types";
+import type { UseChatAgentConfig } from "@/features/chat/types";
 import { USER_ROLES, type UserRole } from "@/features/chat/utils";
 import {
-  useAcceptFleetWorkOrder,
-  useFleetProposalStatus,
+  useApproveWorkOrder,
+  useWorkOrderDraft,
 } from "@/features/tracking/hooks/use-tracking";
+import {
+  parseWorkOrderProposal,
+  type WorkOrderProposal,
+} from "@/features/work-orders/schemas";
 import { authClient } from "@/lib/auth-client";
 import { MONTHS_SHORT } from "@/lib/date-utils";
-import { cn } from "@/lib/utils";
+import { cn, humanize } from "@/lib/utils";
 
 interface AIChatProps {
   config?: UseChatAgentConfig;
@@ -415,27 +415,50 @@ function formatScheduledWindow(iso: string): string {
   return `${monthName} ${Number(day)}, ${year}, ${hour}:${minute}`;
 }
 
+function formatFieldValue(value: unknown): string {
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (value === null || value === undefined || value === "") return "—";
+  return String(value).replace(/_/g, " ");
+}
+
+/** What the card says once the user has decided, in place of the buttons. */
+function statusLine(
+  state: string | undefined,
+  externalIds: string[] | undefined,
+): string {
+  if (state === "SUBMITTING") return "Filing with the vendor…";
+  // FAILED is read before the ids, because an earlier attempt can have filed
+  // some assets and left its mappings behind. Reporting those as "Filed" would
+  // hide the attempt that failed.
+  if (state === "FAILED") return "Approved, but the vendor did not accept it";
+  if (externalIds?.length) return `Filed · ${externalIds.join(", ")}`;
+  if (state === "PENDING") return "Approved — not yet filed with the vendor";
+  return "Approved and tracked in VIPER";
+}
+
 /**
- * Approval card for a Siemens Healthineers Fleet work order the agent proposed.
- * Nothing has been created upstream at this point — Accept is what files it.
- * Rendered from the tool's OUTPUT (not its input) so a card can only appear for
- * a proposal that passed the Siemens-managed check server-side.
+ * The approval card for a proposed work order.
+ *
+ * Nothing has been filed at this point — Approve is what sends it. Rendered from
+ * the tool's OUTPUT rather than its input, so a card can only appear for a
+ * proposal whose target and fields the server already accepted.
+ *
+ * The platform's own fields are rendered as plain rows from `platformPayload`,
+ * so a new platform needs no card of its own: whatever its `payloadSchema`
+ * accepts is what the approver sees.
  */
-function FleetWorkOrderProposalCard({
-  proposal,
-  toolCallId,
-}: {
-  proposal: FleetWorkOrderProposal;
-  toolCallId: string;
-}) {
-  const { data: status, isLoading } = useFleetProposalStatus(toolCallId);
-  const accept = useAcceptFleetWorkOrder();
+function WorkOrderProposalCard({ proposal }: { proposal: WorkOrderProposal }) {
+  const { data: status, isLoading } = useWorkOrderDraft(proposal.ticketId);
+  const approve = useApproveWorkOrder();
   const [dismissed, setDismissed] = useState(false);
 
-  const accepted = Boolean(status);
+  const state = status?.submissionState;
+  const decided = Boolean(status && !status.isDraft);
   const scheduledLabel = proposal.scheduledAt
     ? formatScheduledWindow(proposal.scheduledAt)
     : "Not specified";
+
+  const fields = Object.entries(proposal.platformPayload);
 
   return (
     <div className="mt-2 space-y-3 rounded-lg border bg-background p-3">
@@ -444,142 +467,86 @@ function FleetWorkOrderProposalCard({
         <div className="space-y-0.5">
           <p className="text-sm font-medium">{proposal.summary}</p>
           <p className="text-xs text-muted-foreground">
-            Proposed work order · Siemens Healthineers teamplay Fleet
+            {proposal.target
+              ? `Files on ${proposal.target.integrationName}${
+                  proposal.target.managedBy
+                    ? ` — managed by ${proposal.target.managedBy}`
+                    : ""
+                }`
+              : "Tracked in VIPER only — no external platform manages these assets"}
           </p>
         </div>
       </div>
 
-      <dl className="space-y-1 text-xs">
-        <div className="flex gap-2">
-          <dt className="w-24 shrink-0 text-muted-foreground">Assets</dt>
-          <dd>
-            {proposal.assets
-              .map((a) => `${a.hostname ?? a.assetId} (${a.equipmentKey})`)
-              .join(", ")}
-          </dd>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+        <div>
+          <dt className="text-muted-foreground">Assets</dt>
+          <dd>{proposal.assets.map((a) => a.label).join(", ")}</dd>
         </div>
-        <div className="flex gap-2">
-          <dt className="w-24 shrink-0 text-muted-foreground">Category</dt>
-          <dd>{proposal.category.replace(/_/g, " ").toLowerCase()}</dd>
+        <div>
+          <dt className="text-muted-foreground">Category</dt>
+          <dd>{formatFieldValue(proposal.category)}</dd>
         </div>
-        <div className="flex gap-2">
-          <dt className="w-24 shrink-0 text-muted-foreground">Support</dt>
-          <dd className="capitalize">{proposal.supportType} support</dd>
-        </div>
-        <div className="flex gap-2">
-          <dt className="w-24 shrink-0 text-muted-foreground">System</dt>
-          <dd
-            className={
-              proposal.operationalStatus === "not_operational"
-                ? "font-medium text-destructive"
-                : ""
-            }
-          >
-            {proposal.operationalStatus === "not_operational"
-              ? "Not operational"
-              : "Partially operational"}
-          </dd>
-        </div>
-        <div className="flex gap-2">
-          <dt className="w-24 shrink-0 text-muted-foreground">Patient risk</dt>
-          <dd
-            className={
-              proposal.dangerForPatient === "yes"
-                ? "font-medium text-destructive"
-                : ""
-            }
-          >
-            {proposal.dangerForPatient === "yes"
-              ? "Yes — patient-safety risk"
-              : proposal.dangerForPatient === "unknown"
-                ? "Unknown"
-                : "No"}
-          </dd>
-        </div>
-        <div className="flex gap-2">
-          <dt className="w-24 shrink-0 text-muted-foreground">Overtime</dt>
-          <dd>
-            {proposal.overtimeAuthorized ? "Authorized" : "Not authorized"}
-          </dd>
-        </div>
-        <div className="flex gap-2">
-          <dt className="w-24 shrink-0 text-muted-foreground">Window</dt>
+        <div>
+          <dt className="text-muted-foreground">Window</dt>
           <dd>{scheduledLabel}</dd>
         </div>
+        {fields.map(([key, value]) => (
+          <div key={key}>
+            <dt className="text-muted-foreground">{humanize(key)}</dt>
+            <dd>{formatFieldValue(value)}</dd>
+          </div>
+        ))}
       </dl>
 
-      <p className="text-xs whitespace-pre-wrap">{proposal.description}</p>
+      {proposal.description && (
+        <p className="text-xs text-muted-foreground">{proposal.description}</p>
+      )}
       {proposal.rationale && (
-        <div className="flex items-start gap-1.5 text-xs italic text-muted-foreground">
-          <Bot
-            className="mt-0.5 size-3.5 shrink-0"
-            aria-label="CDST rationale"
-          />
-          <p>{proposal.rationale}</p>
-        </div>
+        <p className="text-xs italic text-muted-foreground">
+          {proposal.rationale}
+        </p>
       )}
 
-      {proposal.dangerForPatient === "yes" && !accepted ? (
-        // Fleet requires patient-safety issues to be phoned in, not filed
-        // online — so there's no Accept here (see the mutation's matching guard).
-        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs">
-          <p className="font-medium text-destructive">
-            Patient-safety risk — call Siemens
-          </p>
-          <p className="text-muted-foreground">
-            teamplay Fleet doesn't accept online tickets for patient-safety
-            issues. Contact Siemens Healthineers by phone to report this — it
-            can't be filed from here.
-          </p>
-        </div>
-      ) : accepted ? (
-        <p className="text-xs font-medium text-muted-foreground">
-          Accepted · Fleet {status?.externalIds.join(", ")}
+      {status?.submissionError && (
+        <p className="text-xs text-destructive">{status.submissionError}</p>
+      )}
+
+      {isLoading ? null : decided ? (
+        <p className="text-xs text-muted-foreground">
+          {statusLine(state, status?.externalIds)}
         </p>
       ) : dismissed ? (
-        <p className="text-xs text-muted-foreground">
-          Dismissed — no work order was created.
-        </p>
+        <p className="text-xs text-muted-foreground">Dismissed</p>
       ) : (
         <div className="flex items-center gap-2">
           <Button
             size="sm"
-            disabled={accept.isPending || isLoading}
-            onClick={() =>
-              accept.mutate({
-                toolCallId,
-                assetIds: proposal.assets.map((a) => a.assetId),
-                summary: proposal.summary,
-                description: proposal.description,
-                category: proposal.category,
-                supportType: proposal.supportType,
-                operationalStatus: proposal.operationalStatus,
-                dangerForPatient: proposal.dangerForPatient,
-                overtimeAuthorized: proposal.overtimeAuthorized,
-                scheduledAt: proposal.scheduledAt,
-              })
-            }
+            disabled={approve.isPending}
+            onClick={() => approve.mutate({ ticketId: proposal.ticketId })}
           >
-            {accept.isPending ? (
+            {approve.isPending ? (
               <>
-                <Loader2 className="size-3 animate-spin" /> Sending…
+                <Loader2 className="size-3 animate-spin" /> Approving…
               </>
             ) : (
-              "Accept"
+              "Approve"
             )}
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            disabled={accept.isPending}
+            disabled={approve.isPending}
             onClick={() => setDismissed(true)}
           >
             Dismiss
           </Button>
           <span className="text-xs text-muted-foreground">
-            {proposal.assets.length > 1
-              ? `Files ${proposal.assets.length} work orders on Fleet`
-              : "Files a work order on Fleet"}
+            {proposal.target
+              ? proposal.assets.length > 1
+                ? `Files ${proposal.assets.length} orders on ${proposal.target.integrationName}`
+                : `Files one order on ${proposal.target.integrationName}`
+              : "Nothing is sent outside VIPER"}
           </span>
         </div>
       )}
@@ -688,16 +655,15 @@ function ChatMessage({
                 />
               );
             }
-            if (toolName(part) === "propose_fleet_work_order") {
+            if (toolName(part) === "propose_work_order") {
               // Only a validated proposal parses; a refusal (or a still-streaming
               // call) falls through to the accordion, which shows the reason.
-              const proposal = parseFleetProposal(part.output);
+              const proposal = parseWorkOrderProposal(part.output);
               if (proposal) {
                 return (
-                  <FleetWorkOrderProposalCard
+                  <WorkOrderProposalCard
                     key={part.toolCallId}
                     proposal={proposal}
-                    toolCallId={part.toolCallId}
                   />
                 );
               }

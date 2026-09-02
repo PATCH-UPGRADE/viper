@@ -418,6 +418,20 @@ function formatScheduledWindow(iso: string): string {
 function formatFieldValue(value: unknown): string {
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (value === null || value === undefined || value === "") return "—";
+  // A platform's payloadSchema may nest. Fleet's does not today, but a value
+  // the approver cannot read is worse than a long one — String() alone would
+  // show "[object Object]" on the card that authorises sending it.
+  if (Array.isArray(value)) {
+    return value.length ? value.map(formatFieldValue).join(", ") : "—";
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    return entries.length
+      ? entries
+          .map(([k, v]) => `${humanize(k)}: ${formatFieldValue(v)}`)
+          .join(", ")
+      : "—";
+  }
   return String(value).replace(/_/g, " ");
 }
 

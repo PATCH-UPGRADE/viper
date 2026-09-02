@@ -5,7 +5,11 @@
  */
 
 import type { z } from "zod";
-import type { PlatformEnum, ResourceType } from "@/generated/prisma";
+import type {
+  PlatformEnum,
+  ResourceType,
+  TicketCategory,
+} from "@/generated/prisma";
 import type { Category } from "../types";
 
 /**
@@ -138,6 +142,53 @@ export interface ResourceModule<
   defaultSyncEvery: number | null;
 }
 
+/**
+ * One VIPER work order, for one asset, in terms every platform understands.
+ * The generic submitter builds this; the platform turns it into its own draft.
+ */
+export interface WorkOrderDraftInput {
+  summary: string;
+  description: string;
+  category: TicketCategory;
+  /** ISO-8601 with offset, or null when no window was proposed. */
+  scheduledAt: string | null;
+  asset: {
+    id: string;
+    hostname: string | null;
+    ip: string | null;
+    /** The platform's own id for this asset, from its ExternalAssetMapping. */
+    externalId: string | null;
+  };
+  /** Who approved the order. Platforms that dispatch an engineer need a contact. */
+  actor: { name: string; email: string };
+  /** Platform-specific fields, already validated against `payloadSchema`. */
+  payload: Record<string, unknown>;
+  /** Our reference, echoed on their record so an order traces back to us. */
+  reference: string;
+}
+
+/**
+ * A resource module that can also be filed *into* from VIPER.
+ *
+ * `payloadSchema` is the only part a model fills in, so it holds the platform's
+ * own choices and nothing VIPER already knows. `toDraft` joins the two halves.
+ */
+export interface WorkOrderModule<
+  TRaw = unknown,
+  TConfig = unknown,
+  TCreds = unknown,
+  TDraft = unknown,
+> extends ResourceModule<unknown, TRaw, TConfig, TCreds, TDraft> {
+  // biome-ignore lint/suspicious/noExplicitAny: a zod object of unknown shape; `unknown` loses `.shape`, which the catalog and JSON Schema generation both read.
+  payloadSchema: z.ZodObject<any>;
+  toDraft(input: WorkOrderDraftInput, config: TConfig): TDraft;
+  /**
+   * Refuse a payload this platform will not accept, before anything is claimed
+   * or sent. The reason is shown to the user and handed back to the model.
+   */
+  assertSubmittable?(payload: Record<string, unknown>): void;
+}
+
 export interface ConnectorDefinition<TConfig, TCreds> {
   platform: PlatformEnum;
   displayName: string;
@@ -166,6 +217,12 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
    */
   sync?: SyncStrategy<TConfig, TCreds>;
   onCreate?(): Promise<void>;
+
+  /**
+   * Open an authenticated session. The pull path builds its own inside `sync`;
+   * a push starts from a user action, so core needs a way to ask for one.
+   */
+  createSession?(input: { config: TConfig; creds: TCreds }): Promise<Session>;
   workOrders?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   assets?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   notifications?: ResourceModule<unknown, unknown, TConfig, TCreds>;

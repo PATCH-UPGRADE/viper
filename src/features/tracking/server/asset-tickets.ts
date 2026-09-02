@@ -1,4 +1,5 @@
 import "server-only";
+import type { Priority, TicketCategory } from "@/generated/prisma";
 import { TicketStatus } from "@/generated/prisma";
 import type { TransactionClient } from "@/lib/db";
 import {
@@ -6,6 +7,48 @@ import {
   matchingAppliesToDeviceGroup,
 } from "@/lib/device-matching";
 import { recordAssetActivity } from "./activities";
+
+interface ParentFields {
+  summary: string;
+  body: string | null;
+  category: TicketCategory;
+  priority: Priority;
+  creatorId: string;
+  scheduledAt: Date | null;
+  sourceLabel: string | null;
+  isDraft: boolean;
+}
+
+export interface ExternalMappingInput {
+  integrationId: string;
+  externalId: string;
+  lastSynced: Date;
+}
+
+/**
+ * Record where a ticket lives on a vendor platform. Idempotent on
+ * `(itemId, integrationId)`, so a retry refreshes the row rather than failing
+ * on the unique constraint.
+ */
+export async function attachExternalMapping(
+  tx: TransactionClient,
+  ticketId: string,
+  mapping: ExternalMappingInput,
+): Promise<void> {
+  await tx.externalWorkOrderMapping.upsert({
+    where: {
+      external_work_order_mappings_item_integration_key: {
+        itemId: ticketId,
+        integrationId: mapping.integrationId,
+      },
+    },
+    update: {
+      externalId: mapping.externalId,
+      lastSynced: mapping.lastSynced,
+    },
+    create: { itemId: ticketId, ...mapping },
+  });
+}
 
 // Creates the dedicated per-asset child ticket for parentTicketId + assetId
 // (copying summary/body/category/etc. from the parent) and its AssetTicket
@@ -17,11 +60,14 @@ export async function createAssetTicket(
     parentTicketId: string;
     assetId: string;
     actorId: string;
-    externalMapping?: {
-      integrationId: string;
-      externalId: string;
-      lastSynced: Date;
-    };
+    externalMapping?: ExternalMappingInput;
+    /**
+     * The parent's copied fields and the asset's labels, when the caller has
+     * already read them. Creating N children otherwise re-reads the same parent
+     * row N times, inside the caller's transaction.
+     */
+    parent?: ParentFields;
+    asset?: { hostname: string | null; ip: string | null };
   },
 ): Promise<string> {
   const { parentTicketId, assetId, actorId, externalMapping } = params;
@@ -30,25 +76,37 @@ export async function createAssetTicket(
     where: { parentTicketId_assetId: { parentTicketId, assetId } },
     select: { ticketId: true },
   });
-  if (existing) return existing.ticketId;
+  if (existing) {
+    // The child is already here, but the mapping may not be: a retry that files
+    // on the vendor platform a second time arrives with an id the first attempt
+    // never recorded. Dropping it would leave a dispatched order untracked, and
+    // the next inbound sync would file a duplicate ticket for it.
+    if (externalMapping) {
+      await attachExternalMapping(tx, existing.ticketId, externalMapping);
+    }
+    return existing.ticketId;
+  }
 
   const [parent, asset] = await Promise.all([
-    tx.workOrderTicket.findUniqueOrThrow({
-      where: { id: parentTicketId },
-      select: {
-        summary: true,
-        body: true,
-        category: true,
-        priority: true,
-        creatorId: true,
-        scheduledAt: true,
-        sourceLabel: true,
-      },
-    }),
-    tx.asset.findUniqueOrThrow({
-      where: { id: assetId },
-      select: { hostname: true, ip: true },
-    }),
+    params.parent ??
+      tx.workOrderTicket.findUniqueOrThrow({
+        where: { id: parentTicketId },
+        select: {
+          summary: true,
+          body: true,
+          category: true,
+          priority: true,
+          creatorId: true,
+          scheduledAt: true,
+          sourceLabel: true,
+          isDraft: true,
+        },
+      }),
+    params.asset ??
+      tx.asset.findUniqueOrThrow({
+        where: { id: assetId },
+        select: { hostname: true, ip: true },
+      }),
   ]);
 
   const child = await tx.workOrderTicket.create({
@@ -59,6 +117,9 @@ export async function createAssetTicket(
       priority: parent.priority,
       scheduledAt: parent.scheduledAt,
       sourceLabel: parent.sourceLabel,
+      // A child is as visible as its parent. A child of a draft that stayed
+      // visible would put an unapproved proposal on the asset's work orders.
+      isDraft: parent.isDraft,
       creator: { connect: { id: parent.creatorId } },
       parent: { connect: { id: parentTicketId } },
       ticket: { create: { assetId, parentTicketId } },

@@ -1,18 +1,20 @@
-import type { ResourceModule } from "../../../core/types";
+import type { WorkOrderModule } from "../../../core/types";
 import type { FleetConfig, FleetCreds } from "../config";
 import { ACTIVITIES_URL, workOrderWebUrl } from "../urls";
 import {
   type FleetActivity,
-  type FleetWorkOrderItem,
   get,
   listChanged,
   toCanonical,
 } from "./activities";
+import { fleetWorkOrderPayloadSchema } from "./payload";
 import { syncWorkOrders } from "./sync";
 import {
+  assertSubmittable,
   create,
   type FleetWorkOrderDraft,
   PROVISIONAL_PREFIX,
+  toDraft,
 } from "./tickets";
 
 /**
@@ -23,8 +25,7 @@ import {
  * create endpoint is the only documented write. A status change made in VIPER
  * therefore does not travel back to Siemens.
  */
-export const workOrders: ResourceModule<
-  FleetWorkOrderItem,
+export const workOrders: WorkOrderModule<
   FleetActivity,
   FleetConfig,
   FleetCreds,
@@ -36,6 +37,11 @@ export const workOrders: ResourceModule<
   get,
   toCanonical,
 
+  // The push half. `payloadSchema` is what a model fills in, `toDraft` joins
+  // that to what VIPER already knows, and `create` files the result.
+  payloadSchema: fleetWorkOrderPayloadSchema,
+  toDraft,
+  assertSubmittable,
   create,
 
   apiUrlFor: () => ACTIVITIES_URL,

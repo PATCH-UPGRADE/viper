@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import { resolveEffectiveIssuesByAsset } from "@/features/issues/server/effective-issues";
 import {
   attachNote,
   attachNotes,
@@ -245,7 +246,7 @@ export const assetsRouter = createTRPCRouter({
           return sortValue;
         }
 
-        return fetchPaginated(prisma.asset, input, {
+        const result = await fetchPaginated(prisma.asset, input, {
           where,
           include: assetDashboardInclude,
           orderBy: sort
@@ -257,15 +258,34 @@ export const assetsRouter = createTRPCRouter({
               ]
             : { updatedAt: "desc" },
         });
+        const effectiveIssues = await resolveEffectiveIssuesByAsset(
+          result.items,
+          assetDashboardInclude.issues.include,
+        );
+        return {
+          ...result,
+          items: result.items.map((asset) => ({
+            ...asset,
+            issues: effectiveIssues.get(asset.id) ?? [],
+          })),
+        };
       }
 
       const totalCount = await prisma.asset.count({ where });
       const meta = buildPaginationMeta(input, totalCount);
 
-      const allAssets = await prisma.asset.findMany({
+      const fetchedAssets = await prisma.asset.findMany({
         where,
         include: assetDashboardInclude,
       });
+      const effectiveIssues = await resolveEffectiveIssuesByAsset(
+        fetchedAssets,
+        assetDashboardInclude.issues.include,
+      );
+      const allAssets = fetchedAssets.map((asset) => ({
+        ...asset,
+        issues: effectiveIssues.get(asset.id) ?? [],
+      }));
 
       type AssetRow = (typeof allAssets)[number];
 

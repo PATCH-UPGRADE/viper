@@ -100,7 +100,7 @@ export async function resolveEffectiveIssuesByAsset<
         { assetId: { in: assetIds } },
       ],
     },
-    include,
+    include: include as Prisma.IssueInclude,
   })) as IssueRow<I>[];
 
   const fleetIssuesByMatchingId = new Map<string, typeof issues>();

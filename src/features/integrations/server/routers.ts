@@ -1,7 +1,12 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { AuthType, type Prisma, ResourceType } from "@/generated/prisma";
+import {
+  AuthType,
+  type Prisma,
+  ResourceType,
+  SubmissionState,
+} from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
@@ -264,6 +269,24 @@ export const integrationsRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       await requireIntegration(input.id);
+
+      // A work order pointing here is cleared by ON DELETE SET NULL, which is
+      // right for one already filed or still waiting. It is not right mid-flight:
+      // the submission job would lose the row it is authenticating against and
+      // fail halfway through a batch, having already filed some of it.
+      const inFlight = await prisma.workOrderTicket.count({
+        where: {
+          targetIntegrationId: input.id,
+          submissionState: SubmissionState.SUBMITTING,
+        },
+      });
+      if (inFlight > 0) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `${inFlight} work order(s) are being filed on this integration right now. Wait for them to finish, then remove it.`,
+        });
+      }
+
       return prisma.integration.delete({
         where: { id: input.id },
         omit: omitCredentials,

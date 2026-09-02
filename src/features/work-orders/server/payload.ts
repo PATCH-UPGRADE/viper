@@ -63,15 +63,26 @@ export function keepFileableTargets(resolved: ResolvedTargets): {
   unknownIds: string[];
 } {
   const targets: FileableTarget[] = [];
-  const unmanaged = [...resolved.unmanaged];
+  const dropped: ResolvedTargets["targets"] = [];
 
   for (const target of resolved.targets) {
     const module = workOrderModuleForPlatform(target.platform);
-    if (module) {
-      targets.push({ ...target, module });
-      continue;
-    }
+    if (module) targets.push({ ...target, module });
+    else dropped.push(target);
+  }
+
+  // An asset can be managed twice over — a vendor contract and a department
+  // arrangement, say — so one of its platforms being unfileable does not make
+  // the asset unmanaged. Only report the assets no retained target covers, or
+  // the model is told the same asset is both fileable and not.
+  const covered = new Set(targets.flatMap((t) => t.assets.map((a) => a.id)));
+  const unmanaged = [...resolved.unmanaged];
+  const seen = new Set(unmanaged.map((u) => u.id));
+
+  for (const target of dropped) {
     for (const asset of target.assets) {
+      if (covered.has(asset.id) || seen.has(asset.id)) continue;
+      seen.add(asset.id);
       unmanaged.push({ id: asset.id, label: labelFor(asset) });
     }
   }

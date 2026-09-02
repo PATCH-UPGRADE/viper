@@ -23,7 +23,12 @@ export const submitWorkOrder = inngest.createFunction(
     id: "submit-work-order",
     // One filing at a time per ticket, whatever re-sends the event.
     concurrency: { key: "event.data.ticketId", limit: 1 },
-    retries: 0,
+    // Safe to retry: Inngest memoizes a completed step, so a retry after the
+    // outcome write failed skips the filing entirely, and `fileClaimedTicket`
+    // skips any child that already carries a mapping even if the whole step
+    // re-runs. Without a retry, a failure between filing and recording strands
+    // the ticket in SUBMITTING, which nothing can claim again.
+    retries: 2,
   },
   { event: "workOrder/submit.requested" },
   async ({ event, step }) => {

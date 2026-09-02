@@ -1,8 +1,7 @@
 import "server-only";
 import { requirePlatform } from "@/features/integrations/core/registry";
-import { moduleForResource } from "@/features/integrations/core/sync/resources";
 import type { WorkOrderModule } from "@/features/integrations/core/types";
-import { type PlatformEnum, ResourceType } from "@/generated/prisma";
+import type { PlatformEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   labelFor,
@@ -12,18 +11,21 @@ import {
 
 /**
  * The work order module for a platform, or null when that platform cannot be
- * filed on. Pure: the registry is an in-memory table, so knowing the platform
- * is enough.
+ * filed on.
+ *
+ * Filing needs two things a platform declares separately: the module itself,
+ * and a way to authenticate. Both are checked here, so a platform that can only
+ * do half the job is never offered to a model — the alternative is a draft the
+ * user approves and a job that then discovers there is no session.
+ *
+ * Pure: the registry is an in-memory table, so knowing the platform is enough.
  */
 function workOrderModuleForPlatform(
   platform: PlatformEnum,
 ): WorkOrderModule | null {
-  const module = moduleForResource(
-    requirePlatform(platform),
-    ResourceType.WorkOrder,
-  ) as WorkOrderModule | undefined;
-
-  return module?.create ? module : null;
+  const connector = requirePlatform(platform);
+  if (!connector.createSession) return null;
+  return connector.workOrders ?? null;
 }
 
 /** The same, for a caller that holds only an integration id. */

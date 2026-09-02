@@ -179,6 +179,9 @@ export interface WorkOrderModule<
   TCreds = unknown,
   TDraft = unknown,
 > extends ResourceModule<unknown, TRaw, TConfig, TCreds, TDraft> {
+  create: NonNullable<
+    ResourceModule<unknown, TRaw, TConfig, TCreds, TDraft>["create"]
+  >;
   // biome-ignore lint/suspicious/noExplicitAny: a zod object of unknown shape; `unknown` loses `.shape`, which the catalog and JSON Schema generation both read.
   payloadSchema: z.ZodObject<any>;
   toDraft(input: WorkOrderDraftInput, config: TConfig): TDraft;
@@ -223,7 +226,13 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
    * a push starts from a user action, so core needs a way to ask for one.
    */
   createSession?(input: { config: TConfig; creds: TCreds }): Promise<Session>;
-  workOrders?: ResourceModule<unknown, unknown, TConfig, TCreds>;
+  /**
+   * Filing needs `createSession` above as well as this module. Both are checked
+   * in one place — `work-orders/server/payload.ts` — so the model is never
+   * offered a platform that cannot complete the job.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: TRaw/TDraft vary per platform and are erased here, exactly as `AnyConnectorModule` erases TConfig/TCreds.
+  workOrders?: WorkOrderModule<any, TConfig, TCreds, any>;
   assets?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   notifications?: ResourceModule<unknown, unknown, TConfig, TCreds>;
 }

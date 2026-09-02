@@ -1,13 +1,9 @@
 import "server-only";
 import { decryptCredentials } from "@/features/integrations/core/credentials";
 import { requirePlatform } from "@/features/integrations/core/registry";
-import { moduleForResource } from "@/features/integrations/core/sync/resources";
-import type {
-  WorkOrderDraftInput,
-  WorkOrderModule,
-} from "@/features/integrations/core/types";
+import type { WorkOrderDraftInput } from "@/features/integrations/core/types";
 import { attachExternalMapping } from "@/features/tracking/server/asset-tickets";
-import { ResourceType, SubmissionState } from "@/generated/prisma";
+import { SubmissionState } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
 /**
@@ -30,18 +26,11 @@ async function openFiler(integrationId: string) {
   });
 
   const connector = requirePlatform(integration.platform);
-  const module = moduleForResource(connector, ResourceType.WorkOrder) as
-    | WorkOrderModule
-    | undefined;
+  const module = connector.workOrders;
 
-  if (!module?.create) {
+  if (!module || !connector.createSession) {
     throw new Error(
-      `${integration.name} cannot have work orders filed on it — its platform has no work order module.`,
-    );
-  }
-  if (!connector.createSession) {
-    throw new Error(
-      `${integration.name} cannot be signed in to — its platform provides no session.`,
+      `${integration.name} cannot have work orders filed on it — its platform does not support filing.`,
     );
   }
 

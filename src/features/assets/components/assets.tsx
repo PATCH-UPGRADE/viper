@@ -120,7 +120,7 @@ export const AssetIssueMetrics = ({
     <div className="flex flex-col gap-6">
       <div>
         <div className="mb-3 flex items-baseline gap-3">
-          <h3 className="text-sm font-semibold">Active Issues</h3>
+          <h3 className="text-sm font-semibold">Affected Assets</h3>
           <span className="text-xs text-muted-foreground">
             {totalActive} total &middot; {totalActiveWithRem} with remediations
             available
@@ -165,7 +165,7 @@ export const AssetIssueMetrics = ({
 
       <div>
         <div className="mb-3 flex items-baseline gap-3">
-          <h3 className="text-sm font-semibold">Remediated Issues</h3>
+          <h3 className="text-sm font-semibold">Remediated Assets</h3>
           <span className="text-xs text-muted-foreground">
             {totalRemediated} total
           </span>

@@ -34,6 +34,9 @@ export const PLATFORM_QUERY_PROCEDURES = [
 export const PLATFORM_CATALOG = `Available read-only procedures for query_platform_data:
 - assets.getMany — list/search hospital device assets. input: { search?, page?, pageSize? }
 - assets.getOne — one asset by id. input: { id }
+  Both carry "managedBy": who services the asset, as a vendor or a department, with
+  their responsibilities. An entry whose "workOrderIntegration" is set names the
+  platform their work orders are filed on — use list_work_order_targets to file one.
 - assets.getManyByDeviceGroup — assets in a device group. input: { deviceGroupId, search?, page?, pageSize? }
 - assets.getManyByWorkflow — assets used in a clinical workflow. input: { id } (workflow id)
 - assets.getUtilization — one asset's utilization schedule, as a readable summary. input: { id }

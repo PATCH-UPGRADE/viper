@@ -9,8 +9,9 @@ target?") on exactly one vulnerability. It targets one of two things:
   overrides the matching-level issue for that vulnerability, for that asset
   only.
 
-"Exactly one of the two is set" is a code convention, not a database
-constraint — both columns are nullable and nothing enforces the XOR.
+"Exactly one of the two is set — never both, never neither" is a code
+convention, not a database constraint: both columns are nullable and nothing
+in Postgres enforces the rule.
 
 ## Which issues affect an asset
 

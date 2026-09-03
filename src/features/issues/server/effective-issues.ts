@@ -26,14 +26,6 @@ const matchingIdentitySelect = {
   versionRange: true,
 } as const;
 
-/**
- * All issues that affect each given asset: issues attached to a
- * DeviceGroupMatching that applies to the asset's device group (strict
- * version matching), merged with the asset's own issues, which override the
- * matching-level issue for the same vulnerability. Batched: three queries
- * regardless of asset count. This is the single seam to replace if the
- * computed asset-to-matching hop ever needs a denormalized fast path.
- */
 type IssueRows<I extends Prisma.IssueInclude> = Prisma.Result<
   ExtendedPrismaClient["issue"],
   { include: I },
@@ -46,6 +38,14 @@ type IssueRow<I extends Prisma.IssueInclude> = IssueRows<I>[number] &
     deviceGroupMatchingId: string | null;
   };
 
+/**
+ * All issues that affect each given asset: issues attached to a
+ * DeviceGroupMatching that applies to the asset's device group (strict
+ * version matching), merged with the asset's own issues, which override the
+ * matching-level issue for the same vulnerability. Batched: three queries
+ * regardless of asset count. This is the single seam to replace if the
+ * computed asset-to-matching hop ever needs a denormalized fast path.
+ */
 export async function resolveEffectiveIssuesByAsset<
   I extends Prisma.IssueInclude,
 >(

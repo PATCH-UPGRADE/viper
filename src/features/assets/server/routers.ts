@@ -371,6 +371,11 @@ export const assetsRouter = createTRPCRouter({
       Severity,
       { active: number; activeWithRemediations: number; remediated: number }
     >;
+    const totals = {
+      active: 0,
+      activeWithRemediations: 0,
+      remediated: 0,
+    };
     for (const severity of severities) {
       counts[severity] = {
         active: 0,
@@ -380,6 +385,22 @@ export const assetsRouter = createTRPCRouter({
     }
 
     for (const effectiveIssues of effectiveIssuesByAssetId.values()) {
+      const activeIssues = effectiveIssues.filter(
+        (issue) => issue.status === IssueStatus.AFFECTED,
+      );
+      if (activeIssues.length > 0) {
+        totals.active++;
+      }
+      if (
+        activeIssues.some(
+          (issue) => issue.vulnerability._count.remediations > 0,
+        )
+      ) {
+        totals.activeWithRemediations++;
+      }
+      if (effectiveIssues.some((issue) => issue.status === IssueStatus.FIXED)) {
+        totals.remediated++;
+      }
       for (const severity of severities) {
         const activeOfSeverity = effectiveIssues.filter(
           (issue) =>
@@ -408,7 +429,7 @@ export const assetsRouter = createTRPCRouter({
       }
     }
 
-    return counts;
+    return { ...counts, totals };
   }),
 
   // Internal API for asset vulnerability matching

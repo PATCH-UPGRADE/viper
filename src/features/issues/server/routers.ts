@@ -96,7 +96,11 @@ export const issuesRouter = createTRPCRouter({
       );
       const effectiveIssues = (effectiveIssuesByAssetId.get(found.id) ?? [])
         .filter((issue) => issue.status === issueStatus)
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        .sort(
+          (a, b) =>
+            b.createdAt.getTime() - a.createdAt.getTime() ||
+            a.id.localeCompare(b.id),
+        );
 
       const meta = buildPaginationMeta(input, effectiveIssues.length);
       const items = effectiveIssues.slice(meta.skip, meta.skip + meta.take);

@@ -202,6 +202,30 @@ describe("assets.getIssueMetricsInternal — affected-asset counts", () => {
       remediated: 0,
     });
   });
+
+  it("does not double-count a machine affected at two severities in the totals", async () => {
+    const highVulnerability = {
+      ...vulnerability,
+      id: "vuln-2",
+      severity: "High",
+    };
+    mockPrisma.issue.findMany.mockResolvedValue([
+      FLEET_ISSUE,
+      {
+        ...FLEET_ISSUE,
+        id: "issue-fleet-high",
+        vulnerabilityId: "vuln-2",
+        vulnerability: highVulnerability,
+      },
+    ]);
+    const { assets } = setup();
+
+    const metrics = await assets.getIssueMetricsInternal();
+
+    expect(metrics.Critical.active).toBe(3);
+    expect(metrics.High.active).toBe(3);
+    expect(metrics.totals.active).toBe(3);
+  });
 });
 
 describe("issues.getManyInternalByStatusAndAssetId — per-asset tabs", () => {

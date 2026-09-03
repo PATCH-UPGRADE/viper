@@ -86,9 +86,11 @@ const ACTIVE_ISSUES_SHOWN_MAX = 5;
 export const IssuesSidebarList = ({
   issues,
   type,
+  assetId: knownAssetId,
 }: {
   issues: Issue[];
   type: "assets" | "vulnerabilities";
+  assetId?: string;
 }) => {
   const issuesQuery = useSuspenseIssuesById({
     ids: issues.map((i) => i.id),
@@ -103,7 +105,7 @@ export const IssuesSidebarList = ({
 
   if (issues.length === 0) return null;
 
-  const assetId = issues[0].assetId;
+  const assetId = knownAssetId ?? issues[0].assetId;
   const isIssuesOverflow = issues.length > ACTIVE_ISSUES_SHOWN_MAX;
   const visibleIssues = issues.slice(
     0,

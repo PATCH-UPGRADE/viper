@@ -45,7 +45,7 @@ import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
-import { Severity } from "@/generated/prisma";
+import { IssueStatus, Severity } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
 import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
@@ -106,15 +106,9 @@ export const AssetIssueMetrics = ({
     Severity.Low,
   ] as const;
 
-  const totalActive = severities.reduce((sum, s) => sum + data[s].active, 0);
-  const totalActiveWithRem = severities.reduce(
-    (sum, s) => sum + data[s].activeWithRemediations,
-    0,
-  );
-  const totalRemediated = severities.reduce(
-    (sum, s) => sum + data[s].remediated,
-    0,
-  );
+  const totalActive = data.totals.active;
+  const totalActiveWithRem = data.totals.activeWithRemediations;
+  const totalRemediated = data.totals.remediated;
 
   return (
     <div className="flex flex-col gap-6">
@@ -429,6 +423,10 @@ export function AssetDrawer({
   ...props
 }: PropsWithChildren<AssetDrawerProps>) {
   const hasIssues = isAssetWithIssues(asset);
+  const activeIssueCount = hasIssues
+    ? asset.issues.filter((issue) => issue.status === IssueStatus.AFFECTED)
+        .length
+    : 0;
 
   return (
     <EntityDrawer trigger={children} {...props}>
@@ -479,18 +477,18 @@ export function AssetDrawer({
           <>
             <Separator />
             <div>
-              {asset.issues.length === 0 ? (
+              {activeIssueCount === 0 ? (
                 <>
                   <h3 className="font-semibold mb-2">Issues</h3>
                   <p className="text-xs text-muted-foreground">
-                    No issues detected
+                    No active issues detected
                   </p>
                 </>
               ) : (
                 <>
                   <h3 className="font-semibold mb-2 text-destructive">
-                    {asset.issues.length} active vulnerabilit
-                    {asset.issues.length === 1 ? "y" : "ies"} detected
+                    {activeIssueCount} active vulnerabilit
+                    {activeIssueCount === 1 ? "y" : "ies"} detected
                   </h3>
                   <p className="text-xs text-muted-foreground my-2">
                     Vulnerabilities have been detected. Lab result integrity
@@ -504,6 +502,7 @@ export function AssetDrawer({
                 <IssuesSidebarList
                   issues={asset.issues}
                   type="vulnerabilities"
+                  assetId={asset.id}
                 />
               </Suspense>
             </div>

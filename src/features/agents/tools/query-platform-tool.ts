@@ -26,6 +26,8 @@ export const PLATFORM_QUERY_PROCEDURES = [
   "deviceGroups.getOne",
   "workflows.getManyByAsset",
   "workflows.getManyForLlm",
+  "notifications.getMany",
+  "notifications.getOne",
 ] as const;
 
 /** Condensed, prompt-injectable catalog of the allowlisted read procedures. */
@@ -44,8 +46,23 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - deviceGroups.getOne — one device group by id. input: { id }
 - workflows.getManyByAsset — clinical workflows that use an asset. input: { id } (asset id)
 - workflows.getManyForLlm — list/search all clinical workflows. input: { search?, page?, pageSize? }
+- notifications.getMany — list/search inbox notifications. input: { search?, page?, pageSize?, priority?, type? } — priority and type are optional arrays; omit them for everything. priority values: Critical, High, Monitor, Defer, Unsorted. type values: Advisory, Recall, UpdateAvailable, Other. pageSize is capped at 10 here and a larger request is clamped, so read totalCount and step through with page.
+- notifications.getOne — one notification by id, with the affected-asset counts per matching rule and the ids of the vulnerabilities it references. input: { id }
 
 'Workflows' represent how devices are used in clinical contexts/for patient care.
+
+'Notifications' are the hospital's inbox: vendor advisories, recalls, and update
+announcements that arrive from vendors and feeds. Each carries a triaged priority and
+the matching rules it was matched to.
+
+A notification's "deviceGroupsMatchings" and "affectedAssets" entries are matching RULES
+(manufacturer/product/version), not device groups. They give asset COUNTS per triage
+bucket, not asset records, and their ids are NOT device group ids — never send one as a
+deviceGroupId, because that returns an empty page instead of an error and reads as "no
+assets affected". To get the assets themselves, find the device group with
+deviceGroups.getMany, and search on the matching's manufacturer/product/version names.
+Then follow that device group's "_links.assets". A notification's "vulnerabilities"
+array holds vulnerabilityId values; send one to vulnerabilities.getOne for the CVE.
 
 Assets, vulnerabilities, and remediations each include a "notes" array of resolved,
 entity-specific notes ({ id, text }) — device/vuln/remediation caveats a human recorded
@@ -73,12 +90,30 @@ const DEVICE_GROUP_URL_KEYS = [
   "deviceArtifactsUrl",
 ] as const;
 
+/**
+ * Merge navigation hints into an object's `_links` map.
+ *
+ * Always merge, never assign. A single object can match more than one shape
+ * rule below, and a plain assignment silently drops the links an earlier rule
+ * added. The "does not clobber links added by another transform" test pins
+ * this; keeping the merge in one place stops a new entity from regressing it.
+ */
+function addLinks(
+  obj: Record<string, unknown>,
+  links: Record<string, unknown>,
+): void {
+  // Narrow before spreading: the walker types values as unknown, and an object
+  // reached here may already carry links from an earlier shape rule.
+  const existing = (obj._links ?? {}) as Record<string, unknown>;
+  obj._links = { ...existing, ...links };
+}
+
 // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
 function linkifyDeviceGroup(dg: Record<string, any>): void {
   const id = dg.id;
   for (const key of DEVICE_GROUP_URL_KEYS) delete dg[key];
   if (typeof id !== "string") return;
-  dg._links = {
+  addLinks(dg, {
     assets: {
       procedure: "assets.getManyByDeviceGroup",
       input: { deviceGroupId: id },
@@ -87,7 +122,7 @@ function linkifyDeviceGroup(dg: Record<string, any>): void {
       procedure: "vulnerabilities.getManyByDeviceGroup",
       input: { deviceGroupId: id },
     },
-  };
+  });
 }
 
 /**
@@ -102,8 +137,7 @@ function linkifyAsset(asset: Record<string, any>): void {
   if (typeof id !== "string") return;
   const hasUtilization = asset.utilization != null;
   delete asset.utilization;
-  asset._links = {
-    ...(asset._links ?? {}),
+  addLinks(asset, {
     workflows: {
       procedure: "workflows.getManyByAsset",
       input: { id },
@@ -116,7 +150,7 @@ function linkifyAsset(asset: Record<string, any>): void {
           },
         }
       : {}),
-  };
+  });
 }
 
 /**
@@ -127,20 +161,80 @@ function linkifyAsset(asset: Record<string, any>): void {
 function linkifyWorkflow(workflow: Record<string, any>): void {
   const id = workflow.id;
   if (typeof id !== "string") return;
-  workflow._links = {
-    ...(workflow._links ?? {}),
+  addLinks(workflow, {
     assets: {
       procedure: "assets.getManyByWorkflow",
       input: { id },
     },
-  };
+  });
+}
+
+/**
+ * Manufacturer, Product, Version, and Vendor are canonical reference records.
+ * Their audit columns and internal flags never change an answer, and the same
+ * record repeats once per row that references it. One vendor advisory carries
+ * 18 device group matchings, so the identical manufacturer arrives 18 times.
+ *
+ * Keep the id and the names. The catalog tells the model to find a device group
+ * by searching these names, so they are load-bearing.
+ *
+ * Every key below is a scalar or a string array, so the order against the child
+ * walk does not matter.
+ */
+const CANONICAL_NOISE_KEYS = [
+  "hasCpe",
+  "nameMappings",
+  "versScheme",
+  "createdAt",
+  "updatedAt",
+] as const;
+
+// biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
+function trimCanonicalRecord(record: Record<string, any>): void {
+  for (const key of CANONICAL_NOISE_KEYS) delete record[key];
+}
+
+/**
+ * A source record carries `raw`: the entire inbound payload, e.g. a whole
+ * Resend email event. It is worth tens of KB of context per row, and the model
+ * never needs it — `markdown` and the parent's own summary already carry the
+ * content.
+ *
+ * Matched on the row's own shape, not its parent: Notification and
+ * WorkOrderTicket both hold `sources`, so the parent is not a reliable signal.
+ *
+ * Stripped before the child walk, so the payload is never recursed into.
+ */
+function stripSourcePayload(source: Record<string, unknown>): void {
+  delete source.raw;
+}
+
+/**
+ * Notifications are the hospital's inbox items. getMany returns list rows without
+ * the affected-asset breakdown, so point the model at the detail call.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
+function linkifyNotification(notification: Record<string, any>): void {
+  const id = notification.id;
+  if (typeof id !== "string") return;
+  addLinks(notification, {
+    detail: {
+      procedure: "notifications.getOne",
+      input: { id },
+    },
+  });
 }
 
 /**
  * Deep-walk a tRPC result and turn every device group's HATEOAS URLs into tRPC
- * "_links" navigation hints
+ * "_links" navigation hints. Also drops payloads too expensive to put in context.
+ *
+ * Entities are matched by shape, not by the procedure that produced them, so a
+ * nested entity is linkified too (e.g. the device group inside an asset result).
+ *
+ * Exported for tests; the tool itself is the only production caller.
  */
-function addNavigationLinks(value: unknown): unknown {
+export function addNavigationLinks(value: unknown): unknown {
   if (Array.isArray(value)) {
     for (const item of value) addNavigationLinks(item);
     return value;
@@ -148,10 +242,16 @@ function addNavigationLinks(value: unknown): unknown {
   if (value !== null && typeof value === "object") {
     // biome-ignore lint/suspicious/noExplicitAny: walking arbitrary tRPC result JSON
     const obj = value as Record<string, any>;
+    if ("raw" in obj && "channel" in obj) stripSourcePayload(obj);
     for (const key of Object.keys(obj)) addNavigationLinks(obj[key]);
+    if ("canonicalName" in obj && "canonicalDisplayName" in obj)
+      trimCanonicalRecord(obj);
     if ("assetsUrl" in obj || "vulnerabilitiesUrl" in obj)
       linkifyDeviceGroup(obj);
     if ("utilization" in obj) linkifyAsset(obj);
+    // hospitalImpact exists only on Notification
+    if ("hospitalImpact" in obj && !("affectedAssets" in obj))
+      linkifyNotification(obj);
     if (
       typeof obj.id === "string" &&
       Array.isArray(obj.nodes) &&
@@ -161,6 +261,43 @@ function addNavigationLinks(value: unknown): unknown {
     return obj;
   }
   return value;
+}
+
+type PlatformProcedure = (typeof PLATFORM_QUERY_PROCEDURES)[number];
+
+/**
+ * Hard page-size limits for procedures whose cost grows faster than their row
+ * count. `paginationInputSchema` accepts up to 100, and prose in the catalog is
+ * advisory — the model can ignore it and often will.
+ *
+ * notifications.getMany runs one deviceGroup.findMany per matching per row, with
+ * no batching. A vendor advisory carries ~18 matchings, so a page of 100 is
+ * ~1800 concurrent queries against a Prisma pool of roughly 17. The overflow
+ * throws P2024, which reaches the model as "an unexpected error occurred", and
+ * the pool is starved for the live UI while it happens.
+ *
+ * Capped here rather than in `paginationInputSchema`, because the routers are
+ * shared with the UI and this limit is about the agent caller only.
+ */
+const PAGE_SIZE_CAPS: Partial<Record<PlatformProcedure, number>> = {
+  "notifications.getMany": 10,
+};
+
+/**
+ * Clamp an over-large page request. The response still carries `totalCount` and
+ * `hasNextPage`, so the model can see that more rows exist and page for them.
+ *
+ * Exported for tests.
+ */
+export function capPageSize(
+  procedure: PlatformProcedure,
+  input: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  const cap = PAGE_SIZE_CAPS[procedure];
+  if (cap === undefined) return input;
+  const requested = input?.pageSize;
+  if (typeof requested !== "number" || requested <= cap) return input;
+  return { ...input, pageSize: cap };
 }
 
 /**
@@ -178,8 +315,8 @@ export function makeQueryPlatformDataTool(userId: string) {
         if (typeof fn !== "function") {
           return `Unknown procedure: ${procedure}`;
         }
-        const result = await fn(input ?? {});
-        return JSON.stringify(addNavigationLinks(result), null, 2);
+        const result = await fn(capPageSize(procedure, input) ?? {});
+        return JSON.stringify(addNavigationLinks(result));
       } catch (error) {
         const message =
           error instanceof TRPCError
@@ -190,7 +327,7 @@ export function makeQueryPlatformDataTool(userId: string) {
     },
     {
       name: "query_platform_data",
-      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device groups, clinical workflows) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here. Returned objects may carry a "_links" map of follow-up calls — call this tool again with a link's procedure and input to navigate (e.g. from an asset's device group to all its assets or vulnerabilities).
+      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device groups, clinical workflows, inbox notifications) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here. Returned objects may carry a "_links" map of follow-up calls — call this tool again with a link's procedure and input to navigate (e.g. from an asset's device group to all its assets or vulnerabilities).
 
 ${PLATFORM_CATALOG}`,
       schema: z.object({

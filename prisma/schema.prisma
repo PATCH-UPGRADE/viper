@@ -1195,10 +1195,37 @@ model Department {
   users              User[]
   tickets            WorkOrderTicket[]   @relation("WorkOrderTicketDepartments")
   ticketDescriptions TicketDescription[]
+  debriefs           Debrief[]
 
   managesRelationships ManagesRelationship[]
 
   @@map("department")
+}
+
+enum DebriefStatus {
+  Generating
+  Ready
+  Failed
+}
+
+model Debrief {
+  id           String        @id @default(cuid())
+  departmentId String
+  department   Department    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  status       DebriefStatus @default(Generating)
+  /// DebriefBullet[] — validated by debriefBulletsSchema in src/features/debrief/types.ts
+  bullets      Json          @default("[]")
+  /// Model id that produced this debrief, for tracing quality changes.
+  model        String?
+  /// createdAt of the previous Ready debrief for this department.
+  since        DateTime?
+  /// Failure message when status is Failed.
+  error        String?       @db.Text
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([departmentId, createdAt])
+  @@map("debrief")
 }
 
 model CategoryColor {
@@ -1459,7 +1486,7 @@ model MitigationPlan {
   summary     String        @db.Text
   compareLine String?       @db.Text // short blurb comparing this plan to the others
   tags        PlanTagEnum[]
-  cards       Json          @default("{}") // { effort, downtime, residual_risk, coverage, timeline }
+  cards       Json          @default("{}") // { effort, downtime, residual_risk, coverage, timeline, rollback_level, rollback_summary, rollback }
 
   notificationId String
   notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
@@ -1468,6 +1495,7 @@ model MitigationPlan {
   order      Int // 0-based; order 0 is the recommended plan
 
   workOrders WorkOrderTicket[]
+  briefing   PlanBriefing?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1477,11 +1505,26 @@ model MitigationPlan {
   @@map("mitigation_plan")
 }
 
+model PlanBriefing {
+  id String @id @default(cuid())
+
+  mitigationPlanId String         @unique
+  mitigationPlan   MitigationPlan @relation(fields: [mitigationPlanId], references: [id], onDelete: Cascade)
+
+  // Markdown strings keyed by audience: { ciso, cmio, deptHead }
+  content Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("plan_briefing")
+}
+
 // A snapshot of some record at a point in time, that goes on to be a source for
 // a notification or work order. Append-only, deduplicated on contentHash and
 // ordered by observedAt — cheap "version control".
 //
-// A record links to notifications/work roders via SourceLink 
+// A record links to notifications/work orders via SourceLink.
 model SourceRecord {
   id      String        @id @default(cuid())
   channel SourceChannel

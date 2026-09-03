@@ -1,6 +1,7 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { fetchUtilizationGrids } from "@/features/assets/server/utilization";
 import {
   IssueStatus,
   MatchFeedbackTargetType,
@@ -20,6 +21,7 @@ import {
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
+import { findDeviceGroupIdsForMatchings } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
   type MatchingWithLabels,
@@ -579,6 +581,39 @@ export const notificationsRouter = createTRPCRouter({
         statusNotes: noteByAsset.get(a.id) ?? null,
       }));
       return createPaginatedResponse(items, meta);
+    }),
+
+  getAffectedAssetUtilization: protectedProcedure
+    .input(z.object({ notificationId: z.string() }))
+    .query(async ({ input }) => {
+      const notification = await prisma.notification.findUnique({
+        where: { id: input.notificationId },
+        select: {
+          deviceGroupsMatchings: {
+            select: {
+              confidence: true,
+              deviceGroupMatching: {
+                select: {
+                  manufacturerId: true,
+                  productId: true,
+                  versionId: true,
+                  versionRange: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!notification) throw new TRPCError({ code: "NOT_FOUND" });
+      const matchings = notification.deviceGroupsMatchings
+        .filter((m) => m.confidence !== "Rejected")
+        .map((m) => m.deviceGroupMatching);
+
+      const deviceGroupIds = await findDeviceGroupIdsForMatchings(matchings);
+      if (deviceGroupIds.length === 0) {
+        return { assets: [], totalAssetCount: 0 };
+      }
+      return fetchUtilizationGrids({ deviceGroupId: { in: deviceGroupIds } });
     }),
 
   markRead: protectedProcedure

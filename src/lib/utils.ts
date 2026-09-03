@@ -7,6 +7,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * The leading word of a display name, for addressing someone directly.
+ *
+ * Returns null for an absent or blank name, so callers choose their own
+ * wording rather than greet an empty string.
+ */
+export function firstNameOf(name: string | null | undefined): string | null {
+  const trimmed = name?.trim();
+  if (!trimmed) return null;
+  return trimmed.split(/\s+/)[0];
+}
+
 export function plural(s: string, count: number): string {
   if (count === 1) {
     return s;

@@ -1,7 +1,16 @@
 "use client";
 
 import { format } from "date-fns";
+import { SquareCheckBigIcon } from "lucide-react";
+import Link from "next/link";
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
+import {
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useCategoryColor } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
 import type { TicketCategory, TicketStatus } from "@/generated/prisma";
@@ -21,6 +30,8 @@ export const statusHue: Record<TicketStatus, string> = {
   REQUIRES_APPROVAL: "yellow",
   DONE: "green",
 };
+
+const statusOrder = Object.keys(statusLabels) as TicketStatus[];
 
 export const categoryLabels: Record<TicketCategory, string> = {
   PATCH: "Patch",
@@ -65,6 +76,80 @@ export const StatusChip = ({
   </Badge>
 );
 
+// Row linking to another ticket; `action` is the optional hover-reveal
+// button sub-tickets.tsx uses that related-work-orders.tsx doesn't need.
+export const TicketRefRow = ({
+  id,
+  summary,
+  status,
+  assigneeName,
+  action,
+}: {
+  id: string;
+  summary: string;
+  status: TicketStatus;
+  assigneeName: string | null;
+  action?: ReactNode;
+}) => (
+  <li className="group relative flex items-center py-2.5">
+    <Link
+      href={`/tracking/${id}`}
+      className={cn(
+        "flex min-w-0 flex-1 items-center gap-3",
+        action &&
+          "transition-[padding] group-hover:pr-8 group-focus-within:pr-8",
+      )}
+    >
+      <SquareCheckBigIcon className="size-4 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 flex-1 truncate text-sm font-medium group-hover:underline">
+        {summary}
+      </span>
+      <div className="flex shrink-0 items-center gap-3">
+        <span className="text-xs text-muted-foreground">
+          {assigneeName ?? "Unassigned"}
+        </span>
+        <StatusChip status={status} />
+      </div>
+    </Link>
+    {action}
+  </li>
+);
+
+// Trigger + option list for a ticket-status Select. Callers still own the
+// <Select value={...} onValueChange={...}> wrapper — this only standardizes
+// the trigger's coloring/labeling and the option list, since edit-form.tsx
+// (labeled via id) and linked-assets-table.tsx (labeled via aria-label,
+// no visible <Label>) need different labeling but the same options/colors.
+export const TicketStatusSelectTrigger = ({
+  status,
+  id,
+  size,
+  colored = false,
+}: {
+  status: TicketStatus;
+  id?: string;
+  size?: "sm" | "default";
+  colored?: boolean;
+}) => (
+  <>
+    <SelectTrigger
+      id={id}
+      size={size}
+      aria-label={id ? undefined : "Ticket status"}
+      className={colored ? getChipClass(statusHue[status]) : undefined}
+    >
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      {statusOrder.map((s) => (
+        <SelectItem key={s} value={s}>
+          {statusLabels[s]}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </>
+);
+
 export const DepartmentChips = ({
   departments,
 }: {
@@ -90,6 +175,26 @@ export const DepartmentChips = ({
 };
 
 export type DetailAssetTicket = TicketDetail["assets"][number];
+
+// To Do → In Progress → Requires Approval → Done (doesn't mutate the input).
+export const sortAssetTicketsByStatus = (
+  assetTickets: DetailAssetTicket[],
+): DetailAssetTicket[] =>
+  [...assetTickets].sort(
+    (a, b) =>
+      statusOrder.indexOf(a.ticket.status) -
+      statusOrder.indexOf(b.ticket.status),
+  );
+
+export const countAssetTicketsByStatus = (
+  assetTickets: DetailAssetTicket[],
+): { status: TicketStatus; count: number }[] =>
+  statusOrder
+    .map((status) => ({
+      status,
+      count: assetTickets.filter((a) => a.ticket.status === status).length,
+    }))
+    .filter((c) => c.count > 0);
 
 export const formatLocation = (location: unknown): string => {
   if (!location || typeof location !== "object") return "—";

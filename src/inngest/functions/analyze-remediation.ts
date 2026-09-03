@@ -1,5 +1,6 @@
 import "server-only";
 import { persistMitigationPlans } from "@/features/inbox/agent/mitigation/persist";
+import { generateQuestionForNotification } from "@/features/inbox/agent/question";
 import { triageNotification } from "@/features/inbox/agent/triage";
 import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
 import { Prisma, SourceChannel, SourceLinkType } from "@/generated/prisma";
@@ -148,12 +149,18 @@ export const analyzeRemediation = inngest.createFunction(
       persistMitigationPlans(sourceId, notificationId),
     );
 
+    const questionSummary = await step.run("generate-questions", async () => {
+      if (!vexSummary) return { questionSkipped: true as const };
+      return generateQuestionForNotification(sourceId, notificationId);
+    });
+
     return {
       remediationId,
       notificationId,
       sourceId,
       vexSummary,
       mitigationSummary,
+      questionSummary,
     };
   },
 );

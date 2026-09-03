@@ -24,8 +24,14 @@ const goldenPlan = {
     effort: "2 tickets · ~14 hrs total",
     downtime: "None to contain",
     residual_risk: "Low",
+    residual_risk_note:
+      "Attack path closed immediately; the vulnerable code is fully removed once each machine is patched.",
     coverage: "6 of 6 assets",
     timeline: "Contained today · patched in ~2 weeks",
+    rollback_level: "Easy",
+    rollback_summary: "Revertible by IT in minutes",
+    rollback:
+      "The firewall rules revert from the console in ~10 min. The firmware update needs a vendor session to roll back.",
   },
   workOrders: [
     {
@@ -88,6 +94,54 @@ describe("buildMitigationPlansSchema", () => {
     };
     const parsed = schema.safeParse({
       plans: [{ ...goldenPlan, cards: partialCards }],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("accepts a plan with no rollback card — rows written before the field existed", () => {
+    const {
+      rollback: _rollback,
+      rollback_level: _level,
+      rollback_summary: _summary,
+      ...cardsWithoutRollback
+    } = goldenPlan.cards;
+    const parsed = schema.safeParse({
+      plans: [{ ...goldenPlan, cards: cardsWithoutRollback }],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("accepts a plan with no residual risk note — rows written before the field existed", () => {
+    const { residual_risk_note: _note, ...cardsWithoutNote } = goldenPlan.cards;
+    const parsed = schema.safeParse({
+      plans: [{ ...goldenPlan, cards: cardsWithoutNote }],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects a rollback level outside the enum", () => {
+    const parsed = schema.safeParse({
+      plans: [
+        {
+          ...goldenPlan,
+          cards: { ...goldenPlan.cards, rollback_level: "Trivial" },
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects an opaque ref leaking into the rollback card", () => {
+    const parsed = schema.safeParse({
+      plans: [
+        {
+          ...goldenPlan,
+          cards: {
+            ...goldenPlan.cards,
+            rollback: "Revert the group-1 switch config.",
+          },
+        },
+      ],
     });
     expect(parsed.success).toBe(false);
   });

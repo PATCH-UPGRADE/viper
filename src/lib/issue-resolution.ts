@@ -24,12 +24,12 @@ function takesPrecedence(
 }
 
 /**
- * The effective issues for one asset: an asset-level override wins for its
- * vulnerability; vulnerabilities without an override inherit the fleet-level
- * issue. Duplicate fleet issues for one vulnerability collapse to the most
- * severe status (AFFECTED > UNDER_INVESTIGATION > NOT_AFFECTED > FIXED),
- * ties broken by lowest id.
+ * Merge multiple issues under 1 asset.
+ * Pick Individual Issue over Fleet's Issue
+ * If no Individual Issue go to Fleet's Issue
+ * If there are multiple Fleet's Issues, picks the most severe one
  */
+
 export function mergeEffectiveIssues<T extends MergeableIssue>(
   fleetIssues: T[],
   overrideIssues: T[],

@@ -38,14 +38,6 @@ type IssueRow<I extends Prisma.IssueInclude> = IssueRows<I>[number] &
     deviceGroupMatchingId: string | null;
   };
 
-/**
- * All issues that affect each given asset: issues attached to a
- * DeviceGroupMatching that applies to the asset's device group (strict
- * version matching), merged with the asset's own issues, which override the
- * matching-level issue for the same vulnerability. Batched: three queries
- * regardless of asset count. This is the single seam to replace if the
- * computed asset-to-matching hop ever needs a denormalized fast path.
- */
 export async function resolveEffectiveIssuesByAsset<
   I extends Prisma.IssueInclude,
 >(
@@ -60,6 +52,8 @@ export async function resolveEffectiveIssuesByAsset<
     where: { id: { in: deviceGroupIds } },
     select: groupIdentitySelect,
   });
+
+  // DeviceGroupMatching entity requires manufacture.id, so we can filter out which one has DGM
   const groupsWithManufacturer = deviceGroups.filter(
     (g): g is (typeof deviceGroups)[number] & { manufacturerId: string } =>
       g.manufacturerId !== null,
@@ -81,6 +75,8 @@ export async function resolveEffectiveIssuesByAsset<
         });
 
   const matchingIdsByGroupId = new Map<string, string[]>();
+
+  // combine DeviceGroup and DeviceGroupMatching using manufacturerId, productId, and versions range
   for (const group of groupsWithManufacturer) {
     const applicableMatchingIds = candidateMatchings
       .filter((matching) => matchingAppliesToDeviceGroup(matching, group))
@@ -88,6 +84,7 @@ export async function resolveEffectiveIssuesByAsset<
     matchingIdsByGroupId.set(group.id, applicableMatchingIds);
   }
 
+  // 1 unique array of DGM ids related to found DeviceGroups
   const allMatchingIds = [
     ...new Set([...matchingIdsByGroupId.values()].flat()),
   ];

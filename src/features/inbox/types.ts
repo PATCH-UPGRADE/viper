@@ -1,5 +1,6 @@
 import type { EmailReceivedEvent } from "resend";
 import { z } from "zod";
+import { externalMappingSelect } from "@/features/integrations/core/urls";
 import {
   type AssetStatus,
   type Prisma,
@@ -19,8 +20,12 @@ export const notificationInclude = {
       },
     },
   },
-  sources: {
-    select: { id: true, channel: true, raw: true, receivedAt: true },
+  sourceLinks: {
+    select: {
+      sourceRecord: {
+        select: { id: true, channel: true, raw: true, observedAt: true },
+      },
+    },
   },
   reads: {
     select: { id: true },
@@ -39,8 +44,8 @@ export type NotificationWithRelations = Omit<
     assetCount: number;
   })[];
 };
-
-export type NotificationSource = NotificationWithRelations["sources"][number];
+export type NotificationSource =
+  NotificationWithRelations["sourceLinks"][number];
 
 export const notificationDetailInclude = {
   deviceGroupsMatchings: {
@@ -55,16 +60,31 @@ export const notificationDetailInclude = {
     },
   },
   vulnerabilities: {
-    select: { vulnerabilityId: true },
-  },
-  sources: {
     select: {
-      id: true,
-      channel: true,
-      raw: true,
-      markdown: true,
-      receivedAt: true,
-      referenceUrl: true,
+      vulnerabilityId: true,
+      vulnerability: { select: { cveId: true } },
+    },
+  },
+  sourceLinks: {
+    select: {
+      sourceType: true,
+      reasonWhy: true,
+      sourceRecord: {
+        select: {
+          id: true,
+          channel: true,
+          raw: true,
+          markdown: true,
+          observedAt: true,
+          attachments: {
+            where: { downloadUrl: { not: null } },
+            select: { id: true, filename: true, contentType: true, size: true },
+          },
+          // Urls are filled in by `mappingUrlExtension`; the integration id it
+          // needs to do that is part of `externalMappingSelect`.
+          mapping: externalMappingSelect,
+        },
+      },
     },
   },
   reads: {
@@ -78,7 +98,7 @@ type NotificationDetailBasePayload = Prisma.NotificationGetPayload<{
 
 export type ResolvedDeviceGroupAsset = {
   id: string;
-  ip: string;
+  ip: string | null;
   hostname: string | null;
   location: unknown;
   version: string | null;
@@ -121,7 +141,7 @@ export type NotificationDetailWithRelations = Omit<
 };
 
 export type NotificationDetailSource =
-  NotificationDetailWithRelations["sources"][number];
+  NotificationDetailWithRelations["sourceLinks"][number]["sourceRecord"];
 
 /**
  * The value stored in `NotificationSource.raw` for email sources

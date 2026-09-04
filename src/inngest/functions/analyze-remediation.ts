@@ -1,26 +1,35 @@
 import "server-only";
 import { persistMitigationPlans } from "@/features/inbox/agent/mitigation/persist";
+import { generateQuestionForNotification } from "@/features/inbox/agent/question";
 import { triageNotification } from "@/features/inbox/agent/triage";
 import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
-import { Prisma } from "@/generated/prisma";
+import { Prisma, SourceChannel, SourceLinkType } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { sourceContentHash } from "@/lib/source-hash";
 import { inngest } from "../client";
 
 type PreparedRemediation =
   | { skipped: "no-vulnerability" }
   | { notificationId: string; sourceId: string };
 
-const REMEDIATION_SOURCE_CHANNEL = "TA4" as const;
+const REMEDIATION_SOURCE_CHANNEL = SourceChannel.TA4;
 
 async function findExistingSource(remediationId: string) {
-  return prisma.notificationSource.findUnique({
+  return prisma.sourceRecord.findUnique({
     where: {
       channel_externalId: {
         channel: REMEDIATION_SOURCE_CHANNEL,
         externalId: remediationId,
       },
     },
-    select: { id: true, notificationId: true },
+    select: {
+      id: true,
+      links: {
+        where: { notificationId: { not: null } },
+        select: { notificationId: true },
+        take: 1,
+      },
+    },
   });
 }
 
@@ -35,8 +44,9 @@ async function prepareRemediationNotification(
   const vulnerabilityId = remediation.vulnerabilityId;
 
   const existing = await findExistingSource(remediationId);
-  if (existing?.notificationId) {
-    return { notificationId: existing.notificationId, sourceId: existing.id };
+  const existingNotificationId = existing?.links[0]?.notificationId;
+  if (existing && existingNotificationId) {
+    return { notificationId: existingNotificationId, sourceId: existing.id };
   }
 
   const vuln = await prisma.vulnerability.findUnique({
@@ -47,19 +57,27 @@ async function prepareRemediationNotification(
   const title = `Update available for ${vuln?.cveId ?? "a tracked vulnerability"}`;
   const summary = remediation.description || remediation.narrative || null;
   const markdown = remediation.narrative || remediation.description || null;
+  const raw = { remediationId };
 
   try {
     return await prisma.$transaction(async (tx) => {
       const notification = await tx.notification.create({
         data: { type: "UpdateAvailable", title, summary },
       });
-      const source = await tx.notificationSource.create({
+      const source = await tx.sourceRecord.create({
         data: {
           channel: REMEDIATION_SOURCE_CHANNEL,
           externalId: remediationId,
-          raw: { remediationId },
+          raw,
           markdown,
-          notificationId: notification.id,
+          contentHash: sourceContentHash(raw, markdown),
+          remediationId,
+          links: {
+            create: {
+              notificationId: notification.id,
+              sourceType: SourceLinkType.Source,
+            },
+          },
         },
       });
       await tx.notificationVulnerabilityMapping.create({
@@ -87,8 +105,9 @@ async function prepareRemediationNotification(
       e.code === "P2002"
     ) {
       const raced = await findExistingSource(remediationId);
-      if (raced?.notificationId) {
-        return { notificationId: raced.notificationId, sourceId: raced.id };
+      const racedNotificationId = raced?.links[0]?.notificationId;
+      if (raced && racedNotificationId) {
+        return { notificationId: racedNotificationId, sourceId: raced.id };
       }
     }
     throw e;
@@ -130,12 +149,18 @@ export const analyzeRemediation = inngest.createFunction(
       persistMitigationPlans(sourceId, notificationId),
     );
 
+    const questionSummary = await step.run("generate-questions", async () => {
+      if (!vexSummary) return { questionSkipped: true as const };
+      return generateQuestionForNotification(sourceId, notificationId);
+    });
+
     return {
       remediationId,
       notificationId,
       sourceId,
       vexSummary,
       mitigationSummary,
+      questionSummary,
     };
   },
 );

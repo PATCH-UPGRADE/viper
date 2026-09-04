@@ -4,14 +4,15 @@ import {
   ConfidenceLevel,
   IssueStatus,
   NotAffectedJustification,
-  NotificationChannel,
   NotificationType,
   Priority,
   ScopeTargetModel,
   Severity,
+  SourceChannel,
   Tlp,
   VersionStatus,
 } from "@/generated/prisma";
+import { sourceContentHash } from "@/lib/source-hash";
 import prisma from "../src/lib/db";
 
 const SEED_USER = {
@@ -82,6 +83,21 @@ const SYNGO_PLAZA_ASSETS = [
   },
 ];
 
+// Mock differnt use cases
+const QUESTION_CASES = [
+  {
+    product: "syngo.via",
+    audience: "VENDOR" as const,
+    expect: "VENDOR GE Healthcare - dropdown, 2 contacts",
+  },
+  {
+    product: "MAGNETOM FAMILY",
+    audience: "VENDOR" as const,
+    expect: "VENDOR Philips - dropdown, 1 contact",
+  },
+  { product: "Symbia Intevo", expect: "MANUFACTURER - no contacts, input" },
+];
+
 async function seedSyngoPlazaVexScenario(userId: string) {
   console.log("\n🌱 Seeding Siemens syngo.plaza VEX scenario...");
 
@@ -108,7 +124,6 @@ async function seedSyngoPlazaVexScenario(userId: string) {
       return prisma.asset.create({
         data: {
           ...asset,
-          upstreamApi: "https://example.com/placeholder",
           status: "Active" as AssetStatus,
           deviceGroupId: deviceGroup.id,
           userId,
@@ -263,27 +278,22 @@ async function seedSyngoPlazaVexScenario(userId: string) {
     },
   });
 
-  await prisma.notificationSource.create({
+  const ssa016040Raw = {
+    type: "email.received",
+    created_at: "2026-02-10T09:00:00.000Z",
     data: {
-      notificationId: notification.id,
-      channel: NotificationChannel.Email,
-      sourceType: "Source",
-      raw: {
-        type: "email.received",
-        created_at: "2026-02-10T09:00:00.000Z",
-        data: {
-          email_id: "seed-ssa-016040",
-          created_at: "2026-02-10T09:00:00.000Z",
-          from: "psirt@siemens-healthineers.com",
-          to: ["security@hospital.org"],
-          cc: [],
-          bcc: [],
-          subject:
-            "SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E",
-          attachments: [],
-        },
-      },
-      markdown: `# SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E
+      email_id: "seed-ssa-016040",
+      created_at: "2026-02-10T09:00:00.000Z",
+      from: "psirt@siemens-healthineers.com",
+      to: ["security@hospital.org"],
+      cc: [],
+      bcc: [],
+      subject:
+        "SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E",
+      attachments: [],
+    },
+  };
+  const ssa016040Markdown = `# SSA-016040: Insecure Password Encryption Vulnerability in syngo.plaza VB30E
 
 **Publication Date**: 2026-02-10 · **CVSS v3.1**: 5.3 · **CVSS v4.0**: 6.3
 
@@ -300,8 +310,19 @@ Siemens Healthineers has released a new hot fix (HF07) for syngo.plaza version V
 The affected application does not encrypt passwords properly. This could allow an attacker to recover the original passwords and might gain unauthorized access.
 
 - CVSS v3.1 Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N
-- CWE-261: Weak Encoding for Password`,
-      receivedAt: new Date(),
+- CWE-261: Weak Encoding for Password`;
+
+  await prisma.sourceRecord.create({
+    data: {
+      channel: SourceChannel.Email,
+      links: {
+        create: { notificationId: notification.id, sourceType: "Source" },
+      },
+      externalId: "seed-ssa-016040",
+      contentHash: sourceContentHash(ssa016040Raw, ssa016040Markdown),
+      raw: ssa016040Raw,
+      markdown: ssa016040Markdown,
+      observedAt: new Date(),
     },
   });
 
@@ -621,7 +642,6 @@ async function seedDeserializationScenario(userId: string) {
       await prisma.asset.create({
         data: {
           ...assetFields,
-          upstreamApi: "https://example.com/placeholder",
           status: "Active" as AssetStatus,
           deviceGroupId: deviceGroup.id,
           userId,
@@ -698,27 +718,22 @@ async function seedDeserializationScenario(userId: string) {
     },
   });
 
-  await prisma.notificationSource.create({
+  const ssa220609Raw = {
+    type: "email.received",
+    created_at: "2022-06-09T09:00:00.000Z",
     data: {
-      notificationId: notification.id,
-      channel: NotificationChannel.Email,
-      sourceType: "Source",
-      raw: {
-        type: "email.received",
-        created_at: "2022-06-09T09:00:00.000Z",
-        data: {
-          email_id: "seed-ssa-220609",
-          created_at: "2022-06-09T09:00:00.000Z",
-          from: "psirt@siemens-healthineers.com",
-          to: ["security@hospital.org"],
-          cc: [],
-          bcc: [],
-          subject:
-            "SSA-220609: Deserialization Vulnerability in Healthcare Products",
-          attachments: [],
-        },
-      },
-      markdown: `# SSA-220609: Deserialization Vulnerability in Healthcare Products
+      email_id: "seed-ssa-220609",
+      created_at: "2022-06-09T09:00:00.000Z",
+      from: "psirt@siemens-healthineers.com",
+      to: ["security@hospital.org"],
+      cc: [],
+      bcc: [],
+      subject:
+        "SSA-220609: Deserialization Vulnerability in Healthcare Products",
+      attachments: [],
+    },
+  };
+  const ssa220609Markdown = `# SSA-220609: Deserialization Vulnerability in Healthcare Products
 
 **Publication Date**: 2022-05-31 · **Last Update**: 2022-06-09 · **CVSS v3.1**: 9.8
 
@@ -733,8 +748,19 @@ The application deserialises untrusted data without sufficient validations that 
 
 ## Workarounds and mitigations
 - If possible, block ports 32912/tcp and 32914/tcp on an external firewall.
-- Product-specific fixes are available; contact your local Siemens Healthineers service representative.`,
-      receivedAt: new Date(),
+- Product-specific fixes are available; contact your local Siemens Healthineers service representative.`;
+
+  await prisma.sourceRecord.create({
+    data: {
+      channel: SourceChannel.Email,
+      links: {
+        create: { notificationId: notification.id, sourceType: "Source" },
+      },
+      externalId: "seed-ssa-220609",
+      contentHash: sourceContentHash(ssa220609Raw, ssa220609Markdown),
+      raw: ssa220609Raw,
+      markdown: ssa220609Markdown,
+      observedAt: new Date(),
     },
   });
 
@@ -765,6 +791,233 @@ The application deserialises untrusted data without sufficient validations that 
   console.log(`  ✅ Created: ${title}`);
 }
 
+async function assetIdsForProducts(products: string[]): Promise<string[]> {
+  const assets = await prisma.asset.findMany({
+    where: {
+      deviceGroup: {
+        product: {
+          canonicalName: {
+            in: products.map((product) => product.trim().toLowerCase()),
+          },
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  return assets.map((asset) => asset.id);
+}
+
+async function seedManageBy(args: {
+  vendorId: string;
+  responsibilities: string;
+  products: string[];
+  contract?: { title: string; from: string; to: string };
+}) {
+  const assetIds = await assetIdsForProducts(args.products);
+  const relationship = await prisma.managesRelationship.create({
+    data: {
+      responsibilities: args.responsibilities,
+      vendorId: args.vendorId,
+      assets: { connect: assetIds.map((id) => ({ id })) },
+    },
+  });
+
+  if (args.contract) {
+    await prisma.contract.create({
+      data: {
+        vendorId: args.vendorId,
+        title: args.contract.title,
+        effectiveFrom: new Date(args.contract.from),
+        effectiveTo: new Date(args.contract.to),
+        managesRelationshipId: relationship.id,
+      },
+    });
+  }
+  console.log(`${args.responsibilities}: ${assetIds.length} assets`);
+  return relationship;
+}
+
+async function seedQuestion() {
+  await prisma.question.deleteMany({
+    where: { status: { in: ["PENDING", "UNSURE"] } },
+  });
+
+  for (const { product, audience, expect } of QUESTION_CASES) {
+    const canonicalName = product.trim().toLowerCase();
+
+    const mapping = await prisma.notificationDeviceGroupMapping.findFirst({
+      where: {
+        notificationId: { not: null },
+        deviceGroupMatching: { product: { canonicalName } },
+      },
+
+      select: {
+        notificationId: true,
+        deviceGroupMatchingId: true,
+        notification: { select: { title: true } },
+      },
+    });
+
+    if (!mapping?.notificationId) {
+      console.log(`No notification mapping found for ${product}`);
+      continue;
+    }
+
+    const issue = await prisma.issue.findFirst({
+      where: { deviceGroupMatchingId: mapping?.deviceGroupMatchingId },
+      select: { id: true },
+    });
+
+    if (!issue) {
+      console.log(`No issue on the ${product} matching`);
+      continue;
+    }
+
+    await prisma.question.create({
+      data: {
+        issueId: issue.id,
+        audience,
+        notificationId: mapping.notificationId,
+        title: `Which ${product} version is running on our units?`,
+        reasonWhy: `The advisory lists affected ${product} versions, but our inventory records the version as unknown, so we cannot confirm exposure.`,
+        suggestedAnswers: [
+          "Yes, we should look into it",
+          "No, isolated",
+          "Partially, needs checking",
+        ],
+      },
+    });
+
+    await prisma.question.create({
+      data: {
+        issueId: issue.id,
+        audience,
+        notificationId: mapping.notificationId,
+        title: `Are the ${product} units reachable from the clinical VLAN?`,
+        reasonWhy: `Exposure depends on segmentation, which the advisory cannot tell us.`,
+        status: "UNSURE",
+      },
+    });
+
+    console.log(`  ✅ Seeded ${product} -> expect ${expect}`);
+  }
+
+  console.log(`  ✅ Seeded UNSURE question`);
+}
+
+async function seedVendorCoverage() {
+  console.log("\n🌱 Seeding vendor coverage...");
+
+  const sieManu = await upsertManufacturer("Siemens Healthineers");
+  const geManu = await upsertManufacturer("GE Healthcare");
+  const phillipsManu = await upsertManufacturer("Philips");
+
+  const shVendor = await prisma.vendor.upsert({
+    where: { canonicalName: "siemens healthineers" },
+    update: { manufacturerId: sieManu.id },
+    create: {
+      canonicalName: "siemens healthineers",
+      canonicalDisplayName: "Siemens Healthineers",
+      overview: "Manages imaging fleet for radiology",
+      partnerSince: new Date("2019-01-01"),
+      manufacturerId: sieManu.id,
+    },
+  });
+  const geVendor = await prisma.vendor.upsert({
+    where: { canonicalName: "ge healthcare" },
+    update: { manufacturerId: geManu.id },
+    create: {
+      canonicalName: "ge healthcare",
+      canonicalDisplayName: "GE Healthcare",
+      overview: "Multivendor managed service across the imaging fleet",
+      partnerSince: new Date("2019-02-01"),
+      manufacturerId: geManu.id,
+    },
+  });
+
+  const phillipVendor = await prisma.vendor.upsert({
+    where: { canonicalName: "philips" },
+    update: { manufacturerId: phillipsManu.id },
+    create: {
+      canonicalName: "philips",
+      canonicalDisplayName: "Philips",
+      overview: "Mantains the MRI fleet under a single-engineer contract.",
+      partnerSince: new Date("2019-03-01"),
+      manufacturerId: phillipsManu.id,
+    },
+  });
+
+  const vendorIds = [shVendor.id, geVendor.id, phillipVendor.id];
+  await prisma.contract.deleteMany({ where: { vendorId: { in: vendorIds } } });
+  await prisma.vendorContact.deleteMany({
+    where: { vendorId: { in: vendorIds } },
+  });
+
+  await prisma.vendorContact.createMany({
+    data: [
+      {
+        vendorId: shVendor.id,
+        name: "John Doe",
+        title: "Hospital Biomed Lead",
+        email: "johndoe@example.com",
+        phone: "123-456-7890",
+        notes: "Usually responds the fastest",
+      },
+      {
+        vendorId: shVendor.id,
+        name: "Jane Doe",
+        title: "IT engineer",
+        email: "janedoe@example.com",
+      },
+      {
+        vendorId: geVendor.id,
+        name: "Gordon Doe",
+        title: "Field service engineer",
+        email: "gordondoe@example.com",
+      },
+      {
+        vendorId: phillipVendor.id,
+        name: "Phillips Doe",
+        title: "Admin",
+        phone: "908-765-4321",
+      },
+    ],
+  });
+
+  await seedManageBy({
+    vendorId: shVendor.id,
+    responsibilities: "",
+    products: ["syngo.via"],
+    contract: {
+      title: "Manages imaging fleet for radiology",
+      from: "2023-01-01",
+      to: "2030-01-01",
+    },
+  });
+
+  await seedManageBy({
+    vendorId: geVendor.id,
+    responsibilities: "manage field service",
+    products: ["Symbia Intevo"],
+    contract: {
+      title: "Multivendor managed service across the imaging fleet",
+      from: "2024-01-01",
+      to: "2028-01-01",
+    },
+  });
+  await seedManageBy({
+    vendorId: phillipVendor.id,
+    responsibilities: "manage field service",
+    products: ["MAGNETOM FAMILY"],
+    contract: {
+      title: "MRI Fleet Managed Service Agreement",
+      from: "2021-01-01",
+      to: "2026-01-01",
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Main seed function
 // ---------------------------------------------------------------------------
@@ -781,6 +1034,8 @@ async function main() {
   const user = await getSeedUser();
   await seedSyngoPlazaVexScenario(user.id);
   await seedDeserializationScenario(user.id);
+  await seedVendorCoverage();
+  await seedQuestion();
 
   console.log("\n✨ Done.");
   await prisma.$disconnect();

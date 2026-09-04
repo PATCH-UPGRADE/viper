@@ -3,19 +3,19 @@ import {
   createUIMessageStreamResponse,
   type UIMessage,
 } from "ai";
-import type { AssetWithIssueRelations } from "@/features/assets/types";
-import { USER_ROLES, type UserRole } from "@/features/chat/utils";
-import { generateThreadTitle } from "@/features/chat/viper-agent/generate-thread-title";
-import { buildChatGraph } from "@/features/chat/viper-agent/langgraph/chat-graph";
+import { buildChatGraph } from "@/features/agents/chat/graph";
+import { buildRecommendationsGraph } from "@/features/agents/recommendations/graph";
+import { generateThreadTitle } from "@/features/agents/shared/generate-thread-title";
 import {
   ensureThread,
   loadHistoryMessages,
   saveAssistantMessage,
   saveUserMessage,
   userMessageCount,
-} from "@/features/chat/viper-agent/langgraph/history";
-import { buildRecommendationsGraph } from "@/features/chat/viper-agent/langgraph/recommendations-graph";
-import { streamGraphToUI } from "@/features/chat/viper-agent/langgraph/stream-bridge";
+} from "@/features/agents/shared/history";
+import { streamGraphToUI } from "@/features/agents/shared/stream-bridge";
+import type { AssetWithIssueRelations } from "@/features/assets/types";
+import { USER_ROLES, type UserRole } from "@/features/chat/utils";
 import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
 import { getSession } from "@/lib/auth-utils";
 import prisma from "@/lib/db";

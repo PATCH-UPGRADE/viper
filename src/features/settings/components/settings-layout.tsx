@@ -41,7 +41,7 @@ export const SettingsLayout = ({ children }: { children: React.ReactNode }) => {
     [
       "integrations",
       <>
-        <PlugIcon /> Integrations
+        <PlugIcon /> Connectors
       </>,
     ],
     [

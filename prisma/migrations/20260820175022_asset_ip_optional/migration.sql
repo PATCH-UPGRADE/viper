@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "asset" ALTER COLUMN "ip" DROP NOT NULL;

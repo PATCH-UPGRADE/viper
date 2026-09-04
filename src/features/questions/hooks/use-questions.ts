@@ -41,6 +41,12 @@ export function useRespondToQuestion() {
         queryClient.invalidateQueries({
           queryKey: trpc.issues.getOne.queryKey(),
         });
+        if (variables.action === "unsure") {
+          queryClient.invalidateQueries({
+            queryKey:
+              trpc.questions.getSuggestedEmailByNotificationId.queryKey(),
+          });
+        }
         if (variables.action === "answer") toast.success("Answer submitted");
       },
       onError: (error) =>
@@ -53,11 +59,16 @@ export function useSuspenseSuggestedEmailsByNotificationId(
   notificationId: string,
 ) {
   const trpc = useTRPC();
-  return useSuspenseQuery(
-    trpc.questions.getSuggestedEmailByNotificationId.queryOptions({
+  return useSuspenseQuery({
+    ...trpc.questions.getSuggestedEmailByNotificationId.queryOptions({
       notificationId,
     }),
-  );
+    // I noticed a new draft email was being created when we refetched, I add this to prevent the draft email from changing unexpectedly during a refetch.
+    staleTime: 60 * (60 * 1000), // set it for 1 hour
+    gcTime: 60 * (60 * 1000), // garbadge collection/cache time
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
 }
 
 export function useApproveEscalation(notificationId: string) {

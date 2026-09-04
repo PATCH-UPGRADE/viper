@@ -62,9 +62,8 @@ const {
       mockSetParams,
     ]),
     mockUseSuspenseTrackingTickets: vi.fn(() => ({
-      // biome-ignore lint/suspicious/noExplicitAny: test stub - DataTable doesn't validate
       data: {
-        items: [] as any[],
+        items: [] as Array<ReturnType<typeof sampleTicket>>,
         page: 1,
         pageSize: 5,
         totalCount: 0,
@@ -251,7 +250,7 @@ const sampleTicket = (overrides: Record<string, unknown> = {}) => ({
   status: "TO_DO",
   category: "PATCH",
   sourceLabel: null,
-  sources: [],
+  sourceLinks: [],
   scheduledAt: new Date("2026-06-10T15:00:00Z"),
   departments: [{ id: "d-it", name: "IT", color: "purple" }],
   assignee: { id: "u1", name: "Alice", email: "alice@example.com" },
@@ -623,7 +622,7 @@ describe("TrackingList — source column", () => {
 
   it("shows the creator's name when there is no ingested source (manual)", () => {
     renderWith({
-      sources: [],
+      sourceLinks: [],
       creator: { id: "u9", name: "Carol Creator", image: null },
     });
     expect(screen.getByText("Carol Creator")).toBeInTheDocument();
@@ -631,22 +630,25 @@ describe("TrackingList — source column", () => {
 
   it("shows the email address for an Email source", () => {
     renderWith({
-      sources: [{ channel: "Email" }],
+      sourceLinks: [{ sourceRecord: { channel: "Email" } }],
       sourceLabel: "ops@stmary.example.org",
     });
     expect(screen.getByText("ops@stmary.example.org")).toBeInTheDocument();
   });
 
-  it("shows the service name for a PolledApi (integration) source", () => {
+  it("shows the service name for an Integration source", () => {
     renderWith({
-      sources: [{ channel: "PolledApi" }],
+      sourceLinks: [{ sourceRecord: { channel: "Integration" } }],
       sourceLabel: "Armis",
     });
     expect(screen.getByText("Armis")).toBeInTheDocument();
   });
 
   it("falls back to the channel name when sourceLabel is null", () => {
-    renderWith({ sources: [{ channel: "Email" }], sourceLabel: null });
+    renderWith({
+      sourceLinks: [{ sourceRecord: { channel: "Email" } }],
+      sourceLabel: null,
+    });
     expect(screen.getByText("Email")).toBeInTheDocument();
   });
 });

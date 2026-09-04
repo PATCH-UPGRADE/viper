@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { NoteActionContext } from "@/features/notes/agent/noteAction/context";
 import { planNoteActions } from "@/features/notes/agent/noteAction/process_output";
-import {
-  type NoteActionResult,
-  noteActionSchema,
-} from "@/features/notes/agent/noteAction/schema";
+import type { NoteActionResult } from "@/features/notes/agent/noteAction/schema";
 
 function mockContext(candidateIds: string[]): NoteActionContext {
   return {

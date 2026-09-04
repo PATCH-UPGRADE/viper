@@ -8,23 +8,25 @@ import {
   ShieldCheckIcon,
   UserCheckIcon,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { AssetUtilizationAnswer } from "@/features/assets/components/asset-utilization-grid";
 import { CollapsibleSectionCard } from "./section-card";
 
 type StubQuestion = {
   id: string;
   icon: LucideIcon;
   question: string;
-  answer: string;
+  answer: ReactNode;
 };
 
 // TODO: Replace these stub questions with real data
-const STUB_QUESTIONS: StubQuestion[] = [
+const buildQuestions = (assetIds: string[]): StubQuestion[] => [
   {
     id: "technical",
     icon: MonitorIcon,
@@ -58,14 +60,18 @@ const STUB_QUESTIONS: StubQuestion[] = [
     icon: ClockIcon,
     question: "What are good times to complete this work order?",
     answer:
-      "Recommended maintenance windows that minimize disruption to the affected services will appear here.",
+      assetIds.length > 0 ? (
+        <AssetUtilizationAnswer assetIds={assetIds} />
+      ) : (
+        "Recommended maintenance windows that minimize disruption to the affected services will appear here."
+      ),
   },
 ];
 
-export const AdditionalDetailsCard = () => (
+export const AdditionalDetailsCard = ({ assetIds }: { assetIds: string[] }) => (
   <CollapsibleSectionCard title="Additional Details">
     <Accordion type="single" collapsible className="w-full">
-      {STUB_QUESTIONS.map(({ id, icon: Icon, question, answer }) => (
+      {buildQuestions(assetIds).map(({ id, icon: Icon, question, answer }) => (
         <AccordionItem key={id} value={id}>
           <AccordionTrigger className="text-sm hover:no-underline">
             <span className="flex items-center gap-2.5 text-left">

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BriefingPanel } from "@/features/mitigation/components/accept-plan-drawer/briefing-panel";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
 import {
   useMarkTicketSeen,
@@ -32,6 +33,7 @@ import { TicketEditForm } from "./edit-form";
 import { LinkedAssetsTabContent } from "./linked-assets";
 import { OverviewCard } from "./overview-card";
 import { RawJsonListCard } from "./raw-json-list-card";
+import { RelatedWorkOrdersSection } from "./related-work-orders";
 import { SubTicketsSection } from "./sub-tickets";
 
 // Re-exports so existing import sites (`./ticket-detail`) keep working.
@@ -42,6 +44,7 @@ export { LinkedAssetsTable } from "./linked-assets-table";
 
 const TAB_VALUES = [
   "details",
+  "briefing",
   "assets",
   "remediations",
   "vulnerabilities",
@@ -71,6 +74,11 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
   useEffect(() => {
     markSeen({ ticketId: id });
   }, [id, markSeen]);
+
+  // A stale ?tab=briefing on a plan-less ticket would render a blank panel.
+  useEffect(() => {
+    if (tab === "briefing" && !data.mitigationPlanId) setTab("details");
+  }, [tab, data.mitigationPlanId, setTab]);
 
   return (
     <EntityContainer
@@ -157,6 +165,9 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
         >
           <TabsList variant="line-primary">
             <TabsTrigger value="details">Details</TabsTrigger>
+            {data.mitigationPlanId && (
+              <TabsTrigger value="briefing">Briefing</TabsTrigger>
+            )}
             <TabsTrigger value="assets">
               Assets
               <TabCount n={data.assets.length} />
@@ -174,11 +185,19 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
           <TabsContent value="details" className="mt-4 flex flex-col gap-4">
             <OverviewCard data={data} />
             <DescriptionCard data={data} />
+            {data.mitigationPlan && (
+              <RelatedWorkOrdersSection
+                ticketId={data.id}
+                siblings={data.mitigationPlan.workOrders}
+              />
+            )}
             <SubTicketsSection
               parentId={data.id}
               childTickets={data.children}
             />
-            <AdditionalDetailsCard />
+            <AdditionalDetailsCard
+              assetIds={data.assets.map((a) => a.asset.id)}
+            />
             <ActivityTimeline
               ticketId={data.id}
               comments={data.comments}
@@ -186,11 +205,16 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
             />
           </TabsContent>
 
+          {data.mitigationPlanId && (
+            <TabsContent value="briefing" className="mt-4">
+              <BriefingPanel planId={data.mitigationPlanId} />
+            </TabsContent>
+          )}
+
           <TabsContent value="assets" className="mt-4">
             <LinkedAssetsTabContent
               ticketId={data.id}
               assetTickets={data.assets}
-              remediations={data.remediations}
             />
           </TabsContent>
 

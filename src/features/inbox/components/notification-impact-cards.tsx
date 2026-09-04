@@ -12,6 +12,7 @@ import {
   hospitalImpactSchema,
   type NotificationDetailWithRelations,
 } from "../types";
+import { NotificationSourcePills } from "./notification-source-pills";
 
 export function HospitalImpactCard({
   notification,
@@ -80,7 +81,10 @@ export function NotificationSummaryCard({
     <CollapsibleCard defaultOpen>
       <CollapsibleCardTrigger>Summary</CollapsibleCardTrigger>
       <CollapsibleCardContent>
-        <p className="text-sm leading-relaxed">{notification.summary}</p>
+        <div className="flex flex-col gap-4">
+          <p className="text-sm leading-relaxed">{notification.summary}</p>
+          <NotificationSourcePills notification={notification} />
+        </div>
       </CollapsibleCardContent>
     </CollapsibleCard>
   );

@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import type { TRPCClientError } from "@trpc/client";
 import { toast } from "sonner";
+import type { AppRouter } from "@/trpc/routers/_app";
 
 /**
  * Generic factory for create mutation hooks
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 export function createMutationHook<TData, TVariables>(
   mutationFn: UseMutationOptions<
     TData,
-    TRPCClientError<any>,
+    TRPCClientError<AppRouter>,
     TVariables
   >["mutationFn"],
   options: {
@@ -28,7 +29,7 @@ export function createMutationHook<TData, TVariables>(
   return () => {
     const queryClient = useQueryClient();
 
-    return useMutation<TData, TRPCClientError<any>, TVariables>({
+    return useMutation<TData, TRPCClientError<AppRouter>, TVariables>({
       mutationFn,
       onSuccess: (data) => {
         toast.success(options.successMessage(data));

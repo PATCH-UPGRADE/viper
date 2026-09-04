@@ -13,6 +13,7 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { ExternalMappingList } from "@/components/external-mappings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -258,21 +259,16 @@ function RemediationDrawer({
 
               <div>
                 <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Upstream API
+                  Integrations
                 </div>
-                {remediation.upstreamApi ? (
-                  <a
-                    href={remediation.upstreamApi}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline flex items-center gap-1"
-                  >
-                    {remediation.upstreamApi}
-                    <ExternalLinkIcon className="size-3" />
-                  </a>
-                ) : (
-                  <p>None set</p>
-                )}
+                <ExternalMappingList
+                  mappings={remediation.externalMappings}
+                  emptyMessage={
+                    <p className="text-sm text-muted-foreground">
+                      Not mapped to any integration.
+                    </p>
+                  }
+                />
               </div>
             </div>
           </div>

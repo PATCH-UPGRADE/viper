@@ -1,403 +1,190 @@
 "use client";
 
-import { DialogClose } from "@radix-ui/react-dialog";
 import {
-  AlertCircleIcon,
-  CircleCheck,
-  CircleDot,
-  CircleX,
-  Sparkles,
+  ArchiveIcon,
+  BellIcon,
+  BugIcon,
+  InboxIcon,
+  type LucideIcon,
+  WebhookIcon,
 } from "lucide-react";
-import { useMemo } from "react";
-import type { UseFormReturn } from "react-hook-form";
-import { AuthenticationFields } from "@/components/auth-form";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   EmptyView,
-  EntitySearch,
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Textarea } from "@/components/ui/textarea";
-import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
-import { getIntegrationColumns } from "@/features/integrations/components/columns";
-import {
-  IntegrationType,
-  type ResourceType,
-  type SyncStatusEnum,
-} from "@/generated/prisma";
-import { useEntitySearch } from "@/hooks/use-entity-search";
-import { usePaginationParams } from "@/lib/pagination";
+import { Card } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { mainPadding } from "@/config/constants";
+import { SettingsSubheader } from "@/features/settings/components/settings-layout";
+import { useSuspenseWebhooks } from "@/features/webhooks/hooks/use-webhooks";
 import { cn } from "@/lib/utils";
+import type { CatalogEntry } from "../core/catalog";
 import { useSuspenseIntegrations } from "../hooks/use-integrations";
-import type { IntegrationFormValues } from "../types";
+import { CATEGORIES, type Category } from "../types";
+import { IntegrationCard } from "./integration-row";
+import { IntegrationsCatalog } from "./integrations-catalog";
 
-export const IntegrationsSearch = () => {
-  const [params, setParams] = usePaginationParams();
-  const { searchValue, onSearchChange } = useEntitySearch({
-    params,
-    setParams,
-  });
-
-  return (
-    <EntitySearch
-      value={searchValue}
-      onChange={onSearchChange}
-      placeholder="Search integrations by name"
-    />
-  );
+const SECTION_ICONS: Record<Category, LucideIcon> = {
+  "Hospital Inventory": ArchiveIcon,
+  "Vulnerability Management Platforms": BugIcon,
+  "Ticketing Platforms": InboxIcon,
+  Notifications: BellIcon,
 };
 
-export const IntegrationsList = ({
-  resourceType,
-}: {
-  resourceType: ResourceType;
-}) => {
-  const { data: integrations } = useSuspenseIntegrations(resourceType);
+/** Highlights whichever catalog section's top is closest to (but above) the viewport top. */
+const useScrollSpy = () => {
+  const [active, setActive] = useState<Category>(CATEGORIES[0]);
+  const elements = useRef(new Map<Category, HTMLDivElement>());
 
-  const columns = useMemo(() => {
-    return getIntegrationColumns(resourceType);
-  }, [resourceType]);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting);
+        if (visible.length === 0) return;
+        const topmost = visible.reduce((a, b) =>
+          a.boundingClientRect.top <= b.boundingClientRect.top ? a : b,
+        );
+        setActive(topmost.target.getAttribute("data-section") as Category);
+      },
+      { rootMargin: "-96px 0px -70% 0px", threshold: 0 },
+    );
+    for (const el of elements.current.values()) observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
-  return (
-    <DataTable
-      search={<IntegrationsSearch />}
-      paginatedData={integrations}
-      columns={columns}
-    />
-  );
-};
-
-export const SyncStatusIndicator = ({
-  status,
-}: {
-  status?: SyncStatusEnum;
-}) => {
-  const className = "flex gap-1 items-center font-semibold";
-  switch (status) {
-    case "Error":
-      return (
-        <span className={cn(className, "text-destructive")}>
-          <CircleX size={15} /> Error
-        </span>
-      );
-    case "Success":
-      return (
-        <span className={cn(className, "text-emerald-600")}>
-          <CircleCheck size={15} /> Success
-        </span>
-      );
-    default:
-      return (
-        <span className={cn(className, "text-gray-500")}>
-          <CircleDot size={15} /> Pending
-        </span>
-      );
-  }
-};
-
-export const IntegrationCreateModal = ({
-  form,
-  handleCreate,
-  open,
-  setOpen,
-  isUpdate,
-  resourceType,
-}: {
-  form: UseFormReturn<IntegrationFormValues>;
-  handleCreate: (values: IntegrationFormValues) => void;
-  open: boolean;
-  setOpen: (open: boolean) => void;
-  resourceType?: ResourceType;
-  isUpdate?: boolean;
-}) => {
-  const onSubmit = (values: IntegrationFormValues) => {
-    handleCreate(values);
+  const register = (section: Category) => (el: HTMLDivElement | null) => {
+    if (el) elements.current.set(section, el);
+    else elements.current.delete(section);
   };
 
-  const isPending = form.formState.isSubmitting;
-  const integrationType = form.watch("integrationType");
-  const verbLabel = isUpdate ? "Update" : "Create";
-  const label = `${verbLabel} ${!isUpdate ? "New" : ""} ${resourceType || ""} Integration`;
+  const scrollTo = (section: Category) => {
+    setActive(section);
+    elements.current
+      .get(section)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
-  const integrationTypes = [
-    {
-      value: IntegrationType.PARTNER,
-      id: "partner",
-      title: "Standard Integration",
-      description: "Pre-configured platforms with built-in support",
-      badge: "e.g., BlueFlow, Helm",
-      icon: null,
-    },
-    {
-      value: IntegrationType.AI,
-      id: "ai",
-      title: "AI Integration",
-      description: "Flexible setup for any custom platform",
-      badge: "Universal & Adaptive",
-      icon: <Sparkles size={15} />,
-    },
-    {
-      value: IntegrationType.REST,
-      id: "rest",
-      title: "REST Integration",
-      description: "Direct pull from a REST API with a built-in adapter",
-      badge: "e.g., Siemens Fleet",
-      icon: null,
-    },
-    /* TODO: Consider using a CSAF type for notification integrations?
-     * ...(resourceType === "Vulnerability"
-      ? [
-          {
-            value: IntegrationType.CSAF,
-            id: "csaf",
-            title: "CSAF Integration",
-            description: "Parse machine-readable CSAF security advisories",
-            badge: "CSAF 2.0",
-            icon: null,
-          },
-        ]
-      : []),*/
-  ];
+  return { active, register, scrollTo };
+};
+
+const ConnectorsSidebar = ({
+  active,
+  onSelect,
+}: {
+  active: Category;
+  onSelect: (section: Category) => void;
+}) => {
+  const { data } = useSuspenseIntegrations();
+  const { data: webhooks } = useSuspenseWebhooks();
+
+  const countBySection = useMemo(
+    () =>
+      data.items.reduce(
+        (counts, item) => {
+          for (const category of item.categories) {
+            counts[category] = (counts[category] ?? 0) + 1;
+          }
+          return counts;
+        },
+        {} as Record<Category, number>,
+      ),
+    [data.items],
+  );
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="p-0 rounded-2xl w-6xl lg:max-w-2xl overflow-hidden">
-        <DialogHeader className="px-6 py-4 border-b gap-1">
-          <DialogTitle className="text-xl">{label}</DialogTitle>
-          <DialogDescription>
-            Connect a standard integration or use AI to sync with any platform
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit, (e) => console.error(e))}
-            id="integration-form"
-            className="px-6"
+    <nav className="flex flex-col gap-1 w-56 shrink-0 sticky top-4 self-start">
+      {CATEGORIES.map((name) => {
+        const Icon = SECTION_ICONS[name];
+        return (
+          <button
+            key={name}
+            type="button"
+            onClick={() => onSelect(name)}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-left",
+              active === name
+                ? "bg-accent text-accent-foreground font-medium"
+                : "text-muted-foreground hover:bg-accent/50",
+            )}
           >
-            <div className="no-scrollbar -mx-6 px-6 py-4 max-h-[60vh] overflow-y-auto grid gap-6">
-              <FormField
-                control={form.control}
-                name="integrationType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Integration Type *</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        className="grid grid-cols-2 gap-4"
-                      >
-                        {integrationTypes.map((type) => {
-                          const isSelected = field.value === type.value;
-
-                          return (
-                            <FormItem key={type.id}>
-                              <FormControl>
-                                <RadioGroupItem
-                                  value={String(type.value)}
-                                  id={type.id}
-                                  className="sr-only"
-                                />
-                              </FormControl>
-                              <FormLabel
-                                htmlFor={type.id}
-                                className={cn(
-                                  "flex flex-col cursor-pointer rounded-lg border-2 p-6 hover:border-primary/50 transition-colors",
-                                  isSelected
-                                    ? "border-primary bg-primary/5"
-                                    : "border-border",
-                                )}
-                              >
-                                <div className="flex items-start gap-3 mb-3">
-                                  <div
-                                    className={cn(
-                                      "w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5",
-                                      isSelected
-                                        ? "border-primary"
-                                        : "border-muted-foreground",
-                                    )}
-                                  >
-                                    {isSelected && (
-                                      <div className="w-3 h-3 rounded-full bg-primary" />
-                                    )}
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="text-md font-semibold mb-2 flex gap-1">
-                                      {type.icon}
-                                      {type.title}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground mb-3">
-                                      {type.description}
-                                    </div>
-                                    <Badge className="text-xs">
-                                      {type.badge}
-                                    </Badge>
-                                  </div>
-                                </div>
-                              </FormLabel>
-                            </FormItem>
-                          );
-                        })}
-                      </RadioGroup>
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              {integrationType === IntegrationType.AI && (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <AlertCircleIcon className="stroke-blue-900" />
-                  <AlertDescription className="text-blue-900">
-                    <strong>AI-generated integrations:</strong> While our AI
-                    does its best to understand and sync with your platform, we
-                    recommend verifying synced data for accuracy.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Integration Name *</FormLabel>
-                    <FormDescription>
-                      How this integration will appear in the platform
-                    </FormDescription>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        placeholder="e.g., Hospital Asset Inventory"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="integrationUri"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Integration URL *</FormLabel>
-                    <FormDescription>
-                      API endpoint for the integration
-                    </FormDescription>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        placeholder="https://example.com/api"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* @ts-expect-error this works, but ts doesn't want you to pass a partial form (extended types don't work) */}
-              <AuthenticationFields form={form} />
-
-              <FormField
-                control={form.control}
-                name="syncEvery"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sync Interval (seconds) *</FormLabel>
-                    <FormDescription>
-                      How often to synchronize with the integration
-                    </FormDescription>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="300"
-                        {...field}
-                        onChange={(e) => {
-                          const value = parseInt(e.target.value, 10);
-                          field.onChange(Number.isNaN(value) ? 300 : value);
-                        }}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Minimum: {INTEGRATION_SYNC_EVERY_MIN * 60} seconds
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {integrationType === IntegrationType.AI && (
-                <FormField
-                  control={form.control}
-                  name="prompt"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Additional Instructions{" "}
-                        <span className="text-muted-foreground">
-                          (Optional)
-                        </span>
-                      </FormLabel>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          placeholder="Provide any additional context, access instructions, or special considerations for the AI to understand your integration"
-                          rows={4}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
-          </form>
-        </Form>
-        <DialogFooter className="px-6 py-4 bg-muted border-t justify-between!">
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button type="submit" form="integration-form" disabled={isPending}>
-            {verbLabel} Integration
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <Icon className="size-4 shrink-0" />
+            <span className="flex-1">{name}</span>
+            <span className="text-xs tabular-nums">
+              {countBySection[name] ?? 0}
+            </span>
+          </button>
+        );
+      })}
+      <Separator className="my-1" />
+      <Link
+        href="/settings/webhooks"
+        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent/50"
+      >
+        <WebhookIcon className="size-4 shrink-0" />
+        <span className="flex-1">Webhooks</span>
+        <span className="text-xs tabular-nums">{webhooks.totalCount}</span>
+      </Link>
+    </nav>
   );
 };
 
-export const IntegrationsLoading = () => {
-  return <LoadingView message="Loading integrations..." />;
+const EnabledIntegrations = () => {
+  const { data } = useSuspenseIntegrations();
+
+  return (
+    <div className="flex flex-col gap-4 flex-1 min-w-0">
+      <SettingsSubheader
+        title="Enabled Integrations"
+        description="Currently active connections syncing data into VIPER."
+      />
+      {data.items.length === 0 ? (
+        <EmptyView message="No integrations enabled yet." />
+      ) : (
+        <Card className="p-0 gap-0 overflow-hidden divide-y">
+          {data.items.map((integration) => (
+            <IntegrationCard key={integration.id} integration={integration} />
+          ))}
+        </Card>
+      )}
+    </div>
+  );
 };
 
-export const IntegrationsError = () => {
-  return <ErrorView message="Error loading integrations" />;
+export const IntegrationsList = ({ catalog }: { catalog: CatalogEntry[] }) => {
+  const { active, register, scrollTo } = useScrollSpy();
+
+  return (
+    <div className="flex gap-6">
+      <ConnectorsSidebar active={active} onSelect={scrollTo} />
+      <div className="flex flex-col gap-10 flex-1 min-w-0">
+        <EnabledIntegrations />
+        <IntegrationsCatalog catalog={catalog} register={register} />
+      </div>
+    </div>
+  );
 };
 
-export const IntegrationsEmpty = () => {
-  return <EmptyView message="No Integrations" />;
-};
+export const IntegrationsContainer = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => (
+  <div className={cn(mainPadding, "flex flex-col gap-4")}>
+    <SettingsSubheader
+      title="Connectors"
+      description="Connect Viper to the systems your hospital already runs — inventory, vulnerability feeds, ticketing, and notifications."
+    />
+    {children}
+  </div>
+);
+
+export const IntegrationsLoading = () => (
+  <LoadingView message="Loading integrations..." />
+);
+
+export const IntegrationsError = () => (
+  <ErrorView message="Error loading integrations" />
+);

@@ -62,16 +62,12 @@ export const setupMockIntegration = async (
 
   expect(createdIntegration.name).toBe(mockIntegrationPayload.name);
   expect(createdIntegration.platform).toBe(mockIntegrationPayload.platform);
-  expect(createdIntegration.integrationUri).toBe(
-    mockIntegrationPayload.integrationUri,
-  );
-  expect(createdIntegration.integrationType).toBe(
-    mockIntegrationPayload.integrationType,
-  );
-  expect(createdIntegration.resourceType).toBe(
-    mockIntegrationPayload.resourceType,
+  expect(createdIntegration.config).toMatchObject(
+    mockIntegrationPayload.config,
   );
   expect(createdIntegration.syncEvery).toBe(mockIntegrationPayload.syncEvery);
+  // Credentials are encrypted bytes and must never come back to a client.
+  expect(createdIntegration).not.toHaveProperty("credentials");
 
   // create an api key for the integration user
   // this will be used to simulate previous integrationUpload runs

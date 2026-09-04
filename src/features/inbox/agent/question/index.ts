@@ -1,6 +1,6 @@
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { buildUserMessage, PdfAttachment } from "@/lib/agent-messages";
+import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { fetchPdfAttachments } from "../../utils";
 import {
@@ -67,9 +67,11 @@ export async function generateFollowUpQuestion(
   );
   if (!context) return null;
 
-  const source = await prisma.notificationSource.findFirst({
-    where: { notificationId: priorQuestions[0].notificationId },
-    orderBy: { receivedAt: "desc" },
+  const source = await prisma.sourceRecord.findFirst({
+    where: {
+      links: { some: { notificationId: priorQuestions[0].notificationId } },
+    },
+    orderBy: { observedAt: "desc" },
   });
 
   const pdfAttachments = source ? await fetchPdfAttachments(source.id) : [];

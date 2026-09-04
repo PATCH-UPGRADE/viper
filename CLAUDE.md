@@ -57,13 +57,16 @@ npm run format
 
 ## Technology Stack
 
-- **Framework**: Next.js 15.5.4 with App Router, React 19, TypeScript (strict mode)
-- **API Layer**: tRPC 11.6.0 for end-to-end type-safe APIs
-- **Database**: Prisma 6.16.3 with PostgreSQL
-- **Authentication**: Better Auth 1.3.26
-- **Background Jobs**: Inngest 3.44.1
+> `package.json` is the source of truth for version info
+
+- **Framework**: Next.js 15 with App Router, React 19, TypeScript (strict mode)
+- **API Layer**: tRPC 11 for end-to-end type-safe APIs
+- **Database**: Prisma 6 with PostgreSQL
+- **Authentication**: Better Auth 1.x
+- **Background Jobs**: Inngest 3.x
+- **Testing**: Vitest 4 (jsdom for unit/component, node for server-side)
 - **State Management**: Jotai (global), TanStack Query (server), nuqs (URL)
-- **Visual Editor**: XYFlow React 12.8.6
+- **Visual Editor**: XYFlow React 12
 - **UI**: Radix UI + Tailwind CSS 4 + shadcn/ui (New York style)
 - **AI / Chat**: LangGraph + LangChain (`ChatAnthropic`) for the chat & recommendations agents, streamed to the client via Vercel AI SDK UI (`useChat`)
 - **AI Providers**: Vercel AI SDK with Anthropic, OpenAI, Google
@@ -193,7 +196,7 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
 
 Inngest runs the durable/background work: integration syncs (cron + event-driven),
 nightly vulnerability enrichment (EPSS / KEV), chat memory persistence, and
-expired-token cleanup. The AI chat does **not** run in Inngest — see "AI Chat" below.
+expired-token cleanup. The AI chat does **not** run in Inngest — see "AI Agents" below.
 
 **Setup** (`src/inngest/functions/`):
 
@@ -201,32 +204,81 @@ expired-token cleanup. The AI chat does **not** run in Inngest — see "AI Chat"
 - Use `step.sleep()` for delays
 - Automatic retry and observability built-in
 
-**API Route** (`src/app/api/inngest/route.ts`):
+**API Route** (`src/app/api/inngest/route.ts`): every function must be added to the `functions`
+array passed to `serve()`, or it will never run.
 
-```typescript
-export const { GET, POST, PUT } = serve({
-  client: inngest,
-  functions: [
-    syncAllIntegrations,
-    syncIntegration,
-    enrichVulnerability,
-    enrichAllVulnerabilities,
-    purgeExpiredTokensFn,
-  ],
-});
-```
+Integration syncs are the one group that is *not* extended by editing these files: adding a
+platform never touches `src/inngest/functions/sync-integrations.ts`. See
+`src/features/integrations/CLAUDE.md` if necessary.
 
 **Development**: Run `npm run inngest:dev` (or `npm run dev:all`) to start the Inngest dev server
 
-### AI Chat (LangGraph + AI SDK UI)
+### AI Agents
 
-The chat and recommendations agents run as a **streaming Next.js route**
-(`src/app/api/chat/route.ts`) — not as Inngest jobs:
+Agents come in two shapes that live in different places. Which shape you need decides
+where the code goes.
 
-- **LangGraph** orchestrates each agent graph in `src/features/chat/viper-agent/langgraph/` (`buildAgentGraph`: deterministic context preload → model ↔ tools, with an `ask_user_questions` human-in-the-loop stop).
-- Models are **LangChain `ChatAnthropic`** — Haiku for the chat agent, Opus + extended thinking for the recommendations agent.
-- The route streams token + reasoning + tool deltas to the client via **Vercel AI SDK UI** (`useChat` in `src/features/chat/hooks/use-viper-chat.ts`); `langgraph/stream-bridge.ts` maps LangGraph `streamEvents` onto the AI SDK UI message stream.
-- Conversation history is persisted to Prisma (`ChatThread` / `ChatMessage`); the `manage_memories` tool dispatches to the `manageMemoriesFn` Inngest function.
+**Conversational agents — `src/features/agents/`**
+
+LangGraph agents that run a model ↔ tools loop and stream to the UI. They share a
+toolset, so they share a home:
+
+- `shared/` — everything used by more than one conversational agent:
+  `buildAgentGraph` (deterministic context preload → model ↔ tools, with
+  human-in-the-loop stops), the `streamEvents` → AI SDK UI bridge, the hospital-wide
+  notes preload, and thread persistence + titling.
+- `tools/` — model-facing tools: `query_platform_data` (a read-only allowlist of tRPC
+  query procedures — mutations are not representable), `record_note`, and
+  `buildAgentTools`, the registry every conversational agent binds.
+- One directory per agent (`chat/`, `recommendations/`) holding only that agent's
+  graph and prompt.
+
+Because every agent binds the same `buildAgentTools` set, a tool added to the
+registry is armed for all of them — describe it in each agent's `<tools>` prompt
+block or that agent can call something it was never told about.
+
+`buildAgentGraph` ends the turn after any tool in `HALT_TOOLS` —
+`ask_user_questions` and `propose_fleet_work_order` — so the graph stops until the
+user answers or accepts. A halting tool can suppress its own stop by prefixing its
+result with `TOOL_REJECTED_PREFIX` (`"REJECTED:"`): the turn then continues, so the
+model sees its own refusal and can correct or explain it, and the UI does not render
+an approval card for a proposal that was rejected.
+
+**Known exception:** the per-role prompt fragments (`ASSET_ROLE_INSTRUCTIONS`,
+`VULNERABILITY_ROLE_INSTRUCTIONS`, `RECOMMENDATION_ROLE_INSTRUCTIONS`) still live in
+`src/features/chat/utils.ts`, and both graphs import them from there — so not all
+agent prompt text is under `agents/` yet. They are keyed `Record<UserRole, string>`,
+and `UserRole` is also used by the asset and vulnerability drawers, so rehoming the
+fragments means first moving that enum somewhere neutral. Until then, a prompt edit
+may mean editing `features/chat/utils.ts`.
+
+Both currently run as a **streaming Next.js route** (`src/app/api/chat/route.ts`),
+not as Inngest jobs:
+
+- Haiku for the chat agent, Opus + extended thinking for the recommendations agent.
+- The route streams token + reasoning + tool deltas to the client via **Vercel AI SDK UI** (`useChat` in `src/features/chat/hooks/use-viper-chat.ts`); `agents/shared/stream-bridge.ts` maps LangGraph `streamEvents` onto the AI SDK UI message stream.
+- Conversation history is persisted to Prisma (`ChatThread` / `ChatMessage`); the `record_note` tool dispatches to the `actionNotesFn` Inngest function.
+
+**Task agents — `src/features/<feature>/agent/`**
+
+Single-shot calls that classify, extract, or score one record. No graph, no tool
+loop, no streaming — they are invoked from Inngest background jobs rather than from
+a user turn, so they stay beside the feature that owns the data:
+
+- `inbox/agent/` — classify, extract, match, triage, vex, mitigation, question
+- `notes/agent/` — extract-notes, noteAction
+- `questions/agent/escalationEmail/`
+
+Typical shape: `new ChatAnthropic({ … }).withStructuredOutput(zodSchema)`.
+
+**Constraint that shapes both shapes:** Anthropic extended thinking requires
+`tool_choice: "auto"`, and `withStructuredOutput()` forces `tool_choice` — so the two
+cannot be combined. When an agent needs thinking *and* a guaranteed output shape,
+bind a single recording tool and read its call args instead; see
+`inbox/agent/vex/index.ts` and `inbox/agent/mitigation/index.ts`. The same constraint
+is why `buildAgentGraph` preloads mandatory context deterministically instead of
+forcing a first tool call — a single forced tool turn disables thinking for the rest
+of the conversation.
 
 ## Database
 
@@ -314,34 +366,56 @@ The chat and recommendations agents run as a **streaming Next.js route**
 - `prisma/schema.prisma` - Database schema definition
 - `src/lib/db.ts` - Prisma client singleton
 
-**VMP Documentation**:
-
-- `docs/technical-overview.md` - VMP technical architecture and node design
-- `docs/upgrade-baa.pdf` - ARPA-H BAA funding requirements and mission
-
 ## VMP-Specific Development Guidelines
 
 ### Healthcare Data Compliance
 
 - **PHI/PII Protection**: All patient and facility data must comply with HIPAA
-- **Clinical Safety**: Life-safety workflows (identified by `life_safety=true` flag) require additional approval gates
-- **Audit Trail**: All workflow executions, approvals, and decisions must be logged
 - **Section 508**: All UI components must meet accessibility requirements
-
-### Hospital Digital Twin Modeling
-
-When modeling hospital systems:
-
-- **Nodes represent clinical functions**, not just network devices
-- **Edges represent dependencies** (data flow or workflow dependencies)
-- **Attributes include**:
-  - Vulnerability scores (CVSS)
-  - Patch status
-  - Uptime requirements (SLA)
-  - Regulatory criticality
-  - Clinical impact (life_safety flag)
 
 ### Testing Requirements
 
 - **Unit tests**: All AI prompts with golden samples
 - **Validation**: Time calculations, risk metrics, downtime estimates must be deterministic and testable
+
+## Testing
+
+Most of the suite is ordinary unit tests, but the API tests in `src/app/api/v1/__tests__/` drive a
+**live server over HTTP** with supertest. They are not excluded from the default vitest project, so
+a bare `npm run test` without `API_KEY` throws at import time. The full local run:
+
+```bash
+npm run db:create-test-api-key
+```
+
+That prints `API_KEY=<key>`. It requires the seed user (`user@example.com`). The key lasts 24 hours.
+
+The server must be started, since the API tests hit `http://localhost:3000`:
+
+```bash
+API_KEY=<key> npm run test -- --run
+```
+
+`npm run test` is bare `vitest`, i.e. **watch mode** — pass `-- --run` for a terminating one-shot
+run. `.github/workflows/ci.yml` (job `run-npm-tests`) is the canonical version of this recipe.
+
+**Integration suite**: `npm run test:integration` runs `tests/integration/` under
+`vitest.integration.config.mts` (node environment). It is a separate cross-service suite against
+Blueflow with its own env vars — `VIPER_API_URL`, `VIPER_API_KEY`, `BLUEFLOW_URL`,
+`VIPER_CALLBACK_URL` — and its own token script, `npm run db:create-blueflow-integration`.
+
+**Conventions**:
+
+- `vitest.config.mts` is jsdom, sets a 60s timeout, aliases `@` → `src`, and stubs `server-only`.
+- Files are `*.test.ts` / `*.test.tsx`; integration suites are `*.integration.test.ts`. Both
+  colocation styles exist — a `__tests__/` sibling directory or the file next to its source.
+- Server-side tests opt out of jsdom per file:
+
+```typescript
+// @vitest-environment node
+vi.mock("server-only", () => ({}));
+```
+
+  `src/inngest/functions/__tests__/sync-integrations.test.ts` is a good model — it mocks `@/lib/db`
+  and stubs `createFunction` to return the raw handler, so an Inngest function can be driven with a
+  fake `step`.

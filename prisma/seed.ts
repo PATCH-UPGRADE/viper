@@ -2,17 +2,17 @@ import { hashPassword } from "better-auth/crypto";
 import {
   type ArtifactType,
   type AssetStatus,
-  AuthType,
-  IntegrationType,
   NoteStatus,
-  NotificationChannel,
+  PlatformEnum,
   Priority,
   ResourceType,
   Severity,
+  SourceChannel,
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { sourceContentHash } from "@/lib/source-hash";
 
 // Seed user credentials
 const SEED_USER = {
@@ -156,7 +156,6 @@ const SAMPLE_ASSETS = [
     ip: "10.40.1.10",
     cpe: "cpe:2.3:h:gehealthcare:brightspeed_elite_select:-:*:*:*:*:*:*:*",
     role: "CT Scanner",
-    upstreamApi: "https://www.gehealthcare.com/support",
     networkSegment: "IMAGING-VLAN-40",
     hostname: "CT-BRIGHT-001",
     macAddress: "00:1A:2B:3C:50:10",
@@ -172,7 +171,6 @@ const SAMPLE_ASSETS = [
     ip: "10.40.1.30",
     cpe: "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
     role: "Portable Ultrasound",
-    upstreamApi: "https://www.gehealthcare.com/support",
     networkSegment: "IMAGING-VLAN-40",
     hostname: "US-LOGIQ-001",
     macAddress: "00:1A:2B:3C:50:30",
@@ -188,7 +186,6 @@ const SAMPLE_ASSETS = [
     ip: "10.40.1.31",
     cpe: "cpe:2.3:h:gehealthcare:logiq_e:r7:*:*:*:*:*:*:*",
     role: "Portable Ultrasound",
-    upstreamApi: "https://www.gehealthcare.com/support",
     networkSegment: "IMAGING-VLAN-40",
     hostname: "US-LOGIQ-002",
     macAddress: "00:1A:2B:3C:50:31",
@@ -204,7 +201,6 @@ const SAMPLE_ASSETS = [
     ip: "10.40.1.40",
     cpe: "cpe:2.3:h:gehealthcare:optima_xr200amx:-:*:*:*:*:*:*:*",
     role: "X-Ray / DR Node",
-    upstreamApi: "https://www.gehealthcare.com/support",
     networkSegment: "IMAGING-VLAN-40",
     hostname: "XR-OPTIMA-001",
     macAddress: "00:1A:2B:3C:50:40",
@@ -221,7 +217,6 @@ const SAMPLE_ASSETS = [
     ip: "10.40.1.20",
     cpe: "cpe:2.3:a:gehealthcare:advantage_workstation:4.6:*:*:*:*:*:*:*",
     role: "CT Acquisition Workstation",
-    upstreamApi: "https://www.gehealthcare.com/support",
     networkSegment: "IMAGING-VLAN-40",
     hostname: "WS-ADVANTAGE-001",
     macAddress: "00:1A:2B:3C:50:20",
@@ -378,7 +373,6 @@ const SAMPLE_ASSETS = [
     ip: "10.40.2.10",
     cpe: "cpe:2.3:a:gehealthcare:centricity_pacs_iw:5.0:*:*:*:*:*:*:*",
     role: "PACS Server",
-    upstreamApi: "https://www.gehealthcare.com/support",
     networkSegment: "PACS-VLAN-41",
     hostname: "PACS-CENTRICITY-001",
     macAddress: "00:1A:2B:3C:51:10",
@@ -395,7 +389,6 @@ const SAMPLE_ASSETS = [
     ip: "10.40.2.20",
     cpe: "cpe:2.3:a:gehealthcare:centricity_pacs_iw:-:*:*:*:*:*:*:*",
     role: "Radiology Diagnostic Workstation",
-    upstreamApi: "https://www.gehealthcare.com/support",
     networkSegment: "PACS-VLAN-41",
     hostname: "WS-RADIOLOGY-001",
     macAddress: "00:1A:2B:3C:51:20",
@@ -405,13 +398,13 @@ const SAMPLE_ASSETS = [
       room: "Radiology Reading Room",
     },
     status: "Active",
+    utilization: IMAGING_UTILIZATION,
   },
   {
     id: "rad-rws-002",
     ip: "10.40.2.21",
     cpe: "cpe:2.3:a:gehealthcare:centricity_pacs_iw:-:*:*:*:*:*:*:*",
     role: "Radiology Diagnostic Workstation",
-    upstreamApi: "https://www.gehealthcare.com/support",
     networkSegment: "PACS-VLAN-41",
     hostname: "WS-RADIOLOGY-002",
     macAddress: "00:1A:2B:3C:51:21",
@@ -421,6 +414,7 @@ const SAMPLE_ASSETS = [
       room: "Radiology Reading Room",
     },
     status: "Active",
+    utilization: IMAGING_UTILIZATION,
   },
   // ── ED Image Viewer (ED-VLAN-50) ─────────────────────────────────────────────
   // Dell OptiPlex 790, Windows 7
@@ -429,7 +423,6 @@ const SAMPLE_ASSETS = [
     ip: "10.50.1.10",
     cpe: "cpe:2.3:h:dell:optiplex_790:-:*:*:*:*:*:*:*",
     role: "ED Image Viewer / Workstation",
-    upstreamApi: "https://www.dell.com/support",
     networkSegment: "ED-VLAN-50",
     hostname: "WS-ED-VIEWER-001",
     macAddress: "00:1A:2B:3C:52:10",
@@ -447,7 +440,6 @@ const SAMPLE_ASSETS = [
     ip: "10.70.1.10",
     cpe: "cpe:2.3:h:cisco:asa_5505:-:*:*:*:*:*:*:*",
     role: "Remote Radiology VPN Gateway",
-    upstreamApi: "https://www.cisco.com/c/en/us/support",
     networkSegment: "INFRA-VLAN-70",
     hostname: "VPN-ASA-001",
     macAddress: "00:1A:2B:3C:53:10",
@@ -464,7 +456,6 @@ const SAMPLE_ASSETS = [
     ip: "10.70.1.20",
     cpe: "cpe:2.3:h:cisco:catalyst_2960s-24ts-l:-:*:*:*:*:*:*:*",
     role: "Imaging Network Switch",
-    upstreamApi: "https://www.cisco.com/c/en/us/support",
     networkSegment: "INFRA-VLAN-70",
     hostname: "SW-IMAGING-001",
     macAddress: "00:1A:2B:3C:53:20",
@@ -481,7 +472,6 @@ const SAMPLE_ASSETS = [
     ip: "10.70.1.1",
     cpe: "cpe:2.3:h:cisco:asa_5505:-:*:*:*:*:*:*:*",
     role: "Perimeter Firewall",
-    upstreamApi: "https://www.cisco.com/c/en/us/support",
     networkSegment: "INFRA-VLAN-70",
     hostname: "FW-ASA-001",
     macAddress: "00:1A:2B:3C:53:01",
@@ -498,7 +488,6 @@ const SAMPLE_ASSETS = [
     ip: `10.20.3.${101 + i}`,
     cpe: "cpe:2.3:h:philips:intellivue_mp5:-:*:*:*:*:*:*:*",
     role: "Patient Monitor",
-    upstreamApi: "https://www.philips.com/a-w/about/support.html",
     networkSegment: "WARD-VLAN-20",
     hostname: `MON-MP5-${String(i + 1).padStart(3, "0")}`,
     macAddress: `00:1A:2B:3C:60:${(0x10 + i).toString(16).padStart(2, "0").toUpperCase()}`,
@@ -515,8 +504,6 @@ const SAMPLE_ASSETS = [
     ip: `10.20.4.${101 + i}`,
     cpe: "cpe:2.3:h:baxter:sigma_spectrum:-:*:*:*:*:*:*:*",
     role: "Infusion Pump",
-    upstreamApi:
-      "https://www.baxter.com/healthcare-professionals/service-and-support",
     networkSegment: "WARD-VLAN-20",
     hostname: `PUMP-SIGMA-${String(i + 1).padStart(3, "0")}`,
     macAddress: `00:1A:2B:3C:61:${(0x10 + i).toString(16).padStart(2, "0").toUpperCase()}`,
@@ -533,7 +520,6 @@ const SAMPLE_ASSETS = [
     ip: "10.40.1.60",
     cpe: "cpe:2.3:h:siemens:magnetom_sola:-:*:*:*:*:*:*:*",
     role: "MRI Scanner",
-    upstreamApi: "https://www.siemens-healthineers.com/support",
     networkSegment: "IMAGING-VLAN-40",
     hostname: "MR-MAGNETOM-001",
     macAddress: "00:1A:2B:3C:50:60",
@@ -550,7 +536,6 @@ const SAMPLE_ASSETS = [
     ip: "10.40.1.61",
     cpe: "cpe:2.3:h:siemens:somatom_go.top:-:*:*:*:*:*:*:*",
     role: "CT Scanner",
-    upstreamApi: "https://www.siemens-healthineers.com/support",
     networkSegment: "IMAGING-VLAN-40",
     hostname: "CT-SOMATOM-001",
     macAddress: "00:1A:2B:3C:50:61",
@@ -605,8 +590,6 @@ const SAMPLE_VULNERABILITIES = [
       "cpe:2.3:h:gehealthcare:optima_xr200amx:-:*:*:*:*:*:*:*",
     ],
     exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2020-25175",
-    upstreamApi:
-      "https://www.cisa.gov/news-events/ics-medical-advisories/icsma-20-343-01",
     description:
       "GE Healthcare imaging and ultrasound products may allow specific credentials to be exposed during transport over the network due to insufficiently protected credential transmission (CWE-522/CWE-523). Affects the BrightSpeed Elite Select CT scanner, LOGIQ e R7 portable ultrasound units, and Optima XR200amx X-ray system.",
     narrative:
@@ -650,8 +633,6 @@ const SAMPLE_VULNERABILITIES = [
       "cpe:2.3:h:dell:optiplex_790:-:*:*:*:*:*:*:*",
     ],
     exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2017-0144",
-    upstreamApi:
-      "https://support.microsoft.com/en-us/topic/ms17-010-security-update-for-windows-smb-server-814d78c1-a11d-e4c8-d52a-f41a41b5d238",
     description:
       "Windows SMBv1 remote code execution vulnerability (MS17-010) allows unauthenticated remote attackers to execute arbitrary code via crafted SMB packets. Exploited by WannaCry and NotPetya ransomware. End-of-life Windows 7 or Windows Server 2008 R2 devices cannot receive the MS17-010 patch through standard Windows Update.",
     narrative:
@@ -689,8 +670,6 @@ const SAMPLE_VULNERABILITIES = [
       "cpe:2.3:a:cisco:adaptive_security_appliance_software:8.2:*:*:*:*:*:*:*",
     ],
     exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2016-6366",
-    upstreamApi:
-      "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-20160817-asa-snmp",
     description:
       "Buffer overflow in the SNMP code of Cisco ASA Software versions 8.4 and earlier allows unauthenticated remote attackers to execute arbitrary code or reload the device via crafted SNMPv2c packets. Disclosed by the Shadow Brokers as the EXTRABACON exploit. Both ASA 5505 devices in this network (remote radiology VPN gateway and perimeter firewall) run ASA OS 8.2.",
     narrative:
@@ -727,8 +706,6 @@ const SAMPLE_VULNERABILITIES = [
     },
     cpes: ["cpe:2.3:h:baxter:sigma_spectrum:-:*:*:*:*:*:*:*"],
     exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2021-12345",
-    upstreamApi:
-      "https://www.baxter.com/healthcare-professionals/service-and-support",
     description:
       "Buffer overflow in the wireless management interface of Baxter Sigma Spectrum infusion pumps running firmware versions prior to 8.x allows an attacker on the same wireless segment to execute arbitrary code or crash the device via crafted management packets. All 23 Sigma Spectrum pumps on WARD-VLAN-20 are running the vulnerable firmware (v1.2.3).",
     narrative:
@@ -767,7 +744,6 @@ const SAMPLE_REMEDIATIONS = [
       "Apply GE Healthcare ICS security controls per CISA advisory ICSMA-20-343-01 and GE Security Bulletin GE-2020-004 to mitigate credential exposure on imaging devices (CVE-2020-25175).",
     narrative:
       "Work with GE Healthcare Biomedical/Clinical Engineering to apply mitigations from GE Security Bulletin GE-2020-004. Immediately isolate all affected GE imaging devices (CT scanner, ultrasound units, X-ray node) to a dedicated DICOM VLAN with strict ACLs permitting only DICOM traffic (port 104/TCP) to and from the PACS server. Disable unnecessary network services on each device via GE service mode. Request firmware update availability from your GE account representative. Deploy IDS/IPS monitoring on the DICOM VLAN to detect anomalous credential-bearing traffic. Post-remediation: verify DICOM connectivity to PACS and confirm the imaging workflow is unaffected.",
-    upstreamApi: "https://www.gehealthcare.com/security",
   },
   // CVE-2017-0144 remediation for CT Acquisition Workstation (Windows 7 / EOL host)
   {
@@ -778,7 +754,6 @@ const SAMPLE_REMEDIATIONS = [
       "Windows 7 and Server 2008 R2 are end-of-life and do not receive patches via standard Windows Update. Apply MS17-010 via Microsoft extended support if contracted, then implement network-level compensating controls to mitigate EternalBlue (CVE-2017-0144) across all five imaging network Windows hosts.",
     narrative:
       "Immediate actions: (1) Disable SMBv1 on all five affected hosts via PowerShell (Set-SmbServerConfiguration -EnableSMB1Protocol $false) and registry (HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters, SMB1=0). (2) Block TCP port 445 inbound at the Cisco Catalyst 2960S switch using ACLs on all imaging and PACS VLANs. (3) Deploy host-based firewall rules to block SMB from non-management hosts. (4) Micro-segment each workstation subnet to minimize lateral movement. Long-term: coordinate with GE Healthcare to plan migration of CT acquisition workstation and PACS server to a supported OS — Advantage Workstation 4.6 and Centricity PACS-IW 5.0 compatibility with newer Windows versions must be confirmed with the manufacturer before upgrading.",
-    upstreamApi: "https://www.microsoft.com/en-us/windows/end-of-support",
   },
   // CVE-2016-6366 remediation for Cisco ASA 5505 (both VPN gateway and firewall)
   {
@@ -789,8 +764,6 @@ const SAMPLE_REMEDIATIONS = [
       "Upgrade Cisco ASA 5505 software from 8.2.x to a patched release (9.1(7.21) or later) per Cisco Security Advisory cisco-sa-20160817-asa-snmp to remediate the EXTRABACON SNMP buffer overflow (CVE-2016-6366). Applies to both the remote radiology VPN gateway and the perimeter firewall.",
     narrative:
       "Both ASA 5505 appliances must be upgraded. Cisco ASA 5505 supports ASA software up to 9.2(x); upgrade to 9.1(7.21)+ or the latest available 9.2.x release. Before upgrading: back up ASA configuration (copy running-config tftp://...), test rollback procedure in a change window. Schedule separate maintenance windows for each device — perimeter firewall first (~30 min downtime), then VPN gateway (coordinate with remote radiology team to minimize after-hours coverage gap). If an immediate upgrade cannot be scheduled: switch from SNMPv2c to SNMPv3 with authentication and encryption, or restrict SNMP community access via ACL to the management VLAN only. Post-upgrade: verify VPN tunnels for remote radiologist access, confirm firewall policy enforcement, and validate DICOM routing.",
-    upstreamApi:
-      "https://www.cisco.com/c/en/us/support/security/asa-5500-series-next-generation-firewalls/series.html",
   },
 ];
 
@@ -869,7 +842,7 @@ type SampleTicket = {
   department: string | string[];
   // When set, the seed creates a linked NotificationSource on this channel
   // (the ticket renders as ingested). Omitted ⇒ manually created.
-  sourceChannel?: NotificationChannel;
+  sourceChannel?: SourceChannel;
   sourceLabel?: string;
   scheduledAt?: Date;
   linkedCveIds?: string[];
@@ -965,7 +938,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
       Administration:
         "Imaging-chain EternalBlue remediation. Compliance-relevant: EOL OS exposure on patient-facing systems. PACS server change requires CMO sign-off (separate child ticket) due to imaging chain blast radius. Expected aggregate downtime across all hosts: under 30 minutes during business hours, plus a single overnight maintenance window for PACS.",
     },
-    sourceChannel: NotificationChannel.PolledApi,
+    sourceChannel: SourceChannel.Integration,
     sourceLabel: "TriMedX RSQ",
     linkedCveIds: ["CVE-2017-0144"],
     linkedAssetIds: [
@@ -986,7 +959,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.TO_DO,
         category: TicketCategory.CONFIG_CHANGE,
         department: "Radiology",
-        sourceChannel: NotificationChannel.PolledApi,
+        sourceChannel: SourceChannel.Integration,
         sourceLabel: "TriMedX RSQ",
         linkedCveIds: ["CVE-2017-0144"],
         linkedAssetIds: ["rad-ws-001"],
@@ -1002,7 +975,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.REQUIRES_APPROVAL,
         category: TicketCategory.VULN_REMEDIATION,
         department: "Radiology",
-        sourceChannel: NotificationChannel.Email,
+        sourceChannel: SourceChannel.Email,
         sourceLabel: "security@hospital.example.org",
         scheduledAt: inDays(10),
         linkedCveIds: ["CVE-2017-0144"],
@@ -1060,7 +1033,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
     status: TicketStatus.TO_DO,
     category: TicketCategory.VULN_REMEDIATION,
     department: "Radiology",
-    sourceChannel: NotificationChannel.PolledApi,
+    sourceChannel: SourceChannel.Integration,
     sourceLabel: "TriMedX RSQ",
     linkedCveIds: ["CVE-2020-25175"],
     linkedAssetIds: ["rad-ct-001", "rad-us-001", "rad-us-002", "rad-xr-001"],
@@ -1075,7 +1048,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.TO_DO,
         category: TicketCategory.CONFIG_CHANGE,
         department: "Radiology",
-        sourceChannel: NotificationChannel.PolledApi,
+        sourceChannel: SourceChannel.Integration,
         sourceLabel: "TriMedX RSQ",
         linkedCveIds: ["CVE-2020-25175"],
         linkedAssetIds: [
@@ -1119,7 +1092,7 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
         status: TicketStatus.IN_PROGRESS,
         category: TicketCategory.PATCH,
         department: "IT",
-        sourceChannel: NotificationChannel.Email,
+        sourceChannel: SourceChannel.Email,
         sourceLabel: "security@hospital.example.org",
         scheduledAt: inDays(3),
         linkedCveIds: ["CVE-2016-6366"],
@@ -1177,14 +1150,18 @@ async function clearDatabase() {
   await prisma.workflow.deleteMany();
   // Delete in order of dependencies (child tables first)
   await prisma.issue.deleteMany();
-  await prisma.syncStatus.deleteMany();
+  await prisma.integrationResourceSync.deleteMany();
+  // Ticket deletion cascades SourceLink but not the records themselves.
+  await prisma.sourceRecord.deleteMany({ where: { links: { none: {} } } });
   await prisma.externalAssetMapping.deleteMany();
   await prisma.externalVulnerabilityMapping.deleteMany();
   await prisma.artifact.deleteMany();
   await prisma.artifactWrapper.deleteMany();
-  // ContractAsset references Asset, so it must go before the asset delete below.
-  await prisma.contractAsset.deleteMany();
   await prisma.contract.deleteMany();
+  // Both the contract and vendor deletes are SetNull, so the relationship would
+  // otherwise survive here with a null vendorId, out of reach of the
+  // vendor-scoped cleanup in seedVendors().
+  await prisma.managesRelationship.deleteMany();
   await prisma.vendorContact.deleteMany();
   await prisma.vendor.deleteMany();
   await prisma.remediation.deleteMany();
@@ -1356,13 +1333,12 @@ async function seedAssets(userId: string) {
         where: {
           id: "id" in asset && asset.id ? asset.id : "-1",
         },
-        update: {},
+        update: { utilization: asset.utilization },
         create: {
           ...("id" in asset && asset.id ? { id: asset.id } : {}),
           ip: asset.ip,
           networkSegment: asset.networkSegment,
           role: asset.role,
-          upstreamApi: asset.upstreamApi,
           hostname: asset.hostname,
           macAddress: asset.macAddress,
           serialNumber: asset.serialNumber,
@@ -1394,7 +1370,7 @@ async function seedFleetIntegration(userId: string) {
   console.log("\n🌱 Seeding Siemens Healthineers Fleet integration...");
 
   const existing = await prisma.integration.findFirst({
-    where: { integrationUri: { contains: "fleet.siemens-healthineers.com" } },
+    where: { platform: PlatformEnum.FLEET },
   });
 
   // Integrations own a service user — the creator of the tickets they ingest.
@@ -1416,17 +1392,31 @@ async function seedFleetIntegration(userId: string) {
     (await prisma.integration.create({
       data: {
         name: "Siemens Healthineers teamplay Fleet",
-        platform: "teamplay Fleet",
-        integrationUri:
-          "https://fleet.siemens-healthineers.com/rest/v1/activities?tz=-05:00",
-        integrationType: IntegrationType.REST,
-        authType: AuthType.None,
-        resourceType: ResourceType.WorkOrder,
+        platform: PlatformEnum.FLEET,
+        config: {},
         syncEvery: 3600,
         userId,
         integrationUserId: integrationUser.id,
+        resourceSyncs: {
+          create: [
+            { resource: ResourceType.WorkOrder },
+            { resource: ResourceType.Asset },
+          ],
+        },
       },
     }));
+
+  // A re-seed against an existing integration must still gain any sync rows
+  // added since it was first created (e.g. Asset, VW-434).
+  for (const resource of [ResourceType.WorkOrder, ResourceType.Asset]) {
+    await prisma.integrationResourceSync.upsert({
+      where: {
+        integrationId_resource: { integrationId: integration.id, resource },
+      },
+      create: { integrationId: integration.id, resource },
+      update: {},
+    });
+  }
 
   let linked = 0;
   for (const equipment of SEED_FLEET_EQUIPMENT) {
@@ -1657,7 +1647,6 @@ async function seedRemediations(userId: string) {
         data: {
           description: remediation.description,
           narrative: remediation.narrative,
-          upstreamApi: remediation.upstreamApi,
           vulnerabilityId: vulnerability.id,
           deviceGroupMatchings: matchingId
             ? { connect: { id: matchingId } }
@@ -2171,10 +2160,22 @@ async function createWorkOrderTicket(
       status: ticket.status,
       category: ticket.category,
       sourceLabel: ticket.sourceLabel,
-      // For ingested demo tickets, attach a NotificationSource on the given
-      // channel so the Source column renders the channel icon + label.
-      sources: ticket.sourceChannel
-        ? { create: [{ channel: ticket.sourceChannel, raw: {} }] }
+      // For ingested demo tickets, attach a SourceRecord on the given channel
+      // so the Source column renders the channel icon + label.
+      sourceLinks: ticket.sourceChannel
+        ? {
+            create: [
+              {
+                sourceRecord: {
+                  create: {
+                    channel: ticket.sourceChannel,
+                    raw: {},
+                    contentHash: sourceContentHash({}, null),
+                  },
+                },
+              },
+            ],
+          }
         : undefined,
       departments: {
         connect: orderedDepartments.map((d) => ({ id: d.id })),
@@ -2265,6 +2266,11 @@ async function seedVendors() {
   // Rebuilt rather than upserted: neither model has a natural unique key, so a
   // re-seed without SEED_CLEAR_DB would otherwise stack duplicates every run.
   await prisma.contract.deleteMany({ where: { vendorId: vendor.id } });
+  // Contract.managesRelationshipId is SetNull, so the delete above orphans the
+  // relationship rather than removing it — clear it explicitly.
+  await prisma.managesRelationship.deleteMany({
+    where: { vendorId: vendor.id },
+  });
   await prisma.vendorContact.deleteMany({ where: { vendorId: vendor.id } });
 
   await prisma.vendorContact.createMany({
@@ -2291,22 +2297,25 @@ async function seedVendors() {
     select: { id: true },
   });
 
-  const contract = await prisma.contract.create({
+  // ContractAsset is gone: a contract reaches its assets through the
+  // ManagesRelationship that answers "who is responsible for this asset?".
+  const managesRelationship = await prisma.managesRelationship.create({
+    data: {
+      responsibilities:
+        "Managed security and maintenance for imaging equipment under contract.",
+      vendorId: vendor.id,
+      assets: { connect: assets.map((asset) => ({ id: asset.id })) },
+    },
+  });
+
+  await prisma.contract.create({
     data: {
       vendorId: vendor.id,
       title: "Imaging Fleet Managed Service Agreement",
       effectiveFrom: new Date("2024-01-01"),
       effectiveTo: new Date("2027-12-31"),
-      coverageSummary: `Managed security and maintenance across imaging (${assets.length} assets)`,
+      managesRelationshipId: managesRelationship.id,
     },
-  });
-
-  await prisma.contractAsset.createMany({
-    data: assets.map((asset) => ({
-      contractId: contract.id,
-      assetId: asset.id,
-    })),
-    skipDuplicates: true,
   });
 
   console.log(

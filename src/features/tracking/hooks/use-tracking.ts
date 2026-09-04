@@ -28,7 +28,11 @@ export const useSuspenseAssetWorkOrders = (assetId: string) => {
   );
 };
 
-export const useUpdateTicket = (ticketId: string) => {
+export const useUpdateTicket = (
+  ticketId: string,
+  relatedTicketId?: string,
+  assetId?: string,
+) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   return useMutation(
@@ -37,9 +41,16 @@ export const useUpdateTicket = (ticketId: string) => {
         queryClient.invalidateQueries(
           trpc.tracking.getOne.queryFilter({ id: ticketId }),
         );
+        if (relatedTicketId) {
+          queryClient.invalidateQueries(
+            trpc.tracking.getOne.queryFilter({ id: relatedTicketId }),
+          );
+        }
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
         queryClient.invalidateQueries(
-          trpc.tracking.getManyByAssetId.queryFilter(),
+          assetId
+            ? trpc.tracking.getManyByAssetId.queryFilter({ assetId })
+            : trpc.tracking.getManyByAssetId.queryFilter(),
         );
         toast.success("Ticket updated");
       },

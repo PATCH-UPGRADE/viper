@@ -1,13 +1,15 @@
 import { z } from "zod";
+import { externalMappingWithSyncSelect } from "@/features/integrations/core/urls";
 import {
   AssetStatus,
   IssueStatus,
-  NotificationChannel,
-  NotificationSourceType,
   NotificationType,
+  PlatformEnum,
   Priority,
   type Prisma,
   Severity,
+  SourceChannel,
+  SourceLinkType,
   TicketActivityType,
   TicketCategory,
   TicketStatus,
@@ -26,7 +28,11 @@ export const ticketBaseInclude = {
   assets: { select: { asset: { select: { id: true, hostname: true } } } },
   // Ingested source artifact(s); the Source column renders by channel (or the
   // creator avatar when there are none — i.e. a manually-created ticket).
-  sources: { select: { channel: true }, take: 1 },
+  sourceLinks: {
+    select: { sourceRecord: { select: { channel: true } } },
+    orderBy: { createdAt: "desc" as const },
+    take: 1,
+  },
   // `watchers` and `seenBy` are replaced at the procedure level with a
   // where: { userId } filter so each row reflects only the current user's
   // watch/seen state. Including them here keeps the derived TS type consistent
@@ -199,27 +205,32 @@ export const ticketDetailInclude = {
     },
     orderBy: { createdAt: "asc" as const },
   },
-  sources: {
+  sourceLinks: {
     select: {
-      id: true,
-      channel: true,
-      externalId: true,
-      referenceUrl: true,
       sourceType: true,
+      sourceRecord: {
+        select: { id: true, channel: true, externalId: true },
+      },
     },
-    orderBy: { receivedAt: "desc" as const },
+    orderBy: { createdAt: "desc" as const },
   },
-  externalMappings: {
+  externalMappings: externalMappingWithSyncSelect,
+  notification: { select: { id: true, title: true, type: true } },
+  // Self isn't excluded here — a Prisma include can't reference its own
+  // parent's id — so callers filter it out (see related-work-orders.tsx).
+  mitigationPlan: {
     select: {
-      id: true,
-      externalId: true,
-      lastSynced: true,
-      integration: {
-        select: { id: true, name: true, integrationUri: true },
+      workOrders: {
+        select: {
+          id: true,
+          summary: true,
+          status: true,
+          assignee: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "asc" as const },
       },
     },
   },
-  notification: { select: { id: true, title: true, type: true } },
 } satisfies Prisma.WorkOrderTicketInclude;
 
 // What clients receive from the detail endpoints: the per-user `watchers`
@@ -276,9 +287,8 @@ export const workOrderIntegrationItemSchema = z.object({
   // appears in the Suggested (triage) tab. `raw` holds the upstream record.
   source: z
     .object({
-      channel: z.enum(NotificationChannel),
+      channel: z.enum(SourceChannel),
       externalId: z.string().nullish(),
-      referenceUrl: z.string().nullish(),
       markdown: z.string().nullish(),
       raw: z.any().optional(),
     })
@@ -313,7 +323,7 @@ const assigneeItemSchema = z.object({
 const linkedAssetSchema = z.object({
   id: z.string(),
   hostname: z.string().nullable(),
-  ip: z.string(),
+  ip: z.string().nullable(),
   role: z.string().nullable(),
 });
 
@@ -366,35 +376,47 @@ const ticketParentRefSchema = z
   .object({ id: z.string(), summary: z.string() })
   .nullable();
 
-const ticketChildRefSchema = z.object({
+const siblingWorkOrderSchema = z.object({
   id: z.string(),
   summary: z.string(),
   status: z.enum(TicketStatus),
   assignee: z.object({ id: z.string(), name: z.string() }).nullable(),
+});
+
+const ticketChildRefSchema = siblingWorkOrderSchema.extend({
   departments: z.array(departmentItemSchema),
   _count: z.object({ comments: z.number() }),
+});
+
+const ticketMitigationPlanSchema = z.object({
+  workOrders: z.array(siblingWorkOrderSchema),
 });
 
 const detailAssigneeSchema = assigneeItemSchema.extend({
   department: departmentItemSchema.nullable(),
 });
 
+// A link plus the snapshot it points at. sourceType lives on the link because
+// it describes the decision to attach, not the record.
 const ticketSourceSchema = z.object({
-  id: z.string(),
-  channel: z.enum(NotificationChannel),
-  externalId: z.string().nullable(),
-  referenceUrl: z.string().nullable(),
-  sourceType: z.enum(NotificationSourceType),
+  sourceType: z.enum(SourceLinkType),
+  sourceRecord: z.object({
+    id: z.string(),
+    channel: z.enum(SourceChannel),
+    externalId: z.string().nullable(),
+  }),
 });
 
 const ticketExternalMappingSchema = z.object({
   id: z.string(),
   externalId: z.string(),
   lastSynced: z.date().nullable(),
+  upstreamApi: z.string().nullable(),
+  webUrl: z.string().nullable(),
   integration: z.object({
     id: z.string(),
     name: z.string(),
-    integrationUri: z.string(),
+    platform: z.enum(PlatformEnum),
   }),
 });
 
@@ -531,7 +553,8 @@ export const workOrderDetailResponseSchema = z.object({
   comments: z.array(ticketCommentResponseSchema),
   isWatching: z.boolean(),
   activities: z.array(ticketActivitySchema),
-  sources: z.array(ticketSourceSchema),
+  sourceLinks: z.array(ticketSourceSchema),
   externalMappings: z.array(ticketExternalMappingSchema),
   notification: ticketNotificationRefSchema.nullable(),
+  mitigationPlan: ticketMitigationPlanSchema.nullable(),
 });

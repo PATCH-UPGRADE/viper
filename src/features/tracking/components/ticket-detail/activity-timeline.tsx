@@ -14,6 +14,7 @@ import type {
   TicketStatus,
 } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
+import { initialsOf } from "@/lib/string-utils";
 import type { TicketDetail } from "../../types";
 import { AddCommentForm } from "./add-comment-form";
 import { CollapsibleSectionCard } from "./section-card";
@@ -25,15 +26,6 @@ type Activity = TicketDetail["activities"][number];
 type TimelineEntry =
   | { kind: "activity"; createdAt: Date; row: Activity }
   | { kind: "comment"; createdAt: Date; row: Comment };
-
-const initialsOf = (name?: string | null) =>
-  (name ?? "?")
-    .split(/\s+/)
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 
 const isAgentUser = (user: Activity["user"]) => !!user.integrationUser;
 
@@ -120,8 +112,8 @@ const WorkOrderCreatedBody = ({ activity }: { activity: Activity }) => {
   );
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: activity.data is a Json blob with type-specific shape
 const renderActivity = (a: Activity): React.ReactNode => {
+  // biome-ignore lint/suspicious/noExplicitAny: activity.data is a Json blob with type-specific shape
   const data = a.data as any;
   switch (a.type) {
     case "WORK_ORDER_CREATED":
@@ -157,7 +149,7 @@ const renderActivity = (a: Activity): React.ReactNode => {
             reassigned from {from.name} to {to.name}
           </>
         );
-      return <>changed assignee</>;
+      return "changed assignee";
     }
     case "DEPARTMENTS_CHANGED": {
       const added = (data.added ?? []) as Array<{
@@ -207,7 +199,7 @@ const renderActivity = (a: Activity): React.ReactNode => {
       const to = data.to ? new Date(data.to) : null;
       if (!from && to)
         return <>scheduled for {format(to, "MMM d, yyyy 'at' h:mm a")}</>;
-      if (from && !to) return <>cleared the scheduled time</>;
+      if (from && !to) return "cleared the scheduled time";
       if (from && to)
         return (
           <>
@@ -215,10 +207,10 @@ const renderActivity = (a: Activity): React.ReactNode => {
             {format(to, "MMM d, yyyy 'at' h:mm a")}
           </>
         );
-      return <>changed the scheduled time</>;
+      return "changed the scheduled time";
     }
     case "SUMMARY_CHANGED":
-      return <>edited the summary</>;
+      return "edited the summary";
     case "DESCRIPTION_CHANGED": {
       const dept = data.department as
         | { id: string; name: string; color: string | null }

@@ -9,6 +9,7 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { ExternalMappingList } from "@/components/external-mappings";
 import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
@@ -379,24 +380,18 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
           </Card>
 
           <Card className="p-4">
-            {/* API Integration */}
+            {/* Integrations */}
             <div className="flex flex-col gap-3">
-              <h3 className="font-semibold">API Integration</h3>
+              <h3 className="font-semibold">Integrations</h3>
 
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-1">
-                  Upstream API
-                </div>
-                <a
-                  href={asset.upstreamApi}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-                >
-                  {asset.upstreamApi}
-                  <ExternalLinkIcon className="size-3 flex-shrink-0" />
-                </a>
-              </div>
+              <ExternalMappingList
+                mappings={asset.externalMappings}
+                emptyMessage={
+                  <p className="text-sm text-muted-foreground">
+                    Not mapped to any integration.
+                  </p>
+                }
+              />
             </div>
           </Card>
 

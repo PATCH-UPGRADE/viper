@@ -13,7 +13,6 @@ import type React from "react";
 import { PriorityBadge } from "@/components/priority-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { resolveWorkOrderDetailUrl } from "@/features/integrations/teamplay-fleet/urls";
 import { getChipClass } from "@/features/tag-colors/palette";
 import { formatScheduled } from "@/lib/date-utils";
 import type { TicketDetail } from "../../types";
@@ -40,18 +39,13 @@ const MetaField = ({
 
 const SourceHeader = ({ data }: { data: TicketDetail }) => {
   const mapping = data.externalMappings[0];
-  const source = data.sources[0];
+  const source = data.sourceLinks[0]?.sourceRecord;
   const label = data.sourceLabel ?? mapping?.integration.name;
   const externalRef = mapping?.externalId ?? source?.externalId;
 
-  const referenceUrl =
-    source?.referenceUrl ??
-    (mapping
-      ? resolveWorkOrderDetailUrl(
-          mapping.integration.integrationUri,
-          mapping.externalId,
-        )
-      : null);
+  // `webUrl` is filled in on read by the platform module that owns the mapping,
+  // so the link never needs a stored URL or a per-platform branch here.
+  const referenceUrl = mapping?.webUrl ?? null;
 
   // A manually created work order has no source. Do not render the block.
   if (!label && !externalRef) return null;
@@ -96,7 +90,7 @@ const CreatedFooter = ({ data }: { data: TicketDetail }) => {
   const fromAutomation =
     !!data.sourceLabel ||
     data.externalMappings.length > 0 ||
-    data.sources.length > 0;
+    data.sourceLinks.length > 0;
   return (
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t pt-3 text-xs text-muted-foreground">
       <span className="inline-flex items-center gap-1">

@@ -1,5 +1,10 @@
 import { hashPassword } from "better-auth/crypto";
-import { type AssetStatus, Severity, VersionStatus } from "@/generated/prisma";
+import {
+  type AssetStatus,
+  ScopeTargetModel,
+  Severity,
+  VersionStatus,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 
 const SEED_USER = {
@@ -8,58 +13,58 @@ const SEED_USER = {
   name: "Seed User",
 };
 
-const FIXTURE_CVE = "CVE-2099-0371";
-const MANUFACTURER = "Metriq Medical";
-const PRODUCT = "Infuse Station IQ";
-const VERSION = "4.2.0";
+const FIXTURE_CVE = "CVE-2022-29875";
+const ADVISORY_URL =
+  "https://www.siemens-healthineers.com/support-documentation/cybersecurity/ssa-220609";
+const MANUFACTURER = "Siemens Healthineers";
+const PRODUCT = "MAGNETOM NUMARIS X";
+const VERSION = "VA31A";
 
 const ASSET_SPECS = [
   {
-    ip: "10.77.0.11",
-    hostname: "rdt-infuse-01",
-    serialNumber: "RDT-INFUSE-001",
-    role: "Infusion Pump",
-    networkSegment: "CLINICAL-INFUSION",
+    ip: "10.60.0.21",
+    hostname: "mri-numarisx-01",
+    serialNumber: "MAGNETOM-NUMARISX-VA31A-001",
+    role: "MRI Scanner Console",
+    networkSegment: "IMAGING-MRI",
     location: {
       facility: "Main Hospital",
-      building: "West Wing",
-      floor: "3",
-      room: "ICU 1",
+      building: "Imaging Pavilion",
+      floor: "1",
+      room: "MRI Suite 1",
     },
   },
   {
-    ip: "10.77.0.12",
-    hostname: "rdt-infuse-02",
-    serialNumber: "RDT-INFUSE-002",
-    role: "Infusion Pump",
-    networkSegment: "CLINICAL-INFUSION",
+    ip: "10.60.0.22",
+    hostname: "mri-numarisx-02",
+    serialNumber: "MAGNETOM-NUMARISX-VA31A-002",
+    role: "MRI Scanner Console",
+    networkSegment: "IMAGING-MRI-ISOLATED",
     location: {
       facility: "Main Hospital",
-      building: "West Wing",
-      floor: "3",
-      room: "ICU 2",
-    },
-  },
-  {
-    ip: "10.77.0.13",
-    hostname: "rdt-infuse-03",
-    serialNumber: "RDT-INFUSE-003",
-    role: "Infusion Pump",
-    networkSegment: "CLINICAL-INFUSION",
-    location: {
-      facility: "Main Hospital",
-      building: "East Wing",
-      floor: "2",
-      room: "Med-Surg 12",
+      building: "Imaging Pavilion",
+      floor: "1",
+      room: "MRI Suite 2",
     },
   },
 ];
+
+// One scanner is carved out of the advisory by a compensating control, which is specified by a note
+// TODO: for this specific example, which is about reachability of ports, we are working on integrating
+// TA3 tools into our platform as deterministic tools to get this kind of analysis, instead of requiring
+// it be seeded in the first place...
+const EXCLUDED_SERIAL = "MAGNETOM-NUMARISX-VA31A-002";
+const EXCLUSION_NOTE =
+  "mri-numarisx-02 is on the IMAGING-MRI-ISOLATED segment, where ports 32912/tcp and " +
+  "32914/tcp are permitted inbound only from the two Siemens service jump hosts, per the " +
+  "vendor's 'allow network access for trusted clients only' guidance. Both ports are denied " +
+  "from every clinical and general-purpose VLAN at the segment firewall. Verified during the " +
+  "2026-Q2 segmentation audit (ticket NET-4471).";
 
 function assertLocalDatabase() {
   const raw = process.env.DATABASE_URL;
   if (!raw) throw new Error("DATABASE_URL is not set.");
   const { hostname } = new URL(raw);
-  // "postgres" is the compose service host inside the deployed stack.
   if (!["localhost", "127.0.0.1", "postgres"].includes(hostname)) {
     throw new Error(
       `Refusing to run: DATABASE_URL points at "${hostname}". This script deletes metric data and only runs against a local or stack-internal database.`,
@@ -119,23 +124,57 @@ function upsertVersion(name: string) {
   });
 }
 
+function createAssetNote(userId: string, assetId: string, text: string) {
+  return prisma.note.create({
+    data: {
+      userId,
+      text,
+      targetModel: ScopeTargetModel.ASSET,
+      instanceId: assetId,
+    },
+  });
+}
+
+function fixtureAssetIds() {
+  return prisma.asset.findMany({
+    where: { serialNumber: { in: ASSET_SPECS.map((s) => s.serialNumber) } },
+    select: { id: true },
+  });
+}
+
 async function teardownFixture() {
+  // Note.instanceId is a weak reference with no FK, so notes do not cascade off the
+  // asset or the vulnerability. Assets are upserted by serial and keep their ids, so
+  // without this a re-seed stacks up duplicate copies of the exclusion note.
+  const assetIds = (await fixtureAssetIds()).map((a) => a.id);
+  const notes = await prisma.note.deleteMany({
+    where: {
+      targetModel: ScopeTargetModel.ASSET,
+      instanceId: { in: assetIds },
+    },
+  });
+
   const remediations = await prisma.remediation.findMany({
     where: { vulnerability: { cveId: FIXTURE_CVE } },
     select: { id: true },
   });
   const remediationIds = remediations.map((r) => r.id);
 
-  const sources = await prisma.notificationSource.findMany({
+  const sources = await prisma.sourceRecord.findMany({
     where: { channel: "TA4", externalId: { in: remediationIds } },
-    select: { notificationId: true },
+    select: { id: true, links: { select: { notificationId: true } } },
   });
   const notificationIds = sources
-    .map((s) => s.notificationId)
+    .flatMap((s) => s.links.map((l) => l.notificationId))
     .filter((id): id is string => id !== null);
 
   const notifications = await prisma.notification.deleteMany({
     where: { id: { in: notificationIds } },
+  });
+  // Remediation.sourceRecord is SetNull and the links above cascade with their
+  // notification, so these snapshots would otherwise survive every run.
+  const orphanSources = await prisma.sourceRecord.deleteMany({
+    where: { id: { in: sources.map((s) => s.id) }, links: { none: {} } },
   });
   const deleted = await prisma.remediation.deleteMany({
     where: { id: { in: remediationIds } },
@@ -145,7 +184,7 @@ async function teardownFixture() {
   });
 
   console.log(
-    `  teardown: ${notifications.count} notification(s), ${deleted.count} remediation(s), ${vulns.count} vulnerability(s)`,
+    `  teardown: ${notes.count} note(s), ${notifications.count} notification(s), ${orphanSources.count} source(s), ${deleted.count} remediation(s), ${vulns.count} vulnerability(s)`,
   );
 }
 
@@ -177,7 +216,7 @@ async function seedFixture(userId: string) {
   for (const spec of ASSET_SPECS) {
     const data = {
       ...spec,
-      upstreamApi: "https://example.com/rdt-metric",
+      upstreamApi: ADVISORY_URL,
       status: "Active" as AssetStatus,
       deviceGroupId: deviceGroup.id,
       userId,
@@ -196,26 +235,26 @@ async function seedFixture(userId: string) {
     data: {
       cveId: FIXTURE_CVE,
       severity: Severity.High,
-      cvssScore: 7.5,
-      cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+      cvssScore: 8.8,
+      cvssVector: "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
       description:
-        "Synthetic fixture for the remediation deployment time IV&V metric: improper firmware validation on the Infuse Station IQ allows unsigned firmware to be installed.",
+        "The syngo platform underlying NUMARIS X deserialises untrusted data without sufficient validation (CWE-502), which could result in an arbitrary deserialization. An unauthenticated attacker who can reach ports 32912/tcp or 32914/tcp on the scanner console can execute code on the affected system.",
       narrative:
-        "An attacker with network access to the pump could push unsigned firmware and alter infusion parameters.",
+        "An attacker on a network segment that can reach ports 32912/tcp or 32914/tcp on a MAGNETOM NUMARIS X console sends a crafted serialized payload to the syngo service. Because the payload is deserialized without type restriction, it is instantiated and runs arbitrary code under the syngo platform's privileges — no credentials and no user interaction are required.",
       impact:
-        "Infusion pumps could deliver incorrect dosages until patched, requiring manual verification of every infusion in progress.",
+        "Code execution on the MRI scanner console. An affected scanner must be taken off the schedule until it is verified and updated, displacing booked MRI exams onto the remaining unit and delaying inpatient imaging; in-progress exam data and patient information held on the console are exposed to the attacker.",
       userId,
       sarif: {
         version: "2.1.0",
         runs: [
           {
-            tool: { driver: { name: "RDT Metric Fixture" } },
+            tool: { driver: { name: "Siemens Healthineers PSIRT" } },
             results: [
               {
                 ruleId: FIXTURE_CVE,
                 level: "error",
                 message: {
-                  text: "Improper firmware validation on Infuse Station IQ 4.2.0",
+                  text: "Deserialization of untrusted data in Siemens Healthineers syngo platform (SSA-220609) — MAGNETOM NUMARIS X VA31A",
                 },
               },
             ],
@@ -226,6 +265,11 @@ async function seedFixture(userId: string) {
       deviceGroupMatchings: { connect: { id: matching.id } },
     },
   });
+
+  const excludedAsset = await prisma.asset.findFirstOrThrow({
+    where: { serialNumber: EXCLUDED_SERIAL },
+  });
+  await createAssetNote(userId, excludedAsset.id, EXCLUSION_NOTE);
 
   return { matching, deviceGroup, vulnerability };
 }
@@ -246,8 +290,19 @@ async function printSummaryAndAssert() {
   const assetLevel = vulnerability.issues.filter(
     (issue) => issue.assetId !== null,
   ).length;
-  const assets = await prisma.asset.count({
+  const assetRecords = await prisma.asset.findMany({
     where: { serialNumber: { in: ASSET_SPECS.map((s) => s.serialNumber) } },
+    select: { id: true, serialNumber: true },
+  });
+  const assets = assetRecords.length;
+
+  const notes = await prisma.note.findMany({
+    where: {
+      targetModel: ScopeTargetModel.ASSET,
+      instanceId: { in: assetRecords.map((a) => a.id) },
+      deletedAt: null,
+    },
+    select: { instanceId: true },
   });
 
   console.log(`\n  ${FIXTURE_CVE}`);
@@ -255,6 +310,7 @@ async function printSummaryAndAssert() {
   console.log(`    baseline issues         ${baseline}`);
   console.log(`    asset-level issues      ${assetLevel}`);
   console.log(`    fixture assets          ${assets}`);
+  console.log(`    asset notes             ${notes.length}`);
 
   if (matchings !== 1) failures.push(`expected 1 matching, found ${matchings}`);
   if (baseline !== matchings) {
@@ -270,6 +326,20 @@ async function printSummaryAndAssert() {
   if (assets !== ASSET_SPECS.length) {
     failures.push(
       `expected ${ASSET_SPECS.length} fixture assets, found ${assets}`,
+    );
+  }
+
+  // A duplicate or a misplaced note would have VEX except the wrong scanner.
+  const excludedId = assetRecords.find(
+    (a) => a.serialNumber === EXCLUDED_SERIAL,
+  )?.id;
+  if (notes.length !== 1) {
+    failures.push(
+      `expected exactly 1 asset-scoped note, found ${notes.length} — VEX must see one unambiguous exception`,
+    );
+  } else if (notes[0].instanceId !== excludedId) {
+    failures.push(
+      `the asset note is not on ${EXCLUDED_SERIAL} — VEX would except the wrong scanner`,
     );
   }
 

@@ -78,7 +78,10 @@ export const StatusFormBase = ({
     <DropdownMenu>
       <DropdownMenuTrigger
         asChild
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
         className={className}
       >
         <Badge className={statusDetail.color}>

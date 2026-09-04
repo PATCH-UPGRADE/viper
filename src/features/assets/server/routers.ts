@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import { resolveEffectiveIssuesByAsset } from "@/features/issues/server/effective-issues";
 import {
   attachNote,
   attachNotes,
@@ -246,7 +247,7 @@ export const assetsRouter = createTRPCRouter({
           return sortValue;
         }
 
-        return fetchPaginated(prisma.asset, input, {
+        const result = await fetchPaginated(prisma.asset, input, {
           where,
           include: assetDashboardInclude,
           orderBy: sort
@@ -258,15 +259,34 @@ export const assetsRouter = createTRPCRouter({
               ]
             : { updatedAt: "desc" },
         });
+        const effectiveIssues = await resolveEffectiveIssuesByAsset(
+          result.items,
+          assetDashboardInclude.issues.include,
+        );
+        return {
+          ...result,
+          items: result.items.map((asset) => ({
+            ...asset,
+            issues: effectiveIssues.get(asset.id) ?? [],
+          })),
+        };
       }
 
       const totalCount = await prisma.asset.count({ where });
       const meta = buildPaginationMeta(input, totalCount);
 
-      const allAssets = await prisma.asset.findMany({
+      const fetchedAssets = await prisma.asset.findMany({
         where,
         include: assetDashboardInclude,
       });
+      const effectiveIssues = await resolveEffectiveIssuesByAsset(
+        fetchedAssets,
+        assetDashboardInclude.issues.include,
+      );
+      const allAssets = fetchedAssets.map((asset) => ({
+        ...asset,
+        issues: effectiveIssues.get(asset.id) ?? [],
+      }));
 
       type AssetRow = (typeof allAssets)[number];
 
@@ -333,54 +353,84 @@ export const assetsRouter = createTRPCRouter({
   getIssueMetricsInternal: protectedProcedure.query(async () => {
     const severities = Object.values(Severity);
 
-    const [activeResults, activeWithRemResults, remediatedResults] =
-      await Promise.all([
-        Promise.all(
-          severities.map((s) =>
-            prisma.issue.count({
-              where: {
-                status: IssueStatus.AFFECTED,
-                vulnerability: { severity: s },
-              },
-            }),
-          ),
-        ),
-        Promise.all(
-          severities.map((s) =>
-            prisma.issue.count({
-              where: {
-                status: IssueStatus.AFFECTED,
-                vulnerability: { severity: s, remediations: { some: {} } },
-              },
-            }),
-          ),
-        ),
-        Promise.all(
-          severities.map((s) =>
-            prisma.issue.count({
-              where: {
-                status: IssueStatus.FIXED,
-                vulnerability: { severity: s },
-              },
-            }),
-          ),
-        ),
-      ]);
-
-    return severities.reduce(
-      (acc, severity, i) => {
-        acc[severity] = {
-          active: activeResults[i],
-          activeWithRemediations: activeWithRemResults[i],
-          remediated: remediatedResults[i],
-        };
-        return acc;
+    const assets = await prisma.asset.findMany({
+      select: { id: true, deviceGroupId: true },
+    });
+    const effectiveIssuesByAssetId = await resolveEffectiveIssuesByAsset(
+      assets,
+      {
+        vulnerability: {
+          select: {
+            severity: true,
+            _count: { select: { remediations: true } },
+          },
+        },
       },
-      {} as Record<
-        Severity,
-        { active: number; activeWithRemediations: number; remediated: number }
-      >,
     );
+
+    const counts = {} as Record<
+      Severity,
+      { active: number; activeWithRemediations: number; remediated: number }
+    >;
+    const totals = {
+      active: 0,
+      activeWithRemediations: 0,
+      remediated: 0,
+    };
+    for (const severity of severities) {
+      counts[severity] = {
+        active: 0,
+        activeWithRemediations: 0,
+        remediated: 0,
+      };
+    }
+
+    for (const effectiveIssues of effectiveIssuesByAssetId.values()) {
+      const activeIssues = effectiveIssues.filter(
+        (issue) => issue.status === IssueStatus.AFFECTED,
+      );
+      if (activeIssues.length > 0) {
+        totals.active++;
+      }
+      if (
+        activeIssues.some(
+          (issue) => issue.vulnerability._count.remediations > 0,
+        )
+      ) {
+        totals.activeWithRemediations++;
+      }
+      if (effectiveIssues.some((issue) => issue.status === IssueStatus.FIXED)) {
+        totals.remediated++;
+      }
+      for (const severity of severities) {
+        const activeOfSeverity = effectiveIssues.filter(
+          (issue) =>
+            issue.status === IssueStatus.AFFECTED &&
+            issue.vulnerability.severity === severity,
+        );
+        if (activeOfSeverity.length > 0) {
+          counts[severity].active++;
+        }
+        if (
+          activeOfSeverity.some(
+            (issue) => issue.vulnerability._count.remediations > 0,
+          )
+        ) {
+          counts[severity].activeWithRemediations++;
+        }
+        if (
+          effectiveIssues.some(
+            (issue) =>
+              issue.status === IssueStatus.FIXED &&
+              issue.vulnerability.severity === severity,
+          )
+        ) {
+          counts[severity].remediated++;
+        }
+      }
+    }
+
+    return { ...counts, totals };
   }),
 
   // Internal API for asset vulnerability matching

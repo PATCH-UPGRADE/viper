@@ -302,7 +302,14 @@ function MoreVerticalDropdownMenu({
           type="button"
           variant="ghost"
           className={cn("h-8 w-8 p-0 cursor-pointer", triggerClassName)}
-          onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
+          onClick={
+            stopPropagation
+              ? (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              : undefined
+          }
           asChild={asSpan}
         >
           <span>

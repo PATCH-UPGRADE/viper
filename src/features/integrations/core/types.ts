@@ -168,6 +168,7 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
   onCreate?(): Promise<void>;
   workOrders?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   assets?: ResourceModule<unknown, unknown, TConfig, TCreds>;
+  remediations?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   notifications?: ResourceModule<unknown, unknown, TConfig, TCreds>;
 }
 

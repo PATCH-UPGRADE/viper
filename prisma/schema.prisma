@@ -887,6 +887,8 @@ model Remediation {
   alohaStatus AlohaStatus?
   alohaLog    Json         @default("{}")
 
+  sourceImpact Json @default("{}")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1068,6 +1070,7 @@ enum PlatformEnum {
   AI
   PARTNER
   FLEET
+  MEDISAO
 }
 
 // Traffic Light Protocol, governs information sharing

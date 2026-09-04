@@ -39,11 +39,11 @@ describe("registry", () => {
     "%s can actually sync something",
     (platform) => {
       const module = requirePlatform(platform);
-      const resourceModules = [
-        module.assets,
-        module.workOrders,
-        module.notifications,
-      ].filter((m) => m !== undefined);
+      // Asked through `moduleForResource` rather than a hand-written list, so a
+      // platform declaring a resource this test has never heard of still counts.
+      const resourceModules = Object.values(ResourceType)
+        .map((resource) => moduleForResource(module, resource))
+        .filter((m) => m !== undefined);
 
       expect(module.sync ?? resourceModules.length).toBeTruthy();
       for (const resourceModule of resourceModules) {

@@ -115,6 +115,8 @@ export const advisorySourceAdapter: SourceRecordAdapter = {
         markdown: advisory.markdown,
       },
       linkEntities: linkAdvisoryEntities(advisory),
+      // MedISAO prints the TLP marking, so it is never inferred.
+      known: { tlp: advisory.tlp },
     };
   },
 };

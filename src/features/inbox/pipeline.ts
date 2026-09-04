@@ -10,6 +10,7 @@ import { generateQuestionForNotification } from "./agent/question";
 import { triageNotification } from "./agent/triage";
 import { persistTriageResult } from "./agent/triage/persist";
 import { sortNotificationVulnerabilities } from "./agent/vex";
+import type { KnownNotificationFields } from "./source-adapter";
 
 /**
  * The slice of Inngest's `step` this pipeline uses.
@@ -45,6 +46,8 @@ export interface NotificationPipelineInput {
   doc: InboundEmail;
   attachments?: PdfAttachment[];
   linkEntities: LinkEntities;
+  /** What the source stated for itself. Overrides the classifier. */
+  known?: KnownNotificationFields;
 }
 
 /**
@@ -61,9 +64,13 @@ export async function runNotificationPipeline({
   doc,
   attachments,
   linkEntities,
+  known,
 }: NotificationPipelineInput) {
   const notificationId = await step.run("classify-notification", async () => {
     const result = await classifyNotification(sourceId, doc, attachments);
+
+    // A marking the source printed beats one the model read out of the prose.
+    const tlp = known?.tlp ?? result.tlp;
 
     if (result.action === "update") {
       await prisma.notification.update({
@@ -72,7 +79,7 @@ export async function runNotificationPipeline({
           type: result.type,
           title: result.title,
           summary: result.summary,
-          ...(result.tlp !== null ? { tlp: result.tlp } : {}),
+          ...(tlp ? { tlp } : {}),
           sourceLinks: {
             create: {
               sourceRecordId: sourceId,
@@ -91,7 +98,7 @@ export async function runNotificationPipeline({
         type: result.type,
         title: result.title,
         summary: result.summary,
-        ...(result.tlp !== null ? { tlp: result.tlp } : {}),
+        ...(tlp ? { tlp } : {}),
         sourceLinks: {
           create: { sourceRecordId: sourceId, sourceType: "Source" },
         },

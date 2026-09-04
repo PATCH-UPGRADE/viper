@@ -74,6 +74,21 @@ describe("processSourceRecord", () => {
     expect(input.linkEntities).toBe(linkEntities);
   });
 
+  it("forwards the facts the adapter stated for itself", async () => {
+    mockSourceAdapterFor.mockReturnValue({
+      prepare: () => ({ doc, linkEntities, known: { tlp: "AMBER" } }),
+    });
+
+    await run();
+
+    expect(mockRunPipeline.mock.calls[0][0].known).toEqual({ tlp: "AMBER" });
+  });
+
+  it("states nothing when the adapter states nothing", async () => {
+    await run();
+    expect(mockRunPipeline.mock.calls[0][0].known).toBeUndefined();
+  });
+
   it("hands the adapter the stored raw, untouched", async () => {
     const prepare = vi.fn().mockReturnValue({ doc, linkEntities });
     mockSourceAdapterFor.mockReturnValue({ prepare });

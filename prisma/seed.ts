@@ -1401,14 +1401,20 @@ async function seedFleetIntegration(userId: string) {
           create: [
             { resource: ResourceType.WorkOrder },
             { resource: ResourceType.Asset },
+            { resource: ResourceType.SourceRecord },
           ],
         },
       },
     }));
 
+  const allReSourceTypes = [
+    ResourceType.WorkOrder,
+    ResourceType.Asset,
+    ResourceType.SourceRecord,
+  ];
   // A re-seed against an existing integration must still gain any sync rows
   // added since it was first created (e.g. Asset, VW-434).
-  for (const resource of [ResourceType.WorkOrder, ResourceType.Asset]) {
+  for (const resource of allReSourceTypes) {
     await prisma.integrationResourceSync.upsert({
       where: {
         integrationId_resource: { integrationId: integration.id, resource },

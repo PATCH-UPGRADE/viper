@@ -94,7 +94,7 @@ export async function POST(req: Request) {
               assetData,
               vulnerabilityData,
             })
-          : buildChatGraph({ userId, userRole });
+          : buildChatGraph({ userId, userRole, threadId });
 
       await streamGraphToUI({ graph, input: { messages: history }, writer });
       writer.write({ type: "finish" });

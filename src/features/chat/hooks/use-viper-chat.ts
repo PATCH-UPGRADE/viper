@@ -9,7 +9,10 @@ import { useChatUI } from "@/features/chat/context/chat-panel-context";
 import type { UseChatAgentConfig } from "@/features/chat/types";
 import { useTRPC } from "@/trpc/client";
 
-export function useViperChat(config?: UseChatAgentConfig) {
+export function useViperChat(
+  config?: UseChatAgentConfig,
+  controlled?: { threadId?: string; onTurnEnd?: () => void },
+) {
   const { userRole } = useChatUI();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -40,14 +43,15 @@ export function useViperChat(config?: UseChatAgentConfig) {
   }, [threadsQuery]);
 
   // Refresh the thread list when a turn finishes so the AI-generated title (and
-  // any newly-created thread) appears.
+  // any newly-created thread) appears, and notify a controlled caller.
   const prevStatus = useRef(status);
   useEffect(() => {
     if (prevStatus.current === "streaming" && status === "ready") {
       void threadsQuery.refetch();
+      controlled?.onTurnEnd?.();
     }
     prevStatus.current = status;
-  }, [status, threadsQuery]);
+  }, [status, threadsQuery, controlled?.onTurnEnd]);
 
   const { mutateAsync: deleteThreadMutation } = useMutation(
     trpc.chat.deleteThread.mutationOptions({
@@ -85,6 +89,10 @@ export function useViperChat(config?: UseChatAgentConfig) {
         return;
       }
       setCurrentThreadId(threadId);
+      // Clear immediately rather than after the fetch resolves — otherwise a
+      // failed/unknown-thread fetch below leaves the PREVIOUS thread's
+      // messages on screen under the new currentThreadId.
+      setMessages([]);
       setIsLoadingHistory(true);
       try {
         const { messages: ui } = await queryClient.fetchQuery(
@@ -93,13 +101,20 @@ export function useViperChat(config?: UseChatAgentConfig) {
         // biome-ignore lint/suspicious/noExplicitAny: server returns UIMessage-shaped rows
         setMessages(ui as any);
       } catch {
-        // unknown thread — leave as-is
+        // unknown thread — leave empty
       } finally {
         setIsLoadingHistory(false);
       }
     },
     [queryClient, trpc.chat.getUIMessages, setMessages],
   );
+
+  // Adopt an externally-controlled thread id (the /reports route drives it from
+  // the URL); the hook already owns currentThreadId/switchThread.
+  useEffect(() => {
+    const id = controlled?.threadId;
+    if (id && id !== currentThreadId) void switchThread(id);
+  }, [controlled?.threadId, currentThreadId, switchThread]);
 
   const newThread = useCallback(() => {
     setCurrentThreadId(null);

@@ -3,31 +3,47 @@ import z from "zod";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
-  chatThreadInclude,
+  chatThreadListSelect,
   fetchThreadsResponseSchema,
   fetchThreadsSchema,
 } from "../types";
 
 export const chatRouter = createTRPCRouter({
+  // A user's chat threads. `withReport` narrows to threads the agent has written
+  // a report on (the /reports list), ordered newest-touched. No pagination yet.
   getManyThreads: protectedProcedure
     .input(fetchThreadsSchema)
     .output(fetchThreadsResponseSchema)
     .query(async ({ input, ctx }) => {
-      // get only a user's threads
       const threads = await prisma.chatThread.findMany({
-        where: { userId: ctx.auth.user.id },
+        where: {
+          userId: ctx.auth.user.id,
+          ...(input.withReport ? { report: { not: null } } : {}),
+        },
         skip: input.offset,
         take: input.limit,
-        include: chatThreadInclude,
-        orderBy: { createdAt: "desc" },
+        select: chatThreadListSelect,
+        orderBy: input.withReport
+          ? { updatedAt: "desc" }
+          : { createdAt: "desc" },
       });
 
       // TODO: paginate threads
-      return {
-        threads,
-        hasMore: false,
-        total: threads.length,
-      };
+      return { threads, hasMore: false, total: threads.length };
+    }),
+
+  // The report Markdown for the /reports detail panel. Not scoped to
+  // report != null: a freshly-started /reports conversation has no report yet
+  // and the page still needs to render. `null` for an unknown or report-less thread.
+  getReportThread: protectedProcedure
+    .input(z.object({ threadId: z.string() }))
+    .output(z.object({ report: z.string().nullable() }))
+    .query(async ({ input, ctx }) => {
+      const thread = await prisma.chatThread.findFirst({
+        where: { id: input.threadId, userId: ctx.auth.user.id },
+        select: { report: true },
+      });
+      return { report: thread?.report ?? null };
     }),
 
   // UIMessage-shaped history for the chat (AI SDK `useChat`). Rebuilds messages

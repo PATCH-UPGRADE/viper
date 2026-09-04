@@ -1,0 +1,141 @@
+import "server-only";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { gfmFromMarkdown } from "mdast-util-gfm";
+import { gfm } from "micromark-extension-gfm";
+
+/**
+ * Walk a report's Markdown into a flat list of blocks the PDF and Word
+ * exporters both draw from. Deliberately small — headings, paragraphs, lists,
+ * links, bold/italic, tables — which is what the agent emits.
+ */
+
+export interface InlineSpan {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  /** Link text — app-relative, e.g. "/assets/abc". */
+  href?: string;
+}
+
+export type ReportBlock =
+  | { type: "heading"; depth: number; spans: InlineSpan[] }
+  | { type: "paragraph"; spans: InlineSpan[] }
+  | { type: "listItem"; ordered: boolean; marker: string; spans: InlineSpan[] }
+  // ponytail: tables flatten to " | "-joined rows, no column layout.
+  | { type: "table"; rows: string[][] };
+
+// biome-ignore lint/suspicious/noExplicitAny: walking an untyped mdast tree
+type Node = any;
+
+function inlineSpans(
+  nodes: Node[],
+  ctx: { bold?: boolean; italic?: boolean; href?: string } = {},
+): InlineSpan[] {
+  const spans: InlineSpan[] = [];
+  for (const n of nodes ?? []) {
+    switch (n.type) {
+      case "text":
+      case "inlineCode":
+        spans.push({ text: n.value, ...ctx });
+        break;
+      case "strong":
+        spans.push(...inlineSpans(n.children, { ...ctx, bold: true }));
+        break;
+      case "emphasis":
+        spans.push(...inlineSpans(n.children, { ...ctx, italic: true }));
+        break;
+      case "link":
+        spans.push(...inlineSpans(n.children, { ...ctx, href: n.url }));
+        break;
+      case "break":
+        spans.push({ text: "\n", ...ctx });
+        break;
+      default:
+        if (Array.isArray(n.children)) {
+          spans.push(...inlineSpans(n.children, ctx));
+        }
+        break;
+    }
+  }
+  return spans;
+}
+
+export function spanText(spans: InlineSpan[]): string {
+  return spans
+    .map((s) => s.text)
+    .join("")
+    .trim();
+}
+
+function pushList(blocks: ReportBlock[], list: Node): void {
+  const ordered = Boolean(list.ordered);
+  let n = typeof list.start === "number" ? list.start : 1;
+  for (const item of list.children ?? []) {
+    const marker = ordered ? `${n}.` : "•";
+    n += 1;
+    for (const child of item.children ?? []) {
+      if (child.type === "list") {
+        pushList(blocks, child); // ponytail: nested lists lose their indent
+      } else {
+        blocks.push({
+          type: "listItem",
+          ordered,
+          marker,
+          spans: inlineSpans(child.children ?? [child]),
+        });
+      }
+    }
+  }
+}
+
+export function parseReportMarkdown(markdown: string): ReportBlock[] {
+  const tree = fromMarkdown(markdown ?? "", {
+    extensions: [gfm()],
+    mdastExtensions: [gfmFromMarkdown()],
+  });
+  const blocks: ReportBlock[] = [];
+
+  for (const node of tree.children ?? []) {
+    switch (node.type) {
+      case "heading":
+        blocks.push({
+          type: "heading",
+          depth: node.depth,
+          spans: inlineSpans(node.children),
+        });
+        break;
+      case "paragraph":
+        blocks.push({ type: "paragraph", spans: inlineSpans(node.children) });
+        break;
+      case "blockquote":
+        // Rendered like a normal paragraph — no special quoting in v1.
+        blocks.push({
+          type: "paragraph",
+          spans: inlineSpans(
+            (node.children ?? []).flatMap((c: Node) => c.children ?? []),
+          ),
+        });
+        break;
+      case "list":
+        pushList(blocks, node);
+        break;
+      case "code":
+        // Fenced code blocks are rare in reports — keep the text as a paragraph.
+        blocks.push({ type: "paragraph", spans: [{ text: node.value ?? "" }] });
+        break;
+      case "table":
+        blocks.push({
+          type: "table",
+          rows: (node.children ?? []).map((row: Node) =>
+            (row.children ?? []).map((cell: Node) =>
+              spanText(inlineSpans(cell.children)),
+            ),
+          ),
+        });
+        break;
+      default:
+        break;
+    }
+  }
+  return blocks;
+}

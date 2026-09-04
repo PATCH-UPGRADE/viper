@@ -205,7 +205,7 @@ Use this when the remediation is service work Siemens would perform — a firmwa
   },
 );
 
-/** All model-facing tools for the Chat agent, bound to a user. */
+/** Tools shared by every graph built on top of the chat agent. */
 export function buildChatTools(userId: string) {
   return [
     makeQueryPlatformDataTool(userId),

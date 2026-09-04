@@ -61,47 +61,43 @@ export const useUpdateTicket = (
   );
 };
 
-/** Whether a chat work-order proposal has already been accepted (survives reload). */
-export const useFleetProposalStatus = (toolCallId: string) => {
+/**
+ * How far a proposed work order has got. Polled while it is being filed, so the
+ * card can move from "Submitting" to the platform's ids without a reload, and
+ * re-read on reload so an approved order never offers Approve again.
+ */
+export const useWorkOrderDraft = (ticketId: string) => {
   const trpc = useTRPC();
-  return useQuery(
-    trpc.tracking.getFleetProposalStatus.queryOptions({ toolCallId }),
-  );
+  return useQuery({
+    ...trpc.tracking.getWorkOrderDraft.queryOptions({ ticketId }),
+    refetchInterval: (query) =>
+      query.state.data?.submissionState === "SUBMITTING" ? 2000 : false,
+  });
 };
 
-/** Accept a proposal: files the work order on teamplay Fleet and tracks it here. */
-export const useAcceptFleetWorkOrder = () => {
+/** Approve a proposal: track it here, and file it on the managing platform. */
+export const useApproveWorkOrder = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   return useMutation(
-    trpc.tracking.createFleetWorkOrder.mutationOptions({
+    trpc.tracking.approveWorkOrder.mutationOptions({
       onSuccess: (data, variables) => {
-        const count = data.externalIds.length;
-        if (data.alreadyAccepted) {
-          toast.info(
-            "This work order was already sent to Siemens Healthineers",
-          );
-        } else if (data.failures.length > 0) {
-          // Partial success: some orders exist on Fleet, some don't. Say which.
-          toast.warning(
-            `Sent ${count} work order(s) to Fleet; ${data.failures.length} failed: ${data.failures
-              .map((f) => `${f.asset} (${f.message})`)
-              .join("; ")}`,
-          );
+        if (data.submissionState === "SUBMITTING") {
+          toast.success("Approved — filing it with the vendor now");
+        } else if (data.submissionState === "SUBMITTED") {
+          toast.info("This work order was already filed");
         } else {
-          toast.success(
-            `Sent ${count} work order(s) to Siemens Healthineers Fleet`,
-          );
+          toast.success("Approved and tracked in VIPER");
         }
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
         queryClient.invalidateQueries(
-          trpc.tracking.getFleetProposalStatus.queryFilter({
-            toolCallId: variables.toolCallId,
+          trpc.tracking.getWorkOrderDraft.queryFilter({
+            ticketId: variables.ticketId,
           }),
         );
       },
       onError: (error) => {
-        toast.error(`Could not open the Fleet work order: ${error.message}`);
+        toast.error(`Could not approve the work order: ${error.message}`);
       },
     }),
   );

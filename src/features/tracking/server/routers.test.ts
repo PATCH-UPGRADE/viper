@@ -70,39 +70,29 @@ vi.mock("@/lib/auth-utils", () => ({
   verifyApiKey: vi.fn(),
 }));
 
-// The Fleet work order module is exercised directly in its own __tests__; here
-// we stub its network + lookup surface and keep the real UnmanagedAssetsError so
-// the router's rejection path is the one that runs.
-const { mockFleet } = vi.hoisted(() => ({
-  mockFleet: {
-    resolveFleetAssets: vi.fn(),
-    workOrderIntegration: vi.fn(),
-    file: vi.fn(),
-  },
+// The submitter and the payload check are exercised in their own tests; here we
+// stub them so the router's own decisions are what runs.
+const { mockValidatePayload, mockClaim, mockRelease, mockInngestSend } =
+  vi.hoisted(() => ({
+    mockValidatePayload: vi.fn(),
+    mockClaim: vi.fn(),
+    mockRelease: vi.fn(),
+    mockInngestSend: vi.fn(),
+  }));
+
+vi.mock("@/features/work-orders/server/payload", () => ({
+  validatePlatformPayload: mockValidatePayload,
 }));
 
-vi.mock(
-  "@/features/integrations/platforms/teamplay-fleet/work-orders/managed-assets",
-  async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import("@/features/integrations/platforms/teamplay-fleet/work-orders/managed-assets")
-    >()),
-    resolveFleetAssets: mockFleet.resolveFleetAssets,
-    workOrderIntegration: mockFleet.workOrderIntegration,
-  }),
-);
+vi.mock("@/features/work-orders/server/submit", () => ({
+  claimForSubmission: mockClaim,
+  releaseClaim: mockRelease,
+}));
 
-vi.mock(
-  "@/features/integrations/platforms/teamplay-fleet/work-orders/submit",
-  () => ({
-    openFleetWorkOrderFiler: async () => ({
-      config: { contactPhone: "4055555555" },
-      file: mockFleet.file,
-    }),
-  }),
-);
+vi.mock("@/inngest/client", () => ({
+  inngest: { send: mockInngestSend },
+}));
 
-import { UnmanagedAssetsError } from "@/features/integrations/platforms/teamplay-fleet/work-orders/managed-assets";
 import { createCallerFactory } from "@/trpc/init";
 import { trackingRouter } from "./routers";
 
@@ -1676,220 +1666,114 @@ describe("activity writes", () => {
   });
 });
 
-describe("trackingRouter.createFleetWorkOrder", () => {
-  const MRI = {
-    assetId: "rad-mri-001",
-    hostname: "MR-MAGNETOM-001",
-    ip: "10.40.1.60",
-    role: "MRI Scanner",
-    equipmentKey: "US_1064669350",
+describe("trackingRouter.approveWorkOrder", () => {
+  const DRAFT = {
+    id: "t-draft",
+    isDraft: true,
+    mitigationPlanId: null,
+    targetIntegrationId: "int-fleet",
+    platformPayload: { supportType: "technical" },
+    submissionState: "PENDING",
   };
 
-  const INTEGRATION = { id: "int-fleet", authType: "None" };
-
-  const proposal = {
-    toolCallId: "call_abc",
-    assetIds: [MRI.assetId],
-    summary: "Firmware update: MR-MAGNETOM-001",
-    description: "Apply the Siemens firmware update.",
-    category: "FIRMWARE_UPDATE" as const,
-    scheduledAt: "2026-07-22T22:00:00-05:00",
-  };
+  const setup = () =>
+    createCaller({
+      auth: { user: { id: FAKE_USER_ID, name: "Test User" } },
+    } as never);
 
   beforeEach(() => {
-    // No prior acceptance of this proposal, unless a test says otherwise.
-    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(null);
-    let createCallCount = 0;
-    mockPrisma.workOrderTicket.create.mockImplementation(async () => ({
-      id: createCallCount++ === 0 ? "t-new" : "child-new",
-    }));
-    mockFleet.workOrderIntegration.mockResolvedValue(INTEGRATION);
-    mockFleet.resolveFleetAssets.mockResolvedValue([MRI]);
-    mockFleet.file.mockResolvedValue({
-      externalId: "US_400501937577",
-      raw: {},
-    });
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(DRAFT);
+    mockPrisma.workOrderTicket.update.mockResolvedValue(DRAFT);
+    mockPrisma.workOrderTicket.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue(DRAFT);
+    mockValidatePayload.mockResolvedValue({ ok: true, payload: {} });
+    mockClaim.mockResolvedValue(true);
+    mockInngestSend.mockResolvedValue(undefined);
   });
 
-  it("claims a parent ticket, files on Fleet, then spawns a per-asset child carrying the mapping", async () => {
-    const caller = setup();
+  it("promotes the draft, claims it, and hands the filing to the job", async () => {
+    const result = await setup().approveWorkOrder({ ticketId: "t-draft" });
 
-    const result = await caller.createFleetWorkOrder(proposal);
-
-    expect(mockFleet.file).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({
-      ticketId: "t-new",
-      externalIds: ["US_400501937577"],
-      alreadyAccepted: false,
-      failures: [],
-    });
-
-    // The claim ticket is created BEFORE the Fleet call, keyed by the proposal's
-    // tool-call id so a concurrent accept can't file a second order.
-    const claim = mockPrisma.workOrderTicket.create.mock.calls[0][0].data;
-    expect(claim.chatToolCallId).toBe("call_abc");
-    expect(claim.sourceLabel).toBe("Siemens Healthineers teamplay Fleet");
-    expect(claim.assets).toBeUndefined();
-
-    const child = mockPrisma.workOrderTicket.create.mock.calls[1][0].data;
-    expect(child.parent).toEqual({ connect: { id: "t-new" } });
-    expect(child.externalMappings).toEqual({
-      create: {
-        integrationId: "int-fleet",
-        externalId: "US_400501937577",
-        lastSynced: expect.any(Date),
+    // Promoted before the job runs: a filing that fails must still leave a
+    // tracked order. The per-asset children are promoted with the parent.
+    expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
+      where: {
+        OR: [{ id: "t-draft" }, { parentId: "t-draft" }],
+        isDraft: true,
       },
+      data: { isDraft: false },
     });
-    expect(child.ticket).toEqual({
-      create: { assetId: MRI.assetId, parentTicketId: "t-new" },
-    });
-    expect(mockPrisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
-      timeout: 30_000,
-    });
-  });
-
-  it("returns the winner without re-filing when the claim loses a race", async () => {
-    const caller = setup();
-    // Fast-path findUnique sees nothing, but the claim create loses the unique
-    // race to a concurrent accept (P2002); the second read finds the winner.
-    mockPrisma.workOrderTicket.findUnique
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: "t-winner",
-        externalMappings: [{ externalId: "US_400501937577" }],
-        children: [],
-      });
-    mockPrisma.workOrderTicket.create.mockRejectedValueOnce({ code: "P2002" });
-
-    const result = await caller.createFleetWorkOrder(proposal);
-
-    expect(result).toMatchObject({
-      ticketId: "t-winner",
-      externalIds: ["US_400501937577"],
-      alreadyAccepted: true,
-    });
-    // The race loser must not file its own Fleet order.
-    expect(mockFleet.file).not.toHaveBeenCalled();
-  });
-
-  it("refuses to file a patient-safety issue online (Fleet requires a phone call)", async () => {
-    const caller = setup();
-
-    await expect(
-      caller.createFleetWorkOrder({ ...proposal, dangerForPatient: "yes" }),
-    ).rejects.toThrow(/phone/i);
-
-    expect(mockFleet.file).not.toHaveBeenCalled();
-    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
-  });
-
-  it("refuses an asset Siemens does not manage, before calling Fleet", async () => {
-    const caller = setup();
-    mockFleet.resolveFleetAssets.mockRejectedValue(
-      new UnmanagedAssetsError(["PUMP-SIGMA-001"]),
+    expect(mockClaim).toHaveBeenCalledWith("t-draft");
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "workOrder/submit.requested" }),
     );
-
-    await expect(
-      caller.createFleetWorkOrder({ ...proposal, assetIds: ["rad-pump-001"] }),
-    ).rejects.toThrow(/PUMP-SIGMA-001/);
-
-    expect(mockFleet.file).not.toHaveBeenCalled();
-    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
+    expect(result.submissionState).toBe("SUBMITTING");
   });
 
-  it("is idempotent — re-accepting the same proposal files nothing new", async () => {
-    const caller = setup();
+  it("tracks an order no platform manages, and sends nothing", async () => {
     mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
-      id: "t-existing",
-      externalMappings: [{ externalId: "US_400501937577" }],
-      children: [],
+      ...DRAFT,
+      targetIntegrationId: null,
+      submissionState: "NONE",
     });
 
-    const result = await caller.createFleetWorkOrder(proposal);
+    const result = await setup().approveWorkOrder({ ticketId: "t-draft" });
 
-    expect(result).toMatchObject({
-      ticketId: "t-existing",
-      externalIds: ["US_400501937577"],
-      alreadyAccepted: true,
-    });
-    expect(mockFleet.file).not.toHaveBeenCalled();
-    expect(mockPrisma.workOrderTicket.create).not.toHaveBeenCalled();
+    expect(result.submissionState).toBe("NONE");
+    expect(mockClaim).not.toHaveBeenCalled();
+    expect(mockInngestSend).not.toHaveBeenCalled();
   });
 
-  it("still tracks the orders Fleet accepted when one of them fails", async () => {
-    const caller = setup();
-    const CT = { ...MRI, assetId: "rad-ct-002", hostname: "CT-SOMATOM-001" };
-    mockFleet.resolveFleetAssets.mockResolvedValue([MRI, CT]);
-    mockFleet.file
-      .mockResolvedValueOnce({
-        externalId: "US_400501937577",
-        raw: {},
-      })
-      .mockRejectedValueOnce(new Error("503 Service Unavailable"));
-
-    const result = await caller.createFleetWorkOrder({
-      ...proposal,
-      assetIds: [MRI.assetId, CT.assetId],
+  it("refuses a payload the platform no longer accepts", async () => {
+    // The proposal was valid when drafted; the rules can move under it.
+    mockValidatePayload.mockResolvedValue({
+      ok: false,
+      reason: "Siemens requires a phone call for a patient-safety issue.",
     });
 
-    // One order exists upstream, so it must exist here too — and the caller is
-    // told which asset failed rather than the failure being swallowed.
-    expect(result.externalIds).toEqual(["US_400501937577"]);
-    expect(result.failures).toEqual([
-      { asset: "CT-SOMATOM-001", message: "503 Service Unavailable" },
-    ]);
+    await expect(
+      setup().approveWorkOrder({ ticketId: "t-draft" }),
+    ).rejects.toThrow(/phone call/);
+    expect(mockInngestSend).not.toHaveBeenCalled();
+    // Still a draft, so the card can offer Approve again once it is corrected.
+    expect(mockPrisma.workOrderTicket.updateMany).not.toHaveBeenCalled();
   });
 
-  it("fails loudly and drops the claim when Fleet accepts nothing", async () => {
-    const caller = setup();
-    mockFleet.file.mockRejectedValue(new Error("401 Forbidden"));
-
-    await expect(caller.createFleetWorkOrder(proposal)).rejects.toThrow(
-      /401 Forbidden/,
-    );
-    expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({
-      where: { id: "t-new" },
+  it("refuses a mitigation-plan ticket, which the plan's accept flow owns", async () => {
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      ...DRAFT,
+      mitigationPlanId: "plan-1",
     });
-    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledTimes(1);
+
+    await expect(
+      setup().approveWorkOrder({ ticketId: "t-draft" }),
+    ).rejects.toThrow(/mitigation plan/);
+    expect(mockPrisma.workOrderTicket.updateMany).not.toHaveBeenCalled();
+    expect(mockInngestSend).not.toHaveBeenCalled();
   });
 
-  it("drops the claim when no Fleet integration is configured to file against", async () => {
-    const caller = setup();
-    mockFleet.workOrderIntegration.mockRejectedValue(
-      new Error("No Siemens Healthineers Fleet integration is configured"),
-    );
+  it("hands the claim back when the job cannot be queued", async () => {
+    // The claim is held from the moment it is taken. If nothing queues the job
+    // and nothing releases it, the ticket sits in SUBMITTING, which
+    // claimForSubmission will not take again — no filing, and no retry.
+    mockInngestSend.mockRejectedValue(new Error("event bus unavailable"));
 
-    await expect(caller.createFleetWorkOrder(proposal)).rejects.toThrow(
-      /No Siemens Healthineers Fleet integration is configured/,
-    );
+    await expect(
+      setup().approveWorkOrder({ ticketId: "t-draft" }),
+    ).rejects.toThrow(/event bus unavailable/);
 
-    // The claim must not survive. If it does, the retry below takes the
-    // already-accepted fast path and reports success for an order that was
-    // never filed.
-    expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({
-      where: { id: "t-new" },
-    });
-    expect(mockFleet.file).not.toHaveBeenCalled();
+    expect(mockRelease).toHaveBeenCalledWith("t-draft", expect.any(Error));
   });
 
-  it("files on a retry once the integration is configured", async () => {
-    const caller = setup();
-    mockFleet.workOrderIntegration.mockRejectedValueOnce(
-      new Error("No Siemens Healthineers Fleet integration is configured"),
-    );
-
-    await expect(caller.createFleetWorkOrder(proposal)).rejects.toThrow(
-      /No Siemens Healthineers Fleet integration is configured/,
-    );
-
-    // The claim was released, so the proposal is still unaccepted and the same
-    // toolCallId can be filed for real.
-    const result = await caller.createFleetWorkOrder(proposal);
-
-    expect(result).toMatchObject({
-      externalIds: ["US_400501937577"],
-      alreadyAccepted: false,
+  it("does not file twice when a second approval loses the claim", async () => {
+    mockClaim.mockResolvedValue(false);
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
+      submissionState: "SUBMITTING",
     });
-    expect(mockFleet.file).toHaveBeenCalledTimes(1);
+
+    const result = await setup().approveWorkOrder({ ticketId: "t-draft" });
+
+    expect(result.submissionState).toBe("SUBMITTING");
+    expect(mockInngestSend).not.toHaveBeenCalled();
   });
 });

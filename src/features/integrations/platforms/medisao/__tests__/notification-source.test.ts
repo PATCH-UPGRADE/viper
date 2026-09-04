@@ -59,6 +59,16 @@ describe("the advisory document", () => {
   it("refuses a payload that is not an advisory", () => {
     expect(() => advisorySourceAdapter.prepare({ nonsense: true })).toThrow();
   });
+
+  it("states the TLP marking rather than leaving it to the classifier", () => {
+    const { known } = advisorySourceAdapter.prepare(RAW);
+    expect(known?.tlp).toBe("CLEAR");
+  });
+
+  it("states no marking when MedISAO sends one we do not recognise", () => {
+    const { known } = advisorySourceAdapter.prepare({ ...RAW, tlp: "PUCE" });
+    expect(known?.tlp).toBeUndefined();
+  });
 });
 
 describe("the advisory linker", () => {

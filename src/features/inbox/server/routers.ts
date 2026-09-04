@@ -13,6 +13,7 @@ import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
   matchingAppliesToDeviceGroup,
+  matchingWhereForDeviceGroup,
   unknownVersionDeviceGroupWhere,
 } from "@/lib/device-matching";
 import { recordFieldCorrections } from "@/lib/field-correction";
@@ -63,6 +64,56 @@ type AffectedMatchingContext = {
   isNotificationLinked: boolean;
   // ^true if \exists NotificationDeviceGroupMapping n s.t n.dgm.id=am.id
 };
+
+/**
+ * The device group matchings that resolve to one asset's device group.
+ *
+ * A matching is a rule, not a row the asset points at, so the candidates are
+ * narrowed in SQL by manufacturer (and product, or its wildcard) and then
+ * confirmed in memory, which is where exact versions and VERS ranges are
+ * decided.
+ *
+ * Exported for its own tests: the wildcard and version-range cases are the
+ * whole point of it, and they are invisible from the procedure's result.
+ */
+export async function matchingIdsForAsset(assetId: string): Promise<string[]> {
+  const asset = await prisma.asset.findUnique({
+    where: { id: assetId },
+    select: {
+      deviceGroup: {
+        select: {
+          id: true,
+          manufacturerId: true,
+          productId: true,
+          versionId: true,
+          version: { select: { canonicalName: true } },
+        },
+      },
+    },
+  });
+
+  const deviceGroup = asset?.deviceGroup;
+  // An asset with no manufacturer cannot be matched by any rule.
+  if (!deviceGroup?.manufacturerId) return [];
+
+  const candidates = await prisma.deviceGroupMatching.findMany({
+    where: matchingWhereForDeviceGroup({
+      manufacturerId: deviceGroup.manufacturerId,
+      productId: deviceGroup.productId,
+    }),
+    select: {
+      id: true,
+      manufacturerId: true,
+      productId: true,
+      versionId: true,
+      versionRange: true,
+    },
+  });
+
+  return candidates
+    .filter((matching) => matchingAppliesToDeviceGroup(matching, deviceGroup))
+    .map((matching) => matching.id);
+}
 
 const ALLOWED_SORT_FIELDS = new Set(["priority", "updatedAt", "createdAt"]);
 
@@ -614,6 +665,107 @@ export const notificationsRouter = createTRPCRouter({
         return { assets: [], totalAssetCount: 0 };
       }
       return fetchUtilizationGrids({ deviceGroupId: { in: deviceGroupIds } });
+    }),
+
+  /**
+   * Advisories that concern one asset: linked to it directly, or linked to a
+   * device group matching that resolves to its device group.
+   *
+   * The source is flattened here rather than in the client, so the table does
+   * not have to know how a SourceRecord reaches its integration.
+   */
+  getManyByAssetId: protectedProcedure
+    .input(paginationInputSchema.extend({ assetId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const asset = await prisma.asset.findUnique({
+        where: { id: input.assetId },
+        select: { id: true },
+      });
+      if (!asset) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const matchingIds = await matchingIdsForAsset(input.assetId);
+
+      const reachesThisAsset = {
+        OR: [
+          { assets: { some: { assetId: input.assetId } } },
+          ...(matchingIds.length > 0
+            ? [
+                {
+                  deviceGroupsMatchings: {
+                    some: { deviceGroupMatchingId: { in: matchingIds } },
+                  },
+                },
+              ]
+            : []),
+        ],
+      };
+
+      // Kept as separate AND clauses: the search filter is itself an OR, and
+      // merging the two at one level would let a search match an advisory that
+      // has nothing to do with this asset.
+      const where = {
+        AND: [
+          reachesThisAsset,
+          ...(input.search ? [createSearchFilter(input.search)] : []),
+        ],
+      };
+
+      const totalCount = await prisma.notification.count({ where });
+      const meta = buildPaginationMeta(input, totalCount);
+
+      const items = await prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (input.page - 1) * input.pageSize,
+        take: input.pageSize,
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          summary: true,
+          priority: true,
+          tlp: true,
+          createdAt: true,
+          updatedAt: true,
+          // Scoped to the caller: "new" means this person has not read it.
+          reads: { where: { userId: ctx.auth.user.id }, select: { id: true } },
+          sourceLinks: {
+            select: {
+              sourceRecord: {
+                select: {
+                  channel: true,
+                  observedAt: true,
+                  mapping: {
+                    select: {
+                      webUrl: true,
+                      integration: { select: { name: true, platform: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return createPaginatedResponse(
+        items.map(({ reads, sourceLinks, ...notification }) => ({
+          ...notification,
+          isUnread: reads.length === 0,
+          sources: sourceLinks.map(({ sourceRecord }) => ({
+            channel: sourceRecord.channel,
+            observedAt: sourceRecord.observedAt,
+            // The row's own name is what an operator recognises; the platform
+            // is the fallback for a source with no integration behind it.
+            label:
+              sourceRecord.mapping?.integration.name ??
+              sourceRecord.mapping?.integration.platform ??
+              sourceRecord.channel,
+            url: sourceRecord.mapping?.webUrl ?? null,
+          })),
+        })),
+        meta,
+      );
     }),
 
   markRead: protectedProcedure

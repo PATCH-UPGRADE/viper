@@ -39,6 +39,19 @@ export const useAffectedAssetsPage = (args: {
   });
 };
 
+/** One page of the advisories that concern a single asset. */
+export const useSuspenseAssetAdvisories = (args: {
+  assetId: string;
+  page: number;
+  pageSize: number;
+  search: string;
+}) => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(
+    trpc.notifications.getManyByAssetId.queryOptions(args),
+  );
+};
+
 export const useMarkNotificationRead = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

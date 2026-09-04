@@ -1,5 +1,15 @@
+import type { Tlp } from "@/generated/prisma";
 import type { InboundEmail } from "./agent/prompt";
 import type { LinkEntities } from "./pipeline";
+
+/**
+ * Facts a source states outright, which the classifier would otherwise have to
+ * read out of the prose. A stated fact always beats an inferred one, so
+ * anything set here overrides what the model returned.
+ */
+export interface KnownNotificationFields {
+  tlp?: Tlp;
+}
 
 /**
  * How one platform's stored snapshot becomes a Notification.
@@ -24,5 +34,6 @@ export interface SourceRecordAdapter {
     /** Sender, subject and body, whatever this platform calls them. */
     doc: InboundEmail;
     linkEntities: LinkEntities;
+    known?: KnownNotificationFields;
   };
 }

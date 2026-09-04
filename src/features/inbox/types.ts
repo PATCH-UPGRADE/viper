@@ -1,3 +1,4 @@
+import type { inferOutput } from "@trpc/tanstack-react-query";
 import type { EmailReceivedEvent } from "resend";
 import { z } from "zod";
 import { externalMappingSelect } from "@/features/integrations/core/urls";
@@ -7,6 +8,7 @@ import {
   TicketCategory,
   type VersionStatus,
 } from "@/generated/prisma";
+import type { trpc } from "@/trpc/server";
 
 export const notificationInclude = {
   deviceGroupsMatchings: {
@@ -23,7 +25,15 @@ export const notificationInclude = {
   sourceLinks: {
     select: {
       sourceRecord: {
-        select: { id: true, channel: true, raw: true, observedAt: true },
+        select: {
+          id: true,
+          channel: true,
+          raw: true,
+          observedAt: true,
+          // An integration source has no sender to show, so the row it came
+          // from supplies the name instead.
+          mapping: externalMappingSelect,
+        },
       },
     },
   },
@@ -200,3 +210,9 @@ export const workOrderPayloadSchema = z.object({
 });
 
 export type WorkOrderPayload = z.infer<typeof workOrderPayloadSchema>;
+
+/** One row on an asset's Advisories tab. */
+export type AssetAdvisory = inferOutput<
+  typeof trpc.notifications.getManyByAssetId
+>["items"][number];
+export type AssetAdvisorySource = AssetAdvisory["sources"][number];

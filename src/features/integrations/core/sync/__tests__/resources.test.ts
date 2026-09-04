@@ -2,7 +2,11 @@
 import { describe, expect, it } from "vitest";
 
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
-import type { AnyConnectorModule, ResourceModule } from "../../types";
+import type {
+  AnyConnectorModule,
+  ResourceModule,
+  WorkOrderModule,
+} from "../../types";
 import { moduleForResource, resourcesFor } from "../resources";
 
 /**
@@ -17,6 +21,17 @@ const stubResourceModule = (): ResourceModule<unknown, unknown, unknown> => ({
   get: async () => ({}),
   toCanonical: (raw) => raw,
   defaultSyncEvery: null,
+});
+
+/** A resource that can also be filed into needs the whole push half declared. */
+const stubWorkOrderModule = (): WorkOrderModule => ({
+  ...stubResourceModule(),
+  openFiler: async () => ({
+    file: async () => ({ externalId: "x", raw: null }),
+  }),
+  // biome-ignore lint/suspicious/noExplicitAny: schemas are irrelevant here
+  payloadSchema: {} as any,
+  toDraft: (input) => input,
 });
 
 const moduleWith = (fields: Partial<AnyConnectorModule>): AnyConnectorModule =>
@@ -36,7 +51,7 @@ const moduleWith = (fields: Partial<AnyConnectorModule>): AnyConnectorModule =>
 describe("resourcesFor", () => {
   it("derives one resource per ResourceModule field", () => {
     const module = moduleWith({
-      workOrders: stubResourceModule(),
+      workOrders: stubWorkOrderModule(),
       notifications: stubResourceModule(),
     });
 
@@ -72,7 +87,7 @@ describe("resourcesFor", () => {
 
 describe("moduleForResource / hasResourceModules", () => {
   it("round-trips every module field", () => {
-    const workOrders = stubResourceModule();
+    const workOrders = stubWorkOrderModule();
     const assets = stubResourceModule();
     const notifications = stubResourceModule();
     const module = moduleWith({ workOrders, assets, notifications });

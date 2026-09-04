@@ -10,6 +10,7 @@ import {
   Severity,
   SourceChannel,
   SourceLinkType,
+  SubmissionState,
   TicketActivityType,
   TicketCategory,
   TicketStatus,
@@ -533,8 +534,16 @@ export const workOrderDetailResponseSchema = z.object({
   sourceLabel: z.string().nullable(),
   body: z.string().nullable(),
   suggestedAssignee: z.string().nullable(),
-  // Set when the ticket came from accepting an agent's Fleet work-order proposal.
+  // Set when the ticket came from accepting an agent's work-order proposal.
   chatToolCallId: z.string().nullable(),
+  // Where this order is filed, and how far the filing has got. Null target means
+  // VIPER tracks it and no vendor platform is involved.
+  targetIntegrationId: z.string().nullable(),
+  // Prisma's Json column — see the note on `location` above.
+  platformPayload: z.any(),
+  submissionState: z.enum(SubmissionState),
+  submissionError: z.string().nullable(),
+  submittedAt: z.date().nullable(),
   priority: z.enum(Priority),
   priorityReasonWhy: z.string().nullable(),
   isDraft: z.boolean(),

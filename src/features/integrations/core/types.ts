@@ -58,8 +58,8 @@ export interface Session {
 }
 
 /**
- * Everything one resource-module sync attempt needs.
- * Assumed it uses the platform createSession module
+ * Everything one resource-module sync attempt needs. The module opens its own
+ * session from `creds`, with its platform's own auth helper.
  */
 export interface ResourceSyncCtx<TConfig = unknown, TCreds = unknown> {
   integrationId: string;
@@ -126,11 +126,6 @@ export interface ResourceModule<
   toCanonical?(raw: TRaw, config: TConfig): TCanonical;
 
   // we push to their platform
-  create?(
-    session: Session,
-    draft: TDraft,
-    config: TConfig,
-  ): Promise<{ externalId: string; raw: unknown }>;
   update?(
     session: Session,
     externalId: string,
@@ -167,6 +162,11 @@ export interface WorkOrderDraftInput {
   reference: string;
 }
 
+/** One authenticated run of filing, held open across several assets. */
+export interface WorkOrderFiler<TDraft> {
+  file(draft: TDraft): Promise<{ externalId: string; raw: unknown }>;
+}
+
 /**
  * A resource module that can also be filed *into* from VIPER.
  *
@@ -179,9 +179,19 @@ export interface WorkOrderModule<
   TCreds = unknown,
   TDraft = unknown,
 > extends ResourceModule<unknown, TRaw, TConfig, TCreds, TDraft> {
-  create: NonNullable<
-    ResourceModule<unknown, TRaw, TConfig, TCreds, TDraft>["create"]
-  >;
+  /**
+   * Sign in once, then file as many orders as the caller needs.
+   *
+   * The platform's own auth helper lives behind this, so core never holds a
+   * session. One order per asset is the normal case, so a platform must
+   * authenticate here rather than inside `file`. A Fleet login drives a
+   * headless browser, and a per-call session costs one browser launch per
+   * asset.
+   */
+  openFiler(input: {
+    config: TConfig;
+    creds: TCreds;
+  }): Promise<WorkOrderFiler<TDraft>>;
   // biome-ignore lint/suspicious/noExplicitAny: a zod object of unknown shape; `unknown` loses `.shape`, which the catalog and JSON Schema generation both read.
   payloadSchema: z.ZodObject<any>;
   toDraft(input: WorkOrderDraftInput, config: TConfig): TDraft;
@@ -221,16 +231,6 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
   sync?: SyncStrategy<TConfig, TCreds>;
   onCreate?(): Promise<void>;
 
-  /**
-   * Open an authenticated session. The pull path builds its own inside `sync`;
-   * a push starts from a user action, so core needs a way to ask for one.
-   */
-  createSession?(input: { config: TConfig; creds: TCreds }): Promise<Session>;
-  /**
-   * Filing needs `createSession` above as well as this module. Both are checked
-   * in one place — `work-orders/server/payload.ts` — so the model is never
-   * offered a platform that cannot complete the job.
-   */
   // biome-ignore lint/suspicious/noExplicitAny: TRaw/TDraft vary per platform and are erased here, exactly as `AnyConnectorModule` erases TConfig/TCreds.
   workOrders?: WorkOrderModule<any, TConfig, TCreds, any>;
   assets?: ResourceModule<unknown, unknown, TConfig, TCreds>;

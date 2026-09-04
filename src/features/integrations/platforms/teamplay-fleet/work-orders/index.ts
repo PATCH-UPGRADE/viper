@@ -8,10 +8,10 @@ import {
   toCanonical,
 } from "./activities";
 import { fleetWorkOrderPayloadSchema } from "./payload";
+import { openFiler } from "./submit";
 import { syncWorkOrders } from "./sync";
 import {
   assertSubmittable,
-  create,
   type FleetWorkOrderDraft,
   PROVISIONAL_PREFIX,
   toDraft,
@@ -19,7 +19,7 @@ import {
 
 /**
  * Fleet models a work order per piece of equipment, so an order covering N
- * assets is N calls to `create` and N mappings, one on each per-asset ticket.
+ * assets is N calls to `file` and N mappings, one on each per-asset ticket.
  *
  * There is no `update`: Fleet's activities collection is read-only, and the
  * create endpoint is the only documented write. A status change made in VIPER
@@ -38,11 +38,11 @@ export const workOrders: WorkOrderModule<
   toCanonical,
 
   // The push half. `payloadSchema` is what a model fills in, `toDraft` joins
-  // that to what VIPER already knows, and `create` files the result.
+  // that to what VIPER already knows, and `openFiler` files the result.
   payloadSchema: fleetWorkOrderPayloadSchema,
   toDraft,
   assertSubmittable,
-  create,
+  openFiler,
 
   apiUrlFor: () => ACTIVITIES_URL,
   // A provisional id is ours, not Fleet's, so it names no page there. Resolve to

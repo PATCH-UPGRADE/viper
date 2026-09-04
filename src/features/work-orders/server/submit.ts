@@ -1,10 +1,14 @@
 import "server-only";
 import { decryptCredentials } from "@/features/integrations/core/credentials";
 import { requirePlatform } from "@/features/integrations/core/registry";
-import type { WorkOrderDraftInput } from "@/features/integrations/core/types";
+import type {
+  WorkOrderDraftInput,
+  WorkOrderFiler,
+} from "@/features/integrations/core/types";
 import { attachExternalMapping } from "@/features/tracking/server/asset-tickets";
 import { SubmissionState } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { labelFor } from "./targets";
 
 /**
  * Filing a draft work order on whichever platform manages its assets.
@@ -15,11 +19,14 @@ import prisma from "@/lib/db";
  */
 
 /**
- * Open one authenticated session for an integration. Signing in can be
- * expensive — Fleet drives a headless browser — so a submission that covers
- * several assets opens this once and files every asset through it.
+ * Read the platform's module and settings, and hand back a way to open a filer.
+ *
+ * Signing in can be expensive — Fleet drives a headless browser — so a
+ * submission that covers several assets opens one filer and files every asset
+ * through it, and a submission with nothing left to file opens none at all.
+ * How that session is made is the platform's business, not this file's.
  */
-async function openFiler(integrationId: string) {
+async function prepareFiling(integrationId: string) {
   const integration = await prisma.integration.findUniqueOrThrow({
     where: { id: integrationId },
     select: { platform: true, config: true, credentials: true, name: true },
@@ -28,7 +35,7 @@ async function openFiler(integrationId: string) {
   const connector = requirePlatform(integration.platform);
   const module = connector.workOrders;
 
-  if (!module || !connector.createSession) {
+  if (!module) {
     throw new Error(
       `${integration.name} cannot have work orders filed on it — its platform does not support filing.`,
     );
@@ -48,9 +55,9 @@ async function openFiler(integrationId: string) {
   }
 
   return {
-    session: await connector.createSession({ config, creds }),
-    config,
     module,
+    config,
+    open: () => module.openFiler({ config, creds }),
   };
 }
 
@@ -140,19 +147,23 @@ export async function fileClaimedTicket(
     select: { name: true, email: true },
   });
 
-  const { session, config, module } = await openFiler(integrationId);
+  const { open, config, module } = await prepareFiling(integrationId);
   const payload = module.payloadSchema.parse(ticket.platformPayload ?? {});
   // Re-checked at the point of sending. The proposal was validated when it was
   // drafted, but a stored payload can outlive the rules that accepted it.
   module.assertSubmittable?.(payload);
 
-  const mappings = await prisma.externalAssetMapping.findMany({
-    where: {
-      integrationId,
-      itemId: { in: ticket.assets.map((a) => a.asset.id) },
-    },
-    select: { itemId: true, externalId: true },
-  });
+  const assetExternalIds = new Map(
+    (
+      await prisma.externalAssetMapping.findMany({
+        where: {
+          integrationId,
+          itemId: { in: ticket.assets.map((a) => a.asset.id) },
+        },
+        select: { itemId: true, externalId: true },
+      })
+    ).map((m) => [m.itemId, m.externalId]),
+  );
 
   // A FAILED ticket can be claimed again, and a child that already carries a
   // mapping for this integration was filed on a previous attempt. Sending it
@@ -172,14 +183,21 @@ export async function fileClaimedTicket(
   const externalIds: string[] = [];
   const failures: SubmissionFailure[] = [];
 
+  // Opened on the first asset that still needs sending, never before: signing in
+  // to the vendor is expensive, and a retry of a fully filed order — or an order
+  // that reached no assets at all — must not pay for a login it never uses.
+  let filer: WorkOrderFiler<unknown> | undefined;
+
   for (const { asset, ticketId: childTicketId } of ticket.assets) {
-    const label = asset.hostname ?? asset.ip ?? asset.id;
-    const filed = alreadyFiled.get(childTicketId);
-    if (filed) {
-      externalIds.push(filed);
+    const alreadyOpen = alreadyFiled.get(childTicketId);
+    if (alreadyOpen) {
+      externalIds.push(alreadyOpen);
       continue;
     }
+
+    const label = labelFor(asset);
     try {
+      filer ??= await open();
       const input: WorkOrderDraftInput = {
         summary: ticket.summary,
         description: ticket.body ?? "",
@@ -189,30 +207,37 @@ export async function fileClaimedTicket(
           id: asset.id,
           hostname: asset.hostname,
           ip: asset.ip,
-          externalId:
-            mappings.find((m) => m.itemId === asset.id)?.externalId ?? null,
+          externalId: assetExternalIds.get(asset.id) ?? null,
         },
         actor: { name: actor.name, email: actor.email ?? "" },
         payload,
         reference: ticket.id,
       };
 
-      const result = await module.create?.(
-        session,
-        module.toDraft(input, config),
-        config,
-      );
-      if (!result) throw new Error("The platform filed nothing.");
+      const result = await filer.file(module.toDraft(input, config));
+      externalIds.push(result.externalId);
 
       // One write per asset, deliberately: an order the vendor accepted is
       // recorded before the next call, so a crash mid-loop cannot re-file it.
       // The upsert is atomic on its own, so it needs no transaction.
-      await attachExternalMapping(prisma, childTicketId, {
-        integrationId,
-        externalId: result.externalId,
-        lastSynced: new Date(),
-      });
-      externalIds.push(result.externalId);
+      //
+      // Its own catch, because the order is already open at the vendor by this
+      // point. Counting a failed write as a failed filing would hide the id
+      // the vendor gave us, and the next attempt would file the order twice.
+      try {
+        await attachExternalMapping(prisma, childTicketId, {
+          integrationId,
+          externalId: result.externalId,
+          lastSynced: new Date(),
+        });
+      } catch (error) {
+        failures.push({
+          asset: label,
+          message: `filed as ${result.externalId}, but recording it failed: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+        });
+      }
     } catch (error) {
       failures.push({
         asset: label,
@@ -230,6 +255,8 @@ export async function finishSubmission(
   filed: number,
   failures: SubmissionFailure[],
 ): Promise<void> {
+  const detail = failures.map((f) => `${f.asset} — ${f.message}`).join("; ");
+
   await prisma.workOrderTicket.update({
     where: { id: ticketId },
     data:
@@ -238,14 +265,15 @@ export async function finishSubmission(
             submissionState: SubmissionState.SUBMITTED,
             submittedAt: new Date(),
             submissionError: failures.length
-              ? `Filed ${filed}, failed ${failures.length}: ${failures.map((f) => `${f.asset} — ${f.message}`).join("; ")}`
+              ? `Filed ${filed}, failed ${failures.length}: ${detail}`
               : null,
           }
         : {
             submissionState: SubmissionState.FAILED,
-            submissionError: failures
-              .map((f) => `${f.asset} — ${f.message}`)
-              .join("; "),
+            // No failures and nothing filed means the order reached no asset at
+            // all. Without a message the user sees a failure with no reason.
+            submissionError:
+              detail || "Nothing was filed: this work order covers no assets.",
           },
   });
 }

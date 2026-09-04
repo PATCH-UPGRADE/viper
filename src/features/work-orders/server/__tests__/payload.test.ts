@@ -12,13 +12,17 @@ vi.mock("@/features/integrations/core/registry", () => ({
 import { keepFileableTargets } from "../payload";
 import type { ResolvedTargets } from "../targets";
 
-// A platform that can be filed on declares both halves.
+// A platform that can be filed on declares a work order module, and that
+// module carries its own auth.
 const FILEABLE = {
-  createSession: async () => ({ request: async () => new Response() }),
-  workOrders: { create: async () => ({ externalId: "x", raw: null }) },
+  workOrders: {
+    openFiler: async () => ({
+      file: async () => ({ externalId: "x", raw: null }),
+    }),
+  },
 };
 // One that cannot: no work order module at all.
-const NOT_FILEABLE = { createSession: async () => ({}) };
+const NOT_FILEABLE = {};
 
 const target = (
   platform: string,
@@ -83,6 +87,24 @@ describe("keepFileableTargets", () => {
 
     expect(targets.map((t) => t.platform)).toEqual(["FLEET"]);
     expect(unmanaged).toEqual([{ id: "a2", label: "CT-1" }]);
+  });
+
+  it("covers an asset by a fileable target listed after an unfileable one", () => {
+    // Order must not decide the answer: the partition finishes before coverage
+    // is worked out, so a later target still protects an earlier asset.
+    mockRegistry.mockImplementation((p: string) =>
+      p === "FLEET" ? FILEABLE : NOT_FILEABLE,
+    );
+
+    const { targets, unmanaged } = keepFileableTargets(
+      resolved([
+        target("PARTNER", [{ id: "a1", hostname: "MR-1" }]),
+        target("FLEET", [{ id: "a1", hostname: "MR-1" }]),
+      ]),
+    );
+
+    expect(targets.map((t) => t.platform)).toEqual(["FLEET"]);
+    expect(unmanaged).toEqual([]);
   });
 
   it("reports an asset once when two unfileable targets cover it", () => {

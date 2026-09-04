@@ -13,19 +13,16 @@ import {
  * The work order module for a platform, or null when that platform cannot be
  * filed on.
  *
- * Filing needs two things a platform declares separately: the module itself,
- * and a way to authenticate. Both are checked here, so a platform that can only
- * do half the job is never offered to a model — the alternative is a draft the
- * user approves and a job that then discovers there is no session.
+ * A platform that declares a work order module can also authenticate for it,
+ * because `openFiler` is part of that module. So the module alone decides
+ * whether a platform is offered to a model.
  *
  * Pure: the registry is an in-memory table, so knowing the platform is enough.
  */
 function workOrderModuleForPlatform(
   platform: PlatformEnum,
 ): WorkOrderModule | null {
-  const connector = requirePlatform(platform);
-  if (!connector.createSession) return null;
-  return connector.workOrders ?? null;
+  return requirePlatform(platform).workOrders ?? null;
 }
 
 /** The same, for a caller that holds only an integration id. */
@@ -90,14 +87,9 @@ export function keepFileableTargets(resolved: ResolvedTargets): {
   return { targets, unmanaged, unknownIds: resolved.unknownIds };
 }
 
-interface PayloadRejection {
-  ok: false;
-  reason: string;
-}
-
 type PayloadCheck =
   | { ok: true; payload: Record<string, unknown> }
-  | PayloadRejection;
+  | { ok: false; reason: string };
 
 /**
  * Validate what a model filled in against the platform it chose.

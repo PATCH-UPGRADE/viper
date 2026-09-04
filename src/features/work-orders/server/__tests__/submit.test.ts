@@ -3,15 +3,34 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockPrisma } = vi.hoisted(() => ({
+const { mockPrisma, mockRequirePlatform } = vi.hoisted(() => ({
   mockPrisma: {
-    workOrderTicket: { updateMany: vi.fn(), update: vi.fn() },
+    workOrderTicket: {
+      updateMany: vi.fn(),
+      update: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+    },
+    integration: { findUniqueOrThrow: vi.fn() },
+    user: { findUniqueOrThrow: vi.fn() },
+    externalAssetMapping: { findMany: vi.fn() },
+    externalWorkOrderMapping: { findMany: vi.fn() },
   },
+  mockRequirePlatform: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
+vi.mock("@/features/integrations/core/registry", () => ({
+  requirePlatform: mockRequirePlatform,
+}));
+vi.mock("@/features/integrations/core/credentials", () => ({
+  decryptCredentials: () => ({ username: "u", password: "p" }),
+}));
 
-import { claimForSubmission, finishSubmission } from "../submit";
+import {
+  claimForSubmission,
+  fileClaimedTicket,
+  finishSubmission,
+} from "../submit";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -61,5 +80,64 @@ describe("finishSubmission", () => {
     const [args] = mockPrisma.workOrderTicket.update.mock.calls[0];
     expect(args.data.submissionState).toBe("FAILED");
     expect(args.data.submissionError).toMatch(/MR-1 — 401/);
+  });
+});
+
+describe("fileClaimedTicket", () => {
+  const openFiler = vi.fn();
+
+  /** A ticket whose one child already carries a mapping for this integration. */
+  const fullyFiled = () => {
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
+      id: "wo-1",
+      summary: "Patch",
+      body: null,
+      category: "PATCH",
+      scheduledAt: null,
+      platformPayload: {},
+      targetIntegrationId: "int-1",
+      assets: [
+        {
+          asset: { id: "a1", hostname: "MR-1", ip: null },
+          ticketId: "child-1",
+        },
+      ],
+    });
+    mockPrisma.integration.findUniqueOrThrow.mockResolvedValue({
+      platform: "FLEET",
+      config: {},
+      credentials: new Uint8Array([1]),
+      name: "Fleet",
+    });
+    mockPrisma.user.findUniqueOrThrow.mockResolvedValue({
+      name: "Ann Lee",
+      email: "ann@example.com",
+    });
+    mockPrisma.externalAssetMapping.findMany.mockResolvedValue([]);
+    mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([
+      { itemId: "child-1", externalId: "FLEET-9" },
+    ]);
+    mockRequirePlatform.mockReturnValue({
+      definition: {
+        configSchema: { parse: (c: unknown) => c },
+        credentialSchema: { parse: (c: unknown) => c },
+      },
+      workOrders: {
+        openFiler,
+        payloadSchema: { parse: (p: unknown) => p },
+        toDraft: (input: unknown) => input,
+      },
+    });
+  };
+
+  it("does not sign in when every asset was already filed", async () => {
+    // Opening a filer launches a headless browser on Fleet. A retry of a fully
+    // filed order must cost nothing.
+    fullyFiled();
+
+    const result = await fileClaimedTicket("wo-1", "user-1");
+
+    expect(openFiler).not.toHaveBeenCalled();
+    expect(result).toEqual({ externalIds: ["FLEET-9"], failures: [] });
   });
 });

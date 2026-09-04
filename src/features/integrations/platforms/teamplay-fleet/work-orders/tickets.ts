@@ -88,7 +88,7 @@ export interface FleetWorkOrderDraft {
  * of the message, and this is the backstop that no caller can bypass.
  */
 export function assertSubmittable(payload: {
-  dangerForPatient?: FleetPatientDanger | string;
+  dangerForPatient?: string;
 }): void {
   if (payload.dangerForPatient === "yes") {
     throw new Error(

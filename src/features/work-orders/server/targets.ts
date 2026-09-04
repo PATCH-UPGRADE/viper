@@ -125,10 +125,10 @@ export async function resolveWorkOrderTargets(
       })
     : [];
 
-  const unknownIds: string[] = [];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const unknownIds = missing.filter((id) => !byId.has(id));
   const unmanaged = missing.map((id) => {
-    const row = rows.find((r) => r.id === id);
-    if (!row) unknownIds.push(id);
+    const row = byId.get(id);
     return { id, label: row ? labelFor(row) : `${id} (no such asset)` };
   });
 

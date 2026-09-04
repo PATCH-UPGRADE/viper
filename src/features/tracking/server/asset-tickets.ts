@@ -171,6 +171,8 @@ export async function attachMatchingAssets(
     },
     select: {
       id: true,
+      hostname: true,
+      ip: true,
       deviceGroup: {
         select: {
           id: true,
@@ -182,6 +184,22 @@ export async function attachMatchingAssets(
       },
     },
   });
+  // Read once for the whole fan-out. Every child copies the same parent, so
+  // leaving this to createAssetTicket would re-read it for each asset.
+  const parent = await tx.workOrderTicket.findUniqueOrThrow({
+    where: { id: parentTicketId },
+    select: {
+      summary: true,
+      body: true,
+      category: true,
+      priority: true,
+      creatorId: true,
+      scheduledAt: true,
+      sourceLabel: true,
+      isDraft: true,
+    },
+  });
+
   // Guards against creating the same asset's child ticket twice — findMany
   // already returns each asset once, so this only matters if that changes.
   const attachedAssetIds = new Set<string>();
@@ -193,7 +211,13 @@ export async function attachMatchingAssets(
     if (!matches) continue;
     attachedAssetIds.add(asset.id);
 
-    await createAssetTicket(tx, { parentTicketId, assetId: asset.id, actorId });
+    await createAssetTicket(tx, {
+      parentTicketId,
+      assetId: asset.id,
+      actorId,
+      parent,
+      asset: { hostname: asset.hostname, ip: asset.ip },
+    });
   }
 }
 

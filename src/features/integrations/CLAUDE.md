@@ -123,7 +123,6 @@ export interface ResourceModule<TCanonical, TRaw, TConfig, TCreds>
   toCanonical?(raw: TRaw, config: TConfig): TCanonical;
 
   // we push to their platform
-  create?(session: Session, draft: TCanonical): Promise<{ externalId: string; raw: TRaw }>;
   update?(session: Session, externalId: string, patch: Partial<TCanonical>): Promise<...>;
 
   defaultSyncEvery: number | null;
@@ -133,6 +132,33 @@ export interface ResourceModule<TCanonical, TRaw, TConfig, TCreds>
 **`sync` is the contract; everything else is optional.** Declaring a resource module means that
 module knows how to sync itself — the pull and push helpers are the pieces a `sync` is usually
 built out of, not obligations. A resource we only ever write to needs none of them.
+
+A `Session` is a platform's own, built inside `sync` from that platform's auth helper — see
+`teamplay-fleet/assets/sync.ts`, which calls `createFleetSession(ctx.creds)`. Core never makes
+one.
+
+### Filing work orders
+
+A work order module extends `ResourceModule` with the push half, and `openFiler` carries the
+auth for it:
+
+```ts
+export interface WorkOrderModule<TRaw, TConfig, TCreds, TDraft>
+  extends ResourceModule<unknown, TRaw, TConfig, TCreds, TDraft> {
+  openFiler(input: { config: TConfig; creds: TCreds }): Promise<WorkOrderFiler<TDraft>>;
+  payloadSchema: z.ZodObject<any>;
+  toDraft(input: WorkOrderDraftInput, config: TConfig): TDraft;
+  assertSubmittable?(payload: Record<string, unknown>): void;
+}
+
+export interface WorkOrderFiler<TDraft> {
+  file(draft: TDraft): Promise<{ externalId: string; raw: unknown }>;
+}
+```
+
+Core opens a filer once per submission and calls `file` once per asset, because one work order
+covers N assets. **Sign in inside `openFiler`, not inside `file`.** A Fleet login drives a
+headless browser, so a per-call session costs one browser launch per asset.
 
 
 ## Registering a new platform

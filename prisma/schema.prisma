@@ -1267,7 +1267,6 @@ model WorkOrderTicket {
 
   body String? @db.Text
 
-  isDraft          Boolean         @default(false)
   mitigationPlanId String?
   mitigationPlan   MitigationPlan? @relation(fields: [mitigationPlanId], references: [id], onDelete: Cascade)
 
@@ -1309,8 +1308,20 @@ model WorkOrderTicket {
   externalMappings ExternalWorkOrderMapping[]
   lastCommentAt    DateTime?
 
-  // Where this work order is filed, and what the platform needs to file it.
-  // Null means VIPER tracks it and no vendor platform is involved.
+  // A draft is a work order VIPER has not committed to yet: it is hidden from
+  // the ticket lists, and it is what a mitigation plan holds until the plan is
+  // accepted. It is not about the vendor — a ticket leaves draft whether or not
+  // it is ever filed anywhere.
+  isDraft Boolean @default(false)
+
+  // Where this work order will be filed, and the payload that the platform
+  // needs. Both are set on the draft, and both stay after the order is filed,
+  // because a retry of a FAILED submission reads them again.
+  //
+  // This is the intent, not the result. ExternalWorkOrderMapping holds the
+  // result: one row per child ticket, with the id that the platform returned.
+  // Null means that VIPER tracks this work order, and no vendor platform is
+  // involved.
   targetIntegrationId String?
   targetIntegration   Integration? @relation(name: "WorkOrderTarget", fields: [targetIntegrationId], references: [id], onDelete: SetNull)
   platformPayload     Json?

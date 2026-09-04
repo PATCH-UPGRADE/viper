@@ -9,7 +9,7 @@ import {
   FLEET_SUPPORT_TYPES,
 } from "@/features/integrations/platforms/teamplay-fleet/work-orders/constants";
 import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
-import { type Prisma, TicketCategory } from "@/generated/prisma";
+import { TicketCategory } from "@/generated/prisma";
 
 export interface UseChatAgentConfig {
   agent?: "chat" | "giveRecommendations";
@@ -86,15 +86,16 @@ export const fetchThreadsSchema = z.object({
   offset: z.number().int().min(0).optional(),
 });
 
-export const chatThreadInclude = {
-  _count: {
-    select: { messages: true },
-  },
+// Scalar columns for the thread list — deliberately excludes the `report` TEXT
+// blob, which the list never shows.
+export const chatThreadListSelect = {
+  id: true,
+  userId: true,
+  title: true,
+  createdAt: true,
+  updatedAt: true,
+  _count: { select: { messages: true } },
 } as const;
-
-export type ChatThreadWithRelations = Prisma.ChatThreadGetPayload<{
-  include: typeof chatThreadInclude;
-}>;
 
 export const chatThreadSchema = z.object({
   id: z.string(),

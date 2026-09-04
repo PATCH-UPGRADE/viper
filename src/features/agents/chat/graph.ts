@@ -9,6 +9,7 @@ import { buildAgentGraph } from "../shared/build-graph";
 import { loadPersistentNotesMarkdown } from "../shared/notes-preload";
 import { PLATFORM_CATALOG } from "../tools/query-platform-tool";
 import { buildAgentTools } from "../tools/registry";
+import { makeWriteReportTool } from "../tools/report-tool";
 
 const CHAT_MODEL = "claude-haiku-4-5-20251001";
 
@@ -27,6 +28,9 @@ Be concise, accurate, and prioritize patient safety in your recommendations.
 - propose_fleet_work_order: propose a work order on Siemens Healthineers'
   teamplay Fleet platform. Your turn ends here until the user accepts or dismisses.
 - record_note: record a durable fact the user tells you about. Fire and forget, a separate notes agent decides whether it creates, updates or deletes a note.
+- write_report: create or replace the formatted report shown in this conversation's
+  read-only report panel. Use when the user asks for a report/briefing/write-up.
+  Keep replying in normal chat text too — the report is a separate artifact.
 </tools>
 
 ## Data access
@@ -69,25 +73,61 @@ You do not choose create vs update vs delete, the notes agent does, after readin
 Recording is asynchronous, so never tell the user a note was created. Always state in your reply what you recorded,
 in one short sentence (e.g. "I've noted that these ventilators run firmware 3.2").
 The sentence is what carries the fact forward in this conversation.
+
+## Reports
+When the user asks for a report, briefing, or write-up, call write_report with the whole
+document as Markdown. It renders in a separate read-only panel (the user can't edit it) and
+is exportable to PDF/Word, so it is not part of the chat — still answer the user in chat too,
+briefly, and say the report is ready. Calling write_report again replaces the report entirely;
+that is how revisions work when the user re-prompts. When a report already exists it is given
+to you above under "Current report" — revise that text, don't rebuild it from memory.
+
+Look data up with query_platform_data before writing — never invent CVSS scores, versions,
+counts, or hostnames. Cite specific records as Markdown links to their Viper route, using only
+ids from query_platform_data results: [MRI-01](/assets/<id>), [CVE-2024-1234](/vulnerabilities/<id>),
+[name](/remediations/<id>). A link whose id doesn't resolve is
+converted to plain text on save, so cite carefully. Budget, staffing, and other off-platform
+facts come from the user via ask_user_questions — record them with record_note as usual.
+If you still can't get something the report needs, say so plainly in the report (a short
+"Not available" note) rather than omitting it and leaving the report looking complete.
 `;
 
-function buildSystemPrompt(role: UserRole): string {
+export function buildSystemPrompt(
+  role: UserRole,
+  report?: string | null,
+): string {
   return [
     BASE_PROMPT,
     `<user_role>The user's role is: ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</user_role>`,
-  ].join("\n\n");
+    // On a re-prompt of a report thread, feed the CURRENT report back so a
+    // revision edits what's in the panel (the "## Reports" section above says how).
+    report ? `## Current report\n\n${report}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export function buildChatGraph({
   userId,
   userRole = "hospital administration",
+  threadId,
+  report,
   loadNotes = loadPersistentNotesMarkdown,
 }: {
   userId: string;
   userRole?: UserRole;
+  /** The thread being written to — enables write_report. */
+  threadId: string;
+  /** The thread's current report, if any — fed into the system prompt for revisions. */
+  report?: string | null;
   loadNotes?: () => Promise<string>;
 }) {
-  const tools = buildAgentTools(userId);
+  // write_report is chat-only — the recommendations graph calls buildAgentTools
+  // directly and never gets it.
+  const tools = [
+    ...buildAgentTools(userId),
+    makeWriteReportTool(userId, threadId),
+  ];
   const model = new ChatAnthropic({
     model: CHAT_MODEL,
     maxTokens: 4096,
@@ -97,7 +137,7 @@ export function buildChatGraph({
   return buildAgentGraph({
     model,
     tools,
-    systemMessage: new SystemMessage(buildSystemPrompt(userRole)),
+    systemMessage: new SystemMessage(buildSystemPrompt(userRole, report)),
     preload: loadNotes,
   });
 }

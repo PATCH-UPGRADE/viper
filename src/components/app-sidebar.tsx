@@ -6,6 +6,7 @@ import {
   ComputerIcon,
   CpuIcon,
   ExternalLink,
+  FileTextIcon,
   HeartIcon,
   HomeIcon,
   InboxIcon,
@@ -96,6 +97,11 @@ const mainItems: NavItem[] = [
     title: "Vulnerability Dashboard",
     icon: BugIcon,
     url: "/vulnerabilities",
+  },
+  {
+    title: "Reports",
+    icon: FileTextIcon,
+    url: "/reports",
   },
   {
     title: "Settings",

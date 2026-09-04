@@ -5,7 +5,12 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: {} }));
 
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
-import { defaultSyncEveryFor, registry, requirePlatform } from "../registry";
+import {
+  defaultSyncEveryFor,
+  registry,
+  requirePlatform,
+  sourceAdapterFor,
+} from "../registry";
 import { moduleForResource } from "../sync/resources";
 
 /**
@@ -27,6 +32,22 @@ describe("registry", () => {
     expect(requirePlatform(PlatformEnum.FLEET).definition.platform).toBe(
       PlatformEnum.FLEET,
     );
+  });
+
+  // A notifications module records SourceRecords, and `process-source-record`
+  // can only handle them through the adapter. Declaring one without the other
+  // leaves every snapshot unprocessed, and nothing else would say so.
+  it.each(Object.keys(registry) as PlatformEnum[])(
+    "%s declares a source adapter if it records snapshots",
+    (platform) => {
+      const module = requirePlatform(platform);
+      if (!module.notifications) return;
+      expect(sourceAdapterFor(platform)?.prepare).toBeTypeOf("function");
+    },
+  );
+
+  it("has no adapter for a platform that records no snapshots", () => {
+    expect(sourceAdapterFor(PlatformEnum.PARTNER)).toBeUndefined();
   });
 
   it("has no cadence opinion for a platform without ResourceModules", () => {

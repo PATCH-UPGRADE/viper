@@ -6,6 +6,7 @@ import type { DeviceArtifactResponse } from "@/features/device-artifacts/types";
 import {
   ArtifactType,
   AuthType,
+  PlatformEnum,
   ResourceType,
   SyncStatusEnum,
 } from "@/generated/prisma";
@@ -38,15 +39,18 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
   const mockIntegrationPayload = {
     name: "mockDeviceArtifactIntegration",
-    platform: "mockIntegrationPlatform",
-    integrationUri: "https://mock-deviceArtifact-upstream-api.com/",
-    integrationType: "PARTNER" as const,
-    authType: AuthType.Bearer,
-    resourceType: ResourceType.DeviceArtifact,
-    authentication: {
-      token: AUTH_TOKEN,
-    },
+    platform: PlatformEnum.PARTNER,
     syncEvery: 300,
+    config: {
+      integrationUri: "https://mock-deviceArtifact-upstream-api.com/",
+      resource: ResourceType.DeviceArtifact,
+    },
+    credentials: {
+      authType: AuthType.Bearer,
+      authentication: {
+        token: AUTH_TOKEN,
+      },
+    },
   };
 
   const deviceArtifactsIntegrationPayload = {
@@ -635,7 +639,6 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     expect(mapping1.externalId).toBe(daPayload1.vendorId);
 
     expect(foundDeviceArtifact1.description).toBe(daPayload1.description);
-    expect(foundDeviceArtifact1.upstreamApi).toBe(daPayload1.upstreamApi);
     expect(
       foundDeviceArtifact1.deviceGroupMatchings.some(
         (m: { product: { canonicalName: string } | null }) =>
@@ -669,7 +672,6 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     expect(mapping2.externalId).toBe(daPayload2.vendorId);
 
     expect(foundDeviceArtifact2.description).toBe(daPayload2.description);
-    expect(foundDeviceArtifact2.upstreamApi).toBe(daPayload2.upstreamApi);
     expect(
       foundDeviceArtifact2.deviceGroupMatchings.some(
         (m: { product: { canonicalName: string } | null }) =>
@@ -685,13 +687,16 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
 
     expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
 
-    const foundSync = await prisma.syncStatus.findFirstOrThrow({
-      where: { syncedAt: mapping1.lastSynced },
+    const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
+      where: {
+        integrationId: createdIntegration.id,
+        resource: mockIntegrationPayload.config.resource,
+      },
     });
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBeNullable();
-    expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
+    expect(foundSync.lastSuccessfulSync).toStrictEqual(mapping2.lastSynced);
   });
 });

@@ -1,0 +1,257 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { PlusIcon } from "lucide-react";
+import { useState } from "react";
+import { type UseFormReturn, useForm } from "react-hook-form";
+import { z } from "zod";
+import { AuthenticationFields } from "@/components/auth-form";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
+import { authSchema } from "@/lib/schemas";
+import { humanize } from "@/lib/utils";
+import type { CatalogEntry } from "../core/catalog";
+import { useCreateIntegration } from "../hooks/use-integrations";
+import type { FieldSpec } from "../types";
+
+const zodForSpec = (spec: FieldSpec): z.ZodTypeAny => {
+  const field =
+    spec.kind === "select"
+      ? z.enum(spec.options && spec.options.length > 0 ? spec.options : [""])
+      : spec.kind === "number"
+        ? z.coerce.number()
+        : spec.kind === "url"
+          ? z.string().url()
+          : spec.required
+            ? z.string().min(1)
+            : z.string();
+  return spec.required ? field : field.optional();
+};
+
+const shapeFor = (specs: FieldSpec[]) =>
+  Object.fromEntries(specs.map((spec) => [spec.key, zodForSpec(spec)]));
+
+const DynamicField = ({
+  form,
+  name,
+  spec,
+}: {
+  // biome-ignore lint/suspicious/noExplicitAny: field name/path is only known at runtime — same tradeoff as any generic dynamic-schema form.
+  form: UseFormReturn<any>;
+  name: string;
+  spec: FieldSpec;
+}) => {
+  const label = humanize(spec.key);
+  return (
+    <FormField
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>
+            {label}
+            {spec.required ? " *" : ""}
+          </FormLabel>
+          <FormControl>
+            {spec.kind === "select" ? (
+              <Select
+                value={(field.value as string | undefined) ?? ""}
+                onValueChange={field.onChange}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={`Select ${label}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(spec.options ?? []).map((option) => (
+                    <SelectItem value={option} key={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                type={
+                  spec.kind === "number" || spec.kind === "password"
+                    ? spec.kind
+                    : "text"
+                }
+                value={(field.value as string | undefined) ?? ""}
+                onChange={(e) => field.onChange(e.target.value)}
+              />
+            )}
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+};
+
+export const CreateIntegrationDialog = ({ entry }: { entry: CatalogEntry }) => {
+  const {
+    platform,
+    displayName,
+    configFields,
+    credentialFields,
+    credentialsAreAuthShaped,
+  } = entry;
+  const [open, setOpen] = useState(false);
+  const createIntegration = useCreateIntegration();
+
+  const formSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    syncEvery: z
+      .number()
+      .int()
+      .positive()
+      .min(INTEGRATION_SYNC_EVERY_MIN * 60),
+    config: z.object(shapeFor(configFields)),
+    credentials: credentialsAreAuthShaped
+      ? authSchema
+      : z.object(shapeFor(credentialFields)),
+  });
+
+  type FormValues = z.infer<typeof formSchema>;
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      syncEvery: INTEGRATION_SYNC_EVERY_MIN * 60,
+      config: {},
+      credentials: credentialsAreAuthShaped ? { authType: "None" } : {},
+    } as FormValues,
+  });
+
+  const onSubmit = (values: FormValues) => {
+    createIntegration.mutate(
+      { ...values, platform },
+      {
+        onSuccess: () => {
+          form.reset();
+          setOpen(false);
+        },
+      },
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <PlusIcon /> Add
+      </Button>
+      <DialogContent className="p-0 rounded-2xl overflow-hidden">
+        <DialogHeader className="px-6 py-4 border-b gap-1">
+          <DialogTitle className="text-xl">Add {displayName}</DialogTitle>
+          <DialogDescription>
+            Connect a new {displayName} integration.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            id="create-integration-form"
+            className="px-6 py-4 max-h-[60vh] overflow-y-auto grid gap-6"
+          >
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Integration Name *</FormLabel>
+                  <FormControl>
+                    <Input type="text" placeholder={displayName} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {configFields.map((spec) => (
+              <DynamicField
+                key={spec.key}
+                form={form}
+                name={`config.${spec.key}`}
+                spec={spec}
+              />
+            ))}
+
+            <FormField
+              control={form.control}
+              name="syncEvery"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sync Interval (seconds) *</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      {...field}
+                      onChange={(e) =>
+                        field.onChange(
+                          Number(e.target.value) ||
+                            INTEGRATION_SYNC_EVERY_MIN * 60,
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {credentialsAreAuthShaped ? (
+              <AuthenticationFields form={form} name="credentials" />
+            ) : (
+              credentialFields.map((spec) => (
+                <DynamicField
+                  key={spec.key}
+                  form={form}
+                  name={`credentials.${spec.key}`}
+                  spec={spec}
+                />
+              ))
+            )}
+          </form>
+        </Form>
+        <DialogFooter className="px-6 py-4 bg-muted border-t justify-between!">
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button
+            type="submit"
+            form="create-integration-form"
+            disabled={createIntegration.isPending}
+          >
+            Create Integration
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

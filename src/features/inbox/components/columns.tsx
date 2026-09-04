@@ -1,3 +1,4 @@
+// TODO(VW-499): Fix changes after VW-427
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
@@ -23,7 +24,7 @@ import { NotificationTypeBadge } from "./notification-type-badge";
 function SourceDisplay({
   source,
 }: {
-  source: NotificationWithRelations["sources"][number];
+  source: NotificationWithRelations["sourceLinks"][number]["sourceRecord"];
 }) {
   const raw =
     source.channel === "Email"
@@ -40,7 +41,7 @@ function SourceDisplay({
         </span>
       </span>
       <span className="text-xs text-muted-foreground">
-        {formatDistanceToNow(source.receivedAt, { addSuffix: true })}
+        {formatDistanceToNow(source.observedAt, { addSuffix: true })}
       </span>
     </span>
   );
@@ -150,7 +151,7 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
     meta: { title: "Sources" },
     header: "Sources",
     cell: ({ row }) => {
-      const { sources } = row.original;
+      const sources = row.original.sourceLinks.map((link) => link.sourceRecord);
       if (sources.length === 0) {
         return <span className="text-muted-foreground text-sm">—</span>;
       }
@@ -193,7 +194,7 @@ export const notificationColumns: ColumnDef<NotificationWithRelations>[] = [
                           </span>
                         </span>
                         <span className="text-xs text-muted-foreground shrink-0">
-                          {formatDistanceToNow(source.receivedAt, {
+                          {formatDistanceToNow(source.observedAt, {
                             addSuffix: true,
                           })}
                         </span>

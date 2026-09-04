@@ -243,7 +243,6 @@ async function seed() {
         data: {
           ip: `10.90.${groupIndex}.${i + 10}`,
           hostname: `${TAG} seeded-${groupIndex}-${i}`,
-          upstreamApi: "seed",
           deviceGroupId: group.id,
           userId: user.id,
           createdAt: hoursAgo(groupIndex + 1),
@@ -253,6 +252,7 @@ async function seed() {
                   create: {
                     integrationId: integration.id,
                     externalId: `${TAG}-${groupIndex}-${i}`,
+                    upstreamApi: "seed",
                   },
                 },
               }

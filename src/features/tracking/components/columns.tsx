@@ -18,7 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
-import { type NotificationChannel, TicketStatus } from "@/generated/prisma";
+import { type SourceChannel, TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { useSetWatching } from "../hooks/use-tracking";
 import type { TrackingTicketChildRow } from "../types";
@@ -29,10 +29,9 @@ import {
 } from "./ticket-detail/shared";
 
 // Icon shown in the Source column for each ingested-source channel.
-const channelIcons: Record<NotificationChannel, LucideIcon> = {
+const channelIcons: Record<SourceChannel, LucideIcon> = {
   Email: MailIcon,
-  PolledApi: BoxIcon,
-  Crawl: BoxIcon,
+  Integration: BoxIcon,
   TA4: BoxIcon,
 };
 
@@ -277,7 +276,7 @@ export const trackingColumns: ColumnDef<TrackingTicketChildRow>[] = [
     header: "Source",
     cell: ({ row }) => {
       const t = row.original;
-      const source = t.sources[0];
+      const source = t.sourceLinks[0]?.sourceRecord;
       // No ingested source ⇒ manually created: show the creator.
       if (!source) {
         return (

@@ -290,7 +290,7 @@ type AffectedAsset = {
   asset: {
     id: string;
     hostname: string | null;
-    ip: string;
+    ip: string | null;
     role: string | null;
     location: unknown;
     utilization: unknown;

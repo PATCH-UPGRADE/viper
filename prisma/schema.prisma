@@ -251,6 +251,8 @@ model Vendor {
   contracts Contract[]
   contacts  VendorContact[]
 
+  managesRelationships ManagesRelationship[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -282,13 +284,19 @@ model Contract {
   title           String?
   effectiveFrom   DateTime?
   effectiveTo     DateTime?
-  coverageSummary String?
+
+  termsJson Json?
 
   vendorId String
   vendor   Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
-  files  ArtifactWrapper[]
-  covers ContractAsset[]
+  files ArtifactWrapper[]
+
+  // one-to-one with ManagesRelationship. @unique or Prisma makes this many-to-one.
+  managesRelationshipId String?              @unique
+  managesRelationship   ManagesRelationship? @relation(fields: [managesRelationshipId], references: [id], onDelete: SetNull)
+
+  // TODO: A Contract has a ContractSla in the future
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -297,20 +305,32 @@ model Contract {
   @@map("contract")
 }
 
-model ContractAsset {
-  id String @id @default(cuid())
+// Who in the hospital, or outside of it, is responsible for managing an asset.
+model ManagesRelationship {
+  id               String @id @default(cuid())
+  responsibilities String @db.Text
 
-  contractId String
-  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  assetId    String
-  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  // one vendor has many ManagesRelationships
+  vendorId String?
+  vendor   Vendor?   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  contract Contract? // optional if a vendor is provided. fk lives on Contract
+
+  // where work orders for these assets get filed
+  workOrderIntegrationId String?
+  workOrderIntegration   Integration? @relation(fields: [workOrderIntegrationId], references: [id], onDelete: SetNull)
+
+  assets Asset[] @relation("ManagedAssets")
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([contractId, assetId])
-  @@index([contractId])
-  @@index([assetId])
-  @@map("contract_asset")
+  @@index([departmentId])
+  @@index([vendorId])
+  @@index([workOrderIntegrationId])
+  @@map("manages_relationship")
 }
 
 model Product {
@@ -349,9 +369,9 @@ model DeviceGroup {
   manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
   productId      String?
   product        Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
-  versionId     String?
-  version       Version?      @relation(fields: [versionId], references: [id], onDelete: SetNull)
-  versionStatus VersionStatus @default(UNKNOWN)
+  versionId      String?
+  version        Version?      @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  versionStatus  VersionStatus @default(UNKNOWN)
 
   cpe        String[] @default([])
   udi        String?
@@ -375,8 +395,8 @@ model DeviceGroupMatching {
   manufacturer   Manufacturer @relation(fields: [manufacturerId], references: [id], onDelete: Cascade)
   productId      String? // null => wildcard (all products of the manufacturer)
   product        Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  versionId String? // exact version when set
-  version   Version? @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  versionId      String? // exact version when set
+  version        Version?     @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
   versionRange String?
 
@@ -415,10 +435,9 @@ enum AssetStatus {
 
 model Asset {
   id             String  @id @default(cuid())
-  ip             String
+  ip             String?
   networkSegment String?
   role           String?
-  upstreamApi    String  @map("upstream-api")
 
   hostname     String?
   macAddress   String?
@@ -437,10 +456,11 @@ model Asset {
   issues               Issue[]
   deviceGroupHistories DeviceGroupHistory[]
   externalMappings     ExternalAssetMapping[]
-  contractAssets       ContractAsset[]
   assetTickets         AssetTicket[]
   notificationMappings NotificationAssetMapping[]
   nodes                Node[]
+  // who in the hospital, or outside of it, is responsible for managing this asset
+  managedBy            ManagesRelationship[]      @relation("ManagedAssets")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -463,6 +483,11 @@ model ExternalAssetMapping {
   updatedAt     DateTime    @updatedAt
   lastSynced    DateTime?
 
+  // Both optional, both only set by the generic ai/partner platforms
+  // see resource module's .apiUrlFor for other platforms
+  upstreamApi String? // the API endpoint
+  webUrl      String? // where a human looks at it
+
   // Composite unique constraint: one external ID per integration per item
   @@unique([itemId, integrationId], name: "external_asset_mappings_item_integration_key")
   // Critical index for fast lookups: "find item by integration's external ID"
@@ -483,6 +508,9 @@ model ExternalDeviceArtifactMapping {
   updatedAt     DateTime       @updatedAt
   lastSynced    DateTime?
 
+  upstreamApi String?
+  webUrl      String?
+
   @@unique([itemId, integrationId], name: "external_device_artifact_mappings_item_integration_key")
   @@unique([integrationId, externalId], name: "external_device_artifact_mappings_integration_external_key")
   @@index([itemId])
@@ -499,6 +527,9 @@ model ExternalRemediationMapping {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   lastSynced    DateTime?
+
+  upstreamApi String?
+  webUrl      String?
 
   @@unique([itemId, integrationId], name: "external_remediation_mappings_item_integration_key")
   @@unique([integrationId, externalId], name: "external_remediation_mappings_integration_external_key")
@@ -517,6 +548,9 @@ model ExternalWorkOrderMapping {
   updatedAt     DateTime        @updatedAt
   lastSynced    DateTime?
 
+  upstreamApi String?
+  webUrl      String?
+
   @@unique([itemId, integrationId], name: "external_work_order_mappings_item_integration_key")
   @@unique([integrationId, externalId], name: "external_work_order_mappings_integration_external_key")
   @@index([itemId])
@@ -533,6 +567,9 @@ model ExternalVulnerabilityMapping {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   lastSynced    DateTime?
+
+  upstreamApi String?
+  webUrl      String?
 
   @@unique([itemId, integrationId], name: "external_vulnerability_mappings_item_integration_key")
   @@unique([integrationId, externalId], name: "external_vulnerability_mappings_integration_external_key")
@@ -620,7 +657,6 @@ model DeviceArtifact {
   artifacts     ArtifactWrapper[]
   vulnerability Vulnerability[]
 
-  upstreamApi String? @map("upstream-api")
   description String? @db.Text
   role        String?
 
@@ -669,7 +705,6 @@ model Vulnerability {
   affectedComponents   String[]              @default([])
   deviceGroupMatchings DeviceGroupMatching[] @relation("VulnerabilityMatchings")
   exploitUri           String?               @map("exploit-uri")
-  upstreamApi          String?               @map("upstream-api")
 
   // EPSS (Exploit Prediction Scoring System) fields
   epss        Float? // Probability score between 0.0 and 1.0
@@ -785,8 +820,8 @@ model Note {
   instanceId       String? // weak reference — app validates this id exists in targetModel's table
   answeredQuestion Question?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([targetModel, instanceId])
@@ -839,7 +874,6 @@ model Remediation {
   deviceGroupMatchings DeviceGroupMatching[] @relation("RemediationMatchings")
   description          String?               @db.Text // description of remediation
   narrative            String?               @db.Text // how a remediation can be applied
-  upstreamApi          String?               @map("upstream-api")
 
   vulnerabilityId String?
   vulnerability   Vulnerability? @relation(fields: [vulnerabilityId], references: [id], onDelete: SetNull)
@@ -858,6 +892,8 @@ model Remediation {
   updatedAt DateTime @updatedAt
 
   externalMappings ExternalRemediationMapping[]
+  // raw TA4 submissions that produced this remediation
+  sourceRecords    SourceRecord[]
 
   @@index([vulnerabilityId])
   @@index([userId])
@@ -907,22 +943,20 @@ model Apikey {
   @@map("apikey")
 }
 
+// An instance of a Platform. Pretty much just a way to save settings and auth
+// to the db; everything the platform *does* lives in its own module.
 model Integration {
-  id                 String          @id @default(cuid())
-  name               String
-  platform           String? // The name of the integration platform, e.g "BlueFlow"
-  integrationUri     String          @map("integration-uri")
-  integrationType    IntegrationType
-  // ^PARTNER: Helm, Blueflow. Follows VIPER standard 
-  // AI: uses AI to pull data from any platform
-  // CSAF: parses CSAF security advisories (Vulnerability resource type only)
-  prompt             String?         @db.Text // optional, additional instructions for AI
-  authType           AuthType
-  resourceType       ResourceType
-  authentication     Json? // TODO: this needs to be encrypted
-  syncEvery          Int // e.g 300, sync every 300 seconds
-  syncStatus         SyncStatus[]
-  lastSuccessfulSync DateTime?
+  id       String       @id @default(cuid())
+  name     String
+  platform PlatformEnum
+
+  config      Json   @default("{}") // validated by the platform's configSchema
+  credentials Bytes? // AES-256-GCM, key from CREDENTIAL_ENCRYPTION_KEY.
+  // decrypted plaintext is validated by the platform's credentialSchema
+
+  syncEvery Int? // seconds. null = inherit the platform's defaultSyncEvery.
+  // ^if we're polling, that's how often to poll
+  enabled   Boolean @default(true)
 
   apiKeyConnector ApiKeyConnector?
 
@@ -930,15 +964,20 @@ model Integration {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // the user that this integration creates
+  // the shadow user this integration owns; ingested rows are attributed to it
   integrationUserId String @unique
   integrationUser   User   @relation(name: "integration_user", fields: [integrationUserId], references: [id], onDelete: Cascade)
+
+  resourceSyncs IntegrationResourceSync[]
 
   assetMappings          ExternalAssetMapping[]
   deviceArtifactMappings ExternalDeviceArtifactMapping[]
   remediationMappings    ExternalRemediationMapping[]
   vulnerabilityMappings  ExternalVulnerabilityMapping[]
   workOrderMappings      ExternalWorkOrderMapping[]
+  sourceRecordMappings   ExternalSourceRecordMapping[]
+
+  managesRelationships ManagesRelationship[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -949,6 +988,7 @@ model Integration {
 }
 
 // separate out to preserve between ApiKey rotations
+// TODO VW-435: clean up / delete later...
 model ApiKeyConnector {
   id String @id @default(cuid())
 
@@ -976,15 +1016,33 @@ enum SyncStatusEnum {
   Success
 }
 
-model SyncStatus {
-  id            String         @id @default(cuid())
-  integration   Integration    @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+// stores a cursor in JSON (what do we send to external platforms?)
+// stores if a sync was successful or not
+// only one per integration resource
+model IntegrationResourceSync {
+  id            String       @id @default(cuid())
   integrationId String
-  status        SyncStatusEnum @default(Pending)
-  errorMessage  String?
-  syncedAt      DateTime       @default(now())
+  integration   Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  resource      ResourceType
 
-  @@map("sync_status")
+  cursor              Json? // for pagination — opaque to core, interpreted only by the platform
+  status              SyncStatusEnum @default(Pending)
+  errorMessage        String?
+  lastAttemptAt       DateTime?
+  lastSuccessfulSync  DateTime?
+  consecutiveFailures Int            @default(0) // drives the backoff exponent; reset to 0 on success
+
+  syncEvery Int? // seconds. overrides Integration syncEvery.
+  enabled   Boolean @default(true) // operator toggle: turn off Fleet assets, keep work orders.
+
+  nextSyncAt DateTime? // when this resource is next due. null = due now.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([integrationId, resource])
+  @@index([integrationId])
+  @@map("integration_resource_sync")
 }
 
 model Webhook {
@@ -1030,13 +1088,14 @@ enum ResourceType {
   DeviceArtifact
   Remediation
   WorkOrder
+  SourceRecord
 }
 
-enum IntegrationType {
-  PARTNER
+// Which platform module handles an Integration. Platforms are represented in code
+enum PlatformEnum {
   AI
-  CSAF
-  REST
+  PARTNER
+  FLEET
 }
 
 // Traffic Light Protocol, governs information sharing
@@ -1138,6 +1197,8 @@ model Department {
   ticketDescriptions TicketDescription[]
   debriefs           Debrief[]
 
+  managesRelationships ManagesRelationship[]
+
   @@map("department")
 }
 
@@ -1188,7 +1249,7 @@ model WorkOrderTicket {
   priorityReasonWhy String?  @db.Text
 
   sourceLabel String?
-  sources     NotificationSource[]
+  sourceLinks SourceLink[]
 
   body String? @db.Text
 
@@ -1365,11 +1426,13 @@ enum NotificationType {
   Other
 }
 
-enum NotificationChannel {
-  Email
-  PolledApi
-  Crawl
-  TA4
+// how a record entered the system
+// the platform behind `mappingId` says where it came from.
+enum SourceChannel {
+  Email // inbound mail — mappingId null, externalId is the Resend id
+  // TODO VW-448: Consider eliminating Email (and SourceRecord.externalId)
+  Integration // from a platform — mappingId set
+  TA4 // POSTed to /api/v1/remediations
 }
 
 enum ConfidenceLevel {
@@ -1379,10 +1442,10 @@ enum ConfidenceLevel {
   Rejected // A human marked this match as incorrect
 }
 
-enum NotificationSourceType {
-  // Source: the notification was created as a result of this email
+enum SourceLinkType {
+  // Source: the target was created as a result of this record
   Source
-  // Link: the notification already existed, and was linked to this email
+  // Link: the target already existed and this record was attached to it
   Link
 }
 
@@ -1398,7 +1461,7 @@ model Notification {
   priorityReasonWhy String?  @db.Text
   hospitalImpact    Json     @default("{}") // structured: { byline, impactStatement, careAreas, likelihood } — see hospitalImpactSchema
 
-  sources               NotificationSource[]
+  sourceLinks           SourceLink[]
   reads                 NotificationRead[]
   assets                NotificationAssetMapping[]
   deviceGroupsMatchings NotificationDeviceGroupMapping[]
@@ -1457,36 +1520,91 @@ model PlanBriefing {
   @@map("plan_briefing")
 }
 
-model NotificationSource {
-  id             String        @id @default(cuid())
-  notificationId String?
-  notification   Notification? @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+// A snapshot of some record at a point in time, that goes on to be a source for
+// a notification or work order. Append-only, deduplicated on contentHash and
+// ordered by observedAt — cheap "version control".
+//
+// A record links to notifications/work orders via SourceLink.
+model SourceRecord {
+  id      String        @id @default(cuid())
+  channel SourceChannel
 
+  // null for email / TA4 sources, since those aren't mirrored rows.
+  // INVARIANT: mappingId set => externalId null
+  mappingId String?
+  mapping   ExternalSourceRecordMapping? @relation(name: "MappingSnapshots", fields: [mappingId], references: [id], onDelete: Cascade)
+
+  contentHash String // dedup: skip the write if it matches the mapping's newest 
+  raw         Json    @default("{}")
+  markdown    String? @db.Text
+  externalId  String? // TODO VW-448: Consider removing this; used only for email
+
+  observedAt DateTime @default(now())
+
+  // A SourceRecord can optionally be a TA4 remediation: the raw submission,
+  // pointing at the Remediation it created.
+  remediationId String?
+  remediation   Remediation? @relation(fields: [remediationId], references: [id], onDelete: SetNull)
+
+  links       SourceLink[] // what notifications / work orders this source feeds
+  attachments NotificationAttachment[]
+
+  @@unique([channel, externalId])
+  @@index([mappingId, observedAt])
+  @@index([remediationId])
+  @@map("source_record")
+}
+
+// Links sources to notifications/work orders, with a reason why provided by LLM
+model SourceLink {
+  id             String       @id @default(cuid())
+  sourceRecordId String
+  sourceRecord   SourceRecord @relation(fields: [sourceRecordId], references: [id], onDelete: Cascade)
+
+  // either a notification or a work order
+  notificationId    String?
+  notification      Notification?    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   workOrderTicketId String?
   workOrderTicket   WorkOrderTicket? @relation(fields: [workOrderTicketId], references: [id], onDelete: Cascade)
 
-  sourceType NotificationSourceType @default(Source)
-  reasonWhy  String?                @db.Text // why was this email linked to this notification?
+  sourceType SourceLinkType @default(Source)
+  reasonWhy  String?        @db.Text
 
-  channel      NotificationChannel
-  externalId   String? // for an email, this is the resend email id
-  referenceUrl String?
-  raw          Json
-  markdown     String?             @db.Text
+  createdAt DateTime @default(now())
 
-  attachments NotificationAttachment[]
-  receivedAt  DateTime                 @default(now())
-
-  @@unique([channel, externalId])
+  @@unique([sourceRecordId, notificationId])
+  @@unique([sourceRecordId, workOrderTicketId])
   @@index([notificationId])
   @@index([workOrderTicketId])
-  @@map("notification_source")
+  @@map("source_link")
+}
+
+// One row per external record (an advisory, a notification on another platform),
+// owning many snapshots of it.
+model ExternalSourceRecordMapping {
+  id            String      @id @default(cuid())
+  integrationId String
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  externalId    String // the advisory / notification id on another platform
+
+  sourceRecords SourceRecord[] @relation(name: "MappingSnapshots")
+
+  upstreamApi String?
+  webUrl      String?
+
+  lastSynced DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([integrationId, externalId])
+  @@index([integrationId])
+  @@map("external_source_record_mappings")
 }
 
 model NotificationAttachment {
-  id       String             @id @default(cuid())
+  id       String       @id @default(cuid())
   sourceId String
-  source   NotificationSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  source   SourceRecord @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
   filename    String?
   contentType String?
@@ -1602,18 +1720,6 @@ model MatchFeedback {
   @@index([targetType, targetId])
   @@index([notificationId])
   @@map("match_feedback")
-}
-
-model IntegrationSession {
-  id        String    @id @default(cuid())
-  host      String    @unique
-  header    String
-  value     String
-  expiresAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@map("integration_session")
 }
 
 // ─── Correction ────────────────────────────────────────────────────────────

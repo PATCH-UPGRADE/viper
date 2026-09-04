@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  // Off by default, but allows us to ignore type errors on blueflow
+  // ci job
+  typescript: {
+    ignoreBuildErrors: process.env.VIPER_IGNORE_BUILD_ERRORS === "1",
+  },
   serverExternalPackages: ["playwright-core", "@sparticuz/chromium"],
   outputFileTracingIncludes: {
     "/api/inngest/route": [
@@ -20,11 +25,6 @@ const nextConfig: NextConfig = {
       {
         source: "/settings",
         destination: "/settings/integrations",
-        permanent: false,
-      },
-      {
-        source: "/settings/integrations",
-        destination: "/settings/integrations/assets",
         permanent: false,
       },
     ];

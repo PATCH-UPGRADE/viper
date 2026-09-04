@@ -1,7 +1,12 @@
 import { fail } from "node:assert";
 import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
-import { AuthType, ResourceType, SyncStatusEnum } from "@/generated/prisma";
+import {
+  AuthType,
+  PlatformEnum,
+  ResourceType,
+  SyncStatusEnum,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
   AUTH_TOKEN,
@@ -18,27 +23,28 @@ describe("Assets Endpoint (/assets)", () => {
     ip: "192.168.1.100",
     cpe: generateCPE("asset_v1"),
     role: "Primary Server",
-    upstreamApi: "https://api.hospital-upstream.com/v1",
   };
 
   const payload2 = {
     ip: "192.168.1.101",
     cpe: generateCPE("asset_v2"),
     role: "Primary Server",
-    upstreamApi: "https://api.hospital-upstream.com/v2",
   };
 
   const mockIntegrationPayload = {
     name: "mockIntegration",
-    platform: "mockIntegrationPlatform",
-    integrationUri: "https://mock-upstream-api.com/",
-    integrationType: "PARTNER" as const,
-    authType: AuthType.Bearer,
-    resourceType: ResourceType.Asset,
-    authentication: {
-      token: AUTH_TOKEN,
-    },
+    platform: PlatformEnum.PARTNER,
     syncEvery: 300,
+    config: {
+      integrationUri: "https://mock-upstream-api.com/",
+      resource: ResourceType.Asset,
+    },
+    credentials: {
+      authType: AuthType.Bearer,
+      authentication: {
+        token: AUTH_TOKEN,
+      },
+    },
   };
 
   const assetIntegrationPayload = {
@@ -89,10 +95,9 @@ describe("Assets Endpoint (/assets)", () => {
     previous: null,
   };
 
-  it("POST /assets - should create asset with only ip and upstreamApi", async () => {
+  it("POST /assets - should create asset with only ip", async () => {
     const minimalPayload = {
       ip: "10.0.0.1",
-      upstreamApi: "https://api.hospital-upstream.com/v1",
     };
 
     const res = await request(BASE_URL)
@@ -189,7 +194,6 @@ describe("Assets Endpoint (/assets)", () => {
       ip: "192.168.1.105", // Updated field
       cpe: generateCPE("asset_v1"),
       role: "Backup Server",
-      upstreamApi: "https://api.hospital-upstream.com/v1",
     };
 
     const putRes = await request(BASE_URL)
@@ -230,14 +234,12 @@ describe("Assets Endpoint (/assets)", () => {
     expect(bodyFirst.deviceGroup).toHaveProperty("assetsUrl");
     expect(bodyFirst.deviceGroup).toHaveProperty("deviceArtifactsUrl");
     expect(bodyFirst.role).toBe(payload.role);
-    expect(bodyFirst.upstreamApi).toBe(payload.upstreamApi);
 
     const bodySecond = res.body.at(1);
     expect(bodySecond).toHaveProperty("id");
     expect(bodySecond.ip).toBe(payload2.ip);
     expect(bodySecond.deviceGroup.cpe.includes(payload2.cpe)).toBe(true);
     expect(bodySecond.role).toBe(payload2.role);
-    expect(bodySecond.upstreamApi).toBe(payload2.upstreamApi);
 
     // GET first payload from DB
     const firstAssetId = bodyFirst.id;
@@ -253,7 +255,6 @@ describe("Assets Endpoint (/assets)", () => {
     );
     expect(firstDetailRes.body.deviceGroup).toHaveProperty("url");
     expect(firstDetailRes.body.role).toBe(payload.role);
-    expect(firstDetailRes.body.upstreamApi).toBe(payload.upstreamApi);
 
     // GET second payload from DB
     const secondAssetId = bodySecond.id;
@@ -268,7 +269,6 @@ describe("Assets Endpoint (/assets)", () => {
       true,
     );
     expect(secondDetailRes.body.role).toBe(payload2.role);
-    expect(secondDetailRes.body.upstreamApi).toBe(payload2.upstreamApi);
 
     // DELETE the assets
     const deleteFirstAssetRes = await request(BASE_URL)
@@ -443,7 +443,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset1.networkSegment).toBe(assetPayload1.networkSegment);
     expect(foundAsset1.role).toBe(assetPayload1.role);
-    expect(foundAsset1.upstreamApi).toBe(assetPayload1.upstreamApi);
     expect(foundAsset1.hostname).toBe(assetPayload1.hostname);
     expect(foundAsset1.macAddress).toBe(assetPayload1.macAddress);
     expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
@@ -472,7 +471,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
     expect(foundAsset2.role).toBe(assetPayload2.role);
-    expect(foundAsset2.upstreamApi).toBe(assetPayload2.upstreamApi);
     expect(foundAsset2.hostname).toBe(assetPayload2.hostname);
     expect(foundAsset2.macAddress).toBe(assetPayload2.macAddress);
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
@@ -486,14 +484,17 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
 
-    const foundSync = await prisma.syncStatus.findFirstOrThrow({
-      where: { syncedAt: mapping1.lastSynced },
+    const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
+      where: {
+        integrationId: createdIntegration.id,
+        resource: mockIntegrationPayload.config.resource,
+      },
     });
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBeNullable();
-    expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
+    expect(foundSync.lastSuccessfulSync).toStrictEqual(mapping2.lastSynced);
   });
 
   it("update Assets uploadIntegration endpoint int test", async () => {
@@ -533,14 +534,11 @@ describe("Assets Endpoint (/assets)", () => {
     expect(createAssetsReq.body.shouldRetry).toBe(false);
     expect(createAssetsReq.body.message).toBe("success");
 
-    // update some field before updating
+    // re-send the same items: the sync should take the update path, not create
     const updateAssetsPayload = {
       ...assetIntegrationPayload,
       ...assetIntegrationPayload.items,
     };
-    const newUpstreamApi = "https://mock-upstream-api.com/v2";
-    updateAssetsPayload.items[0].upstreamApi = newUpstreamApi;
-    updateAssetsPayload.items[1].upstreamApi = newUpstreamApi;
 
     const updateToken = await createIntegrationToken(
       createdIntegration.integrationUserId,
@@ -578,7 +576,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset1.networkSegment).toBe(assetPayload1.networkSegment);
     expect(foundAsset1.role).toBe(assetPayload1.role);
-    expect(foundAsset1.upstreamApi).toBe(newUpstreamApi); // this field should be updated
     expect(foundAsset1.hostname).toBe(assetPayload1.hostname);
     expect(foundAsset1.macAddress).toBe(assetPayload1.macAddress);
     expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
@@ -613,7 +610,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
     expect(foundAsset2.role).toBe(assetPayload2.role);
-    expect(foundAsset2.upstreamApi).toBe(newUpstreamApi); // this field should be updated
     expect(foundAsset2.hostname).toBe(assetPayload2.hostname);
     expect(foundAsset2.macAddress).toBe(assetPayload2.macAddress);
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
@@ -621,14 +617,17 @@ describe("Assets Endpoint (/assets)", () => {
     expect(foundAsset2.status).toBe(assetPayload2.status);
     expect(foundAsset2.deviceGroup.cpe.includes(assetPayload2.cpe)).toBe(true);
 
-    const foundSync = await prisma.syncStatus.findFirstOrThrow({
-      where: { syncedAt: mapping1.lastSynced },
+    const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
+      where: {
+        integrationId: createdIntegration.id,
+        resource: mockIntegrationPayload.config.resource,
+      },
     });
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBeNullable();
-    expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
+    expect(foundSync.lastSuccessfulSync).toStrictEqual(mapping2.lastSynced);
   });
 
   it("mixed create+update Assets uploadIntegration endpoint int test", async () => {
@@ -674,8 +673,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     // now create another asset and update the existing one
     const createWithUpdateAssets = { ...assetIntegrationPayload };
-    const newUpstreamApi = "https://mock-upstream-api.com/v2";
-    createWithUpdateAssets.items[0].upstreamApi = newUpstreamApi;
 
     const updateToken = await createIntegrationToken(
       createdIntegration.integrationUserId,
@@ -713,7 +710,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset1.networkSegment).toBe(assetPayload1.networkSegment);
     expect(foundAsset1.role).toBe(assetPayload1.role);
-    expect(foundAsset1.upstreamApi).toBe(newUpstreamApi); // this field should be updated
     expect(foundAsset1.hostname).toBe(assetPayload1.hostname);
     expect(foundAsset1.macAddress).toBe(assetPayload1.macAddress);
     expect(foundAsset1.serialNumber).toBe(assetPayload1.serialNumber);
@@ -742,7 +738,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
     expect(foundAsset2.role).toBe(assetPayload2.role);
-    expect(foundAsset2.upstreamApi).toBe(assetPayload2.upstreamApi);
     expect(foundAsset2.hostname).toBe(assetPayload2.hostname);
     expect(foundAsset2.macAddress).toBe(assetPayload2.macAddress);
     expect(foundAsset2.serialNumber).toBe(assetPayload2.serialNumber);
@@ -756,14 +751,17 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
 
-    const foundSync = await prisma.syncStatus.findFirstOrThrow({
-      where: { syncedAt: mapping1.lastSynced },
+    const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
+      where: {
+        integrationId: createdIntegration.id,
+        resource: mockIntegrationPayload.config.resource,
+      },
     });
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBeNullable();
-    expect(foundSync.syncedAt).toStrictEqual(mapping2.lastSynced);
+    expect(foundSync.lastSuccessfulSync).toStrictEqual(mapping2.lastSynced);
   });
 
   it("asset with no mapping Assets uploadIntegration endpoint int test", async () => {
@@ -805,8 +803,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     // setup an update for the asset
     const updatedAsset = assetIntegrationPayload.items[0];
-    const newUpstreamApi = "https://mock-upstream-api.com/v2";
-    updatedAsset.upstreamApi = newUpstreamApi;
     const updateAssetPayload = {
       ...assetIntegrationPayload,
       items: [updatedAsset],
@@ -849,7 +845,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset1.networkSegment).toBe(updatedAsset.networkSegment);
     expect(foundAsset1.role).toBe(updatedAsset.role);
-    expect(foundAsset1.upstreamApi).toBe(updatedAsset.upstreamApi); // this field should be updated
     expect(foundAsset1.hostname).toBe(updatedAsset.hostname);
     expect(foundAsset1.macAddress).toBe(updatedAsset.macAddress);
     expect(foundAsset1.serialNumber).toBe(updatedAsset.serialNumber);
@@ -861,14 +856,17 @@ describe("Assets Endpoint (/assets)", () => {
       fail("lastSynced value should not be null");
     }
 
-    const foundSync = await prisma.syncStatus.findFirstOrThrow({
-      where: { syncedAt: mapping1.lastSynced },
+    const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
+      where: {
+        integrationId: createdIntegration.id,
+        resource: mockIntegrationPayload.config.resource,
+      },
     });
 
     expect(foundSync.integrationId).toBe(createdIntegration.id);
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBeNullable();
-    expect(foundSync.syncedAt).toStrictEqual(mapping1.lastSynced);
+    expect(foundSync.lastSuccessfulSync).toStrictEqual(mapping1.lastSynced);
   });
 
   it("all null unique field should miss Asset uploadIntegration endpoint int test", async () => {
@@ -970,8 +968,6 @@ describe("Assets Endpoint (/assets)", () => {
       });
     });
 
-    const newUpstreamApi = "https://mock-upstream-api.com/v2";
-
     // create our unfindable asset by overriding all unique fields
     const createdAssetRes = await request(BASE_URL)
       .post("/assets")
@@ -987,7 +983,6 @@ describe("Assets Endpoint (/assets)", () => {
       ...assetIntegrationPayload.items[0],
       hostname: undefined,
       macAddress: undefined,
-      upstreamApi: newUpstreamApi,
     };
 
     // this should produce an update based on serialNumber match
@@ -1017,7 +1012,6 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(foundAsset.networkSegment).toBe(matchableAsset.networkSegment);
     expect(foundAsset.role).toBe(matchableAsset.role);
-    expect(foundAsset.upstreamApi).toBe(matchableAsset.upstreamApi); // this should be updated
     expect(foundAsset.hostname).toBeNullable();
     expect(foundAsset.macAddress).toBeNullable();
     expect(foundAsset.serialNumber).toBe(matchableAsset.serialNumber);

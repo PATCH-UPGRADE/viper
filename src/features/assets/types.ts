@@ -1,11 +1,15 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
-import { AssetStatus, type Prisma } from "@/generated/prisma";
+import {
+  externalMappingSelect,
+  externalMappingWithSyncSelect,
+} from "@/features/integrations/core/urls";
+import { AssetStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
+import type { ExtendedPrismaClient } from "@/lib/db";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
   cpeSchema,
   createIntegrationInputSchema,
-  safeUrlSchema,
   userIncludeSelect,
   userSchema,
 } from "@/lib/schemas";
@@ -38,7 +42,6 @@ export const assetInputSchema = z.object({
   networkSegment: z.string().nullish(),
   cpe: cpeSchema.nullish(),
   role: z.string().min(1).nullish(),
-  upstreamApi: safeUrlSchema,
   hostname: z.string().nullish(),
   macAddress: z.string().nullish(),
   serialNumber: z.string().nullish(),
@@ -62,10 +65,21 @@ export const assetArrayInputSchema = z.object({
 
 export const assetResponseSchema = z.object({
   id: z.string(),
-  ip: z.string(),
+  ip: z.string().nullable(),
   deviceGroup: deviceGroupWithUrlsSchema,
   role: z.string().nullable(),
-  upstreamApi: z.string(),
+  externalMappings: z.array(
+    z.object({
+      externalId: z.string(),
+      upstreamApi: z.string().nullable(),
+      webUrl: z.string().nullable(),
+      integration: z.object({
+        id: z.string(),
+        name: z.string(),
+        platform: z.enum(PlatformEnum),
+      }),
+    }),
+  ),
   networkSegment: z.string().nullable(),
   hostname: z.string().nullable(),
   macAddress: z.string().nullable(),
@@ -98,16 +112,24 @@ export type AssetsVulnsInput = z.infer<typeof assetsVulnsInputSchema>;
 export const assetInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
-};
+  externalMappings: externalMappingSelect,
+} satisfies Prisma.AssetInclude;
+
+/**
+ * Derived from the *extended* client, not `Prisma.AssetGetPayload` — the device
+ * group's `url` / `sbomUrl` / ... are computed by `deviceGroupExtension`, and
+ * the base payload helper resolves them to `never`.
+ */
+export type AssetWithRelations = Prisma.Result<
+  ExtendedPrismaClient["asset"],
+  { include: typeof assetInclude },
+  "findUniqueOrThrow"
+>;
 
 export const assetDashboardInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
-  externalMappings: {
-    include: {
-      integration: { select: { id: true, name: true } },
-    },
-  },
+  externalMappings: externalMappingWithSyncSelect,
   issues: {
     include: {
       vulnerability: {

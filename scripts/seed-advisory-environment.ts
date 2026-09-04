@@ -124,7 +124,6 @@ async function upsertAsset(
   return prisma.asset.create({
     data: {
       ...spec,
-      upstreamApi: "https://example.com/placeholder",
       status: "Active" as AssetStatus,
       deviceGroupId,
       userId,
@@ -222,8 +221,9 @@ async function assetsInScopeOf(matchings: MatchingRow[]) {
 
 async function resetInboxEnvironment() {
   const notifications = await prisma.notification.deleteMany({});
-  const orphanSources = await prisma.notificationSource.deleteMany({
-    where: { notificationId: null, workOrderTicketId: null },
+  // A source is orphaned when nothing links to it any more.
+  const orphanSources = await prisma.sourceRecord.deleteMany({
+    where: { links: { none: {} } },
   });
   const draftTickets = await prisma.workOrderTicket.deleteMany({
     where: { isDraft: true },

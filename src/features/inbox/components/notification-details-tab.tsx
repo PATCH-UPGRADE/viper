@@ -1,8 +1,9 @@
+// TODO(VW-499): Fix changes after VW-427
 "use client";
 
 import { format } from "date-fns";
 import { ExternalLinkIcon, HeartIcon, MailIcon, Unlink } from "lucide-react";
-import { Fragment, type ReactNode, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { TlpBadge } from "@/components/tlp-badge";
 import {
@@ -13,7 +14,6 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   CollapsibleCard,
   CollapsibleCardContent,
@@ -26,7 +26,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
 import {
   Table,
   TableBody,
@@ -48,6 +47,7 @@ import type {
   NotificationDetailWithRelations,
   RawEmailPayload,
 } from "../types";
+import { EmailSourceModal } from "./email-source-modal";
 import {
   HospitalImpactCard,
   NotificationSummaryCard,
@@ -55,65 +55,6 @@ import {
 
 type DeviceGroupMapping =
   NotificationDetailWithRelations["deviceGroupsMatchings"][number];
-
-// ---------------------------------------------------------------------------
-// EmailSourceModal
-// ---------------------------------------------------------------------------
-
-function EmailSourceModal({
-  source,
-  open,
-  onOpenChange,
-}: {
-  source: NotificationDetailSource;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const raw = source.raw as unknown as RawEmailPayload;
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Original source email</DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col gap-4 overflow-auto min-h-0">
-          <Card>
-            <CardContent>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-                {(
-                  [
-                    { label: "From", value: raw.data?.from ?? "—" },
-                    { label: "Subject", value: raw.data?.subject ?? "—" },
-                    {
-                      label: "Date",
-                      value: format(source.receivedAt, "PPP p"),
-                    },
-                  ] satisfies { label: string; value: string }[]
-                ).map(({ label, value }) => (
-                  <Fragment key={label}>
-                    <dt className="font-medium text-muted-foreground">
-                      {label}
-                    </dt>
-                    <dd>{value}</dd>
-                  </Fragment>
-                ))}
-              </dl>
-            </CardContent>
-          </Card>
-          {source.markdown && (
-            <Card className="overflow-auto">
-              <CardContent>
-                <MarkdownWithTablesWrapper>
-                  {source.markdown}
-                </MarkdownWithTablesWrapper>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // SourceReference
@@ -125,7 +66,7 @@ function SourceReference({ source }: { source: NotificationDetailSource }) {
     source.channel === "Email"
       ? (source.raw as unknown as RawEmailPayload)
       : null;
-  const label = raw?.data?.subject ?? source.referenceUrl ?? source.channel;
+  const label = raw?.data?.subject ?? source.channel;
 
   if (source.channel === "Email") {
     return (
@@ -142,10 +83,17 @@ function SourceReference({ source }: { source: NotificationDetailSource }) {
       </>
     );
   }
+  // Resolved by mappingUrlExtension from the platform's `notifications`
+  // resource module. If one doesn't exist, render the label unlinked
+  // rather than an anchor to nowhere.
+  const href = source.mapping?.webUrl;
+  if (!href) {
+    return <span className="truncate max-w-xs text-sm">{label}</span>;
+  }
 
   return (
     <a
-      href={source.referenceUrl ?? "#"}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-center gap-1 text-sm text-primary hover:underline"
@@ -181,6 +129,7 @@ export function NotificationDetailsTab({
   const [comment, setComment] = useState("");
   const markMatchIncorrect = useMarkMatchIncorrect();
 
+  const sources = notification.sourceLinks.map((link) => link.sourceRecord);
   const detailRows: { label: string; content: ReactNode }[] = [
     {
       label: "TLP",
@@ -193,11 +142,11 @@ export function NotificationDetailsTab({
     {
       label: "References",
       content:
-        notification.sources.length === 0 ? (
+        sources.length === 0 ? (
           <span className="text-muted-foreground">—</span>
         ) : (
           <div className="flex flex-col gap-1.5">
-            {notification.sources.map((source) => (
+            {sources.map((source) => (
               <SourceReference key={source.id} source={source} />
             ))}
           </div>

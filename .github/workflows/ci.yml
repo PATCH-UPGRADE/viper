@@ -99,6 +99,9 @@ jobs:
           API_KEY_LINE="$(npm run db:create-test-api-key --silent | grep '^API_KEY=' | tr -d '\r')"
           echo "$API_KEY_LINE" >> "$GITHUB_ENV"
 
+      - name: Generate credential encryption key
+        run: echo "CREDENTIAL_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+
       - name: Start API server
         run: npm run dev &
 

@@ -17,6 +17,7 @@ import {
   InfoColumn,
   type InfoColumnSection,
 } from "@/components/dashboard-drawers";
+import { ExternalMappingList } from "@/components/external-mappings";
 import { Badge } from "@/components/ui/badge";
 import { CopyCode } from "@/components/ui/code";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -161,7 +162,7 @@ function buildSankeyData(
 
 interface SankeyTooltip {
   label: string;
-  ip: string;
+  ip: string | null;
   x: number;
   y: number;
 }
@@ -521,49 +522,19 @@ function AssetInfoColumn({ asset }: { asset: AssetWithIssueRelations }) {
     {
       header: "Connectors",
       items: [
-        ...(asset.upstreamApi
-          ? [
-              {
-                header: "Upstream API",
-                content: (
-                  <a
-                    href={asset.upstreamApi}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-                  >
-                    {asset.upstreamApi}
-                    <ExternalLinkIcon className="size-3 flex-shrink-0" />
-                  </a>
-                ),
-              },
-            ]
-          : []),
         ...(asset.externalMappings.length > 0
           ? [
               {
                 header: "Integrations",
                 content: (
-                  <ul className="space-y-2">
-                    {asset.externalMappings.map((mapping) => (
-                      <li
-                        key={mapping.id}
-                        className="text-sm flex flex-col gap-0.5"
-                      >
-                        <span className="font-medium">
-                          {mapping.integration.name}
-                        </span>
-                        {mapping.lastSynced && (
-                          <span className="text-xs text-muted-foreground">
-                            Last synced{" "}
-                            {formatDistanceToNow(mapping.lastSynced, {
-                              addSuffix: true,
-                            })}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                  <ExternalMappingList
+                    mappings={asset.externalMappings}
+                    emptyMessage={
+                      <p className="text-sm text-muted-foreground">
+                        Not mapped to any integration.
+                      </p>
+                    }
+                  />
                 ),
               },
             ]

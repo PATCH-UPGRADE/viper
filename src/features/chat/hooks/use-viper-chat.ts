@@ -31,12 +31,18 @@ export function useViperChat(
     clearError,
   } = useChat({ transport });
 
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  // A controlled caller (e.g. /reports) seeds the starting thread id and
+  // remounts this hook (via `key`) when it changes — no need to sync it in.
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(
+    () => controlled?.threadId ?? null,
+  );
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-  const threadsQuery = useQuery(
-    trpc.chat.getManyThreads.queryOptions({ limit: 50 }),
-  );
+  const threadsQuery = useQuery({
+    ...trpc.chat.getManyThreads.queryOptions({ limit: 50 }),
+    // The thread list/selector only renders in uncontrolled mode.
+    enabled: !controlled?.threadId,
+  });
   const threads = threadsQuery.data?.threads ?? [];
   const refreshThreads = useCallback(() => {
     void threadsQuery.refetch();
@@ -109,12 +115,12 @@ export function useViperChat(
     [queryClient, trpc.chat.getUIMessages, setMessages],
   );
 
-  // Adopt an externally-controlled thread id (the /reports route drives it from
-  // the URL); the hook already owns currentThreadId/switchThread.
+  // Load history for the controlled starting thread once on mount — the
+  // caller remounts (via `key`) instead of changing controlled.threadId in place.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-only, by design
   useEffect(() => {
-    const id = controlled?.threadId;
-    if (id && id !== currentThreadId) void switchThread(id);
-  }, [controlled?.threadId, currentThreadId, switchThread]);
+    if (controlled?.threadId) void switchThread(controlled.threadId);
+  }, []);
 
   const newThread = useCallback(() => {
     setCurrentThreadId(null);

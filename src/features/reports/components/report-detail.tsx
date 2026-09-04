@@ -23,17 +23,20 @@ export function ReportDetail({ chatId }: { chatId: string }) {
 
   const onTurnEnd = useCallback(() => {
     void refetch();
-    // Scoped to the /reports list specifically — an unscoped invalidate would
-    // also refetch every other open chat panel's unrelated thread list.
     void queryClient.invalidateQueries(
-      trpc.chat.getManyThreads.queryFilter({ withReport: true }),
+      trpc.chat.getReportThreads.queryFilter(),
     );
-  }, [refetch, queryClient, trpc.chat.getManyThreads]);
+  }, [refetch, queryClient, trpc.chat.getReportThreads]);
 
   return (
     <div className="flex min-w-0 flex-1">
       <div className="flex w-[400px] shrink-0 flex-col border-r">
-        <AIChat controlledThreadId={chatId} onTurnEnd={onTurnEnd} />
+        {/* Remount on chatId change instead of syncing it into chat state. */}
+        <AIChat
+          key={chatId}
+          controlledThreadId={chatId}
+          onTurnEnd={onTurnEnd}
+        />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">

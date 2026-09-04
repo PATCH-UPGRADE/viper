@@ -1,14 +1,10 @@
 import { Suspense } from "react";
 import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import { ReportsLanding } from "@/features/reports/components/reports-landing";
-import { requireAuth } from "@/lib/auth-utils";
 import { HydrateClient, prefetch, trpc } from "@/trpc/server";
 
 const Page = async () => {
-  await requireAuth();
-  prefetch(
-    trpc.chat.getManyThreads.queryOptions({ limit: 50, withReport: true }),
-  );
+  prefetch(trpc.chat.getReportThreads.queryOptions({ limit: 50 }));
 
   return (
     <HydrateClient>

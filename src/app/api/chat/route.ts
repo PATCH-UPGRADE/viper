@@ -82,7 +82,7 @@ export async function POST(req: Request) {
 
       // Persist the user's turn, then hydrate the full conversation from the DB
       // (authoritative — we don't trust client-side message state).
-      await ensureThread(threadId, userId, userText);
+      const thread = await ensureThread(threadId, userId, userText);
       await saveUserMessage(threadId, newUserMessage.id, userText);
       const history = await loadHistoryMessages(threadId);
 
@@ -94,7 +94,12 @@ export async function POST(req: Request) {
               assetData,
               vulnerabilityData,
             })
-          : buildChatGraph({ userId, userRole, threadId });
+          : buildChatGraph({
+              userId,
+              userRole,
+              threadId,
+              report: thread.report,
+            });
 
       await streamGraphToUI({ graph, input: { messages: history }, writer });
       writer.write({ type: "finish" });

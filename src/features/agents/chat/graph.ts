@@ -5,12 +5,11 @@ import {
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
 } from "@/features/chat/utils";
-import prisma from "@/lib/db";
 import { buildAgentGraph } from "../shared/build-graph";
 import { loadPersistentNotesMarkdown } from "../shared/notes-preload";
 import { PLATFORM_CATALOG } from "../tools/query-platform-tool";
-import { makeWriteReportTool } from "../tools/report-tool";
 import { buildAgentTools } from "../tools/registry";
+import { makeWriteReportTool } from "../tools/report-tool";
 
 const CHAT_MODEL = "claude-haiku-4-5-20251001";
 
@@ -93,23 +92,34 @@ If you still can't get something the report needs, say so plainly in the report 
 "Not available" note) rather than omitting it and leaving the report looking complete.
 `;
 
-function buildSystemPrompt(role: UserRole): string {
+export function buildSystemPrompt(
+  role: UserRole,
+  report?: string | null,
+): string {
   return [
     BASE_PROMPT,
     `<user_role>The user's role is: ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</user_role>`,
-  ].join("\n\n");
+    // On a re-prompt of a report thread, feed the CURRENT report back so a
+    // revision edits what's in the panel (the "## Reports" section above says how).
+    report ? `## Current report\n\n${report}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export function buildChatGraph({
   userId,
   userRole = "hospital administration",
   threadId,
+  report,
   loadNotes = loadPersistentNotesMarkdown,
 }: {
   userId: string;
   userRole?: UserRole;
-  /** The thread being written to — enables write_report and the report preload. */
+  /** The thread being written to — enables write_report. */
   threadId: string;
+  /** The thread's current report, if any — fed into the system prompt for revisions. */
+  report?: string | null;
   loadNotes?: () => Promise<string>;
 }) {
   // write_report is chat-only — the recommendations graph calls buildAgentTools
@@ -127,21 +137,7 @@ export function buildChatGraph({
   return buildAgentGraph({
     model,
     tools,
-    systemMessage: new SystemMessage(buildSystemPrompt(userRole)),
-    // On a re-prompt of a report thread, feed the CURRENT report back so a
-    // revision edits what's in the panel (the "## Reports" prompt section says
-    // how). Both loads are independent — run them together.
-    preload: async () => {
-      const [notes, thread] = await Promise.all([
-        loadNotes(),
-        prisma.chatThread.findUnique({
-          where: { id: threadId },
-          select: { report: true },
-        }),
-      ]);
-      return thread?.report
-        ? `${notes}\n\n## Current report\n\n${thread.report}`
-        : notes;
-    },
+    systemMessage: new SystemMessage(buildSystemPrompt(userRole, report)),
+    preload: loadNotes,
   });
 }

@@ -9,23 +9,34 @@ import {
 } from "../types";
 
 export const chatRouter = createTRPCRouter({
-  // A user's chat threads. `withReport` narrows to threads the agent has written
-  // a report on (the /reports list), ordered newest-touched. No pagination yet.
+  // A user's chat threads, newest-created first. No pagination yet.
   getManyThreads: protectedProcedure
     .input(fetchThreadsSchema)
     .output(fetchThreadsResponseSchema)
     .query(async ({ input, ctx }) => {
       const threads = await prisma.chatThread.findMany({
-        where: {
-          userId: ctx.auth.user.id,
-          ...(input.withReport ? { report: { not: null } } : {}),
-        },
+        where: { userId: ctx.auth.user.id },
         skip: input.offset,
         take: input.limit,
         select: chatThreadListSelect,
-        orderBy: input.withReport
-          ? { updatedAt: "desc" }
-          : { createdAt: "desc" },
+        orderBy: { createdAt: "desc" },
+      });
+
+      // TODO: paginate threads
+      return { threads, hasMore: false, total: threads.length };
+    }),
+
+  // Threads that have a report (the /reports list), newest-touched first.
+  getReportThreads: protectedProcedure
+    .input(fetchThreadsSchema)
+    .output(fetchThreadsResponseSchema)
+    .query(async ({ input, ctx }) => {
+      const threads = await prisma.chatThread.findMany({
+        where: { userId: ctx.auth.user.id, report: { not: null } },
+        skip: input.offset,
+        take: input.limit,
+        select: chatThreadListSelect,
+        orderBy: { updatedAt: "desc" },
       });
 
       // TODO: paginate threads

@@ -20,17 +20,18 @@ import {
   type BaseMessage,
   HumanMessage,
 } from "@langchain/core/messages";
+import type { ChatThread } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
-/** Ensure the thread row exists (created lazily on first message). */
+/** Ensure the thread row exists (created lazily on first message); returns it. */
 export async function ensureThread(
   threadId: string,
   userId: string,
   firstUserContent: string,
-): Promise<void> {
+): Promise<ChatThread> {
   // Keyed by threadId only, no userId scope — intentional (see access-model
   // note in the file header).
-  await prisma.chatThread.upsert({
+  return prisma.chatThread.upsert({
     where: { id: threadId },
     update: { updatedAt: new Date() },
     create: {

@@ -84,8 +84,6 @@ export const fetchThreadsSchema = z.object({
   cursorTimestamp: z.string().optional(),
   cursorId: z.string().optional(),
   offset: z.number().int().min(0).optional(),
-  /** Only threads that have a report (the /reports list), newest-touched first. */
-  withReport: z.boolean().optional(),
 });
 
 // Scalar columns for the thread list — deliberately excludes the `report` TEXT

@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { renderReportDocx } from "./report-docx";
 import { parseReportMarkdown } from "./report-markdown";
-import { renderReportPdf } from "./report-pdf";
+import { renderReportPdf, textWithLinks } from "./report-pdf";
 
 const MD = `# Remediation plan
 
@@ -77,5 +77,21 @@ describe("renderers", () => {
     // Arrow, thin space, CJK — pdf-lib's standard fonts can't encode these.
     const pdf = await renderReportPdf("Report", "See MRI → CT. 影像. Done.​");
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+  });
+});
+
+describe("textWithLinks", () => {
+  it("keeps a citation's target readable — PDF text isn't clickable, so the href is printed", () => {
+    expect(
+      textWithLinks([
+        { text: "See " },
+        { text: "MRI-01", href: "/assets/abc" },
+        { text: " for details." },
+      ]),
+    ).toBe("See MRI-01 (/assets/abc) for details.");
+  });
+
+  it("leaves plain text untouched", () => {
+    expect(textWithLinks([{ text: "No links here." }])).toBe("No links here.");
   });
 });

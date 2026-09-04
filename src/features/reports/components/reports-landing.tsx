@@ -11,7 +11,7 @@ export function ReportsLanding() {
   const router = useRouter();
   const trpc = useTRPC();
   const { data } = useSuspenseQuery(
-    trpc.chat.getManyThreads.queryOptions({ limit: 50, withReport: true }),
+    trpc.chat.getReportThreads.queryOptions({ limit: 50 }),
   );
   const reports = data.threads;
 

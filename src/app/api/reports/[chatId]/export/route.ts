@@ -8,13 +8,11 @@ export const runtime = "nodejs";
 const FORMATS = {
   pdf: {
     contentType: "application/pdf",
-    ext: "pdf",
     render: renderReportPdf,
   },
   docx: {
     contentType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ext: "docx",
     render: renderReportDocx,
   },
 } as const;
@@ -37,10 +35,10 @@ export async function GET(
   }
 
   const format = new URL(req.url).searchParams.get("format") ?? "pdf";
-  const spec = FORMATS[format as keyof typeof FORMATS];
-  if (!spec) {
+  if (format !== "pdf" && format !== "docx") {
     return new Response("Unknown format", { status: 400 });
   }
+  const spec = FORMATS[format];
 
   const { chatId } = await params;
   const thread = await prisma.chatThread.findFirst({
@@ -55,7 +53,7 @@ export async function GET(
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": spec.contentType,
-      "Content-Disposition": `attachment; filename="${slug(thread.title)}.${spec.ext}"`,
+      "Content-Disposition": `attachment; filename="${slug(thread.title)}.${format}"`,
     },
   });
 }

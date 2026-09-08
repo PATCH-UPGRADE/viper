@@ -20,9 +20,7 @@ export interface InlineSpan {
 export type ReportBlock =
   | { type: "heading"; depth: number; spans: InlineSpan[] }
   | { type: "paragraph"; spans: InlineSpan[] }
-  | { type: "listItem"; ordered: boolean; marker: string; spans: InlineSpan[] }
-  // ponytail: tables flatten to " | "-joined rows, no column layout.
-  | { type: "table"; rows: string[][] };
+  | { type: "listItem"; ordered: boolean; marker: string; spans: InlineSpan[] };
 
 // biome-ignore lint/suspicious/noExplicitAny: walking an untyped mdast tree
 type Node = any;
@@ -58,13 +56,6 @@ function inlineSpans(
     }
   }
   return spans;
-}
-
-export function spanText(spans: InlineSpan[]): string {
-  return spans
-    .map((s) => s.text)
-    .join("")
-    .trim();
 }
 
 export function reportTitle(title: string | null): string {
@@ -132,13 +123,15 @@ export function parseReportMarkdown(markdown: string): ReportBlock[] {
         blocks.push({ type: "paragraph", spans: [{ text: node.value ?? "" }] });
         break;
       case "table":
-        blocks.push({
-          type: "table",
-          rows: (node.children ?? []).map((row: Node) =>
-            (row.children ?? []).map((cell: Node) =>
-              spanText(inlineSpans(cell.children)),
-            ),
-          ),
+        // v1 exports use one paragraph per row, preserving links and styles.
+        (node.children ?? []).forEach((row: Node, i: number) => {
+          blocks.push({
+            type: "paragraph",
+            spans: (row.children ?? []).flatMap((cell: Node, j: number) => [
+              ...(j ? [{ text: "   |   " }] : []),
+              ...inlineSpans(cell.children, { bold: i === 0 }),
+            ]),
+          });
         });
         break;
       default:

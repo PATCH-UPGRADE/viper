@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport } from "ai";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useChatUI } from "@/features/chat/context/chat-panel-context";
 import type { UseChatAgentConfig } from "@/features/chat/types";
@@ -11,11 +11,15 @@ import { useTRPC } from "@/trpc/client";
 
 export function useViperChat(
   config?: UseChatAgentConfig,
-  controlled?: { threadId?: string; onTurnEnd?: () => void },
+  controlledThreadId?: string,
 ) {
   const { userRole } = useChatUI();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  // Report routes remount the chat (via `key`) when the thread changes.
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(
+    () => controlledThreadId ?? null,
+  );
 
   const transport = useMemo(
     () => new DefaultChatTransport({ api: "/api/chat" }),
@@ -29,35 +33,31 @@ export function useViperChat(
     stop,
     setMessages,
     clearError,
-  } = useChat({ transport });
+  } = useChat({
+    transport,
+    onFinish: () => {
+      // A finished turn can rename/reorder the thread lists and (if write_report
+      // ran) change the report — refresh exactly those, not cached history.
+      void queryClient.invalidateQueries(
+        trpc.chat.getManyThreads.queryFilter(),
+      );
+      void queryClient.invalidateQueries(
+        trpc.chat.getReportThreads.queryFilter(),
+      );
+      void queryClient.invalidateQueries(
+        trpc.chat.getReportThread.queryFilter(),
+      );
+    },
+  });
 
-  // A controlled caller (e.g. /reports) seeds the starting thread id and
-  // remounts this hook (via `key`) when it changes — no need to sync it in.
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(
-    () => controlled?.threadId ?? null,
-  );
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const threadsQuery = useQuery({
     ...trpc.chat.getManyThreads.queryOptions({ limit: 50 }),
     // The thread list/selector only renders in uncontrolled mode.
-    enabled: !controlled?.threadId,
+    enabled: !controlledThreadId,
   });
   const threads = threadsQuery.data?.threads ?? [];
-  const refreshThreads = useCallback(() => {
-    void threadsQuery.refetch();
-  }, [threadsQuery]);
-
-  // Refresh the thread list when a turn finishes so the AI-generated title (and
-  // any newly-created thread) appears, and notify a controlled caller.
-  const prevStatus = useRef(status);
-  useEffect(() => {
-    if (prevStatus.current === "streaming" && status === "ready") {
-      void threadsQuery.refetch();
-      controlled?.onTurnEnd?.();
-    }
-    prevStatus.current = status;
-  }, [status, threadsQuery, controlled?.onTurnEnd]);
 
   const { mutateAsync: deleteThreadMutation } = useMutation(
     trpc.chat.deleteThread.mutationOptions({
@@ -116,11 +116,10 @@ export function useViperChat(
   );
 
   // Load history for the controlled starting thread once on mount — the
-  // caller remounts (via `key`) instead of changing controlled.threadId in place.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-only, by design
+  // caller remounts (via `key`) when navigating between reports.
   useEffect(() => {
-    if (controlled?.threadId) void switchThread(controlled.threadId);
-  }, []);
+    if (controlledThreadId) void switchThread(controlledThreadId);
+  }, [controlledThreadId, switchThread]);
 
   const newThread = useCallback(() => {
     setCurrentThreadId(null);
@@ -146,7 +145,6 @@ export function useViperChat(
     threads,
     threadsLoading: threadsQuery.isLoading,
     threadsError: threadsQuery.error?.message ?? null,
-    refreshThreads,
     currentThreadId,
     switchThread,
     newThread,

@@ -1,9 +1,20 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+vi.mock("../shared/build-graph", () => ({ buildAgentGraph: vi.fn() }));
+vi.mock("@langchain/anthropic", () => ({
+  ChatAnthropic: class {
+    bindTools() {
+      return {};
+    }
+  },
+}));
 
-import { buildSystemPrompt } from "./graph";
+import { buildAgentGraph } from "../shared/build-graph";
+import { buildChatGraph, buildSystemPrompt } from "./graph";
+
+beforeEach(() => vi.clearAllMocks());
 
 describe("chat system prompt — write_report", () => {
   it("describes write_report in the tool list", () => {
@@ -24,19 +35,31 @@ describe("chat system prompt — write_report", () => {
     );
   });
 
-  it("omits the current-report section when there is no report yet", () => {
-    expect(buildSystemPrompt("hospital administration")).not.toContain(
-      "## Current report",
+  it("preloads notes alone for a new report", async () => {
+    buildChatGraph({
+      userId: "user",
+      threadId: "thread",
+      loadNotes: async () => "Hospital notes",
+    });
+    const config = vi.mocked(buildAgentGraph).mock.calls[0][0];
+    expect(await config.preload()).toBe("Hospital notes");
+    expect(config.tools.some((tool) => tool.name === "write_report")).toBe(
+      true,
     );
   });
 
-  it("feeds an existing report back for revision, verbatim", () => {
-    const prompt = buildSystemPrompt(
-      "hospital administration",
-      "# CT Scanner Briefing\n\nExisting content.",
+  it("preloads the current report verbatim without promoting it to system instructions", async () => {
+    const report = "# CT Scanner Briefing\n\nExisting content.";
+    buildChatGraph({
+      userId: "user",
+      threadId: "thread",
+      report,
+      loadNotes: async () => "Hospital notes",
+    });
+    const config = vi.mocked(buildAgentGraph).mock.calls[0][0];
+    expect(await config.preload()).toBe(
+      `Hospital notes\n\n## Current report\n\n${report}`,
     );
-    expect(prompt).toContain("## Current report");
-    expect(prompt).toContain("# CT Scanner Briefing\n\nExisting content.");
-    expect(prompt).toMatch(/revise that text, don't rebuild it from memory/);
+    expect(config.systemMessage.content).not.toContain(report);
   });
 });

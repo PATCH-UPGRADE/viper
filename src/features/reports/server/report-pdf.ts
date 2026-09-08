@@ -130,12 +130,6 @@ export async function renderReportPdf(
       case "listItem":
         draw(`${b.marker}  ${textWithLinks(b.spans)}`, { indent: 12, gap: 4 });
         break;
-      case "table":
-        b.rows.forEach((row, i) => {
-          draw(row.join("   |   "), { font: i === 0 ? bold : regular, gap: 2 });
-        });
-        y -= 8;
-        break;
     }
   };
 

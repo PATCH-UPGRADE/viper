@@ -11,7 +11,6 @@ import { sourceContentHash } from "@/lib/source-hash";
 import type { FleetConfig, FleetCreds } from "../config";
 import { createFleetSession } from "../session";
 import { type FleetAdvisoryItem, listChanged, toCanonical } from "./advisories";
-import { mappingPaths } from "@/features/integrations/core/mapping-urls";
 
 type FleetAdvisoryDraft = FleetAdvisoryItem & {
   contentHash: string;
@@ -110,14 +109,6 @@ export async function inngestFleetAdvisories(
     integrationId,
     ResourceType.SourceRecord,
   );
-}
-
-export async function recordAdvisories(
-  integrationId: string,
-  items: FleetAdvisoryItem[],
-): Promise<IntegrationResponse> {
-  const changed = await changedOnly(integrationId, items);
-  return inngestFleetAdvisories(changed, integrationId);
 }
 
 export async function syncAdvisories(

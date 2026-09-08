@@ -1,5 +1,5 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
-//import "server-only";
+import "server-only";
 import {
   type ArtifactType,
   type ResourceType,

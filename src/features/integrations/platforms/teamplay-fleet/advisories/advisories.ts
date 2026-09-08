@@ -27,7 +27,7 @@ export type FleetAdvisory = z.infer<typeof fleetAdvisorySchema>;
 const fleetAttachmentSchema = z.object({
   name: z.string(),
   type: z.string().nullish(),
-  size:  z.string().nullish(),
+  size: z.string().nullish(),
   languageCode: z.string().nullish(),
 });
 
@@ -110,7 +110,7 @@ export async function fetchAttachments(
 
 export async function* listChanged(
   session: Session,
-  cursor: Cursor | null,
+  _cursor: Cursor | null,
 ): AsyncIterable<Page<FleetAdvisoryRecord>> {
   const all = await fetchAdvisories(session);
   const activeAdvisories = all.filter((a) => a.active !== false);

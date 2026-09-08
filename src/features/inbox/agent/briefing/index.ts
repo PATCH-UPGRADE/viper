@@ -86,9 +86,7 @@ export async function generateBriefing(
 ): Promise<Briefing> {
   const model = new ChatAnthropic({
     model: MODEL,
-    // 3 audiences x 3 fields of real prose can run long; budget generously
-    // so a verbose (but valid) response doesn't get cut off mid-JSON.
-    maxTokens: 8000,
+    maxTokens: 8000, // 3 audiences x 3 fields of prose can run long
   }).withStructuredOutput(generatedBriefingSchema);
 
   const messages = [
@@ -99,20 +97,14 @@ export async function generateBriefing(
   try {
     return renderBriefing(await model.invoke(messages));
   } catch {
-    // Most likely still ran over budget — ask for a tighter rewrite instead
-    // of failing the request outright.
-    // ponytail: retries on any parse failure, not just truncation. Narrow to
-    // the response's stop_reason if blind retries prove costly.
-    console.warn(
-      `generateBriefing: plan "${plan.title}" retrying, more concisely`,
-    );
+    // ponytail: retries once on any parse failure (likely still ran over
+    // budget), not just truncation specifically.
     return renderBriefing(
       await model.invoke([
         ...messages,
         {
           role: "user" as const,
-          content:
-            "Your previous response didn't come through — it may have been cut off for being too long. Stay within each field's length guidance and answer again, in full.",
+          content: "That didn't come through — answer again, more concisely.",
         },
       ]),
     );

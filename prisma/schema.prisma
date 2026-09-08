@@ -1533,7 +1533,7 @@ model SourceRecord {
   // INVARIANT: mappingId set => externalId null
   mappingId String?
   mapping   ExternalSourceRecordMapping? @relation(name: "MappingSnapshots", fields: [mappingId], references: [id], onDelete: Cascade)
-
+  externalMappings  ExternalSourceRecordMapping[] @relation(name: "MappedSourceRecord")
   contentHash String // dedup: skip the write if it matches the mapping's newest 
   raw         Json    @default("{}")
   markdown    String? @db.Text
@@ -1586,7 +1586,8 @@ model ExternalSourceRecordMapping {
   integrationId String
   integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   externalId    String // the advisory / notification id on another platform
-
+  itemId  String?
+  item SourceRecord? @relation(name: "MappedSourceRecord", fields:[itemId], references: [id], onDelete: Cascade)
   sourceRecords SourceRecord[] @relation(name: "MappingSnapshots")
 
   upstreamApi String?
@@ -1598,6 +1599,7 @@ model ExternalSourceRecordMapping {
 
   @@unique([integrationId, externalId])
   @@index([integrationId])
+  @@index([itemId])
   @@map("external_source_record_mappings")
 }
 

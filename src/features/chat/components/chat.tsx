@@ -999,7 +999,7 @@ function ChatInner({
     );
   }, [messages, status]);
 
-  const isDisabled = isAgentBusy || hasActiveQuestions;
+  const isDisabled = isLoadingHistory || isAgentBusy || hasActiveQuestions;
 
   const sendWithOverride = useCallback(
     (message: string, override?: Partial<UseChatAgentConfig>) => {

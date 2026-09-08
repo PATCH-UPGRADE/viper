@@ -4,9 +4,8 @@ import { z } from "zod";
 import { existingIds } from "@/features/inbox/utils";
 import prisma from "@/lib/db";
 
-// Each citable route segment and the table that backs it. Device groups link
-// to their API detail route (no dashboard page). Keep this list in step with
-// the citation examples in the report prompt (graph.ts).
+// Citable route segments; keep in step with the examples in graph.ts. The
+// deviceGroups key is its API route — device groups have no dashboard page.
 type Finder = Parameters<typeof existingIds>[0];
 const FINDERS = {
   assets: (a) => prisma.asset.findMany(a),
@@ -14,12 +13,8 @@ const FINDERS = {
   remediations: (a) => prisma.remediation.findMany(a),
   "api/v1/deviceGroups": (a) => prisma.deviceGroup.findMany(a),
 } satisfies Record<string, Finder>;
-type CitationSegment = keyof typeof FINDERS;
-
 const LINK_RE = new RegExp(
-  `\\[([^\\]]+)\\]\\(/(${Object.keys(FINDERS)
-    .map((s) => s.replace(/\//g, "\\/"))
-    .join("|")})/([A-Za-z0-9_-]+)\\)`,
+  `\\[([^\\]]+)\\]\\(/(${Object.keys(FINDERS).join("|")})/([A-Za-z0-9_-]+)\\)`,
   "g",
 );
 
@@ -29,24 +24,22 @@ export function makeWriteReportTool(userId: string, threadId: string) {
       const body = markdown.trim();
       if (!body) return "Report was empty — nothing saved.";
 
-      // One scan collects cited ids per segment; resolve every segment in
-      // parallel; one pass de-links citations whose id didn't resolve.
-      const cited = new Map<CitationSegment, Set<string>>();
-      for (const [, , segment, id] of body.matchAll(LINK_RE)) {
-        const seg = segment as CitationSegment;
-        if (!cited.has(seg)) cited.set(seg, new Set());
-        cited.get(seg)?.add(id);
-      }
-      const valid = new Map<CitationSegment, Set<string>>();
-      await Promise.all(
-        [...cited].map(async ([seg, ids]) => {
-          valid.set(seg, await existingIds(FINDERS[seg], [...ids]));
-        }),
+      // existingIds skips the DB when a segment has no cited ids.
+      const links = [...body.matchAll(LINK_RE)];
+      const valid = new Map(
+        await Promise.all(
+          Object.entries(FINDERS).map(async ([segment, findMany]) => {
+            const ids = links
+              .filter((link) => link[2] === segment)
+              .map((link) => link[3]);
+            return [segment, await existingIds(findMany, ids)] as const;
+          }),
+        ),
       );
       const report = body.replace(
         LINK_RE,
         (link, label: string, segment: string, id: string) =>
-          valid.get(segment as CitationSegment)?.has(id) ? link : label,
+          valid.get(segment)?.has(id) ? link : label,
       );
 
       const updated = await prisma.chatThread.updateMany({

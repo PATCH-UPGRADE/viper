@@ -36,17 +36,8 @@ export function useViperChat(
   } = useChat({
     transport,
     onFinish: () => {
-      // A finished turn can rename/reorder the thread lists and (if write_report
-      // ran) change the report — refresh exactly those, not cached history.
-      void queryClient.invalidateQueries(
-        trpc.chat.getManyThreads.queryFilter(),
-      );
-      void queryClient.invalidateQueries(
-        trpc.chat.getReportThreads.queryFilter(),
-      );
-      void queryClient.invalidateQueries(
-        trpc.chat.getReportThread.queryFilter(),
-      );
+      // Refresh reports and lists, and expire history before a thread reopens.
+      void queryClient.invalidateQueries(trpc.chat.pathFilter());
     },
   });
 
@@ -130,9 +121,9 @@ export function useViperChat(
     async (threadId: string) => {
       await deleteThreadMutation({ threadId });
       if (threadId === currentThreadId) newThread();
-      void threadsQuery.refetch();
+      void queryClient.invalidateQueries(trpc.chat.pathFilter());
     },
-    [deleteThreadMutation, currentThreadId, newThread, threadsQuery],
+    [deleteThreadMutation, currentThreadId, newThread, queryClient, trpc.chat],
   );
 
   return {

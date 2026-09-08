@@ -22,11 +22,7 @@ import {
 } from "@langchain/core/messages";
 import prisma from "@/lib/db";
 
-/**
- * Ensure the thread row exists (created lazily on first message). Returns just
- * `report` — the one field the caller reads (revision context); a non-report
- * thread pays nothing for it.
- */
+/** Create the thread lazily and return its current report for revisions. */
 export async function ensureThread(
   threadId: string,
   userId: string,

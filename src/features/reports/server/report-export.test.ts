@@ -1,9 +1,10 @@
 // @vitest-environment node
 
+import { PDFDocument, StandardFonts } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { renderReportDocx } from "./report-docx";
 import { parseReportMarkdown } from "./report-markdown";
-import { renderReportPdf, textWithLinks } from "./report-pdf";
+import { renderReportPdf, textWithLinks, wrap } from "./report-pdf";
 
 const MD = `# Remediation plan
 
@@ -66,23 +67,42 @@ describe("parseReportMarkdown", () => {
 
 describe("renderers", () => {
   it("renders a PDF", async () => {
-    const pdf = await renderReportPdf("Remediation plan", MD);
+    const pdf = await renderReportPdf(MD);
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
   });
 
   it("renders a .docx (zip) file", async () => {
-    const docx = await renderReportDocx("Remediation plan", MD);
+    const docx = await renderReportDocx(MD);
     expect(docx.subarray(0, 2).toString()).toBe("PK");
   });
 
   it("does not throw on empty markdown", async () => {
-    expect((await renderReportPdf(null, "")).length).toBeGreaterThan(0);
+    expect((await renderReportPdf("")).length).toBeGreaterThan(0);
   });
 
   it("renders a PDF with non-WinAnsi characters", async () => {
     // Arrow, thin space, CJK — pdf-lib's standard fonts can't encode these.
-    const pdf = await renderReportPdf("Report", "See MRI → CT. 影像. Done.​");
+    const pdf = await renderReportPdf("See MRI → CT. 影像. Done.​ \u0080");
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+  });
+
+  it("wraps long citation URLs without losing text or exceeding the page width", async () => {
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const url = `https://vendor.example/advisories/${"a".repeat(200)}`;
+    const lines = wrap(url, font, 10.5, 484);
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.join("")).toBe(url);
+    expect(
+      lines.every((line) => font.widthOfTextAtSize(line, 10.5) <= 484),
+    ).toBe(true);
+  });
+
+  it("paginates long reports", async () => {
+    const pdf = await PDFDocument.load(
+      await renderReportPdf("A paragraph.\n\n".repeat(100)),
+    );
+    expect(pdf.getPageCount()).toBeGreaterThan(1);
   });
 });
 

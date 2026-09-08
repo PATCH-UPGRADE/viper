@@ -12,8 +12,6 @@ import {
   type InlineSpan,
   parseReportMarkdown,
   type ReportBlock,
-  reportGeneratedLine,
-  reportTitle,
 } from "./report-markdown";
 
 type Level = (typeof HeadingLevel)[keyof typeof HeadingLevel];
@@ -55,31 +53,9 @@ function blockParagraph(block: ReportBlock): Paragraph {
   });
 }
 
-export async function renderReportDocx(
-  title: string | null,
-  markdown: string,
-): Promise<Buffer> {
-  const children: Paragraph[] = [
-    new Paragraph({
-      heading: HeadingLevel.TITLE,
-      children: [new TextRun({ text: reportTitle(title) })],
-    }),
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: reportGeneratedLine(),
-          italics: true,
-          color: "6B7280",
-        }),
-      ],
-    }),
-    new Paragraph({ text: "" }),
-  ];
-
-  for (const block of parseReportMarkdown(markdown)) {
-    children.push(blockParagraph(block));
-  }
-
-  const doc = new Document({ sections: [{ children }] });
+export async function renderReportDocx(markdown: string): Promise<Buffer> {
+  const doc = new Document({
+    sections: [{ children: parseReportMarkdown(markdown).map(blockParagraph) }],
+  });
   return Buffer.from(await Packer.toBuffer(doc));
 }

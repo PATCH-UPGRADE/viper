@@ -49,7 +49,7 @@ export async function GET(
     return new Response("Report not found", { status: 404 });
   }
 
-  const buffer = await spec.render(thread.title, thread.report);
+  const buffer = await spec.render(thread.report);
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": spec.contentType,

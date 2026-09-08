@@ -6,19 +6,13 @@ import { z } from "zod";
 const briefingSectionSchema = z.object({
   exposure: z
     .string()
-    .describe(
-      "What's at risk, tailored to what this audience cares about. 2-4 sentences (roughly 60-100 words).",
-    ),
+    .describe("What's at risk, tailored to what this audience cares about."),
   whyThisPlan: z
     .string()
     .describe(
-      "Why this plan over the alternatives, for this audience. If this isn't the recommended plan, give the legitimate reason someone might still choose it — don't just concede to the recommended plan. 2-4 sentences (roughly 60-100 words).",
+      "Why this plan over the alternatives, for this audience. If this isn't the recommended plan, give the legitimate reason someone might still choose it — don't just concede to the recommended plan.",
     ),
-  whyNow: z
-    .string()
-    .describe(
-      "Urgency, for this audience. 1-2 sentences (roughly 30-50 words).",
-    ),
+  whyNow: z.string().describe("Urgency, for this audience."),
 });
 
 export const generatedBriefingSchema = z.object({

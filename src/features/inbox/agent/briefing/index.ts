@@ -91,10 +91,30 @@ export async function generateBriefing(
     maxTokens: 8000,
   }).withStructuredOutput(generatedBriefingSchema);
 
-  const generated = await model.invoke([
-    { role: "system", content: SYSTEM_PROMPT },
-    { role: "user", content: renderPlanPrompt(plan) },
-  ]);
+  const messages = [
+    { role: "system" as const, content: SYSTEM_PROMPT },
+    { role: "user" as const, content: renderPlanPrompt(plan) },
+  ];
 
-  return renderBriefing(generated);
+  try {
+    return renderBriefing(await model.invoke(messages));
+  } catch {
+    // Most likely still ran over budget — ask for a tighter rewrite instead
+    // of failing the request outright.
+    // ponytail: retries on any parse failure, not just truncation. Narrow to
+    // the response's stop_reason if blind retries prove costly.
+    console.warn(
+      `generateBriefing: plan "${plan.title}" retrying, more concisely`,
+    );
+    return renderBriefing(
+      await model.invoke([
+        ...messages,
+        {
+          role: "user" as const,
+          content:
+            "Your previous response didn't come through — it may have been cut off for being too long. Stay within each field's length guidance and answer again, in full.",
+        },
+      ]),
+    );
+  }
 }

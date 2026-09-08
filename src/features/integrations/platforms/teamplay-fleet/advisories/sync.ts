@@ -57,7 +57,7 @@ async function changedOnly(
   }
 
   return items.flatMap((item) => {
-    const contentHash = sourceContentHash(hashableOf(item.raw, item.body));
+    const contentHash = sourceContentHash(hashableOf(item.raw), item.body);
     const mappingId = mappingIdByExternalId.get(item.vendorId) ?? null;
     if (mappingId && newestHash.get(mappingId) === contentHash) return [];
     return [{ ...item, contentHash, mappingId }];

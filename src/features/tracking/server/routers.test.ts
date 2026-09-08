@@ -150,6 +150,11 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   externalMappings: [],
   notification: null,
   mitigationPlan: null,
+  targetIntegrationId: null,
+  platformPayload: null,
+  submissionState: "NONE",
+  submissionError: null,
+  submittedAt: null,
   ...overrides,
 });
 

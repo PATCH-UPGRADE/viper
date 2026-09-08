@@ -14,8 +14,8 @@ import {
   UnmanagedAssetsError,
   workOrderIntegration,
 } from "@/features/integrations/platforms/teamplay-fleet/work-orders/managed-assets";
+import { fleetContactFor } from "@/features/integrations/platforms/teamplay-fleet/work-orders/payload";
 import { openFleetWorkOrderFiler } from "@/features/integrations/platforms/teamplay-fleet/work-orders/submit";
-import type { FleetContact } from "@/features/integrations/platforms/teamplay-fleet/work-orders/tickets";
 import {
   Priority,
   type Prisma,
@@ -61,24 +61,6 @@ import {
   snapshotBeforeUpdate,
 } from "./activities";
 import { cascadeDoneStatus, createAssetTicket } from "./asset-tickets";
-
-/**
- * Siemens calls whoever approved the work order, so the contact is the accepting
- * user. The user record holds no phone number, so the integration's configured
- * `contactPhone` is the hospital's callback number for VIPER-raised orders.
- */
-function fleetContactFor(
-  user: { name?: string | null; email?: string | null },
-  contactPhone: string | undefined,
-): FleetContact {
-  const [firstName, ...rest] = (user.name ?? "").trim().split(/\s+/);
-  return {
-    email: user.email ?? "",
-    firstName: firstName || "VIPER",
-    lastName: rest.join(" ") || "User",
-    phone: contactPhone ?? "",
-  };
-}
 
 // A lost create-race (or a retry) surfaces as a P2002 unique violation. Duck-typed
 // on `code` rather than `instanceof`: across Next.js module boundaries the thrown
@@ -1128,7 +1110,13 @@ export const trackingRouter = createTRPCRouter({
         });
       }
 
-      const contact = fleetContactFor(ctx.auth.user, filer.config.contactPhone);
+      const contact = fleetContactFor(
+        {
+          name: ctx.auth.user.name ?? "",
+          email: ctx.auth.user.email ?? "",
+        },
+        filer.config.contactPhone,
+      );
 
       // Now that we hold the claim, file on Fleet. Failures are collected per
       // asset rather than aborting: an order Fleet did accept must still be

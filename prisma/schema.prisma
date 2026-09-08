@@ -280,10 +280,10 @@ model VendorContact {
 }
 
 model Contract {
-  id              String    @id @default(cuid())
-  title           String?
-  effectiveFrom   DateTime?
-  effectiveTo     DateTime?
+  id            String    @id @default(cuid())
+  title         String?
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
 
   termsJson Json?
 
@@ -978,6 +978,7 @@ model Integration {
   sourceRecordMappings   ExternalSourceRecordMapping[]
 
   managesRelationships ManagesRelationship[]
+  targetedWorkOrders   WorkOrderTicket[]     @relation(name: "WorkOrderTarget")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1151,6 +1152,19 @@ model ChatMessage {
   @@index([threadId, createdAt])
 }
 
+/**
+ * How far an external filing has got. Separate from `isDraft`, which is about
+ * visibility and mitigation-plan membership: a ticket can be promoted out of
+ * draft long before, or without ever, reaching a vendor platform.
+ */
+enum SubmissionState {
+  NONE
+  PENDING
+  SUBMITTING
+  SUBMITTED
+  FAILED
+}
+
 enum TicketStatus {
   TO_DO
   IN_PROGRESS
@@ -1253,7 +1267,6 @@ model WorkOrderTicket {
 
   body String? @db.Text
 
-  isDraft          Boolean         @default(false)
   mitigationPlanId String?
   mitigationPlan   MitigationPlan? @relation(fields: [mitigationPlanId], references: [id], onDelete: Cascade)
 
@@ -1295,6 +1308,30 @@ model WorkOrderTicket {
   externalMappings ExternalWorkOrderMapping[]
   lastCommentAt    DateTime?
 
+  // A draft is a work order VIPER has not committed to yet: it is hidden from
+  // the ticket lists, and it is what a mitigation plan holds until the plan is
+  // accepted. It is not about the vendor — a ticket leaves draft whether or not
+  // it is ever filed anywhere.
+  isDraft Boolean @default(false)
+
+  // Where this work order will be filed, and the payload that the platform
+  // needs. Both are set on the draft, and both stay after the order is filed,
+  // because a retry of a FAILED submission reads them again.
+  //
+  // This is the intent, not the result. ExternalWorkOrderMapping holds the
+  // result: one row per child ticket, with the id that the platform returned.
+  // Null means that VIPER tracks this work order, and no vendor platform is
+  // involved.
+  targetIntegrationId String?
+  targetIntegration   Integration? @relation(name: "WorkOrderTarget", fields: [targetIntegrationId], references: [id], onDelete: SetNull)
+  platformPayload     Json?
+
+  // Guards the submit race. A compare-and-swap on this is what stops two
+  // approvals filing the same order twice.
+  submissionState SubmissionState @default(NONE)
+  submissionError String?         @db.Text
+  submittedAt     DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1305,6 +1342,8 @@ model WorkOrderTicket {
   @@index([parentId])
   @@index([mitigationPlanId])
   @@index([notificationId])
+  @@index([submissionState])
+  @@index([targetIntegrationId])
   @@map("work_order_ticket")
 }
 
@@ -1788,7 +1827,7 @@ model Question {
   parentQuestion   Question? @relation("QuestionChain", fields: [parentQuestionId], references: [id], onDelete: SetNull)
   followupQuestion Question? @relation("QuestionChain")
 
-  audience  QuestionAudience?
+  audience QuestionAudience?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

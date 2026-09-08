@@ -18,6 +18,7 @@ const { mockCategoriesFor, mockDefaultSyncEveryFor, mockInngest, mockPrisma } =
         update: vi.fn(),
       },
       integrationResourceSync: { findUnique: vi.fn(), update: vi.fn() },
+      workOrderTicket: { count: vi.fn() },
     },
   }));
 
@@ -203,12 +204,25 @@ describe("integrationsRouter enable controls", () => {
 describe("integrationsRouter.remove", () => {
   it("removes an existing integration", async () => {
     mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
+    mockPrisma.workOrderTicket.count.mockResolvedValue(0);
 
     await caller.remove({ id: "integration-1" });
 
     expect(mockPrisma.integration.delete).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "integration-1" } }),
     );
+  });
+
+  it("refuses while a work order is being filed on it", async () => {
+    // Deleting mid-flight would pull the row the submission job authenticates
+    // against, failing a batch it has already partly filed.
+    mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
+    mockPrisma.workOrderTicket.count.mockResolvedValue(2);
+
+    await expect(caller.remove({ id: "integration-1" })).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    expect(mockPrisma.integration.delete).not.toHaveBeenCalled();
   });
 
   it("404s instead of 500ing when the integration doesn't exist", async () => {

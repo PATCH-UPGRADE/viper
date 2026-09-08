@@ -19,6 +19,7 @@ import {
   resolveEntityFilterFn,
 } from "@/inngest/functions/resolve-entity-filters";
 import { sendEscalationEmailFn } from "@/inngest/functions/send-escalation-email";
+import { submitWorkOrder } from "@/inngest/functions/submit-work-order";
 import {
   syncAllIntegrations,
   syncIntegration,
@@ -42,5 +43,6 @@ export const { GET, POST, PUT } = serve({
     sendEscalationEmailFn,
     generateAllDebriefs,
     generateDepartmentDebrief,
+    submitWorkOrder,
   ],
 });

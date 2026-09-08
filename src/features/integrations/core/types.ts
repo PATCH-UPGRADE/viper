@@ -5,7 +5,11 @@
  */
 
 import type { z } from "zod";
-import type { PlatformEnum, ResourceType } from "@/generated/prisma";
+import type {
+  PlatformEnum,
+  ResourceType,
+  TicketCategory,
+} from "@/generated/prisma";
 import type { Category } from "../types";
 
 /**
@@ -54,8 +58,8 @@ export interface Session {
 }
 
 /**
- * Everything one resource-module sync attempt needs.
- * Assumed it uses the platform createSession module
+ * Everything one resource-module sync attempt needs. The module opens its own
+ * session from `creds`, with its platform's own auth helper.
  */
 export interface ResourceSyncCtx<TConfig = unknown, TCreds = unknown> {
   integrationId: string;
@@ -122,11 +126,6 @@ export interface ResourceModule<
   toCanonical?(raw: TRaw, config: TConfig): TCanonical;
 
   // we push to their platform
-  create?(
-    session: Session,
-    draft: TDraft,
-    config: TConfig,
-  ): Promise<{ externalId: string; raw: unknown }>;
   update?(
     session: Session,
     externalId: string,
@@ -136,6 +135,71 @@ export interface ResourceModule<
 
   /** how often this resource should sync, in seconds. null = no opinion. */
   defaultSyncEvery: number | null;
+}
+
+/**
+ * One VIPER work order, for one asset, in terms every platform understands.
+ * The generic submitter builds this; the platform turns it into its own draft.
+ */
+export interface WorkOrderDraftInput {
+  summary: string;
+  description: string;
+  category: TicketCategory;
+  /** ISO-8601 with offset, or null when no window was proposed. */
+  scheduledAt: string | null;
+  asset: {
+    id: string;
+    hostname: string | null;
+    ip: string | null;
+    /** The platform's own id for this asset, from its ExternalAssetMapping. */
+    externalId: string | null;
+  };
+  /** Who approved the order. Platforms that dispatch an engineer need a contact. */
+  actor: { name: string; email: string };
+  /** Platform-specific fields, already validated against `payloadSchema`. */
+  payload: Record<string, unknown>;
+  /** Our reference, echoed on their record so an order traces back to us. */
+  reference: string;
+}
+
+/** One authenticated run of filing, held open across several assets. */
+export interface WorkOrderFiler<TDraft> {
+  file(draft: TDraft): Promise<{ externalId: string; raw: unknown }>;
+}
+
+/**
+ * A resource module that can also be filed *into* from VIPER.
+ *
+ * `payloadSchema` is the only part a model fills in, so it holds the platform's
+ * own choices and nothing VIPER already knows. `toDraft` joins the two halves.
+ */
+export interface WorkOrderModule<
+  TRaw = unknown,
+  TConfig = unknown,
+  TCreds = unknown,
+  TDraft = unknown,
+> extends ResourceModule<unknown, TRaw, TConfig, TCreds, TDraft> {
+  /**
+   * Sign in once, then file as many orders as the caller needs.
+   *
+   * The platform's own auth helper lives behind this, so core never holds a
+   * session. One order per asset is the normal case, so a platform must
+   * authenticate here rather than inside `file`. A Fleet login drives a
+   * headless browser, and a per-call session costs one browser launch per
+   * asset.
+   */
+  openFiler(input: {
+    config: TConfig;
+    creds: TCreds;
+  }): Promise<WorkOrderFiler<TDraft>>;
+  // biome-ignore lint/suspicious/noExplicitAny: a zod object of unknown shape; `unknown` loses `.shape`, which the catalog and JSON Schema generation both read.
+  payloadSchema: z.ZodObject<any>;
+  toDraft(input: WorkOrderDraftInput, config: TConfig): TDraft;
+  /**
+   * Refuse a payload this platform will not accept, before anything is claimed
+   * or sent. The reason is shown to the user and handed back to the model.
+   */
+  assertSubmittable?(payload: Record<string, unknown>): void;
 }
 
 export interface ConnectorDefinition<TConfig, TCreds> {
@@ -166,7 +230,9 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
    */
   sync?: SyncStrategy<TConfig, TCreds>;
   onCreate?(): Promise<void>;
-  workOrders?: ResourceModule<unknown, unknown, TConfig, TCreds>;
+
+  // biome-ignore lint/suspicious/noExplicitAny: TRaw/TDraft vary per platform and are erased here, exactly as `AnyConnectorModule` erases TConfig/TCreds.
+  workOrders?: WorkOrderModule<any, TConfig, TCreds, any>;
   assets?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   notifications?: ResourceModule<unknown, unknown, TConfig, TCreds>;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -50,7 +51,9 @@ export function ReportsSidebar() {
                 {r.title || "Untitled report"}
               </span>
               <span className="mt-0.5 block text-xs text-muted-foreground">
-                {new Date(r.updatedAt).toLocaleDateString()}
+                {formatDistanceToNow(new Date(r.updatedAt), {
+                  addSuffix: true,
+                })}
               </span>
             </Link>
           ))

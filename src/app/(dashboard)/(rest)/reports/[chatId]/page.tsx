@@ -9,7 +9,9 @@ interface PageProps {
 
 const Page = async ({ params }: PageProps) => {
   const { chatId } = await params;
+  // Report + chat history in parallel on the server, not a client waterfall.
   prefetch(trpc.chat.getReportThread.queryOptions({ threadId: chatId }));
+  prefetch(trpc.chat.getUIMessages.queryOptions({ threadId: chatId }));
 
   return (
     <HydrateClient>

@@ -35,10 +35,10 @@ export async function GET(
   }
 
   const format = new URL(req.url).searchParams.get("format") ?? "pdf";
-  if (format !== "pdf" && format !== "docx") {
+  const spec = FORMATS[format as keyof typeof FORMATS];
+  if (!spec) {
     return new Response("Unknown format", { status: 400 });
   }
-  const spec = FORMATS[format];
 
   const { chatId } = await params;
   const thread = await prisma.chatThread.findFirst({

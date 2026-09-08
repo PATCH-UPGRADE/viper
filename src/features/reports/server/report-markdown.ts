@@ -88,14 +88,8 @@ export function parseReportMarkdown(markdown: string): ReportBlock[] {
         blocks.push({ type: "paragraph", spans: inlineSpans(node.children) });
         break;
       case "blockquote":
-        blocks.push({
-          type: "paragraph",
-          spans: inlineSpans(
-            node.children.flatMap<Node>((c) =>
-              "children" in c ? c.children : [],
-            ),
-          ),
-        });
+        // inlineSpans recurses into the quote's child paragraphs itself.
+        blocks.push({ type: "paragraph", spans: inlineSpans(node.children) });
         break;
       case "list":
         pushList(blocks, node);
@@ -114,8 +108,6 @@ export function parseReportMarkdown(markdown: string): ReportBlock[] {
             ]),
           });
         });
-        break;
-      default:
         break;
     }
   }

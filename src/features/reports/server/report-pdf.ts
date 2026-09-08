@@ -45,16 +45,19 @@ export function wrap(
       } else {
         line = next;
       }
-      // URLs and identifiers may be wider than a page even on their own.
+      // A single token (e.g. a citation URL) can be wider than the page —
+      // binary-search the largest prefix that fits and hard-break there.
       while (font.widthOfTextAtSize(line, size) > maxWidth) {
-        let end = line.length - 1;
-        while (
-          end > 1 &&
-          font.widthOfTextAtSize(line.slice(0, end), size) > maxWidth
-        )
-          end--;
-        lines.push(line.slice(0, end));
-        line = line.slice(end);
+        let lo = 1;
+        let hi = line.length;
+        while (lo < hi) {
+          const mid = (lo + hi + 1) >> 1;
+          if (font.widthOfTextAtSize(line.slice(0, mid), size) <= maxWidth)
+            lo = mid;
+          else hi = mid - 1;
+        }
+        lines.push(line.slice(0, lo));
+        line = line.slice(lo);
       }
     }
     lines.push(line);
@@ -75,13 +78,11 @@ export async function renderReportPdf(markdown: string): Promise<Buffer> {
     raw: string,
     { font = regular, size = BODY_SIZE, indent = 0, gap = 4 } = {},
   ) => {
-    const text = [...raw]
-      .map((ch) =>
-        /\s/.test(ch) || supported.has(ch.codePointAt(0)!)
-          ? ch
-          : (SUBST[ch] ?? "?"),
-      )
-      .join("");
+    const text = raw.replace(/\P{ASCII}/gu, (ch) =>
+      /\s/.test(ch) || supported.has(ch.codePointAt(0)!)
+        ? ch
+        : (SUBST[ch] ?? "?"),
+    );
     const lineHeight = Math.max(LINE, size + 3);
     for (const line of wrap(text, font, size, MAX_W - indent)) {
       if (y - lineHeight < MARGIN) {

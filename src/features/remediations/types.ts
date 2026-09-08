@@ -59,6 +59,28 @@ export const vulnerabilitySchema = z.object({
   url: z.string(),
 });
 
+/**
+ * What the manufacturer said about applying this remediation, as the source
+ * platform sent it. Every field is optional because no source is obliged to
+ * answer, and `{}` is what a remediation from any other origin carries.
+ *
+ * Loose on purpose: the source's own category and mechanism enums are still in
+ * flux, so an unrecognised value is kept rather than rejected.
+ */
+export const sourceImpactSchema = z
+  .object({
+    category: z.string().nullish(),
+    mechanism: z.string().nullish(),
+    requiresDowntime: z.boolean().nullish(),
+    estimatedDowntimeSeconds: z.number().nullish(),
+    restartRequired: z.boolean().nullish(),
+    disablesFeatures: z.boolean().nullish(),
+    workflowImpact: z.string().nullish(),
+    clinicalImpactNotes: z.string().nullish(),
+  })
+  .loose();
+export type SourceImpact = z.infer<typeof sourceImpactSchema>;
+
 export const remediationResponseSchema = z.object({
   id: z.string(),
   deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
@@ -76,6 +98,7 @@ export const remediationResponseSchema = z.object({
   ),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
+  sourceImpact: sourceImpactSchema,
   vulnerability: vulnerabilitySchema.nullish(),
   user: userSchema,
   artifacts: z.array(artifactWrapperWithUrlsSchema),

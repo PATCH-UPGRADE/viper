@@ -280,10 +280,10 @@ model VendorContact {
 }
 
 model Contract {
-  id              String    @id @default(cuid())
-  title           String?
-  effectiveFrom   DateTime?
-  effectiveTo     DateTime?
+  id            String    @id @default(cuid())
+  title         String?
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
 
   termsJson Json?
 
@@ -1531,13 +1531,13 @@ model SourceRecord {
 
   // null for email / TA4 sources, since those aren't mirrored rows.
   // INVARIANT: mappingId set => externalId null
-  mappingId String?
-  mapping   ExternalSourceRecordMapping? @relation(name: "MappingSnapshots", fields: [mappingId], references: [id], onDelete: Cascade)
-  externalMappings  ExternalSourceRecordMapping[] @relation(name: "MappedSourceRecord")
-  contentHash String // dedup: skip the write if it matches the mapping's newest 
-  raw         Json    @default("{}")
-  markdown    String? @db.Text
-  externalId  String? // TODO VW-448: Consider removing this; used only for email
+  mappingId        String?
+  mapping          ExternalSourceRecordMapping?  @relation(name: "MappingSnapshots", fields: [mappingId], references: [id], onDelete: Cascade)
+  externalMappings ExternalSourceRecordMapping[] @relation(name: "MappedSourceRecord")
+  contentHash      String // dedup: skip the write if it matches the mapping's newest 
+  raw              Json                          @default("{}")
+  markdown         String?                       @db.Text
+  externalId       String? // TODO VW-448: Consider removing this; used only for email
 
   observedAt DateTime @default(now())
 
@@ -1582,12 +1582,12 @@ model SourceLink {
 // One row per external record (an advisory, a notification on another platform),
 // owning many snapshots of it.
 model ExternalSourceRecordMapping {
-  id            String      @id @default(cuid())
+  id            String         @id @default(cuid())
   integrationId String
-  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  integration   Integration    @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   externalId    String // the advisory / notification id on another platform
-  itemId  String?
-  item SourceRecord? @relation(name: "MappedSourceRecord", fields:[itemId], references: [id], onDelete: Cascade)
+  itemId        String?
+  item          SourceRecord?  @relation(name: "MappedSourceRecord", fields: [itemId], references: [id], onDelete: SetNull)
   sourceRecords SourceRecord[] @relation(name: "MappingSnapshots")
 
   upstreamApi String?
@@ -1790,7 +1790,7 @@ model Question {
   parentQuestion   Question? @relation("QuestionChain", fields: [parentQuestionId], references: [id], onDelete: SetNull)
   followupQuestion Question? @relation("QuestionChain")
 
-  audience  QuestionAudience?
+  audience QuestionAudience?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

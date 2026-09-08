@@ -52,11 +52,14 @@ export const externalIdOf = (raw: FleetAdvisory): string => String(raw.id);
  * The subset of `raw` that decides whether the advisory actually changed.
  * enableMail and lastEmailsSent are for Fleet's own subscriber, not advisory
  */
-const EXCLUDED_FIELDS = ["enableMail", "lastEmailsSent"] as const;
+const EXCLUDED_FIELDS = [
+  "enableMail",
+  "lastEmailsSent",
+] as const satisfies readonly (keyof FleetAdvisory)[];
 
-export function hashableOf(
-  raw: Record<string, unknown>,
-): Record<string, unknown> {
+export function hashableOf<T extends FleetAdvisory>(
+  raw: T,
+): Omit<T, (typeof EXCLUDED_FIELDS)[number]> {
   const copy = { ...raw };
   for (const field of EXCLUDED_FIELDS) delete copy[field];
   return copy;
@@ -91,7 +94,6 @@ export async function fetchAttachments(
   session: Session,
   externalId: string,
 ): Promise<FleetAdvisoryAttachment[]> {
-  let body: unknown;
   try {
     const res = await session.request(advisoryAttachmentsUrl(externalId));
     if (!res.ok) {
@@ -100,12 +102,18 @@ export async function fetchAttachments(
       );
       return [];
     }
-    body = await res.json();
+    const parsed = fleetAttachmentsResponseSchema.safeParse(await res.json());
+    if (!parsed.success) {
+      console.warn(
+        `Fleet advisory ${externalId} attachments returned an unexpected shape`,
+      );
+      return [];
+    }
+    return parsed.data;
   } catch (err) {
     console.warn(`Fleet advisory ${externalId} attachments failed`, err);
     return [];
   }
-  return fleetAttachmentsResponseSchema.parse(body);
 }
 
 export async function* listChanged(

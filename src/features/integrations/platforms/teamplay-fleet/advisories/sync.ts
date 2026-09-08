@@ -10,7 +10,12 @@ import type { IntegrationResponse } from "@/lib/schemas";
 import { sourceContentHash } from "@/lib/source-hash";
 import type { FleetConfig, FleetCreds } from "../config";
 import { createFleetSession } from "../session";
-import { type FleetAdvisoryItem, listChanged, toCanonical } from "./advisories";
+import {
+  type FleetAdvisoryItem,
+  hashableOf,
+  listChanged,
+  toCanonical,
+} from "./advisories";
 
 type FleetAdvisoryDraft = FleetAdvisoryItem & {
   contentHash: string;
@@ -52,7 +57,7 @@ async function changedOnly(
   }
 
   return items.flatMap((item) => {
-    const contentHash = sourceContentHash(item.raw, item.body);
+    const contentHash = sourceContentHash(hashableOf(item.raw, item.body));
     const mappingId = mappingIdByExternalId.get(item.vendorId) ?? null;
     if (mappingId && newestHash.get(mappingId) === contentHash) return [];
     return [{ ...item, contentHash, mappingId }];
@@ -95,10 +100,11 @@ export async function inngestFleetAdvisories(
           contentHash: item.contentHash,
           raw: item.raw,
           markdown: item.body,
+          ...(item.mappingId ? { mappingId: item.mappingId } : {}),
         };
         return {
           createData: fields,
-          updateData: fields,
+          updateData: { ...fields, mappingId: item.mappingId },
           uniqueFieldConditions: [],
           artifactsData: undefined,
         };

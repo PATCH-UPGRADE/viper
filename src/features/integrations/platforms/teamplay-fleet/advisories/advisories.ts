@@ -27,16 +27,13 @@ export type FleetAdvisory = z.infer<typeof fleetAdvisorySchema>;
 const fleetAttachmentSchema = z.object({
   name: z.string(),
   type: z.string().nullish(),
-  size: z.coerce.number().nullish(),
+  size:  z.string().nullish(),
   languageCode: z.string().nullish(),
 });
 
 export type FleetAdvisoryAttachment = z.infer<typeof fleetAttachmentSchema>;
 
-const fleetAttachmentsResponseSchema = z
-  .record(z.string(), fleetAttachmentSchema)
-  .transform((byIndex) => Object.values(byIndex));
-
+const fleetAttachmentsResponseSchema = z.array(fleetAttachmentSchema);
 export interface FleetAdvisoryRecord extends FleetAdvisory {
   attachments: FleetAdvisoryAttachment[];
 }
@@ -65,7 +62,7 @@ export function hashableOf(
   return copy;
 }
 
-export const praseCVEIds = (value: string | null | undefined): string[] =>
+export const parseCveIds = (value: string | null | undefined): string[] =>
   value ? value.split(/[,;\s]+/).filter(Boolean) : [];
 
 // computeVulnerabilityPriority checking against 7
@@ -143,9 +140,9 @@ export async function get(
 
 export function buildAdvisoryBody(advisory: FleetAdvisoryRecord): string {
   const attachments = advisory.attachments;
-  const cves = praseCVEIds(advisory.cveIds);
+  const cves = parseCveIds(advisory.cveIds);
   const band = cvssBand(advisory.cvssScore);
-  
+
   const lines: string[] = [
     `# ${buildText(advisory.title) ?? `Fleet advisory ${advisory.id}`}`,
   ];

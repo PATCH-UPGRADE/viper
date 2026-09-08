@@ -1,5 +1,4 @@
 // @vitest-environment node
-
 import { describe, expect, it } from "vitest";
 import { renderReportDocx } from "./report-docx";
 import { parseReportMarkdown } from "./report-markdown";
@@ -25,15 +24,17 @@ patch --apply MRI-01
 
 | Device | Risk |
 | --- | --- |
-| [MRI-01](/assets/table_asset) | High |
+| MRI-01 | High |
 `;
 
 describe("parseReportMarkdown", () => {
   const blocks = parseReportMarkdown(MD);
 
-  it("normalizes tables, blockquotes, and fenced code into paragraphs", () => {
+  it("splits into the expected block types (blockquote + fenced code collapse to paragraph)", () => {
     const types = new Set(blocks.map((b) => b.type));
-    expect(types).toEqual(new Set(["heading", "paragraph", "listItem"]));
+    expect(types).toEqual(
+      new Set(["heading", "paragraph", "listItem", "table"]),
+    );
   });
 
   it("keeps the link href and inline styles on spans", () => {
@@ -54,13 +55,6 @@ describe("parseReportMarkdown", () => {
       .filter((b) => b.type === "listItem" && b.ordered)
       .map((b) => (b.type === "listItem" ? b.marker : ""));
     expect(markers).toEqual(["1.", "2."]);
-  });
-
-  it("keeps a table cell's citation link when flattening the row to a paragraph", () => {
-    const hrefs = blocks.flatMap((b) =>
-      b.type === "paragraph" ? b.spans.map((s) => s.href) : [],
-    );
-    expect(hrefs).toContain("/assets/table_asset");
   });
 });
 

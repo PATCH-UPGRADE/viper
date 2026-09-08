@@ -7,7 +7,7 @@ import {
   Paragraph,
   TextRun,
 } from "docx";
-import { getApiUrl } from "@/lib/url-utils";
+import { getBaseUrl } from "@/lib/url-utils";
 import {
   type InlineSpan,
   parseReportMarkdown,
@@ -27,32 +27,62 @@ const HEADING: Record<number, Level> = {
 };
 
 function absolute(href: string): string {
-  return /^https?:\/\//.test(href) ? href : getApiUrl(href);
+  return /^https?:\/\//.test(href) ? href : `${getBaseUrl()}${href}`;
 }
 
 function runs(spans: InlineSpan[]): (TextRun | ExternalHyperlink)[] {
-  return spans.map((s) => {
-    if (s.text === "\n") return new TextRun({ break: 1 });
-    if (s.href) {
-      return new ExternalHyperlink({
-        link: absolute(s.href),
-        children: [new TextRun({ text: s.text, style: "Hyperlink" })],
-      });
-    }
-    return new TextRun({ text: s.text, bold: s.bold, italics: s.italic });
-  });
+  return spans
+    .filter((s) => s.text !== "\n")
+    .map((s) => {
+      if (s.href) {
+        return new ExternalHyperlink({
+          link: absolute(s.href),
+          children: [new TextRun({ text: s.text, style: "Hyperlink" })],
+        });
+      }
+      return new TextRun({ text: s.text, bold: s.bold, italics: s.italic });
+    });
 }
 
-function blockParagraph(block: ReportBlock): Paragraph {
-  const list = block.type === "listItem" ? block : null;
-  return new Paragraph({
-    heading: block.type === "heading" ? HEADING[block.depth] : undefined,
-    bullet: list && !list.ordered ? { level: 0 } : undefined,
-    children: [
-      ...(list?.ordered ? [new TextRun({ text: `${list.marker} ` })] : []),
-      ...runs(block.spans),
-    ],
-  });
+function blockParagraphs(block: ReportBlock): Paragraph[] {
+  switch (block.type) {
+    case "heading":
+      return [
+        new Paragraph({
+          heading: HEADING[block.depth],
+          children: runs(block.spans),
+        }),
+      ];
+    case "paragraph":
+      return [new Paragraph({ children: runs(block.spans) })];
+    case "listItem":
+      // Ordered items get their marker drawn as literal text (matching the PDF
+      // export) rather than a Word numbering definition — simpler than
+      // registering a numbering config for what's otherwise a flat list.
+      return [
+        block.ordered
+          ? new Paragraph({
+              children: [
+                new TextRun({ text: `${block.marker} ` }),
+                ...runs(block.spans),
+              ],
+            })
+          : new Paragraph({
+              bullet: { level: 0 },
+              children: runs(block.spans),
+            }),
+      ];
+    case "table":
+      // ponytail: flattened to text rows, same as the PDF export.
+      return block.rows.map(
+        (row, i) =>
+          new Paragraph({
+            children: [
+              new TextRun({ text: row.join("   |   "), bold: i === 0 }),
+            ],
+          }),
+      );
+  }
 }
 
 export async function renderReportDocx(
@@ -77,7 +107,7 @@ export async function renderReportDocx(
   ];
 
   for (const block of parseReportMarkdown(markdown)) {
-    children.push(blockParagraph(block));
+    children.push(...blockParagraphs(block));
   }
 
   const doc = new Document({ sections: [{ children }] });

@@ -84,9 +84,11 @@ interface AIChatProps {
    * When set, the in-chat thread selector is hidden — navigation lives elsewhere.
    */
   controlledThreadId?: string;
+  /** Fired when an agent turn finishes (streaming → ready). */
+  onTurnEnd?: () => void;
 }
 
-export function AIChat({ config, controlledThreadId }: AIChatProps) {
+export function AIChat({ config, controlledThreadId, onTurnEnd }: AIChatProps) {
   const { data: session } = authClient.useSession();
   const user = session?.user ?? null;
 
@@ -104,6 +106,7 @@ export function AIChat({ config, controlledThreadId }: AIChatProps) {
       config={config}
       user={user}
       controlledThreadId={controlledThreadId}
+      onTurnEnd={onTurnEnd}
     />
   );
 }
@@ -958,10 +961,12 @@ function ChatInner({
   config,
   user,
   controlledThreadId,
+  onTurnEnd,
 }: {
   config?: UseChatAgentConfig;
   user: ChatUser | null;
   controlledThreadId?: string;
+  onTurnEnd?: () => void;
 }) {
   const {
     messages,
@@ -976,8 +981,9 @@ function ChatInner({
     switchThread,
     newThread,
     deleteThread,
+    refreshThreads,
     isLoadingHistory,
-  } = useViperChat(config, controlledThreadId);
+  } = useViperChat(config, { threadId: controlledThreadId, onTurnEnd });
 
   const [input, setInput] = useState("");
   const [configOverride, setConfigOverride] =
@@ -1092,7 +1098,10 @@ function ChatInner({
                       <Button
                         variant="ghost"
                         className="text-destructive hover:text-destructive"
-                        onClick={() => deleteThread(currentThreadId)}
+                        onClick={async () => {
+                          await deleteThread(currentThreadId);
+                          refreshThreads();
+                        }}
                       >
                         <Trash2 />
                       </Button>

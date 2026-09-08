@@ -50,6 +50,26 @@ const sameOrigin = (candidate: string, origin: string): boolean => {
   }
 };
 
+/**
+ * One page, parsed. `next` is the whole URL of the page after it, or null.
+ *
+ * Separate from `walkPages` because a caller serving a person wants one page
+ * and a cursor to come back with, not the whole collection drained.
+ */
+export async function fetchPage<T>(
+  session: Session,
+  url: string,
+  itemSchema: z.ZodType<T>,
+): Promise<{ items: T[]; next: string | null }> {
+  const response = await session.request(url);
+  if (!response.ok) {
+    throw new MedIsaoRequestError(url, response.status, response.statusText);
+  }
+
+  const { next, results } = envelopeSchema.parse(await response.json());
+  return { items: results.map((item) => itemSchema.parse(item)), next };
+}
+
 /** Walk every page from `firstUrl`, parsing each item with `itemSchema`. */
 export async function* walkPages<T>(
   session: Session,
@@ -66,20 +86,19 @@ export async function* walkPages<T>(
       );
     }
 
-    const response = await session.request(url);
-    if (!response.ok) {
-      throw new MedIsaoRequestError(url, response.status, response.statusText);
-    }
+    const result: { items: T[]; next: string | null } = await fetchPage(
+      session,
+      url,
+      itemSchema,
+    );
+    yield result.items;
 
-    const { next, results } = envelopeSchema.parse(await response.json());
-    yield results.map((item) => itemSchema.parse(item));
-
-    if (next !== null && !sameOrigin(next, origin)) {
+    if (result.next !== null && !sameOrigin(result.next, origin)) {
       throw new Error(
-        `MedISAO paging tried to leave ${origin}. Refusing to follow ${next}.`,
+        `MedISAO paging tried to leave ${origin}. Refusing to follow ${result.next}.`,
       );
     }
-    url = next;
+    url = result.next;
   }
 }
 

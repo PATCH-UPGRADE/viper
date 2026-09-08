@@ -142,8 +142,110 @@ export interface ResourceModule<
    */
   sourceRecords?: SourceRecordAdapter;
 
+  /** How this platform's comments on this resource are read and written. */
+  comments?: CommentsApi<TConfig, TCreds>;
+
+  /** How questions to the manufacturer about this resource are raised. */
+  inquiries?: InquiriesApi<TConfig, TCreds>;
+
   /** how often this resource should sync, in seconds. null = no opinion. */
   defaultSyncEvery: number | null;
+}
+
+/**
+ * What a platform needs to make one call on behalf of an integration, outside
+ * a sync. Same two pieces a `SyncCtx` carries, minus everything a sync attempt
+ * owns — there is no cursor and no watermark when a person is waiting.
+ */
+export interface PlatformCallCtx<TConfig = unknown, TCreds = unknown> {
+  config: TConfig;
+  creds: TCreds;
+}
+
+/** One comment as it exists on the platform. */
+export interface ExternalComment {
+  externalId: string;
+  /**
+   * Opaque author handle. Stable within one record and uncorrelated across
+   * records by design, so it is never a user id and never a profile link.
+   */
+  pseudonym: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ExternalCommentPage {
+  items: ExternalComment[];
+  /** Opaque; hand it back to read the next page. null = end of stream. */
+  nextCursor: string | null;
+}
+
+/**
+ * Reading and writing the comments a platform keeps against one of its records.
+ *
+ * Declared on the resource module that owns those records, so a caller reaches
+ * it through the registry and never names a platform. Absent means the platform
+ * has no comment surface, which is not an error.
+ */
+export interface CommentsApi<TConfig = unknown, TCreds = unknown> {
+  list(
+    ctx: PlatformCallCtx<TConfig, TCreds>,
+    externalId: string,
+    cursor?: string | null,
+  ): Promise<ExternalCommentPage>;
+
+  create(
+    ctx: PlatformCallCtx<TConfig, TCreds>,
+    externalId: string,
+    draft: {
+      body: string;
+      /**
+       * Our own stable identifier for the person writing. The platform derives
+       * its pseudonym from this, so a value that changes splits that person's
+       * thread in two.
+       */
+      authorExternalUserId: string;
+    },
+  ): Promise<ExternalComment>;
+}
+
+/** One inquiry we raised with a manufacturer, and their answer if it has come. */
+export interface ExternalInquiry {
+  externalId: string;
+  body: string;
+  /** The platform's own vocabulary; kept as sent rather than narrowed. */
+  status: string | null;
+  /** The manufacturer's answer. Single-response in the current contract. */
+  response: string | null;
+  respondedAt: string | null;
+  createdAt: string;
+}
+
+export interface ExternalInquiryPage {
+  items: ExternalInquiry[];
+  nextCursor: string | null;
+}
+
+/**
+ * Questions we put to a manufacturer about one of their records.
+ *
+ * The mirror image of `CommentsApi`, and deliberately not merged with it. A
+ * comment is pseudonymous and shared with every consumer; an inquiry is
+ * attributed and private, scoped to the token that raised it, because a
+ * question needs an answer and an answer needs somebody to answer.
+ */
+export interface InquiriesApi<TConfig = unknown, TCreds = unknown> {
+  list(
+    ctx: PlatformCallCtx<TConfig, TCreds>,
+    externalId: string,
+    cursor?: string | null,
+  ): Promise<ExternalInquiryPage>;
+
+  create(
+    ctx: PlatformCallCtx<TConfig, TCreds>,
+    externalId: string,
+    draft: { body: string },
+  ): Promise<ExternalInquiry>;
 }
 
 export interface ConnectorDefinition<TConfig, TCreds> {

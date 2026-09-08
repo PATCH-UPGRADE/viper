@@ -275,6 +275,13 @@ function RemediationDrawer({
         </div>
 
         <DrawerFooter>
+          {/* The drawer is the quick read. Comments and the manufacturer's
+              stated impact live on the full page, which is too much for it. */}
+          <Button asChild>
+            <Link href={`/remediations/${remediation.id}`}>
+              Open full remediation
+            </Link>
+          </Button>
           <DrawerClose asChild>
             <Button variant="outline">Close</Button>
           </DrawerClose>

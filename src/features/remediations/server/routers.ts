@@ -1,4 +1,10 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { loadIntegrationContext } from "@/features/integrations/core/context";
+import {
+  commentsApiFor,
+  inquiriesApiFor,
+} from "@/features/integrations/core/registry";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import {
   attachNote,
@@ -59,7 +65,206 @@ const createSearchFilter = (search: string) => {
     : {};
 };
 
+/**
+ * Find where this remediation lives on a platform that keeps comments.
+ *
+ * A remediation can be mirrored from more than one platform, and only some
+ * platforms have a comment surface at all, so the first mapping whose module
+ * declares one wins. Nothing here names a platform: the mapping says which one
+ * it is, and the registry says what that platform can do.
+ */
+async function platformTargetFor(remediationId: string) {
+  const mappings = await prisma.externalRemediationMapping.findMany({
+    where: { itemId: remediationId },
+    select: {
+      externalId: true,
+      integration: { select: { id: true, platform: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  for (const mapping of mappings) {
+    const platform = mapping.integration.platform;
+    const comments = commentsApiFor(platform, ResourceType.Remediation);
+    const inquiries = inquiriesApiFor(platform, ResourceType.Remediation);
+    if (comments || inquiries) {
+      return {
+        comments,
+        inquiries,
+        externalId: mapping.externalId,
+        integrationId: mapping.integration.id,
+      };
+    }
+  }
+  return null;
+}
+
 export const remediationsRouter = createTRPCRouter({
+  /**
+   * Comments other hospitals left on this remediation, one page at a time.
+   *
+   * Returns an empty page rather than an error for a remediation no platform
+   * keeps comments for, because "no comment surface" is a normal state and the
+   * page renders the same either way.
+   */
+  /**
+   * Questions this hospital put to the manufacturer about this remediation.
+   *
+   * Private by construction: the platform scopes inquiries to the token that
+   * raised them, so this returns ours and never another consumer's.
+   */
+  getInquiries: protectedProcedure
+    .input(
+      z.object({
+        remediationId: z.string(),
+        cursor: z.string().nullish(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const target = await platformTargetFor(input.remediationId);
+      if (!target?.inquiries) {
+        return { items: [], nextCursor: null, supported: false };
+      }
+
+      const platformCtx = await loadIntegrationContext(target.integrationId);
+      const page = await target.inquiries.list(
+        platformCtx,
+        target.externalId,
+        input.cursor,
+      );
+      return { ...page, supported: true };
+    }),
+
+  /**
+   * Ask the manufacturer a question about this remediation.
+   *
+   * Attributed, unlike a comment: the platform knows which consumer asked,
+   * because the answer has to come back to somebody. Nothing is recorded on our
+   * side, since the platform already scopes the thread to us.
+   */
+  addInquiry: protectedProcedure
+    .input(
+      z.object({
+        remediationId: z.string(),
+        body: z.string().trim().min(1).max(10_000),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const target = await platformTargetFor(input.remediationId);
+      if (!target?.inquiries) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This remediation has no platform that accepts inquiries.",
+        });
+      }
+
+      const platformCtx = await loadIntegrationContext(target.integrationId);
+      return target.inquiries.create(platformCtx, target.externalId, {
+        body: input.body,
+      });
+    }),
+
+  getComments: protectedProcedure
+    .input(
+      z.object({
+        remediationId: z.string(),
+        cursor: z.string().nullish(),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      const target = await platformTargetFor(input.remediationId);
+      if (!target?.comments) {
+        return { items: [], nextCursor: null, supported: false };
+      }
+
+      const platformCtx = await loadIntegrationContext(target.integrationId);
+      const page = await target.comments.list(
+        platformCtx,
+        target.externalId,
+        input.cursor,
+      );
+
+      // The feed is deliberately anonymous, so the only way to know which
+      // comments are the caller's own is the pseudonym we recorded when they
+      // posted. Nothing here can identify anybody else.
+      const mine = await prisma.externalCommentIdentity.findMany({
+        where: {
+          userId: ctx.auth.user.id,
+          remediationId: input.remediationId,
+          integrationId: target.integrationId,
+        },
+        select: { pseudonym: true },
+      });
+      const minePseudonyms = new Set(mine.map((row) => row.pseudonym));
+
+      return {
+        ...page,
+        items: page.items.map((comment) => ({
+          ...comment,
+          isMine: minePseudonyms.has(comment.pseudonym),
+        })),
+        supported: true,
+      };
+    }),
+
+  /**
+   * Post a comment to the platform, as this user.
+   *
+   * The platform derives a pseudonym from `authorExternalUserId`, so the value
+   * must be stable for a given person forever: a change splits their thread in
+   * two on every reader's screen. `user.id` is stable by construction.
+   *
+   * Only we hold the mapping from that id back to a person, so if a hospital
+   * ever needs to prove authorship, this is the only side that can.
+   */
+  addComment: protectedProcedure
+    .input(
+      z.object({
+        remediationId: z.string(),
+        body: z.string().trim().min(1).max(10_000),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const target = await platformTargetFor(input.remediationId);
+      if (!target?.comments) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This remediation has no platform that accepts comments.",
+        });
+      }
+
+      const platformCtx = await loadIntegrationContext(target.integrationId);
+      const comment = await target.comments.create(
+        platformCtx,
+        target.externalId,
+        {
+          body: input.body,
+          authorExternalUserId: ctx.auth.user.id,
+        },
+      );
+
+      // The platform derives the same pseudonym for this person on this record
+      // every time, so an upsert keeps one row however often they comment.
+      await prisma.externalCommentIdentity.upsert({
+        where: {
+          userId_remediationId_integrationId: {
+            userId: ctx.auth.user.id,
+            remediationId: input.remediationId,
+            integrationId: target.integrationId,
+          },
+        },
+        create: {
+          userId: ctx.auth.user.id,
+          remediationId: input.remediationId,
+          integrationId: target.integrationId,
+          pseudonym: comment.pseudonym,
+        },
+        update: { pseudonym: comment.pseudonym },
+      });
+
+      return { ...comment, isMine: true };
+    }),
+
   // GET /api/remediations - List all remediations (any authenticated user can see all)
   getMany: protectedProcedure
     .input(paginationInputSchema)

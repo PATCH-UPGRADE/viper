@@ -97,8 +97,7 @@ export async function generateBriefing(
   try {
     return renderBriefing(await model.invoke(messages));
   } catch {
-    // ponytail: retries once on any parse failure (likely still ran over
-    // budget), not just truncation specifically.
+    // Retries once on any failure, not just truncation.
     return renderBriefing(
       await model.invoke([
         ...messages,

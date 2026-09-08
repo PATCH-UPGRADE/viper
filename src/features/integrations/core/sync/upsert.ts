@@ -1,5 +1,5 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: "any" allows us to reuse prisma client/models accross multiple files
-import "server-only";
+//import "server-only";
 import {
   type ArtifactType,
   type ResourceType,
@@ -107,7 +107,7 @@ export interface SyncConfig<
   TCreateData,
   TUpdateData,
   TModel extends { id: string },
-  TMappingModel extends { id: string; itemId?: string },
+  TMappingModel extends { id: string; itemId?: string | null },
 > {
   // Prisma model delegates
   model: Pick<PrismaDelegate<TModel>, "findFirst" | "create" | "update">;
@@ -152,7 +152,7 @@ export async function processIntegrationSync<
   TCreateData extends Record<string, any>,
   TUpdateData extends Record<string, any>,
   TModel extends { id: string },
-  TMappingModel extends { id: string; itemId?: string },
+  TMappingModel extends { id: string; itemId?: string | null },
 >(
   prisma: PrismaClientLike,
   config: SyncConfig<

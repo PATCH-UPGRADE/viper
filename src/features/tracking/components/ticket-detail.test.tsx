@@ -996,8 +996,11 @@ describe("TicketDetailContent — view mode", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Comment")).toBeInTheDocument();
 
-    // The status-change tagline is human-readable
-    expect(screen.getByText(/changed status from/i)).toBeInTheDocument();
+    // The status-change row reads as label, old badge, new badge
+    const statusEntry = screen.getByLabelText("Activity: STATUS_CHANGED");
+    expect(within(statusEntry).getByText("Status")).toBeInTheDocument();
+    expect(within(statusEntry).getByText("To Do")).toBeInTheDocument();
+    expect(within(statusEntry).getByText("In Progress")).toBeInTheDocument();
 
     // Asset label surfaces in the tagline
     expect(screen.getByText("host-icu-1")).toBeInTheDocument();
@@ -1047,6 +1050,27 @@ describe("TicketDetailContent — view mode", () => {
     // Known category still renders; the unknown priority is omitted (no crash).
     expect(within(entry).getByText("Category")).toBeInTheDocument();
     expect(within(entry).queryByText("Priority")).not.toBeInTheDocument();
+  });
+
+  it("renders a PRIORITY_CHANGED entry as label, old badge, new badge", () => {
+    renderDetail({
+      activities: [
+        {
+          id: "p1",
+          ticketId: "ticket-1",
+          userId: "u1",
+          type: "PRIORITY_CHANGED",
+          data: { from: "High", to: "Critical" },
+          createdAt: new Date("2026-05-15T12:00:00Z"),
+          user: { id: "u1", name: "Alice", image: null, integrationUser: null },
+        },
+      ],
+    });
+
+    const entry = screen.getByLabelText("Activity: PRIORITY_CHANGED");
+    expect(within(entry).getByText("Priority")).toBeInTheDocument();
+    expect(within(entry).getByText("High")).toBeInTheDocument();
+    expect(within(entry).getByText("Critical")).toBeInTheDocument();
   });
 });
 

@@ -8,7 +8,8 @@ import {
   isAutomationActor,
   type TimelineEntry,
 } from "@/components/activity-timeline";
-import { priorityConfig } from "@/components/priority-badge";
+import { FieldChange } from "@/components/field-change";
+import { PriorityBadge, priorityConfig } from "@/components/priority-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getChipClass } from "@/features/tag-colors/palette";
@@ -86,23 +87,35 @@ const renderActivity = (a: Activity): React.ReactNode => {
       return <WorkOrderCreatedBody activity={a} />;
     case "STATUS_CHANGED":
       return (
-        <>
-          changed status from <StatusChip status={data.from as TicketStatus} />{" "}
-          to <StatusChip status={data.to as TicketStatus} />
-        </>
+        <FieldChange
+          label="Status"
+          from={<StatusChip status={data.from as TicketStatus} />}
+          to={<StatusChip status={data.to as TicketStatus} />}
+        />
       );
     case "CATEGORY_CHANGED":
       return (
-        <>
-          changed category from{" "}
-          <Badge variant="outline">
-            {categoryLabels[data.from as TicketCategory]}
-          </Badge>{" "}
-          to{" "}
-          <Badge variant="outline">
-            {categoryLabels[data.to as TicketCategory]}
-          </Badge>
-        </>
+        <FieldChange
+          label="Category"
+          from={
+            <Badge variant="outline">
+              {categoryLabels[data.from as TicketCategory]}
+            </Badge>
+          }
+          to={
+            <Badge variant="outline">
+              {categoryLabels[data.to as TicketCategory]}
+            </Badge>
+          }
+        />
+      );
+    case "PRIORITY_CHANGED":
+      return (
+        <FieldChange
+          label="Priority"
+          from={<PriorityBadge priority={data.from as Priority} />}
+          to={<PriorityBadge priority={data.to as Priority} />}
+        />
       );
     case "ASSIGNEE_CHANGED": {
       const from = data.from as { name: string } | null;

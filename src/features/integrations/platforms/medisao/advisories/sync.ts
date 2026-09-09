@@ -16,6 +16,9 @@ import {
 } from "../watermarks";
 import { listChanged, type MedIsaoAdvisoryItem } from "./feed";
 
+/** How many stranded snapshots one sync will hand to the pipeline. */
+const MAX_PIPELINE_DISPATCH = 500;
+
 /**
  * Record what each advisory looked like on this poll.
  *
@@ -110,6 +113,31 @@ async function recordSnapshots(
 }
 
 /**
+ * Snapshots of this integration that never became a Notification.
+ *
+ * Derived from the database rather than from what this run happened to write.
+ * A failed `inngest.send` is otherwise unrecoverable: the snapshots are already
+ * stored, so the next run's `contentHash` dedup finds nothing new and never
+ * emits for them again, and they sit unprocessed with nothing reporting it.
+ *
+ * Asking the question this way also recovers a snapshot whose links were
+ * removed underneath it, which is what a database reset does.
+ */
+async function unprocessedSnapshotIds(
+  integrationId: string,
+): Promise<string[]> {
+  const records = await prisma.sourceRecord.findMany({
+    where: { mapping: { integrationId }, links: { none: {} } },
+    select: { id: true },
+    orderBy: { observedAt: "asc" },
+    // A bound, so a systemic failure cannot turn one sync into an unbounded
+    // send. Whatever is left is picked up on the next pass.
+    take: MAX_PIPELINE_DISPATCH,
+  });
+  return records.map((record) => record.id);
+}
+
+/**
  * Poll every channel this key can see and store the advisories that moved.
  *
  * The classify-and-triage pipeline is not run here. It is several model calls
@@ -157,18 +185,24 @@ export async function syncAdvisories(
     if (highest) nextWatermarks[channel.id] = highest.toISOString();
   }
 
-  const newSourceRecordIds = await recordSnapshots(items, ctx.integrationId);
+  await recordSnapshots(items, ctx.integrationId);
 
-  if (newSourceRecordIds.length > 0) {
+  const pending = await unprocessedSnapshotIds(ctx.integrationId);
+  if (pending.length > 0) {
     await inngest.send(
-      newSourceRecordIds.map((sourceRecordId) => ({
+      pending.map((sourceRecordId) => ({
         name: "inbox/source-record.recorded" as const,
+        // Idempotency key: re-emitting a snapshot whose run is already in
+        // flight must not put it through the pipeline, and its agents, twice.
+        id: `medisao-advisory-${sourceRecordId}`,
         data: { sourceRecordId },
       })),
     );
   }
 
-  // Advance the watermarks only behind a successful write: a throw above leaves
-  // the stored cursor alone, so the next attempt re-reads the same window.
+  // A throw anywhere above leaves the stored cursor alone, so the next attempt
+  // re-reads the same window. Nothing is lost by the send itself failing
+  // either: the snapshots are already stored, and the query above finds them
+  // again next time.
   return { cursor: nextWatermarks };
 }

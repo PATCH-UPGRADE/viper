@@ -35,18 +35,24 @@ export class MedIsaoRequestError extends Error {
 }
 
 /**
- * Where the next page may live.
+ * Refuse to call anything but the configured MedISAO origin.
  *
- * `next` arrives inside a response body, and the session puts the API key on
- * every request it makes. Following that link wherever it points would hand the
- * key to whoever wrote it, so a page is only ever followed back to the origin
- * the walk started from.
+ * The session puts the API key on every request it makes, so calling a url from
+ * anywhere else hands the key to whoever supplied it. Two callers supply one:
+ * a `next` link inside a response body, and a cursor a client hands us. Neither
+ * is trusted, so both come through here.
  */
-const sameOrigin = (candidate: string, origin: string): boolean => {
+const requireSameOrigin = (candidate: string, origin: string): void => {
+  let candidateOrigin: string | null = null;
   try {
-    return new URL(candidate).origin === origin;
+    candidateOrigin = new URL(candidate).origin;
   } catch {
-    return false;
+    candidateOrigin = null;
+  }
+  if (candidateOrigin !== origin) {
+    throw new Error(
+      `MedISAO paging tried to leave ${origin}. Refusing to follow ${candidate}.`,
+    );
   }
 };
 
@@ -55,12 +61,18 @@ const sameOrigin = (candidate: string, origin: string): boolean => {
  *
  * Separate from `walkPages` because a caller serving a person wants one page
  * and a cursor to come back with, not the whole collection drained.
+ *
+ * `allowedOrigin` is required rather than optional so a caller passing a url it
+ * did not build itself cannot forget to bound it.
  */
 export async function fetchPage<T>(
   session: Session,
   url: string,
   itemSchema: z.ZodType<T>,
+  allowedOrigin: string,
 ): Promise<{ items: T[]; next: string | null }> {
+  requireSameOrigin(url, allowedOrigin);
+
   const response = await session.request(url);
   if (!response.ok) {
     throw new MedIsaoRequestError(url, response.status, response.statusText);
@@ -90,14 +102,10 @@ export async function* walkPages<T>(
       session,
       url,
       itemSchema,
+      origin,
     );
     yield result.items;
-
-    if (result.next !== null && !sameOrigin(result.next, origin)) {
-      throw new Error(
-        `MedISAO paging tried to leave ${origin}. Refusing to follow ${result.next}.`,
-      );
-    }
+    // An off-origin `next` is refused by the fetch above, before it is called.
     url = result.next;
   }
 }

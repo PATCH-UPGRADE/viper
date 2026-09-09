@@ -79,9 +79,14 @@ import { cn } from "@/lib/utils";
 
 interface AIChatProps {
   config?: UseChatAgentConfig;
+  /**
+   * Drive the active thread from outside (the /reports route uses the URL).
+   * When set, the in-chat thread selector is hidden — navigation lives elsewhere.
+   */
+  controlledThreadId?: string;
 }
 
-export function AIChat({ config }: AIChatProps) {
+export function AIChat({ config, controlledThreadId }: AIChatProps) {
   const { data: session } = authClient.useSession();
   const user = session?.user ?? null;
 
@@ -94,7 +99,13 @@ export function AIChat({ config }: AIChatProps) {
     );
   }
 
-  return <ChatInner config={config} user={user} />;
+  return (
+    <ChatInner
+      config={config}
+      user={user}
+      controlledThreadId={controlledThreadId}
+    />
+  );
 }
 
 // ─── Message part helpers (AI SDK UIMessage parts) ────────────────────────────
@@ -946,9 +957,11 @@ function ThreadSelector({
 function ChatInner({
   config,
   user,
+  controlledThreadId,
 }: {
   config?: UseChatAgentConfig;
   user: ChatUser | null;
+  controlledThreadId?: string;
 }) {
   const {
     messages,
@@ -963,9 +976,8 @@ function ChatInner({
     switchThread,
     newThread,
     deleteThread,
-    refreshThreads,
     isLoadingHistory,
-  } = useViperChat(config);
+  } = useViperChat(config, controlledThreadId);
 
   const [input, setInput] = useState("");
   const [configOverride, setConfigOverride] =
@@ -987,7 +999,7 @@ function ChatInner({
     );
   }, [messages, status]);
 
-  const isDisabled = isAgentBusy || hasActiveQuestions;
+  const isDisabled = isLoadingHistory || isAgentBusy || hasActiveQuestions;
 
   const sendWithOverride = useCallback(
     (message: string, override?: Partial<UseChatAgentConfig>) => {
@@ -1027,69 +1039,72 @@ function ChatInner({
 
   const chatContent = (
     <div className="flex flex-col h-full">
-      <div className="bg-muted p-2 flex gap-2 justify-between">
-        <ThreadSelector
-          currentThreadId={currentThreadId}
-          selectThread={switchThread}
-          threads={threads}
-          threadsError={threadsError}
-          threadsLoading={threadsLoading}
-        />
-        <div>
-          <TooltipProvider>
-            {isFullscreen ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setIsFullscreen(false)}
-                  >
-                    <Minimize2 />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Exit fullscreen</TooltipContent>
-              </Tooltip>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" onClick={() => setIsFullscreen(true)}>
-                    <Fullscreen />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Fullscreen</TooltipContent>
-              </Tooltip>
-            )}
-
-            {currentThreadId && (
-              <>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" onClick={() => newThread()}>
-                      <MessageSquarePlus />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>New Chat</TooltipContent>
-                </Tooltip>
+      {/* /reports drives the thread from the URL — no in-chat selector there. */}
+      {!controlledThreadId && (
+        <div className="bg-muted p-2 flex gap-2 justify-between">
+          <ThreadSelector
+            currentThreadId={currentThreadId}
+            selectThread={switchThread}
+            threads={threads}
+            threadsError={threadsError}
+            threadsLoading={threadsLoading}
+          />
+          <div>
+            <TooltipProvider>
+              {isFullscreen ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="text-destructive hover:text-destructive"
-                      onClick={async () => {
-                        await deleteThread(currentThreadId);
-                        refreshThreads();
-                      }}
+                      onClick={() => setIsFullscreen(false)}
                     >
-                      <Trash2 />
+                      <Minimize2 />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Delete Thread</TooltipContent>
+                  <TooltipContent>Exit fullscreen</TooltipContent>
                 </Tooltip>
-              </>
-            )}
-          </TooltipProvider>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setIsFullscreen(true)}
+                    >
+                      <Fullscreen />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Fullscreen</TooltipContent>
+                </Tooltip>
+              )}
+
+              {currentThreadId && (
+                <>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" onClick={() => newThread()}>
+                        <MessageSquarePlus />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>New Chat</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => deleteThread(currentThreadId)}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Delete Thread</TooltipContent>
+                  </Tooltip>
+                </>
+              )}
+            </TooltipProvider>
+          </div>
         </div>
-      </div>
+      )}
       <div ref={containerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {isLoadingHistory ? (
           <ChatMessagesSkeletonList />

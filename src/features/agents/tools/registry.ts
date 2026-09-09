@@ -21,6 +21,7 @@ import { TicketCategory } from "@/generated/prisma";
 import { TOOL_REJECTED_PREFIX } from "../shared/build-graph";
 import { makeRecordNoteTool } from "./note-tool";
 import { makeQueryPlatformDataTool } from "./query-platform-tool";
+import { makeWriteReportTool } from "./report-tool";
 
 /** ```viper-ask-user ...``` block the chat UI parses to render question chips. */
 const askUserQuestions = tool(
@@ -213,12 +214,14 @@ Use this when the remediation is service work Siemens would perform — a firmwa
  * same set — `chat/graph.ts` and `recommendations/graph.ts` both call it — so a tool
  * added here is armed for all of them and must be described in each agent's prompt.
  */
-export function buildAgentTools(userId: string) {
+export function buildAgentTools(userId: string, reportThreadId?: string) {
   return [
     makeQueryPlatformDataTool(userId),
     askUserQuestions,
     listFleetManagedAssetsTool,
     proposeFleetWorkOrder,
     makeRecordNoteTool(userId),
+    // write_report only when given a thread to write to (chat yes, recommendations no).
+    ...(reportThreadId ? [makeWriteReportTool(userId, reportThreadId)] : []),
   ];
 }

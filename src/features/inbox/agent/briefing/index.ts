@@ -3,6 +3,7 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { planCardsSchema } from "@/features/inbox/agent/mitigation/schema";
 import {
   type Briefing,
+  type GeneratedBriefing,
   generatedBriefingSchema,
   renderBriefing,
 } from "./schema";
@@ -86,13 +87,26 @@ export async function generateBriefing(
 ): Promise<Briefing> {
   const model = new ChatAnthropic({
     model: MODEL,
-    maxTokens: 2000,
+    maxTokens: 8000, // 3 audiences x 3 fields of prose can run long
   }).withStructuredOutput(generatedBriefingSchema);
 
-  const generated = await model.invoke([
-    { role: "system", content: SYSTEM_PROMPT },
-    { role: "user", content: renderPlanPrompt(plan) },
-  ]);
+  const messages = [
+    { role: "system" as const, content: SYSTEM_PROMPT },
+    { role: "user" as const, content: renderPlanPrompt(plan) },
+  ];
 
+  let generated: GeneratedBriefing;
+  try {
+    generated = await model.invoke(messages);
+  } catch {
+    // Retries once on any failure, not just truncation.
+    generated = await model.invoke([
+      ...messages,
+      {
+        role: "user" as const,
+        content: "That didn't come through — answer again, more concisely.",
+      },
+    ]);
+  }
   return renderBriefing(generated);
 }

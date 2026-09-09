@@ -349,6 +349,8 @@ export const assetsRouter = createTRPCRouter({
       return createPaginatedResponse(items, meta);
     }),
 
+  // TODO: VW-511 -- full table load-and-merge: every asset plus all effective issues,
+  // worst case O(assets * vulnerabilities), on every dashboard load and status change
   getIssueMetricsInternal: protectedProcedure.query(async () => {
     const severities = Object.values(Severity);
 

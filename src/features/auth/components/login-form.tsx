@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { ErrorContext } from "better-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -27,6 +26,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
+import { getSafeRedirectPath } from "@/lib/auth-redirect";
 
 const loginSchema = z.object({
   email: z.email("Please enter a valid email address"),
@@ -38,13 +38,18 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 type LoginFormProps = {
   isVerified?: boolean;
   verificationEmailSent?: boolean;
+  next?: string;
 };
 
-export const handleSocialLogin = async (provider: "google" | "github") => {
+/** `callbackURL` must already be a safe app-relative path (see `getSafeRedirectPath`). */
+export const handleSocialLogin = async (
+  provider: "google" | "github",
+  callbackURL = "/",
+) => {
   await authClient.signIn.social(
     {
       provider,
-      callbackURL: "/",
+      callbackURL,
     },
     {
       onError: (ctx: ErrorContext) => {
@@ -57,8 +62,13 @@ export const handleSocialLogin = async (provider: "google" | "github") => {
 export function LoginForm({
   isVerified = false,
   verificationEmailSent = false,
+  next,
 }: LoginFormProps) {
-  const router = useRouter();
+  const safeNext = getSafeRedirectPath(next);
+  const callbackURL = safeNext ?? "/";
+  const signupHref = safeNext
+    ? `/signup?next=${encodeURIComponent(safeNext)}`
+    : "/signup";
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -69,16 +79,14 @@ export function LoginForm({
   });
 
   const onSubmit = async (values: LoginFormValues) => {
+    // Better Auth's client redirect plugin navigates to `callbackURL` on success.
     await authClient.signIn.email(
       {
         email: values.email,
         password: values.password,
-        callbackURL: "/",
+        callbackURL,
       },
       {
-        onSuccess: () => {
-          router.push("/");
-        },
         onError: (ctx: ErrorContext) => {
           toast.error(ctx.error.message);
         },
@@ -114,7 +122,7 @@ export function LoginForm({
                     className="w-full"
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleSocialLogin("google")}
+                    onClick={() => handleSocialLogin("google", callbackURL)}
                   >
                     <Image
                       alt="Google"
@@ -129,7 +137,7 @@ export function LoginForm({
                     className="w-full"
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleSocialLogin("github")}
+                    onClick={() => handleSocialLogin("github", callbackURL)}
                   >
                     <Image
                       alt="GitHub"
@@ -182,7 +190,10 @@ export function LoginForm({
 
                 <div className="text-center text-sm">
                   Don&apos;t have an account?{" "}
-                  <Link href="/signup" className="underline underline-offset-4">
+                  <Link
+                    href={signupHref}
+                    className="underline underline-offset-4"
+                  >
                     Sign up
                   </Link>
                 </div>

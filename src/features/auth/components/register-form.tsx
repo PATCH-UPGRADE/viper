@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { MIN_PASSWORD_LENGTH } from "@/config/constants";
 import { authClient } from "@/lib/auth-client";
+import { getSafeRedirectPath } from "@/lib/auth-redirect";
 import { handleSocialLogin } from "./login-form";
 
 const registerSchema = z
@@ -49,8 +50,18 @@ const registerSchema = z
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-export function RegisterForm() {
+type RegisterFormProps = {
+  next?: string;
+};
+
+export function RegisterForm({ next }: RegisterFormProps) {
   const router = useRouter();
+  const safeNext = getSafeRedirectPath(next);
+  // Append `next`, picking `?` or `&` so `/login?verified=1` stays well-formed.
+  const withNext = (path: string) =>
+    safeNext
+      ? `${path}${path.includes("?") ? "&" : "?"}next=${encodeURIComponent(safeNext)}`
+      : path;
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -62,16 +73,18 @@ export function RegisterForm() {
   });
 
   const onSubmit = async (values: RegisterFormValues) => {
+    // Push stays here (unlike login): verification is required, so Better Auth
+    // returns no redirect — `callbackURL` only seeds the verification email link.
     await authClient.signUp.email(
       {
         name: values.email,
         email: values.email,
         password: values.password,
-        callbackURL: "/login?verified=1",
+        callbackURL: withNext("/login?verified=1"),
       },
       {
         onSuccess: () => {
-          router.push("/login?verification_email_sent=1");
+          router.push(withNext("/login?verification_email_sent=1"));
         },
         onError: (ctx: ErrorContext) => {
           toast.error(ctx.error.message);
@@ -99,7 +112,7 @@ export function RegisterForm() {
                     className="w-full"
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleSocialLogin("google")}
+                    onClick={() => handleSocialLogin("google", safeNext ?? "/")}
                   >
                     <Image
                       alt="Google"
@@ -114,7 +127,7 @@ export function RegisterForm() {
                     className="w-full"
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleSocialLogin("github")}
+                    onClick={() => handleSocialLogin("github", safeNext ?? "/")}
                   >
                     <Image
                       alt="GitHub"
@@ -191,7 +204,10 @@ export function RegisterForm() {
                 </div>
                 <div className="text-center text-sm">
                   Already have an account?{" "}
-                  <Link href="/login" className="underline underline-offset-4">
+                  <Link
+                    href={withNext("/login")}
+                    className="underline underline-offset-4"
+                  >
                     Login
                   </Link>
                 </div>

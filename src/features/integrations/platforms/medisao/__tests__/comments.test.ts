@@ -80,6 +80,22 @@ describe("reading comments", () => {
 
   // Comments inherit the remediation's visibility exactly, so a manufacturer
   // unpublishing it is an empty list rather than a broken page.
+  // The cursor is client input, and the session signs every request with the
+  // API key. An unbounded cursor would send that key wherever the caller liked.
+  it("refuses a cursor pointing at another origin, before calling it", async () => {
+    await expect(
+      comments.list(ctx, REMEDIATION, "https://attacker.test/steal"),
+    ).rejects.toThrow(/Refusing to follow/);
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("refuses a cursor that is not a url at all", async () => {
+    await expect(comments.list(ctx, REMEDIATION, "not-a-url")).rejects.toThrow(
+      /Refusing to follow/,
+    );
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it("reads a vanished remediation as no comments", async () => {
     request.mockResolvedValue(new Response("", { status: 404 }));
 

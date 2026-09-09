@@ -51,7 +51,14 @@ export const inquiries: InquiriesApi<MedIsaoConfig, MedIsaoCreds> = {
       cursor ?? remediationInquiriesUrl(ctx.config.apiUrl, externalId);
 
     try {
-      const { items, next } = await fetchPage(session, url, rawInquirySchema);
+      // `url` may be a cursor the client sent, so it is bounded to the
+      // configured origin before the session signs a request with it.
+      const { items, next } = await fetchPage(
+        session,
+        url,
+        rawInquirySchema,
+        new URL(ctx.config.apiUrl).origin,
+      );
       return { items: items.map(toCanonical), nextCursor: next };
     } catch (error) {
       // Inquiries inherit the remediation's visibility, so an unpublished

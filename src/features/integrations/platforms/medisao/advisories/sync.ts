@@ -192,9 +192,6 @@ export async function syncAdvisories(
     await inngest.send(
       pending.map((sourceRecordId) => ({
         name: "inbox/source-record.recorded" as const,
-        // Idempotency key: re-emitting a snapshot whose run is already in
-        // flight must not put it through the pipeline, and its agents, twice.
-        id: `medisao-advisory-${sourceRecordId}`,
         data: { sourceRecordId },
       })),
     );

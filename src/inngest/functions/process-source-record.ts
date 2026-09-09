@@ -26,6 +26,9 @@ export const processSourceRecord = inngest.createFunction(
         where: { id: sourceRecordId },
         select: {
           raw: true,
+          // A snapshot is linked by the pipeline itself, so a link means this
+          // work already ran to completion.
+          links: { select: { id: true }, take: 1 },
           mapping: {
             select: { integration: { select: { platform: true } } },
           },
@@ -41,8 +44,17 @@ export const processSourceRecord = inngest.createFunction(
       return {
         raw: record.raw,
         platform: record.mapping.integration.platform,
+        alreadyProcessed: record.links.length > 0,
       };
     });
+
+    // The sync re-emits any snapshot that never became a Notification, so the
+    // same snapshot can arrive twice while its first run is still going. The
+    // event carries an idempotency key, but that is the queue's promise rather
+    // than ours, and a second run would pay for the agents all over again.
+    if (snapshot.alreadyProcessed) {
+      return { sourceRecordId, skipped: "already-processed" as const };
+    }
 
     const adapter = sourceAdapterFor(snapshot.platform);
     if (!adapter) {

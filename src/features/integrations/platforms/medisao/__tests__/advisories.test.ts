@@ -213,13 +213,17 @@ describe("syncAdvisories", () => {
     expect(strandedQuery.where.mapping).toEqual({ integrationId: "int-1" });
   });
 
-  it("gives each event an idempotency key, so a re-emit runs the pipeline once", async () => {
+  // A key derived from the snapshot is suppressed by the queue for the life of
+  // its dedup window, which is the same window this sync needs to retry in. A
+  // snapshot needing reprocessing later would be dropped and stranded again.
+  // `process-source-record` guards against a duplicate delivery instead.
+  it("sets no idempotency key, so a later retry is never suppressed", async () => {
     serve(["chan-1"], { "chan-1": page([advisory()]) });
 
     await syncAdvisories(ctx());
 
     const [[events]] = send.mock.calls;
-    expect(events[0].id).toBe("medisao-advisory-src-0");
+    expect(events[0]).not.toHaveProperty("id");
   });
 
   it("records a snapshot and wakes the pipeline for it", async () => {

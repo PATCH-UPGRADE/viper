@@ -50,6 +50,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.sourceRecord.findUnique.mockResolvedValue({
     raw: { anything: "the platform understands" },
+    links: [],
     mapping: { integration: { platform: "MEDISAO" } },
   });
   mockSourceAdapterFor.mockReturnValue({
@@ -87,6 +88,7 @@ describe("processSourceRecord", () => {
   it("works for any platform, naming none", async () => {
     mockPrisma.sourceRecord.findUnique.mockResolvedValue({
       raw: {},
+      links: [],
       mapping: { integration: { platform: "SOME_FUTURE_PLATFORM" } },
     });
 
@@ -101,9 +103,29 @@ describe("processSourceRecord", () => {
     await expect(run()).rejects.toThrow(/No SourceRecord src-1/);
   });
 
+  // The sync re-emits anything without a link, so a snapshot can arrive again
+  // while its first run is still going. Running the agents twice costs money.
+  it("does nothing for a snapshot that already produced a notification", async () => {
+    mockPrisma.sourceRecord.findUnique.mockResolvedValue({
+      raw: {},
+      links: [{ id: "link-1" }],
+      mapping: { integration: { platform: "MEDISAO" } },
+    });
+
+    const result = await run();
+
+    expect(result).toEqual({
+      sourceRecordId: "src-1",
+      skipped: "already-processed",
+    });
+    expect(mockRunPipeline).not.toHaveBeenCalled();
+    expect(mockSourceAdapterFor).not.toHaveBeenCalled();
+  });
+
   it("fails loudly on a snapshot with no integration behind it", async () => {
     mockPrisma.sourceRecord.findUnique.mockResolvedValue({
       raw: {},
+      links: [],
       mapping: null,
     });
     await expect(run()).rejects.toThrow(/no integration mapping/);

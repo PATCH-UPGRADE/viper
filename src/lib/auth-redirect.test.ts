@@ -24,6 +24,8 @@ describe("getSafeRedirectPath", () => {
       "http://evil.com",
       "//evil.com",
       "/\\evil.com",
+      "/\t//evil.com",
+      "/\n/evil.com",
       "javascript:alert(1)",
       "data:text/html,test",
       "mailto:test@example.com",

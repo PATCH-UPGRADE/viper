@@ -1,13 +1,18 @@
 /**
  * Sanitizes a `?next=` value into a same-origin redirect target, or `null`.
- * Rejects anything not starting with a single `/` — full URLs, schemes, and
- * `//` / `/\` (which browsers resolve as protocol-relative). No server-only
- * deps, so both server and client code can import it.
+ * Requires a single leading `/`, then resolves the value against a throwaway
+ * origin and rejects anything that escapes it: full URLs, schemes, `//host`,
+ * `/\host`, and control-character tricks like `/\t/host` that browsers collapse
+ * to `//`. No server-only deps, so both server and client code can import it.
  */
 export function getSafeRedirectPath(
   value: string | null | undefined,
 ): string | null {
-  return value?.startsWith("/") && value[1] !== "/" && value[1] !== "\\"
-    ? value
-    : null;
+  if (!value?.startsWith("/")) return null;
+  try {
+    const url = new URL(value, "http://x.invalid");
+    return url.origin === "http://x.invalid" ? url.pathname + url.search : null;
+  } catch {
+    return null;
+  }
 }

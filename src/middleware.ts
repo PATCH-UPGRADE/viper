@@ -19,7 +19,7 @@ export const middleware = (request: NextRequest) => {
 };
 
 export const config = {
-  // Skip API routes, Next internals, the Sentry tunnel (`/monitoring`), and any
-  // request for a file with an extension (static assets).
-  matcher: ["/((?!api|_next|monitoring|.*\\.[^/]+$).*)"],
+  // Skip API routes, Next internals, and the Sentry tunnel (`/monitoring`).
+  // Static assets are fine to pass through — the header is just ignored.
+  matcher: ["/((?!api/|_next/|monitoring$).*)"],
 };

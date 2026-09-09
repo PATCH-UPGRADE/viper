@@ -91,6 +91,24 @@ const serve = (
   });
 };
 
+/**
+ * `sourceRecord.findMany` serves two different questions in this sync: the
+ * newest hash per mapping, and which snapshots are still unprocessed. They are
+ * told apart by the `links` filter, so each test states them separately.
+ */
+const mockSourceRecordReads = ({
+  newest = [],
+  stranded = [],
+}: {
+  newest?: { mappingId: string; contentHash: string }[];
+  stranded?: { id: string }[];
+} = {}) => {
+  prismaMock.sourceRecord.findMany.mockImplementation(
+    async ({ where }: { where: Record<string, unknown> }) =>
+      "links" in where ? stranded : newest,
+  );
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.externalSourceRecordMapping.findMany.mockResolvedValue([]);
@@ -99,7 +117,9 @@ beforeEach(() => {
       data.map((row, i) => ({ id: `map-${i}`, externalId: row.externalId })),
   );
   prismaMock.externalSourceRecordMapping.updateMany.mockResolvedValue({});
-  prismaMock.sourceRecord.findMany.mockResolvedValue([]);
+  // A snapshot written by this run has no links yet, so the unprocessed query
+  // returns it. Tests that write nothing override this.
+  mockSourceRecordReads({ stranded: [{ id: "src-0" }] });
   prismaMock.sourceRecord.createManyAndReturn.mockImplementation(
     async ({ data }: { data: unknown[] }) =>
       data.map((_row, i) => ({ id: `src-${i}` })),
@@ -165,6 +185,43 @@ describe("the advisory feed", () => {
 });
 
 describe("syncAdvisories", () => {
+  // A failed send used to be unrecoverable: the snapshot is already stored, so
+  // the next run's hash dedup finds nothing new and never emits for it again.
+  it("wakes the pipeline for a stranded snapshot it did not write", async () => {
+    // Nothing arrives from the feed this run, so nothing is written. The
+    // stranded snapshot is from an earlier run whose send failed.
+    serve(["chan-1"], {});
+    mockSourceRecordReads({ stranded: [{ id: "stranded-1" }] });
+
+    await syncAdvisories(ctx());
+
+    expect(prismaMock.sourceRecord.createManyAndReturn).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledWith([
+      expect.objectContaining({ data: { sourceRecordId: "stranded-1" } }),
+    ]);
+  });
+
+  it("asks only for snapshots that never became a notification", async () => {
+    serve(["chan-1"], {});
+
+    await syncAdvisories(ctx());
+
+    const strandedQuery = prismaMock.sourceRecord.findMany.mock.calls
+      .map(([args]) => args)
+      .find((args) => "links" in args.where);
+    expect(strandedQuery.where.links).toEqual({ none: {} });
+    expect(strandedQuery.where.mapping).toEqual({ integrationId: "int-1" });
+  });
+
+  it("gives each event an idempotency key, so a re-emit runs the pipeline once", async () => {
+    serve(["chan-1"], { "chan-1": page([advisory()]) });
+
+    await syncAdvisories(ctx());
+
+    const [[events]] = send.mock.calls;
+    expect(events[0].id).toBe("medisao-advisory-src-0");
+  });
+
   it("records a snapshot and wakes the pipeline for it", async () => {
     serve(["chan-1"], { "chan-1": page([advisory()]) });
 
@@ -178,10 +235,10 @@ describe("syncAdvisories", () => {
     });
 
     expect(send).toHaveBeenCalledWith([
-      {
+      expect.objectContaining({
         name: "inbox/source-record.recorded",
         data: { sourceRecordId: "src-0" },
-      },
+      }),
     ]);
   });
 
@@ -199,9 +256,10 @@ describe("syncAdvisories", () => {
     prismaMock.externalSourceRecordMapping.findMany.mockResolvedValue([
       { id: "map-existing", externalId: LIVE_ADVISORY.id },
     ]);
-    prismaMock.sourceRecord.findMany.mockResolvedValue([
-      { mappingId: "map-existing", contentHash: written.contentHash },
-    ]);
+    mockSourceRecordReads({
+      newest: [{ mappingId: "map-existing", contentHash: written.contentHash }],
+      stranded: [],
+    });
     serve(["chan-1"], { "chan-1": page([advisory()]) });
 
     await syncAdvisories(ctx());
@@ -247,6 +305,7 @@ describe("syncAdvisories", () => {
       gone: () => new Response("", { status: 404 }),
       "chan-2": page([advisory({ id: "kept" })]),
     });
+    mockSourceRecordReads({ stranded: [] });
 
     const outcome = await syncAdvisories(ctx());
 
@@ -258,8 +317,9 @@ describe("syncAdvisories", () => {
     expect(outcome.cursor).not.toHaveProperty("gone");
   });
 
-  it("sends no event when nothing changed", async () => {
+  it("sends nothing when no snapshot is waiting", async () => {
     serve(["chan-1"], {});
+    mockSourceRecordReads({ stranded: [] });
 
     await syncAdvisories(ctx());
 

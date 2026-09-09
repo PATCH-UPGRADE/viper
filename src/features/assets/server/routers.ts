@@ -387,20 +387,46 @@ export const assetsRouter = createTRPCRouter({
     }
 
     for (const effectiveIssues of effectiveIssuesByAssetId.values()) {
-      for (const issue of effectiveIssues) {
-        const severityCounts = counts[issue.vulnerability.severity];
-        const hasRemediation = issue.vulnerability._count.remediations > 0;
-
-        if (issue.status === IssueStatus.AFFECTED) {
-          severityCounts.active++;
-          totals.active++;
-          if (hasRemediation) {
-            severityCounts.activeWithRemediations++;
-            totals.activeWithRemediations++;
-          }
-        } else if (issue.status === IssueStatus.FIXED) {
-          severityCounts.remediated++;
-          totals.remediated++;
+      const activeIssues = effectiveIssues.filter(
+        (issue) => issue.status === IssueStatus.AFFECTED,
+      );
+      if (activeIssues.length > 0) {
+        totals.active++;
+      }
+      if (
+        activeIssues.some(
+          (issue) => issue.vulnerability._count.remediations > 0,
+        )
+      ) {
+        totals.activeWithRemediations++;
+      }
+      if (effectiveIssues.some((issue) => issue.status === IssueStatus.FIXED)) {
+        totals.remediated++;
+      }
+      for (const severity of severities) {
+        const activeOfSeverity = effectiveIssues.filter(
+          (issue) =>
+            issue.status === IssueStatus.AFFECTED &&
+            issue.vulnerability.severity === severity,
+        );
+        if (activeOfSeverity.length > 0) {
+          counts[severity].active++;
+        }
+        if (
+          activeOfSeverity.some(
+            (issue) => issue.vulnerability._count.remediations > 0,
+          )
+        ) {
+          counts[severity].activeWithRemediations++;
+        }
+        if (
+          effectiveIssues.some(
+            (issue) =>
+              issue.status === IssueStatus.FIXED &&
+              issue.vulnerability.severity === severity,
+          )
+        ) {
+          counts[severity].remediated++;
         }
       }
     }

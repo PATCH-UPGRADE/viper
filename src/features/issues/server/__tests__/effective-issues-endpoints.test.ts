@@ -185,33 +185,8 @@ describe("assets.getManyDashboardInternal — effective issues per row", () => {
   });
 });
 
-describe("assets.getIssueMetricsInternal — effective issue counts", () => {
-  const unremediatedVulnerability = {
-    ...vulnerability,
-    id: "vuln-2",
-    cveId: "CVE-2026-BAR",
-    _count: { remediations: 0 },
-  };
-
-  const fiveAssetFleet = () => {
-    mockPrisma.asset.findMany.mockResolvedValue(
-      ["a1", "a2", "a3", "a4", "a5"].map(makeAsset),
-    );
-  };
-
-  const assetLevelIssue = (
-    id: string,
-    assetId: string,
-    overrides: Record<string, unknown>,
-  ) => ({
-    ...FLEET_ISSUE,
-    id,
-    assetId,
-    deviceGroupMatchingId: null,
-    ...overrides,
-  });
-
-  it("counts one instance per affected asset and honors the override", async () => {
+describe("assets.getIssueMetricsInternal — affected-asset counts", () => {
+  it("counts assets, not issue rows, and honors the override", async () => {
     const { assets } = setup();
 
     const metrics = await assets.getIssueMetricsInternal();
@@ -228,41 +203,28 @@ describe("assets.getIssueMetricsInternal — effective issue counts", () => {
     });
   });
 
-  it("counts every effective issue instance across the fleet the rule covers", async () => {
-    fiveAssetFleet();
+  it("does not double-count a machine affected at two severities in the totals", async () => {
+    const highVulnerability = {
+      ...vulnerability,
+      id: "vuln-2",
+      severity: "High",
+    };
     mockPrisma.issue.findMany.mockResolvedValue([
       FLEET_ISSUE,
-      assetLevelIssue("issue-a1-fixed", "a1", { status: IssueStatus.FIXED }),
-      assetLevelIssue("issue-a2-extra", "a2", {
+      {
+        ...FLEET_ISSUE,
+        id: "issue-fleet-high",
         vulnerabilityId: "vuln-2",
-        vulnerability: unremediatedVulnerability,
-      }),
+        vulnerability: highVulnerability,
+      },
     ]);
     const { assets } = setup();
 
     const metrics = await assets.getIssueMetricsInternal();
 
-    expect(metrics.Critical.active).toBe(5);
-    expect(metrics.Critical.activeWithRemediations).toBe(4);
-    expect(metrics.Critical.remediated).toBe(1);
-  });
-
-  it("moves every covered asset to remediated when the fleet issue is fixed", async () => {
-    fiveAssetFleet();
-    mockPrisma.issue.findMany.mockResolvedValue([
-      { ...FLEET_ISSUE, status: IssueStatus.FIXED },
-      assetLevelIssue("issue-a1-fixed", "a1", { status: IssueStatus.FIXED }),
-      assetLevelIssue("issue-a2-extra", "a2", {
-        vulnerabilityId: "vuln-2",
-        vulnerability: unremediatedVulnerability,
-      }),
-    ]);
-    const { assets } = setup();
-
-    const metrics = await assets.getIssueMetricsInternal();
-
-    expect(metrics.Critical.remediated).toBe(5);
-    expect(metrics.Critical.active).toBe(1);
+    expect(metrics.Critical.active).toBe(3);
+    expect(metrics.High.active).toBe(3);
+    expect(metrics.totals.active).toBe(3);
   });
 });
 

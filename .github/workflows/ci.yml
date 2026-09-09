@@ -86,7 +86,10 @@ jobs:
         run: npm ci
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: [
+          sudo rm -f /etc/apt/sources.list.d/google-chrome
+          npx playwright install --with-deps chromium
+        ]
 
       - name: Run database migrations
         run: npx prisma migrate deploy

@@ -1,13 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 /**
- * Records the requested path (pathname + query string) on an internal request
- * header so server components — specifically `requireAuth()` — can send a
- * logged-out user to `/login?next=…` and back to where they started.
- *
- * This is the whole job: no session checks, no Prisma, no redirects. Middleware
- * runs on the Edge runtime where the real auth check (Prisma) can't run, so that
- * decision stays in `requireAuth()` / `requireUnauth()`.
+ * Records the requested path on an internal header so `requireAuth()` can bounce
+ * a logged-out user to `/login?next=…` and back. No session/Prisma/redirect
+ * logic here — that stays in `requireAuth()`, which the Edge runtime can't run.
  */
 export const middleware = (request: NextRequest) => {
   const headers = new Headers(request.headers);
@@ -19,7 +15,7 @@ export const middleware = (request: NextRequest) => {
 };
 
 export const config = {
-  // Skip API routes, Next internals, and the Sentry tunnel (`/monitoring`).
-  // Static assets are fine to pass through — the header is just ignored.
+  // Skip API routes, Next internals, and the Sentry tunnel; static assets can
+  // pass through harmlessly (the header is just ignored).
   matcher: ["/((?!api/|_next/|monitoring$).*)"],
 };

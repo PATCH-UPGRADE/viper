@@ -57,7 +57,7 @@ type RegisterFormProps = {
 export function RegisterForm({ next }: RegisterFormProps) {
   const router = useRouter();
   const safeNext = getSafeRedirectPath(next);
-  // Append `next`, picking `?` or `&` so `/login?verified=1` stays well-formed.
+  // Append `next`, choosing `?` or `&` for the separator.
   const withNext = (path: string) =>
     safeNext
       ? `${path}${path.includes("?") ? "&" : "?"}next=${encodeURIComponent(safeNext)}`
@@ -73,8 +73,8 @@ export function RegisterForm({ next }: RegisterFormProps) {
   });
 
   const onSubmit = async (values: RegisterFormValues) => {
-    // Push stays here (unlike login): verification is required, so Better Auth
-    // returns no redirect — `callbackURL` only seeds the verification email link.
+    // Unlike login, keep the push: verification is on, so signUp returns no
+    // redirect — `callbackURL` only seeds the verification email link.
     await authClient.signUp.email(
       {
         name: values.email,

@@ -34,10 +34,9 @@ export const verifyApiKey = async (req: Request | undefined) => {
 };
 
 /**
- * Requires authentication and returns the session.
- * Redirects an unauthenticated user to /login, preserving the page they were
- * trying to reach as `?next=` (from the `x-viper-request-path` header set by
- * middleware). Falls back to a bare /login if the header is absent.
+ * Requires authentication and returns the session. Redirects an unauthenticated
+ * user to `/login?next=<current path>` (from the `x-viper-request-path` header
+ * set by middleware), or a bare `/login` if that header is absent.
  */
 export const requireAuth = async () => {
   const session = await getSession();
@@ -53,10 +52,9 @@ export const requireAuth = async () => {
 };
 
 /**
- * Requires NO authentication.
- * Redirects an authenticated user to `next` (validated as an app-relative path)
- * or / otherwise. `next` carries a user through the login → signup → email
- * verification → auto-sign-in chain back to their original destination.
+ * Requires NO authentication. Redirects an authenticated user to `next` (a
+ * validated app-relative path) or `/` — this is what carries the destination
+ * through the signup → verification → auto-sign-in chain.
  */
 export const requireUnauth = async (next?: string) => {
   const session = await getSession();

@@ -1,9 +1,8 @@
 /**
- * Sanitizes a `?next=` value into a same-origin redirect target, or `null`.
- * Requires a single leading `/`, then resolves the value against a throwaway
- * origin and rejects anything that escapes it: full URLs, schemes, `//host`,
- * `/\host`, and control-character tricks like `/\t/host` that browsers collapse
- * to `//`. No server-only deps, so both server and client code can import it.
+ * Turns a `?next=` value into a same-origin path, or `null`. Resolving against a
+ * throwaway origin rejects anything that escapes it — full URLs, `//host`,
+ * `/\host`, and tab/newline tricks browsers collapse to `//`. No server-only
+ * deps, so client and server can both import it.
  */
 export function getSafeRedirectPath(
   value: string | null | undefined,

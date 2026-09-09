@@ -3,6 +3,7 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { planCardsSchema } from "@/features/inbox/agent/mitigation/schema";
 import {
   type Briefing,
+  type GeneratedBriefing,
   generatedBriefingSchema,
   renderBriefing,
 } from "./schema";
@@ -94,18 +95,18 @@ export async function generateBriefing(
     { role: "user" as const, content: renderPlanPrompt(plan) },
   ];
 
+  let generated: GeneratedBriefing;
   try {
-    return renderBriefing(await model.invoke(messages));
+    generated = await model.invoke(messages);
   } catch {
     // Retries once on any failure, not just truncation.
-    return renderBriefing(
-      await model.invoke([
-        ...messages,
-        {
-          role: "user" as const,
-          content: "That didn't come through — answer again, more concisely.",
-        },
-      ]),
-    );
+    generated = await model.invoke([
+      ...messages,
+      {
+        role: "user" as const,
+        content: "That didn't come through — answer again, more concisely.",
+      },
+    ]);
   }
+  return renderBriefing(generated);
 }

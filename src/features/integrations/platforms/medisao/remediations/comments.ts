@@ -53,7 +53,14 @@ export const comments: CommentsApi<MedIsaoConfig, MedIsaoCreds> = {
     const url = cursor ?? remediationCommentsUrl(ctx.config.apiUrl, externalId);
 
     try {
-      const { items, next } = await fetchPage(session, url, rawCommentSchema);
+      // `url` may be a cursor the client sent, so it is bounded to the
+      // configured origin before the session signs a request with it.
+      const { items, next } = await fetchPage(
+        session,
+        url,
+        rawCommentSchema,
+        new URL(ctx.config.apiUrl).origin,
+      );
       return { items: items.map(toCanonical), nextCursor: next };
     } catch (error) {
       // Comments inherit the remediation's visibility exactly. A manufacturer

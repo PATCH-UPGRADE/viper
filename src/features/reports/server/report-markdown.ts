@@ -50,14 +50,14 @@ function pushList(
   for (const item of list.children) {
     const marker = ordered ? `${n}.` : "•";
     n += 1;
-    for (const child of item.children) {
+    for (const [i, child] of item.children.entries()) {
       if (child.type === "list") {
         pushList(blocks, child); // ponytail: nested lists lose their indent
       } else {
         blocks.push({
           type: "listItem",
           ordered,
-          marker,
+          marker: i === 0 ? marker : "", // one marker per item, not per block
           spans:
             child.type === "code"
               ? [{ text: child.value }]

@@ -63,9 +63,12 @@ export const chatRouter = createTRPCRouter({
   getUIMessages: protectedProcedure
     .input(z.object({ threadId: z.string() }))
     .query(async ({ input, ctx }) => {
-      await prisma.chatThread.findUniqueOrThrow({
+      // A fresh /reports thread has no row yet — no history, not an error.
+      const thread = await prisma.chatThread.findFirst({
         where: { id: input.threadId, userId: ctx.auth.user.id },
+        select: { id: true },
       });
+      if (!thread) return { messages: [] };
       const rows = await prisma.chatMessage.findMany({
         where: { threadId: input.threadId },
         orderBy: { createdAt: "asc" },

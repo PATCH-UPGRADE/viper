@@ -9,10 +9,8 @@
  * text-only hydration is both safe and sufficient. `toolCalls` is still
  * persisted for the UI to render.
  *
- * Access model (INTENTIONAL — do not "harden"): these functions key off the
- * client-supplied `threadId` and are NOT scoped to `userId` — `ensureThread`
- * upserts by id alone, and `loadHistoryMessages`/`saveUserMessage` trust the
- * threadId as given.
+ * Call ensureThread first to authorize the thread before loading its report
+ * or using the threadId-only message helpers below.
  */
 import "server-only";
 import {
@@ -28,10 +26,8 @@ export async function ensureThread(
   userId: string,
   firstUserContent: string,
 ): Promise<{ report: string | null }> {
-  // Keyed by threadId only, no userId scope — intentional (see access-model
-  // note in the file header).
   return prisma.chatThread.upsert({
-    where: { id: threadId },
+    where: { id: threadId, userId },
     update: { updatedAt: new Date() },
     create: {
       id: threadId,

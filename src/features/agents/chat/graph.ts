@@ -9,7 +9,6 @@ import { buildAgentGraph } from "../shared/build-graph";
 import { loadPersistentNotesMarkdown } from "../shared/notes-preload";
 import { PLATFORM_CATALOG } from "../tools/query-platform-tool";
 import { buildAgentTools } from "../tools/registry";
-import { makeWriteReportTool } from "../tools/report-tool";
 
 const CHAT_MODEL = "claude-haiku-4-5-20251001";
 
@@ -106,12 +105,8 @@ export function buildChatGraph({
   report?: string | null;
   loadNotes?: () => Promise<string>;
 }) {
-  // write_report is chat-only — the recommendations graph calls buildAgentTools
-  // directly and never gets it.
-  const tools = [
-    ...buildAgentTools(userId),
-    makeWriteReportTool(userId, threadId),
-  ];
+  // Passing threadId adds write_report; the recommendations graph omits it.
+  const tools = buildAgentTools(userId, threadId);
   const model = new ChatAnthropic({
     model: CHAT_MODEL,
     maxTokens: 4096,

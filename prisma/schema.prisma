@@ -1126,6 +1126,8 @@ model ChatThread {
   messages  ChatMessage[]
 
   @@index([userId])
+  // /reports listing: filter by user, sort by updatedAt.
+  @@index([userId, updatedAt(sort: Desc)])
 }
 
 enum ChatMessageStatus {

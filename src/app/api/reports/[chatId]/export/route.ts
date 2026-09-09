@@ -1,9 +1,8 @@
+// Plain route handler, not tRPC — needs to set Content-Disposition on a binary download.
 import { renderReportDocx } from "@/features/reports/server/report-docx";
 import { renderReportPdf } from "@/features/reports/server/report-pdf";
 import { getSession } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
-
-export const runtime = "nodejs";
 
 const FORMATS = {
   pdf: {
@@ -35,10 +34,10 @@ export async function GET(
   }
 
   const format = new URL(req.url).searchParams.get("format") ?? "pdf";
-  const spec = FORMATS[format as keyof typeof FORMATS];
-  if (!spec) {
+  if (!Object.hasOwn(FORMATS, format)) {
     return new Response("Unknown format", { status: 400 });
   }
+  const spec = FORMATS[format as keyof typeof FORMATS];
 
   const { chatId } = await params;
   const thread = await prisma.chatThread.findFirst({
@@ -54,6 +53,8 @@ export async function GET(
     headers: {
       "Content-Type": spec.contentType,
       "Content-Disposition": `attachment; filename="${slug(thread.title)}.${format}"`,
+      // Contains patient/facility data — keep it out of shared/disk caches.
+      "Cache-Control": "private, no-store, max-age=0",
     },
   });
 }

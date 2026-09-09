@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, getToolName, isToolUIPart } from "ai";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useChatUI } from "@/features/chat/context/chat-panel-context";
@@ -40,6 +40,20 @@ export function useViperChat(
       void queryClient.invalidateQueries(trpc.chat.pathFilter());
     },
   });
+
+  const completedReportWrites = messages
+    .flatMap((message) => message.parts)
+    .filter(
+      (part) =>
+        isToolUIPart(part) &&
+        getToolName(part) === "write_report" &&
+        part.state === "output-available",
+    ).length;
+  useEffect(() => {
+    if (completedReportWrites) {
+      void queryClient.invalidateQueries(trpc.chat.pathFilter());
+    }
+  }, [completedReportWrites, queryClient, trpc.chat]);
 
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
@@ -106,11 +120,11 @@ export function useViperChat(
     [queryClient, trpc.chat.getUIMessages, setMessages],
   );
 
-  // Load history for the controlled starting thread once on mount — the
-  // caller remounts (via `key`) when navigating between reports.
+  // Load the controlled thread's history when its id changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: switchThread is a stable useCallback
   useEffect(() => {
     if (controlledThreadId) void switchThread(controlledThreadId);
-  }, [controlledThreadId, switchThread]);
+  }, [controlledThreadId]);
 
   const newThread = useCallback(() => {
     setCurrentThreadId(null);

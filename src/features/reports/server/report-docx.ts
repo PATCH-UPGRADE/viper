@@ -7,7 +7,7 @@ import {
   Paragraph,
   TextRun,
 } from "docx";
-import { getApiUrl } from "@/lib/url-utils";
+import { toAbsoluteUrl } from "@/lib/url-utils";
 import {
   type InlineSpan,
   parseReportMarkdown,
@@ -24,16 +24,12 @@ const HEADING: Record<number, Level> = {
   6: HeadingLevel.HEADING_6,
 };
 
-function absolute(href: string): string {
-  return /^https?:\/\//.test(href) ? href : getApiUrl(href);
-}
-
 function runs(spans: InlineSpan[]): (TextRun | ExternalHyperlink)[] {
   return spans.map((s) => {
     if (s.text === "\n") return new TextRun({ break: 1 });
     if (s.href) {
       return new ExternalHyperlink({
-        link: absolute(s.href),
+        link: toAbsoluteUrl(s.href),
         children: [new TextRun({ text: s.text, style: "Hyperlink" })],
       });
     }

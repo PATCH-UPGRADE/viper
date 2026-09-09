@@ -71,6 +71,7 @@ export async function POST(req: Request) {
   const userText = textOf(newUserMessage);
   const threadId = body.threadId ?? crypto.randomUUID();
   const { agent, assetData, vulnerabilityData } = body;
+  let userMessageSaved = false;
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
@@ -84,6 +85,7 @@ export async function POST(req: Request) {
       // (authoritative — we don't trust client-side message state).
       const thread = await ensureThread(threadId, userId, userText);
       await saveUserMessage(threadId, newUserMessage.id, userText);
+      userMessageSaved = true;
       const history = await loadHistoryMessages(threadId);
 
       const graph =
@@ -107,6 +109,7 @@ export async function POST(req: Request) {
     onError: (error) =>
       error instanceof Error ? error.message : String(error),
     onFinish: async ({ responseMessage }) => {
+      if (!userMessageSaved) return;
       const { content, toolCalls } = splitAssistant(responseMessage);
       if (content.trim() || toolCalls.length) {
         await saveAssistantMessage(threadId, content, toolCalls);

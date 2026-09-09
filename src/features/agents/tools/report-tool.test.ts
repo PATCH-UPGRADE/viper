@@ -80,6 +80,24 @@ describe("write_report", () => {
     expect(prisma.chatThread.updateMany).not.toHaveBeenCalled();
   });
 
+  it("validates titled and reference citations without rewriting code examples", async () => {
+    vi.mocked(prisma.asset.findMany).mockResolvedValue([]);
+    const markdown =
+      '[**Missing**](/assets/missing "Device") and [Missing][device].\n\n[device]: /assets/missing\n\n`[Example](/assets/example)`';
+    await makeWriteReportTool("user", "thread").invoke({ markdown });
+    expect(prisma.chatThread.updateMany).toHaveBeenCalledWith({
+      where: { id: "thread", userId: "user" },
+      data: {
+        report:
+          "**Missing** and Missing.\n\n[device]: /assets/missing\n\n`[Example](/assets/example)`",
+      },
+    });
+    expect(prisma.asset.findMany).toHaveBeenCalledExactlyOnceWith({
+      where: { id: { in: ["missing"] } },
+      select: { id: true },
+    });
+  });
+
   it("does not report success when the thread is missing or belongs to another user", async () => {
     vi.mocked(prisma.chatThread.updateMany).mockResolvedValue({ count: 0 });
     const result = await makeWriteReportTool("user", "thread").invoke({

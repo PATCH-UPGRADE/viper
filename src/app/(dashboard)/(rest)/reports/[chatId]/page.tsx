@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { ErrorView, LoadingView } from "@/components/entity-components";
 import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import { ReportDetail } from "@/features/reports/components/report-detail";
 import { HydrateClient, prefetch, trpc } from "@/trpc/server";
@@ -16,13 +17,9 @@ const Page = async ({ params }: PageProps) => {
   return (
     <HydrateClient>
       <ReportingErrorBoundary
-        fallback={
-          <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
-            Couldn&apos;t load this report.
-          </div>
-        }
+        fallback={<ErrorView message="Couldn't load this report." />}
       >
-        <Suspense fallback={<div className="flex-1" />}>
+        <Suspense fallback={<LoadingView message="Loading report…" />}>
           <ReportDetail chatId={chatId} />
         </Suspense>
       </ReportingErrorBoundary>

@@ -41,15 +41,14 @@ type LoginFormProps = {
   next?: string;
 };
 
-/** `callbackURL` must already be a safe app-relative path (see `getSafeRedirectPath`). */
 export const handleSocialLogin = async (
   provider: "google" | "github",
-  callbackURL = "/",
+  next?: string,
 ) => {
   await authClient.signIn.social(
     {
       provider,
-      callbackURL,
+      callbackURL: getSafeRedirectPath(next) ?? "/",
     },
     {
       onError: (ctx: ErrorContext) => {
@@ -120,7 +119,7 @@ export function LoginForm({
                     className="w-full"
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleSocialLogin("google", callbackURL)}
+                    onClick={() => handleSocialLogin("google", next)}
                   >
                     <Image
                       alt="Google"
@@ -135,7 +134,7 @@ export function LoginForm({
                     className="w-full"
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleSocialLogin("github", callbackURL)}
+                    onClick={() => handleSocialLogin("github", next)}
                   >
                     <Image
                       alt="GitHub"

@@ -68,8 +68,7 @@ export function RegisterForm({ next }: RegisterFormProps) {
   });
 
   const onSubmit = async (values: RegisterFormValues) => {
-    // Unlike login, keep the push: verification is on, so signUp returns no
-    // redirect — `callbackURL` only seeds the verification email link.
+    // Verification is required, so signUp returns no redirect — navigate here.
     await authClient.signUp.email(
       {
         name: values.email,
@@ -109,7 +108,7 @@ export function RegisterForm({ next }: RegisterFormProps) {
                     className="w-full"
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleSocialLogin("google", safeNext ?? "/")}
+                    onClick={() => handleSocialLogin("google", next)}
                   >
                     <Image
                       alt="Google"
@@ -124,7 +123,7 @@ export function RegisterForm({ next }: RegisterFormProps) {
                     className="w-full"
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleSocialLogin("github", safeNext ?? "/")}
+                    onClick={() => handleSocialLogin("github", next)}
                   >
                     <Image
                       alt="GitHub"

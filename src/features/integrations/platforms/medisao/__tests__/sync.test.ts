@@ -194,6 +194,36 @@ describe("syncRemediations", () => {
     expect(processIntegrationSync).not.toHaveBeenCalled();
   });
 
+  // A partial failure does not throw: the ingest helper collects per-item
+  // errors and reports shouldRetry. Advancing past them would drop them.
+  it("holds the watermark when some items failed to land", async () => {
+    serve([{ id: "chan-1" }], {
+      "chan-1": page([remediation({ updated_at: "2026-09-01T00:00:00.000Z" })]),
+    });
+    processIntegrationSync.mockResolvedValue({
+      message: "1 of 1 items failed: boom",
+      shouldRetry: true,
+    });
+
+    const outcome = await syncRemediations(
+      ctx({ cursor: { "chan-1": "2026-08-01T00:00:00.000Z" } }),
+    );
+
+    expect(outcome.cursor).toEqual({ "chan-1": "2026-08-01T00:00:00.000Z" });
+  });
+
+  it("advances the watermark when every item landed", async () => {
+    serve([{ id: "chan-1" }], {
+      "chan-1": page([remediation({ updated_at: "2026-09-01T00:00:00.000Z" })]),
+    });
+
+    const outcome = await syncRemediations(
+      ctx({ cursor: { "chan-1": "2026-08-01T00:00:00.000Z" } }),
+    );
+
+    expect(outcome.cursor).toEqual({ "chan-1": "2026-09-01T00:00:00.000Z" });
+  });
+
   it("does not ingest when nothing changed", async () => {
     serve([{ id: "chan-1" }], {});
 
@@ -244,6 +274,39 @@ describe("the ingest mapping", () => {
     });
     expect(createData.deviceGroupMatchings).toEqual({
       connect: [{ id: "matching-1" }],
+    });
+  });
+
+  // Every part of the key is free text, so a separator-joined key would let
+  // "A B"+"C" and "A"+"B C" share one cache entry and one device group.
+  it("does not confuse two identities whose parts differ only by spacing", async () => {
+    serve([{ id: "chan-1" }], {
+      "chan-1": page([
+        remediation({
+          id: "a",
+          channel: { vendor: "Acme Medical", product: "Pump" },
+        }),
+        remediation({
+          id: "b",
+          channel: { vendor: "Acme", product: "Medical Pump" },
+        }),
+      ]),
+    });
+    resolveMatchingId
+      .mockResolvedValueOnce("matching-a")
+      .mockResolvedValueOnce("matching-b");
+
+    await syncRemediations(ctx());
+    const [, config, input] = processIntegrationSync.mock.calls[0];
+    const first = await config.transformInputItem(input.items[0], "u");
+    const second = await config.transformInputItem(input.items[1], "u");
+
+    expect(resolveMatchingId).toHaveBeenCalledTimes(2);
+    expect(first.createData.deviceGroupMatchings).toEqual({
+      connect: [{ id: "matching-a" }],
+    });
+    expect(second.createData.deviceGroupMatchings).toEqual({
+      connect: [{ id: "matching-b" }],
     });
   });
 

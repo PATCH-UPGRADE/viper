@@ -85,12 +85,15 @@ async function ingestRemediations(
       // consecutiveFailures.
       shouldRecordSyncOutcome: false,
       transformInputItem: async (item: MedIsaoRemediationItem, userId) => {
-        const identity = [
+        // JSON rather than a joined string: every part is free text, so any
+        // separator can appear inside one and let two different identities
+        // collide on one cache entry.
+        const identity = JSON.stringify([
           item.manufacturer,
           item.product ?? "",
           item.version ?? "",
           item.versionRange ?? "",
-        ].join(" ");
+        ]);
 
         let matchingId = matchingIdCache.get(identity);
         if (!matchingId) {
@@ -196,9 +199,20 @@ export async function syncRemediations(
     if (highest) nextWatermarks[channel.id] = highest.toISOString();
   }
 
-  // Advance the watermarks only behind a successful ingest: a throw here leaves
-  // the stored cursor alone, so the next attempt re-reads the same window.
-  if (items.length > 0) await ingestRemediations(items, ctx.integrationId);
+  // Advance the watermarks only behind a clean ingest.
+  //
+  // A throw leaves the stored cursor alone by itself, but a partial failure
+  // does not throw: `processIntegrationSync` collects per-item errors and
+  // reports `shouldRetry` instead. Advancing past those items would drop them
+  // for good, so the whole window is re-read next time. Re-reading is free,
+  // because every write behind this is an upsert keyed on the external id.
+  if (items.length > 0) {
+    const outcome = await ingestRemediations(items, ctx.integrationId);
+    if (outcome.shouldRetry) {
+      console.warn(`MedISAO remediation ingest incomplete: ${outcome.message}`);
+      return { cursor: watermarks };
+    }
+  }
 
   return { cursor: nextWatermarks };
 }

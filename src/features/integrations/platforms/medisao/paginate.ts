@@ -34,12 +34,29 @@ export class MedIsaoRequestError extends Error {
   }
 }
 
+/**
+ * Where the next page may live.
+ *
+ * `next` arrives inside a response body, and the session puts the API key on
+ * every request it makes. Following that link wherever it points would hand the
+ * key to whoever wrote it, so a page is only ever followed back to the origin
+ * the walk started from.
+ */
+const sameOrigin = (candidate: string, origin: string): boolean => {
+  try {
+    return new URL(candidate).origin === origin;
+  } catch {
+    return false;
+  }
+};
+
 /** Walk every page from `firstUrl`, parsing each item with `itemSchema`. */
 export async function* walkPages<T>(
   session: Session,
   firstUrl: string,
   itemSchema: z.ZodType<T>,
 ): AsyncGenerator<T[]> {
+  const origin = new URL(firstUrl).origin;
   let url: string | null = firstUrl;
 
   for (let page = 0; url !== null; page++) {
@@ -56,6 +73,12 @@ export async function* walkPages<T>(
 
     const { next, results } = envelopeSchema.parse(await response.json());
     yield results.map((item) => itemSchema.parse(item));
+
+    if (next !== null && !sameOrigin(next, origin)) {
+      throw new Error(
+        `MedISAO paging tried to leave ${origin}. Refusing to follow ${next}.`,
+      );
+    }
     url = next;
   }
 }

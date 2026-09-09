@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
-import { getSafeRedirectPath } from "@/lib/auth-redirect";
+import { getSafeRedirectPath, withNextParam } from "@/lib/auth-redirect";
 
 const loginSchema = z.object({
   email: z.email("Please enter a valid email address"),
@@ -66,9 +66,7 @@ export function LoginForm({
 }: LoginFormProps) {
   const safeNext = getSafeRedirectPath(next);
   const callbackURL = safeNext ?? "/";
-  const signupHref = safeNext
-    ? `/signup?next=${encodeURIComponent(safeNext)}`
-    : "/signup";
+  const signupHref = withNextParam("/signup", safeNext);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),

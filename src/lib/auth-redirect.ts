@@ -15,3 +15,12 @@ export function getSafeRedirectPath(
     return null;
   }
 }
+
+/**
+ * Appends `?next=<encoded>` to `path`, using `&` if `path` already has a query
+ * string. Returns `path` unchanged when `next` is null.
+ */
+export function withNextParam(path: string, next: string | null): string {
+  if (!next) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}next=${encodeURIComponent(next)}`;
+}

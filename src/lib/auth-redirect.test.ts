@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getSafeRedirectPath } from "./auth-redirect";
+import { getSafeRedirectPath, withNextParam } from "./auth-redirect";
 
 describe("getSafeRedirectPath", () => {
   it("accepts app-relative paths, query string preserved", () => {
@@ -33,5 +33,21 @@ describe("getSafeRedirectPath", () => {
     ]) {
       expect(getSafeRedirectPath(bad)).toBeNull();
     }
+  });
+});
+
+describe("withNextParam", () => {
+  it("returns the path unchanged when next is null", () => {
+    expect(withNextParam("/signup", null)).toBe("/signup");
+    expect(withNextParam("/login?verified=1", null)).toBe("/login?verified=1");
+  });
+
+  it("uses `?` for a bare path and `&` when a query already exists", () => {
+    expect(withNextParam("/signup", "/assets/1")).toBe(
+      "/signup?next=%2Fassets%2F1",
+    );
+    expect(withNextParam("/login?verified=1", "/assets/1?tab=x")).toBe(
+      "/login?verified=1&next=%2Fassets%2F1%3Ftab%3Dx",
+    );
   });
 });

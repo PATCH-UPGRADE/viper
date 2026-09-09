@@ -29,7 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { MIN_PASSWORD_LENGTH } from "@/config/constants";
 import { authClient } from "@/lib/auth-client";
-import { getSafeRedirectPath } from "@/lib/auth-redirect";
+import { getSafeRedirectPath, withNextParam } from "@/lib/auth-redirect";
 import { handleSocialLogin } from "./login-form";
 
 const registerSchema = z
@@ -57,11 +57,6 @@ type RegisterFormProps = {
 export function RegisterForm({ next }: RegisterFormProps) {
   const router = useRouter();
   const safeNext = getSafeRedirectPath(next);
-  // Append `next`, choosing `?` or `&` for the separator.
-  const withNext = (path: string) =>
-    safeNext
-      ? `${path}${path.includes("?") ? "&" : "?"}next=${encodeURIComponent(safeNext)}`
-      : path;
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -80,11 +75,13 @@ export function RegisterForm({ next }: RegisterFormProps) {
         name: values.email,
         email: values.email,
         password: values.password,
-        callbackURL: withNext("/login?verified=1"),
+        callbackURL: withNextParam("/login?verified=1", safeNext),
       },
       {
         onSuccess: () => {
-          router.push(withNext("/login?verification_email_sent=1"));
+          router.push(
+            withNextParam("/login?verification_email_sent=1", safeNext),
+          );
         },
         onError: (ctx: ErrorContext) => {
           toast.error(ctx.error.message);
@@ -205,7 +202,7 @@ export function RegisterForm({ next }: RegisterFormProps) {
                 <div className="text-center text-sm">
                   Already have an account?{" "}
                   <Link
-                    href={withNext("/login")}
+                    href={withNextParam("/login", safeNext)}
                     className="underline underline-offset-4"
                   >
                     Login

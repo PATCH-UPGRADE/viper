@@ -1,10 +1,14 @@
 "use client";
 
 import { format } from "date-fns";
-import { BotIcon, PlusIcon } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 import { useState } from "react";
+import {
+  ActivityTimeline,
+  isAutomationActor,
+  type TimelineEntry,
+} from "@/components/activity-timeline";
 import { priorityConfig } from "@/components/priority-badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getChipClass } from "@/features/tag-colors/palette";
@@ -13,27 +17,12 @@ import type {
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
-import { formatScheduled } from "@/lib/date-utils";
-import { initialsOf } from "@/lib/string-utils";
 import type { TicketDetail } from "../../types";
 import { AddCommentForm } from "./add-comment-form";
-import { CollapsibleSectionCard } from "./section-card";
-import { categoryLabels, formatDate, StatusChip } from "./shared";
+import { categoryLabels, StatusChip } from "./shared";
 
 type Comment = TicketDetail["comments"][number];
 type Activity = TicketDetail["activities"][number];
-
-type TimelineEntry =
-  | { kind: "activity"; createdAt: Date; row: Activity }
-  | { kind: "comment"; createdAt: Date; row: Comment };
-
-const isAgentUser = (user: Activity["user"]) => !!user.integrationUser;
-
-// Automation actors (integration users) surface under one identity rather than
-// the specific integration's user name (e.g. "Siemens Healthineers ... Fleet").
-const AGENT_DISPLAY_NAME = "VIPER";
-const actorName = (user: Activity["user"]) =>
-  isAgentUser(user) ? AGENT_DISPLAY_NAME : user.name;
 
 const SetField = ({ label, value }: { label: string; value: string }) => (
   <span>
@@ -41,29 +30,6 @@ const SetField = ({ label, value }: { label: string; value: string }) => (
     <span className="font-medium text-foreground">{value}</span>
   </span>
 );
-
-const AgentBadge = () => (
-  <Badge
-    variant="secondary"
-    className="px-1.5 py-0 text-[10px] font-semibold uppercase tracking-wide"
-  >
-    AI Agent
-  </Badge>
-);
-
-const ActorAvatar = ({ user }: { user: Activity["user"] }) =>
-  isAgentUser(user) ? (
-    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-      <BotIcon className="size-4" />
-    </span>
-  ) : (
-    <Avatar className="size-8 shrink-0 border">
-      {user.image && <AvatarImage src={user.image} alt={user.name ?? ""} />}
-      <AvatarFallback className="bg-accent text-accent-foreground text-xs">
-        {initialsOf(user.name)}
-      </AvatarFallback>
-    </Avatar>
-  );
 
 const WorkOrderCreatedBody = ({ activity }: { activity: Activity }) => {
   const data = activity.data as {
@@ -272,80 +238,45 @@ const renderActivity = (a: Activity): React.ReactNode => {
   }
 };
 
-const TimelineConnector = () => (
-  <span
-    aria-hidden
-    className="-bottom-4 -translate-x-1/2 absolute top-8 left-4 w-px bg-border"
-  />
+const CommentBody = ({ comment }: { comment: Comment }) => (
+  <div className="flex flex-col gap-1">
+    {comment.author.department && (
+      <Badge
+        variant="outline"
+        className={`w-fit ${getChipClass(comment.author.department.color)}`}
+      >
+        {comment.author.department.name}
+      </Badge>
+    )}
+    <p className="whitespace-pre-wrap text-foreground">{comment.body}</p>
+  </div>
 );
 
-const ActivityRow = ({
-  activity,
-  isLast,
-}: {
-  activity: Activity;
-  isLast: boolean;
-}) => (
-  <li
-    className="relative flex items-start gap-3 text-sm"
-    aria-label={`Activity: ${activity.type}`}
-  >
-    {!isLast && <TimelineConnector />}
-    <ActorAvatar user={activity.user} />
-    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-        <span className="font-semibold">{actorName(activity.user)}</span>
-        {isAgentUser(activity.user) && <AgentBadge />}
-        <span className="text-xs text-muted-foreground">
-          {formatScheduled(activity.createdAt, "·")}
-        </span>
-      </div>
-      <div className="text-muted-foreground">{renderActivity(activity)}</div>
-    </div>
-  </li>
-);
+const activityEntry = (activity: Activity): TimelineEntry => ({
+  id: `a-${activity.id}`,
+  kind: `Activity: ${activity.type}`,
+  createdAt: new Date(activity.createdAt),
+  actor: {
+    name: activity.user.name,
+    image: activity.user.image,
+    isAgent: isAutomationActor(activity.user),
+  },
+  body: renderActivity(activity),
+});
 
-const CommentRow = ({
-  comment,
-  isLast,
-}: {
-  comment: Comment;
-  isLast: boolean;
-}) => (
-  <li className="relative flex gap-3" aria-label="Comment">
-    {!isLast && <TimelineConnector />}
-    <Avatar className="size-8 shrink-0 border">
-      {comment.author.image && (
-        <AvatarImage
-          src={comment.author.image}
-          alt={comment.author.name ?? ""}
-        />
-      )}
-      <AvatarFallback className="bg-accent text-accent-foreground text-xs">
-        {initialsOf(comment.author.name)}
-      </AvatarFallback>
-    </Avatar>
-    <div className="flex flex-col min-w-0 flex-1">
-      <div className="flex items-center text-xs text-muted-foreground mb-1 gap-2">
-        <span className="font-bold text-foreground truncate">
-          {comment.author.name}
-        </span>
-        {comment.author.department && (
-          <Badge
-            variant="outline"
-            className={getChipClass(comment.author.department.color)}
-          >
-            {comment.author.department.name}
-          </Badge>
-        )}
-        <span>{formatDate(comment.createdAt)}</span>
-      </div>
-      <p className="text-sm whitespace-pre-wrap">{comment.body}</p>
-    </div>
-  </li>
-);
+const commentEntry = (comment: Comment): TimelineEntry => ({
+  id: `c-${comment.id}`,
+  kind: "Comment",
+  createdAt: new Date(comment.createdAt),
+  actor: {
+    name: comment.author.name,
+    image: comment.author.image,
+    isAgent: false,
+  },
+  body: <CommentBody comment={comment} />,
+});
 
-export const ActivityTimeline = ({
+export const TicketActivityTimeline = ({
   ticketId,
   comments,
   activities,
@@ -354,26 +285,15 @@ export const ActivityTimeline = ({
   comments: Comment[];
   activities: Activity[];
 }) => {
-  const entries: TimelineEntry[] = [
-    ...activities.map((row) => ({
-      kind: "activity" as const,
-      createdAt: new Date(row.createdAt),
-      row,
-    })),
-    ...comments.map((row) => ({
-      kind: "comment" as const,
-      createdAt: new Date(row.createdAt),
-      row,
-    })),
-    // Newest first.
-  ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
   const [showComment, setShowComment] = useState(false);
+  const entries = [
+    ...activities.map(activityEntry),
+    ...comments.map(commentEntry),
+  ];
 
   return (
-    <CollapsibleSectionCard
-      title="Activity"
-      meta={`${entries.length} event${entries.length === 1 ? "" : "s"}`}
+    <ActivityTimeline
+      entries={entries}
       action={
         !showComment && (
           <Button
@@ -387,36 +307,13 @@ export const ActivityTimeline = ({
         )
       }
     >
-      <div className="flex flex-col gap-4">
-        {showComment && (
-          <AddCommentForm
-            ticketId={ticketId}
-            onCancel={() => setShowComment(false)}
-            onSubmitted={() => setShowComment(false)}
-          />
-        )}
-        {entries.length > 0 ? (
-          <ul className="flex flex-col gap-4">
-            {entries.map((entry, i) =>
-              entry.kind === "activity" ? (
-                <ActivityRow
-                  key={`a-${entry.row.id}`}
-                  activity={entry.row}
-                  isLast={i === entries.length - 1}
-                />
-              ) : (
-                <CommentRow
-                  key={`c-${entry.row.id}`}
-                  comment={entry.row}
-                  isLast={i === entries.length - 1}
-                />
-              ),
-            )}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">No activity yet.</p>
-        )}
-      </div>
-    </CollapsibleSectionCard>
+      {showComment && (
+        <AddCommentForm
+          ticketId={ticketId}
+          onCancel={() => setShowComment(false)}
+          onSubmitted={() => setShowComment(false)}
+        />
+      )}
+    </ActivityTimeline>
   );
 };

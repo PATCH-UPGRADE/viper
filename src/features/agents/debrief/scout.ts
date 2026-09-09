@@ -1,10 +1,10 @@
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { AUTOMATION_USER_ID } from "@/config/constants";
 import { buildAgentGraph } from "@/features/agents/shared/build-graph";
 import { loadPersistentNotesMarkdown } from "@/features/agents/shared/notes-preload";
 import { makeQueryPlatformDataTool } from "@/features/agents/tools/query-platform-tool";
-import { AUTOMATION_USER_ID } from "@/lib/automation-user";
 import { SCOUT_SYSTEM_PROMPT } from "./prompts";
 
 const SCOUT_MODEL = "claude-sonnet-5";

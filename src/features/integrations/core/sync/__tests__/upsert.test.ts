@@ -7,7 +7,6 @@ const { mockPrisma, mockCreateArtifactWrappers } = vi.hoisted(() => ({
   mockPrisma: {
     $transaction: vi.fn(),
     integrationResourceSync: { upsert: vi.fn() },
-    apiKeyConnector: { updateMany: vi.fn() },
   },
   mockCreateArtifactWrappers: vi.fn(),
 }));

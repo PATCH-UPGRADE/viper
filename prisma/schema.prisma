@@ -33,7 +33,6 @@ model User {
   artifactWrappers ArtifactWrapper[]
 
   apikeys           Apikey[]
-  apiKeyConnectors  ApiKeyConnector[]
   integration       Integration[]
   integrationUser   Integration?       @relation("integration_user")
   webhooks          Webhook[]
@@ -280,10 +279,10 @@ model VendorContact {
 }
 
 model Contract {
-  id              String    @id @default(cuid())
-  title           String?
-  effectiveFrom   DateTime?
-  effectiveTo     DateTime?
+  id            String    @id @default(cuid())
+  title         String?
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
 
   termsJson Json?
 
@@ -937,8 +936,6 @@ model Apikey {
   permissions         String?
   metadata            String?
 
-  connector ApiKeyConnector?
-
   @@index([referenceId])
   @@map("apikey")
 }
@@ -957,8 +954,6 @@ model Integration {
   syncEvery Int? // seconds. null = inherit the platform's defaultSyncEvery.
   // ^if we're polling, that's how often to poll
   enabled   Boolean @default(true)
-
-  apiKeyConnector ApiKeyConnector?
 
   // The user who created the integration
   userId String
@@ -985,29 +980,6 @@ model Integration {
   @@index([userId])
   @@index([integrationUserId])
   @@map("integration")
-}
-
-// separate out to preserve between ApiKey rotations
-// TODO VW-435: clean up / delete later...
-model ApiKeyConnector {
-  id String @id @default(cuid())
-
-  name         String?
-  resourceType ResourceType?
-  lastRequest  DateTime?
-
-  apiKeyId      String?      @unique
-  apiKey        Apikey?      @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
-  integrationId String?      @unique
-  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
-  userId        String
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@map("api_key_connector")
 }
 
 enum SyncStatusEnum {
@@ -1794,7 +1766,7 @@ model Question {
   parentQuestion   Question? @relation("QuestionChain", fields: [parentQuestionId], references: [id], onDelete: SetNull)
   followupQuestion Question? @relation("QuestionChain")
 
-  audience  QuestionAudience?
+  audience QuestionAudience?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

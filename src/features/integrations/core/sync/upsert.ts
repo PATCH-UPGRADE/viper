@@ -58,33 +58,24 @@ export async function upsertResourceSync(
   const statusToSet = succeeded ? SyncStatusEnum.Success : SyncStatusEnum.Error;
   const errorMessage = succeeded ? null : response.message;
 
-  await prisma.$transaction(async (tx) => {
-    await tx.integrationResourceSync.upsert({
-      where: { integrationId_resource: { integrationId, resource } },
-      update: {
-        status: statusToSet,
-        errorMessage,
-        ...(succeeded
-          ? { lastSuccessfulSync: lastSynced, consecutiveFailures: 0 }
-          : { consecutiveFailures: { increment: 1 } }),
-      },
-      create: {
-        integrationId,
-        resource,
-        status: statusToSet,
-        errorMessage,
-        ...(succeeded
-          ? { lastSuccessfulSync: lastSynced }
-          : { consecutiveFailures: 1 }),
-      },
-    });
-
-    // integrations do not have api keys. update when the request was made here
-    // TODO: VW-435 should probably remove this
-    await tx.apiKeyConnector.updateMany({
-      where: { integrationId },
-      data: { lastRequest: lastSynced },
-    });
+  await prisma.integrationResourceSync.upsert({
+    where: { integrationId_resource: { integrationId, resource } },
+    update: {
+      status: statusToSet,
+      errorMessage,
+      ...(succeeded
+        ? { lastSuccessfulSync: lastSynced, consecutiveFailures: 0 }
+        : { consecutiveFailures: { increment: 1 } }),
+    },
+    create: {
+      integrationId,
+      resource,
+      status: statusToSet,
+      errorMessage,
+      ...(succeeded
+        ? { lastSuccessfulSync: lastSynced }
+        : { consecutiveFailures: 1 }),
+    },
   });
 }
 

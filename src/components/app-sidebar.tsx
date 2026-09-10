@@ -5,6 +5,7 @@ import {
   ChevronDownIcon,
   ComputerIcon,
   CpuIcon,
+  DatabaseIcon,
   ExternalLink,
   FileTextIcon,
   HeartIcon,
@@ -13,7 +14,6 @@ import {
   LayoutGridIcon,
   ListChecksIcon,
   type LucideIcon,
-  PlugIcon,
   SettingsIcon,
   Sparkles,
   WorkflowIcon,
@@ -22,7 +22,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
@@ -40,15 +39,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { useSuspenseConnectors } from "@/features/api-key-connectors/hooks/use-connectors";
 import { useChatUI } from "@/features/chat/context/chat-panel-context";
-import { ResourceType } from "@/generated/prisma";
 import { NavUser } from "./nav-user";
 import { Separator } from "./ui/separator";
 
@@ -132,63 +123,32 @@ const SidebarNavItem = ({ item }: { item: NavItem }) => {
   );
 };
 
-interface ConnectorSidebarEntry {
-  title: string;
-  icon: LucideIcon;
-  url: string;
-  activeCount: number;
-  totalCount: number;
-}
+const tableItems: NavItem[] = [
+  {
+    title: "Assets",
+    icon: ComputerIcon,
+    url: "/tables/assets",
+  },
+  {
+    title: "Device Artifacts",
+    icon: CpuIcon,
+    url: "/tables/deviceArtifacts",
+  },
+  {
+    title: "Remediations",
+    icon: HeartIcon,
+    url: "/tables/remediations",
+  },
+  {
+    title: "Vulnerabilities",
+    icon: BugIcon,
+    url: "/tables/vulnerabilities",
+  },
+];
 
 export const AppSidebar = () => {
   const pathname = usePathname();
-  const [connectorsOpen, setConnectorsOpen] = useState(true);
-  const connectorsResult = useSuspenseConnectors();
-
-  const connectorItems: { [type: string]: ConnectorSidebarEntry } = {
-    [ResourceType.Asset]: {
-      title: "Assets",
-      icon: ComputerIcon,
-      url: "/connectors/assets",
-      activeCount: 0,
-      totalCount: 0,
-    },
-    [ResourceType.DeviceArtifact]: {
-      title: "Device Artifacts",
-      icon: CpuIcon,
-      url: "/connectors/deviceArtifacts",
-      activeCount: 0,
-      totalCount: 0,
-    },
-    [ResourceType.Remediation]: {
-      title: "Remediations",
-      icon: HeartIcon,
-      url: "/connectors/remediations",
-      activeCount: 0,
-      totalCount: 0,
-    },
-    [ResourceType.Vulnerability]: {
-      title: "Vulnerabilities",
-      icon: BugIcon,
-      url: "/connectors/vulnerabilities",
-      activeCount: 0,
-      totalCount: 0,
-    },
-  };
-
-  let totalActiveConnectors = 0;
-  for (const type of Object.values(ResourceType)) {
-    if (!connectorItems[type]) {
-      continue;
-    }
-
-    connectorItems[type].totalCount =
-      connectorsResult.data.totalCount[type] ?? 0;
-    const activeCount = connectorsResult.data.activeCount[type] ?? 0;
-    connectorItems[type].activeCount = activeCount;
-    totalActiveConnectors += activeCount;
-  }
-
+  const [tablesOpen, setTablesOpen] = useState(true);
   const { toggleChatPanel } = useChatUI();
 
   return (
@@ -231,29 +191,26 @@ export const AppSidebar = () => {
         <SidebarMenu>
           <SidebarMenuItem>
             <Collapsible
-              open={connectorsOpen}
-              onOpenChange={setConnectorsOpen}
-              className="group/connectors"
+              open={tablesOpen}
+              onOpenChange={setTablesOpen}
+              className="group/tables"
             >
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton
-                  tooltip="Connectors"
+                  tooltip="DB Tables"
                   className="gap-x-4 h-10 px-4"
                 >
-                  <PlugIcon className="size-4" aria-hidden="true" />
-                  <span>Connectors</span>
-                  <Badge variant="secondary" className="ml-auto mr-1 text-xs">
-                    {totalActiveConnectors}
-                  </Badge>
+                  <DatabaseIcon className="size-4" aria-hidden="true" />
+                  <span>DB Tables</span>
                   <ChevronDownIcon
-                    className="size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/connectors:rotate-180"
+                    className="ml-auto size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/tables:rotate-180"
                     aria-hidden="true"
                   />
                 </SidebarMenuButton>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenu>
-                  {Object.values(connectorItems).map((item) => (
+                  {tableItems.map((item) => (
                     <SidebarMenuItem key={item.title} className="ml-4">
                       <SidebarMenuButton
                         tooltip={item.title}
@@ -264,30 +221,6 @@ export const AppSidebar = () => {
                         <Link href={item.url} prefetch>
                           <item.icon className="size-4" aria-hidden="true" />
                           <span>{item.title}</span>
-                          <span className="sr-only">
-                            {item.activeCount} Active Connectors,{" "}
-                            {item.totalCount} Total Connectors
-                          </span>
-                          <TooltipProvider delayDuration={500}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge
-                                  variant="secondary"
-                                  className="ml-auto text-xs"
-                                  aria-hidden="true"
-                                >
-                                  {item.activeCount}
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent
-                                className="flex flex-col"
-                                animated={false}
-                              >
-                                <span>Active: {item.activeCount}</span>
-                                <span>Total: {item.totalCount}</span>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

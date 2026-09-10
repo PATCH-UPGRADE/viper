@@ -1,12 +1,10 @@
 import "server-only";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import type {
   ResourceSyncCtx,
   SyncOutcome,
 } from "@/features/integrations/core/types";
-import { ResourceType, SourceChannel } from "@/generated/prisma";
+import { SourceChannel } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import type { IntegrationResponse } from "@/lib/schemas";
 import { sourceContentHash } from "@/lib/source-hash";
 import type { FleetConfig, FleetCreds } from "../config";
 import { createFleetSession } from "../session";
@@ -17,124 +15,124 @@ import {
   toCanonical,
 } from "./advisories";
 
-type FleetAdvisoryDraft = FleetAdvisoryItem & {
-  contentHash: string;
-  mappingId: string | null;
-};
-
-async function changedOnly(
-  integrationId: string,
+/**
+ * Record what each active advisory looked like on this poll.
+ *
+ * Snapshots are append-only and deduplicate on `contentHash`, so an unchanged
+ * advisory costs no write. The mapping owns the snapshots, which keeps the
+ * record off the global `(channel, externalId)` unique key that only channels
+ * without a mapping use.
+ *
+ * Fleet cannot filter its advisories by change, so every poll carries the whole
+ * collection. The work is therefore batched into a fixed number of queries, the
+ * same shape `work-orders/sync.ts` uses for activities: a per-advisory round
+ * trip would spend hundreds of them an hour to discover that nothing moved.
+ */
+async function recordAdvisories(
   items: FleetAdvisoryItem[],
-): Promise<FleetAdvisoryDraft[]> {
-  const mappings = await prisma.externalSourceRecordMapping.findMany({
+  integrationId: string,
+): Promise<void> {
+  if (items.length === 0) return;
+
+  const lastSynced = new Date();
+  const existing = await prisma.externalSourceRecordMapping.findMany({
     where: {
       integrationId,
       externalId: { in: items.map((item) => item.vendorId) },
     },
     select: { id: true, externalId: true },
   });
-
   const mappingIdByExternalId = new Map(
-    mappings.map((m) => [m.externalId, m.id]),
+    existing.map((mapping) => [mapping.externalId, mapping.id]),
   );
-  if (mappings.length > 0) {
+
+  const missing = items.filter(
+    (item) => !mappingIdByExternalId.has(item.vendorId),
+  );
+  if (missing.length > 0) {
+    const created =
+      await prisma.externalSourceRecordMapping.createManyAndReturn({
+        data: missing.map((item) => ({
+          integrationId,
+          externalId: item.vendorId,
+          lastSynced,
+        })),
+        select: { id: true, externalId: true },
+      });
+    for (const mapping of created) {
+      mappingIdByExternalId.set(mapping.externalId, mapping.id);
+    }
+  }
+  // Stamped even for advisories that did not change: it records that we polled.
+  const existingIds = existing.map((mapping) => mapping.id);
+  if (existingIds.length > 0) {
     await prisma.externalSourceRecordMapping.updateMany({
-      where: { id: { in: mappings.map((m) => m.id) } },
-      data: { lastSynced: new Date() },
+      where: { id: { in: existingIds } },
+      data: { lastSynced },
     });
   }
 
+  // Newest snapshot per mapping in one query, so the hash comparison below
+  // needs no further round trips. Only the mappings that already existed can
+  // have a snapshot, so the ones created just above are left out of the `in`.
   const newest = await prisma.sourceRecord.findMany({
-    where: { mappingId: { in: [...mappingIdByExternalId.values()] } },
+    where: { mappingId: { in: existingIds } },
     orderBy: [{ mappingId: "asc" }, { observedAt: "desc" }],
     distinct: ["mappingId"],
     select: { mappingId: true, contentHash: true },
   });
-
-  const newestHash = new Map<string, string>();
-  for (const record of newest) {
-    if (record.mappingId) newestHash.set(record.mappingId, record.contentHash);
-  }
-
-  return items.flatMap((item) => {
-    const contentHash = sourceContentHash(hashableOf(item.raw), item.body);
-    const mappingId = mappingIdByExternalId.get(item.vendorId) ?? null;
-    if (mappingId && newestHash.get(mappingId) === contentHash) return [];
-    return [{ ...item, contentHash, mappingId }];
-  });
-}
-
-export async function inngestFleetAdvisories(
-  items: FleetAdvisoryDraft[],
-  integrationId: string,
-): Promise<IntegrationResponse> {
-  const { integrationUserId } = await prisma.integration.findUniqueOrThrow({
-    where: { id: integrationId },
-    select: { integrationUserId: true },
-  });
-
-  return processIntegrationSync(
-    prisma,
-    {
-      model: {
-        ...prisma.sourceRecord,
-        update: ({ data }) => prisma.sourceRecord.create({ data }),
-      },
-      mappingModel: prisma.externalSourceRecordMapping,
-      shouldRecordSyncOutcome: false,
-      onItemCreated: async (sourceRecordId: string) => {
-        const mapping = await prisma.externalSourceRecordMapping.findFirst({
-          where: { itemId: sourceRecordId },
-          select: { id: true },
-        });
-        if (mapping) {
-          await prisma.sourceRecord.update({
-            where: { id: sourceRecordId },
-            data: { mappingId: mapping.id },
-          });
-        }
-      },
-      transformInputItem: async (item: FleetAdvisoryDraft) => {
-        const fields = {
-          channel: SourceChannel.Integration,
-          contentHash: item.contentHash,
-          raw: item.raw,
-          markdown: item.body,
-          ...(item.mappingId ? { mappingId: item.mappingId } : {}),
-        };
-        return {
-          createData: fields,
-          updateData: { ...fields, mappingId: item.mappingId },
-          uniqueFieldConditions: [],
-          artifactsData: undefined,
-        };
-      },
-    },
-    { items },
-    integrationUserId,
-    integrationId,
-    ResourceType.SourceRecord,
+  const newestHashByMappingId = new Map(
+    newest.map((record) => [record.mappingId, record.contentHash]),
   );
+
+  const changed: {
+    item: FleetAdvisoryItem;
+    mappingId: string;
+    contentHash: string;
+  }[] = [];
+  for (const item of items) {
+    const mappingId = mappingIdByExternalId.get(item.vendorId);
+    if (!mappingId) continue;
+    // `hashableOf` drops enableMail / lastEmailsSent, which describe Fleet's
+    // subscriber mailing rather than the advisory: a mail going out must not
+    // read as a new revision.
+    const contentHash = sourceContentHash(hashableOf(item.raw), item.body);
+    if (newestHashByMappingId.get(mappingId) === contentHash) continue;
+    changed.push({ item, mappingId, contentHash });
+  }
+  if (changed.length === 0) return;
+
+  await prisma.sourceRecord.createMany({
+    data: changed.map(({ item, mappingId, contentHash }) => ({
+      channel: SourceChannel.Integration,
+      mappingId,
+      contentHash,
+      raw: item.raw,
+      markdown: item.body,
+    })),
+  });
 }
 
 export async function syncAdvisories(
   ctx: ResourceSyncCtx<FleetConfig, FleetCreds>,
 ): Promise<SyncOutcome> {
   const session = await createFleetSession(ctx.creds);
-  const byVendorId = new Map<string, FleetAdvisoryItem>();
 
+  // Keyed by vendorId so one advisory appearing twice in a response is carried
+  // once. A repeat would otherwise write two identical snapshots, because the
+  // hash comparison reads the newest stored record and cannot see a sibling
+  // created in the same pass.
+  const byVendorId = new Map<string, FleetAdvisoryItem>();
   for await (const page of listChanged(session, ctx.cursor)) {
     for (const raw of page.items) {
       const item = toCanonical(raw);
       byVendorId.set(item.vendorId, item);
     }
   }
-  const changed = await changedOnly(ctx.integrationId, [
-    ...byVendorId.values(),
-  ]);
-  const response = await inngestFleetAdvisories(changed, ctx.integrationId);
-  if (response.shouldRetry) {
-    throw new Error(response.message);
-  }
+
+  // Throwing makes finalize-sync record Error.
+  await recordAdvisories([...byVendorId.values()], ctx.integrationId);
+
+  // No cursor, advisories endpoint cannot paginate
   return { cursor: null };
 }

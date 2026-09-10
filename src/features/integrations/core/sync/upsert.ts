@@ -107,7 +107,7 @@ export interface SyncConfig<
   TCreateData,
   TUpdateData,
   TModel extends { id: string },
-  TMappingModel extends { id: string; itemId?: string | null },
+  TMappingModel extends { id: string; itemId: string },
 > {
   // Prisma model delegates
   model: Pick<PrismaDelegate<TModel>, "findFirst" | "create" | "update">;
@@ -152,7 +152,7 @@ export async function processIntegrationSync<
   TCreateData extends Record<string, any>,
   TUpdateData extends Record<string, any>,
   TModel extends { id: string },
-  TMappingModel extends { id: string; itemId?: string | null },
+  TMappingModel extends { id: string; itemId: string },
 >(
   prisma: PrismaClientLike,
   config: SyncConfig<

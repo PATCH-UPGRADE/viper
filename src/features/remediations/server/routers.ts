@@ -17,6 +17,7 @@ import {
 } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
+import { hospitalIdentifier } from "@/lib/hospital";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
   cpesToMatchingConnect,
@@ -73,6 +74,7 @@ const createSearchFilter = (search: string) => {
  * declares one wins. Nothing here names a platform: the mapping says which one
  * it is, and the registry says what that platform can do.
  */
+
 async function platformTargetFor(remediationId: string) {
   const mappings = await prisma.externalRemediationMapping.findMany({
     where: { itemId: remediationId },
@@ -171,7 +173,7 @@ export const remediationsRouter = createTRPCRouter({
         cursor: z.string().nullish(),
       }),
     )
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       const target = await platformTargetFor(input.remediationId);
       if (!target?.comments) {
         return { items: [], nextCursor: null, supported: false };
@@ -185,23 +187,24 @@ export const remediationsRouter = createTRPCRouter({
       );
 
       // The feed is deliberately anonymous, so the only way to know which
-      // comments are the caller's own is the pseudonym we recorded when they
-      // posted. Nothing here can identify anybody else.
-      const mine = await prisma.externalCommentIdentity.findMany({
+      // comments are ours is the pseudonym we recorded when one was posted.
+      // Not scoped to the caller: every user here shares one author id, so a
+      // colleague's comment is this hospital's too. Nothing in this query can
+      // identify anybody outside it.
+      const ours = await prisma.externalCommentIdentity.findMany({
         where: {
-          userId: ctx.auth.user.id,
           remediationId: input.remediationId,
           integrationId: target.integrationId,
         },
         select: { pseudonym: true },
       });
-      const minePseudonyms = new Set(mine.map((row) => row.pseudonym));
+      const ourPseudonyms = new Set(ours.map((row) => row.pseudonym));
 
       return {
         ...page,
         items: page.items.map((comment) => ({
           ...comment,
-          isMine: minePseudonyms.has(comment.pseudonym),
+          fromYourHospital: ourPseudonyms.has(comment.pseudonym),
         })),
         supported: true,
       };
@@ -210,12 +213,15 @@ export const remediationsRouter = createTRPCRouter({
   /**
    * Post a comment to the platform, as this user.
    *
-   * The platform derives a pseudonym from `authorExternalUserId`, so the value
-   * must be stable for a given person forever: a change splits their thread in
-   * two on every reader's screen. `user.id` is stable by construction.
+   * Posted under this deployment's hospital identifier, so MedISAO sees a
+   * single voice rather than one per member of staff. Their API requires an
+   * author field and refuses a blank one, but what actually identifies us is
+   * the token: the realm secret behind the pseudonym is scoped to it.
    *
-   * Only we hold the mapping from that id back to a person, so if a hospital
-   * ever needs to prove authorship, this is the only side that can.
+   * The row we write still records which user posted, because only this side
+   * holds any mapping back to a person. That is coarser than it was: two
+   * colleagues commenting on the same remediation share a pseudonym, so we can
+   * say the hospital wrote a comment and when, but not which of them.
    */
   addComment: protectedProcedure
     .input(
@@ -239,7 +245,7 @@ export const remediationsRouter = createTRPCRouter({
         target.externalId,
         {
           body: input.body,
-          authorExternalUserId: ctx.auth.user.id,
+          authorExternalUserId: hospitalIdentifier(),
         },
       );
 
@@ -262,7 +268,7 @@ export const remediationsRouter = createTRPCRouter({
         update: { pseudonym: comment.pseudonym },
       });
 
-      return { ...comment, isMine: true };
+      return { ...comment, fromYourHospital: true };
     }),
 
   // GET /api/remediations - List all remediations (any authenticated user can see all)

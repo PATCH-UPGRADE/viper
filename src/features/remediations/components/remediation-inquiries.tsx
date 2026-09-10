@@ -117,57 +117,66 @@ export const RemediationInquiries = ({
           You have not asked the manufacturer anything about this remediation.
         </p>
       ) : (
-        <ul className="flex flex-col gap-4">
-          {data.items.map((inquiry) => (
-            <li
-              key={inquiry.externalId}
-              className="flex flex-col gap-2 rounded-md border p-3"
-            >
-              <span className="flex items-center gap-2">
-                <span className="text-xs font-medium">You asked</span>
-                <span className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(inquiry.createdAt), {
-                    addSuffix: true,
-                  })}
+        <>
+          {data.nextCursor && (
+            <p className="text-xs text-muted-foreground">
+              Older questions are not shown.
+            </p>
+          )}
+          <ul className="flex flex-col gap-4">
+            {/* The platform returns newest first. A thread reads the other
+              way, and the composer sits below, so the newest question ends
+              up next to the box you type in. */}
+            {[...data.items].reverse().map((inquiry) => (
+              <li
+                key={inquiry.externalId}
+                className="flex flex-col gap-2 rounded-md border p-3"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="text-xs font-medium">You asked</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(inquiry.createdAt), {
+                      addSuffix: true,
+                    })}
+                  </span>
+                  {inquiry.status && (
+                    // Filled once an answer is in. Keyed on the answer rather
+                    // than the status text, because MedISAO never published
+                    // its status vocabulary and we render whatever it sends.
+                    <Badge
+                      variant={inquiry.response ? "default" : "outline"}
+                      className="ml-auto"
+                    >
+                      {inquiry.status}
+                    </Badge>
+                  )}
                 </span>
-                {inquiry.status && (
-                  <Badge variant="outline" className="ml-auto">
-                    {inquiry.status}
-                  </Badge>
-                )}
-              </span>
-              <p className="text-sm whitespace-pre-wrap wrap-anywhere">
-                {inquiry.body}
-              </p>
+                <p className="text-sm whitespace-pre-wrap wrap-anywhere">
+                  {inquiry.body}
+                </p>
 
-              {inquiry.response ? (
-                <div className="border-l-2 pl-3">
-                  <p className="text-xs font-medium">
-                    The manufacturer answered
-                    {inquiry.respondedAt && (
-                      <span className="ml-1 font-normal text-muted-foreground">
-                        {formatDistanceToNow(new Date(inquiry.respondedAt), {
+                {inquiry.response ? (
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-xs text-muted-foreground">
+                      The manufacturer answered
+                      {inquiry.respondedAt &&
+                        ` ${formatDistanceToNow(new Date(inquiry.respondedAt), {
                           addSuffix: true,
-                        })}
-                      </span>
-                    )}
+                        })}`}
+                    </p>
+                    <p className="text-sm font-semibold wrap-anywhere">
+                      {inquiry.response}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    No answer yet.
                   </p>
-                  <p className="text-sm whitespace-pre-wrap wrap-anywhere">
-                    {inquiry.response}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">No answer yet.</p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {data.nextCursor && (
-        <p className="text-xs text-muted-foreground">
-          Older questions are not shown.
-        </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       <InquiryComposer remediationId={remediationId} />

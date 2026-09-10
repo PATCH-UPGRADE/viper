@@ -14,15 +14,32 @@ import {
 const MAX_BODY_LENGTH = 10_000;
 
 /**
- * A pseudonym is stable within one remediation and uncorrelated across them, so
- * it is a handle for following a conversation and nothing more. Rendered as a
- * short label with a colour derived from the same hex, never as a profile
- * anyone can click into, and never presented as a person.
+ * Who wrote a comment, as far as anyone here can tell.
  *
- * The label carries the identity on its own, so the colour is decoration and no
+ * Another hospital is a pseudonym: stable within one remediation and
+ * uncorrelated across them, so it is a handle for following a conversation and
+ * nothing more. Rendered as a short label with a colour derived from the same
+ * hex, never as a profile anyone can click into, and never as a person. The
+ * label carries the identity on its own, so the colour is decoration and no
  * meaning is lost without it.
  */
-function PseudonymBadge({ pseudonym }: { pseudonym: string }) {
+function AuthorBadge({
+  pseudonym,
+  fromYourHospital,
+}: {
+  pseudonym: string;
+  fromYourHospital: boolean;
+}) {
+  // Our own hash tells a reader here nothing they do not already know, and
+  // reads as just another anonymous hospital. Name us instead.
+  if (fromYourHospital) {
+    return (
+      <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+        Your hospital
+      </span>
+    );
+  }
+
   const short = pseudonym.slice(0, 8);
   const hue = Number.parseInt(pseudonym.slice(0, 2), 16) * (360 / 256);
 
@@ -142,32 +159,36 @@ export const RemediationComments = ({
           No hospital has commented on this remediation yet.
         </p>
       ) : (
-        <ul className="flex flex-col gap-4">
-          {data.items.map((comment) => (
-            <li key={comment.externalId} className="flex flex-col gap-1">
-              <span className="flex items-center gap-2">
-                <PseudonymBadge pseudonym={comment.pseudonym} />
-                {comment.isMine && (
-                  <span className="text-xs font-medium text-primary">You</span>
-                )}
-                <span className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(comment.createdAt), {
-                    addSuffix: true,
-                  })}
+        <>
+          {data.nextCursor && (
+            <p className="text-xs text-muted-foreground">
+              Older comments are not shown.
+            </p>
+          )}
+          <ul className="flex flex-col gap-4">
+            {/* The platform returns newest first. A thread reads the other
+              way, and the composer sits below, so the newest comment ends
+              up next to the box you type in. */}
+            {[...data.items].reverse().map((comment) => (
+              <li key={comment.externalId} className="flex flex-col gap-1">
+                <span className="flex items-center gap-2">
+                  <AuthorBadge
+                    pseudonym={comment.pseudonym}
+                    fromYourHospital={comment.fromYourHospital}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(comment.createdAt), {
+                      addSuffix: true,
+                    })}
+                  </span>
                 </span>
-              </span>
-              <p className="text-sm whitespace-pre-wrap wrap-anywhere">
-                {comment.body}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {data.nextCursor && (
-        <p className="text-xs text-muted-foreground">
-          Older comments are not shown.
-        </p>
+                <p className="text-sm whitespace-pre-wrap wrap-anywhere">
+                  {comment.body}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       <CommentComposer remediationId={remediationId} />

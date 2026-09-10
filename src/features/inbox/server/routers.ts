@@ -8,6 +8,7 @@ import {
   MatchFeedbackTargetType,
   NotificationType,
   Priority,
+  type Prisma,
 } from "@/generated/prisma";
 import { requestNoteAction } from "@/inngest/functions/notes-action";
 import prisma from "@/lib/db";
@@ -330,6 +331,67 @@ async function buildMatchingContexts(
   }
   return contexts;
 }
+
+/**
+ * One advisory row, as both drawer sections render it.
+ *
+ * Shared so the asset and vulnerability queries cannot drift into returning
+ * different shapes for the same component.
+ */
+const notificationRowSelect = (userId: string) =>
+  ({
+    id: true,
+    type: true,
+    title: true,
+    summary: true,
+    priority: true,
+    tlp: true,
+    createdAt: true,
+    updatedAt: true,
+    // Scoped to the caller: "new" means this person has not read it.
+    reads: { where: { userId }, select: { id: true } },
+    sourceLinks: {
+      select: {
+        sourceRecord: {
+          select: {
+            channel: true,
+            observedAt: true,
+            mapping: {
+              select: {
+                webUrl: true,
+                integration: { select: { name: true, platform: true } },
+              },
+            },
+          },
+        },
+      },
+    },
+  }) satisfies Prisma.NotificationSelect;
+
+type NotificationRow = Prisma.NotificationGetPayload<{
+  select: ReturnType<typeof notificationRowSelect>;
+}>;
+
+/** Flattened here so a table never has to know how a snapshot reaches its integration. */
+const toAdvisoryRow = ({
+  reads,
+  sourceLinks,
+  ...notification
+}: NotificationRow) => ({
+  ...notification,
+  isUnread: reads.length === 0,
+  sources: sourceLinks.map(({ sourceRecord }) => ({
+    channel: sourceRecord.channel,
+    observedAt: sourceRecord.observedAt,
+    // The row's own name is what an operator recognises; the platform is the
+    // fallback for a source with no integration behind it.
+    label:
+      sourceRecord.mapping?.integration.name ??
+      sourceRecord.mapping?.integration.platform ??
+      sourceRecord.channel,
+    url: sourceRecord.mapping?.webUrl ?? null,
+  })),
+});
 
 export const notificationsRouter = createTRPCRouter({
   getMany: protectedProcedure
@@ -725,54 +787,60 @@ export const notificationsRouter = createTRPCRouter({
         orderBy: { createdAt: "desc" },
         skip: meta.skip,
         take: meta.take,
-        select: {
-          id: true,
-          type: true,
-          title: true,
-          summary: true,
-          priority: true,
-          tlp: true,
-          createdAt: true,
-          updatedAt: true,
-          // Scoped to the caller: "new" means this person has not read it.
-          reads: { where: { userId: ctx.auth.user.id }, select: { id: true } },
-          sourceLinks: {
-            select: {
-              sourceRecord: {
-                select: {
-                  channel: true,
-                  observedAt: true,
-                  mapping: {
-                    select: {
-                      webUrl: true,
-                      integration: { select: { name: true, platform: true } },
-                    },
-                  },
-                },
+        select: notificationRowSelect(ctx.auth.user.id),
+      });
+
+      return createPaginatedResponse(items.map(toAdvisoryRow), meta);
+    }),
+
+  /**
+   * Advisories that name one vulnerability.
+   *
+   * A direct link, unlike `getManyByAssetId`: an advisory says which CVEs it
+   * concerns, so there are no matching rules to resolve first.
+   */
+  getManyByVulnerabilityId: protectedProcedure
+    .input(paginationInputSchema.extend({ vulnerabilityId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const vulnerability = await prisma.vulnerability.findUnique({
+        where: { id: input.vulnerabilityId },
+        select: { id: true },
+      });
+      if (!vulnerability) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const where = {
+        AND: [
+          {
+            vulnerabilities: {
+              some: {
+                vulnerabilityId: input.vulnerabilityId,
+                // A human said this match was wrong, so it must not put the
+                // advisory on the vulnerability. Null is not a rejection: it
+                // means nobody has judged the match yet.
+                OR: [
+                  { confidence: null },
+                  { confidence: { not: ConfidenceLevel.Rejected } },
+                ],
               },
             },
           },
-        },
+          ...(input.search ? [createSearchFilter(input.search)] : []),
+        ],
+      };
+
+      const totalCount = await prisma.notification.count({ where });
+      const meta = buildPaginationMeta(input, totalCount);
+
+      const items = await prisma.notification.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        // From the meta, not from the input: it caps the page at totalPages.
+        skip: meta.skip,
+        take: meta.take,
+        select: notificationRowSelect(ctx.auth.user.id),
       });
 
-      return createPaginatedResponse(
-        items.map(({ reads, sourceLinks, ...notification }) => ({
-          ...notification,
-          isUnread: reads.length === 0,
-          sources: sourceLinks.map(({ sourceRecord }) => ({
-            channel: sourceRecord.channel,
-            observedAt: sourceRecord.observedAt,
-            // The row's own name is what an operator recognises; the platform
-            // is the fallback for a source with no integration behind it.
-            label:
-              sourceRecord.mapping?.integration.name ??
-              sourceRecord.mapping?.integration.platform ??
-              sourceRecord.channel,
-            url: sourceRecord.mapping?.webUrl ?? null,
-          })),
-        })),
-        meta,
-      );
+      return createPaginatedResponse(items.map(toAdvisoryRow), meta);
     }),
 
   markRead: protectedProcedure

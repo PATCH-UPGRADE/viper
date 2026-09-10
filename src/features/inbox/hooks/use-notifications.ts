@@ -39,17 +39,43 @@ export const useAffectedAssetsPage = (args: {
   });
 };
 
-/** One page of the advisories that concern a single asset. */
-export const useSuspenseAssetAdvisories = (args: {
+/**
+ * One page of the advisories that concern a single asset.
+ *
+ * A plain query rather than a suspense one: this renders inside the asset
+ * drawer, and suspending would blank the whole drawer while it loads.
+ */
+export const useAssetAdvisories = (args: {
   assetId: string;
   page: number;
   pageSize: number;
   search: string;
 }) => {
   const trpc = useTRPC();
-  return useSuspenseQuery(
-    trpc.notifications.getManyByAssetId.queryOptions(args),
-  );
+  return useQuery({
+    ...trpc.notifications.getManyByAssetId.queryOptions(args),
+    placeholderData: keepPreviousData,
+  });
+};
+
+/** Both advisory drawers render the same section, so they share one shape. */
+export type AdvisoriesQuery = ReturnType<typeof useAssetAdvisories>;
+
+/**
+ * Advisories that name this vulnerability. A direct link, unlike the asset
+ * query, which has to resolve device group matching rules first.
+ */
+export const useVulnerabilityAdvisories = (args: {
+  vulnerabilityId: string;
+  page: number;
+  pageSize: number;
+  search: string;
+}) => {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.notifications.getManyByVulnerabilityId.queryOptions(args),
+    placeholderData: keepPreviousData,
+  });
 };
 
 export const useMarkNotificationRead = () => {

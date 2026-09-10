@@ -7,6 +7,7 @@ import {
   ExternalLinkIcon,
   FileText,
   MessageSquare,
+  RssIcon,
   ServerIcon,
   Wrench,
 } from "lucide-react";
@@ -28,6 +29,11 @@ import {
   SuggestedQuestionsProvider,
 } from "@/features/chat/context/suggested-questions-context";
 import type { UserRole } from "@/features/chat/utils";
+import {
+  ADVISORY_PAGE_SIZE,
+  AdvisoriesSection,
+} from "@/features/inbox/components/advisories-section";
+import { useAssetAdvisories } from "@/features/inbox/hooks/use-notifications";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import type {
   EnrichedNetworkAsset,
@@ -593,6 +599,16 @@ export function AssetDashboardDrawer({
     asset.issues.flatMap((i) => i.vulnerability.remediations.map((r) => r.id)),
   ).size;
 
+  // Owned here, not in the url: the assets list behind this drawer reads the
+  // same pagination params, so paging the tab would page the table underneath.
+  const [advisoryPage, setAdvisoryPage] = useState(1);
+  const advisories = useAssetAdvisories({
+    assetId: asset.id,
+    page: advisoryPage,
+    pageSize: ADVISORY_PAGE_SIZE,
+    search: "",
+  });
+
   const suggestedQuestions: Partial<Record<UserRole, SuggestedQuestion[]>> = {
     CISO: [
       { label: "Advise me on creating a remediation plan for this asset." },
@@ -660,6 +676,20 @@ export function AssetDashboardDrawer({
       icon: BugIcon,
       count: asset.issues.length,
       content: <VulnerabilitiesSection asset={asset} />,
+    },
+    {
+      value: "advisories",
+      label: "Advisories",
+      icon: RssIcon,
+      count: advisories.data?.totalCount,
+      content: (
+        <AdvisoriesSection
+          query={advisories}
+          page={advisoryPage}
+          setPage={setAdvisoryPage}
+          emptyMessage="No advisories affect this asset"
+        />
+      ),
     },
   ];
 

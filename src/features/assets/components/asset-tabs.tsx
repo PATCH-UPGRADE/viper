@@ -8,9 +8,7 @@ export const AssetTabs = ({ assetId }: { assetId: string }) => {
   const pathname = usePathname();
   const activeTab = pathname.endsWith("/work-orders")
     ? "work-orders"
-    : pathname.endsWith("/advisories")
-      ? "advisories"
-      : "overview";
+    : "overview";
 
   return (
     <div className="px-4">
@@ -21,9 +19,6 @@ export const AssetTabs = ({ assetId }: { assetId: string }) => {
           </TabsTrigger>
           <TabsTrigger value="work-orders" asChild>
             <Link href={`/assets/${assetId}/work-orders`}>Work Orders</Link>
-          </TabsTrigger>
-          <TabsTrigger value="advisories" asChild>
-            <Link href={`/assets/${assetId}/advisories`}>Advisories</Link>
           </TabsTrigger>
         </TabsList>
       </Tabs>

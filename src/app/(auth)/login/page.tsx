@@ -5,18 +5,20 @@ type PageProps = {
   searchParams: Promise<{
     verified?: string;
     verification_email_sent?: string;
+    next?: string;
   }>;
 };
 
 const Page = async ({ searchParams }: PageProps) => {
-  await requireUnauth();
-
   const params = await searchParams;
+
+  await requireUnauth(params.next);
 
   return (
     <LoginForm
       isVerified={params.verified === "1"}
       verificationEmailSent={params.verification_email_sent === "1"}
+      next={params.next}
     />
   );
 };

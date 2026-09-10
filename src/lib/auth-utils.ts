@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "./auth";
+import { getSafeRedirectPath, withNextParam } from "./auth-redirect";
 
 /**
  * Gets the current session from Better Auth
@@ -33,27 +34,30 @@ export const verifyApiKey = async (req: Request | undefined) => {
 };
 
 /**
- * Requires authentication and returns the session
- * Redirects to /login if not authenticated
+ * Requires authentication; returns the session. When signed out, redirects to
+ * `/login?next=<path>` — the path from middleware's `x-viper-request-path` header.
  */
 export const requireAuth = async () => {
   const session = await getSession();
 
   if (!session) {
-    redirect("/login");
+    const next = getSafeRedirectPath(
+      (await headers()).get("x-viper-request-path"),
+    );
+    redirect(withNextParam("/login", next));
   }
 
   return session;
 };
 
 /**
- * Requires NO authentication
- * Redirects to / if authenticated
+ * Requires NO authentication. Redirects a signed-in user to a validated `next`
+ * app-relative path, or `/`.
  */
-export const requireUnauth = async () => {
+export const requireUnauth = async (next?: string) => {
   const session = await getSession();
 
   if (session) {
-    redirect("/");
+    redirect(getSafeRedirectPath(next) ?? "/");
   }
 };

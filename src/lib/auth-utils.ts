@@ -51,9 +51,8 @@ export const requireAuth = async () => {
 };
 
 /**
- * Requires NO authentication. Redirects a signed-in user to `next` (validated as
- * an app-relative path) or `/`. Carries the destination through the
- * signup → verification → auto-sign-in chain.
+ * Requires NO authentication. Redirects a signed-in user to a validated `next`
+ * app-relative path, or `/`.
  */
 export const requireUnauth = async (next?: string) => {
   const session = await getSession();

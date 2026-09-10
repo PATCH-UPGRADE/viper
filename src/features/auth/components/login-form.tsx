@@ -64,8 +64,6 @@ export function LoginForm({
   next,
 }: LoginFormProps) {
   const safeNext = getSafeRedirectPath(next);
-  const callbackURL = safeNext ?? "/";
-  const signupHref = withNextParam("/signup", safeNext);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -81,7 +79,7 @@ export function LoginForm({
       {
         email: values.email,
         password: values.password,
-        callbackURL,
+        callbackURL: safeNext ?? "/",
       },
       {
         onError: (ctx: ErrorContext) => {
@@ -188,7 +186,7 @@ export function LoginForm({
                 <div className="text-center text-sm">
                   Don&apos;t have an account?{" "}
                   <Link
-                    href={signupHref}
+                    href={withNextParam("/signup", safeNext)}
                     className="underline underline-offset-4"
                   >
                     Sign up

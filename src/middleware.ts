@@ -1,9 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 /**
- * Records the requested path on an internal header so `requireAuth()` can bounce
- * a logged-out user to `/login?next=…` and back. No session/Prisma/redirect
- * logic here — that stays in `requireAuth()`, which the Edge runtime can't run.
+ * Puts the requested path on `x-viper-request-path` so `requireAuth()` can build
+ * `/login?next=…`. No auth logic here — Prisma can't run on the Edge runtime.
  */
 export const middleware = (request: NextRequest) => {
   const { pathname, search } = request.nextUrl;

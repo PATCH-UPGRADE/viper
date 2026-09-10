@@ -33,22 +33,14 @@ describe("requireAuth", () => {
     );
   });
 
-  it("redirects to a bare /login when the request-path header is absent", async () => {
+  it("redirects to a bare /login when there is no safe captured path", async () => {
     getSessionMock.mockResolvedValue(null);
-    headerGetMock.mockReturnValue(null);
 
-    await requireAuth();
-
-    expect(redirectMock).toHaveBeenCalledWith("/login");
-  });
-
-  it("ignores an off-origin header value and falls back to /login", async () => {
-    getSessionMock.mockResolvedValue(null);
-    headerGetMock.mockReturnValue("https://evil.com");
-
-    await requireAuth();
-
-    expect(redirectMock).toHaveBeenCalledWith("/login");
+    for (const headerValue of [null, "https://evil.com", "//evil.com"]) {
+      headerGetMock.mockReturnValue(headerValue);
+      await requireAuth();
+      expect(redirectMock).toHaveBeenLastCalledWith("/login");
+    }
   });
 });
 

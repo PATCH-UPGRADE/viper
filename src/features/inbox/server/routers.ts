@@ -784,7 +784,9 @@ export const notificationsRouter = createTRPCRouter({
 
       const items = await prisma.notification.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        // `id` breaks the tie: advisories synced in one batch share a
+        // createdAt, and an unstable order repeats or skips rows at a page edge.
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip: meta.skip,
         take: meta.take,
         select: notificationRowSelect(ctx.auth.user.id),
@@ -833,7 +835,9 @@ export const notificationsRouter = createTRPCRouter({
 
       const items = await prisma.notification.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        // `id` breaks the tie: advisories synced in one batch share a
+        // createdAt, and an unstable order repeats or skips rows at a page edge.
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         // From the meta, not from the input: it caps the page at totalPages.
         skip: meta.skip,
         take: meta.take,

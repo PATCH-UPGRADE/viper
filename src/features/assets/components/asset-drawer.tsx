@@ -685,7 +685,6 @@ export function AssetDashboardDrawer({
       content: (
         <AdvisoriesSection
           query={advisories}
-          page={advisoryPage}
           setPage={setAdvisoryPage}
           emptyMessage="No advisories affect this asset"
         />

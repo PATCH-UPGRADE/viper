@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fetchUtilizationGrids } from "@/features/assets/server/utilization";
 import {
+  ConfidenceLevel,
   IssueStatus,
   MatchFeedbackTargetType,
   NotificationType,
@@ -692,7 +693,13 @@ export const notificationsRouter = createTRPCRouter({
             ? [
                 {
                   deviceGroupsMatchings: {
-                    some: { deviceGroupMatchingId: { in: matchingIds } },
+                    some: {
+                      deviceGroupMatchingId: { in: matchingIds },
+                      OR: [
+                        { confidence: null },
+                        { confidence: { not: ConfidenceLevel.Rejected } },
+                      ],
+                    },
                   },
                 },
               ]
@@ -716,8 +723,8 @@ export const notificationsRouter = createTRPCRouter({
       const items = await prisma.notification.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        skip: (input.page - 1) * input.pageSize,
-        take: input.pageSize,
+        skip: meta.skip,
+        take: meta.take,
         select: {
           id: true,
           type: true,

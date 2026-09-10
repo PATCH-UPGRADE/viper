@@ -16,8 +16,3 @@ export const prefetchRemediations = (params: Input) => {
 export const prefetchRemediation = (id: string) => {
   return prefetch(trpc.remediations.getOne.queryOptions({ id }));
 };
-
-/**
- * Not prefetched with the remediation: comments come from a third party, and a
- * slow platform would hold up the whole server render.
- */

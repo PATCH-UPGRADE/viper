@@ -25,10 +25,26 @@ export type TimelineEntry = {
 
 const AGENT_DISPLAY_NAME = "VIPER";
 
+export const VIPER_ACTOR: TimelineActor = {
+  name: AGENT_DISPLAY_NAME,
+  isAgent: true,
+};
+
 export const isAutomationActor = (user: {
   id: string;
   integrationUser?: { id: string } | null;
 }) => user.id === AUTOMATION_USER_ID || !!user.integrationUser;
+
+export const actorFromUser = (user: {
+  id: string;
+  name: string | null;
+  image?: string | null;
+  integrationUser?: { id: string } | null;
+}): TimelineActor => ({
+  name: user.name,
+  image: user.image,
+  isAgent: isAutomationActor(user),
+});
 
 const AgentBadge = () => (
   <Badge

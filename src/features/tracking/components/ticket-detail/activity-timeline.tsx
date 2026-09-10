@@ -5,11 +5,16 @@ import { PlusIcon } from "lucide-react";
 import { useState } from "react";
 import {
   ActivityTimeline,
-  isAutomationActor,
+  actorFromUser,
   type TimelineEntry,
 } from "@/components/activity-timeline";
-import { FieldChange } from "@/components/field-change";
-import { PriorityBadge, priorityConfig } from "@/components/priority-badge";
+import {
+  type FieldRenderers,
+  FieldValueChange,
+  priorityFieldRenderer,
+} from "@/components/field-change";
+import { priorityConfig } from "@/components/priority-badge";
+import { SeenBy } from "@/components/seen-by";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getChipClass } from "@/features/tag-colors/palette";
@@ -18,6 +23,7 @@ import type {
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
+import { useTicketSeenBy } from "../../hooks/use-tracking";
 import type { TicketDetail } from "../../types";
 import { AddCommentForm } from "./add-comment-form";
 import { categoryLabels, StatusChip } from "./shared";
@@ -79,6 +85,20 @@ const WorkOrderCreatedBody = ({ activity }: { activity: Activity }) => {
   );
 };
 
+const ticketFieldRenderers: FieldRenderers = {
+  status: {
+    label: "Status",
+    render: (value) => <StatusChip status={value as TicketStatus} />,
+  },
+  category: {
+    label: "Category",
+    render: (value) => (
+      <Badge variant="outline">{categoryLabels[value as TicketCategory]}</Badge>
+    ),
+  },
+  priority: priorityFieldRenderer,
+};
+
 const renderActivity = (a: Activity): React.ReactNode => {
   // biome-ignore lint/suspicious/noExplicitAny: activity.data is a Json blob with type-specific shape
   const data = a.data as any;
@@ -87,34 +107,29 @@ const renderActivity = (a: Activity): React.ReactNode => {
       return <WorkOrderCreatedBody activity={a} />;
     case "STATUS_CHANGED":
       return (
-        <FieldChange
-          label="Status"
-          from={<StatusChip status={data.from as TicketStatus} />}
-          to={<StatusChip status={data.to as TicketStatus} />}
+        <FieldValueChange
+          field="status"
+          from={data.from}
+          to={data.to}
+          renderers={ticketFieldRenderers}
         />
       );
     case "CATEGORY_CHANGED":
       return (
-        <FieldChange
-          label="Category"
-          from={
-            <Badge variant="outline">
-              {categoryLabels[data.from as TicketCategory]}
-            </Badge>
-          }
-          to={
-            <Badge variant="outline">
-              {categoryLabels[data.to as TicketCategory]}
-            </Badge>
-          }
+        <FieldValueChange
+          field="category"
+          from={data.from}
+          to={data.to}
+          renderers={ticketFieldRenderers}
         />
       );
     case "PRIORITY_CHANGED":
       return (
-        <FieldChange
-          label="Priority"
-          from={<PriorityBadge priority={data.from as Priority} />}
-          to={<PriorityBadge priority={data.to as Priority} />}
+        <FieldValueChange
+          field="priority"
+          from={data.from}
+          to={data.to}
+          renderers={ticketFieldRenderers}
         />
       );
     case "ASSIGNEE_CHANGED": {
@@ -269,11 +284,7 @@ const activityEntry = (activity: Activity): TimelineEntry => ({
   id: `a-${activity.id}`,
   kind: `Activity: ${activity.type}`,
   createdAt: new Date(activity.createdAt),
-  actor: {
-    name: activity.user.name,
-    image: activity.user.image,
-    isAgent: isAutomationActor(activity.user),
-  },
+  actor: actorFromUser(activity.user),
   body: renderActivity(activity),
 });
 
@@ -281,11 +292,7 @@ const commentEntry = (comment: Comment): TimelineEntry => ({
   id: `c-${comment.id}`,
   kind: "Comment",
   createdAt: new Date(comment.createdAt),
-  actor: {
-    name: comment.author.name,
-    image: comment.author.image,
-    isAgent: false,
-  },
+  actor: actorFromUser(comment.author),
   body: <CommentBody comment={comment} />,
 });
 
@@ -299,6 +306,7 @@ export const TicketActivityTimeline = ({
   activities: Activity[];
 }) => {
   const [showComment, setShowComment] = useState(false);
+  const { data: viewers = [] } = useTicketSeenBy(ticketId);
   const entries = [
     ...activities.map(activityEntry),
     ...comments.map(commentEntry),
@@ -307,6 +315,7 @@ export const TicketActivityTimeline = ({
   return (
     <ActivityTimeline
       entries={entries}
+      footer={<SeenBy viewers={viewers} />}
       action={
         !showComment && (
           <Button

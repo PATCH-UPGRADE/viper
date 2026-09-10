@@ -49,6 +49,7 @@ const {
   mockUseAttachAsset,
   mockUseDetachAsset,
   mockUseAttachableAssets,
+  mockUseTicketSeenBy,
 } = vi.hoisted(() => {
   const mockMutate = vi.fn();
   const mockAddCommentMutate = vi.fn();
@@ -67,6 +68,7 @@ const {
     mockDetachMutate,
     mockAttachAssetMutate,
     mockDetachAssetMutate,
+    mockUseTicketSeenBy: vi.fn(() => ({ data: [] })),
     mockUseAttachAsset: vi.fn(() => ({
       mutate: mockAttachAssetMutate,
       isPending: false,
@@ -172,6 +174,7 @@ vi.mock("../hooks/use-tracking", () => ({
   useAttachAsset: mockUseAttachAsset,
   useDetachAsset: mockUseDetachAsset,
   useAttachableAssets: mockUseAttachableAssets,
+  useTicketSeenBy: mockUseTicketSeenBy,
 }));
 
 vi.mock("@/lib/auth-client", () => ({

@@ -117,6 +117,11 @@ export const useDepartments = () => {
   return useQuery(trpc.departments.getMany.queryOptions());
 };
 
+export const useTicketSeenBy = (ticketId: string) => {
+  const trpc = useTRPC();
+  return useQuery(trpc.tracking.getSeenBy.queryOptions({ ticketId }));
+};
+
 export const useMarkTicketSeen = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -145,8 +150,11 @@ export const useMarkTicketSeen = () => {
           };
         });
       },
-      onSettled: () => {
+      onSettled: (_data, _error, { ticketId }) => {
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.tracking.getSeenBy.queryFilter({ ticketId }),
+        );
       },
     }),
   );

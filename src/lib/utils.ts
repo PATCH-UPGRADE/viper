@@ -113,3 +113,22 @@ export function formatFileSize(bytes: number): string {
 
   return `${parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
 }
+
+export function seenBySummary(
+  viewers: { name: string | null }[],
+  maxNamed = 3,
+): string {
+  if (viewers.length === 0) return "Not seen yet";
+  const names = viewers.map((viewer) => viewer.name ?? "someone");
+  const namedViewers = names.slice(0, maxNamed);
+  const remainingCount = names.length - namedViewers.length;
+  if (remainingCount > 0) {
+    const others =
+      remainingCount === 1 ? "1 other" : `${remainingCount} others`;
+    return `Seen by ${namedViewers.join(", ")} and ${others}`;
+  }
+  if (namedViewers.length === 1) return `Seen by ${namedViewers[0]}`;
+  const allButLast = namedViewers.slice(0, -1).join(", ");
+  const last = namedViewers[namedViewers.length - 1];
+  return `Seen by ${allButLast} and ${last}`;
+}

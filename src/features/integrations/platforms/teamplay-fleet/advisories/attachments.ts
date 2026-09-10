@@ -5,9 +5,6 @@ import { advisoryAttachmentsDownloadUrl } from "../urls";
 
 const downloadUrlSchema = z.object({ url: z.string() });
 
-// {
-// 	"url": "https://storage.fleet.siemens-healthineers.com/security-advisories/25%2Fpdf%2Ffile%2F260202%20%20Security%20Advisory%20016040.pdf?sv=2021-10-04&spr=https&se=2026-06-23T19%3A32%3A32Z&sp=r&sig=KqOSWueof8fE9ftCYdCE9SbcoRw2k1bumLpfli0jexg%3D&sr=b&rscd=attachment%3B%20filename%3D260202%20%20Security%20Advisory%20016040.pdf"
-// }
 // biome-ignore lint/correctness/noUnusedVariables: kept for the advisory-PDF follow-up in the TODO below
 async function resolveDownloadUrl(
   session: Session,
@@ -32,5 +29,3 @@ async function resolveDownloadUrl(
   }
   return parsed.data.url;
 }
-
-// TODO Store the attachment in notificationAttachment?

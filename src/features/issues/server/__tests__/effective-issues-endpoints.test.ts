@@ -266,6 +266,32 @@ describe("assets.getIssueMetricsInternal — effective issue counts", () => {
   });
 });
 
+describe("assets.getRecentVulnerableInternal — newly vulnerable assets", () => {
+  it("surfaces assets exposed only through a fleet rule and drops overridden ones", async () => {
+    const { assets } = setup();
+
+    const result = await assets.getRecentVulnerableInternal({
+      pageSize: 10,
+      createdAfter: new Date("2026-01-01"),
+    });
+
+    expect(result.items.map((asset) => asset.id)).toEqual(["p2", "p3"]);
+    expect(result.totalCount).toBe(2);
+  });
+
+  it("caps the listed assets at pageSize but counts every newly vulnerable asset", async () => {
+    const { assets } = setup();
+
+    const result = await assets.getRecentVulnerableInternal({
+      pageSize: 1,
+      createdAfter: new Date("2026-01-01"),
+    });
+
+    expect(result.items.map((asset) => asset.id)).toEqual(["p2"]);
+    expect(result.totalCount).toBe(2);
+  });
+});
+
 describe("issues.getManyInternalByStatusAndAssetId — per-asset tabs", () => {
   it("lists bar's override under NOT_AFFECTED and hides the fleet issue from its AFFECTED tab", async () => {
     mockPrisma.asset.findUnique.mockResolvedValue(makeAsset("bar"));

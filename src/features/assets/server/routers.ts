@@ -664,20 +664,28 @@ export const assetsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input }) => {
-      const where = {
-        createdAt: { gte: input.createdAfter },
-        issues: { some: { status: IssueStatus.AFFECTED } },
+      const recentAssets = await prisma.asset.findMany({
+        where: { createdAt: { gte: input.createdAfter } },
+        include: assetDashboardInclude,
+        orderBy: { createdAt: "desc" },
+      });
+      const effectiveIssues = await resolveEffectiveIssuesByAsset(
+        recentAssets,
+        assetDashboardInclude.issues.include,
+      );
+      const recentAssetsWithEffectiveIssues = recentAssets.map((asset) => ({
+        ...asset,
+        issues: effectiveIssues.get(asset.id) ?? [],
+      }));
+      const newlyVulnerableAssets = recentAssetsWithEffectiveIssues.filter(
+        (asset) =>
+          asset.issues.some((issue) => issue.status === IssueStatus.AFFECTED),
+      );
+
+      return {
+        items: newlyVulnerableAssets.slice(0, input.pageSize),
+        totalCount: newlyVulnerableAssets.length,
       };
-      const [totalCount, items] = await Promise.all([
-        prisma.asset.count({ where }),
-        prisma.asset.findMany({
-          where,
-          include: assetDashboardInclude,
-          orderBy: { createdAt: "desc" },
-          take: input.pageSize,
-        }),
-      ]);
-      return { items, totalCount };
     }),
 
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)

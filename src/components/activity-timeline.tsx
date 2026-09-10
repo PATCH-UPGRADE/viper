@@ -55,7 +55,7 @@ const AgentBadge = () => (
   </Badge>
 );
 
-const ActorAvatar = ({ actor }: { actor: TimelineActor }) =>
+export const ActorAvatar = ({ actor }: { actor: TimelineActor }) =>
   actor.isAgent ? (
     <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
       <BotIcon className="size-4" />
@@ -106,14 +106,12 @@ const TimelineRow = ({
 
 export const ActivityTimeline = ({
   entries,
-  action,
-  children,
+  composer,
   footer,
   emptyMessage = "No activity yet.",
 }: {
   entries: TimelineEntry[];
-  action?: ReactNode;
-  children?: ReactNode;
+  composer?: ReactNode;
   footer?: ReactNode;
   emptyMessage?: string;
 }) => {
@@ -126,10 +124,8 @@ export const ActivityTimeline = ({
     <CollapsibleSectionCard
       title="Activity"
       meta={`${eventCount} event${eventCount === 1 ? "" : "s"}`}
-      action={action}
     >
       <div className="flex flex-col gap-4">
-        {children}
         {eventCount > 0 ? (
           <ul className="flex flex-col gap-4">
             {newestFirst.map((entry, index) => (
@@ -143,6 +139,7 @@ export const ActivityTimeline = ({
         ) : (
           <p className="text-sm text-muted-foreground">{emptyMessage}</p>
         )}
+        {composer}
         {footer && (
           <div className="border-t pt-3 text-xs text-muted-foreground">
             {footer}

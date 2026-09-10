@@ -1,8 +1,6 @@
 "use client";
 
 import { format } from "date-fns";
-import { PlusIcon } from "lucide-react";
-import { useState } from "react";
 import {
   ActivityTimeline,
   actorFromUser,
@@ -16,7 +14,6 @@ import {
 import { priorityConfig } from "@/components/priority-badge";
 import { SeenBy } from "@/components/seen-by";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { getChipClass } from "@/features/tag-colors/palette";
 import type {
   Priority,
@@ -305,7 +302,6 @@ export const TicketActivityTimeline = ({
   comments: Comment[];
   activities: Activity[];
 }) => {
-  const [showComment, setShowComment] = useState(false);
   const { data: viewers = [] } = useTicketSeenBy(ticketId);
   const entries = [
     ...activities.map(activityEntry),
@@ -315,27 +311,8 @@ export const TicketActivityTimeline = ({
   return (
     <ActivityTimeline
       entries={entries}
+      composer={<AddCommentForm ticketId={ticketId} />}
       footer={<SeenBy viewers={viewers} />}
-      action={
-        !showComment && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowComment(true)}
-          >
-            <PlusIcon className="size-3.5" />
-            Add comment
-          </Button>
-        )
-      }
-    >
-      {showComment && (
-        <AddCommentForm
-          ticketId={ticketId}
-          onCancel={() => setShowComment(false)}
-          onSubmitted={() => setShowComment(false)}
-        />
-      )}
-    </ActivityTimeline>
+    />
   );
 };

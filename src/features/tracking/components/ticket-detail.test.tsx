@@ -1022,6 +1022,32 @@ describe("TicketDetailContent — view mode", () => {
     expect(statusIdx).toBeGreaterThan(commentIdx);
   });
 
+  it("keeps the comment box open below the activity list instead of behind an Add comment button", () => {
+    renderDetail({
+      activities: [
+        {
+          id: "a1",
+          ticketId: "ticket-1",
+          userId: "u1",
+          type: "ASSET_ATTACHED",
+          data: { assetId: "asset-x", assetLabel: "host-icu-1" },
+          createdAt: new Date("2026-05-15T14:00:00Z"),
+          user: { id: "u1", name: "Alice", image: null, integrationUser: null },
+        },
+      ],
+    });
+
+    const lastRow = screen.getByLabelText("Activity: ASSET_ATTACHED");
+    const commentBox = screen.getByPlaceholderText(/write a comment/i);
+    expect(
+      lastRow.compareDocumentPosition(commentBox) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: /add comment/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows 'No activity yet' when there are no comments or activities", () => {
     renderDetail();
     expect(screen.getByText(/no activity yet/i)).toBeInTheDocument();

@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { Severity } from "@/generated/prisma";
+import { cvssBand } from "@/features/vulnerabilities/utils";
 import type { Cursor, Page, Session } from "../../../core/types";
 import { ADVISORIES_URL, advisoryAttachmentsUrl } from "../urls";
 import { buildRow, buildText } from "../utils";
@@ -67,16 +67,6 @@ export function hashableOf<T extends FleetAdvisory>(
 
 export const parseCveIds = (value: string | null | undefined): string[] =>
   value ? value.split(/[,;\s]+/).filter(Boolean) : [];
-
-// computeVulnerabilityPriority checking against 7
-// The band is from https://www.first.org/cvss/v3.1/specification-document section 5
-function cvssBand(score: number | null | undefined): Severity | null {
-  if (score == null || score <= 0) return null;
-  if (score >= 9) return Severity.Critical;
-  if (score >= 7) return Severity.High;
-  if (score >= 4) return Severity.Medium;
-  return Severity.Low;
-}
 
 // For the list of advisories
 async function fetchAdvisories(session: Session): Promise<FleetAdvisory[]> {

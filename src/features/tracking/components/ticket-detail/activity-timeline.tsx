@@ -1,6 +1,8 @@
 "use client";
 
 import { format } from "date-fns";
+import { PlusIcon } from "lucide-react";
+import { useState } from "react";
 import {
   ActivityTimeline,
   actorFromUser,
@@ -13,6 +15,7 @@ import {
 } from "@/components/field-change";
 import { priorityConfig } from "@/components/priority-badge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { getChipClass } from "@/features/tag-colors/palette";
 import type {
   Priority,
@@ -300,6 +303,7 @@ export const TicketActivityTimeline = ({
   comments: Comment[];
   activities: Activity[];
 }) => {
+  const [isCommenting, setIsCommenting] = useState(false);
   const entries = [
     ...activities.map(activityEntry),
     ...comments.map(commentEntry),
@@ -308,7 +312,27 @@ export const TicketActivityTimeline = ({
   return (
     <ActivityTimeline
       entries={entries}
-      composer={<AddCommentForm ticketId={ticketId} />}
+      action={
+        !isCommenting && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsCommenting(true)}
+          >
+            <PlusIcon className="size-3.5" />
+            Add comment
+          </Button>
+        )
+      }
+      composer={
+        isCommenting && (
+          <AddCommentForm
+            ticketId={ticketId}
+            onCancel={() => setIsCommenting(false)}
+            onSubmitted={() => setIsCommenting(false)}
+          />
+        )
+      }
     />
   );
 };

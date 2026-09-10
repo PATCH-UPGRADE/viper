@@ -106,10 +106,12 @@ const TimelineRow = ({
 
 export const ActivityTimeline = ({
   entries,
+  action,
   composer,
   emptyMessage = "No activity yet.",
 }: {
   entries: TimelineEntry[];
+  action?: ReactNode;
   composer?: ReactNode;
   emptyMessage?: string;
 }) => {
@@ -122,8 +124,10 @@ export const ActivityTimeline = ({
     <CollapsibleSectionCard
       title="Activity"
       meta={`${eventCount} event${eventCount === 1 ? "" : "s"}`}
+      action={action}
     >
       <div className="flex flex-col gap-4">
+        {composer}
         {eventCount > 0 ? (
           <ul className="flex flex-col gap-4">
             {newestFirst.map((entry, index) => (
@@ -137,7 +141,6 @@ export const ActivityTimeline = ({
         ) : (
           <p className="text-sm text-muted-foreground">{emptyMessage}</p>
         )}
-        {composer}
       </div>
     </CollapsibleSectionCard>
   );

@@ -1019,7 +1019,8 @@ describe("TicketDetailContent — view mode", () => {
     expect(statusIdx).toBeGreaterThan(commentIdx);
   });
 
-  it("keeps the comment box open below the activity list instead of behind an Add comment button", () => {
+  it("opens the comment box above the activity list from the Add comment button so nobody scrolls to comment", async () => {
+    const user = userEvent.setup();
     renderDetail({
       activities: [
         {
@@ -1034,15 +1035,18 @@ describe("TicketDetailContent — view mode", () => {
       ],
     });
 
-    const lastRow = screen.getByLabelText("Activity: ASSET_ATTACHED");
-    const commentBox = screen.getByPlaceholderText(/write a comment/i);
     expect(
-      lastRow.compareDocumentPosition(commentBox) &
+      screen.queryByPlaceholderText(/write a comment/i),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /add comment/i }));
+
+    const commentBox = screen.getByPlaceholderText(/write a comment/i);
+    const newestRow = screen.getByLabelText("Activity: ASSET_ATTACHED");
+    expect(
+      commentBox.compareDocumentPosition(newestRow) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: /add comment/i }),
-    ).not.toBeInTheDocument();
   });
 
   it("shows 'No activity yet' when there are no comments or activities", () => {

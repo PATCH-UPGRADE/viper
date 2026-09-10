@@ -148,7 +148,7 @@ const tableItems: NavItem[] = [
 
 export const AppSidebar = () => {
   const pathname = usePathname();
-  const [tablesOpen, setTablesOpen] = useState(true);
+  const [tablesOpen, setTablesOpen] = useState(false);
   const { toggleChatPanel } = useChatUI();
 
   return (

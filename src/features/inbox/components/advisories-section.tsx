@@ -47,8 +47,6 @@ function SourcePill({ source }: { source: AssetAdvisorySource }) {
       target="_blank"
       rel="noopener noreferrer"
       className="text-xs text-muted-foreground hover:underline"
-      // The row is a link to the advisory; this one leaves the app.
-      onClick={(event) => event.stopPropagation()}
       aria-label={`Open the ${source.label} advisory in a new tab`}
     >
       {body}
@@ -56,12 +54,13 @@ function SourcePill({ source }: { source: AssetAdvisorySource }) {
   );
 }
 
+/**
+ * The row is not a link. A source pill is its own anchor, and an anchor cannot
+ * live inside another one, so the advisory link is on the title instead.
+ */
 function AdvisoryRow({ advisory }: { advisory: AssetAdvisory }) {
   return (
-    <Link
-      href={`/inbox/${advisory.id}`}
-      className="flex flex-col gap-1.5 rounded-md border p-3 hover:bg-accent"
-    >
+    <div className="flex flex-col gap-1.5 rounded-md border p-3 hover:bg-accent">
       <span className="flex items-center gap-2">
         {advisory.isUnread && (
           <>
@@ -79,9 +78,12 @@ function AdvisoryRow({ advisory }: { advisory: AssetAdvisory }) {
         </span>
       </span>
 
-      <span className="text-sm font-medium">
+      <Link
+        href={`/inbox/${advisory.id}`}
+        className="text-sm font-medium hover:underline"
+      >
         {advisory.title ?? "Untitled advisory"}
-      </span>
+      </Link>
       {advisory.summary && (
         <span className="text-xs text-muted-foreground line-clamp-2">
           {advisory.summary}
@@ -98,7 +100,7 @@ function AdvisoryRow({ advisory }: { advisory: AssetAdvisory }) {
           ))}
         </span>
       )}
-    </Link>
+    </div>
   );
 }
 
@@ -112,12 +114,11 @@ function AdvisoryRow({ advisory }: { advisory: AssetAdvisory }) {
  */
 export const AdvisoriesSection = ({
   query,
-  page,
   setPage,
   emptyMessage,
 }: {
   query: AdvisoriesQuery;
-  page: number;
+  /** Only a setter: the page to step from comes back with the results. */
   setPage: (page: number) => void;
   emptyMessage: string;
 }) => {
@@ -163,7 +164,7 @@ export const AdvisoriesSection = ({
               size="sm"
               variant="outline"
               disabled={!data.hasPreviousPage}
-              onClick={() => setPage(page - 1)}
+              onClick={() => setPage(data.page - 1)}
             >
               Newer
             </Button>
@@ -171,7 +172,7 @@ export const AdvisoriesSection = ({
               size="sm"
               variant="outline"
               disabled={!data.hasNextPage}
-              onClick={() => setPage(page + 1)}
+              onClick={() => setPage(data.page + 1)}
             >
               Older
             </Button>

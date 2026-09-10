@@ -13,7 +13,6 @@ import {
   FieldValueChange,
   priorityFieldRenderer,
 } from "@/components/field-change";
-import { SeenBy } from "@/components/seen-by";
 import type { NotificationType } from "@/generated/prisma";
 import type { NotificationDetailWithRelations } from "../types";
 import { NotificationTypeBadge } from "./notification-type-badge";
@@ -82,9 +81,5 @@ export const NotificationActivityTimeline = ({
       body: rowBody(row),
     }),
   );
-  const viewers = notification.readReceipts.map((receipt) => receipt.user);
-
-  return (
-    <ActivityTimeline entries={entries} footer={<SeenBy viewers={viewers} />} />
-  );
+  return <ActivityTimeline entries={entries} />;
 };

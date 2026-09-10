@@ -29,7 +29,6 @@ import {
   notificationDetailInclude,
   notificationInclude,
   type ResolvedDeviceGroupAsset,
-  readReceiptInclude,
 } from "../types";
 import {
   AFFECTED_BUCKETS,
@@ -418,25 +417,17 @@ export const notificationsRouter = createTRPCRouter({
         assetCount: countByMatchingId.get(m.deviceGroupMatching.id) ?? 0,
       }));
 
-      const [fieldCorrections, readReceipts] = await Promise.all([
-        prisma.fieldCorrection.findMany({
-          where: { targetType: "Notification", targetId: input.id },
-          include: fieldCorrectionInclude,
-          orderBy: { createdAt: "asc" },
-        }),
-        prisma.notificationRead.findMany({
-          where: { notificationId: input.id },
-          include: readReceiptInclude,
-          orderBy: { readAt: "desc" },
-        }),
-      ]);
+      const fieldCorrections = await prisma.fieldCorrection.findMany({
+        where: { targetType: "Notification", targetId: input.id },
+        include: fieldCorrectionInclude,
+        orderBy: { createdAt: "asc" },
+      });
 
       return {
         ...notification,
         deviceGroupsMatchings,
         affectedAssets,
         fieldCorrections,
-        readReceipts,
       };
     }),
 

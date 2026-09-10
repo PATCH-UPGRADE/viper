@@ -107,12 +107,10 @@ const TimelineRow = ({
 export const ActivityTimeline = ({
   entries,
   composer,
-  footer,
   emptyMessage = "No activity yet.",
 }: {
   entries: TimelineEntry[];
   composer?: ReactNode;
-  footer?: ReactNode;
   emptyMessage?: string;
 }) => {
   const newestFirst = [...entries].sort(
@@ -140,11 +138,6 @@ export const ActivityTimeline = ({
           <p className="text-sm text-muted-foreground">{emptyMessage}</p>
         )}
         {composer}
-        {footer && (
-          <div className="border-t pt-3 text-xs text-muted-foreground">
-            {footer}
-          </div>
-        )}
       </div>
     </CollapsibleSectionCard>
   );

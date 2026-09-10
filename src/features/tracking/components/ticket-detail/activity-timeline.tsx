@@ -12,7 +12,6 @@ import {
   priorityFieldRenderer,
 } from "@/components/field-change";
 import { priorityConfig } from "@/components/priority-badge";
-import { SeenBy } from "@/components/seen-by";
 import { Badge } from "@/components/ui/badge";
 import { getChipClass } from "@/features/tag-colors/palette";
 import type {
@@ -20,7 +19,6 @@ import type {
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
-import { useTicketSeenBy } from "../../hooks/use-tracking";
 import type { TicketDetail } from "../../types";
 import { AddCommentForm } from "./add-comment-form";
 import { categoryLabels, StatusChip } from "./shared";
@@ -302,7 +300,6 @@ export const TicketActivityTimeline = ({
   comments: Comment[];
   activities: Activity[];
 }) => {
-  const { data: viewers = [] } = useTicketSeenBy(ticketId);
   const entries = [
     ...activities.map(activityEntry),
     ...comments.map(commentEntry),
@@ -312,7 +309,6 @@ export const TicketActivityTimeline = ({
     <ActivityTimeline
       entries={entries}
       composer={<AddCommentForm ticketId={ticketId} />}
-      footer={<SeenBy viewers={viewers} />}
     />
   );
 };

@@ -898,17 +898,6 @@ export const trackingRouter = createTRPCRouter({
       return { ticketId: input.ticketId };
     }),
 
-  getSeenBy: protectedProcedure
-    .input(z.object({ ticketId: z.string() }))
-    .query(async ({ input }) => {
-      const views = await prisma.ticketSeen.findMany({
-        where: { ticketId: input.ticketId },
-        orderBy: { seenAt: "desc" },
-        select: { user: { select: { id: true, name: true, image: true } } },
-      });
-      return views.map((view) => view.user);
-    }),
-
   addComment: protectedProcedure
     .input(
       z.object({

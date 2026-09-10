@@ -69,6 +69,7 @@ export const notificationDetailInclude = {
     select: {
       sourceType: true,
       reasonWhy: true,
+      createdAt: true,
       sourceRecord: {
         select: {
           id: true,
@@ -130,6 +131,24 @@ export type AffectedAssetsSummary = {
   NO_ISSUES: AffectedAssetGroupSummary[];
 };
 
+const actorSelect = { select: { id: true, name: true, image: true } } as const;
+
+export const fieldCorrectionInclude = {
+  user: actorSelect,
+} satisfies Prisma.FieldCorrectionInclude;
+
+export type NotificationFieldCorrection = Prisma.FieldCorrectionGetPayload<{
+  include: typeof fieldCorrectionInclude;
+}>;
+
+export const readReceiptInclude = {
+  user: actorSelect,
+} satisfies Prisma.NotificationReadInclude;
+
+export type NotificationReadReceipt = Prisma.NotificationReadGetPayload<{
+  include: typeof readReceiptInclude;
+}>;
+
 export type NotificationDetailWithRelations = Omit<
   NotificationDetailBasePayload,
   "deviceGroupsMatchings"
@@ -138,6 +157,8 @@ export type NotificationDetailWithRelations = Omit<
     assetCount: number;
   })[];
   affectedAssets: AffectedAssetsSummary;
+  fieldCorrections: NotificationFieldCorrection[];
+  readReceipts: NotificationReadReceipt[];
 };
 
 export type NotificationDetailSource =

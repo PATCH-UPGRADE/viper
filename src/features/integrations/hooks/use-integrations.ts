@@ -33,7 +33,6 @@ const useInvalidateIntegrations = () => {
 
 export const useCreateIntegration = () => {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const invalidateIntegrations = useInvalidateIntegrations();
 
   return useMutation(
@@ -41,10 +40,6 @@ export const useCreateIntegration = () => {
       onSuccess: () => {
         toast.success("Integration created");
         invalidateIntegrations();
-        // Need to recount # of active ApiKey Connectors
-        queryClient.invalidateQueries(
-          trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
-        );
       },
       onError: (error) => {
         toast.error(`Failed to create Integration: ${error.message}`);
@@ -56,7 +51,6 @@ export const useCreateIntegration = () => {
 
 export const useRemoveIntegration = () => {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const invalidateIntegrations = useInvalidateIntegrations();
 
   return useMutation(
@@ -64,10 +58,6 @@ export const useRemoveIntegration = () => {
       onSuccess: () => {
         toast.success("Integration removed");
         invalidateIntegrations();
-        // Need to recount # of active ApiKey Connectors
-        queryClient.invalidateQueries(
-          trpc.apiKeyConnectors.getManyTypeCountInternal.queryOptions(),
-        );
       },
       onError: (error) => {
         toast.error(`Failed to remove Integration: ${error.message}`);

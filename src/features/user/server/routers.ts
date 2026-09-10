@@ -42,13 +42,6 @@ export const userRouter = createTRPCRouter({
         skip: meta.skip,
         take: meta.take,
         where: whereFilter,
-        include: {
-          connector: {
-            select: {
-              resourceType: true,
-            },
-          },
-        },
         orderBy: { createdAt: "desc" },
       });
 
@@ -59,7 +52,7 @@ export const userRouter = createTRPCRouter({
     .input(apiTokenInputSchema)
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.auth.user.id;
-      const { name, resourceType } = input;
+      const { name } = input;
 
       const data = await auth.api.createApiKey({
         body: {
@@ -75,50 +68,17 @@ export const userRouter = createTRPCRouter({
           //permissions, // server-only
         },
       });
-
-      await prisma.apiKeyConnector.create({
-        data: {
-          name,
-          resourceType,
-          lastRequest: data.lastRequest,
-          apiKeyId: data.id,
-          userId,
-        },
-      });
       return data;
     }),
 
   removeApiToken: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await prisma.$transaction(async (tx) => {
-        // Scope to the owner (referenceId) so a user can only delete their own
-        // key; throws if it's missing or not theirs.
-        const apiKeyResult = await tx.apikey.findFirstOrThrow({
-          where: { id: input.id, referenceId: ctx.auth.user.id },
-          select: {
-            name: true,
-            lastRequest: true,
-            connector: {
-              select: {
-                id: true,
-              },
-            },
-          },
-        });
-
-        // a key should always have a connector even
-        // if sometimes a connector doesn't have a key
-        if (apiKeyResult.connector) {
-          // pass values to the connector before deleting the key
-          await tx.apiKeyConnector.update({
-            where: { id: apiKeyResult.connector.id },
-            data: {
-              name: apiKeyResult.name,
-              lastRequest: apiKeyResult.lastRequest,
-            },
-          });
-        }
+      // Scope to the owner (referenceId) so a user can only delete their own
+      // key; throws if it's missing or not theirs.
+      await prisma.apikey.findFirstOrThrow({
+        where: { id: input.id, referenceId: ctx.auth.user.id },
+        select: { id: true },
       });
 
       const data = await auth.api.deleteApiKey({

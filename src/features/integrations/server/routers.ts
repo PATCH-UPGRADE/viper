@@ -184,13 +184,6 @@ export const integrationsRouter = createTRPCRouter({
             resourceSyncs: {
               create: resources.map((resource) => ({ resource })),
             },
-            apiKeyConnector: {
-              create: {
-                name,
-                resourceType: resources[0],
-                userId: ctx.auth.user.id,
-              },
-            },
           },
           include: integrationsInclude,
           omit: omitCredentials,

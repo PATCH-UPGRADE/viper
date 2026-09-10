@@ -3,19 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockPrisma, mockTx } = vi.hoisted(() => {
-  const tx = {
+const { mockPrisma } = vi.hoisted(() => ({
+  mockPrisma: {
     integrationResourceSync: { upsert: vi.fn() },
-    apiKeyConnector: { updateMany: vi.fn() },
-  };
-  return {
-    mockTx: tx,
-    mockPrisma: {
-      // biome-ignore lint/suspicious/noExplicitAny: prisma's interactive-transaction signature
-      $transaction: vi.fn(async (fn: any) => fn(tx)),
-    },
-  };
-});
+  },
+}));
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/lib/router-utils", () => ({ createArtifactWrappers: vi.fn() }));
@@ -40,7 +32,8 @@ const response = (
 const call = (res: IntegrationResponse) =>
   upsertResourceSync("integration-1", ResourceType.Asset, res, SYNCED_AT);
 
-const upsertArgs = () => mockTx.integrationResourceSync.upsert.mock.calls[0][0];
+const upsertArgs = () =>
+  mockPrisma.integrationResourceSync.upsert.mock.calls[0][0];
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -86,16 +79,6 @@ describe("upsertResourceSync", () => {
         integrationId: "integration-1",
         resource: ResourceType.Asset,
       },
-    });
-  });
-
-  it("stamps the connector's lastRequest in the same transaction", async () => {
-    await call(response());
-
-    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(mockTx.apiKeyConnector.updateMany).toHaveBeenCalledWith({
-      where: { integrationId: "integration-1" },
-      data: { lastRequest: SYNCED_AT },
     });
   });
 });

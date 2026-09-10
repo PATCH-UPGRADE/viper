@@ -36,14 +36,14 @@ import type { CombinedPageProps } from "@/lib/page-types";
 import type { PaginationInput } from "@/lib/pagination";
 import { HydrateClient } from "@/trpc/server";
 
-interface ConnectorResourceTypeConfig {
+interface TableResourceTypeConfig {
   errorElement: () => React.ReactNode;
   listElement: React.FC;
   loadingElement: () => React.ReactNode;
   prefetch: (params: PaginationInput) => void;
 }
 
-const LIST_MAPPING: Record<string, ConnectorResourceTypeConfig> = {
+const LIST_MAPPING: Record<string, TableResourceTypeConfig> = {
   [ResourceType.Asset]: {
     errorElement: AssetsError,
     listElement: AssetsList,
@@ -83,6 +83,9 @@ const Page = async ({
 
   const resourceType = integrationsMapping[resourceTypeUrl].type;
   const config = LIST_MAPPING[resourceType];
+  if (!config) {
+    return notFound();
+  }
   const paginationParams = await paginationParamsLoader(searchParams);
   await config.prefetch({ ...paginationParams });
 

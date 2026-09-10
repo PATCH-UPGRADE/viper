@@ -2,6 +2,7 @@ import "server-only";
 import { persistMitigationPlans } from "@/features/inbox/agent/mitigation/persist";
 import { generateQuestionForNotification } from "@/features/inbox/agent/question";
 import { triageNotification } from "@/features/inbox/agent/triage";
+import { persistTriageResult } from "@/features/inbox/agent/triage/persist";
 import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
 import { Prisma, SourceChannel, SourceLinkType } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -134,14 +135,7 @@ export const analyzeRemediation = inngest.createFunction(
 
     await step.run("triage-notification", async () => {
       const result = await triageNotification(sourceId, notificationId);
-      await prisma.notification.update({
-        where: { id: notificationId },
-        data: {
-          priority: result.priority,
-          priorityReasonWhy: result.priorityReasonWhy,
-          hospitalImpact: result.hospitalImpact,
-        },
-      });
+      await persistTriageResult(notificationId, result);
       return { priority: result.priority };
     });
 

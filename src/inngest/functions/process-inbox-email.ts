@@ -12,6 +12,7 @@ import { matchAndLinkEntities } from "@/features/inbox/agent/match";
 import { persistMitigationPlans } from "@/features/inbox/agent/mitigation/persist";
 import { generateQuestionForNotification } from "@/features/inbox/agent/question";
 import { triageNotification } from "@/features/inbox/agent/triage";
+import { persistTriageResult } from "@/features/inbox/agent/triage/persist";
 import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
 import {
   fetchPdfAttachmentsFromResend,
@@ -424,14 +425,7 @@ export const processInboxEmail = inngest.createFunction(
           notificationId,
           inlinedPdfs ?? undefined,
         );
-        await prisma.notification.update({
-          where: { id: notificationId },
-          data: {
-            priority: result.priority,
-            priorityReasonWhy: result.priorityReasonWhy,
-            hospitalImpact: result.hospitalImpact,
-          },
-        });
+        await persistTriageResult(notificationId, result);
         return {
           priority: result.priority,
           priorityReasonWhy: result.priorityReasonWhy,

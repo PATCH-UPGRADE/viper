@@ -2,7 +2,6 @@
 
 import {
   ActivityTimeline,
-  actorFromUser,
   type TimelineActor,
   type TimelineEntry,
   VIPER_ACTOR,
@@ -65,7 +64,9 @@ const rowBody = (row: NotificationActivityRow) => {
 };
 
 const rowActor = (row: NotificationActivityRow): TimelineActor =>
-  row.kind === "FIELD_CHANGED" ? actorFromUser(row.user) : VIPER_ACTOR;
+  row.kind === "FIELD_CHANGED"
+    ? { name: row.user.name, image: row.user.image, isAgent: row.isAgent }
+    : VIPER_ACTOR;
 
 export const NotificationActivityTimeline = ({
   notification,

@@ -1,6 +1,10 @@
 import "server-only";
-import { AUTOMATION_USER_ID } from "@/config/constants";
 import prisma from "@/lib/db";
+
+// Fixed id for the single service account that owns automatically-ingested
+// records (e.g. work-order tickets created from forwarded emails). Using a
+// stable id makes find-or-create idempotent and keeps provenance clear.
+export const AUTOMATION_USER_ID = "viper-automation";
 
 /**
  * Find-or-create the VIPER Automation service user. Used as `creatorId` for

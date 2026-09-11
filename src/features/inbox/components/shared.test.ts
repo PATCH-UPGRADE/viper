@@ -140,6 +140,7 @@ describe("notificationActivityRows", () => {
         reason: "Machines are already segmented.",
         createdAt: new Date("2026-08-08T10:00:00Z"),
         user,
+        isAgent: false,
       },
     ],
   };
@@ -175,6 +176,7 @@ describe("notificationActivityRows", () => {
       to: "High",
       reason: "Machines are already segmented.",
       user,
+      isAgent: false,
     });
     expect(rows).toHaveLength(3);
   });

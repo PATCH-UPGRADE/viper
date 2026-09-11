@@ -22,5 +22,3 @@ export const DEBRIEF_POLL_INTERVAL_MS = 10_000;
 export const RECENT_ASSET_WINDOW_MS = 10 * 60 * 1000;
 
 export const RECENT_UPDATES_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-export const AUTOMATION_USER_ID = "viper-automation";

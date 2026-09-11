@@ -137,7 +137,7 @@ export const fieldCorrectionInclude = {
 
 export type NotificationFieldCorrection = Prisma.FieldCorrectionGetPayload<{
   include: typeof fieldCorrectionInclude;
-}>;
+}> & { isAgent: boolean };
 
 export type NotificationDetailWithRelations = Omit<
   NotificationDetailBasePayload,

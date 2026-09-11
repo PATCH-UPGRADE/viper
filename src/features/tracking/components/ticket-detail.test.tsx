@@ -996,7 +996,6 @@ describe("TicketDetailContent — view mode", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Comment")).toBeInTheDocument();
 
-    // The status-change row reads as label, old badge, new badge
     const statusEntry = screen.getByLabelText("Activity: STATUS_CHANGED");
     expect(within(statusEntry).getByText("Status")).toBeInTheDocument();
     expect(within(statusEntry).getByText("To Do")).toBeInTheDocument();

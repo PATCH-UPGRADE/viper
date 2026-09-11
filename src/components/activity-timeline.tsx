@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import { CollapsibleSectionCard } from "@/components/collapsible-section-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { AUTOMATION_USER_ID } from "@/config/constants";
 import { formatScheduled } from "@/lib/date-utils";
 import { initialsOf } from "@/lib/string-utils";
 
@@ -30,10 +29,8 @@ export const VIPER_ACTOR: TimelineActor = {
   isAgent: true,
 };
 
-export const isAutomationActor = (user: {
-  id: string;
-  integrationUser?: { id: string } | null;
-}) => user.id === AUTOMATION_USER_ID || !!user.integrationUser;
+const isAutomationActor = (user: { integrationUser?: { id: string } | null }) =>
+  !!user.integrationUser;
 
 export const actorFromUser = (user: {
   id: string;
@@ -107,11 +104,9 @@ const TimelineRow = ({
 export const ActivityTimeline = ({
   entries,
   composer,
-  emptyMessage = "No activity yet.",
 }: {
   entries: TimelineEntry[];
   composer?: ReactNode;
-  emptyMessage?: string;
 }) => {
   const newestFirst = [...entries].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
@@ -136,7 +131,7 @@ export const ActivityTimeline = ({
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+          <p className="text-sm text-muted-foreground">No activity yet.</p>
         )}
       </div>
     </CollapsibleSectionCard>

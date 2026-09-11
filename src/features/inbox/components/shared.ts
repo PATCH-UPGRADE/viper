@@ -45,10 +45,11 @@ export type NotificationActivityRow =
       id: string;
       createdAt: Date;
       field: string;
-      from: string;
+      from: string | null;
       to: string;
       reason: string | null;
       user: ActivityActor;
+      isAgent: boolean;
     };
 
 type ActivitySource = {
@@ -66,6 +67,7 @@ type ActivityCorrection = {
   reason: string | null;
   createdAt: Date;
   user: ActivityActor;
+  isAgent: boolean;
 };
 
 const sourceRow = (link: ActivitySource): NotificationActivityRow => ({
@@ -84,10 +86,11 @@ const fieldChangeRow = (
   id: `correction-${correction.id}`,
   createdAt: new Date(correction.createdAt),
   field: correction.field,
-  from: String(correction.fromValue ?? ""),
+  from: correction.fromValue == null ? null : String(correction.fromValue),
   to: String(correction.toValue ?? ""),
   reason: correction.reason,
   user: correction.user,
+  isAgent: correction.isAgent,
 });
 
 export function notificationActivityRows(notification: {

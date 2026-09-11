@@ -95,11 +95,12 @@ export function useViperChat(
             agent: cfg.agent ?? "chat",
             assetData: cfg.assetData,
             vulnerabilityData: cfg.vulnerabilityData,
+            fromReports: !!controlledThreadId,
           },
         },
       );
     },
-    [currentThreadId, config, userRole, sendMessage],
+    [currentThreadId, config, userRole, sendMessage, controlledThreadId],
   );
 
   const switchThread = useCallback(

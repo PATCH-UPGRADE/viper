@@ -61,6 +61,27 @@ async function resolveVulnerabilityIds(
   );
 }
 
+/**
+ * The description we store, with every vulnerability the remediation claims to
+ * fix named in it.
+ *
+ * Viper holds one vulnerability per remediation and MedISAO lists many, so the
+ * rest would be lost: the sync stores no raw payload, and an identifier we do
+ * not already hold resolves to nothing. Naming them keeps them readable and
+ * searchable even when Viper has never heard of them.
+ *
+ * Built from the feed alone. Marking which ones Viper holds would rewrite this
+ * text every time a vulnerability was added, so a re-sync would churn the row.
+ */
+export const describeRemediation = (
+  item: Pick<MedIsaoRemediationItem, "description" | "fixedVulnerabilities">,
+): string | null => {
+  if (item.fixedVulnerabilities.length === 0) return item.description;
+
+  const fixes = `Fixes: ${item.fixedVulnerabilities.join(", ")}`;
+  return item.description ? `${item.description}\n\n${fixes}` : fixes;
+};
+
 async function ingestRemediations(
   items: MedIsaoRemediationItem[],
   integrationId: string,
@@ -120,7 +141,7 @@ async function ingestRemediations(
         const vulnerabilityId = resolved.length === 1 ? resolved[0] : null;
 
         const fields = {
-          description: item.description,
+          description: describeRemediation(item),
           narrative: item.narrative,
           sourceImpact: item.sourceImpact,
           ...(vulnerabilityId ? { vulnerabilityId } : {}),

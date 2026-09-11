@@ -29,7 +29,9 @@ vi.mock("../session", () => ({
   createMedIsaoSession: (): Session => ({ request }),
 }));
 
-const { syncRemediations } = await import("../remediations/sync");
+const { describeRemediation, syncRemediations } = await import(
+  "../remediations/sync"
+);
 
 const API = "https://dev.example.test";
 
@@ -234,6 +236,58 @@ describe("syncRemediations", () => {
   });
 });
 
+describe("the description we store", () => {
+  // Viper keeps one vulnerability per remediation and MedISAO lists many, so
+  // anything unresolved would otherwise vanish: the sync stores no raw payload.
+  it("names every vulnerability the remediation claims to fix", () => {
+    expect(
+      describeRemediation({
+        description: "patch it",
+        fixedVulnerabilities: ["CVE-2026-0001", "GHSA-abc", "VENDOR-7"],
+      }),
+    ).toBe("patch it\n\nFixes: CVE-2026-0001, GHSA-abc, VENDOR-7");
+  });
+
+  it("names the one we did link, so the text does not depend on what Viper holds", () => {
+    expect(
+      describeRemediation({
+        description: "patch it",
+        fixedVulnerabilities: ["CVE-2026-0001"],
+      }),
+    ).toBe("patch it\n\nFixes: CVE-2026-0001");
+  });
+
+  it("stands alone when the feed gave no description", () => {
+    expect(
+      describeRemediation({
+        description: null,
+        fixedVulnerabilities: ["CVE-2026-0001"],
+      }),
+    ).toBe("Fixes: CVE-2026-0001");
+  });
+
+  it("leaves the description alone when nothing is fixed", () => {
+    expect(
+      describeRemediation({
+        description: "patch it",
+        fixedVulnerabilities: [],
+      }),
+    ).toBe("patch it");
+    expect(
+      describeRemediation({ description: null, fixedVulnerabilities: [] }),
+    ).toBeNull();
+  });
+
+  // A re-sync rebuilds this from the feed, so the row must not drift.
+  it("produces the same text every time", () => {
+    const item = {
+      description: "patch it",
+      fixedVulnerabilities: ["CVE-2026-0001", "CVE-2026-0002"],
+    };
+    expect(describeRemediation(item)).toBe(describeRemediation(item));
+  });
+});
+
 describe("the ingest mapping", () => {
   /** Run the sync, then drive the transform the ingest helper was handed. */
   const transformOf = async (over: Record<string, unknown> = {}) => {
@@ -258,6 +312,23 @@ describe("the ingest mapping", () => {
       workflowImpact: "imaging paused",
       clinicalImpactNotes: "schedule outside clinic hours",
     });
+  });
+
+  it("writes the fixed vulnerabilities onto the row, held or not", async () => {
+    prismaMock.vulnerability.findMany.mockResolvedValue([
+      { id: "vuln-1", cveId: "CVE-2026-0001" },
+    ]);
+
+    const { createData } = await transformOf({
+      fixed_vulnerabilities: ["CVE-2026-0001", "GHSA-unknown"],
+    });
+
+    // One resolved and is linked; the other exists nowhere in Viper, so the
+    // description is the only place it survives.
+    expect(createData.vulnerabilityId).toBe("vuln-1");
+    expect(createData.description).toContain(
+      "Fixes: CVE-2026-0001, GHSA-unknown",
+    );
   });
 
   it("resolves the channel to a device group matching, not a CPE", async () => {

@@ -38,8 +38,8 @@ describe("registry", () => {
   // can only handle them through the adapter. Declaring one without the other
   // leaves every snapshot unprocessed, and nothing else would say so.
   //
-  // Fleet is the one platform in that state today so its snapshots are written 
-  // and never become Notifications. Listed rather than skipped, 
+  // Fleet is the one platform in that state today so its snapshots are written
+  // and never become Notifications. Listed rather than skipped,
   // so a new platform still fails.
   const KNOWN_MISSING_ADAPTERS: PlatformEnum[] = [PlatformEnum.FLEET];
 

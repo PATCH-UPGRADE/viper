@@ -30,6 +30,7 @@ interface ChatBody {
   agent?: "chat" | "giveRecommendations";
   assetData?: AssetWithIssueRelations;
   vulnerabilityData?: VulnerabilityWithRelations;
+  fromReports?: boolean;
 }
 
 function textOf(message: UIMessage | undefined): string {
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
   }
   const userText = textOf(newUserMessage);
   const threadId = body.threadId ?? crypto.randomUUID();
-  const { agent, assetData, vulnerabilityData } = body;
+  const { agent, assetData, vulnerabilityData, fromReports } = body;
   let userMessageSaved = false;
 
   const stream = createUIMessageStream({
@@ -101,6 +102,7 @@ export async function POST(req: Request) {
               userRole,
               threadId,
               report: thread.report,
+              fromReports,
             });
 
       await streamGraphToUI({ graph, input: { messages: history }, writer });

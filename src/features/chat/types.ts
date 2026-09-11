@@ -86,12 +86,14 @@ export const fetchThreadsSchema = z.object({
   offset: z.number().int().min(0).optional(),
 });
 
-// Scalar columns for the thread list — deliberately excludes the `report` TEXT
-// blob, which the list never shows.
+// Scalar columns for the thread list — deliberately excludes the report's
+// content, which the list never shows. reportId is included as a has-a-report
+// signal (e.g. the thread selector's report indicator), not its content.
 export const chatThreadListSelect = {
   id: true,
   userId: true,
   title: true,
+  reportId: true,
   createdAt: true,
   updatedAt: true,
   _count: { select: { messages: true } },
@@ -101,6 +103,7 @@ export const chatThreadSchema = z.object({
   id: z.string(),
   userId: z.string(),
   title: z.string().nullable(),
+  reportId: z.string().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
   _count: z.object({

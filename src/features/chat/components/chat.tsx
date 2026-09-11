@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  FileText,
   Fullscreen,
   Loader2,
   MessageSquarePlus,
@@ -57,6 +58,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
+import { ReportAttachment } from "@/features/chat/components/report-modal";
 import { useChatUI } from "@/features/chat/context/chat-panel-context";
 import { useSuggestedQuestions } from "@/features/chat/context/suggested-questions-context";
 import {
@@ -868,6 +870,7 @@ function ChatInputForm({
 interface ThreadListItem {
   id: string;
   title: string | null;
+  reportId: string | null;
 }
 
 function ThreadSelector({
@@ -933,8 +936,11 @@ function ThreadSelector({
       <SelectContent>
         {threads.map((thread) => (
           <SelectItem key={thread.id} value={thread.id}>
-            <span className="truncate max-w-[200px] block">
-              {thread.title || "New Chat"}
+            <span className="flex items-center gap-1.5 max-w-[200px]">
+              <span className="truncate">{thread.title || "New Chat"}</span>
+              {thread.reportId && (
+                <FileText className="size-3 shrink-0 text-muted-foreground" />
+              )}
             </span>
           </SelectItem>
         ))}
@@ -977,6 +983,8 @@ function ChatInner({
     newThread,
     deleteThread,
     isLoadingHistory,
+    report,
+    reportTitle,
   } = useViperChat(config, controlledThreadId);
 
   const [input, setInput] = useState("");
@@ -1135,6 +1143,12 @@ function ChatInner({
       {status === "error" && error && (
         <ChatError error={error} onClear={clearError} />
       )}
+
+      <ReportAttachment
+        threadId={currentThreadId}
+        title={reportTitle}
+        report={report}
+      />
 
       <ChatInputForm
         input={input}

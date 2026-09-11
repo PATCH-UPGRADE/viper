@@ -7,7 +7,7 @@ import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-
 import { AIChat } from "@/features/chat/components/chat";
 import { useTRPC } from "@/trpc/client";
 
-const EXPORTS = [
+export const EXPORTS = [
   ["pdf", "PDF"],
   ["docx", "Word"],
 ] as const;

@@ -1,11 +1,11 @@
 "use client";
 
+import { CollapsibleSectionCard } from "@/components/collapsible-section-card";
 import { Badge } from "@/components/ui/badge";
 import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getChipClass } from "@/features/tag-colors/palette";
 import type { TicketDetail } from "../../types";
-import { CollapsibleSectionCard } from "./section-card";
 
 export const DescriptionCard = ({ data }: { data: TicketDetail }) => {
   if (data.descriptions.length === 0 && !data.body) return null;

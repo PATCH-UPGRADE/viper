@@ -9,6 +9,7 @@ import {
   Priority,
 } from "@/generated/prisma";
 import { requestNoteAction } from "@/inngest/functions/notes-action";
+import { AUTOMATION_USER_ID } from "@/lib/automation-user";
 import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
@@ -24,6 +25,7 @@ import {
 import { findDeviceGroupIdsForMatchings } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
+  fieldCorrectionInclude,
   type MatchingWithLabels,
   notificationDetailInclude,
   notificationInclude,
@@ -416,7 +418,22 @@ export const notificationsRouter = createTRPCRouter({
         assetCount: countByMatchingId.get(m.deviceGroupMatching.id) ?? 0,
       }));
 
-      return { ...notification, deviceGroupsMatchings, affectedAssets };
+      const correctionRecords = await prisma.fieldCorrection.findMany({
+        where: { targetType: "Notification", targetId: input.id },
+        include: fieldCorrectionInclude,
+        orderBy: { createdAt: "asc" },
+      });
+      const fieldCorrections = correctionRecords.map((correction) => ({
+        ...correction,
+        isAgent: correction.userId === AUTOMATION_USER_ID,
+      }));
+
+      return {
+        ...notification,
+        deviceGroupsMatchings,
+        affectedAssets,
+        fieldCorrections,
+      };
     }),
 
   getAffectedAssetsPage: protectedProcedure

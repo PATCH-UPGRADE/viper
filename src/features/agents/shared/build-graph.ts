@@ -35,11 +35,11 @@ const lastAi = (messages: BaseMessage[]) =>
  * Tools that hand control back to the user: the turn ends after them and only
  * resumes when the user answers / accepts.
  */
-const HALT_TOOLS = new Set(["ask_user_questions", "propose_fleet_work_order"]);
+const HALT_TOOLS = new Set(["ask_user_questions", "propose_work_order"]);
 
 /**
  * A halting tool prefixes its result with this when it refuses the call (e.g. a
- * work order proposed for an asset Siemens doesn't manage). Such a turn must
+ * work order whose fields the chosen platform refuses). Such a turn must
  * NOT halt — the model has to see the refusal and correct itself or explain it,
  * and the UI must not render an approval card for a proposal that was rejected.
  */

@@ -1,25 +1,18 @@
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import { validatePlatformPayload } from "@/features/work-orders/server/payload";
+import {
+  claimForSubmission,
+  releaseClaim,
+} from "@/features/work-orders/server/submit";
+import { inngest } from "@/inngest/client";
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
-  FLEET_OPERATIONAL_STATUSES,
-  FLEET_PATIENT_DANGERS,
-  FLEET_SOURCE_LABEL,
-  FLEET_SUPPORT_TYPES,
-} from "@/features/integrations/platforms/teamplay-fleet/work-orders/constants";
-import {
-  type FleetManagedAsset,
-  resolveFleetAssets,
-  UnmanagedAssetsError,
-  workOrderIntegration,
-} from "@/features/integrations/platforms/teamplay-fleet/work-orders/managed-assets";
-import { fleetContactFor } from "@/features/integrations/platforms/teamplay-fleet/work-orders/payload";
-import { openFleetWorkOrderFiler } from "@/features/integrations/platforms/teamplay-fleet/work-orders/submit";
-import {
   Priority,
   type Prisma,
   ResourceType,
+  SubmissionState,
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
@@ -940,20 +933,23 @@ export const trackingRouter = createTRPCRouter({
       });
     }),
 
-  // ─── Siemens Healthineers Fleet work orders (proposed in chat) ─────────────
+  // ─── Work orders proposed by an agent ──────────────────────────────────────
 
   /**
-   * Has this chat proposal already been accepted? Chat history rehydrates stored
-   * tool parts on reload, so without this the card would offer a live Accept
-   * button again for a work order that has already been filed.
+   * How far has this proposal got? Chat history rehydrates stored tool parts on
+   * reload, so without this the card would offer a live Approve button for an
+   * order that has already been filed.
    */
-  getFleetProposalStatus: protectedProcedure
-    .input(z.object({ toolCallId: z.string() }))
+  getWorkOrderDraft: protectedProcedure
+    .input(z.object({ ticketId: z.string() }))
     .query(async ({ input }) => {
       const ticket = await prisma.workOrderTicket.findUnique({
-        where: { chatToolCallId: input.toolCallId },
+        where: { id: input.ticketId },
         select: {
           id: true,
+          isDraft: true,
+          submissionState: true,
+          submissionError: true,
           externalMappings: { select: { externalId: true } },
           children: {
             select: { externalMappings: { select: { externalId: true } } },
@@ -963,7 +959,12 @@ export const trackingRouter = createTRPCRouter({
       if (!ticket) return null;
 
       return {
-        ticketId: ticket.id,
+        isDraft: ticket.isDraft,
+        submissionState: ticket.submissionState,
+        submissionError: ticket.submissionError,
+        // The mapping lives on the per-asset child, because one platform record
+        // exists per asset. The parent carries one only for platforms that file
+        // per ticket.
         externalIds: [
           ...ticket.externalMappings.map((m) => m.externalId),
           ...ticket.children.flatMap((c) =>
@@ -974,227 +975,111 @@ export const trackingRouter = createTRPCRouter({
     }),
 
   /**
-   * Accept an agent's work-order proposal: file it on teamplay Fleet, then
-   * record it in VIPER. Fleet models activities per equipment, so a proposal
-   * covering N assets files N work orders; each becomes a dedicated
-   * per-asset child of a parent ticket that carries the proposal's
-   * toolCallId, same as any other asset attachment.
+   * Approve a proposed work order: promote it out of draft so VIPER tracks it,
+   * then, when a platform manages its assets, hand it to the submitter.
+   *
+   * The filing itself runs as a job. A work order can cover dozens of assets and
+   * signing in to a vendor is slow, so doing it here would risk a timeout with
+   * orders already dispatched and nothing recorded.
    */
-  // TODO: VW-432 / VW-430 code to create a fleet work order must live in teamplay-fleet
-  // platform resource module
-  createFleetWorkOrder: protectedProcedure
-    .input(
-      z.object({
-        /** The chat tool call this proposal came from — the idempotency key. */
-        toolCallId: z.string(),
-        assetIds: z.array(z.string()).min(1),
-        summary: z.string().min(1),
-        description: z.string().default(""),
-        category: z.enum(TicketCategory),
-        // Operational flags the approver saw on the card, forwarded to Fleet.
-        supportType: z.enum(FLEET_SUPPORT_TYPES).default("technical"),
-        operationalStatus: z
-          .enum(FLEET_OPERATIONAL_STATUSES)
-          .default("partially_operational"),
-        dangerForPatient: z.enum(FLEET_PATIENT_DANGERS).default("unknown"),
-        overtimeAuthorized: z.boolean().default(false),
-        scheduledAt: z.string().nullish(),
-      }),
-    )
+  approveWorkOrder: protectedProcedure
+    .input(z.object({ ticketId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const userId = ctx.auth.user.id;
-      type Failure = { asset: string; message: string };
+      const found = await prisma.workOrderTicket.findUnique({
+        where: { id: input.ticketId },
+        select: {
+          id: true,
+          isDraft: true,
+          mitigationPlanId: true,
+          targetIntegrationId: true,
+          platformPayload: true,
+          submissionState: true,
+        },
+      });
+      const ticket = requireExistence(found, "Work order");
 
-      // Fleet won't accept an online ticket for a patient-safety issue — it
-      // requires a phone call — so never POST one. The card shows the same
-      // guidance; this is the server-side guard (client is untrusted).
-      if (input.dangerForPatient === "yes") {
+      // A mitigation-plan ticket is drafted and promoted by the plan's own
+      // accept flow. Approving one here would publish it without the plan.
+      if (ticket.mitigationPlanId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message:
-            "A patient-safety issue can't be filed as an online work order — Siemens Healthineers requires you to report it by phone.",
+            "This work order belongs to a mitigation plan. Accept the plan instead.",
         });
       }
 
-      // Read whatever's already persisted for this proposal into the response
-      // shape. Used by both the fast path and the lost-claim race path — the
-      // unique chatToolCallId is the idempotency key.
-      const readAccepted = async () => {
-        const t = await prisma.workOrderTicket.findUnique({
-          where: { chatToolCallId: input.toolCallId },
-          select: {
-            id: true,
-            externalMappings: { select: { externalId: true } },
-            children: {
-              select: { externalMappings: { select: { externalId: true } } },
-            },
-          },
-        });
-        if (!t) return null;
-        return {
-          ticketId: t.id,
-          externalIds: [
-            ...t.externalMappings.map((m) => m.externalId),
-            ...t.children.flatMap((c) =>
-              c.externalMappings.map((m) => m.externalId),
-            ),
-          ],
-          alreadyAccepted: true as const,
-          failures: [] as Failure[],
-        };
-      };
-
-      // Fast path: this proposal was already accepted (double-click / retry).
-      const already = await readAccepted();
-      if (already) return already;
-
-      // Re-check the Siemens-managed scope server-side. The tool already checked
-      // it, but the model and the client are both untrusted inputs here.
-      let assets: FleetManagedAsset[];
-      try {
-        assets = await resolveFleetAssets(input.assetIds);
-      } catch (error) {
-        if (error instanceof UnmanagedAssetsError) {
-          throw new TRPCError({ code: "FORBIDDEN", message: error.message });
-        }
-        throw error;
-      }
-
-      const scheduledAt = input.scheduledAt
-        ? new Date(input.scheduledAt)
-        : null;
-
-      // Claim the idempotency row BEFORE any Fleet call. The unique
-      // chatToolCallId means a concurrent request loses this create race (P2002)
-      // and returns the winner instead of filing a second set of Fleet orders.
-      let root: { id: string };
-      try {
-        root = await prisma.workOrderTicket.create({
-          data: {
-            summary: input.summary,
-            body: input.description,
-            category: input.category,
-            status: TicketStatus.TO_DO,
-            scheduledAt,
-            sourceLabel: FLEET_SOURCE_LABEL,
-            chatToolCallId: input.toolCallId,
-            creator: { connect: { id: userId } },
-          },
-          select: { id: true },
-        });
-      } catch (error) {
-        if (isUniqueViolation(error)) {
-          const winner = await readAccepted();
-          if (winner) return winner;
-        }
-        throw error;
-      }
-
-      // Both of these run after the claim row exists, so either failing must
-      // release it. A surviving claim is worse than a leak: the next attempt
-      // takes the already-accepted fast path and reports success for an order
-      // that was never filed.
-      //
-      // Signing in drives a headless browser, so the session is opened once and
-      // every asset is filed through it.
-      let integration: Awaited<ReturnType<typeof workOrderIntegration>>;
-      let filer: Awaited<ReturnType<typeof openFleetWorkOrderFiler>>;
-      try {
-        integration = await workOrderIntegration();
-        filer = await openFleetWorkOrderFiler(integration);
-      } catch (error) {
-        await prisma.workOrderTicket.delete({ where: { id: root.id } });
-        throw new TRPCError({
-          code: "BAD_GATEWAY",
-          message: `Could not file the work order on Siemens Healthineers Fleet: ${error instanceof Error ? error.message : "Unknown error"}`,
-        });
-      }
-
-      const contact = fleetContactFor(
-        {
-          name: ctx.auth.user.name ?? "",
-          email: ctx.auth.user.email ?? "",
-        },
-        filer.config.contactPhone,
-      );
-
-      // Now that we hold the claim, file on Fleet. Failures are collected per
-      // asset rather than aborting: an order Fleet did accept must still be
-      // tracked here.
-      const filed: {
-        asset: FleetManagedAsset;
-        externalId: string;
-      }[] = [];
-      const failures: Failure[] = [];
-
-      for (const asset of assets) {
-        try {
-          const result = await filer.file({
-            equipmentKey: asset.equipmentKey,
-            summary: input.summary,
-            description: input.description,
-            category: input.category,
-            supportType: input.supportType,
-            operationalStatus: input.operationalStatus,
-            dangerForPatient: input.dangerForPatient,
-            overtimeAuthorized: input.overtimeAuthorized,
-            scheduledAt: input.scheduledAt ?? null,
-            contact,
-            // Our reference on the Fleet ticket, so an order can be traced back
-            // to the proposal it came from.
-            ownIncidentNumber: input.toolCallId,
-          });
-          filed.push({ asset, externalId: result.externalId });
-        } catch (error) {
-          failures.push({
-            asset: asset.hostname ?? asset.ip ?? asset.assetId,
-            message: error instanceof Error ? error.message : "Unknown error",
-          });
-        }
-      }
-
-      // Nothing filed → drop the claim so a genuine retry can proceed, then fail.
-      if (filed.length === 0) {
-        await prisma.workOrderTicket.delete({ where: { id: root.id } });
-        throw new TRPCError({
-          code: "BAD_GATEWAY",
-          message: `Fleet did not accept the work order: ${failures.map((f) => f.message).join("; ")}`,
-        });
-      }
-
-      const childIds: string[] = [];
-      await prisma.$transaction(
-        async (tx) => {
-          for (const { asset, externalId } of filed) {
-            const childTicketId = await createAssetTicket(tx, {
-              parentTicketId: root.id,
-              assetId: asset.assetId,
-              actorId: userId,
-              externalMapping: {
-                integrationId: integration.id,
-                externalId,
-                lastSynced: new Date(),
-              },
-            });
-            childIds.push(childTicketId);
-          }
-        },
-        { timeout: 30_000 },
-      );
-
-      try {
-        await Promise.all(
-          [root.id, ...childIds].map((id) => recordCreationActivity(id)),
+      // Checked before anything is promoted: a rejected payload must leave the
+      // proposal exactly as it was, so the card can still offer Approve. It is
+      // re-checked here rather than trusted from drafting time, because a stored
+      // payload can outlive the rules that accepted it and the client is
+      // untrusted.
+      if (ticket.targetIntegrationId) {
+        const checked = await validatePlatformPayload(
+          ticket.targetIntegrationId,
+          ticket.platformPayload,
         );
+        if (!checked.ok) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: checked.reason });
+        }
+      }
+
+      // Promote once the payload is known to be fileable. A filing that fails
+      // after this still leaves a tracked work order, so the user's decision is
+      // never lost. The per-asset children carry the parent's draft state, so
+      // they are promoted with it.
+      if (ticket.isDraft) {
+        await prisma.workOrderTicket.updateMany({
+          where: {
+            OR: [{ id: ticket.id }, { parentId: ticket.id }],
+            isDraft: true,
+          },
+          data: { isDraft: false },
+        });
+        try {
+          await recordCreationActivity(ticket.id);
+        } catch (error) {
+          console.error("recordCreationActivity (approve) failed", error);
+        }
+      }
+
+      if (!ticket.targetIntegrationId) {
+        // Nothing manages these assets, so VIPER tracks it and that is all.
+        return { ticketId: ticket.id, submissionState: ticket.submissionState };
+      }
+
+      // Two approvals racing each other both read PENDING; only one claim wins,
+      // and the loser must not send a second order.
+      const claimed = await claimForSubmission(ticket.id);
+      if (!claimed) {
+        const current = await prisma.workOrderTicket.findUniqueOrThrow({
+          where: { id: ticket.id },
+          select: { submissionState: true },
+        });
+        return {
+          ticketId: ticket.id,
+          submissionState: current.submissionState,
+        };
+      }
+
+      // The claim is held from here on. If the job is never queued, nothing else
+      // releases it, and the ticket stays SUBMITTING forever with no filing and
+      // no retry, so hand it back before reporting the failure.
+      try {
+        await inngest.send({
+          name: "workOrder/submit.requested",
+          data: { ticketId: ticket.id, actorId: ctx.auth.user.id },
+        });
       } catch (error) {
-        console.error("recordCreationActivity (fleet) failed", error);
+        await releaseClaim(ticket.id, error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Could not start filing the work order: ${error instanceof Error ? error.message : "Unknown error"}`,
+        });
       }
 
       return {
-        ticketId: root.id,
-        externalIds: filed.map((f) => f.externalId),
-        alreadyAccepted: false,
-        failures,
+        ticketId: ticket.id,
+        submissionState: SubmissionState.SUBMITTING,
       };
     }),
 

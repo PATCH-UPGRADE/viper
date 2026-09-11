@@ -1,5 +1,6 @@
 import { PlatformEnum } from "@/generated/prisma";
 import type { ConnectorModule } from "../../core/types";
+import { notifications } from "./advisories";
 import { assets } from "./assets";
 import {
   configSchema,
@@ -23,4 +24,5 @@ export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
   onCreate,
   assets,
   workOrders,
+  notifications,
 };

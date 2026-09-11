@@ -16,16 +16,21 @@ CREATE TABLE "ChatReport" (
 -- 2. Nullable FK column.
 ALTER TABLE "ChatThread" ADD COLUMN "reportId" TEXT;
 
--- 3. Move data. Reuse the thread id as the report id — opaque, guaranteed
---    unique, no id generation needed in raw SQL.
-INSERT INTO "ChatReport" ("id", "content", "createdAt", "updatedAt")
-SELECT "id", "report", "createdAt", "updatedAt"
-FROM "ChatThread"
-WHERE "report" IS NOT NULL;
-
-UPDATE "ChatThread"
-SET "reportId" = "id"
-WHERE "report" IS NOT NULL;
+-- 3. Move data in one pass over ChatThread. Reuse the thread id as the report
+--    id — opaque, guaranteed unique, no id generation needed in raw SQL — so
+--    the follow-up UPDATE can join on the (indexed) primary key instead of
+--    re-scanning ChatThread with the same WHERE.
+WITH moved AS (
+  INSERT INTO "ChatReport" ("id", "content", "createdAt", "updatedAt")
+  SELECT "id", "report", "createdAt", "updatedAt"
+  FROM "ChatThread"
+  WHERE "report" IS NOT NULL
+  RETURNING "id"
+)
+UPDATE "ChatThread" t
+SET "reportId" = t."id"
+FROM moved
+WHERE t."id" = moved."id";
 
 -- 4. Drop the old column.
 ALTER TABLE "ChatThread" DROP COLUMN "report";

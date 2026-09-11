@@ -1092,11 +1092,8 @@ model ChatThread {
   // The thread's report (write_report tool), stored in its own ChatReport row.
   // A thread with a non-null reportId is a "report thread" and shows under
   // /reports. Users don't edit it directly — they re-prompt and the agent
-  // rewrites it. @unique keeps this 1:1 for now, chosen so a later move to
-  // one-report / many-threads only relocates the FK, not the model shape.
-  // That move also needs the write_report upsert, createReportThread, and
-  // deleteThread's cleanup (all written for 1:1) reworked — dropping @unique
-  // alone isn't the whole migration.
+  // rewrites it. @unique keeps this 1:1 for now; see deleteThread's cleanup
+  // comment for what breaks if that changes.
   reportId  String?       @unique
   report    ChatReport?   @relation(fields: [reportId], references: [id])
   createdAt DateTime      @default(now())

@@ -133,17 +133,14 @@ export const chatRouter = createTRPCRouter({
       if (!thread) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
+      await prisma.chatThread.delete({ where: { id: input.threadId } });
       // The FK sits on ChatThread, so the report row isn't cascaded — drop it
-      // too. Independent deletes (nothing here for the other to race on), so
-      // run them together. NOTE: this assumes 1:1 — once a ChatReport can be
-      // shared by many threads (see the schema comment), this must check for
-      // other referencing threads before deleting it.
-      await Promise.all([
-        prisma.chatThread.delete({ where: { id: input.threadId } }),
-        thread.reportId
-          ? prisma.chatReport.delete({ where: { id: thread.reportId } })
-          : Promise.resolve(),
-      ]);
+      // too. NOTE: this assumes 1:1 — once a ChatReport can be shared by many
+      // threads (see the schema comment), this must check for other
+      // referencing threads before deleting it.
+      if (thread.reportId) {
+        await prisma.chatReport.delete({ where: { id: thread.reportId } });
+      }
       return { success: true };
     }),
 });

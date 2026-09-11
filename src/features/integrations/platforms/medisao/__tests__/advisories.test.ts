@@ -184,6 +184,32 @@ describe("the advisory feed", () => {
   });
 });
 
+describe("the advisory body", () => {
+  // They live in `raw` too, but nothing reads `raw`: the agents are given the
+  // markdown, and an identifier Viper has never held links to nothing.
+  it("names every vulnerability the advisory references", () => {
+    expect(
+      toMarkdown(
+        rawAdvisorySchema.parse({
+          ...LIVE_ADVISORY,
+          linked_vulnerabilities: ["CVE-2026-0001", "GHSA-abc"],
+        }),
+      ),
+    ).toContain("Referenced vulnerabilities: CVE-2026-0001, GHSA-abc");
+  });
+
+  it("says nothing when the advisory references none", () => {
+    expect(
+      toMarkdown(
+        rawAdvisorySchema.parse({
+          ...LIVE_ADVISORY,
+          linked_vulnerabilities: [],
+        }),
+      ),
+    ).not.toContain("Referenced vulnerabilities");
+  });
+});
+
 describe("syncAdvisories", () => {
   // A failed send used to be unrecoverable: the snapshot is already stored, so
   // the next run's hash dedup finds nothing new and never emits for it again.

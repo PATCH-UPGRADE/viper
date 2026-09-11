@@ -57,6 +57,11 @@ export const toMarkdown = (raw: RawMedIsaoAdvisory): string => {
   if (raw.name) parts.push(`# ${raw.name}`);
   if (raw.description) parts.push(raw.description);
   if (raw.version_text) parts.push(`Affected versions: ${raw.version_text}`);
+  if (raw.linked_vulnerabilities?.length) {
+    parts.push(
+      `Referenced vulnerabilities: ${raw.linked_vulnerabilities.join(", ")}`,
+    );
+  }
   if (raw.url) parts.push(`Source: ${raw.url}`);
   return parts.join("\n\n");
 };

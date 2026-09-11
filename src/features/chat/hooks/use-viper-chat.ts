@@ -55,6 +55,16 @@ export function useViperChat(
     }
   }, [completedReportWrites, queryClient, trpc.chat]);
 
+  // Fetch the report only once one's been written, and only outside /reports
+  // — ReportDetail already has its own report panel for the controlled case.
+  const reportQuery = useQuery({
+    ...trpc.chat.getReportThread.queryOptions({
+      threadId: currentThreadId ?? "",
+    }),
+    enabled:
+      completedReportWrites > 0 && !controlledThreadId && !!currentThreadId,
+  });
+
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const threadsQuery = useQuery({
@@ -155,6 +165,8 @@ export function useViperChat(
     newThread,
     deleteThread,
     isLoadingHistory,
+    report: reportQuery.data?.report ?? null,
+    reportTitle: reportQuery.data?.title ?? null,
   };
 }
 

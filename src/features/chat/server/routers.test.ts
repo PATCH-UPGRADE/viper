@@ -90,6 +90,7 @@ describe("chatRouter — report thread list & creation", () => {
       id,
       userId: FAKE_USER_ID,
       title: id,
+      reportId: "report-1",
       createdAt: new Date(),
       updatedAt: new Date(),
       _count: { messages },

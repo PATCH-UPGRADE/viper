@@ -1,6 +1,11 @@
 "use client";
 
-import { ExternalLinkIcon, MailIcon, PaperclipIcon } from "lucide-react";
+import {
+  ExternalLinkIcon,
+  MailIcon,
+  PaperclipIcon,
+  RssIcon,
+} from "lucide-react";
 import { useState } from "react";
 import type {
   NotificationDetailSource,
@@ -31,6 +36,11 @@ export function NotificationSourcePills({
   const emailSources = sourceRecords.filter(
     (source) => source.channel === "Email",
   );
+  // A snapshot pulled from a platform has no sender to open, so it shows the
+  // integration it came from and links out when the publisher has a page.
+  const integrationSources = sourceRecords.filter(
+    (source) => source.channel !== "Email" && source.mapping !== null,
+  );
   const attachments = sourceRecords.flatMap((source) => source.attachments);
   const cveIds = [
     ...new Set(
@@ -40,7 +50,13 @@ export function NotificationSourcePills({
     ),
   ];
 
-  if (emailSources.length + attachments.length + cveIds.length === 0) {
+  if (
+    emailSources.length +
+      integrationSources.length +
+      attachments.length +
+      cveIds.length ===
+    0
+  ) {
     return null;
   }
 
@@ -75,6 +91,35 @@ export function NotificationSourcePills({
           <ExternalLinkIcon className="size-3 text-muted-foreground" />
         </a>
       ))}
+      {integrationSources.map((source) => {
+        const label =
+          source.mapping?.integration.name ??
+          source.mapping?.integration.platform;
+        const href = source.mapping?.webUrl ?? source.mapping?.upstreamApi;
+
+        if (!href) {
+          return (
+            <span key={source.id} className={PILL}>
+              <span className="truncate">{label}</span>
+              <RssIcon className="size-3 shrink-0 text-muted-foreground" />
+            </span>
+          );
+        }
+
+        return (
+          <a
+            key={source.id}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={PILL}
+            aria-label={`Open the ${label} record in a new tab`}
+          >
+            <span className="truncate">{label}</span>
+            <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground" />
+          </a>
+        );
+      })}
       {emailSources.map((source) => {
         const senderName = emailSenderName(source.raw) ?? "Email";
         const subject = emailSubject(source.raw);

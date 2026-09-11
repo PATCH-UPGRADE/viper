@@ -23,7 +23,15 @@ export const notificationInclude = {
   sourceLinks: {
     select: {
       sourceRecord: {
-        select: { id: true, channel: true, raw: true, observedAt: true },
+        select: {
+          id: true,
+          channel: true,
+          raw: true,
+          observedAt: true,
+          // An integration source has no sender to show, so the row it came
+          // from supplies the name instead.
+          mapping: externalMappingSelect,
+        },
       },
     },
   },

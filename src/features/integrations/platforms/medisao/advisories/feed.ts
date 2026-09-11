@@ -1,6 +1,8 @@
 import { z } from "zod";
+import type { Tlp } from "@/generated/prisma";
 import type { Session } from "../../../core/types";
 import { walkPages, withSince } from "../paginate";
+import { parseTlp } from "../tlp";
 import { channelAdvisoriesUrl } from "../urls";
 import { splitVersion } from "../version";
 
@@ -46,6 +48,8 @@ export interface MedIsaoAdvisoryItem {
   /** What every downstream agent reads. */
   markdown: string;
   vulnerabilityIds: string[];
+  /** Stated by MedISAO, so it is never left to the classifier to infer. */
+  tlp: Tlp | undefined;
 
   updatedAt: string;
   raw: RawMedIsaoAdvisory;
@@ -83,6 +87,7 @@ export const toCanonical = (
   title: raw.name?.trim() || `MedISAO advisory ${raw.id}`,
   markdown: toMarkdown(raw),
   vulnerabilityIds: raw.linked_vulnerabilities ?? [],
+  tlp: parseTlp(raw.tlp),
 
   updatedAt: raw.updated_at,
   raw,

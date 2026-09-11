@@ -61,8 +61,7 @@ export function useViperChat(
     ...trpc.chat.getReportThread.queryOptions({
       threadId: currentThreadId ?? "",
     }),
-    enabled:
-      completedReportWrites > 0 && !controlledThreadId && !!currentThreadId,
+    enabled: completedReportWrites > 0 && !controlledThreadId,
   });
 
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);

@@ -7,7 +7,7 @@ import { partner } from "../platforms/partner";
 import { teamplayFleet } from "../platforms/teamplay-fleet";
 import type { Category } from "../types";
 import { moduleForResource } from "./sync/resources";
-import type { AnyConnectorModule } from "./types";
+import type { AnyConnectorModule, CommentsApi, InquiriesApi } from "./types";
 
 /**
  * Every platform VIPER knows how to run, keyed by the enum on the row.
@@ -45,6 +45,26 @@ export const sourceAdapterFor = (
   platform: PlatformEnum,
 ): SourceRecordAdapter | undefined =>
   registry[platform]?.notifications?.sourceRecords;
+
+/**
+ * How this platform's comments on a resource are read and written, if it has
+ * any. Undefined for a platform with no comment surface, which is not an error.
+ */
+export const commentsApiFor = (
+  platform: PlatformEnum,
+  resource: ResourceType,
+): CommentsApi | undefined =>
+  moduleForResource(requirePlatform(platform), resource)?.comments;
+
+/**
+ * How questions to a manufacturer about a resource are raised, if this platform
+ * carries them. Undefined for a platform with no inquiry surface.
+ */
+export const inquiriesApiFor = (
+  platform: PlatformEnum,
+  resource: ResourceType,
+): InquiriesApi | undefined =>
+  moduleForResource(requirePlatform(platform), resource)?.inquiries;
 
 /** The platform author's own sense of how fast this resource moves. */
 export const defaultSyncEveryFor = (

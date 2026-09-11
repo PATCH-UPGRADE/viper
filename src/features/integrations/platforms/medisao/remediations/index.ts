@@ -1,6 +1,8 @@
 import type { ResourceModule } from "../../../core/types";
 import type { MedIsaoConfig, MedIsaoCreds } from "../config";
+import { comments } from "./comments";
 import type { MedIsaoRemediationItem, RawMedIsaoRemediation } from "./feed";
+import { inquiries } from "./inquiries";
 import { syncRemediations } from "./sync";
 
 /**
@@ -15,6 +17,9 @@ export const remediations: ResourceModule<
   MedIsaoCreds
 > = {
   sync: syncRemediations,
+
+  comments,
+  inquiries,
 
   defaultSyncEvery: 86400,
 };

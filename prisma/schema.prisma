@@ -56,6 +56,8 @@ model User {
   @@unique([email])
   @@index([departmentId])
   @@map("user")
+  commentIdentities  ExternalCommentIdentity[]
+
 }
 
 model Session {
@@ -899,6 +901,8 @@ model Remediation {
   @@index([vulnerabilityId])
   @@index([userId])
   @@map("remediation")
+  commentIdentities ExternalCommentIdentity[]
+
 }
 
 model IssueRemediation {
@@ -982,6 +986,8 @@ model Integration {
   @@index([userId])
   @@index([integrationUserId])
   @@map("integration")
+  commentIdentities ExternalCommentIdentity[]
+
 }
 
 enum SyncStatusEnum {
@@ -1562,6 +1568,36 @@ model SourceLink {
 
 // One row per external record (an advisory, a notification on another platform),
 // owning many snapshots of it.
+// The pseudonym a comment platform derived from the identifier we sent for one
+// person on one record. Written after a successful post.
+//
+// Two reasons it is kept. It is what lets a reader see which comments are their
+// own, since the platform's feed is deliberately anonymous. And it is the only
+// record anywhere that ties a pseudonym back to a person: the platform never
+// authenticated them, so authorship can only ever be attested from this side.
+model ExternalCommentIdentity {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  remediationId String
+  remediation   Remediation @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+
+  integrationId String
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  // Stable within one record and uncorrelated across records, by the platform's
+  // design. Never a user handle.
+  pseudonym String
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, remediationId, integrationId])
+  @@index([remediationId])
+  @@map("external_comment_identity")
+}
+
 model ExternalSourceRecordMapping {
   id            String      @id @default(cuid())
   integrationId String

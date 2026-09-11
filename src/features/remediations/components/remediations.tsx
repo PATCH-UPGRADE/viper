@@ -42,6 +42,9 @@ import type {
   RemediationCard as RemediationCardType,
   RemediationResponse,
 } from "../types";
+import { RemediationComments } from "./remediation-comments";
+import { hasStatedImpact, RemediationImpact } from "./remediation-impact";
+import { RemediationInquiries } from "./remediation-inquiries";
 
 export const RemediationsSearch = () => {
   const [params, setParams] = useRemediationsParams();
@@ -271,6 +274,34 @@ function RemediationDrawer({
                 />
               </div>
             </div>
+          </div>
+
+          {hasStatedImpact(remediation.sourceImpact ?? {}) && (
+            <>
+              <Separator />
+              <div className="flex flex-col gap-2">
+                <h3 className="font-semibold">Manufacturer impact</h3>
+                <RemediationImpact impact={remediation.sourceImpact ?? {}} />
+              </div>
+            </>
+          )}
+
+          <Separator />
+
+          {/* Both sections reach MedISAO when the drawer opens, and each shows
+              its own loading and empty state, so neither blocks the rest. */}
+          <div className="flex flex-col gap-2">
+            <h3 className="font-semibold">Comments from other hospitals</h3>
+            <RemediationComments remediationId={remediation.id} />
+          </div>
+
+          <Separator />
+
+          <div className="flex flex-col gap-2">
+            <h3 className="font-semibold">
+              Your questions to the manufacturer
+            </h3>
+            <RemediationInquiries remediationId={remediation.id} />
           </div>
         </div>
 

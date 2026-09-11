@@ -12,3 +12,9 @@ export const channelRemediationsUrl = (apiUrl: string, channelId: string) =>
 
 export const channelAdvisoriesUrl = (apiUrl: string, channelId: string) =>
   `${channelsUrl(apiUrl)}/${encodeURIComponent(channelId)}/advisories`;
+
+export const remediationCommentsUrl = (apiUrl: string, externalId: string) =>
+  `${root(apiUrl)}/remediations/${encodeURIComponent(externalId)}/comments`;
+
+export const remediationInquiriesUrl = (apiUrl: string, externalId: string) =>
+  `${root(apiUrl)}/remediations/${encodeURIComponent(externalId)}/inquiries`;

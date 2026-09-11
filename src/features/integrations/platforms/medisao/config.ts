@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { authCredentialSchema } from "@/features/integrations/core/credentials";
 import { safeUrlSchema } from "@/lib/schemas";
 
 /**
@@ -13,6 +12,12 @@ export const configSchema = z.object({
 });
 export type MedIsaoConfig = z.infer<typeof configSchema>;
 
-/** MedISAO issues one API key per consumer, sent as `Authorization: Bearer`. */
-export const credentialSchema = authCredentialSchema;
+/**
+ * MedISAO issues one API token per consumer and accepts it only as
+ * `Authorization: Bearer`.
+ *
+ */
+export const credentialSchema = z.object({
+  apiToken: z.string().min(1, "An API token is required"),
+});
 export type MedIsaoCreds = z.infer<typeof credentialSchema>;

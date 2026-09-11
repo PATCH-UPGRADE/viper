@@ -1,4 +1,3 @@
-import { authHeaders } from "@/features/integrations/core/credentials";
 import type { Session } from "../../core/types";
 import type { MedIsaoCreds } from "./config";
 
@@ -14,7 +13,7 @@ export const createMedIsaoSession = (creds: MedIsaoCreds): Session => ({
       ...init,
       headers: {
         Accept: "application/json",
-        ...authHeaders(creds),
+        Authorization: `Bearer ${creds.apiToken}`,
         ...init?.headers,
       },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

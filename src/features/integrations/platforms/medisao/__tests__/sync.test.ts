@@ -68,7 +68,7 @@ const ctx = (
   ({
     integrationId: "int-1",
     config: { apiUrl: API },
-    creds: {},
+    creds: { apiToken: "test-token" },
     cursor: null,
     lastSuccessfulSync: null,
     callback: vi.fn(),

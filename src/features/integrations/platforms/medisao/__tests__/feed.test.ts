@@ -3,11 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { Session } from "../../../core/types";
 import { channelSchema } from "../channels";
 import { MedIsaoRequestError, walkPages, withSince } from "../paginate";
-import {
-  rawRemediationSchema,
-  splitVersion,
-  toCanonical,
-} from "../remediations/feed";
+import { rawRemediationSchema, toCanonical } from "../remediations/feed";
+import { splitVersion } from "../version";
 
 vi.mock("server-only", () => ({}));
 

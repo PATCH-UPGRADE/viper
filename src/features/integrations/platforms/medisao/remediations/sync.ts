@@ -1,42 +1,21 @@
 import "server-only";
-import { z } from "zod";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { resolveMatchingId } from "@/lib/router-utils";
 import type { IntegrationResponse } from "@/lib/schemas";
-import type { Cursor, ResourceSyncCtx, SyncOutcome } from "../../../core/types";
+import type { ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import { listChannels } from "../channels";
 import type { MedIsaoConfig, MedIsaoCreds } from "../config";
 import { MedIsaoRequestError } from "../paginate";
 import { createMedIsaoSession } from "../session";
+import {
+  asDate,
+  type ChannelWatermarks,
+  parseCursor,
+  sinceFor,
+} from "../watermarks";
 import { listChanged, type MedIsaoRemediationItem } from "./feed";
-
-/**
- * One watermark per channel, because MedISAO scopes every remediation endpoint
- * to a channel and each moves at its own pace. A single platform-wide watermark
- * would re-read every channel whenever any one of them changed.
- */
-const cursorSchema = z.record(z.string(), z.string());
-type ChannelWatermarks = z.infer<typeof cursorSchema>;
-
-/** A cursor we cannot read means a full re-read, which the mapping upsert absorbs. */
-const parseCursor = (cursor: Cursor | null): ChannelWatermarks => {
-  const parsed = cursorSchema.safeParse(cursor);
-  return parsed.success ? parsed.data : {};
-};
-
-const asDate = (value: string | undefined): Date | null => {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-};
-
-const sinceFor = (
-  channelId: string,
-  watermarks: ChannelWatermarks,
-  lastSuccessfulSync: Date | null,
-): Date | null => asDate(watermarks[channelId]) ?? lastSuccessfulSync;
 
 /**
  * MedISAO names a vulnerability by identifier, not by our id, and the array is

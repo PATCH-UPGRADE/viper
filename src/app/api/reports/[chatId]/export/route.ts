@@ -42,13 +42,13 @@ export async function GET(
   const { chatId } = await params;
   const thread = await prisma.chatThread.findFirst({
     where: { id: chatId, userId: session.user.id },
-    select: { title: true, report: true },
+    select: { title: true, report: { select: { content: true } } },
   });
-  if (!thread?.report) {
+  if (!thread?.report?.content) {
     return new Response("Report not found", { status: 404 });
   }
 
-  const buffer = await spec.render(thread.report);
+  const buffer = await spec.render(thread.report.content);
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": spec.contentType,

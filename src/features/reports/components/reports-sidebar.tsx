@@ -1,6 +1,10 @@
 "use client";
 
-import { useSuspenseQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";
@@ -12,10 +16,26 @@ export function ReportsSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(
     trpc.chat.getReportThreads.queryOptions({ limit: 50 }),
   );
   const reports = data.threads;
+
+  const { mutateAsync: createReportThread, isPending } = useMutation(
+    trpc.chat.createReportThread.mutationOptions(),
+  );
+
+  // Create the (empty) thread before navigating so it's in the sidebar
+  // immediately, then go to it.
+  const newReport = async () => {
+    const id = crypto.randomUUID();
+    await createReportThread({ threadId: id });
+    // Only the sidebar list depends on this — refetch it in the background
+    // instead of blocking the navigation the user is waiting on.
+    void queryClient.invalidateQueries(trpc.chat.pathFilter());
+    router.push(`/reports/${id}`);
+  };
 
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r">
@@ -26,7 +46,8 @@ export function ReportsSidebar() {
         <Button
           size="sm"
           variant="outline"
-          onClick={() => router.push(`/reports/${crypto.randomUUID()}`)}
+          disabled={isPending}
+          onClick={newReport}
         >
           <PlusIcon className="size-4" />
           New

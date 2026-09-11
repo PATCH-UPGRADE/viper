@@ -26,13 +26,15 @@ export const chatRouter = createTRPCRouter({
       return { threads, hasMore: false, total: threads.length };
     }),
 
-  // Threads that have a report (the /reports list), newest-touched first.
+  // Threads that have a report (the /reports list), newest-touched first. The
+  // report row can be blank ("") — a thread started from /reports before the
+  // agent has written anything still belongs in the list.
   getReportThreads: protectedProcedure
     .input(fetchThreadsSchema)
     .output(fetchThreadsResponseSchema)
     .query(async ({ input, ctx }) => {
       const threads = await prisma.chatThread.findMany({
-        where: { userId: ctx.auth.user.id, report: { not: null } },
+        where: { userId: ctx.auth.user.id, reportId: { not: null } },
         skip: input.offset,
         take: input.limit,
         select: chatThreadListSelect,
@@ -48,13 +50,36 @@ export const chatRouter = createTRPCRouter({
   // and the page still needs to render. `null` for an unknown or report-less thread.
   getReportThread: protectedProcedure
     .input(z.object({ threadId: z.string() }))
-    .output(z.object({ report: z.string().nullable() }))
+    .output(
+      z.object({ report: z.string().nullable(), title: z.string().nullable() }),
+    )
     .query(async ({ input, ctx }) => {
       const thread = await prisma.chatThread.findFirst({
         where: { id: input.threadId, userId: ctx.auth.user.id },
-        select: { report: true },
+        select: { report: { select: { content: true, title: true } } },
       });
-      return { report: thread?.report ?? null };
+      return {
+        report: thread?.report?.content ?? null,
+        title: thread?.report?.title ?? null,
+      };
+    }),
+
+  // Create an empty report thread up front (the "New" button in /reports) so it
+  // shows in the sidebar before any message is sent. Takes the client-generated
+  // id it's about to navigate to — always a fresh crypto.randomUUID(), so this
+  // is never called twice for the same id.
+  createReportThread: protectedProcedure
+    .input(z.object({ threadId: z.string() }))
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ input, ctx }) => {
+      await prisma.chatThread.create({
+        data: {
+          id: input.threadId,
+          user: { connect: { id: ctx.auth.user.id } },
+          report: { create: { content: "" } },
+        },
+      });
+      return { success: true };
     }),
 
   // UIMessage-shaped history for the chat (AI SDK `useChat`). Rebuilds messages
@@ -103,11 +128,22 @@ export const chatRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const thread = await prisma.chatThread.findFirst({
         where: { id: input.threadId, userId: ctx.auth.user.id },
+        select: { reportId: true },
       });
       if (!thread) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
-      await prisma.chatThread.delete({ where: { id: input.threadId } });
+      // The FK sits on ChatThread, so the report row isn't cascaded — drop it
+      // too. Independent deletes (nothing here for the other to race on), so
+      // run them together. NOTE: this assumes 1:1 — once a ChatReport can be
+      // shared by many threads (see the schema comment), this must check for
+      // other referencing threads before deleting it.
+      await Promise.all([
+        prisma.chatThread.delete({ where: { id: input.threadId } }),
+        thread.reportId
+          ? prisma.chatReport.delete({ where: { id: thread.reportId } })
+          : Promise.resolve(),
+      ]);
       return { success: true };
     }),
 });

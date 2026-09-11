@@ -20,7 +20,7 @@ const ROUTE_RE = new RegExp(
 
 export function makeWriteReportTool(userId: string, threadId: string) {
   return tool(
-    async ({ markdown }) => {
+    async ({ title, markdown }) => {
       const body = markdown.trim();
       if (!body) return "Report was empty — nothing saved.";
 
@@ -71,13 +71,20 @@ export function makeWriteReportTool(userId: string, threadId: string) {
           report.slice(node.position!.end.offset!);
       }
 
-      const updated = await prisma.chatThread.updateMany({
+      // Ownership check first — update() can only key on the unique id.
+      const thread = await prisma.chatThread.findFirst({
         where: { id: threadId, userId },
-        data: { report },
+        select: { id: true },
       });
-      if (updated.count === 0) {
+      if (!thread) {
         return "Could not save the report — thread not found.";
       }
+      const data = { title, content: report };
+      await prisma.chatThread.update({
+        where: { id: threadId },
+        data: { report: { upsert: { create: data, update: data } } },
+        select: { id: true },
+      });
 
       return "Report saved. Tell the user it is ready; don't paste it into chat.";
     },
@@ -86,6 +93,11 @@ export function makeWriteReportTool(userId: string, threadId: string) {
       description:
         "Create or replace this conversation's full Markdown report when asked for a report, briefing, or write-up. The read-only report panel supports PDF/Word export. Cite retrieved records using the routes in the report instructions; unresolved citations become plain text. Reply briefly in chat after saving.",
       schema: z.object({
+        title: z
+          .string()
+          .describe(
+            "A short descriptive title for the report (e.g. 'CT Scanner Vulnerability Report'). Replaces any existing title for the thread.",
+          ),
         markdown: z
           .string()
           .describe(

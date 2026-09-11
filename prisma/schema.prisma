@@ -33,6 +33,7 @@ model User {
   artifactWrappers ArtifactWrapper[]
 
   apikeys           Apikey[]
+  apiKeyConnectors  ApiKeyConnector[]
   integration       Integration[]
   integrationUser   Integration?       @relation("integration_user")
   webhooks          Webhook[]
@@ -279,10 +280,10 @@ model VendorContact {
 }
 
 model Contract {
-  id            String    @id @default(cuid())
-  title         String?
-  effectiveFrom DateTime?
-  effectiveTo   DateTime?
+  id              String    @id @default(cuid())
+  title           String?
+  effectiveFrom   DateTime?
+  effectiveTo     DateTime?
 
   termsJson Json?
 
@@ -936,6 +937,8 @@ model Apikey {
   permissions         String?
   metadata            String?
 
+  connector ApiKeyConnector?
+
   @@index([referenceId])
   @@map("apikey")
 }
@@ -954,6 +957,8 @@ model Integration {
   syncEvery Int? // seconds. null = inherit the platform's defaultSyncEvery.
   // ^if we're polling, that's how often to poll
   enabled   Boolean @default(true)
+
+  apiKeyConnector ApiKeyConnector?
 
   // The user who created the integration
   userId String
@@ -980,6 +985,29 @@ model Integration {
   @@index([userId])
   @@index([integrationUserId])
   @@map("integration")
+}
+
+// separate out to preserve between ApiKey rotations
+// TODO VW-435: clean up / delete later...
+model ApiKeyConnector {
+  id String @id @default(cuid())
+
+  name         String?
+  resourceType ResourceType?
+  lastRequest  DateTime?
+
+  apiKeyId      String?      @unique
+  apiKey        Apikey?      @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  integrationId String?      @unique
+  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("api_key_connector")
 }
 
 enum SyncStatusEnum {
@@ -1089,10 +1117,16 @@ model ChatThread {
   userId    String
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String?
-  // Markdown report the agent wrote for this thread (write_report tool). A
-  // thread with this set is a "report thread" and shows up under /reports.
-  // Users cannot edit it directly — they re-prompt and the agent rewrites it.
-  report    String?       @db.Text
+  // The thread's report (write_report tool), stored in its own ChatReport row.
+  // A thread with a non-null reportId is a "report thread" and shows under
+  // /reports. Users don't edit it directly — they re-prompt and the agent
+  // rewrites it. @unique keeps this 1:1 for now, chosen so a later move to
+  // one-report / many-threads only relocates the FK, not the model shape.
+  // That move also needs the write_report upsert, createReportThread, and
+  // deleteThread's cleanup (all written for 1:1) reworked — dropping @unique
+  // alone isn't the whole migration.
+  reportId  String?       @unique
+  report    ChatReport?   @relation(fields: [reportId], references: [id])
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   messages  ChatMessage[]
@@ -1100,6 +1134,17 @@ model ChatThread {
   @@index([userId])
   // /reports listing: filter by user, sort by updatedAt.
   @@index([userId, updatedAt(sort: Desc)])
+}
+
+model ChatReport {
+  id        String      @id @default(cuid())
+  // Set by write_report alongside content — a report's own title, distinct
+  // from the conversation's (ChatThread.title).
+  title     String?
+  content   String      @db.Text
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  thread    ChatThread?
 }
 
 enum ChatMessageStatus {
@@ -1766,7 +1811,7 @@ model Question {
   parentQuestion   Question? @relation("QuestionChain", fields: [parentQuestionId], references: [id], onDelete: SetNull)
   followupQuestion Question? @relation("QuestionChain")
 
-  audience QuestionAudience?
+  audience  QuestionAudience?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -1,4 +1,3 @@
-import type { inferOutput } from "@trpc/tanstack-react-query";
 import type { EmailReceivedEvent } from "resend";
 import { z } from "zod";
 import { externalMappingSelect } from "@/features/integrations/core/urls";
@@ -8,7 +7,6 @@ import {
   TicketCategory,
   type VersionStatus,
 } from "@/generated/prisma";
-import type { trpc } from "@/trpc/server";
 
 export const notificationInclude = {
   deviceGroupsMatchings: {
@@ -210,9 +208,3 @@ export const workOrderPayloadSchema = z.object({
 });
 
 export type WorkOrderPayload = z.infer<typeof workOrderPayloadSchema>;
-
-/** One row on an asset's Advisories tab. */
-export type AssetAdvisory = inferOutput<
-  typeof trpc.notifications.getManyByAssetId
->["items"][number];
-export type AssetAdvisorySource = AssetAdvisory["sources"][number];

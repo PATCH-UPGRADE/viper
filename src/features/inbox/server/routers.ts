@@ -3,19 +3,16 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fetchUtilizationGrids } from "@/features/assets/server/utilization";
 import {
-  ConfidenceLevel,
   IssueStatus,
   MatchFeedbackTargetType,
   NotificationType,
   Priority,
-  type Prisma,
 } from "@/generated/prisma";
 import { requestNoteAction } from "@/inngest/functions/notes-action";
 import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
   matchingAppliesToDeviceGroup,
-  matchingWhereForDeviceGroup,
   unknownVersionDeviceGroupWhere,
 } from "@/lib/device-matching";
 import { recordFieldCorrections } from "@/lib/field-correction";
@@ -66,56 +63,6 @@ type AffectedMatchingContext = {
   isNotificationLinked: boolean;
   // ^true if \exists NotificationDeviceGroupMapping n s.t n.dgm.id=am.id
 };
-
-/**
- * The device group matchings that resolve to one asset's device group.
- *
- * A matching is a rule, not a row the asset points at, so the candidates are
- * narrowed in SQL by manufacturer (and product, or its wildcard) and then
- * confirmed in memory, which is where exact versions and VERS ranges are
- * decided.
- *
- * Exported for its own tests: the wildcard and version-range cases are the
- * whole point of it, and they are invisible from the procedure's result.
- */
-export async function matchingIdsForAsset(assetId: string): Promise<string[]> {
-  const asset = await prisma.asset.findUnique({
-    where: { id: assetId },
-    select: {
-      deviceGroup: {
-        select: {
-          id: true,
-          manufacturerId: true,
-          productId: true,
-          versionId: true,
-          version: { select: { canonicalName: true } },
-        },
-      },
-    },
-  });
-
-  const deviceGroup = asset?.deviceGroup;
-  // An asset with no manufacturer cannot be matched by any rule.
-  if (!deviceGroup?.manufacturerId) return [];
-
-  const candidates = await prisma.deviceGroupMatching.findMany({
-    where: matchingWhereForDeviceGroup({
-      manufacturerId: deviceGroup.manufacturerId,
-      productId: deviceGroup.productId,
-    }),
-    select: {
-      id: true,
-      manufacturerId: true,
-      productId: true,
-      versionId: true,
-      versionRange: true,
-    },
-  });
-
-  return candidates
-    .filter((matching) => matchingAppliesToDeviceGroup(matching, deviceGroup))
-    .map((matching) => matching.id);
-}
 
 const ALLOWED_SORT_FIELDS = new Set(["priority", "updatedAt", "createdAt"]);
 
@@ -331,67 +278,6 @@ async function buildMatchingContexts(
   }
   return contexts;
 }
-
-/**
- * One advisory row, as both drawer sections render it.
- *
- * Shared so the asset and vulnerability queries cannot drift into returning
- * different shapes for the same component.
- */
-const notificationRowSelect = (userId: string) =>
-  ({
-    id: true,
-    type: true,
-    title: true,
-    summary: true,
-    priority: true,
-    tlp: true,
-    createdAt: true,
-    updatedAt: true,
-    // Scoped to the caller: "new" means this person has not read it.
-    reads: { where: { userId }, select: { id: true } },
-    sourceLinks: {
-      select: {
-        sourceRecord: {
-          select: {
-            channel: true,
-            observedAt: true,
-            mapping: {
-              select: {
-                webUrl: true,
-                integration: { select: { name: true, platform: true } },
-              },
-            },
-          },
-        },
-      },
-    },
-  }) satisfies Prisma.NotificationSelect;
-
-type NotificationRow = Prisma.NotificationGetPayload<{
-  select: ReturnType<typeof notificationRowSelect>;
-}>;
-
-/** Flattened here so a table never has to know how a snapshot reaches its integration. */
-const toAdvisoryRow = ({
-  reads,
-  sourceLinks,
-  ...notification
-}: NotificationRow) => ({
-  ...notification,
-  isUnread: reads.length === 0,
-  sources: sourceLinks.map(({ sourceRecord }) => ({
-    channel: sourceRecord.channel,
-    observedAt: sourceRecord.observedAt,
-    // The row's own name is what an operator recognises; the platform is the
-    // fallback for a source with no integration behind it.
-    label:
-      sourceRecord.mapping?.integration.name ??
-      sourceRecord.mapping?.integration.platform ??
-      sourceRecord.channel,
-    url: sourceRecord.mapping?.webUrl ?? null,
-  })),
-});
 
 export const notificationsRouter = createTRPCRouter({
   getMany: protectedProcedure
@@ -728,123 +614,6 @@ export const notificationsRouter = createTRPCRouter({
         return { assets: [], totalAssetCount: 0 };
       }
       return fetchUtilizationGrids({ deviceGroupId: { in: deviceGroupIds } });
-    }),
-
-  /**
-   * Advisories that concern one asset: linked to it directly, or linked to a
-   * device group matching that resolves to its device group.
-   *
-   * The source is flattened here rather than in the client, so the table does
-   * not have to know how a SourceRecord reaches its integration.
-   */
-  getManyByAssetId: protectedProcedure
-    .input(paginationInputSchema.extend({ assetId: z.string() }))
-    .query(async ({ input, ctx }) => {
-      const asset = await prisma.asset.findUnique({
-        where: { id: input.assetId },
-        select: { id: true },
-      });
-      if (!asset) throw new TRPCError({ code: "NOT_FOUND" });
-
-      const matchingIds = await matchingIdsForAsset(input.assetId);
-
-      const reachesThisAsset = {
-        OR: [
-          { assets: { some: { assetId: input.assetId } } },
-          ...(matchingIds.length > 0
-            ? [
-                {
-                  deviceGroupsMatchings: {
-                    some: {
-                      deviceGroupMatchingId: { in: matchingIds },
-                      OR: [
-                        { confidence: null },
-                        { confidence: { not: ConfidenceLevel.Rejected } },
-                      ],
-                    },
-                  },
-                },
-              ]
-            : []),
-        ],
-      };
-
-      // Kept as separate AND clauses: the search filter is itself an OR, and
-      // merging the two at one level would let a search match an advisory that
-      // has nothing to do with this asset.
-      const where = {
-        AND: [
-          reachesThisAsset,
-          ...(input.search ? [createSearchFilter(input.search)] : []),
-        ],
-      };
-
-      const totalCount = await prisma.notification.count({ where });
-      const meta = buildPaginationMeta(input, totalCount);
-
-      const items = await prisma.notification.findMany({
-        where,
-        // `id` breaks the tie: advisories synced in one batch share a
-        // createdAt, and an unstable order repeats or skips rows at a page edge.
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        skip: meta.skip,
-        take: meta.take,
-        select: notificationRowSelect(ctx.auth.user.id),
-      });
-
-      return createPaginatedResponse(items.map(toAdvisoryRow), meta);
-    }),
-
-  /**
-   * Advisories that name one vulnerability.
-   *
-   * A direct link, unlike `getManyByAssetId`: an advisory says which CVEs it
-   * concerns, so there are no matching rules to resolve first.
-   */
-  getManyByVulnerabilityId: protectedProcedure
-    .input(paginationInputSchema.extend({ vulnerabilityId: z.string() }))
-    .query(async ({ input, ctx }) => {
-      const vulnerability = await prisma.vulnerability.findUnique({
-        where: { id: input.vulnerabilityId },
-        select: { id: true },
-      });
-      if (!vulnerability) throw new TRPCError({ code: "NOT_FOUND" });
-
-      const where = {
-        AND: [
-          {
-            vulnerabilities: {
-              some: {
-                vulnerabilityId: input.vulnerabilityId,
-                // A human said this match was wrong, so it must not put the
-                // advisory on the vulnerability. Null is not a rejection: it
-                // means nobody has judged the match yet.
-                OR: [
-                  { confidence: null },
-                  { confidence: { not: ConfidenceLevel.Rejected } },
-                ],
-              },
-            },
-          },
-          ...(input.search ? [createSearchFilter(input.search)] : []),
-        ],
-      };
-
-      const totalCount = await prisma.notification.count({ where });
-      const meta = buildPaginationMeta(input, totalCount);
-
-      const items = await prisma.notification.findMany({
-        where,
-        // `id` breaks the tie: advisories synced in one batch share a
-        // createdAt, and an unstable order repeats or skips rows at a page edge.
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        // From the meta, not from the input: it caps the page at totalPages.
-        skip: meta.skip,
-        take: meta.take,
-        select: notificationRowSelect(ctx.auth.user.id),
-      });
-
-      return createPaginatedResponse(items.map(toAdvisoryRow), meta);
     }),
 
   markRead: protectedProcedure

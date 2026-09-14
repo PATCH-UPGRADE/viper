@@ -110,6 +110,7 @@ export const chatThreadSchema = z.object({
     messages: z.number(),
   }),
 });
+export type ChatThread = z.infer<typeof chatThreadSchema>;
 
 export const fetchThreadsResponseSchema = z.object({
   threads: z.array(chatThreadSchema),

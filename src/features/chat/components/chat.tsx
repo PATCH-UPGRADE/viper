@@ -66,6 +66,7 @@ import {
   type ViperChat,
 } from "@/features/chat/hooks/use-viper-chat";
 import {
+  type ChatThread,
   type FleetWorkOrderProposal,
   parseFleetProposal,
   type UseChatAgentConfig,
@@ -867,11 +868,7 @@ function ChatInputForm({
   );
 }
 
-interface ThreadListItem {
-  id: string;
-  title: string | null;
-  reportId: string | null;
-}
+type ThreadListItem = Pick<ChatThread, "id" | "title" | "reportId">;
 
 function ThreadSelector({
   currentThreadId,

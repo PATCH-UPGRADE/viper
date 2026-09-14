@@ -48,6 +48,15 @@ const lastAi = (messages: BaseMessage[]) =>
   messages.at(-1) as AIMessage | undefined;
 
 /**
+ * Super-step budget for one chat turn. LangGraph defaults to 25, roughly 12 tool
+ * rounds. The recommendation node retrieves assets, vulnerabilities, workflows and
+ * utilization before it answers — a broad fleet question measured 14 — and the
+ * handoff turn costs one more. Exceeding the budget throws GraphRecursionError
+ * part-way through, losing the answer the user is waiting for.
+ */
+export const AGENT_RECURSION_LIMIT = 40;
+
+/**
  * Tools that hand control back to the user: the turn ends after them and only
  * resumes when the user answers / accepts.
  */

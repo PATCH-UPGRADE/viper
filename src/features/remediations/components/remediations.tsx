@@ -276,32 +276,37 @@ function RemediationDrawer({
             </div>
           </div>
 
-          {hasStatedImpact(remediation.sourceImpact ?? {}) && (
-            <>
-              <Separator />
+          <Separator />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <h3 className="font-semibold">MedISAO</h3>
+              <p className="text-xs text-muted-foreground">
+                Provided by MedISAO for this remediation.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-4 border-l pl-4">
+              {hasStatedImpact(remediation.sourceImpact ?? {}) && (
+                <div className="flex flex-col gap-2">
+                  <h4 className="text-sm font-medium">Manufacturer impact</h4>
+                  <RemediationImpact impact={remediation.sourceImpact ?? {}} />
+                </div>
+              )}
+
               <div className="flex flex-col gap-2">
-                <h3 className="font-semibold">Manufacturer impact</h3>
-                <RemediationImpact impact={remediation.sourceImpact ?? {}} />
+                <h4 className="text-sm font-medium">
+                  Comments from other hospitals
+                </h4>
+                <MedIsaoRemediationComments remediationId={remediation.id} />
               </div>
-            </>
-          )}
 
-          <Separator />
-
-          {/* Both sections reach MedISAO when the drawer opens, and each shows
-              its own loading and empty state, so neither blocks the rest. */}
-          <div className="flex flex-col gap-2">
-            <h3 className="font-semibold">Comments from other hospitals</h3>
-            <MedIsaoRemediationComments remediationId={remediation.id} />
-          </div>
-
-          <Separator />
-
-          <div className="flex flex-col gap-2">
-            <h3 className="font-semibold">
-              Your questions to the manufacturer
-            </h3>
-            <MedIsaoRemediationInquiries remediationId={remediation.id} />
+              <div className="flex flex-col gap-2">
+                <h4 className="text-sm font-medium">
+                  Your questions to the manufacturer
+                </h4>
+                <MedIsaoRemediationInquiries remediationId={remediation.id} />
+              </div>
+            </div>
           </div>
         </div>
 

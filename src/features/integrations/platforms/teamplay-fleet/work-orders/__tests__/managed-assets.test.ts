@@ -29,6 +29,7 @@ const managedAsset = (id: string, hostname: string, equipmentKey: string) => ({
   id,
   hostname,
   ip: "10.40.1.60",
+  serialNumber: "SN-MRI-1",
   role: "MRI Scanner",
   externalMappings: [{ externalId: equipmentKey }],
 });
@@ -51,6 +52,7 @@ describe("listFleetManagedAssets", () => {
         assetId: "a1",
         hostname: "MR-MAGNETOM-001",
         ip: "10.40.1.60",
+        serialNumber: "SN-MRI-1",
         role: "MRI Scanner",
         equipmentKey: "US_1064669350",
       },
@@ -89,6 +91,27 @@ describe("resolveFleetAssets", () => {
 
     expect(error).toBeInstanceOf(UnmanagedAssetsError);
     expect(error.message).toMatch(/PUMP-SIGMA-001/);
+  });
+
+  it("names a rejected asset by serial number when it has no hostname or ip", async () => {
+    mockPrisma.asset.findMany
+      .mockResolvedValueOnce([
+        managedAsset("a1", "MR-MAGNETOM-001", "US_1064669350"),
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "a2",
+          hostname: null,
+          ip: null,
+          serialNumber: "63014",
+          role: "Computed Tomography (CT)",
+        },
+      ]);
+
+    const error = await resolveFleetAssets(["a1", "a2"]).catch((e) => e);
+
+    expect(error).toBeInstanceOf(UnmanagedAssetsError);
+    expect(error.message).toMatch(/63014/);
   });
 });
 

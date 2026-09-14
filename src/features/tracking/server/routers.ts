@@ -2,6 +2,7 @@ import { processIntegrationSync } from "@/features/integrations/core/sync/upsert
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
 import {
   FLEET_OPERATIONAL_STATUSES,
   FLEET_PATIENT_DANGERS,
@@ -795,7 +796,7 @@ export const trackingRouter = createTRPCRouter({
           },
           select: {
             ticketId: true,
-            asset: { select: { hostname: true, ip: true } },
+            asset: { select: assetNameSelect },
           },
         });
         if (!assetTicket) {
@@ -827,18 +828,34 @@ export const trackingRouter = createTRPCRouter({
     }),
 
   listAttachableAssets: protectedProcedure
-    .input(z.object({ ticketId: z.string() }))
+    .input(z.object({ ticketId: z.string(), search: z.string().optional() }))
     .query(async ({ input }) => {
+      const insensitive = {
+        contains: input.search,
+        mode: "insensitive",
+      } as const;
+      const matchesSearch = input.search
+        ? {
+            OR: [
+              { hostname: insensitive },
+              { ip: insensitive },
+              { serialNumber: insensitive },
+              { role: insensitive },
+            ],
+          }
+        : {};
       // Only return assets not already attached to this ticket so the picker
       // doesn't show duplicates of what's already in the table.
       return prisma.asset.findMany({
         where: {
           assetTickets: { none: { parentTicketId: input.ticketId } },
+          ...matchesSearch,
         },
         select: {
           id: true,
           hostname: true,
           ip: true,
+          serialNumber: true,
           role: true,
           deviceGroup: {
             select: {
@@ -1159,7 +1176,7 @@ export const trackingRouter = createTRPCRouter({
           filed.push({ asset, externalId: result.externalId });
         } catch (error) {
           failures.push({
-            asset: asset.hostname ?? asset.ip ?? asset.assetId,
+            asset: getAssetDisplayName({ ...asset, id: asset.assetId }),
             message: error instanceof Error ? error.message : "Unknown error",
           });
         }

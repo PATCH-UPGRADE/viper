@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getAssetDisplayName } from "@/features/assets/utils";
 import { deviceGroupMatchingLabel, parseLocation } from "@/lib/markdown";
 import { displayName } from "@/lib/markdown/device-group";
 import { cn } from "@/lib/utils";
@@ -174,7 +175,7 @@ export function MatchingAssetTable({
       cellClassName: "font-mono text-xs",
       cell: (asset) => (
         <span className="inline-flex items-center gap-1">
-          {asset.hostname ?? asset.id}
+          {getAssetDisplayName(asset)}
           {asset.statusNotes && (
             <QuestionTooltip>
               <span className="whitespace-pre-line">{asset.statusNotes}</span>
@@ -200,7 +201,11 @@ export function MatchingAssetTable({
         />
       ),
     },
-    { head: "IP Address", fullOnly: true, cell: (asset) => asset.ip },
+    {
+      head: "IP Address",
+      fullOnly: true,
+      cell: (asset) => asset.ip ?? "—",
+    },
     {
       head: "Location",
       fullOnly: false,

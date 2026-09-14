@@ -1,4 +1,5 @@
 import "server-only";
+import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
 import { PlatformEnum, type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
@@ -14,6 +15,7 @@ export interface FleetManagedAsset {
   assetId: string;
   hostname: string | null;
   ip: string | null;
+  serialNumber: string | null;
   role: string | null;
   /** Fleet's identifier for the physical device; activities carry it too. */
   equipmentKey: string;
@@ -28,6 +30,7 @@ const managedAssetSelect = (integrationIds: string[]) =>
     id: true,
     hostname: true,
     ip: true,
+    serialNumber: true,
     role: true,
     externalMappings: {
       where: { integrationId: { in: integrationIds } },
@@ -40,6 +43,7 @@ type ManagedAssetRow = {
   id: string;
   hostname: string | null;
   ip: string | null;
+  serialNumber: string | null;
   role: string | null;
   externalMappings: { externalId: string }[];
 };
@@ -49,6 +53,7 @@ function toManagedAsset(asset: ManagedAssetRow): FleetManagedAsset {
     assetId: asset.id,
     hostname: asset.hostname,
     ip: asset.ip,
+    serialNumber: asset.serialNumber,
     role: asset.role,
     equipmentKey: asset.externalMappings[0].externalId,
   };
@@ -154,12 +159,12 @@ export async function resolveFleetAssets(
     // error reads "MRI-01" rather than a cuid the user has never seen.
     const rows = await prisma.asset.findMany({
       where: { id: { in: missing } },
-      select: { id: true, hostname: true, ip: true },
+      select: assetNameSelect,
     });
     const labels = missing.map((id) => {
       const row = rows.find((r) => r.id === id);
       if (!row) return `${id} (no such asset)`;
-      return row.hostname ?? row.ip ?? id;
+      return getAssetDisplayName(row);
     });
     throw new UnmanagedAssetsError(labels);
   }

@@ -382,7 +382,8 @@ export const AssetItem = ({ data }: { data: DrawerAsset }) => {
       <div className="flex-1 min-w-0">
         <AssetDrawer asset={data}>{getAssetRoleLabel(data)}</AssetDrawer>
         <div className="text-xs text-muted-foreground mt-1">
-          {data.ip} &bull; {deviceGroupLabel(data.deviceGroup)} &bull; Updated{" "}
+          {data.ip ? <>{data.ip} &bull; </> : null}
+          {deviceGroupLabel(data.deviceGroup)} &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
           {hasIssues && data.issues.length >= 1 && (
             <>
@@ -460,7 +461,11 @@ export function AssetDrawer({
               <div className="text-xs font-medium text-muted-foreground mb-1">
                 IP Address
               </div>
-              <CopyCode>{asset.ip}</CopyCode>
+              {asset.ip ? (
+                <CopyCode>{asset.ip}</CopyCode>
+              ) : (
+                <div className="text-sm text-muted-foreground">—</div>
+              )}
             </div>
 
             <div>

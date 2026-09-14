@@ -1,4 +1,5 @@
 import "server-only";
+import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
 import { TicketStatus } from "@/generated/prisma";
 import type { TransactionClient } from "@/lib/db";
 import {
@@ -47,13 +48,13 @@ export async function createAssetTicket(
     }),
     tx.asset.findUniqueOrThrow({
       where: { id: assetId },
-      select: { hostname: true, ip: true },
+      select: assetNameSelect,
     }),
   ]);
 
   const child = await tx.workOrderTicket.create({
     data: {
-      summary: `${parent.summary} — ${asset.hostname ?? asset.ip}`,
+      summary: `${parent.summary} — ${getAssetDisplayName(asset)}`,
       body: parent.body,
       category: parent.category,
       priority: parent.priority,

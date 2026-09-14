@@ -109,6 +109,8 @@ export type ResolvedDeviceGroupAsset = {
   id: string;
   ip: string | null;
   hostname: string | null;
+  serialNumber: string | null;
+  role: string | null;
   location: unknown;
   version: string | null;
   versionStatus: VersionStatus;

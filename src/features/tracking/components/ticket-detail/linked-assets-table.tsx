@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getAssetDisplayName } from "@/features/assets/utils";
 import { useUpdateTicket } from "@/features/tracking/hooks/use-tracking";
 import type { TicketStatus } from "@/generated/prisma";
 import {
@@ -88,7 +89,7 @@ export const LinkedAssetsTable = ({
                   href={`/tracking/${ticket.id}`}
                   className="font-mono text-xs font-medium text-primary hover:underline"
                 >
-                  {asset.hostname ?? asset.id}
+                  {getAssetDisplayName(asset)}
                 </Link>
               </TableCell>
               <TableCell>
@@ -105,7 +106,9 @@ export const LinkedAssetsTable = ({
               <TableCell className="text-sm">
                 <ClampedCell text={model} />
               </TableCell>
-              <TableCell className="font-mono text-xs">{asset.ip}</TableCell>
+              <TableCell className="font-mono text-xs">
+                {asset.ip ?? "—"}
+              </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 <ClampedCell text={formatLocation(asset.location)} />
               </TableCell>
@@ -116,7 +119,7 @@ export const LinkedAssetsTable = ({
                     size="sm"
                     onClick={() => onDetach(asset.id)}
                     disabled={detachPending}
-                    aria-label={`Detach ${asset.hostname ?? asset.ip}`}
+                    aria-label={`Detach ${getAssetDisplayName(asset)}`}
                   >
                     <XIcon className="size-4" />
                   </Button>

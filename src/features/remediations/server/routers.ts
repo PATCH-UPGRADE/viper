@@ -251,12 +251,12 @@ export const remediationsRouter = createTRPCRouter({
         },
       );
 
-      // The platform derives the same pseudonym for this person on this record
-      // every time, so an upsert keeps one row however often they comment.
+      // We post under the hospital's name and never send a user id, so MedISAO
+      // returns one pseudonym for everybody here. One row per remediation, and
+      // `userId` records whoever commented first.
       await prisma.medISAOExternalCommentIdentity.upsert({
         where: {
-          userId_remediationId_integrationId: {
-            userId: ctx.auth.user.id,
+          remediationId_integrationId: {
             remediationId: input.remediationId,
             integrationId: target.integrationId,
           },

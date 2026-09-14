@@ -14,7 +14,7 @@ CREATE TABLE "medisao_external_comment_identity" (
 CREATE INDEX "medisao_external_comment_identity_remediationId_idx" ON "medisao_external_comment_identity"("remediationId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "medisao_external_comment_identity_userId_remediationId_inte_key" ON "medisao_external_comment_identity"("userId", "remediationId", "integrationId");
+CREATE UNIQUE INDEX "medisao_external_comment_identity_remediationId_integration_key" ON "medisao_external_comment_identity"("remediationId", "integrationId");
 
 -- AddForeignKey
 ALTER TABLE "medisao_external_comment_identity" ADD CONSTRAINT "medisao_external_comment_identity_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;

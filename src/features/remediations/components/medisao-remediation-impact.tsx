@@ -26,7 +26,7 @@ export const hasStatedImpact = (impact: SourceImpact): boolean =>
  * a model estimated. Every field is optional, because no source is obliged to
  * answer, so each says "Not stated" instead of implying a no.
  */
-export function RemediationImpact({ impact }: { impact: SourceImpact }) {
+export function MedIsaoRemediationImpact({ impact }: { impact: SourceImpact }) {
   const rows: { label: string; value: string }[] = [
     { label: "Requires downtime", value: yesNo(impact.requiresDowntime) },
     {

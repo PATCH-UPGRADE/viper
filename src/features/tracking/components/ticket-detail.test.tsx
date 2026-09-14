@@ -81,6 +81,7 @@ const {
           id: "asset-1",
           hostname: "host-loose-1",
           ip: "10.0.0.1",
+          serialNumber: null,
           role: "Workstation",
           deviceGroup: {
             manufacturer: { canonicalDisplayName: "Acme" },
@@ -90,7 +91,8 @@ const {
         {
           id: "asset-2",
           hostname: null,
-          ip: "10.0.0.2",
+          ip: null,
+          serialNumber: "63014",
           role: null,
           deviceGroup: null,
         },
@@ -666,6 +668,7 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   id: "asset-1",
   hostname: "host-1",
   ip: "10.0.0.5",
+  serialNumber: null,
   role: "Infusion Pump",
   location: { building: "A", floor: "3", room: "302" },
   deviceGroupId: "dg-1",
@@ -1257,6 +1260,18 @@ describe("TicketDetailContent — assets attach/detach", () => {
     expect(mockAttachAssetMutate).toHaveBeenCalledTimes(1);
     const [payload] = mockAttachAssetMutate.mock.calls[0];
     expect(payload).toMatchObject({ ticketId: "ticket-1", assetId: "asset-1" });
+  });
+
+  it("names an asset with no hostname or ip by its serial number in the picker", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(screen.getByRole("tab", { name: /assets/i }));
+    await user.click(screen.getByRole("button", { name: /add asset/i }));
+
+    expect(
+      await screen.findByRole("option", { name: /63014/ }),
+    ).toBeInTheDocument();
   });
 
   it("renders a per-row detach button on linked assets and calls detachAsset on click", async () => {

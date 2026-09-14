@@ -130,7 +130,7 @@ export const MedIsaoRemediationComments = ({
   if (isError) {
     return (
       <p className="text-sm text-muted-foreground">
-        Comments are unavailable. The platform could not be reached.
+        Comments are unavailable. MedISAO could not be reached.
       </p>
     );
   }
@@ -138,7 +138,7 @@ export const MedIsaoRemediationComments = ({
   if (!data?.supported) {
     return (
       <p className="text-sm text-muted-foreground">
-        This remediation did not come from a platform that hosts comments.
+        This remediation is not tracked on MedISAO.
       </p>
     );
   }

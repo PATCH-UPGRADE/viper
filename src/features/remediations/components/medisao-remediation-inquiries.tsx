@@ -95,7 +95,7 @@ export const MedIsaoRemediationInquiries = ({
   if (isError) {
     return (
       <p className="text-sm text-muted-foreground">
-        Questions are unavailable. The platform could not be reached.
+        Questions are unavailable. MedISAO could not be reached.
       </p>
     );
   }
@@ -103,7 +103,7 @@ export const MedIsaoRemediationInquiries = ({
   if (!data?.supported) {
     return (
       <p className="text-sm text-muted-foreground">
-        This remediation did not come from a platform that takes questions.
+        This remediation is not tracked on MedISAO.
       </p>
     );
   }

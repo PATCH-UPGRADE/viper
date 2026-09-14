@@ -342,7 +342,11 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
                   <div className="text-xs font-medium text-muted-foreground mb-1">
                     IP Address
                   </div>
-                  <CopyCode>{asset.ip}</CopyCode>
+                  {asset.ip ? (
+                    <CopyCode>{asset.ip}</CopyCode>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">—</div>
+                  )}
                 </div>
 
                 <div>

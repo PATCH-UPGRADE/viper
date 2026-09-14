@@ -501,10 +501,14 @@ function AssetInfoColumn({ asset }: { asset: AssetWithIssueRelations }) {
     {
       header: "Network Information",
       items: [
-        {
-          header: "IP Address",
-          content: <CopyCode>{asset.ip}</CopyCode>,
-        },
+        ...(asset.ip
+          ? [
+              {
+                header: "IP Address",
+                content: <CopyCode>{asset.ip}</CopyCode>,
+              },
+            ]
+          : []),
         ...(asset.networkSegment
           ? [
               {

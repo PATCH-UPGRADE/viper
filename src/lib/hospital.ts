@@ -1,8 +1,5 @@
 import "server-only";
 
-/** Used when a deployment has not named itself. See `hospitalIdentifier`. */
-const DEFAULT_HOSPITAL_IDENTIFIER = "example-hospital";
-
 /**
  * What this deployment calls itself when an outside platform needs a name for
  * the hospital rather than for one member of its staff.
@@ -14,7 +11,16 @@ const DEFAULT_HOSPITAL_IDENTIFIER = "example-hospital";
  *
  * Treat it as permanent once a platform has seen it. Partners derive stable
  * handles from it, so a new value reads as a different hospital and detaches
- * everything sent under the old one.
+ * everything sent under the old one. That is why there is no default: a
+ * deployment cannot be renamed later without abandoning every handle built on
+ * the old name.
  */
-export const hospitalIdentifier = (): string =>
-  process.env.HOSPITAL_IDENTIFIER?.trim() || DEFAULT_HOSPITAL_IDENTIFIER;
+export const hospitalIdentifier = (): string => {
+  const configured = process.env.HOSPITAL_IDENTIFIER?.trim();
+  if (!configured) {
+    throw new Error(
+      "HOSPITAL_IDENTIFIER is not set. Name this deployment before it speaks to an outside platform.",
+    );
+  }
+  return configured;
+};

@@ -4,9 +4,9 @@ import type { SourceImpact } from "../types";
 
 /** Seconds are what the source sends; hours are what someone plans around. */
 function formatDowntime(seconds: number): string {
-  if (seconds < 60) return `${seconds} seconds`;
+  if (seconds < 60) return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} minutes`;
+  if (minutes < 60) return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
   const hours = minutes / 60;
   const rounded = Math.round(hours * 10) / 10;
   return `${rounded} ${rounded === 1 ? "hour" : "hours"}`;

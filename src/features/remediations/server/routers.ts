@@ -103,13 +103,6 @@ async function platformTargetFor(remediationId: string) {
 
 export const remediationsRouter = createTRPCRouter({
   /**
-   * Comments other hospitals left on this remediation, one page at a time.
-   *
-   * Returns an empty page rather than an error for a remediation no platform
-   * keeps comments for, because "no comment surface" is a normal state and the
-   * page renders the same either way.
-   */
-  /**
    * Questions this hospital put to the manufacturer about this remediation.
    *
    * Private by construction: the platform scopes inquiries to the token that
@@ -166,6 +159,13 @@ export const remediationsRouter = createTRPCRouter({
       });
     }),
 
+  /**
+   * Comments other hospitals left on this remediation, one page at a time.
+   *
+   * Returns an empty page rather than an error for a remediation no platform
+   * keeps comments for, because "no comment surface" is a normal state and the
+   * page renders the same either way.
+   */
   getComments: protectedProcedure
     .input(
       z.object({

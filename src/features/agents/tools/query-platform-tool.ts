@@ -37,6 +37,9 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
   Both carry "managedBy": who services the asset, as a vendor or a department, with
   their responsibilities. An entry whose "workOrderIntegration" is set names the
   platform their work orders are filed on — use list_work_order_targets to file one.
+  An entry with a "contract" is serviced under that agreement: cite its title when you
+  say who owns the work, and do not schedule past its "effectiveTo" date without
+  saying that the contract ends first. A null contract still means a real manager.
 - assets.getManyByDeviceGroup — assets in a device group. input: { deviceGroupId, search?, page?, pageSize? }
 - assets.getManyByWorkflow — assets used in a clinical workflow. input: { id } (workflow id)
 - assets.getUtilization — one asset's utilization schedule, as a readable summary. input: { id }

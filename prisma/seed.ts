@@ -1448,7 +1448,20 @@ async function seedFleetIntegration(userId: string) {
     linked++;
   }
 
-  console.log(`✅ Seeded Fleet integration with ${linked} managed asset(s)`);
+  // In production connectUncontractedAssets() points the Siemens relationship at
+  // the Fleet integration. That module is server-only and will not load here, so
+  // the seed sets the same field directly. Without it every relationship has a
+  // null workOrderIntegrationId, so resolveWorkOrderTargets() treats every asset
+  // as unmanaged and no work order can be filed against seed data.
+  const { count: managingRelationships } =
+    await prisma.managesRelationship.updateMany({
+      where: { vendor: { canonicalName: "siemens healthineers" } },
+      data: { workOrderIntegrationId: integration.id },
+    });
+
+  console.log(
+    `✅ Seeded Fleet integration with ${linked} managed asset(s), ${managingRelationships} managing relationship(s)`,
+  );
   return integration;
 }
 

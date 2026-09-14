@@ -18,10 +18,7 @@ const MAX_BODY_LENGTH = 10_000;
  *
  * Another hospital is a pseudonym: stable within one remediation and
  * uncorrelated across them, so it is a handle for following a conversation and
- * nothing more. Rendered as a short label with a colour derived from the same
- * hex, never as a profile anyone can click into, and never as a person. The
- * label carries the identity on its own, so the colour is decoration and no
- * meaning is lost without it.
+ * nothing more.
  */
 function AuthorBadge({
   pseudonym,
@@ -30,8 +27,6 @@ function AuthorBadge({
   pseudonym: string;
   fromYourHospital: boolean;
 }) {
-  // Our own hash tells a reader here nothing they do not already know, and
-  // reads as just another anonymous hospital. Name us instead.
   if (fromYourHospital) {
     return (
       <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
@@ -97,8 +92,6 @@ function CommentComposer({ remediationId }: { remediationId: string }) {
           }
         }}
       />
-      {/* Said at the point of writing, not buried in a help page: the author is
-          hidden, but the text is not, and it cannot be edited or withdrawn. */}
       <p
         id="comment-visibility-notice"
         className="flex items-start gap-1.5 text-xs text-muted-foreground"
@@ -123,7 +116,7 @@ function CommentComposer({ remediationId }: { remediationId: string }) {
   );
 }
 
-export const RemediationComments = ({
+export const MedIsaoRemediationComments = ({
   remediationId,
 }: {
   remediationId: string;
@@ -142,8 +135,6 @@ export const RemediationComments = ({
     );
   }
 
-  // No platform behind this remediation keeps comments, so there is nothing to
-  // read and nowhere to post. Say so rather than showing an empty box.
   if (!data?.supported) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -166,9 +157,6 @@ export const RemediationComments = ({
             </p>
           )}
           <ul className="flex flex-col gap-4">
-            {/* The platform returns newest first. A thread reads the other
-              way, and the composer sits below, so the newest comment ends
-              up next to the box you type in. */}
             {[...data.items].reverse().map((comment) => (
               <li key={comment.externalId} className="flex flex-col gap-1">
                 <span className="flex items-center gap-2">

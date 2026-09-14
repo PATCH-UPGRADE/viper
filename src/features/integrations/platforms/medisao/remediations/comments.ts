@@ -1,15 +1,11 @@
 import "server-only";
 import { z } from "zod";
-import type {
-  CommentsApi,
-  ExternalComment,
-  PlatformCallCtx,
-} from "../../../core/types";
-import type { MedIsaoConfig, MedIsaoCreds } from "../config";
+import type { MedIsaoCallCtx } from "../context";
 import { fetchPage, MedIsaoRequestError } from "../paginate";
 import { createMedIsaoSession } from "../session";
 import { remediationCommentsUrl } from "../urls";
 import { requireSameCollection } from "../utils";
+import type { CommentsApi, ExternalComment } from "./types";
 
 /** MedISAO caps a comment body at 10 000 characters and rejects a blank one. */
 const MAX_BODY_LENGTH = 10_000;
@@ -43,12 +39,8 @@ const toCanonical = (raw: RawComment): ExternalComment => ({
  * Comments are append-only: MedISAO exposes no edit or delete, partly because
  * an edit history is itself correlatable.
  */
-export const comments: CommentsApi<MedIsaoConfig, MedIsaoCreds> = {
-  async list(
-    ctx: PlatformCallCtx<MedIsaoConfig, MedIsaoCreds>,
-    externalId: string,
-    cursor?: string | null,
-  ) {
+export const comments: CommentsApi = {
+  async list(ctx: MedIsaoCallCtx, externalId: string, cursor?: string | null) {
     const session = createMedIsaoSession(ctx.creds);
     const collection = remediationCommentsUrl(ctx.config.apiUrl, externalId);
     // `next` comes back as a whole URL, so a cursor is followed as given.
@@ -77,7 +69,7 @@ export const comments: CommentsApi<MedIsaoConfig, MedIsaoCreds> = {
   },
 
   async create(
-    ctx: PlatformCallCtx<MedIsaoConfig, MedIsaoCreds>,
+    ctx: MedIsaoCallCtx,
     externalId: string,
     draft: { body: string; authorExternalUserId: string },
   ) {

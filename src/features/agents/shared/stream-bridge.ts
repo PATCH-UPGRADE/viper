@@ -15,6 +15,7 @@
 import "server-only";
 import type { AIMessage, ToolMessage } from "@langchain/core/messages";
 import type { UIMessageChunk } from "ai";
+import { AGENT_RECURSION_LIMIT } from "./build-graph";
 import { REQUEST_RECOMMENDATION_TOOL } from "./recommendation-window";
 
 /** Minimal writer surface — AI SDK's UIMessageStreamWriter, or a test spy. */
@@ -141,7 +142,10 @@ export async function streamGraphToUI({
     writer.write({ type: "text-delta", id: textId as string, delta });
   };
 
-  for await (const ev of graph.streamEvents(input, { version: "v2" })) {
+  for await (const ev of graph.streamEvents(input, {
+    version: "v2",
+    recursionLimit: AGENT_RECURSION_LIMIT,
+  })) {
     switch (ev.event) {
       case "on_chat_model_start": {
         run += 1;

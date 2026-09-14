@@ -1,5 +1,5 @@
 /**
- * Shared Viper agent graph shape (chat + recommendations):
+ * Shared Viper agent graph shape:
  *
  *   preload (deterministic context) -> agent <-> tools
  *
@@ -9,6 +9,9 @@
  * - tools: ToolNode; if a HALT_TOOL was called, END so the user can act on it
  *   (human-in-the-loop): answer the questions, or accept/dismiss the proposed
  *   work order.
+ * - recommendation (optional): a second model the agent hands the turn to by calling
+ *   request_recommendation. It runs the same tools loop with its own system message
+ *   and sees the conversation through recommendationWindow.
  */
 import "server-only";
 import {
@@ -21,12 +24,25 @@ import {
 import type { Runnable } from "@langchain/core/runnables";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import {
+  Annotation,
   END,
   MessagesAnnotation,
   START,
   StateGraph,
 } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
+import {
+  REQUEST_RECOMMENDATION_TOOL,
+  recommendationWindow,
+} from "./recommendation-window";
+
+const AgentState = Annotation.Root({
+  ...MessagesAnnotation.spec,
+  recommending: Annotation<boolean>({
+    reducer: (_current, incoming) => incoming,
+    default: () => false,
+  }),
+});
 
 const lastAi = (messages: BaseMessage[]) =>
   messages.at(-1) as AIMessage | undefined;
@@ -76,20 +92,29 @@ function shouldHalt(messages: BaseMessage[]): boolean {
   );
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: bound chat model (post-bindTools) has a wide type
+type BoundModel = Runnable<any, AIMessage>;
+
+function routeAfterModel(state: typeof AgentState.State) {
+  return lastAi(state.messages)?.tool_calls?.length ? "tools" : END;
+}
+
 export function buildAgentGraph({
   model,
   tools,
   systemMessage,
   preload,
+  recommendation,
 }: {
-  // biome-ignore lint/suspicious/noExplicitAny: bound chat model (post-bindTools) has a wide type
-  model: Runnable<any, AIMessage>;
+  model: BoundModel;
   tools: StructuredToolInterface[];
   systemMessage: SystemMessage;
   /** Returns the mandatory context markdown injected before the first turn. */
   preload: () => Promise<string>;
+  /** A second model the agent hands the turn to by calling request_recommendation. */
+  recommendation?: { model: BoundModel; systemMessage: SystemMessage };
 }) {
-  return new StateGraph(MessagesAnnotation)
+  const graph = new StateGraph(AgentState)
     .addNode("preload", async () => ({
       messages: [new HumanMessage(`(Context for you)\n${await preload()}`)],
     }))
@@ -98,12 +123,38 @@ export function buildAgentGraph({
     }))
     .addNode("tools", new ToolNode(tools))
     .addEdge(START, "preload")
-    .addEdge("preload", "agent")
-    .addConditionalEdges("tools", (state) =>
-      shouldHalt(state.messages) ? END : "agent",
+    .addConditionalEdges("agent", routeAfterModel);
+
+  if (!recommendation) {
+    return graph
+      .addEdge("preload", "agent")
+      .addConditionalEdges("tools", (state) =>
+        shouldHalt(state.messages) ? END : "agent",
+      )
+      .compile();
+  }
+
+  return graph
+    .addNode("recommendation", async (state) => ({
+      messages: [
+        await recommendation.model.invoke([
+          recommendation.systemMessage,
+          ...recommendationWindow(state.messages),
+        ]),
+      ],
+      recommending: true,
+    }))
+    .addConditionalEdges("preload", (state) =>
+      state.recommending ? "recommendation" : "agent",
     )
-    .addConditionalEdges("agent", (state) =>
-      lastAi(state.messages)?.tool_calls?.length ? "tools" : END,
-    )
+    .addConditionalEdges("tools", (state) => {
+      if (shouldHalt(state.messages)) return END;
+      const agentJustEscalated = lastToolCallNames(state.messages).includes(
+        REQUEST_RECOMMENDATION_TOOL,
+      );
+      if (state.recommending || agentJustEscalated) return "recommendation";
+      return "agent";
+    })
+    .addConditionalEdges("recommendation", routeAfterModel)
     .compile();
 }

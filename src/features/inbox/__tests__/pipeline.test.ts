@@ -11,16 +11,26 @@ const { mockPrisma } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
-const { mockClassify, mockTriage, mockVex, mockQuestions, mockMitigation } =
-  vi.hoisted(() => ({
-    mockClassify: vi.fn(),
-    mockTriage: vi.fn(),
-    mockVex: vi.fn(),
-    mockQuestions: vi.fn(),
-    mockMitigation: vi.fn(),
-  }));
+const {
+  mockClassify,
+  mockTriage,
+  mockPersistTriage,
+  mockVex,
+  mockQuestions,
+  mockMitigation,
+} = vi.hoisted(() => ({
+  mockClassify: vi.fn(),
+  mockTriage: vi.fn(),
+  mockPersistTriage: vi.fn(),
+  mockVex: vi.fn(),
+  mockQuestions: vi.fn(),
+  mockMitigation: vi.fn(),
+}));
 vi.mock("../agent/classify", () => ({ classifyNotification: mockClassify }));
 vi.mock("../agent/triage", () => ({ triageNotification: mockTriage }));
+vi.mock("../agent/triage/persist", () => ({
+  persistTriageResult: mockPersistTriage,
+}));
 vi.mock("../agent/vex", () => ({ sortNotificationVulnerabilities: mockVex }));
 vi.mock("../agent/question", () => ({
   generateQuestionForNotification: mockQuestions,

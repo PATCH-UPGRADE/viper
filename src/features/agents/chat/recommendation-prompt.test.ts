@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { PLATFORM_QUERY_PROCEDURES } from "@/features/agents/tools/query-platform-tool";
+import { buildAgentTools } from "@/features/agents/tools/registry";
 import { USER_ROLES } from "@/features/chat/utils";
 import {
   buildRecommendationSystemPrompt,
@@ -114,6 +115,19 @@ describe("recommendation prompt names the tools the recommendation node binds", 
 
     for (const toolName of RECOMMENDATION_TOOL_NAMES) {
       expect(tools).toContain(`${toolName}:`);
+    }
+  });
+
+  // buildChatGraph filters the registry by these names, and a name that matches
+  // nothing is skipped in silence — the node then loses a tool its prompt still
+  // tells it to use.
+  it("names only tools the registry actually builds", () => {
+    const registryToolNames = buildAgentTools("user", "thread").map(
+      (tool) => tool.name,
+    );
+
+    for (const toolName of RECOMMENDATION_TOOL_NAMES) {
+      expect(registryToolNames).toContain(toolName);
     }
   });
 });

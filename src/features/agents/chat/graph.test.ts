@@ -82,6 +82,18 @@ describe("chat system prompt — request_recommendation", () => {
     expect(prompt).toMatch(/follow-up to an\s+answer the advisor gave/);
   });
 
+  // The advisor node has no edge back to the chat model and binds neither
+  // record_note nor write_report, so a combined request loses that half unless
+  // the chat model is told to handle it before handing the turn over.
+  it("says what to do when the same message also asks for a note or a report", () => {
+    const prompt = buildSystemPrompt("hospital administration");
+    expect(prompt).toMatch(/can neither\s+record notes nor write reports/);
+    expect(prompt).toMatch(/call\s+record_note before you hand off/);
+    expect(prompt).toMatch(
+      /say in your reply that you will write it when they ask again/,
+    );
+  });
+
   it("binds request_recommendation for the chat model and hands a recommendation node to the graph", () => {
     buildChatGraph({
       userId: "user",
@@ -123,7 +135,9 @@ describe("focus record", () => {
     ]) {
       expect(prompt).toContain("<asset_focus>");
       expect(prompt).toContain("ASSET MARKDOWN");
-      expect(prompt).toContain("<role_focus_asset>The user is IT staff.");
+      expect(prompt).toContain(
+        "<role_focus_asset>The user is IT staff. Focus on technical details:",
+      );
       expect(prompt).not.toContain("<vuln_focus>");
     }
   });
@@ -153,9 +167,11 @@ describe("focus record", () => {
       loadNotes: async () => "Hospital notes",
     });
     const config = graphConfig();
-    expect(config.systemMessage.content).not.toContain("_focus>");
-    expect(config.recommendation?.systemMessage.content).not.toContain(
-      "_focus>",
+    expect(config.systemMessage.content).not.toMatch(
+      /_focus>|<role_focus_(asset|vuln)/,
+    );
+    expect(config.recommendation?.systemMessage.content).not.toMatch(
+      /_focus>|<role_focus_(asset|vuln)/,
     );
   });
 });

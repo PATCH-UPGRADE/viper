@@ -32,6 +32,7 @@ import {
 } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import {
+  ASK_USER_QUESTIONS_TOOL,
   REQUEST_RECOMMENDATION_TOOL,
   recommendationWindow,
 } from "./recommendation-window";
@@ -60,7 +61,10 @@ export const AGENT_RECURSION_LIMIT = 40;
  * Tools that hand control back to the user: the turn ends after them and only
  * resumes when the user answers / accepts.
  */
-const HALT_TOOLS = new Set(["ask_user_questions", "propose_fleet_work_order"]);
+const HALT_TOOLS = new Set([
+  ASK_USER_QUESTIONS_TOOL,
+  "propose_fleet_work_order",
+]);
 
 /**
  * A halting tool prefixes its result with this when it refuses the call (e.g. a
@@ -120,7 +124,6 @@ export function buildAgentGraph({
   systemMessage: SystemMessage;
   /** Returns the mandatory context markdown injected before the first turn. */
   preload: () => Promise<string>;
-  /** A second model the agent hands the turn to by calling request_recommendation. */
   recommendation?: { model: BoundModel; systemMessage: SystemMessage };
 }) {
   const graph = new StateGraph(AgentState)

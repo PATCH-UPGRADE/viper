@@ -98,7 +98,7 @@ graph TB
 
 **Inngest** powers background and long-running work: scheduled integration syncs (cron-triggered), event-driven integration syncs, daily vulnerability enrichment against EPSS and KEV feeds, chat memory persistence, and expired-token cleanup. Each function benefits from automatic retries and built-in observability.
 
-**AI Chat** runs as a streaming Next.js route (`/api/chat`), not as an Inngest job. LangGraph orchestrates each agent (LangChain `ChatAnthropic` — Haiku for chat, Opus + extended thinking for recommendations), and token + reasoning + tool deltas stream to the client through the Vercel AI SDK UI (`useChat`).
+**AI Chat** runs as a streaming Next.js route (`/api/chat`), not as an Inngest job. LangGraph orchestrates one chat graph with two model nodes (LangChain `ChatAnthropic` — Haiku for chat, and an Opus + extended thinking recommendation node the chat model hands the turn to), and token + reasoning + tool deltas stream to the client through the Vercel AI SDK UI (`useChat`).
 
 **n8n** acts as an external workflow automation layer. When an integration provider doesn't follow Viper's standardized sync protocol, n8n orchestrates the crawl-and-transform pipeline that normalizes external data before submitting it to Viper's integration upload endpoints.
 

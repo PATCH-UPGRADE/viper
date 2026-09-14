@@ -13,6 +13,7 @@ import {
   saveUserMessage,
   userMessageCount,
 } from "@/features/agents/shared/history";
+import { REQUEST_RECOMMENDATION_TOOL } from "@/features/agents/shared/recommendation-window";
 import {
   streamGraphToUI,
   writeRecommendationMarker,
@@ -114,7 +115,14 @@ export async function POST(req: Request) {
     onFinish: async ({ responseMessage }) => {
       if (!userMessageSaved) return;
       const { content, toolCalls } = splitAssistant(responseMessage);
-      if (content.trim() || toolCalls.length) {
+      const producedNothingButTheResumeMarker =
+        !content.trim() &&
+        toolCalls.length === 1 &&
+        toolCalls[0]?.type === `tool-${REQUEST_RECOMMENDATION_TOOL}`;
+      if (
+        (content.trim() || toolCalls.length) &&
+        !producedNothingButTheResumeMarker
+      ) {
         await saveAssistantMessage(threadId, content, toolCalls);
       }
       // Title on the first exchange only.

@@ -1,7 +1,7 @@
 "use client";
 
 import { PlusIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -81,10 +81,22 @@ const AssetProgressStrip = ({
   );
 };
 
+const SEARCH_DEBOUNCE_MS = 500;
+
 const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
   const [open, setOpen] = useState(false);
-  const { data: candidates } = useAttachableAssets(ticketId);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const { data: candidates } = useAttachableAssets(ticketId, searchQuery);
   const attach = useAttachAsset(ticketId);
+
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setSearchQuery(searchInput),
+      SEARCH_DEBOUNCE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -95,21 +107,17 @@ const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="p-0 w-96" align="end">
-        <Command>
-          <CommandInput placeholder="Search assets..." />
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search assets..."
+            value={searchInput}
+            onValueChange={setSearchInput}
+          />
           <CommandList>
             <CommandEmpty>No eligible assets found.</CommandEmpty>
             <CommandGroup>
               {(candidates ?? []).map((a) => {
                 const label = getAssetDisplayName(a);
-                const searchableText = [
-                  a.hostname,
-                  a.ip,
-                  a.serialNumber,
-                  a.role,
-                ]
-                  .filter(Boolean)
-                  .join(" ");
                 const model = [
                   a.deviceGroup?.manufacturer?.canonicalDisplayName,
                   a.deviceGroup?.product?.canonicalDisplayName,
@@ -120,7 +128,7 @@ const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
                 return (
                   <CommandItem
                     key={a.id}
-                    value={searchableText}
+                    value={a.id}
                     onSelect={() => {
                       attach.mutate(
                         { ticketId, assetId: a.id },

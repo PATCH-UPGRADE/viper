@@ -1525,6 +1525,24 @@ describe("trackingRouter.listAttachableAssets", () => {
     expect(arg.take).toBe(100);
     expect(arg.orderBy).toEqual([{ hostname: "asc" }, { ip: "asc" }]);
   });
+
+  it("searches every field the display name can use, so serial-named assets are reachable past the 100-row cap", async () => {
+    const caller = setup();
+    mockPrisma.asset.findMany.mockResolvedValue([]);
+
+    await caller.listAttachableAssets({ ticketId: "t1", search: "63014" });
+
+    const arg = mockPrisma.asset.findMany.mock.calls[0][0];
+    expect(arg.where).toEqual({
+      assetTickets: { none: { parentTicketId: "t1" } },
+      OR: [
+        { hostname: { contains: "63014", mode: "insensitive" } },
+        { ip: { contains: "63014", mode: "insensitive" } },
+        { serialNumber: { contains: "63014", mode: "insensitive" } },
+        { role: { contains: "63014", mode: "insensitive" } },
+      ],
+    });
+  });
 });
 
 describe("activity writes", () => {

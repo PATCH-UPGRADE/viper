@@ -15,7 +15,6 @@ export interface ExternalCommentPage {
 
 /**
  * Reading and writing the comments MedISAO keeps against one remediation.
- *
  */
 export interface CommentsApi {
   list(

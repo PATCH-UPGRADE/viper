@@ -70,7 +70,6 @@ const createSearchFilter = (search: string) => {
 
 /**
  * Find where this remediation lives on MedISAO.
- *
  */
 async function platformTargetFor(remediationId: string) {
   const mapping = await prisma.externalRemediationMapping.findFirst({

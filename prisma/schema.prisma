@@ -56,7 +56,7 @@ model User {
   @@unique([email])
   @@index([departmentId])
   @@map("user")
-  commentIdentities  ExternalCommentIdentity[]
+  medisaoCommentIdentities  MedISAOExternalCommentIdentity[]
 
 }
 
@@ -901,7 +901,7 @@ model Remediation {
   @@index([vulnerabilityId])
   @@index([userId])
   @@map("remediation")
-  commentIdentities ExternalCommentIdentity[]
+  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
 }
 
@@ -986,7 +986,7 @@ model Integration {
   @@index([userId])
   @@index([integrationUserId])
   @@map("integration")
-  commentIdentities ExternalCommentIdentity[]
+  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
 }
 
@@ -1576,7 +1576,12 @@ model SourceLink {
 // own, since the platform's feed is deliberately anonymous. And it is the only
 // record anywhere that ties a pseudonym back to a person: the platform never
 // authenticated them, so authorship can only ever be attested from this side.
-model ExternalCommentIdentity {
+/// The pseudonym MedISAO derived for one user on one remediation.
+///
+/// Specific to MedISAO, which is the only platform that hosts comments. It is
+/// also the only record tying a pseudonym back to us: MedISAO never
+/// authenticated the person, so they cannot attest authorship for what we post.
+model MedISAOExternalCommentIdentity {
   id String @id @default(cuid())
 
   userId String
@@ -1596,7 +1601,7 @@ model ExternalCommentIdentity {
 
   @@unique([userId, remediationId, integrationId])
   @@index([remediationId])
-  @@map("external_comment_identity")
+  @@map("medisao_external_comment_identity")
 }
 
 model ExternalSourceRecordMapping {

@@ -1,8 +1,6 @@
 import type { ResourceModule } from "../../../core/types";
 import type { MedIsaoConfig, MedIsaoCreds } from "../config";
-import { comments } from "./comments";
 import type { MedIsaoRemediationItem, RawMedIsaoRemediation } from "./feed";
-import { inquiries } from "./inquiries";
 import { syncRemediations } from "./sync";
 
 /**
@@ -18,8 +16,13 @@ export const remediations: ResourceModule<
 > = {
   sync: syncRemediations,
 
-  comments,
-  inquiries,
-
   defaultSyncEvery: 86400,
 };
+
+export { medisaoCallCtx } from "../context";
+/**
+ * Comments and inquiries are reached directly rather than through the registry.
+ * MedISAO is the only platform with either surface, so a caller names it.
+ */
+export { comments } from "./comments";
+export { inquiries } from "./inquiries";

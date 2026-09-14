@@ -1,15 +1,11 @@
 import "server-only";
 import { z } from "zod";
-import type {
-  ExternalInquiry,
-  InquiriesApi,
-  PlatformCallCtx,
-} from "../../../core/types";
-import type { MedIsaoConfig, MedIsaoCreds } from "../config";
+import type { MedIsaoCallCtx } from "../context";
 import { fetchPage, MedIsaoRequestError } from "../paginate";
 import { createMedIsaoSession } from "../session";
 import { remediationInquiriesUrl } from "../urls";
 import { requireSameCollection } from "../utils";
+import type { ExternalInquiry, InquiriesApi } from "./types";
 
 /** MedISAO caps an inquiry body at 10 000 characters. */
 const MAX_BODY_LENGTH = 10_000;
@@ -41,12 +37,8 @@ const toCanonical = (raw: RawInquiry): ExternalInquiry => ({
  * here. There is no author field either — the token says who is asking, which
  * is the point, because an answer has to come back to somebody.
  */
-export const inquiries: InquiriesApi<MedIsaoConfig, MedIsaoCreds> = {
-  async list(
-    ctx: PlatformCallCtx<MedIsaoConfig, MedIsaoCreds>,
-    externalId: string,
-    cursor?: string | null,
-  ) {
+export const inquiries: InquiriesApi = {
+  async list(ctx: MedIsaoCallCtx, externalId: string, cursor?: string | null) {
     const session = createMedIsaoSession(ctx.creds);
     const collection = remediationInquiriesUrl(ctx.config.apiUrl, externalId);
     // `next` comes back as a whole URL, so a cursor is followed as given.
@@ -74,7 +66,7 @@ export const inquiries: InquiriesApi<MedIsaoConfig, MedIsaoCreds> = {
   },
 
   async create(
-    ctx: PlatformCallCtx<MedIsaoConfig, MedIsaoCreds>,
+    ctx: MedIsaoCallCtx,
     externalId: string,
     draft: { body: string },
   ) {

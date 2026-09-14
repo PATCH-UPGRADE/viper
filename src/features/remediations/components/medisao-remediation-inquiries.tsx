@@ -55,8 +55,6 @@ function InquiryComposer({ remediationId }: { remediationId: string }) {
           }
         }}
       />
-      {/* The opposite of the comment notice, and said just as plainly: this one
-          carries your hospital's name, and no other hospital can read it. */}
       <p
         id="inquiry-visibility-notice"
         className="flex items-start gap-1.5 text-xs text-muted-foreground"
@@ -81,7 +79,7 @@ function InquiryComposer({ remediationId }: { remediationId: string }) {
   );
 }
 
-export const RemediationInquiries = ({
+export const MedIsaoRemediationInquiries = ({
   remediationId,
 }: {
   remediationId: string;
@@ -124,9 +122,6 @@ export const RemediationInquiries = ({
             </p>
           )}
           <ul className="flex flex-col gap-4">
-            {/* The platform returns newest first. A thread reads the other
-              way, and the composer sits below, so the newest question ends
-              up next to the box you type in. */}
             {[...data.items].reverse().map((inquiry) => (
               <li
                 key={inquiry.externalId}
@@ -140,9 +135,6 @@ export const RemediationInquiries = ({
                     })}
                   </span>
                   {inquiry.status && (
-                    // Filled once an answer is in. Keyed on the answer rather
-                    // than the status text, because MedISAO never published
-                    // its status vocabulary and we render whatever it sends.
                     <Badge
                       variant={inquiry.response ? "default" : "outline"}
                       className="ml-auto"

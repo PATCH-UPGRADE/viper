@@ -1,17 +1,19 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { loadIntegrationContext } from "@/features/integrations/core/context";
-import {
-  commentsApiFor,
-  inquiriesApiFor,
-} from "@/features/integrations/core/registry";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import {
+  medisaoCallCtx,
+  comments as medisaoComments,
+  inquiries as medisaoInquiries,
+} from "@/features/integrations/platforms/medisao/remediations";
 import {
   attachNote,
   attachNotes,
 } from "@/features/notes/server/get-relevant-notes";
 import {
   type AlohaStatus,
+  PlatformEnum,
   type Prisma,
   ResourceType,
 } from "@/generated/prisma";
@@ -67,38 +69,30 @@ const createSearchFilter = (search: string) => {
 };
 
 /**
- * Find where this remediation lives on a platform that keeps comments.
+ * Find where this remediation lives on MedISAO.
  *
- * A remediation can be mirrored from more than one platform, and only some
- * platforms have a comment surface at all, so the first mapping whose module
- * declares one wins. Nothing here names a platform: the mapping says which one
- * it is, and the registry says what that platform can do.
  */
-
 async function platformTargetFor(remediationId: string) {
-  const mappings = await prisma.externalRemediationMapping.findMany({
-    where: { itemId: remediationId },
+  const mapping = await prisma.externalRemediationMapping.findFirst({
+    where: {
+      itemId: remediationId,
+      integration: { platform: PlatformEnum.MEDISAO },
+    },
     select: {
       externalId: true,
-      integration: { select: { id: true, platform: true } },
+      integration: { select: { id: true } },
     },
     orderBy: { createdAt: "asc" },
   });
 
-  for (const mapping of mappings) {
-    const platform = mapping.integration.platform;
-    const comments = commentsApiFor(platform, ResourceType.Remediation);
-    const inquiries = inquiriesApiFor(platform, ResourceType.Remediation);
-    if (comments || inquiries) {
-      return {
-        comments,
-        inquiries,
-        externalId: mapping.externalId,
-        integrationId: mapping.integration.id,
-      };
-    }
-  }
-  return null;
+  if (!mapping) return null;
+
+  return {
+    comments: medisaoComments,
+    inquiries: medisaoInquiries,
+    externalId: mapping.externalId,
+    integrationId: mapping.integration.id,
+  };
 }
 
 export const remediationsRouter = createTRPCRouter({
@@ -121,7 +115,9 @@ export const remediationsRouter = createTRPCRouter({
         return { items: [], nextCursor: null, supported: false };
       }
 
-      const platformCtx = await loadIntegrationContext(target.integrationId);
+      const platformCtx = medisaoCallCtx(
+        await loadIntegrationContext(target.integrationId),
+      );
       const page = await target.inquiries.list(
         platformCtx,
         target.externalId,
@@ -153,7 +149,9 @@ export const remediationsRouter = createTRPCRouter({
         });
       }
 
-      const platformCtx = await loadIntegrationContext(target.integrationId);
+      const platformCtx = medisaoCallCtx(
+        await loadIntegrationContext(target.integrationId),
+      );
       return target.inquiries.create(platformCtx, target.externalId, {
         body: input.body,
       });
@@ -179,7 +177,9 @@ export const remediationsRouter = createTRPCRouter({
         return { items: [], nextCursor: null, supported: false };
       }
 
-      const platformCtx = await loadIntegrationContext(target.integrationId);
+      const platformCtx = medisaoCallCtx(
+        await loadIntegrationContext(target.integrationId),
+      );
       const page = await target.comments.list(
         platformCtx,
         target.externalId,
@@ -191,7 +191,7 @@ export const remediationsRouter = createTRPCRouter({
       // Not scoped to the caller: every user here shares one author id, so a
       // colleague's comment is this hospital's too. Nothing in this query can
       // identify anybody outside it.
-      const ours = await prisma.externalCommentIdentity.findMany({
+      const ours = await prisma.medISAOExternalCommentIdentity.findMany({
         where: {
           remediationId: input.remediationId,
           integrationId: target.integrationId,
@@ -239,7 +239,9 @@ export const remediationsRouter = createTRPCRouter({
         });
       }
 
-      const platformCtx = await loadIntegrationContext(target.integrationId);
+      const platformCtx = medisaoCallCtx(
+        await loadIntegrationContext(target.integrationId),
+      );
       const comment = await target.comments.create(
         platformCtx,
         target.externalId,
@@ -251,7 +253,7 @@ export const remediationsRouter = createTRPCRouter({
 
       // The platform derives the same pseudonym for this person on this record
       // every time, so an upsert keeps one row however often they comment.
-      await prisma.externalCommentIdentity.upsert({
+      await prisma.medISAOExternalCommentIdentity.upsert({
         where: {
           userId_remediationId_integrationId: {
             userId: ctx.auth.user.id,

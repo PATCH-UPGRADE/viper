@@ -42,9 +42,9 @@ import type {
   RemediationCard as RemediationCardType,
   RemediationResponse,
 } from "../types";
-import { RemediationComments } from "./remediation-comments";
+import { MedIsaoRemediationComments } from "./medisao-remediation-comments";
+import { MedIsaoRemediationInquiries } from "./medisao-remediation-inquiries";
 import { hasStatedImpact, RemediationImpact } from "./remediation-impact";
-import { RemediationInquiries } from "./remediation-inquiries";
 
 export const RemediationsSearch = () => {
   const [params, setParams] = useRemediationsParams();
@@ -292,7 +292,7 @@ function RemediationDrawer({
               its own loading and empty state, so neither blocks the rest. */}
           <div className="flex flex-col gap-2">
             <h3 className="font-semibold">Comments from other hospitals</h3>
-            <RemediationComments remediationId={remediation.id} />
+            <MedIsaoRemediationComments remediationId={remediation.id} />
           </div>
 
           <Separator />
@@ -301,7 +301,7 @@ function RemediationDrawer({
             <h3 className="font-semibold">
               Your questions to the manufacturer
             </h3>
-            <RemediationInquiries remediationId={remediation.id} />
+            <MedIsaoRemediationInquiries remediationId={remediation.id} />
           </div>
         </div>
 

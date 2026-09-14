@@ -4,16 +4,19 @@ import {
   type UIMessage,
 } from "ai";
 import { buildChatGraph } from "@/features/agents/chat/graph";
-import { buildRecommendationsGraph } from "@/features/agents/recommendations/graph";
 import { generateThreadTitle } from "@/features/agents/shared/generate-thread-title";
 import {
   ensureThread,
+  lastAssistantTurnAwaitsRecommendation,
   loadHistoryMessages,
   saveAssistantMessage,
   saveUserMessage,
   userMessageCount,
 } from "@/features/agents/shared/history";
-import { streamGraphToUI } from "@/features/agents/shared/stream-bridge";
+import {
+  streamGraphToUI,
+  writeRecommendationMarker,
+} from "@/features/agents/shared/stream-bridge";
 import type { AssetWithIssueRelations } from "@/features/assets/types";
 import { USER_ROLES, type UserRole } from "@/features/chat/utils";
 import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
@@ -27,7 +30,6 @@ interface ChatBody {
   messages: UIMessage[];
   threadId?: string;
   userRole?: UserRole;
-  agent?: "chat" | "giveRecommendations";
   assetData?: AssetWithIssueRelations;
   vulnerabilityData?: VulnerabilityWithRelations;
   fromReports?: boolean;
@@ -71,7 +73,7 @@ export async function POST(req: Request) {
   }
   const userText = textOf(newUserMessage);
   const threadId = body.threadId ?? crypto.randomUUID();
-  const { agent, assetData, vulnerabilityData, fromReports } = body;
+  const { assetData, vulnerabilityData, fromReports } = body;
   let userMessageSaved = false;
 
   const stream = createUIMessageStream({
@@ -85,26 +87,27 @@ export async function POST(req: Request) {
       // Persist the user's turn, then hydrate the full conversation from the DB
       // (authoritative — we don't trust client-side message state).
       await ensureThread(threadId, userId, userText);
+      const resumeRecommendation =
+        await lastAssistantTurnAwaitsRecommendation(threadId);
       await saveUserMessage(threadId, newUserMessage.id, userText);
       userMessageSaved = true;
       const history = await loadHistoryMessages(threadId);
 
-      const graph =
-        agent === "giveRecommendations"
-          ? buildRecommendationsGraph({
-              userId,
-              userRole,
-              assetData,
-              vulnerabilityData,
-            })
-          : buildChatGraph({
-              userId,
-              userRole,
-              threadId,
-              fromReports,
-            });
+      const graph = buildChatGraph({
+        userId,
+        userRole,
+        threadId,
+        assetData,
+        vulnerabilityData,
+        fromReports,
+      });
 
-      await streamGraphToUI({ graph, input: { messages: history }, writer });
+      if (resumeRecommendation) writeRecommendationMarker(writer);
+      await streamGraphToUI({
+        graph,
+        input: { messages: history, recommending: resumeRecommendation },
+        writer,
+      });
       writer.write({ type: "finish" });
     },
     onError: (error) =>

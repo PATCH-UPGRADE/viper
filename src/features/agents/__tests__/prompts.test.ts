@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { USER_ROLES } from "@/features/chat/utils";
 import { buildSystemPrompt as chatPrompt } from "../chat/graph";
-import { buildSystemPrompt as recommendationsPrompt } from "../recommendations/graph";
+import { buildRecommendationSystemPrompt as recommendationsPrompt } from "../chat/recommendation-prompt";
 
 /**
  * Every conversational agent binds the same tool set, so a tool the registry

@@ -1,16 +1,26 @@
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { SystemMessage } from "@langchain/core/messages";
+import type { AssetWithIssueRelations } from "@/features/assets/types";
 import {
+  ASSET_ROLE_INSTRUCTIONS,
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
+  VULNERABILITY_ROLE_INSTRUCTIONS,
 } from "@/features/chat/utils";
+import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
+import { assetToMarkdown, vulnerabilityToMarkdown } from "@/lib/markdown";
 import { buildAgentGraph } from "../shared/build-graph";
 import { loadPersistentNotesMarkdown } from "../shared/notes-preload";
 import { PLATFORM_CATALOG } from "../tools/query-platform-tool";
 import { buildAgentTools } from "../tools/registry";
+import {
+  buildRecommendationSystemPrompt,
+  RECOMMENDATION_TOOL_NAMES,
+} from "./recommendation-prompt";
 
 const CHAT_MODEL = "claude-haiku-4-5-20251001";
+const RECOMMENDATION_MODEL = "claude-opus-4-6";
 
 const BASE_PROMPT = `You are a helpful AI assistant for a hospital vulnerability management platform (Viper).
 You help hospital administrators and security engineers understand the operational impact
@@ -18,6 +28,11 @@ of vulnerabilities and remediations across systems, safety, and clinical workflo
 Be concise, accurate, and prioritize patient safety in your recommendations.
 
 <tools>
+- request_recommendation: hand the turn to the remediation advisor, a stronger model with a
+  method for ranking fixes. Call it, before fetching data or answering, when the user
+  asks what to do, which devices to fix first, whether to patch now or wait, when to
+  schedule downtime, or how a fix affects patient care — and for any follow-up to an
+  answer the advisor gave. Do not call it for lookups, notes, or reports.
 - ask_user_questions: ask the user 1–4 clarifying questions with suggested answers.
   The agent turn ends here until the user replies.
 - query_platform_data: read-only lookup of assets, vulnerabilities, remediations,
@@ -96,19 +111,52 @@ Ask for off-platform facts with ask_user_questions and record_note. Mark missing
 "Not available". After saving, confirm briefly in chat; the report is in /reports.
 `;
 
-export function buildSystemPrompt(role: UserRole, fromReports = false): string {
+function buildFocusBlocks(
+  role: UserRole,
+  assetData?: AssetWithIssueRelations,
+  vulnerabilityData?: VulnerabilityWithRelations,
+): string {
+  const blocks: string[] = [];
+
+  if (assetData) {
+    const assetMd = assetToMarkdown(assetData, { includeIssues: false });
+    blocks.push(
+      `<role_focus_asset>${ASSET_ROLE_INSTRUCTIONS[role]}</role_focus_asset>\n\n<asset_focus>Unless otherwise specified, the user is asking about this asset:\n\n${assetMd}</asset_focus>`,
+    );
+  }
+
+  if (vulnerabilityData) {
+    const vulnMd = vulnerabilityToMarkdown(vulnerabilityData, {
+      includeAssets: false,
+      includeRemediations: false,
+    });
+    blocks.push(
+      `<role_focus_vuln>${VULNERABILITY_ROLE_INSTRUCTIONS[role]}</role_focus_vuln>\n\n<vuln_focus>Unless otherwise specified, the user is asking about this vulnerability:\n\n${vulnMd}</vuln_focus>`,
+    );
+  }
+
+  return blocks.map((block) => `\n\n${block}`).join("");
+}
+
+export function buildSystemPrompt(
+  role: UserRole,
+  fromReports = false,
+  focus = "",
+): string {
   const reportsBias = fromReports
     ? `\n\n<surface>The user is on the reports view and intends to use this conversation to create a report. Once you understand the user's goals and have enough information, use the write_report tool to create a report. Do not output a "report" to the chat interface unless asked to (use the tool instead).</surface>`
     : "";
   return `${BASE_PROMPT}
 
-<user_role>The user's role is: ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</user_role>${reportsBias}`;
+<user_role>The user's role is: ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</user_role>${reportsBias}${focus}`;
 }
 
 export function buildChatGraph({
   userId,
   userRole = "hospital administration",
   threadId,
+  assetData,
+  vulnerabilityData,
   fromReports,
   loadNotes = loadPersistentNotesMarkdown,
 }: {
@@ -116,22 +164,44 @@ export function buildChatGraph({
   userRole?: UserRole;
   /** The thread being written to — enables write_report. */
   threadId: string;
+  /** The record the user has open, when the chat is embedded in a drawer. */
+  assetData?: AssetWithIssueRelations;
+  vulnerabilityData?: VulnerabilityWithRelations;
   /** Request came from the /reports view — bias the prompt toward write_report. */
   fromReports?: boolean;
   loadNotes?: () => Promise<string>;
 }) {
-  // Passing threadId adds write_report; the recommendations graph omits it.
   const tools = buildAgentTools(userId, threadId);
+  const recommendationTools = tools.filter((tool) =>
+    RECOMMENDATION_TOOL_NAMES.has(tool.name),
+  );
+  const focus = buildFocusBlocks(userRole, assetData, vulnerabilityData);
+
   const model = new ChatAnthropic({
     model: CHAT_MODEL,
     maxTokens: 4096,
     streaming: true,
   }).bindTools(tools);
 
+  const recommendationModel = new ChatAnthropic({
+    model: RECOMMENDATION_MODEL,
+    maxTokens: 8000,
+    streaming: true,
+    thinking: { type: "enabled", budget_tokens: 3000 },
+  }).bindTools(recommendationTools);
+
   return buildAgentGraph({
     model,
     tools,
-    systemMessage: new SystemMessage(buildSystemPrompt(userRole, fromReports)),
+    systemMessage: new SystemMessage(
+      buildSystemPrompt(userRole, fromReports, focus),
+    ),
     preload: loadNotes,
+    recommendation: {
+      model: recommendationModel,
+      systemMessage: new SystemMessage(
+        buildRecommendationSystemPrompt(userRole, focus),
+      ),
+    },
   });
 }

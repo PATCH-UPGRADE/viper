@@ -54,6 +54,8 @@ const createSearchFilter = (search: string) => {
     ? {
         OR: [
           { ip: insensitive },
+          { hostname: insensitive },
+          { serialNumber: insensitive },
           { role: insensitive },
           {
             deviceGroup: {

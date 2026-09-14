@@ -72,6 +72,7 @@ jobs:
 
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/testdb
+      HOSPITAL_IDENTIFIER: ci-hospital
 
     steps:
       - uses: actions/checkout@v4

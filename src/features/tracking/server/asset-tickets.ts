@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  type AssetNameSource,
+  assetNameSelect,
+  getAssetDisplayName,
+} from "@/features/assets/utils";
 import { assetsForMatchings } from "@/features/work-orders/server/drafts";
 import type { Priority, TicketCategory } from "@/generated/prisma";
 import { TicketStatus } from "@/generated/prisma";
@@ -64,7 +69,7 @@ export async function createAssetTicket(
      * row N times, inside the caller's transaction.
      */
     parent?: ParentFields;
-    asset?: { hostname: string | null; ip: string | null };
+    asset?: AssetNameSource;
   },
 ): Promise<string> {
   const { parentTicketId, assetId, actorId, externalMapping } = params;
@@ -102,13 +107,13 @@ export async function createAssetTicket(
     params.asset ??
       tx.asset.findUniqueOrThrow({
         where: { id: assetId },
-        select: { hostname: true, ip: true },
+        select: assetNameSelect,
       }),
   ]);
 
   const child = await tx.workOrderTicket.create({
     data: {
-      summary: `${parent.summary} — ${asset.hostname ?? asset.ip}`,
+      summary: `${parent.summary} — ${getAssetDisplayName(asset)}`,
       body: parent.body,
       category: parent.category,
       priority: parent.priority,
@@ -183,7 +188,7 @@ export async function attachMatchingAssets(
       assetId: asset.id,
       actorId,
       parent,
-      asset: { hostname: asset.hostname, ip: asset.ip },
+      asset,
     });
   }
 }

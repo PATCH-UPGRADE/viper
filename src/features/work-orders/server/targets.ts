@@ -1,4 +1,5 @@
 import "server-only";
+import { assetNameSelect } from "@/features/assets/utils";
 import type { PlatformEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
@@ -17,6 +18,8 @@ interface TargetAsset {
   id: string;
   hostname: string | null;
   ip: string | null;
+  serialNumber: string | null;
+  role: string | null;
   /** The platform's own id for this asset. Null when it was never synced. */
   externalId: string | null;
 }
@@ -68,9 +71,7 @@ export async function resolveWorkOrderTargets(
       assets: {
         where: { id: { in: unique } },
         select: {
-          id: true,
-          hostname: true,
-          ip: true,
+          ...assetNameSelect,
           externalMappings: {
             select: { integrationId: true, externalId: true },
           },
@@ -108,6 +109,8 @@ export async function resolveWorkOrderTargets(
         id: asset.id,
         hostname: asset.hostname,
         ip: asset.ip,
+        serialNumber: asset.serialNumber,
+        role: asset.role,
         externalId:
           asset.externalMappings.find((m) => m.integrationId === integration.id)
             ?.externalId ?? null,

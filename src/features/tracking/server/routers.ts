@@ -4,6 +4,7 @@ import { dispatchSubmission } from "@/features/work-orders/server/submit";
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { assetNameSelect } from "@/features/assets/utils";
 import {
   Priority,
   type Prisma,
@@ -1085,7 +1086,7 @@ export const trackingRouter = createTRPCRouter({
           },
           select: {
             ticketId: true,
-            asset: { select: { hostname: true, ip: true } },
+            asset: { select: assetNameSelect },
           },
         });
         if (!assetTicket) {
@@ -1129,6 +1130,7 @@ export const trackingRouter = createTRPCRouter({
           id: true,
           hostname: true,
           ip: true,
+          serialNumber: true,
           role: true,
           deviceGroup: {
             select: {

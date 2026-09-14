@@ -167,14 +167,11 @@ const makeProposeWorkOrder = (userId: string) =>
           ? target.assets.map((a) => [a.id, labelFor(a)])
           : unmanaged.map((u) => [u.id, u.label]),
       );
-      // The hostname/IP each child ticket names, already fetched by the target
+      // The fields each child ticket is named from, already fetched by the target
       // resolution. Absent only on the untargeted branch, where the child falls
       // back to reading the asset itself.
       const assetRows = new Map(
-        (target?.assets ?? []).map((a) => [
-          a.id,
-          { hostname: a.hostname, ip: a.ip },
-        ]),
+        (target?.assets ?? []).map((asset) => [asset.id, asset]),
       );
 
       // The per-asset children are made here rather than at approval, because

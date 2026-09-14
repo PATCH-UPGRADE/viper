@@ -1,4 +1,8 @@
 import "server-only";
+import {
+  type AssetNameSource,
+  getAssetDisplayName,
+} from "@/features/assets/utils";
 import type {
   Priority,
   TicketCategory,
@@ -336,7 +340,7 @@ export async function recordAssetActivity(
   userId: string,
   assetId: string,
   action: "attached" | "detached",
-  asset: { hostname: string | null; ip: string | null },
+  asset: AssetNameSource,
 ): Promise<void> {
   await tx.ticketActivity.create({
     data: {
@@ -345,7 +349,7 @@ export async function recordAssetActivity(
       type: action === "attached" ? "ASSET_ATTACHED" : "ASSET_DETACHED",
       data: {
         assetId,
-        assetLabel: asset.hostname ?? asset.ip,
+        assetLabel: getAssetDisplayName(asset),
       },
     },
   });

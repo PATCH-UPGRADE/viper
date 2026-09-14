@@ -200,7 +200,11 @@ export function MatchingAssetTable({
         />
       ),
     },
-    { head: "IP Address", fullOnly: true, cell: (asset) => asset.ip },
+    {
+      head: "IP Address",
+      fullOnly: true,
+      cell: (asset) => asset.ip ?? "—",
+    },
     {
       head: "Location",
       fullOnly: false,

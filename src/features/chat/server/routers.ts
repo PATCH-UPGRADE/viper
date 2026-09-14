@@ -1,7 +1,7 @@
-import { TRPCError } from "@trpc/server";
 import z from "zod";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { requireExistence } from "@/trpc/middleware";
 import {
   chatThreadListSelect,
   fetchThreadsResponseSchema,
@@ -126,13 +126,13 @@ export const chatRouter = createTRPCRouter({
     .input(z.object({ threadId: z.string() }))
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ input, ctx }) => {
-      const thread = await prisma.chatThread.findFirst({
-        where: { id: input.threadId, userId: ctx.auth.user.id },
-        select: { reportId: true },
-      });
-      if (!thread) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
+      const thread = requireExistence(
+        await prisma.chatThread.findFirst({
+          where: { id: input.threadId, userId: ctx.auth.user.id },
+          select: { reportId: true },
+        }),
+        "Chat thread",
+      );
       await prisma.chatThread.delete({ where: { id: input.threadId } });
       // The FK sits on ChatThread, so the report row isn't cascaded — drop it
       // too. NOTE: this assumes 1:1 — once a ChatReport can be shared by many

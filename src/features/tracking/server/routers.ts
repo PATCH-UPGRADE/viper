@@ -2,6 +2,7 @@ import { processIntegrationSync } from "@/features/integrations/core/sync/upsert
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { assetNameSelect } from "@/features/assets/utils";
 import {
   FLEET_OPERATIONAL_STATUSES,
   FLEET_PATIENT_DANGERS,
@@ -795,7 +796,7 @@ export const trackingRouter = createTRPCRouter({
           },
           select: {
             ticketId: true,
-            asset: { select: { hostname: true, ip: true } },
+            asset: { select: assetNameSelect },
           },
         });
         if (!assetTicket) {
@@ -839,6 +840,7 @@ export const trackingRouter = createTRPCRouter({
           id: true,
           hostname: true,
           ip: true,
+          serialNumber: true,
           role: true,
           deviceGroup: {
             select: {

@@ -1484,7 +1484,15 @@ describe("trackingRouter.detachAsset", () => {
       },
       select: {
         ticketId: true,
-        asset: { select: { hostname: true, ip: true } },
+        asset: {
+          select: {
+            id: true,
+            hostname: true,
+            ip: true,
+            serialNumber: true,
+            role: true,
+          },
+        },
       },
     });
     expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({
@@ -1687,6 +1695,33 @@ describe("activity writes", () => {
         userId: FAKE_USER_ID,
         type: "ASSET_DETACHED",
         data: { assetId: "a1", assetLabel: "10.0.0.42" },
+      },
+    });
+  });
+
+  it("names the child ticket and the ASSET_ATTACHED row by serial number when the asset has no hostname or ip", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUniqueOrThrow.mockResolvedValueOnce({
+      id: "a1",
+      hostname: null,
+      ip: null,
+      serialNumber: "63014",
+      role: "Computed Tomography (CT)",
+    });
+
+    await caller.attachAsset({ ticketId: "t1", assetId: "a1" });
+
+    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ summary: "Test ticket — 63014" }),
+      }),
+    );
+    expect(mockPrisma.ticketActivity.create).toHaveBeenCalledWith({
+      data: {
+        ticketId: "t1",
+        userId: FAKE_USER_ID,
+        type: "ASSET_ATTACHED",
+        data: { assetId: "a1", assetLabel: "63014" },
       },
     });
   });

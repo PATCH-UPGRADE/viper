@@ -15,6 +15,7 @@ export interface FleetManagedAsset {
   assetId: string;
   hostname: string | null;
   ip: string | null;
+  serialNumber: string | null;
   role: string | null;
   /** Fleet's identifier for the physical device; activities carry it too. */
   equipmentKey: string;
@@ -29,6 +30,7 @@ const managedAssetSelect = (integrationIds: string[]) =>
     id: true,
     hostname: true,
     ip: true,
+    serialNumber: true,
     role: true,
     externalMappings: {
       where: { integrationId: { in: integrationIds } },
@@ -41,6 +43,7 @@ type ManagedAssetRow = {
   id: string;
   hostname: string | null;
   ip: string | null;
+  serialNumber: string | null;
   role: string | null;
   externalMappings: { externalId: string }[];
 };
@@ -50,6 +53,7 @@ function toManagedAsset(asset: ManagedAssetRow): FleetManagedAsset {
     assetId: asset.id,
     hostname: asset.hostname,
     ip: asset.ip,
+    serialNumber: asset.serialNumber,
     role: asset.role,
     equipmentKey: asset.externalMappings[0].externalId,
   };

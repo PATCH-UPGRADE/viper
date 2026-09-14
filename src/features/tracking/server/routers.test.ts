@@ -1891,6 +1891,31 @@ describe("trackingRouter.createFleetWorkOrder", () => {
     ]);
   });
 
+  it("names a failed Fleet asset by serial number, not by its internal id", async () => {
+    const caller = setup();
+    const FLEET_CT = {
+      assetId: "ct_63014",
+      hostname: null,
+      ip: null,
+      serialNumber: "63014",
+      role: "Computed Tomography (CT)",
+      equipmentKey: "US_1006103273",
+    };
+    mockFleet.resolveFleetAssets.mockResolvedValue([MRI, FLEET_CT]);
+    mockFleet.file
+      .mockResolvedValueOnce({ externalId: "US_400501937577", raw: {} })
+      .mockRejectedValueOnce(new Error("503 Service Unavailable"));
+
+    const result = await caller.createFleetWorkOrder({
+      ...proposal,
+      assetIds: [MRI.assetId, FLEET_CT.assetId],
+    });
+
+    expect(result.failures).toEqual([
+      { asset: "63014", message: "503 Service Unavailable" },
+    ]);
+  });
+
   it("fails loudly and drops the claim when Fleet accepts nothing", async () => {
     const caller = setup();
     mockFleet.file.mockRejectedValue(new Error("401 Forbidden"));

@@ -2,7 +2,7 @@ import { processIntegrationSync } from "@/features/integrations/core/sync/upsert
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { assetNameSelect } from "@/features/assets/utils";
+import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
 import {
   FLEET_OPERATIONAL_STATUSES,
   FLEET_PATIENT_DANGERS,
@@ -1161,7 +1161,7 @@ export const trackingRouter = createTRPCRouter({
           filed.push({ asset, externalId: result.externalId });
         } catch (error) {
           failures.push({
-            asset: asset.hostname ?? asset.ip ?? asset.assetId,
+            asset: getAssetDisplayName({ ...asset, id: asset.assetId }),
             message: error instanceof Error ? error.message : "Unknown error",
           });
         }

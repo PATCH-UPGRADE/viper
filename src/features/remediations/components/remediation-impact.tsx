@@ -3,7 +3,7 @@
 import type { SourceImpact } from "../types";
 
 /** Seconds are what the source sends; hours are what someone plans around. */
-function formatDowntime(seconds: number): string {
+export function formatDowntime(seconds: number): string {
   if (seconds < 60) return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;

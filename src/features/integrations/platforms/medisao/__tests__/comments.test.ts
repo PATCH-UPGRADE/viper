@@ -29,6 +29,10 @@ const LIVE_COMMENT = {
   created_at: "2026-08-27T17:37:17.269311Z",
 };
 
+const COLLECTION = `${API}/api/public/v1/remediations/${REMEDIATION}/comments`;
+/** Shaped like a real `next`: MedISAO keeps the path and adds a query. */
+const NEXT = `${COLLECTION}?cursor=cD0yMDI2&page_size=1`;
+
 const page = (results: unknown[], next: string | null = null) =>
   new Response(JSON.stringify({ next, previous: null, results }), {
     status: 200,
@@ -63,19 +67,19 @@ describe("reading comments", () => {
   });
 
   it("returns one page and the cursor for the next", async () => {
-    request.mockResolvedValue(page([LIVE_COMMENT], `${API}/page-2`));
+    request.mockResolvedValue(page([LIVE_COMMENT], NEXT));
 
     const result = await comments.list(ctx, REMEDIATION);
 
-    expect(result.nextCursor).toBe(`${API}/page-2`);
+    expect(result.nextCursor).toBe(NEXT);
   });
 
   it("follows a cursor as given, rather than rebuilding the url", async () => {
     request.mockResolvedValue(page([]));
 
-    await comments.list(ctx, REMEDIATION, `${API}/page-2?cursor=abc`);
+    await comments.list(ctx, REMEDIATION, NEXT);
 
-    expect(request).toHaveBeenCalledWith(`${API}/page-2?cursor=abc`);
+    expect(request).toHaveBeenCalledWith(NEXT);
   });
 
   // Comments inherit the remediation's visibility exactly, so a manufacturer
@@ -86,6 +90,13 @@ describe("reading comments", () => {
     await expect(
       comments.list(ctx, REMEDIATION, "https://attacker.test/steal"),
     ).rejects.toThrow(/Refusing to follow/);
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("refuses a same-origin cursor that pages a different collection", async () => {
+    await expect(
+      comments.list(ctx, REMEDIATION, `${API}/api/public/v1/channels`),
+    ).rejects.toThrow(/does not page/);
     expect(request).not.toHaveBeenCalled();
   });
 

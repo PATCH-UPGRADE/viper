@@ -30,6 +30,10 @@ const ANSWERED = {
   updated_at: "2026-09-02T10:00:00Z",
 };
 
+const COLLECTION = `${API}/api/public/v1/remediations/${REMEDIATION}/inquiries`;
+/** Shaped like a real `next`: MedISAO keeps the path and adds a query. */
+const NEXT = `${COLLECTION}?cursor=cD0yMDI2&page_size=1`;
+
 const page = (results: unknown[], next: string | null = null) =>
   new Response(JSON.stringify({ next, previous: null, results }), {
     status: 200,
@@ -82,6 +86,21 @@ describe("reading inquiries", () => {
     await expect(
       inquiries.list(ctx, REMEDIATION, "https://attacker.test/steal"),
     ).rejects.toThrow(/Refusing to follow/);
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("follows a cursor as given, rather than rebuilding the url", async () => {
+    request.mockResolvedValue(page([]));
+
+    await inquiries.list(ctx, REMEDIATION, NEXT);
+
+    expect(request).toHaveBeenCalledWith(NEXT);
+  });
+
+  it("refuses a same-origin cursor that pages a different collection", async () => {
+    await expect(
+      inquiries.list(ctx, REMEDIATION, `${API}/api/public/v1/channels`),
+    ).rejects.toThrow(/does not page/);
     expect(request).not.toHaveBeenCalled();
   });
 

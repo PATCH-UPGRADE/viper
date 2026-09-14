@@ -9,6 +9,7 @@ import type { MedIsaoConfig, MedIsaoCreds } from "../config";
 import { fetchPage, MedIsaoRequestError } from "../paginate";
 import { createMedIsaoSession } from "../session";
 import { remediationCommentsUrl } from "../urls";
+import { requireSameCollection } from "../utils";
 
 /** MedISAO caps a comment body at 10 000 characters and rejects a blank one. */
 const MAX_BODY_LENGTH = 10_000;
@@ -49,8 +50,10 @@ export const comments: CommentsApi<MedIsaoConfig, MedIsaoCreds> = {
     cursor?: string | null,
   ) {
     const session = createMedIsaoSession(ctx.creds);
+    const collection = remediationCommentsUrl(ctx.config.apiUrl, externalId);
     // `next` comes back as a whole URL, so a cursor is followed as given.
-    const url = cursor ?? remediationCommentsUrl(ctx.config.apiUrl, externalId);
+    if (cursor) requireSameCollection(cursor, collection);
+    const url = cursor ?? collection;
 
     try {
       // `url` may be a cursor the client sent, so it is bounded to the

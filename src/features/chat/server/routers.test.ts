@@ -42,10 +42,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// Regression for VW-512: a fresh /reports thread navigates to
-// /reports/<uuid> with no ChatThread row. The dehydrated prefetch of these
-// two queries must resolve gracefully, not reject (previously threw via
-// prisma.chatThread.findUniqueOrThrow).
+// A fresh /reports thread has no ChatThread row yet — the dehydrated
+// prefetch of these two queries must resolve gracefully, not reject.
 describe("chatRouter — rowless threadId", () => {
   it("getUIMessages returns empty history instead of throwing", async () => {
     const caller = setup();
@@ -79,10 +77,9 @@ describe("chatRouter — rowless threadId", () => {
   });
 });
 
-// VW-512: the /reports sidebar lists every thread with a linked ChatReport,
-// including blank ("") ones created up front by the "New" button. A thread with
-// no ChatReport (an ordinary chat) is excluded by the `reportId: { not: null }`
-// filter — Prisma enforces it, so the unit check is that the filter is passed.
+// The /reports sidebar lists every thread with a linked ChatReport, including
+// blank ("") ones created up front by the "New" button. Prisma enforces the
+// `reportId: { not: null }` filter, so the unit check is that it's passed.
 describe("chatRouter — report thread list & creation", () => {
   it("getReportThreads filters on a linked report, not report content", async () => {
     const caller = setup();

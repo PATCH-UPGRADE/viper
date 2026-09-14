@@ -26,8 +26,6 @@ export function ReportsSidebar() {
     trpc.chat.createReportThread.mutationOptions(),
   );
 
-  // Create the (empty) thread before navigating so it's in the sidebar
-  // immediately, then go to it.
   const newReport = async () => {
     const id = crypto.randomUUID();
     await createReportThread({ threadId: id });

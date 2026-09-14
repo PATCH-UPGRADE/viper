@@ -219,6 +219,7 @@ export const ticketDetailInclude = {
           id: true,
           hostname: true,
           ip: true,
+          serialNumber: true,
           role: true,
           status: true,
           macAddress: true,
@@ -360,7 +361,15 @@ export const workOrderListInclude = {
   assignee: { select: { id: true, name: true, email: true } },
   assets: {
     select: {
-      asset: { select: { id: true, hostname: true, ip: true, role: true } },
+      asset: {
+        select: {
+          id: true,
+          hostname: true,
+          ip: true,
+          serialNumber: true,
+          role: true,
+        },
+      },
     },
   },
   vulnerabilities: {
@@ -544,6 +553,7 @@ const linkedAssetSchema = z.object({
   id: z.string(),
   hostname: z.string().nullable(),
   ip: z.string().nullable(),
+  serialNumber: z.string().nullable(),
   role: z.string().nullable(),
 });
 

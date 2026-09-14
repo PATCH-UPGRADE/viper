@@ -12,6 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  type AssetNameSource,
+  getAssetDisplayName,
+} from "@/features/assets/utils";
 import { useCategoryColor } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
 import type { TicketCategory, TicketStatus } from "@/generated/prisma";
@@ -243,8 +247,8 @@ export const countAssetTicketsByStatus = (
     }))
     .filter((c) => c.count > 0);
 
-export const assetLabel = (asset: { hostname: string | null; id: string }) =>
-  asset.hostname ?? asset.id;
+export const assetLabel = (asset: AssetNameSource) =>
+  getAssetDisplayName(asset);
 
 export const locationLabel = (location: unknown): string | null => {
   if (!location || typeof location !== "object") return null;

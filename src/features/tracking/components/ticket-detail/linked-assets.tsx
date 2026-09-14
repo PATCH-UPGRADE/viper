@@ -17,6 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { getAssetDisplayName } from "@/features/assets/utils";
 import { getSwatchClass } from "@/features/tag-colors/palette";
 import { TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
@@ -103,7 +104,15 @@ const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
             <CommandEmpty>No eligible assets found.</CommandEmpty>
             <CommandGroup>
               {(candidates ?? []).map((a) => {
-                const label = a.hostname ?? a.ip;
+                const label = getAssetDisplayName(a);
+                const searchableText = [
+                  a.hostname,
+                  a.ip,
+                  a.serialNumber,
+                  a.role,
+                ]
+                  .filter(Boolean)
+                  .join(" ");
                 const model = [
                   a.deviceGroup?.manufacturer?.canonicalDisplayName,
                   a.deviceGroup?.product?.canonicalDisplayName,
@@ -114,7 +123,7 @@ const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
                 return (
                   <CommandItem
                     key={a.id}
-                    value={`${a.hostname ?? ""} ${a.ip} ${a.role ?? ""}`}
+                    value={searchableText}
                     onSelect={() => {
                       attach.mutate(
                         { ticketId, assetId: a.id },

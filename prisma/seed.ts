@@ -1,4 +1,5 @@
 import { hashPassword } from "better-auth/crypto";
+import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
 import {
   type ArtifactType,
   type AssetStatus,
@@ -2072,11 +2073,11 @@ async function seedAssetTicket(
 ) {
   const asset = await prisma.asset.findUniqueOrThrow({
     where: { id: assetId },
-    select: { hostname: true, ip: true },
+    select: assetNameSelect,
   });
   await prisma.workOrderTicket.create({
     data: {
-      summary: `${parentTicket.summary} — ${asset.hostname ?? asset.ip}`,
+      summary: `${parentTicket.summary} — ${getAssetDisplayName(asset)}`,
       category: parentTicket.category,
       sourceLabel: parentTicket.sourceLabel,
       scheduledAt: parentTicket.scheduledAt,
@@ -2090,7 +2091,7 @@ async function seedAssetTicket(
       ticketId: parentTicket.id,
       userId,
       type: "ASSET_ATTACHED",
-      data: { assetId, assetLabel: asset.hostname ?? asset.ip },
+      data: { assetId, assetLabel: getAssetDisplayName(asset) },
     },
   });
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
 import { PlatformEnum, type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
@@ -154,12 +155,12 @@ export async function resolveFleetAssets(
     // error reads "MRI-01" rather than a cuid the user has never seen.
     const rows = await prisma.asset.findMany({
       where: { id: { in: missing } },
-      select: { id: true, hostname: true, ip: true },
+      select: assetNameSelect,
     });
     const labels = missing.map((id) => {
       const row = rows.find((r) => r.id === id);
       if (!row) return `${id} (no such asset)`;
-      return row.hostname ?? row.ip ?? id;
+      return getAssetDisplayName(row);
     });
     throw new UnmanagedAssetsError(labels);
   }

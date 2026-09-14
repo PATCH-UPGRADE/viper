@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDowntime } from "./remediation-impact";
+import { formatDowntime } from "./medisao-remediation-impact";
 
 describe("formatDowntime", () => {
   it.each([

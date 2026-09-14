@@ -43,8 +43,11 @@ import type {
   RemediationResponse,
 } from "../types";
 import { MedIsaoRemediationComments } from "./medisao-remediation-comments";
+import {
+  hasStatedImpact,
+  MedIsaoRemediationImpact,
+} from "./medisao-remediation-impact";
 import { MedIsaoRemediationInquiries } from "./medisao-remediation-inquiries";
-import { hasStatedImpact, RemediationImpact } from "./remediation-impact";
 
 export const RemediationsSearch = () => {
   const [params, setParams] = useRemediationsParams();
@@ -289,7 +292,9 @@ function RemediationDrawer({
               {hasStatedImpact(remediation.sourceImpact ?? {}) && (
                 <div className="flex flex-col gap-2">
                   <h4 className="text-sm font-medium">Manufacturer impact</h4>
-                  <RemediationImpact impact={remediation.sourceImpact ?? {}} />
+                  <MedIsaoRemediationImpact
+                    impact={remediation.sourceImpact ?? {}}
+                  />
                 </div>
               )}
 

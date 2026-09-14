@@ -1576,11 +1576,16 @@ model SourceLink {
 // own, since the platform's feed is deliberately anonymous. And it is the only
 // record anywhere that ties a pseudonym back to a person: the platform never
 // authenticated them, so authorship can only ever be attested from this side.
-/// The pseudonym MedISAO derived for one user on one remediation.
+/// The pseudonym MedISAO derived for this hospital on one remediation.
 ///
 /// Specific to MedISAO, which is the only platform that hosts comments. It is
 /// also the only record tying a pseudonym back to us: MedISAO never
 /// authenticated the person, so they cannot attest authorship for what we post.
+///
+/// One row per remediation and integration, not per user. We post under the
+/// deployment's hospital identifier and never send a user id, so MedISAO
+/// returns one pseudonym for everybody here. `userId` records who wrote the
+/// first comment, which the pseudonym deliberately cannot.
 model MedISAOExternalCommentIdentity {
   id String @id @default(cuid())
 
@@ -1599,7 +1604,7 @@ model MedISAOExternalCommentIdentity {
 
   createdAt DateTime @default(now())
 
-  @@unique([userId, remediationId, integrationId])
+  @@unique([remediationId, integrationId])
   @@index([remediationId])
   @@map("medisao_external_comment_identity")
 }

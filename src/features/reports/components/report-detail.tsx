@@ -12,6 +12,26 @@ export const EXPORTS = [
   ["docx", "Word"],
 ] as const;
 
+/** PDF/Word export buttons for a report thread — shared with the chat's report modal. */
+export function ExportLinks({ threadId }: { threadId: string }) {
+  return (
+    <>
+      {EXPORTS.map(([format, label]) => (
+        <Button key={format} variant="outline" size="sm" asChild>
+          <a
+            href={`/api/reports/${threadId}/export?format=${format}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <FileDownIcon className="size-4" />
+            {label}
+          </a>
+        </Button>
+      ))}
+    </>
+  );
+}
+
 export function ReportDetail({ chatId }: { chatId: string }) {
   const trpc = useTRPC();
   const { data } = useSuspenseQuery(
@@ -29,19 +49,7 @@ export function ReportDetail({ chatId }: { chatId: string }) {
         <div className="flex items-center justify-between gap-4 border-b p-3">
           <span className="text-sm font-semibold">Report</span>
           <div className="flex gap-2">
-            {data.report &&
-              EXPORTS.map(([format, label]) => (
-                <Button key={format} variant="outline" size="sm" asChild>
-                  <a
-                    href={`/api/reports/${chatId}/export?format=${format}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <FileDownIcon className="size-4" />
-                    {label}
-                  </a>
-                </Button>
-              ))}
+            {data.report && <ExportLinks threadId={chatId} />}
           </div>
         </div>
 

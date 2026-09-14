@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  ChevronRight,
-  ExternalLinkIcon,
-  FileDownIcon,
-  FileText,
-} from "lucide-react";
+import { ChevronRight, ExternalLinkIcon, FileText } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
-import { EXPORTS } from "@/features/reports/components/report-detail";
+import { ExportLinks } from "@/features/reports/components/report-detail";
 
 /**
  * Report attachment pill + preview modal for the generic (non-/reports)
@@ -63,18 +58,7 @@ export function ReportAttachment({
           </div>
 
           <DialogFooter className="border-t px-4 py-3 sm:justify-end">
-            {EXPORTS.map(([format, label]) => (
-              <Button key={format} variant="outline" size="sm" asChild>
-                <a
-                  href={`/api/reports/${threadId}/export?format=${format}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <FileDownIcon className="size-4" />
-                  {label}
-                </a>
-              </Button>
-            ))}
+            <ExportLinks threadId={threadId} />
             <Button size="sm" asChild>
               <Link href={`/reports/${threadId}`}>
                 Open in Reports

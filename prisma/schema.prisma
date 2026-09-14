@@ -43,21 +43,20 @@ model User {
   fieldCorrections  FieldCorrection[]
 
   departmentId             String?
-  department               Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  workOrderTicketsCreated  WorkOrderTicket[] @relation("WorkOrderTicketCreator")
-  workOrderTicketsAssigned WorkOrderTicket[] @relation("WorkOrderTicketAssignee")
+  department               Department?                      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  workOrderTicketsCreated  WorkOrderTicket[]                @relation("WorkOrderTicketCreator")
+  workOrderTicketsAssigned WorkOrderTicket[]                @relation("WorkOrderTicketAssignee")
   ticketComments           TicketComment[]
   watchedTickets           TicketWatch[]
   ticketSeen               TicketSeen[]
   ticketActivities         TicketActivity[]
   notes                    Note[]
   answeredQuestions        Question[]
+  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
   @@unique([email])
   @@index([departmentId])
   @@map("user")
-  medisaoCommentIdentities  MedISAOExternalCommentIdentity[]
-
 }
 
 model Session {
@@ -894,15 +893,14 @@ model Remediation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  externalMappings ExternalRemediationMapping[]
+  externalMappings         ExternalRemediationMapping[]
   // raw TA4 submissions that produced this remediation
-  sourceRecords    SourceRecord[]
+  sourceRecords            SourceRecord[]
+  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
   @@index([vulnerabilityId])
   @@index([userId])
   @@map("remediation")
-  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
-
 }
 
 model IssueRemediation {
@@ -980,14 +978,13 @@ model Integration {
 
   managesRelationships ManagesRelationship[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt                DateTime                         @default(now())
+  updatedAt                DateTime                         @updatedAt
+  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
   @@index([userId])
   @@index([integrationUserId])
   @@map("integration")
-  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
-
 }
 
 enum SyncStatusEnum {

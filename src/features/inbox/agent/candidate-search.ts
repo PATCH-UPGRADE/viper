@@ -261,6 +261,11 @@ async function searchAsset(
       hostname: { contains: extracted.hostname, mode: "insensitive" },
     });
   }
+  if (extracted.serialNumber) {
+    or.push({
+      serialNumber: { equals: extracted.serialNumber, mode: "insensitive" },
+    });
+  }
   if (or.length === 0) return [];
 
   const rows = await prisma.asset.findMany({

@@ -15,6 +15,7 @@
 import "server-only";
 import type { AIMessage, ToolMessage } from "@langchain/core/messages";
 import type { UIMessageChunk } from "ai";
+import { REQUEST_RECOMMENDATION_TOOL } from "./recommendation-window";
 
 /** Minimal writer surface — AI SDK's UIMessageStreamWriter, or a test spy. */
 export interface UIChunkWriter {
@@ -51,6 +52,22 @@ export function toolMessageToOutputChunk(msg: ToolMessage): UIMessageChunk {
     toolCallId: msg.tool_call_id,
     output: normalizeToolOutput(msg.content),
   };
+}
+
+/** Marks a turn that starts on the recommendation node, resumed after its question card. */
+export function writeRecommendationMarker(writer: UIChunkWriter): void {
+  const toolCallId = crypto.randomUUID();
+  writer.write({
+    type: "tool-input-available",
+    toolCallId,
+    toolName: REQUEST_RECOMMENDATION_TOOL,
+    input: {},
+  });
+  writer.write({
+    type: "tool-output-available",
+    toolCallId,
+    output: "Resuming with the remediation advisor.",
+  });
 }
 
 /**

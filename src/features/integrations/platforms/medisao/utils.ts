@@ -1,6 +1,5 @@
 /**
  * Refuse to call anything but the configured MedISAO origin.
- *
  */
 export const requireSameOrigin = (candidate: string, origin: string): void => {
   let candidateOrigin: string | null = null;
@@ -18,7 +17,6 @@ export const requireSameOrigin = (candidate: string, origin: string): void => {
 
 /**
  * Bound a client-supplied cursor to the collection it claims to page.
- *
  */
 export const requireSameCollection = (
   cursor: string,

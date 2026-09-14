@@ -1,5 +1,9 @@
 import "server-only";
-import { assetNameSelect } from "@/features/assets/utils";
+import {
+  type AssetNameSource,
+  assetNameSelect,
+  getAssetDisplayName,
+} from "@/features/assets/utils";
 import type { PlatformEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
@@ -42,12 +46,8 @@ export interface ResolvedTargets {
   unknownIds: string[];
 }
 
-/** How an asset is named to a person: hostname, else IP, else its id. */
-export const labelFor = (a: {
-  id: string;
-  hostname: string | null;
-  ip: string | null;
-}) => a.hostname ?? a.ip ?? a.id;
+/** How an asset is named to a person: the shared rule in `getAssetDisplayName`. */
+export const labelFor = (a: AssetNameSource) => getAssetDisplayName(a);
 
 export async function resolveWorkOrderTargets(
   assetIds: string[],
@@ -124,7 +124,7 @@ export async function resolveWorkOrderTargets(
   const rows = missing.length
     ? await prisma.asset.findMany({
         where: { id: { in: missing } },
-        select: { id: true, hostname: true, ip: true },
+        select: assetNameSelect,
       })
     : [];
 

@@ -96,6 +96,23 @@ describe("resolveWorkOrderTargets", () => {
     expect(unmanaged).toEqual([{ id: "a9", label: "PUMP-1" }]);
   });
 
+  it("names an unmanaged asset with no hostname or ip by its serial number", async () => {
+    mockPrisma.managesRelationship.findMany.mockResolvedValue([]);
+    mockPrisma.asset.findMany.mockResolvedValue([
+      {
+        id: "a9",
+        hostname: null,
+        ip: null,
+        serialNumber: "63014",
+        role: "Computed Tomography (CT)",
+      },
+    ]);
+
+    const { unmanaged } = await resolveWorkOrderTargets(["a9"]);
+
+    expect(unmanaged).toEqual([{ id: "a9", label: "63014" }]);
+  });
+
   it("reports a null external id when the asset was never synced", async () => {
     // The platform still manages it, but has no id of its own for it yet.
     mockPrisma.managesRelationship.findMany.mockResolvedValue([

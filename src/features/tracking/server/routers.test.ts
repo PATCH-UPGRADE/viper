@@ -104,6 +104,7 @@ vi.mock(
 
 import { UnmanagedAssetsError } from "@/features/integrations/platforms/teamplay-fleet/work-orders/managed-assets";
 import { createCallerFactory } from "@/trpc/init";
+import { ticketDetailInclude, workOrderListInclude } from "../types";
 import { trackingRouter } from "./routers";
 
 const createCaller = createCallerFactory(trackingRouter);
@@ -886,7 +887,17 @@ describe("trackingRouter.list", () => {
       sourceLabel: null,
       departments: [],
       assignee: null,
-      assets: [],
+      assets: [
+        {
+          asset: {
+            id: "a1",
+            hostname: null,
+            ip: null,
+            serialNumber: "63014",
+            role: "Computed Tomography (CT)",
+          },
+        },
+      ],
       vulnerabilities: [],
       advisories: [],
       remediations: [],
@@ -1542,6 +1553,28 @@ describe("trackingRouter.listAttachableAssets", () => {
         { role: { contains: "63014", mode: "insensitive" } },
       ],
     });
+  });
+});
+
+describe("linked-asset include and output schema", () => {
+  const fieldsLinkedAssetSchemaRequires = [
+    "id",
+    "hostname",
+    "ip",
+    "serialNumber",
+    "role",
+  ];
+
+  it("is selected by the list include — dropping one here makes every GET /work-orders response fail output validation", () => {
+    expect(
+      Object.keys(workOrderListInclude.assets.select.asset.select),
+    ).toEqual(expect.arrayContaining(fieldsLinkedAssetSchemaRequires));
+  });
+
+  it("is selected by the detail include — dropping one here makes every GET /work-orders/{id} response fail output validation", () => {
+    expect(Object.keys(ticketDetailInclude.assets.select.asset.select)).toEqual(
+      expect.arrayContaining(fieldsLinkedAssetSchemaRequires),
+    );
   });
 });
 

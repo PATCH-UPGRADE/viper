@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { Session } from "../../core/types";
+import { requireSameOrigin } from "./utils";
 
 /**
  * MedISAO pages with Django REST Framework's envelope: `next` is a whole URL,
@@ -33,28 +34,6 @@ export class MedIsaoRequestError extends Error {
     this.status = status;
   }
 }
-
-/**
- * Refuse to call anything but the configured MedISAO origin.
- *
- * The session puts the API key on every request it makes, so calling a url from
- * anywhere else hands the key to whoever supplied it. Two callers supply one:
- * a `next` link inside a response body, and a cursor a client hands us. Neither
- * is trusted, so both come through here.
- */
-const requireSameOrigin = (candidate: string, origin: string): void => {
-  let candidateOrigin: string | null = null;
-  try {
-    candidateOrigin = new URL(candidate).origin;
-  } catch {
-    candidateOrigin = null;
-  }
-  if (candidateOrigin !== origin) {
-    throw new Error(
-      `MedISAO paging tried to leave ${origin}. Refusing to follow ${candidate}.`,
-    );
-  }
-};
 
 /**
  * One page, parsed. `next` is the whole URL of the page after it, or null.

@@ -9,6 +9,7 @@ import type { MedIsaoConfig, MedIsaoCreds } from "../config";
 import { fetchPage, MedIsaoRequestError } from "../paginate";
 import { createMedIsaoSession } from "../session";
 import { remediationInquiriesUrl } from "../urls";
+import { requireSameCollection } from "../utils";
 
 /** MedISAO caps an inquiry body at 10 000 characters. */
 const MAX_BODY_LENGTH = 10_000;
@@ -47,8 +48,10 @@ export const inquiries: InquiriesApi<MedIsaoConfig, MedIsaoCreds> = {
     cursor?: string | null,
   ) {
     const session = createMedIsaoSession(ctx.creds);
-    const url =
-      cursor ?? remediationInquiriesUrl(ctx.config.apiUrl, externalId);
+    const collection = remediationInquiriesUrl(ctx.config.apiUrl, externalId);
+    // `next` comes back as a whole URL, so a cursor is followed as given.
+    if (cursor) requireSameCollection(cursor, collection);
+    const url = cursor ?? collection;
 
     try {
       // `url` may be a cursor the client sent, so it is bounded to the

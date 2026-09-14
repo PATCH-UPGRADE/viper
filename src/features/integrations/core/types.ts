@@ -5,6 +5,7 @@
  */
 
 import type { z } from "zod";
+import type { SourceRecordAdapter } from "@/features/inbox/source-adapter";
 import type { PlatformEnum, ResourceType } from "@/generated/prisma";
 import type { Category } from "../types";
 
@@ -133,6 +134,13 @@ export interface ResourceModule<
     patch: Partial<TDraft>,
     config: TConfig,
   ): Promise<{ externalId: string; raw: unknown }>;
+
+  /**
+   * Only for a `notifications` module: how a snapshot this resource recorded
+   * becomes a Notification. Declaring it is what lets the generic
+   * `process-source-record` job handle this platform without naming it.
+   */
+  sourceRecords?: SourceRecordAdapter;
 
   /** how often this resource should sync, in seconds. null = no opinion. */
   defaultSyncEvery: number | null;

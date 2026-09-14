@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "@/lib/db";
 import { resolveMatchingId } from "@/lib/router-utils";
-import { findDeviceGroupMatching } from "../server/note-targets";
+import {
+  findDeviceGroupMatching,
+  resolveNoteTargetLabel,
+} from "../server/note-targets";
 
 vi.mock("@/lib/db", () => ({
   default: {
+    asset: { findUnique: vi.fn() },
     deviceGroupMatching: { findFirst: vi.fn(), findMany: vi.fn() },
     manufacturer: { findFirst: vi.fn() },
     product: { findFirst: vi.fn() },
@@ -117,5 +121,29 @@ describe("findDeviceGroupMatching", () => {
     });
     expect(result).toEqual({ found: true, id: "dgm_new" });
     expect(prisma.deviceGroupMatching.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveNoteTargetLabel for an ASSET", () => {
+  it("labels a Fleet asset by serial number instead of reporting it missing", async () => {
+    vi.mocked(prisma.asset.findUnique).mockResolvedValue({
+      id: "ct_63014",
+      hostname: null,
+      ip: null,
+      serialNumber: "63014",
+      role: "Computed Tomography (CT)",
+    } as never);
+
+    await expect(resolveNoteTargetLabel("ASSET", "ct_63014")).resolves.toBe(
+      "63014",
+    );
+  });
+
+  it("returns null only when the asset row does not exist", async () => {
+    vi.mocked(prisma.asset.findUnique).mockResolvedValue(null);
+
+    await expect(
+      resolveNoteTargetLabel("ASSET", "missing"),
+    ).resolves.toBeNull();
   });
 });

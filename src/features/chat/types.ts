@@ -3,7 +3,6 @@ import type { AssetWithIssueRelations } from "@/features/assets/types";
 import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
 
 export interface UseChatAgentConfig {
-  agent?: "chat" | "giveRecommendations";
   assetData?: AssetWithIssueRelations;
   vulnerabilityData?: VulnerabilityWithRelations;
 }

@@ -642,7 +642,7 @@ export function AssetDashboardDrawer({
       icon: MessageSquare,
       content: (
         <SuggestedQuestionsProvider questions={visibleQuestions}>
-          <AIChat config={{ agent: "giveRecommendations", assetData: asset }} />
+          <AIChat config={{ assetData: asset }} />
         </SuggestedQuestionsProvider>
       ),
       rawContent: true,

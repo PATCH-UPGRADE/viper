@@ -1,11 +1,9 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import type { UseChatAgentConfig } from "../types";
 
 export interface SuggestedQuestion {
   label: string;
-  config?: Partial<UseChatAgentConfig>;
 }
 
 const SuggestedQuestionsContext = createContext<SuggestedQuestion[]>([]);

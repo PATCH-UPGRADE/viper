@@ -16,7 +16,17 @@ import { inngest } from "../client";
  * holding, and a second advisory source needs no change here.
  */
 export const processSourceRecord = inngest.createFunction(
-  { id: "process-source-record" },
+  {
+    id: "process-source-record",
+    // One run per snapshot at a time. The sync re-emits anything still without
+    // a link, so the same snapshot can be sent twice while its first run is
+    // going; the early return below catches that only once a link exists.
+    //
+    // Done here rather than by claiming the row: a claim that outlives a
+    // crashed run strands the snapshot, which is the bug the re-emission query
+    // exists to fix.
+    concurrency: { key: "event.data.sourceRecordId", limit: 1 },
+  },
   { event: "inbox/source-record.recorded" },
   async ({ event, step }) => {
     const { sourceRecordId } = event.data as { sourceRecordId: string };
@@ -65,13 +75,14 @@ export const processSourceRecord = inngest.createFunction(
       );
     }
 
-    const { doc, linkEntities } = adapter.prepare(snapshot.raw);
+    const { doc, linkEntities, known } = adapter.prepare(snapshot.raw);
 
     const result = await runNotificationPipeline({
       step,
       sourceId: sourceRecordId,
       doc,
       linkEntities,
+      known,
     });
 
     return { sourceRecordId, platform: snapshot.platform, ...result };

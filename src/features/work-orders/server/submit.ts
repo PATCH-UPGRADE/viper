@@ -135,11 +135,20 @@ export async function dispatchSubmission(
       data: { ticketId, actorId },
     });
   } catch (error) {
-    await releaseClaim(ticketId, error);
-    return {
-      submissionState: SubmissionState.FAILED,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
+    const reason = error instanceof Error ? error.message : "Unknown error";
+    try {
+      await releaseClaim(ticketId, error);
+    } catch (releaseError) {
+      console.error(
+        `dispatchSubmission: ${ticketId} is stuck in SUBMITTING — releasing the claim failed`,
+        releaseError,
+      );
+      return {
+        submissionState: SubmissionState.SUBMITTING,
+        error: `${reason} (the claim could not be released, so this work order needs manual attention)`,
+      };
+    }
+    return { submissionState: SubmissionState.FAILED, error: reason };
   }
 
   return { submissionState: SubmissionState.SUBMITTING };

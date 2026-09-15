@@ -134,7 +134,7 @@ export const mitigationRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
       }
 
-      const { accepted, targeted } = await prisma.$transaction(async (tx) => {
+      const { targeted } = await prisma.$transaction(async (tx) => {
         if (input.edits.length > 0) {
           // Never trust the ids the client sends — an edit may only touch a
           // work order belonging to the plan being accepted.
@@ -213,10 +213,6 @@ export const mitigationRouter = createTRPCRouter({
         }
 
         return {
-          accepted: await tx.mitigationPlan.findUniqueOrThrow({
-            where: { id: plan.id },
-            include: mitigationPlanInclude,
-          }),
           targeted: promoted.filter(
             (t): t is typeof t & { targetIntegrationId: string } =>
               t.targetIntegrationId !== null,
@@ -236,7 +232,14 @@ export const mitigationRouter = createTRPCRouter({
         }
       });
 
-      return accepted;
+      // Read after the filings, not inside the transaction. A ticket whose
+      // payload no longer fits its platform has its target cleared by the step
+      // above, so a plan captured earlier would hand the drawer a vendor it is
+      // no longer going to.
+      return prisma.mitigationPlan.findUniqueOrThrow({
+        where: { id: plan.id },
+        include: mitigationPlanInclude,
+      });
     }),
 
   // The audience-tailored explanation of why a plan makes sense. Generated

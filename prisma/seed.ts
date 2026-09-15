@@ -562,13 +562,17 @@ const SEED_FLEET_EQUIPMENT = [
 
 // Vulnerabilities — cpes is an array to support multi-device-group linking
 const SAMPLE_VULNERABILITIES = [
-  // ── CVE-2023-39181: Siemens Healthineers imaging firmware (High) ─────────────
+  // ── CVE-2023-00001: Siemens Healthineers imaging firmware (High) ─────────────
+  // Hypothetical CVE used for seed data, in the reserved-looking 00001 range so
+  // it cannot be mistaken for a real Healthineers advisory. The advisory id and
+  // the firmware version below are invented for the same reason.
+  //
   // The only vulnerability naming Siemens CPEs, and the two device groups it
   // reaches are the ones the Fleet integration manages. Its DeviceGroupMatchings
   // are therefore what lets a mitigation plan resolve a teamplay Fleet work
   // order target — without it nothing in the seed exercises that path.
   {
-    cveId: "CVE-2023-39181",
+    cveId: "CVE-2023-00001",
     severity: Severity.High,
     cvssScore: 7.8,
     epss: 0.08,
@@ -581,7 +585,7 @@ const SAMPLE_VULNERABILITIES = [
           tool: { driver: { name: "ICS Security Scanner" } },
           results: [
             {
-              ruleId: "CVE-2023-39181",
+              ruleId: "CVE-2023-00001",
               level: "error",
               message: {
                 text: "Siemens Healthineers imaging system service interface permits privilege escalation from an unprivileged local account (CWE-269)",
@@ -595,7 +599,7 @@ const SAMPLE_VULNERABILITIES = [
       "cpe:2.3:h:siemens:magnetom_sola:-:*:*:*:*:*:*:*",
       "cpe:2.3:h:siemens:somatom_go.top:-:*:*:*:*:*:*:*",
     ],
-    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2023-39181",
+    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2023-00001",
     description:
       "The service interface on Siemens Healthineers MAGNETOM and SOMATOM imaging systems does not correctly restrict privileges, so an unprivileged local account can escalate to administrative rights on the scanner console (CWE-269). Siemens services these systems under contract and supplies the firmware update.",
     narrative:
@@ -2391,10 +2395,10 @@ async function seedVendors() {
  * The plans themselves are NOT seeded. They come from an Opus call that the
  * Inngest job makes, and a canned plan would hide a broken agent.
  */
-const FLEET_ADVISORY_MARKDOWN = `# Siemens Healthineers Security Advisory SHSA-2023-114
+const FLEET_ADVISORY_MARKDOWN = `# Siemens Healthineers Security Advisory SHSA-0000-000 (hypothetical)
 
 **Affected products:** MAGNETOM Sola (MRI), SOMATOM go.Top (CT)
-**CVE:** CVE-2023-39181
+**CVE:** CVE-2023-00001
 **Severity:** High (CVSS 7.8)
 
 ## Summary
@@ -2405,7 +2409,7 @@ administrative rights on the scanner console.
 
 ## Remediation
 
-Siemens Healthineers field service must apply firmware update VA30A-SP3. The
+Siemens Healthineers field service must apply firmware update VX00A-SP0. The
 hospital holds no service credentials for these consoles, so the update cannot
 be applied locally. Raise a service request through your teamplay Fleet
 contract.
@@ -2420,15 +2424,25 @@ async function seedFleetAdvisoryNotification() {
   console.log("\n🌱 Seeding the Siemens advisory notification...");
 
   const vulnerability = await prisma.vulnerability.findFirst({
-    where: { cveId: "CVE-2023-39181" },
+    where: { cveId: "CVE-2023-00001" },
     select: { id: true, deviceGroupMatchings: { select: { id: true } } },
   });
   if (!vulnerability) {
-    console.warn("⚠️  CVE-2023-39181 not seeded — skipping the advisory");
+    console.warn("⚠️  CVE-2023-00001 not seeded — skipping the advisory");
     return;
   }
 
-  const raw = { advisoryId: "SHSA-2023-114" };
+  const raw = { advisoryId: "SHSA-0000-000 (hypothetical)" };
+
+  // Rebuilt rather than upserted, as seedVendors does: a Notification has no
+  // natural unique key, so a re-seed without SEED_CLEAR_DB would stack a fresh
+  // advisory every run. The delete cascades its source record and its mappings.
+  await prisma.notification.deleteMany({
+    where: {
+      sourceLinks: { some: { sourceRecord: { raw: { equals: raw } } } },
+    },
+  });
+
   await prisma.notification.create({
     data: {
       type: NotificationType.Advisory,

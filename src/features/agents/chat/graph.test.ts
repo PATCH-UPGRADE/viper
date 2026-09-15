@@ -35,6 +35,12 @@ describe("chat system prompt — write_report", () => {
     );
   });
 
+  it("adds the reports bias only when fromReports is set", () => {
+    const marker = /<surface>The user is on the reports view/;
+    expect(buildSystemPrompt("hospital administration", true)).toMatch(marker);
+    expect(buildSystemPrompt("hospital administration")).not.toMatch(marker);
+  });
+
   it("preloads notes alone for a new report", async () => {
     buildChatGraph({
       userId: "user",

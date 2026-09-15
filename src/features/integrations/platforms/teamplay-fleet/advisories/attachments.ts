@@ -13,8 +13,36 @@ import type { FleetAdvisoryAttachment, FleetAdvisoryItem } from "./advisories";
 
 const DOWNLOAD_TIMEOUT_MS = 30_000;
 const PDF_FILE_TYPE = "pdf";
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
 
 const downloadUrlSchema = z.object({ url: z.string() });
+
+async function readCapped(
+  res: Response,
+  limit: number,
+  label: string,
+): Promise<Buffer> {
+  const declared = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > limit) {
+    throw new Error(`${label}` + `: declares ${declared} bytes`);
+  }
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error(`${label}: response had no body`);
+
+  const chunks: Buffer[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel();
+      throw new Error(`${label}` + `: exceeded ${limit} bytes`);
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks);
+}
 
 async function resolveDownloadUrl(
   session: Session,
@@ -79,7 +107,11 @@ export async function downloadAdvisoryPdfs(
       throw new Error(
         `Fleet advisory ${item.vendorId}: PDF download returned ${res.status}`,
       );
-    const buffer = Buffer.from(await res.arrayBuffer());
+    const buffer = await readCapped(
+      res,
+      MAX_PDF_BYTES,
+      `Fleet advisory ${item.vendorId}`,
+    );
 
     stored.push(
       await storeAttachmentBuffer(buffer, {

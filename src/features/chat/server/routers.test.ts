@@ -13,6 +13,7 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => ({
     },
     chatReport: { delete: vi.fn() },
     chatMessage: { findMany: vi.fn() },
+    $transaction: vi.fn((ops: unknown[]) => Promise.all(ops)),
   },
   mockGetSession: vi.fn(),
 }));

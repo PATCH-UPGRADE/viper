@@ -23,7 +23,15 @@ export const notificationInclude = {
   sourceLinks: {
     select: {
       sourceRecord: {
-        select: { id: true, channel: true, raw: true, observedAt: true },
+        select: {
+          id: true,
+          channel: true,
+          raw: true,
+          observedAt: true,
+          // An integration source has no sender to show, so the row it came
+          // from supplies the name instead.
+          mapping: externalMappingSelect,
+        },
       },
     },
   },
@@ -69,6 +77,7 @@ export const notificationDetailInclude = {
     select: {
       sourceType: true,
       reasonWhy: true,
+      createdAt: true,
       sourceRecord: {
         select: {
           id: true,
@@ -130,6 +139,14 @@ export type AffectedAssetsSummary = {
   NO_ISSUES: AffectedAssetGroupSummary[];
 };
 
+export const fieldCorrectionInclude = {
+  user: { select: { id: true, name: true, image: true } },
+} satisfies Prisma.FieldCorrectionInclude;
+
+export type NotificationFieldCorrection = Prisma.FieldCorrectionGetPayload<{
+  include: typeof fieldCorrectionInclude;
+}> & { isAgent: boolean };
+
 export type NotificationDetailWithRelations = Omit<
   NotificationDetailBasePayload,
   "deviceGroupsMatchings"
@@ -138,6 +155,7 @@ export type NotificationDetailWithRelations = Omit<
     assetCount: number;
   })[];
   affectedAssets: AffectedAssetsSummary;
+  fieldCorrections: NotificationFieldCorrection[];
 };
 
 export type NotificationDetailSource =

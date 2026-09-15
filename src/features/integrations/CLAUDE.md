@@ -69,6 +69,7 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
   onCreate?(): Promise<void>;
   workOrders?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   assets?: ResourceModule<unknown, unknown, TConfig, TCreds>;
+  remediations?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   notifications?: ResourceModule<unknown, unknown, TConfig, TCreds>;
 }
 ```
@@ -126,6 +127,9 @@ export interface ResourceModule<TCanonical, TRaw, TConfig, TCreds>
   create?(session: Session, draft: TCanonical): Promise<{ externalId: string; raw: TRaw }>;
   update?(session: Session, externalId: string, patch: Partial<TCanonical>): Promise<...>;
 
+  // only for a notifications module
+  sourceRecords?: SourceRecordAdapter;
+
   defaultSyncEvery: number | null;
 }
 ```
@@ -161,6 +165,26 @@ Outside the directory — **two edits**:
 Only if you are also introducing a brand-new `ResourceType` do you additionally touch
 `integrationsMapping` (`../types.ts`), `MODULE_FIELDS` (`core/sync/resources.ts`), and
 `ENVELOPE_SCHEMAS` (`core/callback.ts`) — plus add the matching `integrationUpload` procedure.
+
+## A notifications resource: recording snapshots
+
+A `notifications` module records `SourceRecord` snapshots rather than mirroring rows. Turning one
+into a `Notification` is the inbox pipeline's job, not the platform's, so the platform declares
+`sourceRecords: SourceRecordAdapter` (`@/features/inbox/source-adapter`) and stops there:
+
+```ts
+prepare(raw: unknown): { doc: InboundEmail; linkEntities: LinkEntities }
+```
+
+`doc` is the sender, subject and body every agent reads. `linkEntities` attaches what the document
+names, and owns its own step ids. A source that states its device outright resolves it directly; a
+source that only describes it in prose needs the extract and match agents, which is what the email
+path does.
+
+`process-source-record` reads the snapshot, walks mapping to integration to platform, and asks the
+registry for that platform's adapter. **It never branches on which platform it is holding**, so a
+second advisory source needs no change there. A `notifications` module without an adapter is a
+registration bug, and `registry.test.ts` fails on it.
 
 ## Authentication
 

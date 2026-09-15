@@ -88,7 +88,7 @@ function trailingToolResults(messages: BaseMessage[]): string[] {
   const results: string[] = [];
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    if (m.getType() !== "tool") break;
+    if (m.type !== "tool") break;
     const content = (m as ToolMessage).content;
     results.push(
       typeof content === "string" ? content : JSON.stringify(content),

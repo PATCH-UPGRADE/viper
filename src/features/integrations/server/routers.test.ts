@@ -18,7 +18,6 @@ const { mockCategoriesFor, mockDefaultSyncEveryFor, mockInngest, mockPrisma } =
         update: vi.fn(),
       },
       integrationResourceSync: { findUnique: vi.fn(), update: vi.fn() },
-      user: { update: vi.fn() },
       $transaction: vi.fn(),
     },
   }));
@@ -227,13 +226,15 @@ describe("integrationsRouter.update", () => {
     },
   };
 
-  it("keeps the stored credentials untouched when none are provided", async () => {
+  beforeEach(() => {
     mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
     mockPrisma.integration.update.mockResolvedValue({
       id: "integration-1",
       integrationUserId: null,
     });
+  });
 
+  it("keeps the stored credentials untouched when none are provided", async () => {
     await caller.update({ id: "integration-1", data: baseData });
 
     const call = mockPrisma.integration.update.mock.calls[0][0];
@@ -241,12 +242,6 @@ describe("integrationsRouter.update", () => {
   });
 
   it("re-encrypts credentials when they're provided", async () => {
-    mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
-    mockPrisma.integration.update.mockResolvedValue({
-      id: "integration-1",
-      integrationUserId: null,
-    });
-
     await caller.update({
       id: "integration-1",
       data: {

@@ -136,9 +136,7 @@ export const integrationsRouter = createTRPCRouter({
       const items = (result.items as IntegrationListRow[]).map(
         ({ syncEvery, ...integration }) => ({
           ...integration,
-          // The raw integration-level override, kept alongside the resolved
-          // per-resource `effectiveSyncEvery` below — the edit form needs it
-          // to prefill, distinct from `resourceSyncs[].syncEvery`.
+          // Re-added for the edit form's prefill; distinct from resourceSyncs[].syncEvery below.
           syncEvery,
           platformLabel: displayNameFor(integration.platform),
           categories: categoriesFor(integration.platform),

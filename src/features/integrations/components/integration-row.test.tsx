@@ -7,7 +7,6 @@ const {
   mockMutate,
   mockUseRemoveIntegration,
   mockUseSetIntegrationEnabled,
-  mockUseSetResourceSyncEnabled,
   mockUseTriggerSync,
   mockUseCreateIntegration,
   mockUseUpdateIntegration,
@@ -15,7 +14,6 @@ const {
   mockMutate: vi.fn(),
   mockUseRemoveIntegration: vi.fn(),
   mockUseSetIntegrationEnabled: vi.fn(),
-  mockUseSetResourceSyncEnabled: vi.fn(),
   mockUseTriggerSync: vi.fn(),
   mockUseCreateIntegration: vi.fn(),
   mockUseUpdateIntegration: vi.fn(),
@@ -24,7 +22,6 @@ const {
 vi.mock("../hooks/use-integrations", () => ({
   useRemoveIntegration: mockUseRemoveIntegration,
   useSetIntegrationEnabled: mockUseSetIntegrationEnabled,
-  useSetResourceSyncEnabled: mockUseSetResourceSyncEnabled,
   useTriggerSync: mockUseTriggerSync,
   useCreateIntegration: mockUseCreateIntegration,
   useUpdateIntegration: mockUseUpdateIntegration,
@@ -34,51 +31,36 @@ import type { CatalogEntry } from "../core/catalog";
 import type { IntegrationListItem } from "../types";
 import { IntegrationCard } from "./integration-row";
 
-const idleMutation = { mutate: mockMutate, isPending: false };
-
 beforeEach(() => {
   vi.clearAllMocks();
+  const idleMutation = { mutate: mockMutate, isPending: false };
   mockUseRemoveIntegration.mockReturnValue(idleMutation);
   mockUseSetIntegrationEnabled.mockReturnValue(idleMutation);
-  mockUseSetResourceSyncEnabled.mockReturnValue(idleMutation);
   mockUseTriggerSync.mockReturnValue(idleMutation);
   mockUseCreateIntegration.mockReturnValue(idleMutation);
   mockUseUpdateIntegration.mockReturnValue(idleMutation);
 });
 
-const catalogEntry: CatalogEntry = {
+const catalogEntry = {
   platform: PlatformEnum.PARTNER,
   displayName: "Partner API",
-  description: "",
-  categories: [],
-  configFields: [{ key: "integrationUri", kind: "url", required: true }],
+  configFields: [],
   credentialFields: [],
   credentialsAreAuthShaped: true,
-};
+} as unknown as CatalogEntry;
 
 const integration = {
   id: "integration-1",
   name: "My Partner Feed",
   platform: PlatformEnum.PARTNER,
-  platformLabel: "Partner API",
-  categories: [],
   enabled: true,
-  syncEvery: 600,
-  config: { integrationUri: "https://partner.example", resource: "Asset" },
   resourceSyncs: [
     {
-      integrationId: "integration-1",
       resource: "Asset",
-      status: SyncStatusEnum.Success,
-      errorMessage: null,
-      lastAttemptAt: null,
-      lastSuccessfulSync: null,
-      nextSyncAt: null,
       enabled: true,
-      syncEvery: null,
-      effectiveSyncEvery: 600,
-      isOverridden: true,
-      isDue: false,
+      status: SyncStatusEnum.Success,
+      effectiveSyncEvery: 300,
+      isOverridden: false,
     },
   ],
 } as unknown as IntegrationListItem;
@@ -95,7 +77,7 @@ describe("IntegrationActionsMenu edit item", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("opens the edit dialog pre-filled with the integration's name, credentials left blank", async () => {
+  it("opens the edit dialog titled for the platform, pre-filled with the integration's name", async () => {
     const user = userEvent.setup();
     render(
       <IntegrationCard integration={integration} catalogEntry={catalogEntry} />,

@@ -133,8 +133,6 @@ const ConnectorsSidebar = ({
 
 const EnabledIntegrations = ({ catalog }: { catalog: CatalogEntry[] }) => {
   const { data } = useSuspenseIntegrations();
-  const entryFor = (platform: CatalogEntry["platform"]) =>
-    catalog.find((entry) => entry.platform === platform);
 
   return (
     <div className="flex flex-col gap-4 flex-1 min-w-0">
@@ -150,7 +148,9 @@ const EnabledIntegrations = ({ catalog }: { catalog: CatalogEntry[] }) => {
             <IntegrationCard
               key={integration.id}
               integration={integration}
-              catalogEntry={entryFor(integration.platform)}
+              catalogEntry={catalog.find(
+                (entry) => entry.platform === integration.platform,
+              )}
             />
           ))}
         </Card>

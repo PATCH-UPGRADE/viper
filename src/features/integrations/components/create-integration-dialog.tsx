@@ -59,12 +59,8 @@ const zodForSpec = (spec: FieldSpec): z.ZodTypeAny => {
 export const shapeFor = (specs: FieldSpec[]) =>
   Object.fromEntries(specs.map((spec) => [spec.key, zodForSpec(spec)]));
 
-/** Edit mode never shows stored credentials, so every credential field must be fillable-or-blank. */
-export const relaxedShapeFor = (specs: FieldSpec[]) =>
-  shapeFor(specs.map((spec) => ({ ...spec, required: false })));
-
-/** `authSchema` minus its "authentication required unless None" refinement — the shape alone already has `authentication` optional. */
-export const relaxedAuthSchema = z.object(authSchema.shape);
+/** Edit mode never shows stored credentials, so nothing about them can be required client-side — the router's own credentialSchema.parse is the real trust boundary. */
+const anyCredentials = z.record(z.string(), z.unknown()).optional();
 
 const DynamicField = ({
   form,
@@ -149,24 +145,25 @@ export const IntegrationFormDialog = ({
   const updateIntegration = useUpdateIntegration();
   const mutation = mode === "create" ? createIntegration : updateIntegration;
 
-  const shapeForFields = mode === "edit" ? relaxedShapeFor : shapeFor;
-  const authSchemaToUse = mode === "edit" ? relaxedAuthSchema : authSchema;
-  const credentialsSchema = credentialsAreAuthShaped
-    ? authSchemaToUse
-    : z.object(shapeForFields(credentialFields));
-
-  const copy =
+  const credentialsSchema =
     mode === "edit"
-      ? {
-          title: `Edit ${displayName}`,
-          description: "Leave credential fields blank to keep them unchanged.",
-          submit: "Save Changes",
-        }
-      : {
-          title: `Add ${displayName}`,
-          description: `Connect a new ${displayName} integration.`,
-          submit: "Create Integration",
-        };
+      ? anyCredentials
+      : credentialsAreAuthShaped
+        ? authSchema
+        : z.object(shapeFor(credentialFields));
+
+  const [title, description, submitLabel] =
+    mode === "edit"
+      ? [
+          `Edit ${displayName}`,
+          "Leave credential fields blank to keep them unchanged.",
+          "Save Changes",
+        ]
+      : [
+          `Add ${displayName}`,
+          `Connect a new ${displayName} integration.`,
+          "Create Integration",
+        ];
 
   const formSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -225,8 +222,8 @@ export const IntegrationFormDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 rounded-2xl overflow-hidden">
         <DialogHeader className="px-6 py-4 border-b gap-1">
-          <DialogTitle className="text-xl">{copy.title}</DialogTitle>
-          <DialogDescription>{copy.description}</DialogDescription>
+          <DialogTitle className="text-xl">{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form
@@ -303,7 +300,7 @@ export const IntegrationFormDialog = ({
             form={`integration-form-${mode}`}
             disabled={mutation.isPending}
           >
-            {copy.submit}
+            {submitLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

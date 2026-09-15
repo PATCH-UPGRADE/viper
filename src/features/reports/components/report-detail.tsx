@@ -1,36 +1,10 @@
 "use client";
 
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { FileDownIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
 import { AIChat } from "@/features/chat/components/chat";
 import { useTRPC } from "@/trpc/client";
-
-export const EXPORTS = [
-  ["pdf", "PDF"],
-  ["docx", "Word"],
-] as const;
-
-/** PDF/Word export buttons for a report thread — shared with the chat's report modal. */
-export function ExportLinks({ threadId }: { threadId: string }) {
-  return (
-    <>
-      {EXPORTS.map(([format, label]) => (
-        <Button key={format} variant="outline" size="sm" asChild>
-          <a
-            href={`/api/reports/${threadId}/export?format=${format}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <FileDownIcon className="size-4" />
-            {label}
-          </a>
-        </Button>
-      ))}
-    </>
-  );
-}
+import { ExportLinks } from "./export-links";
 
 export function ReportDetail({ chatId }: { chatId: string }) {
   const trpc = useTRPC();

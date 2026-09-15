@@ -48,6 +48,7 @@ import type {
   RawEmailPayload,
 } from "../types";
 import { EmailSourceModal } from "./email-source-modal";
+import { NotificationActivityTimeline } from "./notification-activity-timeline";
 import {
   HospitalImpactCard,
   NotificationSummaryCard,
@@ -301,6 +302,8 @@ export function NotificationDetailsTab({
           </table>
         </CollapsibleCardContent>
       </CollapsibleCard>
+
+      <NotificationActivityTimeline notification={notification} />
 
       <Dialog
         open={!!rejecting}

@@ -4,15 +4,11 @@
 import "server-only";
 import TurndownService from "turndown";
 import { searchCandidates } from "@/features/inbox/agent/candidate-search";
-import { classifyNotification } from "@/features/inbox/agent/classify";
 import { classifyEmailKind } from "@/features/inbox/agent/classify-kind";
 import { extractEntities } from "@/features/inbox/agent/extract";
 import { extractWorkOrder } from "@/features/inbox/agent/extract-work-order";
 import { matchAndLinkEntities } from "@/features/inbox/agent/match";
-import { persistMitigationPlans } from "@/features/inbox/agent/mitigation/persist";
-import { generateQuestionForNotification } from "@/features/inbox/agent/question";
-import { triageNotification } from "@/features/inbox/agent/triage";
-import { sortNotificationVulnerabilities } from "@/features/inbox/agent/vex";
+import { runNotificationPipeline } from "@/features/inbox/pipeline";
 import {
   fetchPdfAttachmentsFromResend,
   isPdf,
@@ -317,138 +313,48 @@ export const processInboxEmail = inngest.createFunction(
       return { workOrderTicketId, sourceId, emailId, linkSummary };
     }
 
-    // 7. Classify email and upsert Notification
-    const notificationId = await step.run("classify-notification", async () => {
-      const result = await classifyNotification(
-        sourceId,
-        {
-          from: email.from,
-          subject: email.subject,
-          markdown: markdown ?? "",
-        },
-        inlinedPdfs ?? undefined,
-      );
+    // 7-11. Classify, link, VEX, triage and plan. Shared with every other
+    // source that lands a SourceRecord; only the linking differs.
+    const doc = {
+      from: email.from,
+      subject: email.subject,
+      markdown: markdown ?? "",
+    };
 
-      if (result.action === "update") {
-        await prisma.notification.update({
-          where: { id: result.notificationId },
-          data: {
-            type: result.type,
-            title: result.title,
-            summary: result.summary,
-            ...(result.tlp !== null ? { tlp: result.tlp } : {}),
-            sourceLinks: {
-              create: {
-                sourceRecordId: sourceId,
-                sourceType: "Link",
-                reasonWhy: result.reasonWhy,
-              },
-            },
-          },
+    const {
+      notificationId,
+      linkSummary,
+      vexSummary,
+      mitigationSummary,
+      questionSummary,
+    } = await runNotificationPipeline({
+      step,
+      sourceId,
+      doc,
+      attachments: inlinedPdfs ?? undefined,
+      // An email names its devices in prose, so they have to be extracted and
+      // then matched before anything can be linked.
+      linkEntities: async (pipelineStep, notificationId) => {
+        const extracted = await pipelineStep.run("extract-entities", () =>
+          extractEntities(sourceId, doc, inlinedPdfs ?? undefined),
+        );
+
+        return pipelineStep.run("match-and-link-entities", async () => {
+          if (
+            !notificationId ||
+            Object.values(extracted).every((v) => v.length === 0)
+          ) {
+            return { linked: 0, updated: 0, created: 0, skipped: 0 };
+          }
+          const candidates = await searchCandidates(extracted);
+          return matchAndLinkEntities(
+            { notificationId },
+            extracted,
+            candidates,
+          );
         });
-
-        return result.notificationId;
-      }
-
-      const notification = await prisma.notification.create({
-        data: {
-          type: result.type,
-          title: result.title,
-          summary: result.summary,
-          ...(result.tlp !== null ? { tlp: result.tlp } : {}),
-          sourceLinks: {
-            create: { sourceRecordId: sourceId, sourceType: "Source" },
-          },
-        },
-      });
-      return notification.id;
+      },
     });
-
-    // 8. Extract entities (device groups) referenced in the notification
-    const extracted = await step.run("extract-entities", () =>
-      extractEntities(
-        sourceId,
-        {
-          from: email.from,
-          subject: email.subject,
-          markdown: markdown ?? "",
-        },
-        inlinedPdfs ?? undefined,
-      ),
-    );
-
-    // 9. Fuzzy-search the DB for matches and link/update/create them
-    const linkSummary = await step.run("match-and-link-entities", async () => {
-      if (
-        !notificationId ||
-        Object.values(extracted).every((v) => v.length === 0)
-      ) {
-        return { linked: 0, updated: 0, created: 0, skipped: 0 };
-      }
-      const candidates = await searchCandidates(extracted);
-      return matchAndLinkEntities({ notificationId }, extracted, candidates);
-    });
-
-    // 10. VEX sort: if the notification has linked vulnerabilities, sort each
-    // baseline Issue into at-risk / possibly-at-risk / unaffected. Runs before
-    // triage so priority/hospital-impact reasoning can reflect the results.
-    const vexSummary = await step.run("sort-vulnerabilities", async () => {
-      if (!notificationId) return { vexSkipped: true as const };
-      const vulnCount = await prisma.notificationVulnerabilityMapping.count({
-        where: { notificationId },
-      });
-      if (vulnCount === 0) return { vexSkipped: true as const };
-      return sortNotificationVulnerabilities(notificationId);
-    });
-
-    // run question and mitigation steps in parallel
-    const [questionSummary, , mitigationSummary] = await Promise.all([
-      // 11. Generte questions for any Issue VEX just left UNDER_INVESTIGATION
-      step.run("generate-questions", async () => {
-        if (!notificationId || !vexSummary)
-          return { questionSkipped: true as const };
-        if ("vexSkipped" in vexSummary && vexSummary.vexSkipped)
-          return { questionSkipped: true as const };
-        return generateQuestionForNotification(
-          sourceId,
-          notificationId,
-          inlinedPdfs ?? undefined,
-        );
-      }),
-      // 11. Triage: assign priority, reason, and hospital impact
-      step.run("triage-notification", async () => {
-        if (!notificationId) return { skipped: true as const };
-
-        const result = await triageNotification(
-          sourceId,
-          notificationId,
-          inlinedPdfs ?? undefined,
-        );
-        await prisma.notification.update({
-          where: { id: notificationId },
-          data: {
-            priority: result.priority,
-            priorityReasonWhy: result.priorityReasonWhy,
-            hospitalImpact: result.hospitalImpact,
-          },
-        });
-        return {
-          priority: result.priority,
-          priorityReasonWhy: result.priorityReasonWhy,
-        };
-      }),
-      // 11. Mitigation plans: if the notification has linked vulnerabilities,
-      // propose ordered remediation plans and materialize each as a plan plus its
-      // draft work orders (isDraft=true; accepting a plan promotes them).
-      step.run("create-mitigation-plans", async () => {
-        if (!notificationId) return null;
-        return persistMitigationPlans(
-          sourceId,
-          notificationId,
-          inlinedPdfs ?? undefined,
-        );
-      }),
-    ]);
 
     return {
       sourceId,

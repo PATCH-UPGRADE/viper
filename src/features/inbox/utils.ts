@@ -2,7 +2,12 @@ import "server-only";
 import type { PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { normalizeName } from "@/lib/router-utils";
-import { downloadBufferFromS3, keyFromDownloadUrl } from "@/lib/s3";
+import {
+  downloadBufferFromS3,
+  keyFromDownloadUrl,
+  normalizeMd5,
+  uploadBufferToS3,
+} from "@/lib/s3";
 
 export const isPdf = (a: {
   filename?: string | null;
@@ -23,6 +28,13 @@ export const INLINE_ATTACHMENT_BUDGET = 4_000_000;
 
 /** A PDF carried through step state, keyed back to its Resend attachment. */
 export type InlinePdfAttachment = PdfAttachment & { id: string };
+export interface StoredAttachment {
+  filename: string | null;
+  contentType: string;
+  downloadUrl: string;
+  size: number;
+  hash: string;
+}
 
 export function pdfsFitInlineBudget(pdfs: PdfAttachment[]): boolean {
   const total = pdfs.reduce((sum, pdf) => sum + pdf.base64.length, 0);
@@ -115,6 +127,40 @@ export async function fetchPdfAttachments(
   );
 
   return results.filter((a) => a !== null);
+}
+
+export async function storeAttachmentBuffer(
+  buffer: Buffer,
+  {
+    filename,
+    contentType,
+    keyPrefix,
+  }: { filename: string | null; contentType: string; keyPrefix: string },
+): Promise<StoredAttachment> {
+  const { createHash } = await import("node:crypto");
+  const hash = createHash("md5").update(buffer).digest("hex");
+  const existing = await prisma.notificationAttachment.findFirst({
+    where: { hash },
+    select: { downloadUrl: true },
+  });
+
+  const downloadUrl =
+    existing?.downloadUrl ??
+    (await uploadBufferToS3(
+      buffer,
+      `${keyPrefix}` +
+        `/${crypto.randomUUID()}` +
+        `-${filename ?? "attachment"}`,
+      contentType,
+      normalizeMd5(hash),
+    ));
+  return {
+    filename,
+    contentType,
+    downloadUrl,
+    size: buffer.length,
+    hash,
+  };
 }
 
 export function keepValidIds(

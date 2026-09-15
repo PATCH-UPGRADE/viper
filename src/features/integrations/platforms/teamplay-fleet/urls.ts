@@ -46,3 +46,6 @@ export const advisoryAttachmentsDownloadUrl = (
 
 export const advisoryWebUrl = (externalId: string): string =>
   `https://${FLEET_HOST}/advisories/${encodeURIComponent(externalId)}/overview`;
+
+export const ADVISORY_ATTACHMENT_HOST =
+  "storage.fleet.siemens-healthineers.com";

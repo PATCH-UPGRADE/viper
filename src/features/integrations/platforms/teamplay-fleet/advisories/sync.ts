@@ -1,4 +1,5 @@
 import "server-only";
+import type { StoredAttachment } from "@/features/inbox/utils";
 import type {
   ResourceSyncCtx,
   SyncOutcome,
@@ -14,6 +15,17 @@ import {
   listChanged,
   toCanonical,
 } from "./advisories";
+import { downloadAdvisoryPdfs } from "./attachments";
+
+interface ChangedAdvisory {
+  item: FleetAdvisoryItem;
+  mappingId: string;
+  contentHash: string;
+}
+
+type PendingAdvisory = ChangedAdvisory & {
+  files: StoredAttachment[];
+};
 
 /**
  * Record what each active advisory looked like on this poll.
@@ -28,11 +40,11 @@ import {
  * same shape `work-orders/sync.ts` uses for activities: a per-advisory round
  * trip would spend hundreds of them an hour to discover that nothing moved.
  */
-async function recordAdvisories(
+async function changedAdvisories(
   items: FleetAdvisoryItem[],
   integrationId: string,
-): Promise<void> {
-  if (items.length === 0) return;
+): Promise<ChangedAdvisory[]> {
+  if (items.length === 0) return [];
 
   const lastSynced = new Date();
   const existing = await prisma.externalSourceRecordMapping.findMany({
@@ -85,11 +97,7 @@ async function recordAdvisories(
     newest.map((record) => [record.mappingId, record.contentHash]),
   );
 
-  const changed: {
-    item: FleetAdvisoryItem;
-    mappingId: string;
-    contentHash: string;
-  }[] = [];
+  const changed: ChangedAdvisory[] = [];
   for (const item of items) {
     const mappingId = mappingIdByExternalId.get(item.vendorId);
     if (!mappingId) continue;
@@ -100,17 +108,26 @@ async function recordAdvisories(
     if (newestHashByMappingId.get(mappingId) === contentHash) continue;
     changed.push({ item, mappingId, contentHash });
   }
-  if (changed.length === 0) return;
+  return changed;
+}
 
-  await prisma.sourceRecord.createMany({
-    data: changed.map(({ item, mappingId, contentHash }) => ({
-      channel: SourceChannel.Integration,
-      mappingId,
-      contentHash,
-      raw: item.raw,
-      markdown: item.body,
-    })),
-  });
+async function recordAdvisories(pending: PendingAdvisory[]): Promise<void> {
+  if (pending.length === 0) return;
+
+  await prisma.$transaction(
+    pending.map(({ item, mappingId, contentHash, files }) =>
+      prisma.sourceRecord.create({
+        data: {
+          channel: SourceChannel.Integration,
+          mappingId,
+          contentHash,
+          raw: item.raw,
+          markdown: item.body,
+          attachments: { create: files },
+        },
+      }),
+    ),
+  );
 }
 
 export async function syncAdvisories(
@@ -129,10 +146,27 @@ export async function syncAdvisories(
       byVendorId.set(item.vendorId, item);
     }
   }
+  const changed = await changedAdvisories(
+    [...byVendorId.values()],
+    ctx.integrationId,
+  );
 
-  // Throwing makes finalize-sync record Error.
-  await recordAdvisories([...byVendorId.values()], ctx.integrationId);
+  const pending: PendingAdvisory[] = [];
 
+  for (const entry of changed) {
+    let files: StoredAttachment[] = [];
+
+    try {
+      files = await downloadAdvisoryPdfs(session, entry.item);
+    } catch (error) {
+      console.warn(
+        `Fleet advisory ${entry.item.vendorId}: stored without its PDF`,
+        error,
+      );
+    }
+    pending.push({ ...entry, files });
+  }
+  await recordAdvisories(pending);
   // No cursor, advisories endpoint cannot paginate
   return { cursor: null };
 }

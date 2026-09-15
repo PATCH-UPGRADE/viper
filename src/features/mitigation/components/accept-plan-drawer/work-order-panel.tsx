@@ -1,3 +1,4 @@
+import { SendHorizonal } from "lucide-react";
 import { memo } from "react";
 import { PriorityBadge } from "@/components/priority-badge";
 import { Input } from "@/components/ui/input";
@@ -111,6 +112,15 @@ const WorkOrderEditCard = memo(function WorkOrderEditCard({
         </div>
         <span className="text-xs font-medium text-muted-foreground">
           {index + 1}/{count}
+        </span>
+      </div>
+
+      <div className="flex items-start gap-2 text-xs text-muted-foreground">
+        <SendHorizonal className="mt-0.5 size-3.5 shrink-0" />
+        <span>
+          {workOrder?.targetIntegration
+            ? `Files on ${workOrder.targetIntegration.name}`
+            : "Tracked in VIPER — not filed with an external platform"}
         </span>
       </div>
 

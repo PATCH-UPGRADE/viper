@@ -5,10 +5,60 @@ import { generateBriefing } from "@/features/inbox/agent/briefing";
 import { persistBriefing } from "@/features/inbox/agent/briefing/persist";
 import { briefingSchema } from "@/features/inbox/agent/briefing/schema";
 import { attachMatchingAssets } from "@/features/tracking/server/asset-tickets";
-import { Priority, TicketCategory } from "@/generated/prisma";
+import { validatePlatformPayload } from "@/features/work-orders/server/payload";
+import { dispatchSubmission } from "@/features/work-orders/server/submit";
+import {
+  Priority,
+  Prisma,
+  SubmissionState,
+  TicketCategory,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
+
+/**
+ * File one accepted work order, and never let it fail the acceptance.
+ *
+ * The payload is re-checked here rather than trusted from drafting time,
+ * because a stored payload can outlive the rules that accepted it — an asset
+ * can lose the equipment key its platform needs between the plan being drafted
+ * and a person accepting it.
+ *
+ * A plan is accepted as a whole, so one device's platform problem must not
+ * block the other work orders. A ticket that can no longer be filed falls back
+ * to what VIPER can always do: track it, and record why it went no further.
+ */
+async function fileAcceptedTicket(
+  ticket: {
+    id: string;
+    targetIntegrationId: string;
+    platformPayload: Prisma.JsonValue;
+  },
+  actorId: string,
+): Promise<void> {
+  const checked = await validatePlatformPayload(
+    ticket.targetIntegrationId,
+    ticket.platformPayload,
+  );
+  if (!checked.ok) {
+    await prisma.workOrderTicket.update({
+      where: { id: ticket.id },
+      data: {
+        targetIntegrationId: null,
+        platformPayload: Prisma.DbNull,
+        submissionState: SubmissionState.NONE,
+        submissionError: checked.reason,
+      },
+    });
+    return;
+  }
+
+  // dispatchSubmission already recorded FAILED on the ticket, which is where a
+  // retry reads from, so a queue that is down does not undo the acceptance.
+  const { error } = await dispatchSubmission(ticket.id, actorId);
+  if (error) throw new Error(error);
+}
 
 // Draft work orders proposed by a plan, in the shape the plan UI renders and
 // the accept drawer edits.
@@ -22,6 +72,9 @@ const planWorkOrderSelect = {
   priority: true,
   isDraft: true,
   suggestedAssignee: true,
+  // Where this order will be filed. The accept drawer names it, so a person can
+  // tell a request going out to a vendor from one VIPER only tracks.
+  targetIntegration: { select: { name: true } },
   assignee: { select: { id: true, name: true, email: true } },
   departments: {
     select: { id: true, name: true, color: true },
@@ -81,7 +134,7 @@ export const mitigationRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
       }
 
-      return prisma.$transaction(async (tx) => {
+      const { targeted } = await prisma.$transaction(async (tx) => {
         if (input.edits.length > 0) {
           // Never trust the ids the client sends — an edit may only touch a
           // work order belonging to the plan being accepted.
@@ -140,6 +193,8 @@ export const mitigationRouter = createTRPCRouter({
           where: { mitigationPlanId: plan.id, isDraft: true },
           select: {
             id: true,
+            targetIntegrationId: true,
+            platformPayload: true,
             deviceGroups: { select: { deviceGroupMatchingId: true } },
           },
         });
@@ -157,10 +212,33 @@ export const mitigationRouter = createTRPCRouter({
           });
         }
 
-        return tx.mitigationPlan.findUniqueOrThrow({
-          where: { id: plan.id },
-          include: mitigationPlanInclude,
-        });
+        return {
+          targeted: promoted.filter(
+            (t): t is typeof t & { targetIntegrationId: string } =>
+              t.targetIntegrationId !== null,
+          ),
+        };
+      });
+
+      const filings = await Promise.allSettled(
+        targeted.map((ticket) => fileAcceptedTicket(ticket, ctx.auth.user.id)),
+      );
+      filings.forEach((filing, index) => {
+        if (filing.status === "rejected") {
+          console.error(
+            `mitigation.accept: filing ${targeted[index].id} failed`,
+            filing.reason,
+          );
+        }
+      });
+
+      // Read after the filings, not inside the transaction. A ticket whose
+      // payload no longer fits its platform has its target cleared by the step
+      // above, so a plan captured earlier would hand the drawer a vendor it is
+      // no longer going to.
+      return prisma.mitigationPlan.findUniqueOrThrow({
+        where: { id: plan.id },
+        include: mitigationPlanInclude,
       });
     }),
 

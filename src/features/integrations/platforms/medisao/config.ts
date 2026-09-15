@@ -15,7 +15,6 @@ export type MedIsaoConfig = z.infer<typeof configSchema>;
 /**
  * MedISAO issues one API token per consumer and accepts it only as
  * `Authorization: Bearer`.
- *
  */
 export const credentialSchema = z.object({
   apiToken: z.string().min(1, "An API token is required"),

@@ -18,3 +18,11 @@ export const remediations: ResourceModule<
 
   defaultSyncEvery: 86400,
 };
+
+export { medisaoCallCtx } from "../context";
+/**
+ * Comments and inquiries are reached directly rather than through the registry.
+ * MedISAO is the only platform with either surface, so a caller names it.
+ */
+export { comments } from "./comments";
+export { inquiries } from "./inquiries";

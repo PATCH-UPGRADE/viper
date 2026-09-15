@@ -25,3 +25,24 @@ export const ACTIVITIES_URL = `https://${FLEET_HOST}/rest/v1/activities?tz=${FLE
  */
 export const workOrderWebUrl = (externalId: string): string =>
   `https://${FLEET_HOST}/activities/${encodeURIComponent(externalId)}/overview`;
+
+// Security Advisories
+
+export const ADVISORIES_URL = `https://${FLEET_HOST}/rest/v1/security-advisories/active`;
+
+// Fleet's advisory PDFs are served in one language at a time
+export const ADVISORIES_LANGUAGE = "en";
+
+// Attachment Metadata - name, type, size, languageCode
+export const advisoryAttachmentsUrl = (externalId: string): string =>
+  `https://${FLEET_HOST}/rest/v1/security-advisories/attachments?id=${encodeURIComponent(externalId)}&languageCode=${ADVISORIES_LANGUAGE}`;
+
+// Download advisories pdf attachment
+export const advisoryAttachmentsDownloadUrl = (
+  externalId: string,
+  fileType: string,
+): string =>
+  `https://${FLEET_HOST}/rest/v1/security-advisories/download-url?id=${encodeURIComponent(externalId)}&fileType=${encodeURIComponent(fileType)}&languageCode=${ADVISORIES_LANGUAGE}`;
+
+export const advisoryWebUrl = (externalId: string): string =>
+  `https://${FLEET_HOST}/advisories/${encodeURIComponent(externalId)}/overview`;

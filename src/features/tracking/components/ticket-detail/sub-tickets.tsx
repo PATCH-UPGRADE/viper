@@ -2,6 +2,7 @@
 
 import { AlertTriangleIcon, PlusIcon, XIcon } from "lucide-react";
 import { useState } from "react";
+import { CollapsibleSectionCard } from "@/components/collapsible-section-card";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -27,7 +28,6 @@ import {
   useDetachChild,
 } from "../../hooks/use-tracking";
 import type { TicketDetail } from "../../types";
-import { CollapsibleSectionCard } from "./section-card";
 import { StatusChip, TicketRefRow } from "./shared";
 
 const AttachChildPopover = ({ parentId }: { parentId: string }) => {

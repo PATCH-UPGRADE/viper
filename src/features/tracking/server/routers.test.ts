@@ -203,6 +203,7 @@ const makeUpdateBefore = (overrides: Record<string, any> = {}): any => ({
   summary: "Test ticket",
   status: "TO_DO",
   category: "PATCH",
+  priority: "Unsorted",
   scheduledAt: null,
   assigneeId: null,
   assignee: null,
@@ -1548,6 +1549,26 @@ describe("activity writes", () => {
     await caller.update({ id: "t1", status: "TO_DO" });
 
     expect(mockPrisma.ticketActivity.createMany).not.toHaveBeenCalled();
+  });
+
+  it("writes one PRIORITY_CHANGED activity row when priority changes", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
+      makeUpdateBefore({ priority: "High" }),
+    );
+
+    await caller.update({ id: "t1", priority: "Critical" });
+
+    expect(mockPrisma.ticketActivity.createMany).toHaveBeenCalledTimes(1);
+    const [arg] = mockPrisma.ticketActivity.createMany.mock.calls[0];
+    expect(arg.data).toEqual([
+      expect.objectContaining({
+        ticketId: "t1",
+        userId: FAKE_USER_ID,
+        type: "PRIORITY_CHANGED",
+        data: { from: "High", to: "Critical" },
+      }),
+    ]);
   });
 
   it("records assignee changes with before/after user snapshots", async () => {

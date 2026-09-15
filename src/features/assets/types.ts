@@ -90,6 +90,13 @@ export const assetResponseSchema = z.object({
         .object({ id: z.string(), canonicalDisplayName: z.string() })
         .nullable(),
       department: z.object({ id: z.string(), name: z.string() }).nullable(),
+      contract: z
+        .object({
+          title: z.string().nullable(),
+          effectiveFrom: z.date().nullable(),
+          effectiveTo: z.date().nullable(),
+        })
+        .nullable(),
       workOrderIntegration: z
         .object({
           id: z.string(),
@@ -142,6 +149,12 @@ export const managesRelationshipSelect = {
     responsibilities: true,
     vendor: { select: { id: true, canonicalDisplayName: true } },
     department: { select: { id: true, name: true } },
+    // A relationship with no contract still records a real manager: the Fleet
+    // equipment sync creates one per serviced asset. `effectiveTo` bounds any
+    // window an advisor schedules against.
+    contract: {
+      select: { title: true, effectiveFrom: true, effectiveTo: true },
+    },
     workOrderIntegration: {
       select: { id: true, name: true, platform: true },
     },

@@ -5,13 +5,13 @@ export const REQUEST_RECOMMENDATION_TOOL = "request_recommendation";
 export const ASK_USER_QUESTIONS_TOOL = "ask_user_questions";
 
 function toolCallNames(message: BaseMessage): string[] {
-  if (message.getType() !== "ai") return [];
+  if (message.type !== "ai") return [];
   const toolCalls = (message as AIMessage).tool_calls ?? [];
   return toolCalls.map((toolCall) => toolCall.name);
 }
 
 function isConversationText(message: BaseMessage): boolean {
-  const type = message.getType();
+  const type = message.type;
   if (type === "human") return true;
   return type === "ai" && toolCallNames(message).length === 0;
 }
@@ -34,7 +34,7 @@ export function recommendationWindow(messages: BaseMessage[]): BaseMessage[] {
 
   const afterRequest = messages.slice(requestedAt + 1);
   const firstRecommendationTurn = afterRequest.findIndex(
-    (message) => message.getType() !== "tool",
+    (message) => message.type !== "tool",
   );
   const recommendationTurns =
     firstRecommendationTurn === -1

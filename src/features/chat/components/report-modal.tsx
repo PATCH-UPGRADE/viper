@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MarkdownWithTablesWrapper } from "@/components/ui/markdown-with-tables-wrapper";
-import { ExportLinks } from "@/features/reports/components/report-detail";
+import { ExportLinks } from "@/features/reports/components/export-links";
 
 /**
  * Report attachment pill + preview modal for the generic (non-/reports)

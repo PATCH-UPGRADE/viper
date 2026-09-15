@@ -72,21 +72,20 @@ vi.mock("@/lib/auth-utils", () => ({
 
 // The submitter and the payload check are exercised in their own tests; here we
 // stub them so the router's own decisions are what runs.
-const { mockValidatePayload, mockClaim, mockRelease, mockInngestSend } =
-  vi.hoisted(() => ({
+const { mockValidatePayload, mockDispatch, mockInngestSend } = vi.hoisted(
+  () => ({
     mockValidatePayload: vi.fn(),
-    mockClaim: vi.fn(),
-    mockRelease: vi.fn(),
+    mockDispatch: vi.fn(),
     mockInngestSend: vi.fn(),
-  }));
+  }),
+);
 
 vi.mock("@/features/work-orders/server/payload", () => ({
   validatePlatformPayload: mockValidatePayload,
 }));
 
 vi.mock("@/features/work-orders/server/submit", () => ({
-  claimForSubmission: mockClaim,
-  releaseClaim: mockRelease,
+  dispatchSubmission: mockDispatch,
 }));
 
 vi.mock("@/inngest/client", () => ({
@@ -1687,11 +1686,10 @@ describe("trackingRouter.approveWorkOrder", () => {
     mockPrisma.workOrderTicket.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue(DRAFT);
     mockValidatePayload.mockResolvedValue({ ok: true, payload: {} });
-    mockClaim.mockResolvedValue(true);
-    mockInngestSend.mockResolvedValue(undefined);
+    mockDispatch.mockResolvedValue({ submissionState: "SUBMITTING" });
   });
 
-  it("promotes the draft, claims it, and hands the filing to the job", async () => {
+  it("promotes the draft, then hands the filing to the submitter", async () => {
     const result = await setup().approveWorkOrder({ ticketId: "t-draft" });
 
     // Promoted before the job runs: a filing that fails must still leave a
@@ -1703,10 +1701,7 @@ describe("trackingRouter.approveWorkOrder", () => {
       },
       data: { isDraft: false },
     });
-    expect(mockClaim).toHaveBeenCalledWith("t-draft");
-    expect(mockInngestSend).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "workOrder/submit.requested" }),
-    );
+    expect(mockDispatch).toHaveBeenCalledWith("t-draft", FAKE_USER_ID);
     expect(result.submissionState).toBe("SUBMITTING");
   });
 
@@ -1720,8 +1715,7 @@ describe("trackingRouter.approveWorkOrder", () => {
     const result = await setup().approveWorkOrder({ ticketId: "t-draft" });
 
     expect(result.submissionState).toBe("NONE");
-    expect(mockClaim).not.toHaveBeenCalled();
-    expect(mockInngestSend).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalled();
   });
 
   it("refuses a payload the platform no longer accepts", async () => {
@@ -1734,7 +1728,6 @@ describe("trackingRouter.approveWorkOrder", () => {
     await expect(
       setup().approveWorkOrder({ ticketId: "t-draft" }),
     ).rejects.toThrow(/phone call/);
-    expect(mockInngestSend).not.toHaveBeenCalled();
     // Still a draft, so the card can offer Approve again once it is corrected.
     expect(mockPrisma.workOrderTicket.updateMany).not.toHaveBeenCalled();
   });
@@ -1749,31 +1742,29 @@ describe("trackingRouter.approveWorkOrder", () => {
       setup().approveWorkOrder({ ticketId: "t-draft" }),
     ).rejects.toThrow(/mitigation plan/);
     expect(mockPrisma.workOrderTicket.updateMany).not.toHaveBeenCalled();
-    expect(mockInngestSend).not.toHaveBeenCalled();
   });
 
-  it("hands the claim back when the job cannot be queued", async () => {
-    // The claim is held from the moment it is taken. If nothing queues the job
-    // and nothing releases it, the ticket sits in SUBMITTING, which
-    // claimForSubmission will not take again — no filing, and no retry.
-    mockInngestSend.mockRejectedValue(new Error("event bus unavailable"));
+  // One approver is waiting on the answer, so a failure to queue is theirs to
+  // see. The accepted-plan path swallows the same failure on purpose.
+  it("reports a failure to queue the job", async () => {
+    mockDispatch.mockResolvedValue({
+      submissionState: "FAILED",
+      error: "event bus unavailable",
+    });
 
     await expect(
       setup().approveWorkOrder({ ticketId: "t-draft" }),
     ).rejects.toThrow(/event bus unavailable/);
-
-    expect(mockRelease).toHaveBeenCalledWith("t-draft", expect.any(Error));
   });
 
-  it("does not file twice when a second approval loses the claim", async () => {
-    mockClaim.mockResolvedValue(false);
-    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
-      submissionState: "SUBMITTING",
-    });
+  // The claim race itself lives in dispatchSubmission now, and is covered by
+  // "sends nothing when the claim is lost" in submit.test.ts. All this router
+  // owes is to report back whatever state the dispatch settled on.
+  it("reports the state a lost claim settled on", async () => {
+    mockDispatch.mockResolvedValue({ submissionState: "SUBMITTED" });
 
     const result = await setup().approveWorkOrder({ ticketId: "t-draft" });
 
-    expect(result.submissionState).toBe("SUBMITTING");
-    expect(mockInngestSend).not.toHaveBeenCalled();
+    expect(result.submissionState).toBe("SUBMITTED");
   });
 });

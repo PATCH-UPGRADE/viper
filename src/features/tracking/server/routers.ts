@@ -1,10 +1,6 @@
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { validatePlatformPayload } from "@/features/work-orders/server/payload";
-import {
-  claimForSubmission,
-  releaseClaim,
-} from "@/features/work-orders/server/submit";
-import { inngest } from "@/inngest/client";
+import { dispatchSubmission } from "@/features/work-orders/server/submit";
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -12,7 +8,6 @@ import {
   Priority,
   type Prisma,
   ResourceType,
-  SubmissionState,
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
@@ -1047,40 +1042,21 @@ export const trackingRouter = createTRPCRouter({
         return { ticketId: ticket.id, submissionState: ticket.submissionState };
       }
 
-      // Two approvals racing each other both read PENDING; only one claim wins,
-      // and the loser must not send a second order.
-      const claimed = await claimForSubmission(ticket.id);
-      if (!claimed) {
-        const current = await prisma.workOrderTicket.findUniqueOrThrow({
-          where: { id: ticket.id },
-          select: { submissionState: true },
-        });
-        return {
-          ticketId: ticket.id,
-          submissionState: current.submissionState,
-        };
-      }
-
-      // The claim is held from here on. If the job is never queued, nothing else
-      // releases it, and the ticket stays SUBMITTING forever with no filing and
-      // no retry, so hand it back before reporting the failure.
-      try {
-        await inngest.send({
-          name: "workOrder/submit.requested",
-          data: { ticketId: ticket.id, actorId: ctx.auth.user.id },
-        });
-      } catch (error) {
-        await releaseClaim(ticket.id, error);
+      const { submissionState, error } = await dispatchSubmission(
+        ticket.id,
+        ctx.auth.user.id,
+      );
+      // One approver is waiting on this answer, so a failure to queue is theirs
+      // to see. The accepted-plan path swallows the same failure, because there
+      // one bad ticket must not fail the whole plan.
+      if (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Could not start filing the work order: ${error instanceof Error ? error.message : "Unknown error"}`,
+          message: `Could not start filing the work order: ${error}`,
         });
       }
 
-      return {
-        ticketId: ticket.id,
-        submissionState: SubmissionState.SUBMITTING,
-      };
+      return { ticketId: ticket.id, submissionState };
     }),
 
   processIntegrationCreate: baseProcedure

@@ -2,7 +2,9 @@ import { hashPassword } from "better-auth/crypto";
 import {
   type ArtifactType,
   type AssetStatus,
+  ConfidenceLevel,
   NoteStatus,
+  NotificationType,
   PlatformEnum,
   Priority,
   ResourceType,
@@ -10,6 +12,7 @@ import {
   SourceChannel,
   TicketCategory,
   TicketStatus,
+  Tlp,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { sourceContentHash } from "@/lib/source-hash";
@@ -559,6 +562,47 @@ const SEED_FLEET_EQUIPMENT = [
 
 // Vulnerabilities — cpes is an array to support multi-device-group linking
 const SAMPLE_VULNERABILITIES = [
+  // ── CVE-2023-39181: Siemens Healthineers imaging firmware (High) ─────────────
+  // The only vulnerability naming Siemens CPEs, and the two device groups it
+  // reaches are the ones the Fleet integration manages. Its DeviceGroupMatchings
+  // are therefore what lets a mitigation plan resolve a teamplay Fleet work
+  // order target — without it nothing in the seed exercises that path.
+  {
+    cveId: "CVE-2023-39181",
+    severity: Severity.High,
+    cvssScore: 7.8,
+    epss: 0.08,
+    inKEV: false,
+    priority: Priority.High,
+    sarif: {
+      version: "2.1.0",
+      runs: [
+        {
+          tool: { driver: { name: "ICS Security Scanner" } },
+          results: [
+            {
+              ruleId: "CVE-2023-39181",
+              level: "error",
+              message: {
+                text: "Siemens Healthineers imaging system service interface permits privilege escalation from an unprivileged local account (CWE-269)",
+              },
+            },
+          ],
+        },
+      ],
+    },
+    cpes: [
+      "cpe:2.3:h:siemens:magnetom_sola:-:*:*:*:*:*:*:*",
+      "cpe:2.3:h:siemens:somatom_go.top:-:*:*:*:*:*:*:*",
+    ],
+    exploitUri: "https://nvd.nist.gov/vuln/detail/CVE-2023-39181",
+    description:
+      "The service interface on Siemens Healthineers MAGNETOM and SOMATOM imaging systems does not correctly restrict privileges, so an unprivileged local account can escalate to administrative rights on the scanner console (CWE-269). Siemens services these systems under contract and supplies the firmware update.",
+    narrative:
+      "A technologist account on the MAGNETOM Sola or SOMATOM go.Top console can reach a service interface that fails to check privileges before running maintenance routines. From there an attacker gains administrative control of the scanner, which is enough to change imaging protocols, disable the device, or read prior studies held locally. The remediation is a firmware update that only Siemens field service can apply, because the hospital holds no service credentials for these consoles.",
+    impact:
+      "Radiology loses a scanner for the length of the service visit, and the department has one unit of each modality. An MRI outage pushes stroke and trauma imaging to CT or to a transfer, so the patch window has to sit outside the acute hours. Because Siemens performs the work, the hospital cannot schedule it alone — the work order has to reach teamplay Fleet.",
+  },
   // ── CVE-2020-25175: GE Healthcare Credential Exposure (Critical) ─────────────
   {
     cveId: "CVE-2020-25175",
@@ -2336,6 +2380,108 @@ async function seedVendors() {
   );
 }
 
+/**
+ * The advisory the mitigate agent plans against.
+ *
+ * It names the two Siemens imaging systems the Fleet integration manages, so a
+ * plan drafted from it resolves to a teamplay Fleet work order target. Without
+ * a notification there is nothing for the agent to run on, and the whole
+ * propose-then-file path is undemoable locally.
+ *
+ * The plans themselves are NOT seeded. They come from an Opus call that the
+ * Inngest job makes, and a canned plan would hide a broken agent.
+ */
+const FLEET_ADVISORY_MARKDOWN = `# Siemens Healthineers Security Advisory SHSA-2023-114
+
+**Affected products:** MAGNETOM Sola (MRI), SOMATOM go.Top (CT)
+**CVE:** CVE-2023-39181
+**Severity:** High (CVSS 7.8)
+
+## Summary
+
+The service interface on the affected imaging consoles does not correctly
+restrict privileges. An unprivileged local account can escalate to
+administrative rights on the scanner console.
+
+## Remediation
+
+Siemens Healthineers field service must apply firmware update VA30A-SP3. The
+hospital holds no service credentials for these consoles, so the update cannot
+be applied locally. Raise a service request through your teamplay Fleet
+contract.
+
+## Workaround
+
+Until the update is applied, restrict console logins to named technologist
+accounts and review the local account list on each system.
+`;
+
+async function seedFleetAdvisoryNotification() {
+  console.log("\n🌱 Seeding the Siemens advisory notification...");
+
+  const vulnerability = await prisma.vulnerability.findFirst({
+    where: { cveId: "CVE-2023-39181" },
+    select: { id: true, deviceGroupMatchings: { select: { id: true } } },
+  });
+  if (!vulnerability) {
+    console.warn("⚠️  CVE-2023-39181 not seeded — skipping the advisory");
+    return;
+  }
+
+  const raw = { advisoryId: "SHSA-2023-114" };
+  await prisma.notification.create({
+    data: {
+      type: NotificationType.Advisory,
+      tlp: Tlp.AMBER,
+      title:
+        "Siemens Healthineers advisory: privilege escalation on MAGNETOM and SOMATOM consoles",
+      summary:
+        "Siemens reports a privilege escalation on the MAGNETOM Sola and SOMATOM go.Top service interface. Their field service must apply the firmware update under the teamplay Fleet contract.",
+      priority: Priority.High,
+      priorityReasonWhy:
+        "Two single-unit imaging systems, and the fix needs a vendor visit rather than a local patch.",
+      hospitalImpact: {
+        byline: "Both radiology scanners need a Siemens service visit",
+        impactStatement:
+          "The MAGNETOM Sola and SOMATOM go.Top each need a firmware update only Siemens can apply. Each visit takes the scanner out of service for its duration.",
+        careAreas: "Radiology, Emergency",
+        likelihood:
+          "Exploitation needs a local console account, so the risk is insider or physical access rather than remote attack.",
+      },
+      vulnerabilities: {
+        create: {
+          vulnerabilityId: vulnerability.id,
+          confidence: ConfidenceLevel.Matched,
+          reasonWhy: "The advisory names this CVE directly.",
+        },
+      },
+      deviceGroupsMatchings: {
+        create: vulnerability.deviceGroupMatchings.map((matching) => ({
+          deviceGroupMatchingId: matching.id,
+          confidence: ConfidenceLevel.Matched,
+          reasonWhy: "The advisory names this make and model.",
+        })),
+      },
+      sourceLinks: {
+        create: {
+          sourceRecord: {
+            create: {
+              channel: SourceChannel.Email,
+              raw,
+              markdown: FLEET_ADVISORY_MARKDOWN,
+              contentHash: sourceContentHash(raw, FLEET_ADVISORY_MARKDOWN),
+            },
+          },
+        },
+      },
+    },
+  });
+
+  console.log(
+    `✅ Seeded advisory notification covering ${vulnerability.deviceGroupMatchings.length} device group matching(s)`,
+  );
+}
+
 async function main() {
   console.log("🌱 Starting database seed...\n");
 
@@ -2359,6 +2505,8 @@ async function main() {
     await seedWorkflows(user.id);
     await seedNotes(user.id);
     await seedWorkOrderTickets(user.id);
+    // After the vulnerabilities, whose CPEs create the matchings it links to.
+    await seedFleetAdvisoryNotification();
 
     console.log("\n✅ Database seeding completed successfully!");
     console.log(`\n📧 Login with: ${SEED_USER.email} / ${SEED_USER.password}`);

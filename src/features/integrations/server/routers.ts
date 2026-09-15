@@ -48,6 +48,7 @@ const integrationListSelect = {
   name: true,
   platform: true,
   syncEvery: true,
+  config: true,
   enabled: true,
   resourceSyncs: integrationsInclude.resourceSyncs,
 } as const satisfies Prisma.IntegrationSelect;
@@ -135,6 +136,10 @@ export const integrationsRouter = createTRPCRouter({
       const items = (result.items as IntegrationListRow[]).map(
         ({ syncEvery, ...integration }) => ({
           ...integration,
+          // The raw integration-level override, kept alongside the resolved
+          // per-resource `effectiveSyncEvery` below — the edit form needs it
+          // to prefill, distinct from `resourceSyncs[].syncEvery`.
+          syncEvery,
           platformLabel: displayNameFor(integration.platform),
           categories: categoriesFor(integration.platform),
           resourceSyncs: integration.resourceSyncs.map((sync) => ({

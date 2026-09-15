@@ -19,6 +19,7 @@ import {
   HumanMessage,
 } from "@langchain/core/messages";
 import prisma from "@/lib/db";
+import { turnAwaitsRecommendation } from "./recommendation-window";
 
 /** Create the thread lazily and return its current report for revisions. */
 export async function ensureThread(
@@ -89,4 +90,19 @@ export async function loadHistoryMessages(
 /** Count of USER messages — used to gate first-exchange title generation. */
 export function userMessageCount(threadId: string): Promise<number> {
   return prisma.chatMessage.count({ where: { threadId, role: "USER" } });
+}
+
+/** Whether the last assistant turn was the recommendation node's and ended on a question card. */
+export async function lastAssistantTurnAwaitsRecommendation(
+  threadId: string,
+): Promise<boolean> {
+  const lastAssistantTurn = await prisma.chatMessage.findFirst({
+    where: { threadId, role: "ASSISTANT" },
+    orderBy: { createdAt: "desc" },
+    select: { toolCalls: true },
+  });
+  const savedToolParts = lastAssistantTurn?.toolCalls;
+  return (
+    Array.isArray(savedToolParts) && turnAwaitsRecommendation(savedToolParts)
+  );
 }

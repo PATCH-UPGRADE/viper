@@ -68,7 +68,7 @@ npm run format
 - **State Management**: Jotai (global), TanStack Query (server), nuqs (URL)
 - **Visual Editor**: XYFlow React 12
 - **UI**: Radix UI + Tailwind CSS 4 + shadcn/ui (New York style)
-- **AI / Chat**: LangGraph + LangChain (`ChatAnthropic`) for the chat & recommendations agents, streamed to the client via Vercel AI SDK UI (`useChat`)
+- **AI / Chat**: LangGraph + LangChain (`ChatAnthropic`) for the chat agent and its recommendation node, streamed to the client via Vercel AI SDK UI (`useChat`)
 - **AI Providers**: Vercel AI SDK with Anthropic, OpenAI, Google
 - **Code Quality**: Biome 2.2.0 (replaces ESLint/Prettier)
 - **Observability**: Sentry
@@ -220,22 +220,35 @@ where the code goes.
 
 **Conversational agents — `src/features/agents/`**
 
-LangGraph agents that run a model ↔ tools loop and stream to the UI. They share a
-toolset, so they share a home:
+LangGraph agents that run a model ↔ tools loop and stream to the UI. There is one
+conversational agent, the chat agent, and it has two model nodes:
 
-- `shared/` — everything used by more than one conversational agent:
-  `buildAgentGraph` (deterministic context preload → model ↔ tools, with
-  human-in-the-loop stops), the `streamEvents` → AI SDK UI bridge, the hospital-wide
-  notes preload, and thread persistence + titling.
+- `shared/` — `buildAgentGraph` (deterministic context preload → model ↔ tools, with
+  human-in-the-loop stops and an optional `recommendation` model node), `recommendation-window.ts`
+  (the message window the recommendation node sees), the `streamEvents` → AI SDK UI bridge, the
+  hospital-wide notes preload, and thread persistence + titling.
 - `tools/` — model-facing tools: `query_platform_data` (a read-only allowlist of tRPC
-  query procedures — mutations are not representable), `record_note`, and
-  `buildAgentTools`, the registry every conversational agent binds.
-- One directory per agent (`chat/`, `recommendations/`) holding only that agent's
-  graph and prompt.
+  query procedures — mutations are not representable), `record_note`, `write_report`,
+  `request_recommendation`, and `buildAgentTools`, the registry the chat graph binds.
+- `chat/` — the chat agent's graph and prompt (Haiku), plus `recommendation-prompt.ts`: the
+  remediation advisor's prompt (Opus + extended thinking) and `RECOMMENDATION_TOOL_NAMES`,
+  the subset of the registry the recommendation node binds.
 
-Because every agent binds the same `buildAgentTools` set, a tool added to the
-registry is armed for all of them — describe it in each agent's `<tools>` prompt
-block or that agent can call something it was never told about.
+The chat model decides, per turn, whether a question needs the recommendation node by calling
+`request_recommendation`. The graph then routes to the `recommendation` node, which owns the rest of
+the turn: it runs the same tools loop with its own system prompt, and its text is the
+reply. When the recommendation node's turn ended on a question card, the next request starts on the
+recommendation node directly (`lastAssistantTurnAwaitsRecommendation` reads the saved tool parts of
+the last assistant turn), so the answers reach the model that asked.
+
+Every tool in the registry must be described in the chat prompt, and in
+`recommendation-prompt.ts` too if it is in `RECOMMENDATION_TOOL_NAMES` — otherwise a model can call
+something it was never told about.
+
+**The recommendation node never sees the chat model's tool-call turns.** Opus runs with extended
+thinking, and the API silently disables thinking when the message list holds an
+assistant tool-call turn without a thinking block. `recommendationWindow` keeps the
+conversation text and the recommendation node's own turns only; it has a unit test, keep it green.
 
 `buildAgentGraph` ends the turn after any tool in `HALT_TOOLS` —
 `ask_user_questions` and `propose_fleet_work_order` — so the graph stops until the
@@ -246,16 +259,16 @@ an approval card for a proposal that was rejected.
 
 **Known exception:** the per-role prompt fragments (`ASSET_ROLE_INSTRUCTIONS`,
 `VULNERABILITY_ROLE_INSTRUCTIONS`, `RECOMMENDATION_ROLE_INSTRUCTIONS`) still live in
-`src/features/chat/utils.ts`, and both graphs import them from there — so not all
+`src/features/chat/utils.ts`, and the chat graph imports them from there — so not all
 agent prompt text is under `agents/` yet. They are keyed `Record<UserRole, string>`,
 and `UserRole` is also used by the asset and vulnerability drawers, so rehoming the
 fragments means first moving that enum somewhere neutral. Until then, a prompt edit
 may mean editing `features/chat/utils.ts`.
 
-Both currently run as a **streaming Next.js route** (`src/app/api/chat/route.ts`),
-not as Inngest jobs:
+It runs as a **streaming Next.js route** (`src/app/api/chat/route.ts`), not as an
+Inngest job:
 
-- Haiku for the chat agent, Opus + extended thinking for the recommendations agent.
+- Haiku for the chat model, Opus + extended thinking for the recommendation node.
 - The route streams token + reasoning + tool deltas to the client via **Vercel AI SDK UI** (`useChat` in `src/features/chat/hooks/use-viper-chat.ts`); `agents/shared/stream-bridge.ts` maps LangGraph `streamEvents` onto the AI SDK UI message stream.
 - Conversation history is persisted to Prisma (`ChatThread` / `ChatMessage`); the `record_note` tool dispatches to the `actionNotesFn` Inngest function.
 

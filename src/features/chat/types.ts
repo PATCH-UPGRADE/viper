@@ -12,7 +12,6 @@ import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/type
 import { TicketCategory } from "@/generated/prisma";
 
 export interface UseChatAgentConfig {
-  agent?: "chat" | "giveRecommendations";
   assetData?: AssetWithIssueRelations;
   vulnerabilityData?: VulnerabilityWithRelations;
 }

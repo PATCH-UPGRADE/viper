@@ -14,11 +14,9 @@ import {
   shapeFor,
 } from "./create-integration-dialog";
 
-// jsdom doesn't implement the Pointer Events APIs Radix Select's trigger uses.
+// jsdom doesn't implement what Radix Select's trigger/option interactions use.
 beforeAll(() => {
   Element.prototype.hasPointerCapture = () => false;
-  Element.prototype.setPointerCapture = () => {};
-  Element.prototype.releasePointerCapture = () => {};
   Element.prototype.scrollIntoView = () => {};
 });
 
@@ -110,14 +108,13 @@ describe("buildCredentialsPatch — auth-shaped credentials", () => {
   });
 });
 
-describe("syncEvery schema: omitted means keep what's stored", () => {
-  it("accepts syncEvery being absent, so a null 'inherit platform default' row is never forced to a number", () => {
-    expect(
-      integrationInputSchema.shape.syncEvery.safeParse(undefined).success,
-    ).toBe(true);
-  });
-
-  it("still validates a provided syncEvery the same as before", () => {
+// "omitted means keep what's stored" (the reason syncEvery is .optional() at
+// all) is already proven at the router level, in routers.test.ts — that test
+// sends syncEvery genuinely absent through this same schema, so it would
+// fail too if .optional() regressed. This one covers what that test doesn't:
+// that relaxing it to optional didn't also loosen the min/positive check.
+describe("syncEvery schema", () => {
+  it("still validates a provided value the same as before .optional() was added", () => {
     expect(integrationInputSchema.shape.syncEvery.safeParse(0).success).toBe(
       false,
     );

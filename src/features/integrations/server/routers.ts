@@ -71,8 +71,7 @@ const toRowShape = (input: IntegrationFormValues) => {
     row: {
       name: input.name,
       platform: input.platform,
-      // Omitted means "keep what is stored" (null = inherit the platform
-      // default) — same reasoning as credentials below.
+      // Omitted means "keep what's stored" (null = inherit the platform default) — same as credentials below.
       ...(input.syncEvery !== undefined && { syncEvery: input.syncEvery }),
       config,
     },
@@ -97,17 +96,7 @@ const toCredentialBlob = (
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/**
- * Merges a client-submitted partial credential patch into the existing
- * decrypted value, one level deep — no platform/auth-shaped branching.
- *
- * A discriminator change is the one exception: if `partial.authType`
- * differs from what's actually stored, the old `authentication` object is
- * for the wrong auth type — `authenticationSchema` is a union with no
- * cross-check against `authType`, so carrying old fields across a switch
- * would validate against the *previous* variant's shape instead of
- * requiring the new one's, even though the two are unrelated shapes.
- */
+/** Drops the old `authentication` when `authType` changes — the auth union has no cross-check against it, so stale fields could otherwise validate as the wrong variant. */
 export const mergeCredentialPatch = (
   existing: unknown,
   partial: Record<string, unknown>,
@@ -130,15 +119,7 @@ export const mergeCredentialPatch = (
   return merged;
 };
 
-/**
- * `credentials` omitted means keep what's stored; present means decrypt it,
- * merge the patch in, then validate+encrypt the result like `create` does.
- *
- * Takes the already-fetched blob rather than fetching it itself: the fetch
- * is I/O, kept outside `asBadRequest` (reserved elsewhere in this file for
- * input-validation failures) so a transient DB error surfaces as a server
- * error, not a 400.
- */
+/** Takes the already-fetched blob rather than fetching it itself, so a transient DB read failure surfaces as a server error, not a 400 from `asBadRequest`. */
 const credentialsPatch = (
   module: AnyConnectorModule,
   data: IntegrationFormValues,
@@ -194,9 +175,7 @@ export const integrationsRouter = createTRPCRouter({
           categories: categoriesFor(integration.platform),
           resourceSyncs: integration.resourceSyncs.map((sync) => ({
             ...sync,
-            // A nested resource row never sees its parent integration's
-            // `syncEvery`, so the table can't tell "resource override" from
-            // "integration-level override" apart from `syncEvery` alone.
+            // A resource row doesn't see its parent's syncEvery, so isOverridden has to check both.
             isOverridden:
               sync.syncEvery !== null || integration.syncEvery !== null,
             effectiveSyncEvery: effectiveSyncEvery(
@@ -272,9 +251,7 @@ export const integrationsRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       const { id, data } = input;
-      // Two independent reads of the same row (existence check, credentials
-      // for the merge) — run them concurrently rather than round-tripping
-      // twice in sequence.
+      // Existence check and credentials fetch are independent reads — run concurrently, not sequentially.
       const [, existingRow] = await Promise.all([
         requireIntegration(id),
         data.credentials
@@ -295,9 +272,7 @@ export const integrationsRouter = createTRPCRouter({
           where: { id },
           data: {
             ...row,
-            // `credentials` omitted means "keep the stored value" —
-            // credentialsPatch returns {} so this spreads nothing. Present
-            // means "apply this (already merged) patch".
+            // credentialsPatch returns {} when omitted, so this spread is a no-op — keeps the stored value.
             ...credentials,
             resourceSyncs: {
               updateMany: {
@@ -308,9 +283,7 @@ export const integrationsRouter = createTRPCRouter({
                 where: {
                   integrationId_resource: { integrationId: id, resource },
                 },
-                // A resource newly implied by config starts enabled (schema
-                // default); an existing row's enabled flag is the user's own
-                // toggle (setResourceSyncEnabled) and must not be reset here.
+                // A newly-implied resource starts enabled; an existing row's toggle (setResourceSyncEnabled) must not be reset here.
                 create: { resource },
                 update: {},
               })),
@@ -343,8 +316,7 @@ export const integrationsRouter = createTRPCRouter({
       });
     }),
 
-  // Operator kill switch for the whole integration — distinct from `update`,
-  // which requires a full (and platform-validated) config/credentials payload.
+  // Kill switch for the whole integration — `update` requires a full, platform-validated payload instead.
   setEnabled: protectedProcedure
     .input(z.object({ id: z.string(), enabled: z.boolean() }))
     .mutation(async ({ input }) => {

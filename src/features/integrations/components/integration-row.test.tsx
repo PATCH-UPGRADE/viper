@@ -4,14 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlatformEnum, SyncStatusEnum } from "@/generated/prisma";
 
 const {
-  mockMutate,
   mockUseRemoveIntegration,
   mockUseSetIntegrationEnabled,
   mockUseTriggerSync,
   mockUseCreateIntegration,
   mockUseUpdateIntegration,
 } = vi.hoisted(() => ({
-  mockMutate: vi.fn(),
   mockUseRemoveIntegration: vi.fn(),
   mockUseSetIntegrationEnabled: vi.fn(),
   mockUseTriggerSync: vi.fn(),
@@ -33,7 +31,7 @@ import { IntegrationCard } from "./integration-row";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  const idleMutation = { mutate: mockMutate, isPending: false };
+  const idleMutation = { mutate: vi.fn(), isPending: false };
   mockUseRemoveIntegration.mockReturnValue(idleMutation);
   mockUseSetIntegrationEnabled.mockReturnValue(idleMutation);
   mockUseTriggerSync.mockReturnValue(idleMutation);

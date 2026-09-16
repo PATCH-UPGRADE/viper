@@ -43,15 +43,16 @@ model User {
   fieldCorrections  FieldCorrection[]
 
   departmentId             String?
-  department               Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  workOrderTicketsCreated  WorkOrderTicket[] @relation("WorkOrderTicketCreator")
-  workOrderTicketsAssigned WorkOrderTicket[] @relation("WorkOrderTicketAssignee")
+  department               Department?                      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  workOrderTicketsCreated  WorkOrderTicket[]                @relation("WorkOrderTicketCreator")
+  workOrderTicketsAssigned WorkOrderTicket[]                @relation("WorkOrderTicketAssignee")
   ticketComments           TicketComment[]
   watchedTickets           TicketWatch[]
   ticketSeen               TicketSeen[]
   ticketActivities         TicketActivity[]
   notes                    Note[]
   answeredQuestions        Question[]
+  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
   @@unique([email])
   @@index([departmentId])
@@ -892,9 +893,10 @@ model Remediation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  externalMappings ExternalRemediationMapping[]
+  externalMappings         ExternalRemediationMapping[]
   // raw TA4 submissions that produced this remediation
-  sourceRecords    SourceRecord[]
+  sourceRecords            SourceRecord[]
+  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
   @@index([vulnerabilityId])
   @@index([userId])
@@ -976,8 +978,9 @@ model Integration {
 
   managesRelationships ManagesRelationship[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt                DateTime                         @default(now())
+  updatedAt                DateTime                         @updatedAt
+  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
   @@index([userId])
   @@index([integrationUserId])
@@ -1563,6 +1566,46 @@ model SourceLink {
 
 // One row per external record (an advisory, a notification on another platform),
 // owning many snapshots of it.
+// The pseudonym a comment platform derived from the identifier we sent for one
+// person on one record. Written after a successful post.
+//
+// Two reasons it is kept. It is what lets a reader see which comments are their
+// own, since the platform's feed is deliberately anonymous. And it is the only
+// record anywhere that ties a pseudonym back to a person: the platform never
+// authenticated them, so authorship can only ever be attested from this side.
+/// The pseudonym MedISAO derived for this hospital on one remediation.
+///
+/// Specific to MedISAO, which is the only platform that hosts comments. It is
+/// also the only record tying a pseudonym back to us: MedISAO never
+/// authenticated the person, so they cannot attest authorship for what we post.
+///
+/// One row per remediation and integration, not per user. We post under the
+/// deployment's hospital identifier and never send a user id, so MedISAO
+/// returns one pseudonym for everybody here. `userId` records who wrote the
+/// first comment, which the pseudonym deliberately cannot.
+model MedISAOExternalCommentIdentity {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  remediationId String
+  remediation   Remediation @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+
+  integrationId String
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  // Stable within one record and uncorrelated across records, by the platform's
+  // design. Never a user handle.
+  pseudonym String
+
+  createdAt DateTime @default(now())
+
+  @@unique([remediationId, integrationId])
+  @@index([remediationId])
+  @@map("medisao_external_comment_identity")
+}
+
 model ExternalSourceRecordMapping {
   id            String      @id @default(cuid())
   integrationId String

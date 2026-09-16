@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { FieldValues, Path, UseFormReturn } from "react-hook-form";
 import {
   FormControl,
@@ -24,6 +25,13 @@ interface AuthenticationFieldsProps<TFieldValues extends FieldValues> {
   name?: string;
 }
 
+/** Which authentication.* leaves belong to each auth type. */
+const AUTH_TYPE_FIELDS: Partial<Record<AuthType, string[]>> = {
+  Basic: ["username", "password"],
+  Bearer: ["token"],
+  Header: ["header", "value"],
+};
+
 export const AuthenticationFields = <TFieldValues extends FieldValues>({
   form,
   name,
@@ -32,6 +40,33 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
     (name ? `${name}.${field}` : field) as Path<TFieldValues>;
 
   const authType = form.watch(path("authType")) as AuthType;
+
+  // A field left `undefined` (never typed into) fails authenticationSchema's
+  // union even though a blank "" for the same field passes it — seed only
+  // the active type's own fields, and only when unset, so a value typed
+  // before switching away and back is never overwritten.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run when authType itself changes.
+  useEffect(() => {
+    const activeFields = new Set(AUTH_TYPE_FIELDS[authType] ?? []);
+    for (const field of Object.values(AUTH_TYPE_FIELDS).flat()) {
+      const fieldPath = path(`authentication.${field}`);
+      if (activeFields.has(field)) {
+        if (form.getValues(fieldPath) === undefined) {
+          form.setValue(fieldPath, "" as never);
+        }
+      } else if (
+        !form.getFieldState(fieldPath, form.formState).isDirty &&
+        form.getValues(fieldPath) !== undefined
+      ) {
+        // A same-named leaf from a type the user isn't on right now and
+        // never actually typed into — clear it. Left as "" it would
+        // structurally satisfy that other type's schema too, and the
+        // union in authenticationSchema resolves to whichever declared
+        // variant matches first, silently dropping the real value.
+        form.setValue(fieldPath, undefined as never);
+      }
+    }
+  }, [authType]);
 
   return (
     <>
@@ -76,7 +111,12 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
               <FormItem>
                 <FormLabel>Username *</FormLabel>
                 <FormControl>
-                  <Input type="text" placeholder="Username" {...field} />
+                  <Input
+                    type="text"
+                    placeholder="Username"
+                    {...field}
+                    value={(field.value as string | undefined) ?? ""}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -89,7 +129,12 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
               <FormItem>
                 <FormLabel>Password *</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="Password" {...field} />
+                  <Input
+                    type="password"
+                    placeholder="Password"
+                    {...field}
+                    value={(field.value as string | undefined) ?? ""}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -106,7 +151,12 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
             <FormItem>
               <FormLabel>Token *</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="Bearer token" {...field} />
+                <Input
+                  type="password"
+                  placeholder="Bearer token"
+                  {...field}
+                  value={(field.value as string | undefined) ?? ""}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -123,7 +173,12 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
               <FormItem>
                 <FormLabel>Header Name *</FormLabel>
                 <FormControl>
-                  <Input type="text" placeholder="X-API-Key" {...field} />
+                  <Input
+                    type="text"
+                    placeholder="X-API-Key"
+                    {...field}
+                    value={(field.value as string | undefined) ?? ""}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -136,7 +191,12 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
               <FormItem>
                 <FormLabel>Header Value *</FormLabel>
                 <FormControl>
-                  <Input type="text" placeholder="Header value" {...field} />
+                  <Input
+                    type="text"
+                    placeholder="Header value"
+                    {...field}
+                    value={(field.value as string | undefined) ?? ""}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

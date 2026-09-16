@@ -59,12 +59,7 @@ const zodForSpec = (spec: FieldSpec): z.ZodTypeAny => {
 export const shapeFor = (specs: FieldSpec[]) =>
   Object.fromEntries(specs.map((spec) => [spec.key, zodForSpec(spec)]));
 
-/**
- * Edit mode's credential fields start blank, so they can't be required the
- * way create's are: wrapping a required field's `z.string().min(1)` in
- * `.optional()` alone still rejects a defined-but-empty string, so `min(1)`
- * itself has to go, not just get an `.optional()` layered on top.
- */
+/** Wrapping `z.string().min(1)` in `.optional()` alone still rejects a defined-but-empty string, so `min(1)` itself has to go. */
 export const relaxedShapeFor = (specs: FieldSpec[]) =>
   shapeFor(specs.map((spec) => ({ ...spec, required: false })));
 
@@ -73,7 +68,7 @@ export const relaxedAuthSchema = z.object(authSchema.shape);
 
 type DirtyFields = Record<string, unknown> | boolean | undefined;
 
-/** Only the dirty leaf entries, rebuilt as {key: realValue}. Untouched fields never differ from their ("") default, so react-hook-form already excludes them here — no placeholder/sentinel comparison needed. */
+/** Untouched fields never differ from their ("") default, so react-hook-form already excludes them here — no placeholder/sentinel comparison needed. */
 const dirtyPatch = (
   dirtyFields: Record<string, unknown>,
   values: Record<string, unknown>,
@@ -84,13 +79,7 @@ const dirtyPatch = (
       .map(([key]) => [key, values[key]]),
   );
 
-/**
- * The partial credentials payload for an edit submission: only the leaf
- * fields the user actually typed into, plus `authType` whenever it's dirty
- * — structural, not itself a "value" the way a password field is, but the
- * server needs it to know which shape the dirty leaf fields belong to.
- * Undefined when nothing was touched.
- */
+/** `authType` is included whenever it's dirty even though it's not itself a "value" — the server needs it to know which shape the dirty leaf fields belong to. */
 export const buildCredentialsPatch = (
   credentialsAreAuthShaped: boolean,
   dirtyFields: DirtyFields,
@@ -199,7 +188,6 @@ export const IntegrationFormDialog = ({
   const updateIntegration = useUpdateIntegration();
   const mutation = mode === "create" ? createIntegration : updateIntegration;
 
-  // Edit relaxes required-ness; create keeps the strict schema unchanged.
   const shapeForFields = mode === "edit" ? relaxedShapeFor : shapeFor;
   const authSchemaToUse = mode === "edit" ? relaxedAuthSchema : authSchema;
   const credentialsSchema = credentialsAreAuthShaped
@@ -249,7 +237,6 @@ export const IntegrationFormDialog = ({
     defaultValues,
   });
 
-  // Re-seed the form from the current row each time the dialog opens.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run on open/close, not on every defaultValues/form identity change.
   useEffect(() => {
     if (open) form.reset(defaultValues);

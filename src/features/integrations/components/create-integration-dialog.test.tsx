@@ -1,9 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { PlatformEnum } from "@/generated/prisma";
 import type { CatalogEntry } from "../core/catalog";
-import type { FieldSpec } from "../types";
+import type { FieldSpec, IntegrationListItem } from "../types";
 import {
   buildCredentialsPatch,
   IntegrationFormDialog,
@@ -17,9 +17,10 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = () => {};
 });
 
+const mockUpdateMutate = vi.fn();
 vi.mock("../hooks/use-integrations", () => ({
   useCreateIntegration: () => ({ mutate: vi.fn(), isPending: false }),
-  useUpdateIntegration: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateIntegration: () => ({ mutate: mockUpdateMutate, isPending: false }),
 }));
 
 const requiredField: FieldSpec = {
@@ -75,7 +76,6 @@ describe("buildCredentialsPatch — auth-shaped credentials", () => {
   });
 
   it("includes authType once dirtied, plus only the dirty, typed leaf field", () => {
-    // authType alone, no leaf field touched yet:
     expect(
       buildCredentialsPatch(
         true,
@@ -84,7 +84,6 @@ describe("buildCredentialsPatch — auth-shaped credentials", () => {
       ),
     ).toEqual({ authType: "Bearer" });
 
-    // authType plus a genuinely typed leaf field:
     expect(
       buildCredentialsPatch(
         true,
@@ -133,5 +132,75 @@ describe("switching auth type before saving (decision: shouldn't force re-entry)
     expect(await screen.findByLabelText(/token/i)).toHaveValue(
       "my-secret-token",
     );
+  });
+});
+
+describe("edit: selecting an auth type without typing a new secret", () => {
+  const entry = {
+    platform: PlatformEnum.PARTNER,
+    displayName: "Partner API",
+    configFields: [],
+    credentialFields: [],
+    credentialsAreAuthShaped: true,
+  } as unknown as CatalogEntry;
+  const integration = {
+    id: "int-1",
+    name: "Demo Partner Feed",
+    syncEvery: 300,
+    config: {},
+  } as unknown as IntegrationListItem;
+
+  it("still submits (leaving credentials untouched) instead of failing silently", async () => {
+    mockUpdateMutate.mockClear();
+    const user = userEvent.setup();
+    render(
+      <IntegrationFormDialog
+        entry={entry}
+        mode="edit"
+        integration={integration}
+        open={true}
+        onOpenChange={() => {}}
+      />,
+    );
+
+    const authTypeSelect = screen.getByRole("combobox");
+    await user.click(authTypeSelect);
+    await user.click(await screen.findByRole("option", { name: "Bearer" }));
+    fireEvent.submit(
+      document.getElementById("integration-form-edit") as HTMLFormElement,
+    );
+
+    await vi.waitFor(() => expect(mockUpdateMutate).toHaveBeenCalled());
+    const [{ data }] = mockUpdateMutate.mock.calls[0];
+    expect(data.credentials).toEqual({ authType: "Bearer" });
+  });
+
+  it("still sends a token actually typed in, even after picking a different type first", async () => {
+    mockUpdateMutate.mockClear();
+    const user = userEvent.setup();
+    render(
+      <IntegrationFormDialog
+        entry={entry}
+        mode="edit"
+        integration={integration}
+        open={true}
+        onOpenChange={() => {}}
+      />,
+    );
+
+    const authTypeSelect = screen.getByRole("combobox");
+    await user.click(authTypeSelect);
+    await user.click(await screen.findByRole("option", { name: "Basic" }));
+    await user.click(authTypeSelect);
+    await user.click(await screen.findByRole("option", { name: "Bearer" }));
+    await user.type(await screen.findByLabelText(/token/i), "brand-new-token");
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await vi.waitFor(() => expect(mockUpdateMutate).toHaveBeenCalled());
+    const [{ data }] = mockUpdateMutate.mock.calls[0];
+    expect(data.credentials).toEqual({
+      authType: "Bearer",
+      authentication: { token: "brand-new-token" },
+    });
   });
 });

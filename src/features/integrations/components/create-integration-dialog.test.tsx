@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlatformEnum } from "@/generated/prisma";
 import type { CatalogEntry } from "../core/catalog";
 import type { FieldSpec, IntegrationListItem } from "../types";
@@ -28,6 +28,14 @@ const requiredField: FieldSpec = {
   kind: "password",
   required: true,
 };
+
+const authShapedEntry = {
+  platform: PlatformEnum.PARTNER,
+  displayName: "Partner API",
+  configFields: [],
+  credentialFields: [],
+  credentialsAreAuthShaped: true,
+} as unknown as CatalogEntry;
 
 describe("edit mode relaxes credential requirements", () => {
   it("accepts a blank (or absent) credential field", () => {
@@ -95,19 +103,11 @@ describe("buildCredentialsPatch — auth-shaped credentials", () => {
 });
 
 describe("switching auth type before saving (decision: shouldn't force re-entry)", () => {
-  const entry = {
-    platform: PlatformEnum.PARTNER,
-    displayName: "Partner API",
-    configFields: [],
-    credentialFields: [],
-    credentialsAreAuthShaped: true,
-  } as unknown as CatalogEntry;
-
   it("keeps a typed token after switching away and back to the same auth type", async () => {
     const user = userEvent.setup();
     render(
       <IntegrationFormDialog
-        entry={entry}
+        entry={authShapedEntry}
         mode="create"
         open={true}
         onOpenChange={() => {}}
@@ -136,13 +136,6 @@ describe("switching auth type before saving (decision: shouldn't force re-entry)
 });
 
 describe("edit: selecting an auth type without typing a new secret", () => {
-  const entry = {
-    platform: PlatformEnum.PARTNER,
-    displayName: "Partner API",
-    configFields: [],
-    credentialFields: [],
-    credentialsAreAuthShaped: true,
-  } as unknown as CatalogEntry;
   const integration = {
     id: "int-1",
     name: "Demo Partner Feed",
@@ -150,12 +143,12 @@ describe("edit: selecting an auth type without typing a new secret", () => {
     config: {},
   } as unknown as IntegrationListItem;
 
-  it("still submits (leaving credentials untouched) instead of failing silently", async () => {
-    mockUpdateMutate.mockClear();
-    const user = userEvent.setup();
+  beforeEach(() => mockUpdateMutate.mockClear());
+
+  const renderEditDialog = () =>
     render(
       <IntegrationFormDialog
-        entry={entry}
+        entry={authShapedEntry}
         mode="edit"
         integration={integration}
         open={true}
@@ -163,12 +156,14 @@ describe("edit: selecting an auth type without typing a new secret", () => {
       />,
     );
 
+  it("still submits (leaving credentials untouched) instead of failing silently", async () => {
+    const user = userEvent.setup();
+    renderEditDialog();
+
     const authTypeSelect = screen.getByRole("combobox");
     await user.click(authTypeSelect);
     await user.click(await screen.findByRole("option", { name: "Bearer" }));
-    fireEvent.submit(
-      document.getElementById("integration-form-edit") as HTMLFormElement,
-    );
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     await vi.waitFor(() => expect(mockUpdateMutate).toHaveBeenCalled());
     const [{ data }] = mockUpdateMutate.mock.calls[0];
@@ -176,17 +171,8 @@ describe("edit: selecting an auth type without typing a new secret", () => {
   });
 
   it("still sends a token actually typed in, even after picking a different type first", async () => {
-    mockUpdateMutate.mockClear();
     const user = userEvent.setup();
-    render(
-      <IntegrationFormDialog
-        entry={entry}
-        mode="edit"
-        integration={integration}
-        open={true}
-        onOpenChange={() => {}}
-      />,
-    );
+    renderEditDialog();
 
     const authTypeSelect = screen.getByRole("combobox");
     await user.click(authTypeSelect);

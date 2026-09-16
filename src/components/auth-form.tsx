@@ -41,28 +41,20 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
 
   const authType = form.watch(path("authType")) as AuthType;
 
-  // A field left `undefined` (never typed into) fails authenticationSchema's
-  // union even though a blank "" for the same field passes it — seed only
-  // the active type's own fields, and only when unset, so a value typed
-  // before switching away and back is never overwritten.
+  // authenticationSchema is a plain union: an unset field fails it (only a
+  // real "" satisfies a variant), but leaving another type's blank field as
+  // "" lets that variant match first, silently dropping the active type's
+  // own value — so blank the active type's fields and unblank every other
+  // type's, leaving anything actually typed alone either way.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run when authType itself changes.
   useEffect(() => {
     const activeFields = new Set(AUTH_TYPE_FIELDS[authType] ?? []);
     for (const field of Object.values(AUTH_TYPE_FIELDS).flat()) {
       const fieldPath = path(`authentication.${field}`);
-      if (activeFields.has(field)) {
-        if (form.getValues(fieldPath) === undefined) {
-          form.setValue(fieldPath, "" as never);
-        }
-      } else if (
-        !form.getFieldState(fieldPath, form.formState).isDirty &&
-        form.getValues(fieldPath) !== undefined
-      ) {
-        // A same-named leaf from a type the user isn't on right now and
-        // never actually typed into — clear it. Left as "" it would
-        // structurally satisfy that other type's schema too, and the
-        // union in authenticationSchema resolves to whichever declared
-        // variant matches first, silently dropping the real value.
+      const value = form.getValues(fieldPath);
+      if (activeFields.has(field) && value === undefined) {
+        form.setValue(fieldPath, "" as never);
+      } else if (!activeFields.has(field) && value === "") {
         form.setValue(fieldPath, undefined as never);
       }
     }

@@ -147,6 +147,24 @@ export type NotificationFieldCorrection = Prisma.FieldCorrectionGetPayload<{
   include: typeof fieldCorrectionInclude;
 }> & { isAgent: boolean };
 
+/** Every reader of a notification, for the header read receipts. */
+export const readReceiptSelect = {
+  id: true,
+  readAt: true,
+  user: {
+    select: {
+      id: true,
+      name: true,
+      image: true,
+      department: { select: { name: true } },
+    },
+  },
+} satisfies Prisma.NotificationReadSelect;
+
+export type NotificationReadReceipt = Prisma.NotificationReadGetPayload<{
+  select: typeof readReceiptSelect;
+}>;
+
 export type NotificationDetailWithRelations = Omit<
   NotificationDetailBasePayload,
   "deviceGroupsMatchings"
@@ -156,6 +174,7 @@ export type NotificationDetailWithRelations = Omit<
   })[];
   affectedAssets: AffectedAssetsSummary;
   fieldCorrections: NotificationFieldCorrection[];
+  readReceipts: NotificationReadReceipt[];
 };
 
 export type NotificationDetailSource =

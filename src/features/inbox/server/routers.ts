@@ -30,6 +30,7 @@ import {
   notificationDetailInclude,
   notificationInclude,
   type ResolvedDeviceGroupAsset,
+  readReceiptSelect,
 } from "../types";
 import {
   AFFECTED_BUCKETS,
@@ -350,16 +351,30 @@ export const notificationsRouter = createTRPCRouter({
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input, ctx }) => {
-      const notification = await prisma.notification.findUnique({
-        where: { id: input.id },
-        include: {
-          ...notificationDetailInclude,
-          reads: {
-            where: { userId: ctx.auth.user.id },
-            select: { id: true },
-          },
-        },
-      });
+      const [notification, correctionRecords, readReceipts] = await Promise.all(
+        [
+          prisma.notification.findUnique({
+            where: { id: input.id },
+            include: {
+              ...notificationDetailInclude,
+              reads: {
+                where: { userId: ctx.auth.user.id },
+                select: { id: true },
+              },
+            },
+          }),
+          prisma.fieldCorrection.findMany({
+            where: { targetType: "Notification", targetId: input.id },
+            include: fieldCorrectionInclude,
+            orderBy: { createdAt: "asc" },
+          }),
+          prisma.notificationRead.findMany({
+            where: { notificationId: input.id },
+            orderBy: { readAt: "desc" },
+            select: readReceiptSelect,
+          }),
+        ],
+      );
 
       if (!notification) {
         throw new TRPCError({ code: "NOT_FOUND" });
@@ -418,11 +433,6 @@ export const notificationsRouter = createTRPCRouter({
         assetCount: countByMatchingId.get(m.deviceGroupMatching.id) ?? 0,
       }));
 
-      const correctionRecords = await prisma.fieldCorrection.findMany({
-        where: { targetType: "Notification", targetId: input.id },
-        include: fieldCorrectionInclude,
-        orderBy: { createdAt: "asc" },
-      });
       const fieldCorrections = correctionRecords.map((correction) => ({
         ...correction,
         isAgent: correction.userId === AUTOMATION_USER_ID,
@@ -433,6 +443,7 @@ export const notificationsRouter = createTRPCRouter({
         deviceGroupsMatchings,
         affectedAssets,
         fieldCorrections,
+        readReceipts,
       };
     }),
 

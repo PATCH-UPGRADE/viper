@@ -4,8 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { PLATFORM_QUERY_PROCEDURES } from "@/features/agents/tools/query-platform-tool";
+import { buildAgentTools } from "@/features/agents/tools/registry";
 import { USER_ROLES } from "@/features/chat/utils";
-import { buildSystemPrompt } from "./graph";
+import {
+  buildRecommendationSystemPrompt,
+  RECOMMENDATION_TOOL_NAMES,
+} from "./recommendation-prompt";
 
 /**
  * How each allowlisted router prefix is named in prose. The prompt describes the
@@ -44,11 +48,11 @@ function proseBlocks(prompt: string) {
   };
 }
 
-describe("recommendations prompt stays in step with the tool allowlist", () => {
+describe("recommendation prompt stays in step with the tool allowlist", () => {
   // An agent that trusts a stale summary declines work the tool would have
   // answered, and nothing else fails when the two drift apart.
   it("names every allowlisted domain in <grounding_rules>", () => {
-    const { grounding } = proseBlocks(buildSystemPrompt("CISO"));
+    const { grounding } = proseBlocks(buildRecommendationSystemPrompt("CISO"));
 
     const missing = prefixes().filter((prefix) => {
       const phrase = DOMAIN_PHRASES[prefix];
@@ -60,7 +64,7 @@ describe("recommendations prompt stays in step with the tool allowlist", () => {
   });
 
   it("names every allowlisted domain in the <tools> block", () => {
-    const { tools } = proseBlocks(buildSystemPrompt("CISO"));
+    const { tools } = proseBlocks(buildRecommendationSystemPrompt("CISO"));
 
     const missing = prefixes().filter((prefix) => {
       const phrase = DOMAIN_PHRASES[prefix];
@@ -71,7 +75,7 @@ describe("recommendations prompt stays in step with the tool allowlist", () => {
   });
 
   it("embeds the catalog, so procedure inputs cannot drift from the prompt", () => {
-    const prompt = buildSystemPrompt("CISO");
+    const prompt = buildRecommendationSystemPrompt("CISO");
 
     for (const procedure of PLATFORM_QUERY_PROCEDURES) {
       expect(prompt).toContain(procedure);
@@ -79,11 +83,11 @@ describe("recommendations prompt stays in step with the tool allowlist", () => {
   });
 });
 
-describe("recommendations prompt grounding rules", () => {
+describe("recommendation prompt grounding rules", () => {
   // The whole point of the tool: answers come from retrieved records, not from
   // the model's prior. Losing these lines is how invented CVSS scores appear.
   it("forbids inventing the values a reader would act on", () => {
-    const prompt = buildSystemPrompt("CISO");
+    const prompt = buildRecommendationSystemPrompt("CISO");
 
     expect(prompt).toMatch(/Never invent CVSS scores/);
     expect(prompt).toMatch(/EPSS values, KEV status, asset IDs, hostnames/);
@@ -91,14 +95,39 @@ describe("recommendations prompt grounding rules", () => {
   });
 
   it("tells the model to say so when a fact cannot be retrieved", () => {
-    expect(buildSystemPrompt("CISO")).toMatch(/say so explicitly/);
+    expect(buildRecommendationSystemPrompt("CISO")).toMatch(
+      /say so explicitly/,
+    );
   });
 
   it("builds a prompt for every role, with that role's instructions", () => {
     for (const role of USER_ROLES) {
-      const prompt = buildSystemPrompt(role);
+      const prompt = buildRecommendationSystemPrompt(role);
       expect(prompt).toContain(`The user has the role ${role}`);
       expect(prompt.length).toBeGreaterThan(1000);
+    }
+  });
+});
+
+describe("recommendation prompt names the tools the recommendation node binds", () => {
+  it("describes every tool in RECOMMENDATION_TOOL_NAMES in the <tools> block", () => {
+    const { tools } = proseBlocks(buildRecommendationSystemPrompt("CISO"));
+
+    for (const toolName of RECOMMENDATION_TOOL_NAMES) {
+      expect(tools).toContain(`${toolName}:`);
+    }
+  });
+
+  // buildChatGraph filters the registry by these names, and a name that matches
+  // nothing is skipped in silence — the node then loses a tool its prompt still
+  // tells it to use.
+  it("names only tools the registry actually builds", () => {
+    const registryToolNames = buildAgentTools("user", "thread").map(
+      (tool) => tool.name,
+    );
+
+    for (const toolName of RECOMMENDATION_TOOL_NAMES) {
+      expect(registryToolNames).toContain(toolName);
     }
   });
 });

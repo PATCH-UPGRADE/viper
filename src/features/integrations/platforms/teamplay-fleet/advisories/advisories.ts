@@ -38,6 +38,10 @@ export interface FleetAdvisoryRecord extends FleetAdvisory {
   attachments: FleetAdvisoryAttachment[];
 }
 
+export const fleetAdvisoryRecordSchema = fleetAdvisorySchema.extend({
+  attachments: z.array(fleetAttachmentSchema).default([]),
+});
+
 export interface FleetAdvisoryItem {
   vendorId: string;
   title: string;

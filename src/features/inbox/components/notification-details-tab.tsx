@@ -67,7 +67,7 @@ function SourceReference({ source }: { source: NotificationDetailSource }) {
     source.channel === "Email"
       ? (source.raw as unknown as RawEmailPayload)
       : null;
-  const label = raw?.data?.subject ?? source.channel;
+  const label = raw?.data?.subject ?? source.mapping?.integration.name ?? source.channel;
 
   if (source.channel === "Email") {
     return (

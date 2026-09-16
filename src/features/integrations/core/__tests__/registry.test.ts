@@ -37,11 +37,7 @@ describe("registry", () => {
   // A notifications module records SourceRecords, and `process-source-record`
   // can only handle them through the adapter. Declaring one without the other
   // leaves every snapshot unprocessed, and nothing else would say so.
-  //
-  // Fleet is the one platform in that state today so its snapshots are written
-  // and never become Notifications. Listed rather than skipped,
-  // so a new platform still fails.
-  const KNOWN_MISSING_ADAPTERS: PlatformEnum[] = [PlatformEnum.FLEET];
+  const KNOWN_MISSING_ADAPTERS: PlatformEnum[] = [];
 
   it.each(Object.keys(registry) as PlatformEnum[])(
     "%s declares a source adapter if it records snapshots",

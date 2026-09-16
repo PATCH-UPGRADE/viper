@@ -16,7 +16,7 @@ import {
   toCanonical,
 } from "./advisories";
 import { downloadAdvisoryPdfs } from "./attachments";
-
+import { dispatchUnprocessedSnapshots } from "./source-record";
 interface ChangedAdvisory {
   item: FleetAdvisoryItem;
   mappingId: string;
@@ -167,6 +167,9 @@ export async function syncAdvisories(
     pending.push({ ...entry, files });
   }
   await recordAdvisories(pending);
+
+  await dispatchUnprocessedSnapshots(ctx.integrationId, [...byVendorId.keys()]);
+
   // No cursor, advisories endpoint cannot paginate
   return { cursor: null };
 }

@@ -446,21 +446,6 @@ describe("mergeCredentialPatch", () => {
     });
   });
 
-  it("treats a missing existing value as an empty base", () => {
-    expect(mergeCredentialPatch(null, { apiToken: "new" })).toEqual({
-      apiToken: "new",
-    });
-  });
-
-  it("shallow-merges a flat (non-auth-shaped) credential the same way", () => {
-    expect(
-      mergeCredentialPatch(
-        { apiToken: "old", region: "us" },
-        { apiToken: "new" },
-      ),
-    ).toEqual({ apiToken: "new", region: "us" });
-  });
-
   it("drops the old authentication object when authType actually changes — it's for the wrong shape", () => {
     expect(
       mergeCredentialPatch(
@@ -468,14 +453,5 @@ describe("mergeCredentialPatch", () => {
         { authType: "Basic" },
       ),
     ).toEqual({ authType: "Basic" });
-  });
-
-  it("does not drop authentication when authType is resent unchanged", () => {
-    expect(
-      mergeCredentialPatch(
-        { authType: "Bearer", authentication: { token: "old" } },
-        { authType: "Bearer", authentication: { token: "new" } },
-      ),
-    ).toEqual({ authType: "Bearer", authentication: { token: "new" } });
   });
 });

@@ -5,10 +5,12 @@ import { PlatformEnum } from "@/generated/prisma";
 import { authSchema } from "@/lib/schemas";
 import type { CatalogEntry } from "../core/catalog";
 import type { FieldSpec } from "../types";
-import { CREDENTIAL_PLACEHOLDER, integrationInputSchema } from "../types";
+import { integrationInputSchema } from "../types";
 import {
   buildCredentialsPatch,
   IntegrationFormDialog,
+  relaxedAuthSchema,
+  relaxedShapeFor,
   shapeFor,
 } from "./create-integration-dialog";
 
@@ -31,47 +33,43 @@ const requiredField: FieldSpec = {
   required: true,
 };
 
-describe("credential schema — unchanged between create and edit", () => {
-  it("rejects an empty required credential field", () => {
+describe("credential schema: create is strict, edit is relaxed", () => {
+  it("create mode rejects an empty required credential field", () => {
     expect(shapeFor([requiredField]).apiToken.safeParse("").success).toBe(
       false,
     );
   });
 
-  it("still requires authentication details for a non-None auth type", () => {
+  it("edit mode accepts a blank (or absent) credential field", () => {
+    const editField = relaxedShapeFor([requiredField]).apiToken;
+    expect(editField.safeParse("").success).toBe(true);
+    expect(editField.safeParse(undefined).success).toBe(true);
+  });
+
+  it("create mode still requires authentication details for a non-None auth type", () => {
     expect(authSchema.safeParse({ authType: "Bearer" }).success).toBe(false);
+  });
+
+  it("edit mode tolerates a bare authType with no authentication block", () => {
+    expect(relaxedAuthSchema.safeParse({ authType: "Bearer" }).success).toBe(
+      true,
+    );
   });
 });
 
 describe("buildCredentialsPatch — flat (non-auth-shaped) credentials", () => {
   it("is undefined when nothing was dirtied", () => {
     expect(
-      buildCredentialsPatch(false, undefined, {
-        apiToken: CREDENTIAL_PLACEHOLDER,
-      }),
+      buildCredentialsPatch(false, undefined, { apiToken: "" }),
     ).toBeUndefined();
   });
 
-  it("excludes a dirtied field that's still the placeholder", () => {
+  it("includes only the dirty, typed field", () => {
     expect(
       buildCredentialsPatch(
         false,
         { apiToken: true },
-        {
-          apiToken: CREDENTIAL_PLACEHOLDER,
-        },
-      ),
-    ).toBeUndefined();
-  });
-
-  it("includes only the dirty, changed field", () => {
-    expect(
-      buildCredentialsPatch(
-        false,
-        { apiToken: true },
-        {
-          apiToken: "new-token",
-        },
+        { apiToken: "new-token" },
       ),
     ).toEqual({ apiToken: "new-token" });
   });
@@ -91,20 +89,17 @@ describe("buildCredentialsPatch — auth-shaped credentials", () => {
     ).toBeUndefined();
   });
 
-  it("includes authType once it's genuinely dirtied, even with no leaf field changed yet", () => {
+  it("includes authType once dirtied, plus only the dirty, typed leaf field", () => {
+    // authType alone, no leaf field touched yet:
     expect(
       buildCredentialsPatch(
         true,
         { authType: true },
-        {
-          authType: "Bearer",
-          authentication: { token: CREDENTIAL_PLACEHOLDER },
-        },
+        { authType: "Bearer", authentication: { token: "" } },
       ),
     ).toEqual({ authType: "Bearer" });
-  });
 
-  it("includes only the dirty, changed leaf field inside authentication", () => {
+    // authType plus a genuinely typed leaf field:
     expect(
       buildCredentialsPatch(
         true,
@@ -112,19 +107,6 @@ describe("buildCredentialsPatch — auth-shaped credentials", () => {
         { authType: "Bearer", authentication: { token: "new-token" } },
       ),
     ).toEqual({ authType: "Bearer", authentication: { token: "new-token" } });
-  });
-
-  it("excludes a dirtied leaf field that's still the placeholder", () => {
-    expect(
-      buildCredentialsPatch(
-        true,
-        { authType: true, authentication: { token: true } },
-        {
-          authType: "Bearer",
-          authentication: { token: CREDENTIAL_PLACEHOLDER },
-        },
-      ),
-    ).toEqual({ authType: "Bearer" });
   });
 });
 

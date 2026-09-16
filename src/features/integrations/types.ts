@@ -65,14 +65,6 @@ export const integrationInputSchema = z.object({
 });
 export type IntegrationFormValues = z.infer<typeof integrationInputSchema>;
 
-/**
- * Pre-fills every credential field on the edit form so it renders as dots
- * and passes normal "required" validation unchanged. A field left at this
- * value on submit is excluded from the patch — see `buildCredentialsPatch`
- * in create-integration-dialog.tsx and `mergeCredentialPatch` in the router.
- */
-export const CREDENTIAL_PLACEHOLDER = "VIPER_PLACEHOLDER";
-
 export function isValidResourceTypeKey(key: string): key is UploadSegment {
   return key in integrationsMapping;
 }

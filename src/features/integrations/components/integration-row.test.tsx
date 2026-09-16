@@ -29,7 +29,6 @@ vi.mock("../hooks/use-integrations", () => ({
 
 import type { CatalogEntry } from "../core/catalog";
 import type { IntegrationListItem } from "../types";
-import { CREDENTIAL_PLACEHOLDER } from "../types";
 import { IntegrationCard } from "./integration-row";
 
 beforeEach(() => {
@@ -95,7 +94,7 @@ describe("IntegrationActionsMenu edit item", () => {
     expect(screen.getByDisplayValue("My Partner Feed")).toBeInTheDocument();
   });
 
-  it("pre-fills a flat platform's credential field with the placeholder, not the real stored value", async () => {
+  it("leaves a flat platform's credential field blank, never showing the real stored value", async () => {
     const flatCatalogEntry = {
       ...catalogEntry,
       credentialsAreAuthShaped: false,
@@ -114,8 +113,6 @@ describe("IntegrationActionsMenu edit item", () => {
       screen.getByRole("menuitem", { name: /edit integration/i }),
     );
 
-    expect(
-      screen.getByDisplayValue(CREDENTIAL_PLACEHOLDER),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/api token/i)).toHaveValue("");
   });
 });

@@ -99,10 +99,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 
 /**
  * Merges a client-submitted partial credential patch into the existing
- * decrypted value: any key in `partial` overrides `existing`, one level
- * deep when both sides hold a plain object at that key (covers the
- * auth-shaped `authentication` sub-object as well as any flat platform's
- * fields — no platform/auth-shaped branching needed).
+ * decrypted value, one level deep — no platform/auth-shaped branching.
  *
  * A discriminator change is the one exception: if `partial.authType`
  * differs from what's actually stored, the old `authentication` object is
@@ -134,18 +131,15 @@ export const mergeCredentialPatch = (
 };
 
 /**
- * `credentials` omitted entirely means "don't touch what's stored". Present
- * means "apply this partial patch" — decrypt what's there (if anything),
- * merge the patch in, then validate+encrypt the result the same way `create`
- * does. The whole-object replace this used to be is just the merge with an
- * empty `existing`.
+ * `credentials` omitted means keep what's stored; present means decrypt it,
+ * merge the patch in, then validate+encrypt the result like `create` does.
  *
  * Takes the already-fetched blob rather than fetching it itself: the fetch
  * is I/O, kept outside `asBadRequest` (reserved elsewhere in this file for
  * input-validation failures) so a transient DB error surfaces as a server
  * error, not a 400.
  */
-const credentialsPatch = async (
+const credentialsPatch = (
   module: AnyConnectorModule,
   data: IntegrationFormValues,
   existingBlob: Uint8Array | null,
@@ -156,9 +150,9 @@ const credentialsPatch = async (
   return { credentials: toCredentialBlob(module, merged) };
 };
 
-const asBadRequest = async <T>(fn: () => T | Promise<T>): Promise<T> => {
+const asBadRequest = <T>(fn: () => T): T => {
   try {
-    return await fn();
+    return fn();
   } catch (error) {
     if (error instanceof TRPCError) throw error;
     throw new TRPCError({
@@ -194,10 +188,8 @@ export const integrationsRouter = createTRPCRouter({
 
       const now = new Date();
       const items = (result.items as IntegrationListRow[]).map(
-        ({ syncEvery, ...integration }) => ({
+        (integration) => ({
           ...integration,
-          // Re-added for the edit form's prefill; distinct from resourceSyncs[].syncEvery below.
-          syncEvery,
           platformLabel: displayNameFor(integration.platform),
           categories: categoriesFor(integration.platform),
           resourceSyncs: integration.resourceSyncs.map((sync) => ({
@@ -205,10 +197,11 @@ export const integrationsRouter = createTRPCRouter({
             // A nested resource row never sees its parent integration's
             // `syncEvery`, so the table can't tell "resource override" from
             // "integration-level override" apart from `syncEvery` alone.
-            isOverridden: sync.syncEvery !== null || syncEvery !== null,
+            isOverridden:
+              sync.syncEvery !== null || integration.syncEvery !== null,
             effectiveSyncEvery: effectiveSyncEvery(
               sync.syncEvery,
-              syncEvery,
+              integration.syncEvery,
               defaultSyncEveryFor(integration.platform, sync.resource),
             ),
             // Same "due" check the cron uses, against the server's clock.
@@ -224,13 +217,11 @@ export const integrationsRouter = createTRPCRouter({
     .input(integrationInputSchema)
     .mutation(async ({ ctx, input }) => {
       const { name } = input;
-      const { row, module, config } = await asBadRequest(() =>
-        toRowShape(input),
-      );
-      const credentials = await asBadRequest(() =>
+      const { row, module, config } = asBadRequest(() => toRowShape(input));
+      const credentials = asBadRequest(() =>
         toCredentialBlob(module, input.credentials),
       );
-      const resources = await asBadRequest(() => resourcesFor(module, config));
+      const resources = asBadRequest(() => resourcesFor(module, config));
 
       const integration = await prisma.$transaction(async (tx) => {
         const integrationUser = await tx.user.create({
@@ -281,20 +272,23 @@ export const integrationsRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       const { id, data } = input;
-      await requireIntegration(id);
-      const { row, module, config } = await asBadRequest(() =>
-        toRowShape(data),
-      );
-      const existingRow = data.credentials
-        ? await prisma.integration.findUnique({
-            where: { id },
-            select: { credentials: true },
-          })
-        : null;
-      const credentials = await asBadRequest(() =>
+      // Two independent reads of the same row (existence check, credentials
+      // for the merge) — run them concurrently rather than round-tripping
+      // twice in sequence.
+      const [, existingRow] = await Promise.all([
+        requireIntegration(id),
+        data.credentials
+          ? prisma.integration.findUnique({
+              where: { id },
+              select: { credentials: true },
+            })
+          : null,
+      ]);
+      const { row, module, config } = asBadRequest(() => toRowShape(data));
+      const credentials = asBadRequest(() =>
         credentialsPatch(module, data, existingRow?.credentials ?? null),
       );
-      const resources = await asBadRequest(() => resourcesFor(module, config));
+      const resources = asBadRequest(() => resourcesFor(module, config));
 
       return prisma.$transaction(async (tx) => {
         const integration = await tx.integration.update({

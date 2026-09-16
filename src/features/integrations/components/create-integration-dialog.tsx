@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
-import { authenticationSchema, authSchema } from "@/lib/schemas";
+import { authSchema } from "@/lib/schemas";
 import { humanize } from "@/lib/utils";
 import type { CatalogEntry } from "../core/catalog";
 import {
@@ -41,7 +41,6 @@ import {
   useUpdateIntegration,
 } from "../hooks/use-integrations";
 import type { FieldSpec, IntegrationListItem } from "../types";
-import { CREDENTIAL_PLACEHOLDER } from "../types";
 
 const zodForSpec = (spec: FieldSpec): z.ZodTypeAny => {
   const field =
@@ -60,40 +59,37 @@ const zodForSpec = (spec: FieldSpec): z.ZodTypeAny => {
 export const shapeFor = (specs: FieldSpec[]) =>
   Object.fromEntries(specs.map((spec) => [spec.key, zodForSpec(spec)]));
 
-/** Every field name any auth variant (Basic/Bearer/Header) uses — derived from the schema itself so a new variant can't silently go unplaceholdered. Object.fromEntries below doesn't care if a name repeats across variants. */
-const AUTH_FIELD_KEYS = authenticationSchema.options.flatMap((variant) =>
-  Object.keys(variant.shape),
-);
+/**
+ * Edit mode's credential fields start blank, so they can't be required the
+ * way create's are: wrapping a required field's `z.string().min(1)` in
+ * `.optional()` alone still rejects a defined-but-empty string, so `min(1)`
+ * itself has to go, not just get an `.optional()` layered on top.
+ */
+export const relaxedShapeFor = (specs: FieldSpec[]) =>
+  shapeFor(specs.map((spec) => ({ ...spec, required: false })));
 
-/** Placeholder-filled `credentials` default for the edit form — every field renders as dots and passes "required" validation unchanged, per CREDENTIAL_PLACEHOLDER's contract. */
-const placeholderCredentials = (
-  credentialsAreAuthShaped: boolean,
-  credentialFields: FieldSpec[],
-) =>
-  credentialsAreAuthShaped
-    ? {
-        authType: "None",
-        authentication: Object.fromEntries(
-          AUTH_FIELD_KEYS.map((key) => [key, CREDENTIAL_PLACEHOLDER]),
-        ),
-      }
-    : Object.fromEntries(
-        credentialFields.map((spec) => [spec.key, CREDENTIAL_PLACEHOLDER]),
-      );
+/** `authSchema` minus its "authentication required unless None" refinement — the shape alone already has `authentication` optional, same reasoning as relaxedShapeFor. */
+export const relaxedAuthSchema = z.object(authSchema.shape);
 
 type DirtyFields = Record<string, unknown> | boolean | undefined;
 
-const dirtyLeaf = (dirty: unknown, value: unknown) =>
-  Boolean(dirty) && value !== CREDENTIAL_PLACEHOLDER;
+/** Only the dirty leaf entries, rebuilt as {key: realValue}. Untouched fields never differ from their ("") default, so react-hook-form already excludes them here — no placeholder/sentinel comparison needed. */
+const dirtyPatch = (
+  dirtyFields: Record<string, unknown>,
+  values: Record<string, unknown>,
+) =>
+  Object.fromEntries(
+    Object.entries(dirtyFields)
+      .filter(([, dirty]) => dirty)
+      .map(([key]) => [key, values[key]]),
+  );
 
 /**
- * The partial credentials payload for an edit submission: only leaf fields
- * the user actually changed — dirty and no longer the placeholder — plus
- * `authType` whenever it's dirty (structural: the server needs it to know
- * which shape the dirty leaf fields belong to, even though it isn't itself
- * a "value" the way a password field is). Returns undefined when nothing
- * was touched, so `credentials` is omitted from the payload entirely and
- * the router's "omitted = keep what's stored" contract applies.
+ * The partial credentials payload for an edit submission: only the leaf
+ * fields the user actually typed into, plus `authType` whenever it's dirty
+ * — structural, not itself a "value" the way a password field is, but the
+ * server needs it to know which shape the dirty leaf fields belong to.
+ * Undefined when nothing was touched.
  */
 export const buildCredentialsPatch = (
   credentialsAreAuthShaped: boolean,
@@ -103,23 +99,13 @@ export const buildCredentialsPatch = (
   if (typeof dirtyFields !== "object" || !dirtyFields) return undefined;
 
   if (!credentialsAreAuthShaped) {
-    const patch = Object.fromEntries(
-      Object.entries(dirtyFields)
-        .filter(([key, dirty]) => dirtyLeaf(dirty, values[key]))
-        .map(([key]) => [key, values[key]]),
-    );
+    const patch = dirtyPatch(dirtyFields, values);
     return Object.keys(patch).length > 0 ? patch : undefined;
   }
 
-  const authDirty = (dirtyFields.authentication ?? {}) as Record<
-    string,
-    unknown
-  >;
-  const authValue = (values.authentication ?? {}) as Record<string, unknown>;
-  const authPatch = Object.fromEntries(
-    Object.entries(authDirty)
-      .filter(([key, dirty]) => dirtyLeaf(dirty, authValue[key]))
-      .map(([key]) => [key, authValue[key]]),
+  const authPatch = dirtyPatch(
+    (dirtyFields.authentication ?? {}) as Record<string, unknown>,
+    (values.authentication ?? {}) as Record<string, unknown>,
   );
   if (!dirtyFields.authType && Object.keys(authPatch).length === 0) {
     return undefined;
@@ -213,18 +199,18 @@ export const IntegrationFormDialog = ({
   const updateIntegration = useUpdateIntegration();
   const mutation = mode === "create" ? createIntegration : updateIntegration;
 
-  // Unchanged between modes — every credential field always has a value
-  // (real, on create; the placeholder, on edit), so "required" validation
-  // applies the same way in both.
+  // Edit relaxes required-ness; create keeps the strict schema unchanged.
+  const shapeForFields = mode === "edit" ? relaxedShapeFor : shapeFor;
+  const authSchemaToUse = mode === "edit" ? relaxedAuthSchema : authSchema;
   const credentialsSchema = credentialsAreAuthShaped
-    ? authSchema
-    : z.object(shapeFor(credentialFields));
+    ? authSchemaToUse
+    : z.object(shapeForFields(credentialFields));
 
   const [title, description, submitLabel] =
     mode === "edit"
       ? [
           `Edit ${displayName}`,
-          "Credential fields show placeholder dots — only fields you change are updated.",
+          "Leave a credential field blank to keep it unchanged.",
           "Save Changes",
         ]
       : [
@@ -250,15 +236,12 @@ export const IntegrationFormDialog = ({
     name: integration?.name ?? "",
     syncEvery: integration?.syncEvery ?? INTEGRATION_SYNC_EVERY_MIN * 60,
     config: integration?.config ?? {},
-    // Create starts genuinely empty; edit never shows the stored value, so
-    // every field starts at the placeholder instead (dots, passes
-    // validation, excluded from the patch unless the user changes it).
-    credentials:
-      mode === "edit"
-        ? placeholderCredentials(credentialsAreAuthShaped, credentialFields)
-        : credentialsAreAuthShaped
-          ? { authType: "None" }
-          : {},
+    // Every credential field starts blank — the user must never see the
+    // stored value, on create because there isn't one yet and on edit
+    // because it's never sent to the client at all.
+    credentials: credentialsAreAuthShaped
+      ? { authType: "None" }
+      : Object.fromEntries(credentialFields.map((spec) => [spec.key, ""])),
   } as FormValues;
 
   const form = useForm<FormValues>({
@@ -291,11 +274,9 @@ export const IntegrationFormDialog = ({
     }
     if (!integration) return;
     const onSuccess = () => onOpenChange(false);
-    // Only send credentials/syncEvery the user actually touched — leaving
-    // either `undefined` here passes zod's `.optional()` the same as an
-    // absent key, and the router reads that as "keep what's stored"
-    // (including a `null` "inherit platform default" syncEvery, and merges
-    // the credentials patch into what's already there — see mergeCredentialPatch).
+    // `undefined` here passes zod's `.optional()` the same as an absent key
+    // — the router reads either as "keep what's stored" (see toRowShape /
+    // mergeCredentialPatch).
     const data = {
       ...values,
       credentials: buildCredentialsPatch(

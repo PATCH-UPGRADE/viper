@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
-import { authSchema } from "@/lib/schemas";
+import { authenticationSchema, authSchema } from "@/lib/schemas";
 import { humanize } from "@/lib/utils";
 import type { CatalogEntry } from "../core/catalog";
 import {
@@ -41,6 +41,7 @@ import {
   useUpdateIntegration,
 } from "../hooks/use-integrations";
 import type { FieldSpec, IntegrationListItem } from "../types";
+import { CREDENTIAL_PLACEHOLDER } from "../types";
 
 const zodForSpec = (spec: FieldSpec): z.ZodTypeAny => {
   const field =
@@ -59,8 +60,75 @@ const zodForSpec = (spec: FieldSpec): z.ZodTypeAny => {
 export const shapeFor = (specs: FieldSpec[]) =>
   Object.fromEntries(specs.map((spec) => [spec.key, zodForSpec(spec)]));
 
-/** Edit mode never shows stored credentials, so nothing about them can be required client-side — the router's own credentialSchema.parse is the real trust boundary. */
-const anyCredentials = z.record(z.string(), z.unknown()).optional();
+/** Every field name any auth variant (Basic/Bearer/Header) uses — derived from the schema itself so a new variant can't silently go unplaceholdered. Object.fromEntries below doesn't care if a name repeats across variants. */
+const AUTH_FIELD_KEYS = authenticationSchema.options.flatMap((variant) =>
+  Object.keys(variant.shape),
+);
+
+/** Placeholder-filled `credentials` default for the edit form — every field renders as dots and passes "required" validation unchanged, per CREDENTIAL_PLACEHOLDER's contract. */
+const placeholderCredentials = (
+  credentialsAreAuthShaped: boolean,
+  credentialFields: FieldSpec[],
+) =>
+  credentialsAreAuthShaped
+    ? {
+        authType: "None",
+        authentication: Object.fromEntries(
+          AUTH_FIELD_KEYS.map((key) => [key, CREDENTIAL_PLACEHOLDER]),
+        ),
+      }
+    : Object.fromEntries(
+        credentialFields.map((spec) => [spec.key, CREDENTIAL_PLACEHOLDER]),
+      );
+
+type DirtyFields = Record<string, unknown> | boolean | undefined;
+
+const dirtyLeaf = (dirty: unknown, value: unknown) =>
+  Boolean(dirty) && value !== CREDENTIAL_PLACEHOLDER;
+
+/**
+ * The partial credentials payload for an edit submission: only leaf fields
+ * the user actually changed — dirty and no longer the placeholder — plus
+ * `authType` whenever it's dirty (structural: the server needs it to know
+ * which shape the dirty leaf fields belong to, even though it isn't itself
+ * a "value" the way a password field is). Returns undefined when nothing
+ * was touched, so `credentials` is omitted from the payload entirely and
+ * the router's "omitted = keep what's stored" contract applies.
+ */
+export const buildCredentialsPatch = (
+  credentialsAreAuthShaped: boolean,
+  dirtyFields: DirtyFields,
+  values: Record<string, unknown>,
+): Record<string, unknown> | undefined => {
+  if (typeof dirtyFields !== "object" || !dirtyFields) return undefined;
+
+  if (!credentialsAreAuthShaped) {
+    const patch = Object.fromEntries(
+      Object.entries(dirtyFields)
+        .filter(([key, dirty]) => dirtyLeaf(dirty, values[key]))
+        .map(([key]) => [key, values[key]]),
+    );
+    return Object.keys(patch).length > 0 ? patch : undefined;
+  }
+
+  const authDirty = (dirtyFields.authentication ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const authValue = (values.authentication ?? {}) as Record<string, unknown>;
+  const authPatch = Object.fromEntries(
+    Object.entries(authDirty)
+      .filter(([key, dirty]) => dirtyLeaf(dirty, authValue[key]))
+      .map(([key]) => [key, authValue[key]]),
+  );
+  if (!dirtyFields.authType && Object.keys(authPatch).length === 0) {
+    return undefined;
+  }
+  return {
+    authType: values.authType,
+    ...(Object.keys(authPatch).length > 0 && { authentication: authPatch }),
+  };
+};
 
 const DynamicField = ({
   form,
@@ -145,18 +213,18 @@ export const IntegrationFormDialog = ({
   const updateIntegration = useUpdateIntegration();
   const mutation = mode === "create" ? createIntegration : updateIntegration;
 
-  const credentialsSchema =
-    mode === "edit"
-      ? anyCredentials
-      : credentialsAreAuthShaped
-        ? authSchema
-        : z.object(shapeFor(credentialFields));
+  // Unchanged between modes — every credential field always has a value
+  // (real, on create; the placeholder, on edit), so "required" validation
+  // applies the same way in both.
+  const credentialsSchema = credentialsAreAuthShaped
+    ? authSchema
+    : z.object(shapeFor(credentialFields));
 
   const [title, description, submitLabel] =
     mode === "edit"
       ? [
           `Edit ${displayName}`,
-          "Leave credential fields blank to keep them unchanged.",
+          "Credential fields show placeholder dots — only fields you change are updated.",
           "Save Changes",
         ]
       : [
@@ -182,8 +250,15 @@ export const IntegrationFormDialog = ({
     name: integration?.name ?? "",
     syncEvery: integration?.syncEvery ?? INTEGRATION_SYNC_EVERY_MIN * 60,
     config: integration?.config ?? {},
-    // Credentials always start blank — the user must never see stored values.
-    credentials: credentialsAreAuthShaped ? { authType: "None" } : {},
+    // Create starts genuinely empty; edit never shows the stored value, so
+    // every field starts at the placeholder instead (dots, passes
+    // validation, excluded from the patch unless the user changes it).
+    credentials:
+      mode === "edit"
+        ? placeholderCredentials(credentialsAreAuthShaped, credentialFields)
+        : credentialsAreAuthShaped
+          ? { authType: "None" }
+          : {},
   } as FormValues;
 
   const form = useForm<FormValues>({
@@ -198,20 +273,40 @@ export const IntegrationFormDialog = ({
   }, [open]);
 
   const onSubmit = (values: FormValues) => {
-    const onSuccess = () => {
-      form.reset();
-      onOpenChange(false);
-    };
-
     if (mode === "create") {
-      createIntegration.mutate({ ...values, platform }, { onSuccess });
+      createIntegration.mutate(
+        { ...values, platform },
+        {
+          // Blank the form back out — ready for the next "Add" — rather
+          // than for edit mode, where reset() with no args would snap the
+          // fields back to the stale pre-edit snapshot during the close
+          // animation instead of what was just saved.
+          onSuccess: () => {
+            form.reset();
+            onOpenChange(false);
+          },
+        },
+      );
       return;
     }
     if (!integration) return;
-    // Only send credentials if the user actually touched them — otherwise
-    // the stored value must stay as-is (see credentialsPatch in the router).
-    const { credentials: _credentials, ...rest } = values;
-    const data = form.formState.dirtyFields.credentials ? values : rest;
+    const onSuccess = () => onOpenChange(false);
+    // Only send credentials/syncEvery the user actually touched — leaving
+    // either `undefined` here passes zod's `.optional()` the same as an
+    // absent key, and the router reads that as "keep what's stored"
+    // (including a `null` "inherit platform default" syncEvery, and merges
+    // the credentials patch into what's already there — see mergeCredentialPatch).
+    const data = {
+      ...values,
+      credentials: buildCredentialsPatch(
+        credentialsAreAuthShaped,
+        form.formState.dirtyFields.credentials as DirtyFields,
+        values.credentials as Record<string, unknown>,
+      ),
+      syncEvery: form.formState.dirtyFields.syncEvery
+        ? values.syncEvery
+        : undefined,
+    };
     updateIntegration.mutate(
       { id: integration.id, data: { ...data, platform } },
       { onSuccess },

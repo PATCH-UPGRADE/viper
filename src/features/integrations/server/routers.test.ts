@@ -36,7 +36,8 @@ vi.mock("../core/registry", async (importOriginal) => {
 
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { createCallerFactory } from "@/trpc/init";
-import { integrationsRouter } from "./routers";
+import { decryptCredentials, encryptCredentials } from "../core/credentials";
+import { integrationsRouter, mergeCredentialPatch } from "./routers";
 
 const caller = createCallerFactory(integrationsRouter)({
   req: undefined,
@@ -254,6 +255,22 @@ describe("integrationsRouter.update", () => {
     expect(call.data.credentials).toBeInstanceOf(Uint8Array);
   });
 
+  it("keeps the stored syncEvery (including a null 'inherit default') untouched when omitted", async () => {
+    const { syncEvery: _syncEvery, ...dataWithoutSyncEvery } = baseData;
+
+    await caller.update({ id: "integration-1", data: dataWithoutSyncEvery });
+
+    const call = mockPrisma.integration.update.mock.calls[0][0];
+    expect(call.data).not.toHaveProperty("syncEvery");
+  });
+
+  it("updates syncEvery when it's provided", async () => {
+    await caller.update({ id: "integration-1", data: baseData });
+
+    const call = mockPrisma.integration.update.mock.calls[0][0];
+    expect(call.data.syncEvery).toBe(600);
+  });
+
   it("404s instead of 500ing when the integration doesn't exist", async () => {
     mockPrisma.integration.findUnique.mockResolvedValue(null);
 
@@ -261,6 +278,71 @@ describe("integrationsRouter.update", () => {
       caller.update({ id: "missing", data: baseData }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(mockPrisma.integration.update).not.toHaveBeenCalled();
+  });
+
+  it("merges one dirty field into the existing credentials, preserving the rest", async () => {
+    const existingBlob = encryptCredentials({
+      authType: "Basic",
+      authentication: { username: "alice", password: "old-pw" },
+    });
+    // requireIntegration's existence check, then the credentials fetch —
+    // two separate findUnique calls with different selects.
+    mockPrisma.integration.findUnique
+      .mockResolvedValueOnce(existingIntegration)
+      .mockResolvedValueOnce({ credentials: existingBlob });
+
+    await caller.update({
+      id: "integration-1",
+      data: {
+        ...baseData,
+        credentials: {
+          authType: "Basic",
+          authentication: { password: "new-pw" },
+        },
+      },
+    });
+
+    const call = mockPrisma.integration.update.mock.calls[0][0];
+    expect(decryptCredentials(call.data.credentials)).toEqual({
+      authType: "Basic",
+      authentication: { username: "alice", password: "new-pw" },
+    });
+  });
+
+  it("requires the new auth type's fields when switching away from what's stored", async () => {
+    const existingBlob = encryptCredentials({
+      authType: "Bearer",
+      authentication: { token: "real-token" },
+    });
+    mockPrisma.integration.findUnique
+      .mockResolvedValueOnce(existingIntegration)
+      .mockResolvedValueOnce({ credentials: existingBlob });
+
+    await expect(
+      caller.update({
+        id: "integration-1",
+        data: { ...baseData, credentials: { authType: "Basic" } },
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mockPrisma.integration.update).not.toHaveBeenCalled();
+  });
+
+  it("does not force a resource sync back on — that's setResourceSyncEnabled's job", async () => {
+    await caller.update({ id: "integration-1", data: baseData });
+
+    const call = mockPrisma.integration.update.mock.calls[0][0];
+    expect(call.data.resourceSyncs.upsert).toEqual([
+      expect.objectContaining({
+        where: {
+          integrationId_resource: {
+            integrationId: "integration-1",
+            resource: ResourceType.Asset,
+          },
+        },
+        create: { resource: ResourceType.Asset },
+        update: {},
+      }),
+    ]);
   });
 });
 
@@ -345,5 +427,55 @@ describe("integrationsRouter.triggerSync", () => {
       message: "No enabled resources to sync",
     });
     expect(mockInngest.send).not.toHaveBeenCalled();
+  });
+});
+
+describe("mergeCredentialPatch", () => {
+  it("applies a one-field patch and retains everything else", () => {
+    expect(
+      mergeCredentialPatch(
+        {
+          authType: "Basic",
+          authentication: { username: "alice", password: "old" },
+        },
+        { authType: "Basic", authentication: { password: "new" } },
+      ),
+    ).toEqual({
+      authType: "Basic",
+      authentication: { username: "alice", password: "new" },
+    });
+  });
+
+  it("treats a missing existing value as an empty base", () => {
+    expect(mergeCredentialPatch(null, { apiToken: "new" })).toEqual({
+      apiToken: "new",
+    });
+  });
+
+  it("shallow-merges a flat (non-auth-shaped) credential the same way", () => {
+    expect(
+      mergeCredentialPatch(
+        { apiToken: "old", region: "us" },
+        { apiToken: "new" },
+      ),
+    ).toEqual({ apiToken: "new", region: "us" });
+  });
+
+  it("drops the old authentication object when authType actually changes — it's for the wrong shape", () => {
+    expect(
+      mergeCredentialPatch(
+        { authType: "Bearer", authentication: { token: "old" } },
+        { authType: "Basic" },
+      ),
+    ).toEqual({ authType: "Basic" });
+  });
+
+  it("does not drop authentication when authType is resent unchanged", () => {
+    expect(
+      mergeCredentialPatch(
+        { authType: "Bearer", authentication: { token: "old" } },
+        { authType: "Bearer", authentication: { token: "new" } },
+      ),
+    ).toEqual({ authType: "Bearer", authentication: { token: "new" } });
   });
 });

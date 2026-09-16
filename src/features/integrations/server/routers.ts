@@ -9,7 +9,11 @@ import { fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 import type { AuthCredential } from "../core/credentials";
-import { encryptCredentials, usesGenericAuth } from "../core/credentials";
+import {
+  decryptCredentials,
+  encryptCredentials,
+  usesGenericAuth,
+} from "../core/credentials";
 import {
   categoriesFor,
   defaultSyncEveryFor,
@@ -67,7 +71,9 @@ const toRowShape = (input: IntegrationFormValues) => {
     row: {
       name: input.name,
       platform: input.platform,
-      syncEvery: input.syncEvery,
+      // Omitted means "keep what is stored" (null = inherit the platform
+      // default) — same reasoning as credentials below.
+      ...(input.syncEvery !== undefined && { syncEvery: input.syncEvery }),
       config,
     },
     module,
@@ -88,17 +94,71 @@ const toCredentialBlob = (
   return isNoneAuth ? null : encryptCredentials(parsed);
 };
 
-const credentialsPatch = (
-  module: AnyConnectorModule,
-  data: IntegrationFormValues,
-) => {
-  if (!data.credentials) return {};
-  return { credentials: toCredentialBlob(module, data.credentials) };
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * Merges a client-submitted partial credential patch into the existing
+ * decrypted value: any key in `partial` overrides `existing`, one level
+ * deep when both sides hold a plain object at that key (covers the
+ * auth-shaped `authentication` sub-object as well as any flat platform's
+ * fields — no platform/auth-shaped branching needed).
+ *
+ * A discriminator change is the one exception: if `partial.authType`
+ * differs from what's actually stored, the old `authentication` object is
+ * for the wrong auth type — `authenticationSchema` is a union with no
+ * cross-check against `authType`, so carrying old fields across a switch
+ * would validate against the *previous* variant's shape instead of
+ * requiring the new one's, even though the two are unrelated shapes.
+ */
+export const mergeCredentialPatch = (
+  existing: unknown,
+  partial: Record<string, unknown>,
+): Record<string, unknown> => {
+  const base = isPlainObject(existing) ? existing : {};
+  const discriminatorChanged =
+    "authType" in partial && partial.authType !== base.authType;
+  const mergeBase = discriminatorChanged
+    ? { ...base, authentication: undefined }
+    : base;
+
+  const merged: Record<string, unknown> = { ...mergeBase };
+  for (const [key, value] of Object.entries(partial)) {
+    const baseValue = mergeBase[key];
+    merged[key] =
+      isPlainObject(value) && isPlainObject(baseValue)
+        ? { ...baseValue, ...value }
+        : value;
+  }
+  return merged;
 };
 
-const asBadRequest = <T>(fn: () => T): T => {
+/**
+ * `credentials` omitted entirely means "don't touch what's stored". Present
+ * means "apply this partial patch" — decrypt what's there (if anything),
+ * merge the patch in, then validate+encrypt the result the same way `create`
+ * does. The whole-object replace this used to be is just the merge with an
+ * empty `existing`.
+ *
+ * Takes the already-fetched blob rather than fetching it itself: the fetch
+ * is I/O, kept outside `asBadRequest` (reserved elsewhere in this file for
+ * input-validation failures) so a transient DB error surfaces as a server
+ * error, not a 400.
+ */
+const credentialsPatch = async (
+  module: AnyConnectorModule,
+  data: IntegrationFormValues,
+  existingBlob: Uint8Array | null,
+) => {
+  if (!data.credentials) return {};
+  const existing = existingBlob ? decryptCredentials(existingBlob) : null;
+  const merged = mergeCredentialPatch(existing, data.credentials);
+  return { credentials: toCredentialBlob(module, merged) };
+};
+
+const asBadRequest = async <T>(fn: () => T | Promise<T>): Promise<T> => {
   try {
-    return fn();
+    return await fn();
   } catch (error) {
     if (error instanceof TRPCError) throw error;
     throw new TRPCError({
@@ -164,11 +224,13 @@ export const integrationsRouter = createTRPCRouter({
     .input(integrationInputSchema)
     .mutation(async ({ ctx, input }) => {
       const { name } = input;
-      const { row, module, config } = asBadRequest(() => toRowShape(input));
-      const credentials = asBadRequest(() =>
+      const { row, module, config } = await asBadRequest(() =>
+        toRowShape(input),
+      );
+      const credentials = await asBadRequest(() =>
         toCredentialBlob(module, input.credentials),
       );
-      const resources = asBadRequest(() => resourcesFor(module, config));
+      const resources = await asBadRequest(() => resourcesFor(module, config));
 
       const integration = await prisma.$transaction(async (tx) => {
         const integrationUser = await tx.user.create({
@@ -220,17 +282,28 @@ export const integrationsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { id, data } = input;
       await requireIntegration(id);
-      const { row, module, config } = asBadRequest(() => toRowShape(data));
-      const credentials = asBadRequest(() => credentialsPatch(module, data));
-      const resources = asBadRequest(() => resourcesFor(module, config));
+      const { row, module, config } = await asBadRequest(() =>
+        toRowShape(data),
+      );
+      const existingRow = data.credentials
+        ? await prisma.integration.findUnique({
+            where: { id },
+            select: { credentials: true },
+          })
+        : null;
+      const credentials = await asBadRequest(() =>
+        credentialsPatch(module, data, existingRow?.credentials ?? null),
+      );
+      const resources = await asBadRequest(() => resourcesFor(module, config));
 
       return prisma.$transaction(async (tx) => {
         const integration = await tx.integration.update({
           where: { id },
           data: {
             ...row,
-            // Blank auth fields mean "keep the stored credential", not
-            // "clear it" — credentialsPatch returns {} so this spreads nothing.
+            // `credentials` omitted means "keep the stored value" —
+            // credentialsPatch returns {} so this spreads nothing. Present
+            // means "apply this (already merged) patch".
             ...credentials,
             resourceSyncs: {
               updateMany: {
@@ -241,8 +314,11 @@ export const integrationsRouter = createTRPCRouter({
                 where: {
                   integrationId_resource: { integrationId: id, resource },
                 },
+                // A resource newly implied by config starts enabled (schema
+                // default); an existing row's enabled flag is the user's own
+                // toggle (setResourceSyncEnabled) and must not be reset here.
                 create: { resource },
-                update: { enabled: true },
+                update: {},
               })),
             },
           },

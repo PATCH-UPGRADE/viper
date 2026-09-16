@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("../../session", () => ({ createFleetSession: vi.fn() }));
+const { send } = vi.hoisted(() => ({ send: vi.fn() }));
+vi.mock("@/inngest/client", () => ({ inngest: { send } }));
 
 import type { ResourceSyncCtx } from "@/features/integrations/core/types";
 import { PlatformEnum, SourceChannel } from "@/generated/prisma";
@@ -55,6 +57,7 @@ describe("Fleet advisories sync", () => {
   let integrationId: string;
 
   beforeAll(async () => {
+    send.mockResolvedValue(undefined);
     vi.mocked(createFleetSession).mockResolvedValue({
       request: async (url: string) =>
         ({

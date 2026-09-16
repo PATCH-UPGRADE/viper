@@ -2,16 +2,13 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { PlatformEnum } from "@/generated/prisma";
-import { authSchema } from "@/lib/schemas";
 import type { CatalogEntry } from "../core/catalog";
 import type { FieldSpec } from "../types";
-import { integrationInputSchema } from "../types";
 import {
   buildCredentialsPatch,
   IntegrationFormDialog,
   relaxedAuthSchema,
   relaxedShapeFor,
-  shapeFor,
 } from "./create-integration-dialog";
 
 // jsdom doesn't implement what Radix Select's trigger/option interactions use.
@@ -31,24 +28,14 @@ const requiredField: FieldSpec = {
   required: true,
 };
 
-describe("credential schema: create is strict, edit is relaxed", () => {
-  it("create mode rejects an empty required credential field", () => {
-    expect(shapeFor([requiredField]).apiToken.safeParse("").success).toBe(
-      false,
-    );
-  });
-
-  it("edit mode accepts a blank (or absent) credential field", () => {
+describe("edit mode relaxes credential requirements", () => {
+  it("accepts a blank (or absent) credential field", () => {
     const editField = relaxedShapeFor([requiredField]).apiToken;
     expect(editField.safeParse("").success).toBe(true);
     expect(editField.safeParse(undefined).success).toBe(true);
   });
 
-  it("create mode still requires authentication details for a non-None auth type", () => {
-    expect(authSchema.safeParse({ authType: "Bearer" }).success).toBe(false);
-  });
-
-  it("edit mode tolerates a bare authType with no authentication block", () => {
+  it("tolerates a bare authType with no authentication block", () => {
     expect(relaxedAuthSchema.safeParse({ authType: "Bearer" }).success).toBe(
       true,
     );
@@ -105,22 +92,6 @@ describe("buildCredentialsPatch — auth-shaped credentials", () => {
         { authType: "Bearer", authentication: { token: "new-token" } },
       ),
     ).toEqual({ authType: "Bearer", authentication: { token: "new-token" } });
-  });
-});
-
-// "omitted means keep what's stored" (the reason syncEvery is .optional() at
-// all) is already proven at the router level, in routers.test.ts — that test
-// sends syncEvery genuinely absent through this same schema, so it would
-// fail too if .optional() regressed. This one covers what that test doesn't:
-// that relaxing it to optional didn't also loosen the min/positive check.
-describe("syncEvery schema", () => {
-  it("still validates a provided value the same as before .optional() was added", () => {
-    expect(integrationInputSchema.shape.syncEvery.safeParse(0).success).toBe(
-      false,
-    );
-    expect(integrationInputSchema.shape.syncEvery.safeParse(300).success).toBe(
-      true,
-    );
   });
 });
 

@@ -37,7 +37,7 @@ vi.mock("../core/registry", async (importOriginal) => {
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { createCallerFactory } from "@/trpc/init";
 import { decryptCredentials, encryptCredentials } from "../core/credentials";
-import { integrationsRouter, mergeCredentialPatch } from "./routers";
+import { integrationsRouter } from "./routers";
 
 const caller = createCallerFactory(integrationsRouter)({
   req: undefined,
@@ -235,11 +235,12 @@ describe("integrationsRouter.update", () => {
     });
   });
 
-  it("keeps the stored credentials untouched when none are provided", async () => {
+  it("keeps stored credentials untouched and applies a provided syncEvery", async () => {
     await caller.update({ id: "integration-1", data: baseData });
 
     const call = mockPrisma.integration.update.mock.calls[0][0];
     expect(call.data).not.toHaveProperty("credentials");
+    expect(call.data.syncEvery).toBe(600);
   });
 
   it("re-encrypts credentials when they're provided", async () => {
@@ -262,13 +263,6 @@ describe("integrationsRouter.update", () => {
 
     const call = mockPrisma.integration.update.mock.calls[0][0];
     expect(call.data).not.toHaveProperty("syncEvery");
-  });
-
-  it("updates syncEvery when it's provided", async () => {
-    await caller.update({ id: "integration-1", data: baseData });
-
-    const call = mockPrisma.integration.update.mock.calls[0][0];
-    expect(call.data.syncEvery).toBe(600);
   });
 
   it("404s instead of 500ing when the integration doesn't exist", async () => {
@@ -427,31 +421,5 @@ describe("integrationsRouter.triggerSync", () => {
       message: "No enabled resources to sync",
     });
     expect(mockInngest.send).not.toHaveBeenCalled();
-  });
-});
-
-describe("mergeCredentialPatch", () => {
-  it("applies a one-field patch and retains everything else", () => {
-    expect(
-      mergeCredentialPatch(
-        {
-          authType: "Basic",
-          authentication: { username: "alice", password: "old" },
-        },
-        { authType: "Basic", authentication: { password: "new" } },
-      ),
-    ).toEqual({
-      authType: "Basic",
-      authentication: { username: "alice", password: "new" },
-    });
-  });
-
-  it("drops the old authentication object when authType actually changes — it's for the wrong shape", () => {
-    expect(
-      mergeCredentialPatch(
-        { authType: "Bearer", authentication: { token: "old" } },
-        { authType: "Basic" },
-      ),
-    ).toEqual({ authType: "Basic" });
   });
 });

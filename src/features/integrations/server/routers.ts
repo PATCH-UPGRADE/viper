@@ -97,7 +97,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** Drops the old `authentication` when `authType` changes — the auth union has no cross-check against it, so stale fields could otherwise validate as the wrong variant. */
-export const mergeCredentialPatch = (
+const mergeCredentialPatch = (
   existing: unknown,
   partial: Record<string, unknown>,
 ): Record<string, unknown> => {

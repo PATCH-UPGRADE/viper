@@ -17,6 +17,7 @@ import {
 } from "./advisories";
 import { downloadAdvisoryPdfs } from "./attachments";
 import { dispatchUnprocessedSnapshots } from "./source-record";
+
 interface ChangedAdvisory {
   item: FleetAdvisoryItem;
   mappingId: string;

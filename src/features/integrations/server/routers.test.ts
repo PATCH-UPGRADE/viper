@@ -18,19 +18,25 @@ const { mockCategoriesFor, mockDefaultSyncEveryFor, mockInngest, mockPrisma } =
         update: vi.fn(),
       },
       integrationResourceSync: { findUnique: vi.fn(), update: vi.fn() },
+      $transaction: vi.fn(),
     },
   }));
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/inngest/client", () => ({ inngest: mockInngest }));
-vi.mock("../core/registry", () => ({
-  defaultSyncEveryFor: mockDefaultSyncEveryFor,
-  displayNameFor: () => "Partner API",
-  categoriesFor: mockCategoriesFor,
-}));
+vi.mock("../core/registry", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../core/registry")>();
+  return {
+    ...actual,
+    defaultSyncEveryFor: mockDefaultSyncEveryFor,
+    displayNameFor: () => "Partner API",
+    categoriesFor: mockCategoriesFor,
+  };
+});
 
 import { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { createCallerFactory } from "@/trpc/init";
+import { decryptCredentials, encryptCredentials } from "../core/credentials";
 import { integrationsRouter } from "./routers";
 
 const caller = createCallerFactory(integrationsRouter)({
@@ -42,6 +48,7 @@ const integrationRow = (syncEvery: number | null, nextSyncAt: Date | null) => ({
   name: "Partner feed",
   platform: PlatformEnum.PARTNER,
   syncEvery,
+  config: { endpoint: "https://partner.example" },
   enabled: true,
   resourceSyncs: [
     {
@@ -55,7 +62,12 @@ const existingIntegration = { id: "integration-1" };
 
 mockDefaultSyncEveryFor.mockReturnValue(900);
 mockCategoriesFor.mockReturnValue([]);
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockPrisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) =>
+    fn(mockPrisma),
+  );
+});
 
 describe("integrationsRouter.getMany", () => {
   it("returns one unified, browser-safe list with resolved resource cadences", async () => {
@@ -74,6 +86,7 @@ describe("integrationsRouter.getMany", () => {
           name: true,
           platform: true,
           syncEvery: true,
+          config: true,
           enabled: true,
           resourceSyncs: expect.any(Object),
         },
@@ -87,6 +100,8 @@ describe("integrationsRouter.getMany", () => {
         platformLabel: "Partner API",
         categories: [],
         enabled: true,
+        syncEvery: 600,
+        config: { endpoint: "https://partner.example" },
         resourceSyncs: [
           expect.objectContaining({
             resource: ResourceType.Asset,
@@ -126,6 +141,7 @@ describe("integrationsRouter.getMany", () => {
         name: "AI Vuln Crawler",
         platform: PlatformEnum.AI,
         syncEvery: null,
+        config: {},
         enabled: true,
         resourceSyncs: [],
       },
@@ -197,6 +213,130 @@ describe("integrationsRouter enable controls", () => {
       }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(mockPrisma.integrationResourceSync.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("integrationsRouter.update", () => {
+  const baseData = {
+    name: "Partner feed",
+    platform: PlatformEnum.PARTNER,
+    syncEvery: 600,
+    config: {
+      resource: ResourceType.Asset,
+      integrationUri: "https://partner.example",
+    },
+  };
+
+  beforeEach(() => {
+    mockPrisma.integration.findUnique.mockResolvedValue(existingIntegration);
+    mockPrisma.integration.update.mockResolvedValue({
+      id: "integration-1",
+      integrationUserId: null,
+    });
+  });
+
+  it("keeps stored credentials untouched and applies a provided syncEvery", async () => {
+    await caller.update({ id: "integration-1", data: baseData });
+
+    const call = mockPrisma.integration.update.mock.calls[0][0];
+    expect(call.data).not.toHaveProperty("credentials");
+    expect(call.data.syncEvery).toBe(600);
+  });
+
+  it("re-encrypts credentials when they're provided", async () => {
+    await caller.update({
+      id: "integration-1",
+      data: {
+        ...baseData,
+        credentials: { authType: "Bearer", authentication: { token: "abc" } },
+      },
+    });
+
+    const call = mockPrisma.integration.update.mock.calls[0][0];
+    expect(call.data.credentials).toBeInstanceOf(Uint8Array);
+  });
+
+  it("keeps the stored syncEvery (including a null 'inherit default') untouched when omitted", async () => {
+    const { syncEvery: _syncEvery, ...dataWithoutSyncEvery } = baseData;
+
+    await caller.update({ id: "integration-1", data: dataWithoutSyncEvery });
+
+    const call = mockPrisma.integration.update.mock.calls[0][0];
+    expect(call.data).not.toHaveProperty("syncEvery");
+  });
+
+  it("404s instead of 500ing when the integration doesn't exist", async () => {
+    mockPrisma.integration.findUnique.mockResolvedValue(null);
+
+    await expect(
+      caller.update({ id: "missing", data: baseData }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(mockPrisma.integration.update).not.toHaveBeenCalled();
+  });
+
+  it("merges one dirty field into the existing credentials, preserving the rest", async () => {
+    const existingBlob = encryptCredentials({
+      authType: "Basic",
+      authentication: { username: "alice", password: "old-pw" },
+    });
+    // requireIntegration's existence check, then the credentials fetch —
+    // two separate findUnique calls with different selects.
+    mockPrisma.integration.findUnique
+      .mockResolvedValueOnce(existingIntegration)
+      .mockResolvedValueOnce({ credentials: existingBlob });
+
+    await caller.update({
+      id: "integration-1",
+      data: {
+        ...baseData,
+        credentials: {
+          authType: "Basic",
+          authentication: { password: "new-pw" },
+        },
+      },
+    });
+
+    const call = mockPrisma.integration.update.mock.calls[0][0];
+    expect(decryptCredentials(call.data.credentials)).toEqual({
+      authType: "Basic",
+      authentication: { username: "alice", password: "new-pw" },
+    });
+  });
+
+  it("requires the new auth type's fields when switching away from what's stored", async () => {
+    const existingBlob = encryptCredentials({
+      authType: "Bearer",
+      authentication: { token: "real-token" },
+    });
+    mockPrisma.integration.findUnique
+      .mockResolvedValueOnce(existingIntegration)
+      .mockResolvedValueOnce({ credentials: existingBlob });
+
+    await expect(
+      caller.update({
+        id: "integration-1",
+        data: { ...baseData, credentials: { authType: "Basic" } },
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mockPrisma.integration.update).not.toHaveBeenCalled();
+  });
+
+  it("does not force a resource sync back on — that's setResourceSyncEnabled's job", async () => {
+    await caller.update({ id: "integration-1", data: baseData });
+
+    const call = mockPrisma.integration.update.mock.calls[0][0];
+    expect(call.data.resourceSyncs.upsert).toEqual([
+      expect.objectContaining({
+        where: {
+          integrationId_resource: {
+            integrationId: "integration-1",
+            resource: ResourceType.Asset,
+          },
+        },
+        create: { resource: ResourceType.Asset },
+        update: {},
+      }),
+    ]);
   });
 });
 

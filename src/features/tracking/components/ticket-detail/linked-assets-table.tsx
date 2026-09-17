@@ -16,6 +16,7 @@ import {
 import { useUpdateTicket } from "@/features/tracking/hooks/use-tracking";
 import type { TicketStatus } from "@/generated/prisma";
 import {
+  assetLabel,
   type DetailAssetTicket,
   formatLocation,
   TicketStatusSelectTrigger,
@@ -50,11 +51,13 @@ const AssetTicketStatusSelect = ({
 export const LinkedAssetsTable = ({
   parentTicketId,
   assetTickets,
+  otherWorkOrderCounts,
   onDetach,
   detachPending,
 }: {
   parentTicketId: string;
   assetTickets: DetailAssetTicket[];
+  otherWorkOrderCounts?: Record<string, number>;
   onDetach?: (assetId: string) => void;
   detachPending?: boolean;
 }) => {
@@ -68,6 +71,7 @@ export const LinkedAssetsTable = ({
           <TableHead>Model</TableHead>
           <TableHead>IP Address</TableHead>
           <TableHead>Location</TableHead>
+          <TableHead className="text-right">Other work orders</TableHead>
           {onDetach && <TableHead className="w-10" />}
         </TableRow>
       </TableHeader>
@@ -88,7 +92,7 @@ export const LinkedAssetsTable = ({
                   href={`/tracking/${ticket.id}`}
                   className="font-mono text-xs font-medium text-primary hover:underline"
                 >
-                  {asset.hostname ?? asset.id}
+                  {assetLabel(asset)}
                 </Link>
               </TableCell>
               <TableCell>
@@ -108,6 +112,9 @@ export const LinkedAssetsTable = ({
               <TableCell className="font-mono text-xs">{asset.ip}</TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 <ClampedCell text={formatLocation(asset.location)} />
+              </TableCell>
+              <TableCell className="text-right text-sm font-semibold">
+                {otherWorkOrderCounts?.[asset.id] ?? 0}
               </TableCell>
               {onDetach && (
                 <TableCell className="w-10">

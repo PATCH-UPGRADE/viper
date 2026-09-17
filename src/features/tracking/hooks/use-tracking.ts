@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type QueryClient,
   useMutation,
   useQuery,
   useQueryClient,
@@ -9,6 +10,24 @@ import {
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import { useTrackingParams } from "./use-tracking-params";
+
+// Every query that derives from a ticket's asset links; attach and detach
+// both change the same set.
+const invalidateTicketAssetLinks = (
+  queryClient: QueryClient,
+  trpc: ReturnType<typeof useTRPC>,
+  ticketId: string,
+) => {
+  queryClient.invalidateQueries(
+    trpc.tracking.getOne.queryFilter({ id: ticketId }),
+  );
+  queryClient.invalidateQueries(
+    trpc.tracking.listAttachableAssets.queryFilter({ ticketId }),
+  );
+  queryClient.invalidateQueries(
+    trpc.tracking.getOtherAssetWorkOrders.queryFilter({ ticketId }),
+  );
+};
 
 export const useSuspenseTrackingTickets = () => {
   const trpc = useTRPC();
@@ -25,6 +44,13 @@ export const useSuspenseAssetWorkOrders = (assetId: string) => {
   const trpc = useTRPC();
   return useSuspenseQuery(
     trpc.tracking.getManyByAssetId.queryOptions({ assetId }),
+  );
+};
+
+export const useSuspenseOtherAssetWorkOrders = (ticketId: string) => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(
+    trpc.tracking.getOtherAssetWorkOrders.queryOptions({ ticketId }),
   );
 };
 
@@ -51,6 +77,9 @@ export const useUpdateTicket = (
           assetId
             ? trpc.tracking.getManyByAssetId.queryFilter({ assetId })
             : trpc.tracking.getManyByAssetId.queryFilter(),
+        );
+        queryClient.invalidateQueries(
+          trpc.tracking.getOtherAssetWorkOrders.queryFilter(),
         );
         toast.success("Ticket updated");
       },
@@ -293,6 +322,11 @@ export const useAttachChild = (parentId: string) => {
           trpc.tracking.listAttachableChildren.queryFilter({ parentId }),
         );
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        // A sub-ticket is excluded from its parent's "other work orders", and
+        // the parent from the sub-ticket's, so both lists change here.
+        queryClient.invalidateQueries(
+          trpc.tracking.getOtherAssetWorkOrders.queryFilter(),
+        );
         // The moved child's parent/breadcrumb changed; refresh its detail and
         // the old parent's detail (if it was reparented from elsewhere).
         queryClient.invalidateQueries(
@@ -350,6 +384,9 @@ export const useDetachChild = (parentId: string) => {
           trpc.tracking.listAttachableChildren.queryFilter({ parentId }),
         );
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.tracking.getOtherAssetWorkOrders.queryFilter(),
+        );
         // The detached child's parent is now null; refresh its detail too.
         queryClient.invalidateQueries(
           trpc.tracking.getOne.queryFilter({ id: ticketId }),
@@ -395,14 +432,7 @@ export const useAttachAsset = (ticketId: string) => {
       onSuccess: () => {
         toast.success("Asset attached");
       },
-      onSettled: () => {
-        queryClient.invalidateQueries(
-          trpc.tracking.getOne.queryFilter({ id: ticketId }),
-        );
-        queryClient.invalidateQueries(
-          trpc.tracking.listAttachableAssets.queryFilter({ ticketId }),
-        );
-      },
+      onSettled: () => invalidateTicketAssetLinks(queryClient, trpc, ticketId),
     }),
   );
 };
@@ -441,14 +471,7 @@ export const useDetachAsset = (ticketId: string) => {
       onSuccess: () => {
         toast.success("Asset detached");
       },
-      onSettled: () => {
-        queryClient.invalidateQueries(
-          trpc.tracking.getOne.queryFilter({ id: ticketId }),
-        );
-        queryClient.invalidateQueries(
-          trpc.tracking.listAttachableAssets.queryFilter({ ticketId }),
-        );
-      },
+      onSettled: () => invalidateTicketAssetLinks(queryClient, trpc, ticketId),
     }),
   );
 };

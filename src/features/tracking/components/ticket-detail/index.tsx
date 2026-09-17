@@ -2,7 +2,7 @@
 
 import { EyeIcon, EyeOffIcon, PencilIcon, SlashIcon } from "lucide-react";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import {
   EntityContainer,
   ErrorView,
@@ -41,6 +41,7 @@ export { AddCommentForm } from "./add-comment-form";
 export { DepartmentMultiSelect } from "./department-multi-select";
 export { TicketEditForm } from "./edit-form";
 export { LinkedAssetsTable } from "./linked-assets-table";
+export { OtherAssetWorkOrdersCard } from "./other-asset-work-orders";
 
 const TAB_VALUES = [
   "details",
@@ -211,11 +212,13 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
             </TabsContent>
           )}
 
-          <TabsContent value="assets" className="mt-4">
-            <LinkedAssetsTabContent
-              ticketId={data.id}
-              assetTickets={data.assets}
-            />
+          <TabsContent value="assets" className="mt-4 flex flex-col gap-4">
+            <Suspense fallback={<LoadingView message="Loading assets..." />}>
+              <LinkedAssetsTabContent
+                ticketId={data.id}
+                assetTickets={data.assets}
+              />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="remediations" className="mt-4">

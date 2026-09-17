@@ -34,6 +34,7 @@ const {
   mockUseDepartments,
   mockUseAddTicketComment,
   mockUseSuspenseTrackingTicket,
+  mockUseSuspenseOtherAssetWorkOrders,
   mockUseSession,
   mockSetWatchingMutate,
   mockUseSetWatching,
@@ -150,6 +151,7 @@ const {
       isPending: false,
     })),
     mockUseSuspenseTrackingTicket: vi.fn(),
+    mockUseSuspenseOtherAssetWorkOrders: vi.fn(() => ({ data: [] })),
     mockUseSession: vi.fn(() => ({
       data: {
         user: { id: "u1", name: "Alice", email: "alice@example.com" },
@@ -164,6 +166,7 @@ vi.mock("../hooks/use-tracking", () => ({
   useDepartments: mockUseDepartments,
   useAddTicketComment: mockUseAddTicketComment,
   useSuspenseTrackingTicket: mockUseSuspenseTrackingTicket,
+  useSuspenseOtherAssetWorkOrders: mockUseSuspenseOtherAssetWorkOrders,
   useSetWatching: mockUseSetWatching,
   useMarkTicketSeen: mockUseMarkTicketSeen,
   useAttachChild: mockUseAttachChild,
@@ -182,6 +185,7 @@ import {
   AddCommentForm,
   DepartmentMultiSelect,
   LinkedAssetsTable,
+  OtherAssetWorkOrdersCard,
   TicketDetailContent,
   TicketEditForm,
 } from "./ticket-detail";
@@ -760,6 +764,177 @@ describe("LinkedAssetsTable", () => {
       id: "child-42",
       status: "DONE",
     });
+  });
+
+  it("renders the other-work-order count for each asset, defaulting to 0", () => {
+    render(
+      <LinkedAssetsTable
+        parentTicketId="t1"
+        assetTickets={
+          [
+            sampleAssetTicket({ id: "asset-1" }, { id: "child-1" }),
+            sampleAssetTicket({ id: "asset-2" }, { id: "child-2" }),
+          ] as never
+        }
+        otherWorkOrderCounts={{ "asset-1": 8 }}
+      />,
+    );
+
+    expect(screen.getByText("Other work orders")).toBeInTheDocument();
+    expect(screen.getByText("8")).toBeInTheDocument();
+    expect(screen.getByText("0")).toBeInTheDocument();
+  });
+});
+
+describe("OtherAssetWorkOrdersCard", () => {
+  const cardAssetTickets = [
+    sampleAssetTicket({ id: "asset-1", hostname: "AST-DIA-01" }),
+    sampleAssetTicket(
+      { id: "asset-2", hostname: "AST-DIA-02" },
+      {
+        id: "child-2",
+      },
+    ),
+  ];
+
+  const cardWorkOrder = (
+    id: string,
+    assetIds: string[],
+    departments: { id: string; name: string }[] = [],
+  ) => ({
+    id,
+    summary: `Work order ${id}`,
+    status: "TO_DO",
+    scheduledAt: null,
+    departments,
+    assetIds,
+  });
+
+  const biomed = { id: "d-biomed", name: "Biomed Engineering" };
+
+  const renderCard = (workOrders: ReturnType<typeof cardWorkOrder>[]) =>
+    render(
+      <OtherAssetWorkOrdersCard
+        assetTickets={cardAssetTickets as never}
+        workOrders={workOrders as never}
+      />,
+    );
+
+  it("shows the distinct work-order total in the header", () => {
+    renderCard([
+      cardWorkOrder("w1", ["asset-1", "asset-2"]),
+      cardWorkOrder("w2", ["asset-1"]),
+    ]);
+
+    expect(
+      screen.getByRole("heading", {
+        name: /other active work orders on these assets \(2\)/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("groups by asset by default, without asset chips on the rows", () => {
+    renderCard([cardWorkOrder("w1", ["asset-1", "asset-2"], [biomed])]);
+
+    expect(screen.getByText("AST-DIA-01")).toBeInTheDocument();
+    expect(screen.getByText("AST-DIA-02")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Work order w1" })).toHaveAttribute(
+      "href",
+      "/tracking/w1",
+    );
+    expect(screen.queryByText("Biomed Engineering")).toBeInTheDocument();
+    // The chips carry the asset label; in asset mode they are absent, so the
+    // only "AST-DIA-01" on screen is the group heading.
+    expect(screen.getAllByText("AST-DIA-01")).toHaveLength(1);
+  });
+
+  it("re-groups by department and adds asset chips when By team is selected", async () => {
+    const user = userEvent.setup();
+    renderCard([cardWorkOrder("w1", ["asset-1", "asset-2"], [biomed])]);
+
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+
+    // One department group, and the row repeats the team beneath its summary.
+    expect(screen.getAllByText("Biomed Engineering")).toHaveLength(2);
+    // Asset names now appear only as chips on the row.
+    expect(screen.getByText("AST-DIA-01")).toBeInTheDocument();
+    expect(screen.getByText("AST-DIA-02")).toBeInTheDocument();
+  });
+
+  it("caps the asset chips on a row and collapses the rest into +N more", async () => {
+    const user = userEvent.setup();
+    render(
+      <OtherAssetWorkOrdersCard
+        assetTickets={
+          Array.from({ length: 6 }, (_, i) =>
+            sampleAssetTicket(
+              { id: `asset-${i}`, hostname: `AST-${i}` },
+              { id: `child-${i}` },
+            ),
+          ) as never
+        }
+        workOrders={
+          [
+            cardWorkOrder(
+              "w1",
+              Array.from({ length: 6 }, (_, i) => `asset-${i}`),
+              [biomed],
+            ),
+          ] as never
+        }
+      />,
+    );
+
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+
+    expect(screen.getByText("AST-3")).toBeInTheDocument();
+    expect(screen.queryByText("AST-4")).not.toBeInTheDocument();
+    expect(screen.getByText("+2 more")).toHaveAttribute(
+      "title",
+      "AST-4, AST-5",
+    );
+  });
+
+  it("puts a work order with no department in a No team group", async () => {
+    const user = userEvent.setup();
+    renderCard([cardWorkOrder("w1", ["asset-1"])]);
+
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+
+    expect(screen.getAllByText("No team").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("caps a group at five rows and keeps the full count on the badge", async () => {
+    const user = userEvent.setup();
+    renderCard(
+      Array.from({ length: 8 }, (_, i) => cardWorkOrder(`w${i}`, ["asset-1"])),
+    );
+
+    expect(screen.getAllByRole("link", { name: /^Work order w/ })).toHaveLength(
+      5,
+    );
+    expect(screen.getByText("8")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Show 3 more" }));
+
+    expect(screen.getAllByRole("link", { name: /^Work order w/ })).toHaveLength(
+      8,
+    );
+    expect(screen.getByText("8")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Show fewer" }),
+    ).toBeInTheDocument();
+  });
+
+  it("tells the user when nothing overlaps in team mode", async () => {
+    const user = userEvent.setup();
+    renderCard([]);
+
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+
+    expect(
+      screen.getByText("No other open work orders touch these assets."),
+    ).toBeInTheDocument();
   });
 });
 

@@ -44,7 +44,9 @@ import {
 import { requireExistence } from "@/trpc/middleware";
 import { TRACKING_TABS } from "../params";
 import {
+  dedupeOtherAssetWorkOrders,
   integrationWorkOrderInputSchema,
+  otherAssetWorkOrderSelect,
   paginatedWorkOrderListResponseSchema,
   ticketBaseInclude,
   ticketCommentResponseSchema,
@@ -391,6 +393,59 @@ export const trackingRouter = createTRPCRouter({
         ...ticket,
         commentCount: _count.comments,
       }));
+    }),
+
+  getOtherAssetWorkOrders: protectedProcedure
+    .input(z.object({ ticketId: z.string() }))
+    .query(async ({ input }) => {
+      // The scope is exactly what the Linked Assets table shows: AssetTicket
+      // rows parented here. A per-asset child ticket therefore has no scope of
+      // its own — its asset hangs off the `ticket` relation, not `assets` —
+      // which matches the empty Linked Assets table on that page.
+      const ticket = requireExistence(
+        await prisma.workOrderTicket.findUnique({
+          where: { id: input.ticketId },
+          select: {
+            id: true,
+            parentId: true,
+            assets: { select: { assetId: true } },
+          },
+        }),
+        "Ticket",
+      );
+
+      const assetIds = ticket.assets.map((a) => a.assetId);
+      if (assetIds.length === 0) return [];
+
+      // This ticket and its parent are the same piece of work, not a
+      // neighbouring one.
+      const excludedIds = ticket.parentId
+        ? [ticket.id, ticket.parentId]
+        : [ticket.id];
+
+      // Driven from AssetTicket's @@index([assetId]): a handful of join rows,
+      // then their parents by primary key.
+      const rows = await prisma.assetTicket.findMany({
+        where: {
+          assetId: { in: assetIds },
+          parentTicket: {
+            id: { notIn: excludedIds },
+            isDraft: false,
+            status: { not: TicketStatus.DONE },
+            // Parent/standalone rows only — never a per-asset child ticket.
+            ticket: null,
+            // Not one of this ticket's own sub-tickets. Spelled as an explicit
+            // OR so rows with a null parentId are unambiguously kept.
+            OR: [{ parentId: null }, { parentId: { not: input.ticketId } }],
+          },
+        },
+        select: {
+          assetId: true,
+          parentTicket: { select: otherAssetWorkOrderSelect },
+        },
+      });
+
+      return dedupeOtherAssetWorkOrders(rows);
     }),
 
   getOne: protectedProcedure

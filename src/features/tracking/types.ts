@@ -50,6 +50,47 @@ export const ticketBaseInclude = {
   },
 } satisfies Prisma.WorkOrderTicketInclude;
 
+// A neighbouring work order shown in "Other active work orders on these assets".
+export const otherAssetWorkOrderSelect = {
+  id: true,
+  summary: true,
+  status: true,
+  scheduledAt: true,
+  departments: {
+    select: { id: true, name: true },
+    orderBy: { name: "asc" as const },
+  },
+} satisfies Prisma.WorkOrderTicketSelect;
+
+export type OtherAssetWorkOrderTicket = Prisma.WorkOrderTicketGetPayload<{
+  select: typeof otherAssetWorkOrderSelect;
+}>;
+
+/** A neighbouring work order plus which of this ticket's linked assets it touches. */
+export type OtherAssetWorkOrder = OtherAssetWorkOrderTicket & {
+  assetIds: string[];
+};
+
+// The sort is a total order (scheduledAt, then summary, then id), so the result
+// never depends on database row order and the query needs no `orderBy`.
+export const dedupeOtherAssetWorkOrders = (
+  rows: { assetId: string; parentTicket: OtherAssetWorkOrderTicket }[],
+): OtherAssetWorkOrder[] => {
+  const byId = new Map<string, OtherAssetWorkOrder>();
+  for (const { assetId, parentTicket } of rows) {
+    const existing = byId.get(parentTicket.id);
+    if (existing) existing.assetIds.push(assetId);
+    else byId.set(parentTicket.id, { ...parentTicket, assetIds: [assetId] });
+  }
+  return [...byId.values()].sort(
+    (a, b) =>
+      (a.scheduledAt?.getTime() ?? Number.POSITIVE_INFINITY) -
+        (b.scheduledAt?.getTime() ?? Number.POSITIVE_INFINITY) ||
+      a.summary.localeCompare(b.summary) ||
+      a.id.localeCompare(b.id),
+  );
+};
+
 export const trackingTicketInclude = {
   ...ticketBaseInclude,
   children: {

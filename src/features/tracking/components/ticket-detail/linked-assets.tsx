@@ -24,8 +24,11 @@ import {
   useAttachAsset,
   useAttachableAssets,
   useDetachAsset,
+  useSuspenseOtherAssetWorkOrders,
 } from "../../hooks/use-tracking";
 import { LinkedAssetsTable } from "./linked-assets-table";
+import { OtherAssetWorkOrdersCard } from "./other-asset-work-orders";
+import { countOtherWorkOrdersByAsset } from "./other-work-order-groups";
 import {
   countAssetTicketsByStatus,
   type DetailAssetTicket,
@@ -148,31 +151,45 @@ export const LinkedAssetsTabContent = ({
 }) => {
   const detach = useDetachAsset(ticketId);
   const sortedAssetTickets = sortAssetTicketsByStatus(assetTickets);
+  const { data: otherWorkOrders } = useSuspenseOtherAssetWorkOrders(ticketId);
 
   return (
-    <Card className="gap-0 py-0">
-      <div className="flex items-center justify-between gap-2 border-b px-5 py-4">
-        <h2 className="text-base font-semibold">
-          Linked Assets{" "}
-          <span className="text-muted-foreground">({assetTickets.length})</span>
-        </h2>
-        <AttachAssetPopover ticketId={ticketId} />
-      </div>
-      <AssetProgressStrip assetTickets={sortedAssetTickets} />
-      <div className="p-2">
-        {assetTickets.length > 0 ? (
-          <LinkedAssetsTable
-            parentTicketId={ticketId}
-            assetTickets={sortedAssetTickets}
-            onDetach={(assetId) => detach.mutate({ ticketId, assetId })}
-            detachPending={detach.isPending}
-          />
-        ) : (
-          <p className="p-4 text-sm text-muted-foreground">
-            No assets linked to this ticket.
-          </p>
-        )}
-      </div>
-    </Card>
+    <>
+      <Card className="gap-0 py-0">
+        <div className="flex items-center justify-between gap-2 border-b px-5 py-4">
+          <h2 className="text-base font-semibold">
+            Linked Assets{" "}
+            <span className="text-muted-foreground">
+              ({assetTickets.length})
+            </span>
+          </h2>
+          <AttachAssetPopover ticketId={ticketId} />
+        </div>
+        <AssetProgressStrip assetTickets={sortedAssetTickets} />
+        <div className="p-2">
+          {assetTickets.length > 0 ? (
+            <LinkedAssetsTable
+              parentTicketId={ticketId}
+              assetTickets={sortedAssetTickets}
+              otherWorkOrderCounts={countOtherWorkOrdersByAsset(
+                otherWorkOrders,
+              )}
+              onDetach={(assetId) => detach.mutate({ ticketId, assetId })}
+              detachPending={detach.isPending}
+            />
+          ) : (
+            <p className="p-4 text-sm text-muted-foreground">
+              No assets linked to this ticket.
+            </p>
+          )}
+        </div>
+      </Card>
+      {assetTickets.length > 0 && (
+        <OtherAssetWorkOrdersCard
+          assetTickets={sortedAssetTickets}
+          workOrders={otherWorkOrders}
+        />
+      )}
+    </>
   );
 };

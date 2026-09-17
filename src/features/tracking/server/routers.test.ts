@@ -46,6 +46,7 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     },
     assetTicket: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
     },
     department: {
       findMany: vi.fn(),
@@ -1113,6 +1114,124 @@ describe("trackingRouter.getManyByAssetId", () => {
     await expect(
       caller.getManyByAssetId({ assetId: "missing" }),
     ).rejects.toThrow(/not found/i);
+  });
+});
+
+describe("trackingRouter.getOtherAssetWorkOrders", () => {
+  const otherTicket = (
+    id: string,
+    scheduledAt: Date | null = null,
+    summary = `Work order ${id}`,
+  ) => ({
+    id,
+    summary,
+    status: "TO_DO",
+    scheduledAt,
+    departments: [],
+  });
+
+  it("returns an empty list without querying when no assets are linked", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [],
+    });
+
+    await expect(
+      caller.getOtherAssetWorkOrders({ ticketId: "t1" }),
+    ).resolves.toEqual([]);
+    expect(mockPrisma.assetTicket.findMany).not.toHaveBeenCalled();
+  });
+
+  it("throws NOT_FOUND for a missing ticket", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(null);
+
+    await expect(
+      caller.getOtherAssetWorkOrders({ ticketId: "missing" }),
+    ).rejects.toThrow(/not found/i);
+  });
+
+  it("de-duplicates a work order that touches two linked assets", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [{ assetId: "a1" }, { assetId: "a2" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([
+      { assetId: "a1", parentTicket: otherTicket("w1") },
+      { assetId: "a2", parentTicket: otherTicket("w1") },
+    ]);
+
+    const result = await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: "w1", assetIds: ["a1", "a2"] });
+  });
+
+  it("excludes this ticket, its parent, its sub-tickets, drafts, Done, and per-asset children", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "child",
+      parentId: "parent",
+      assets: [{ assetId: "a1" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([]);
+
+    await caller.getOtherAssetWorkOrders({ ticketId: "child" });
+
+    expect(mockPrisma.assetTicket.findMany.mock.calls[0][0].where).toEqual({
+      assetId: { in: ["a1"] },
+      parentTicket: {
+        id: { notIn: ["child", "parent"] },
+        isDraft: false,
+        status: { not: "DONE" },
+        ticket: null,
+        OR: [{ parentId: null }, { parentId: { not: "child" } }],
+      },
+    });
+  });
+
+  it("excludes only this ticket when it has no parent", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [{ assetId: "a1" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([]);
+
+    await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
+
+    expect(
+      mockPrisma.assetTicket.findMany.mock.calls[0][0].where.parentTicket.id,
+    ).toEqual({ notIn: ["t1"] });
+  });
+
+  it("sorts soonest-scheduled first, with unscheduled work orders last", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [{ assetId: "a1" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([
+      {
+        assetId: "a1",
+        parentTicket: otherTicket("late", new Date("2026-09-02")),
+      },
+      { assetId: "a1", parentTicket: otherTicket("none", null) },
+      {
+        assetId: "a1",
+        parentTicket: otherTicket("early", new Date("2026-08-08")),
+      },
+    ]);
+
+    const result = await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
+
+    expect(result.map((w) => w.id)).toEqual(["early", "late", "none"]);
   });
 });
 

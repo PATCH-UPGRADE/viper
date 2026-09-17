@@ -20,8 +20,6 @@ function deviceGroupMatchingKey(identity: DeviceGroupMatchingIdentity): string {
 }
 
 export function makeRecordNoteTool(userId: string) {
-  const noMatchIdentities = new Set<string>();
-
   return tool(
     async ({ text, targetModel, instanceId, deviceGroupMatching, create }) => {
       const statement = text.trim();
@@ -29,16 +27,13 @@ export function makeRecordNoteTool(userId: string) {
       let targetId = instanceId ?? null;
 
       if (targetModel === "DEVICE_GROUP_MATCHING" && deviceGroupMatching) {
-        const identityKey = deviceGroupMatchingKey(deviceGroupMatching);
         const lookup = await findDeviceGroupMatching(deviceGroupMatching, {
-          create: create === true && noMatchIdentities.has(identityKey),
+          create: create === true,
         });
         if (!lookup.found) {
-          noMatchIdentities.add(identityKey);
           return JSON.stringify({
-            error: lookup.unknownName
-              ? `Nothing was recorded, so do not tell the user you recorded this. No ${lookup.unknownName} in the inventory has that name, so create: true cannot help. Look the device up with query_platform_data (deviceGroup.getMany) and run again with the exact manufacturer and product names it returns.`
-              : "No device group matching found. Nothing was recorded, so do not tell the user you recorded this. Run again with one of relatedMatchings as deviceGroupMatching to use an existing matching, or run again with create: true to create a new device group matching.",
+            error:
+              "No device group matching found. Nothing was recorded, so do not tell the user you recorded this. Run again with one of relatedMatchings as deviceGroupMatching to use an existing matching, or run again with create: true to create a new device group matching.",
             relatedMatchings: lookup.relatedMatchings,
           });
         }

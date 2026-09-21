@@ -80,6 +80,32 @@ export const assetResponseSchema = z.object({
       }),
     }),
   ),
+  // Who services this asset. `workOrderIntegration` names the platform their
+  // work orders are filed on; null means the manager is in-house.
+  managedBy: z.array(
+    z.object({
+      id: z.string(),
+      responsibilities: z.string(),
+      vendor: z
+        .object({ id: z.string(), canonicalDisplayName: z.string() })
+        .nullable(),
+      department: z.object({ id: z.string(), name: z.string() }).nullable(),
+      contract: z
+        .object({
+          title: z.string().nullable(),
+          effectiveFrom: z.date().nullable(),
+          effectiveTo: z.date().nullable(),
+        })
+        .nullable(),
+      workOrderIntegration: z
+        .object({
+          id: z.string(),
+          name: z.string(),
+          platform: z.enum(PlatformEnum),
+        })
+        .nullable(),
+    }),
+  ),
   networkSegment: z.string().nullable(),
   hostname: z.string().nullable(),
   macAddress: z.string().nullable(),
@@ -109,10 +135,37 @@ export const assetsVulnsInputSchema = z.object({
 });
 export type AssetsVulnsInput = z.infer<typeof assetsVulnsInputSchema>;
 
+/**
+ * Who services this asset, and where their work orders are filed.
+ *
+ * `workOrderIntegration` is what makes a relationship a filing target: a
+ * relationship without one records an in-house owner instead. Both are worth
+ * showing, so the caller can tell "Radiology looks after it" from "Siemens
+ * files the orders".
+ */
+export const managesRelationshipSelect = {
+  select: {
+    id: true,
+    responsibilities: true,
+    vendor: { select: { id: true, canonicalDisplayName: true } },
+    department: { select: { id: true, name: true } },
+    // A relationship with no contract still records a real manager: the Fleet
+    // equipment sync creates one per serviced asset. `effectiveTo` bounds any
+    // window an advisor schedules against.
+    contract: {
+      select: { title: true, effectiveFrom: true, effectiveTo: true },
+    },
+    workOrderIntegration: {
+      select: { id: true, name: true, platform: true },
+    },
+  },
+} satisfies Prisma.Asset$managedByArgs;
+
 export const assetInclude = {
   user: userIncludeSelect,
   deviceGroup: deviceGroupSelect,
   externalMappings: externalMappingSelect,
+  managedBy: managesRelationshipSelect,
 } satisfies Prisma.AssetInclude;
 
 /**

@@ -10,6 +10,7 @@ import type { AnyConnectorModule, ResourceModule } from "../types";
 const MODULE_FIELDS = [
   { field: "workOrders", resource: ResourceType.WorkOrder },
   { field: "assets", resource: ResourceType.Asset },
+  { field: "remediations", resource: ResourceType.Remediation },
   { field: "notifications", resource: ResourceType.SourceRecord },
 ] as const satisfies ReadonlyArray<{
   field: keyof AnyConnectorModule;

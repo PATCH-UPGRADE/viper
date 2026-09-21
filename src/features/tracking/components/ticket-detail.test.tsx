@@ -996,8 +996,10 @@ describe("TicketDetailContent — view mode", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Comment")).toBeInTheDocument();
 
-    // The status-change tagline is human-readable
-    expect(screen.getByText(/changed status from/i)).toBeInTheDocument();
+    const statusEntry = screen.getByLabelText("Activity: STATUS_CHANGED");
+    expect(within(statusEntry).getByText("Status")).toBeInTheDocument();
+    expect(within(statusEntry).getByText("To Do")).toBeInTheDocument();
+    expect(within(statusEntry).getByText("In Progress")).toBeInTheDocument();
 
     // Asset label surfaces in the tagline
     expect(screen.getByText("host-icu-1")).toBeInTheDocument();
@@ -1014,6 +1016,32 @@ describe("TicketDetailContent — view mode", () => {
     expect(assetIdx).toBeGreaterThanOrEqual(0);
     expect(commentIdx).toBeGreaterThan(assetIdx);
     expect(statusIdx).toBeGreaterThan(commentIdx);
+  });
+
+  it("keeps the comment box open above the activity list so nobody scrolls to comment", () => {
+    renderDetail({
+      activities: [
+        {
+          id: "a1",
+          ticketId: "ticket-1",
+          userId: "u1",
+          type: "ASSET_ATTACHED",
+          data: { assetId: "asset-x", assetLabel: "host-icu-1" },
+          createdAt: new Date("2026-05-15T14:00:00Z"),
+          user: { id: "u1", name: "Alice", image: null, integrationUser: null },
+        },
+      ],
+    });
+
+    const commentBox = screen.getByPlaceholderText(/write a comment/i);
+    const newestRow = screen.getByLabelText("Activity: ASSET_ATTACHED");
+    expect(
+      commentBox.compareDocumentPosition(newestRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: /add comment/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows 'No activity yet' when there are no comments or activities", () => {
@@ -1047,6 +1075,27 @@ describe("TicketDetailContent — view mode", () => {
     // Known category still renders; the unknown priority is omitted (no crash).
     expect(within(entry).getByText("Category")).toBeInTheDocument();
     expect(within(entry).queryByText("Priority")).not.toBeInTheDocument();
+  });
+
+  it("renders a PRIORITY_CHANGED entry as label, old badge, new badge", () => {
+    renderDetail({
+      activities: [
+        {
+          id: "p1",
+          ticketId: "ticket-1",
+          userId: "u1",
+          type: "PRIORITY_CHANGED",
+          data: { from: "High", to: "Critical" },
+          createdAt: new Date("2026-05-15T12:00:00Z"),
+          user: { id: "u1", name: "Alice", image: null, integrationUser: null },
+        },
+      ],
+    });
+
+    const entry = screen.getByLabelText("Activity: PRIORITY_CHANGED");
+    expect(within(entry).getByText("Priority")).toBeInTheDocument();
+    expect(within(entry).getByText("High")).toBeInTheDocument();
+    expect(within(entry).getByText("Critical")).toBeInTheDocument();
   });
 });
 

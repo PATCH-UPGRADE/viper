@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuthenticationFields } from "@/components/auth-form";
@@ -36,8 +36,11 @@ import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
 import { authSchema } from "@/lib/schemas";
 import { humanize } from "@/lib/utils";
 import type { CatalogEntry } from "../core/catalog";
-import { useCreateIntegration } from "../hooks/use-integrations";
-import type { FieldSpec } from "../types";
+import {
+  useCreateIntegration,
+  useUpdateIntegration,
+} from "../hooks/use-integrations";
+import type { FieldSpec, IntegrationListItem } from "../types";
 
 const zodForSpec = (spec: FieldSpec): z.ZodTypeAny => {
   const field =
@@ -53,8 +56,54 @@ const zodForSpec = (spec: FieldSpec): z.ZodTypeAny => {
   return spec.required ? field : field.optional();
 };
 
-const shapeFor = (specs: FieldSpec[]) =>
+export const shapeFor = (specs: FieldSpec[]) =>
   Object.fromEntries(specs.map((spec) => [spec.key, zodForSpec(spec)]));
+
+/** Wrapping `z.string().min(1)` in `.optional()` alone still rejects a defined-but-empty string, so `min(1)` itself has to go. */
+export const relaxedShapeFor = (specs: FieldSpec[]) =>
+  shapeFor(specs.map((spec) => ({ ...spec, required: false })));
+
+/** `authSchema` minus its "authentication required unless None" refinement — the shape alone already has `authentication` optional, same reasoning as relaxedShapeFor. */
+export const relaxedAuthSchema = z.object(authSchema.shape);
+
+type DirtyFields = Record<string, unknown> | boolean | undefined;
+
+/** Untouched fields never differ from their ("") default, so react-hook-form already excludes them here — no placeholder/sentinel comparison needed. */
+const dirtyPatch = (
+  dirtyFields: Record<string, unknown>,
+  values: Record<string, unknown>,
+) =>
+  Object.fromEntries(
+    Object.entries(dirtyFields)
+      .filter(([, dirty]) => dirty)
+      .map(([key]) => [key, values[key]]),
+  );
+
+/** `authType` is included whenever it's dirty even though it's not itself a "value" — the server needs it to know which shape the dirty leaf fields belong to. */
+export const buildCredentialsPatch = (
+  credentialsAreAuthShaped: boolean,
+  dirtyFields: DirtyFields,
+  values: Record<string, unknown>,
+): Record<string, unknown> | undefined => {
+  if (typeof dirtyFields !== "object" || !dirtyFields) return undefined;
+
+  if (!credentialsAreAuthShaped) {
+    const patch = dirtyPatch(dirtyFields, values);
+    return Object.keys(patch).length > 0 ? patch : undefined;
+  }
+
+  const authPatch = dirtyPatch(
+    (dirtyFields.authentication ?? {}) as Record<string, unknown>,
+    (values.authentication ?? {}) as Record<string, unknown>,
+  );
+  if (!dirtyFields.authType && Object.keys(authPatch).length === 0) {
+    return undefined;
+  }
+  return {
+    authType: values.authType,
+    ...(Object.keys(authPatch).length > 0 && { authentication: authPatch }),
+  };
+};
 
 const DynamicField = ({
   form,
@@ -113,7 +162,21 @@ const DynamicField = ({
   );
 };
 
-export const CreateIntegrationDialog = ({ entry }: { entry: CatalogEntry }) => {
+type Mode = "create" | "edit";
+
+export const IntegrationFormDialog = ({
+  entry,
+  mode,
+  open,
+  onOpenChange,
+  integration,
+}: {
+  entry: CatalogEntry;
+  mode: Mode;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  integration?: IntegrationListItem;
+}) => {
   const {
     platform,
     displayName,
@@ -121,8 +184,28 @@ export const CreateIntegrationDialog = ({ entry }: { entry: CatalogEntry }) => {
     credentialFields,
     credentialsAreAuthShaped,
   } = entry;
-  const [open, setOpen] = useState(false);
   const createIntegration = useCreateIntegration();
+  const updateIntegration = useUpdateIntegration();
+  const mutation = mode === "create" ? createIntegration : updateIntegration;
+
+  const shapeForFields = mode === "edit" ? relaxedShapeFor : shapeFor;
+  const authSchemaToUse = mode === "edit" ? relaxedAuthSchema : authSchema;
+  const credentialsSchema = credentialsAreAuthShaped
+    ? authSchemaToUse
+    : z.object(shapeForFields(credentialFields));
+
+  const [title, description, submitLabel] =
+    mode === "edit"
+      ? [
+          `Edit ${displayName}`,
+          "Leave a credential field blank to keep it unchanged.",
+          "Save Changes",
+        ]
+      : [
+          `Add ${displayName}`,
+          `Connect a new ${displayName} integration.`,
+          "Create Integration",
+        ];
 
   const formSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -132,51 +215,83 @@ export const CreateIntegrationDialog = ({ entry }: { entry: CatalogEntry }) => {
       .positive()
       .min(INTEGRATION_SYNC_EVERY_MIN * 60),
     config: z.object(shapeFor(configFields)),
-    credentials: credentialsAreAuthShaped
-      ? authSchema
-      : z.object(shapeFor(credentialFields)),
+    credentials: credentialsSchema,
   });
 
   type FormValues = z.infer<typeof formSchema>;
 
+  const defaultValues = {
+    name: integration?.name ?? "",
+    syncEvery: integration?.syncEvery ?? INTEGRATION_SYNC_EVERY_MIN * 60,
+    config: integration?.config ?? {},
+    // Every credential field starts blank — the user must never see the
+    // stored value, on create because there isn't one yet and on edit
+    // because it's never sent to the client at all.
+    credentials: credentialsAreAuthShaped
+      ? { authType: "None" }
+      : Object.fromEntries(credentialFields.map((spec) => [spec.key, ""])),
+  } as FormValues;
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      syncEvery: INTEGRATION_SYNC_EVERY_MIN * 60,
-      config: {},
-      credentials: credentialsAreAuthShaped ? { authType: "None" } : {},
-    } as FormValues,
+    defaultValues,
   });
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run on open/close, not on every defaultValues/form identity change.
+  useEffect(() => {
+    if (open) form.reset(defaultValues);
+  }, [open]);
+
   const onSubmit = (values: FormValues) => {
-    createIntegration.mutate(
-      { ...values, platform },
-      {
-        onSuccess: () => {
-          form.reset();
-          setOpen(false);
+    if (mode === "create") {
+      createIntegration.mutate(
+        { ...values, platform },
+        {
+          // Blank the form back out — ready for the next "Add" — rather
+          // than for edit mode, where reset() with no args would snap the
+          // fields back to the stale pre-edit snapshot during the close
+          // animation instead of what was just saved.
+          onSuccess: () => {
+            form.reset();
+            onOpenChange(false);
+          },
         },
-      },
+      );
+      return;
+    }
+    if (!integration) return;
+    const onSuccess = () => onOpenChange(false);
+    // `undefined` here passes zod's `.optional()` the same as an absent key
+    // — the router reads either as "keep what's stored" (see toRowShape /
+    // mergeCredentialPatch).
+    const data = {
+      ...values,
+      credentials: buildCredentialsPatch(
+        credentialsAreAuthShaped,
+        form.formState.dirtyFields.credentials as DirtyFields,
+        values.credentials as Record<string, unknown>,
+      ),
+      syncEvery: form.formState.dirtyFields.syncEvery
+        ? values.syncEvery
+        : undefined,
+    };
+    updateIntegration.mutate(
+      { id: integration.id, data: { ...data, platform } },
+      { onSuccess },
     );
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Button size="sm" onClick={() => setOpen(true)}>
-        <PlusIcon /> Add
-      </Button>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 rounded-2xl overflow-hidden">
         <DialogHeader className="px-6 py-4 border-b gap-1">
-          <DialogTitle className="text-xl">Add {displayName}</DialogTitle>
-          <DialogDescription>
-            Connect a new {displayName} integration.
-          </DialogDescription>
+          <DialogTitle className="text-xl">{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
-            id="create-integration-form"
+            id={`integration-form-${mode}`}
             className="px-6 py-4 max-h-[60vh] overflow-y-auto grid gap-6"
           >
             <FormField
@@ -245,13 +360,30 @@ export const CreateIntegrationDialog = ({ entry }: { entry: CatalogEntry }) => {
           </DialogClose>
           <Button
             type="submit"
-            form="create-integration-form"
-            disabled={createIntegration.isPending}
+            form={`integration-form-${mode}`}
+            disabled={mutation.isPending}
           >
-            Create Integration
+            {submitLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+};
+
+export const CreateIntegrationDialog = ({ entry }: { entry: CatalogEntry }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <PlusIcon /> Add
+      </Button>
+      <IntegrationFormDialog
+        entry={entry}
+        mode="create"
+        open={open}
+        onOpenChange={setOpen}
+      />
+    </>
   );
 };

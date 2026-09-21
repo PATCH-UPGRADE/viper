@@ -38,6 +38,7 @@ import type { NotificationDetailSource } from "../types";
 import { NotificationAffectedAssetsTab } from "./notification-affected-assets-tab";
 import { NotificationDetailsTab } from "./notification-details-tab";
 import { NotificationQuestionTab } from "./notification-questions-tab";
+import { NotificationReadReceipts } from "./notification-read-receipts";
 import { NotificationRespondTab } from "./notification-respond-tab";
 import { NotificationTypeBadge } from "./notification-type-badge";
 
@@ -271,6 +272,10 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
             onPendingChanges={setPendingPriority}
           />
         )}
+        <NotificationReadReceipts
+          receipts={notification.readReceipts}
+          className="ml-auto"
+        />
       </div>
 
       <CorrectionDialog

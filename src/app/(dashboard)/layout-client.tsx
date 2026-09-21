@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -13,17 +12,11 @@ const MAX_WIDTH = 800;
 // split out Inner part into a client component so can use useChatUI and useRef hooks
 const LayoutInner = ({ children }: { children: React.ReactNode }) => {
   const { state } = useChatUI();
-  const pathname = usePathname();
 
   const [chatWidth, setChatWidth] = useState(DEFAULT_WIDTH);
   const isDragging = useRef(false);
 
-  // /reports (and its thread pages) already embeds its own chat for the
-  // selected thread — showing the global panel too would stack two "Ask
-  // VIPER" surfaces side by side. Match the route exactly, not by prefix, so
-  // an unrelated route sharing the "/reports" prefix isn't caught too.
-  const onReports = pathname === "/reports" || pathname.startsWith("/reports/");
-  const isOpen = state !== "collapsed" && !onReports;
+  const isOpen = state !== "collapsed";
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

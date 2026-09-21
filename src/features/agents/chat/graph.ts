@@ -84,10 +84,13 @@ Ask for off-platform facts with ask_user_questions and record_note. Mark missing
 "Not available". After saving, confirm briefly in chat; the report is in /reports.
 `;
 
-export function buildSystemPrompt(role: UserRole): string {
+export function buildSystemPrompt(role: UserRole, fromReports = false): string {
+  const reportsBias = fromReports
+    ? `\n\n<surface>The user is on the reports view and intends to use this conversation to create a report. Once you understand the user's goals and have enough information, use the write_report tool to create a report. Do not output a "report" to the chat interface unless asked to (use the tool instead).</surface>`
+    : "";
   return `${BASE_PROMPT}
 
-<user_role>The user's role is: ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</user_role>`;
+<user_role>The user's role is: ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</user_role>${reportsBias}`;
 }
 
 export function buildChatGraph({
@@ -95,6 +98,7 @@ export function buildChatGraph({
   userRole = "hospital administration",
   threadId,
   report,
+  fromReports,
   loadNotes = loadPersistentNotesMarkdown,
 }: {
   userId: string;
@@ -103,6 +107,8 @@ export function buildChatGraph({
   threadId: string;
   /** Current document content for revisions, included in the context preload. */
   report?: string | null;
+  /** Request came from the /reports view — bias the prompt toward write_report. */
+  fromReports?: boolean;
   loadNotes?: () => Promise<string>;
 }) {
   // Passing threadId adds write_report; the recommendations graph omits it.
@@ -116,7 +122,7 @@ export function buildChatGraph({
   return buildAgentGraph({
     model,
     tools,
-    systemMessage: new SystemMessage(buildSystemPrompt(userRole)),
+    systemMessage: new SystemMessage(buildSystemPrompt(userRole, fromReports)),
     preload: report
       ? async () => `${await loadNotes()}\n\n## Current report\n\n${report}`
       : loadNotes,

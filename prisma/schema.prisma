@@ -1089,10 +1089,13 @@ model ChatThread {
   userId    String
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String?
-  // Markdown report the agent wrote for this thread (write_report tool). A
-  // thread with this set is a "report thread" and shows up under /reports.
-  // Users cannot edit it directly — they re-prompt and the agent rewrites it.
-  report    String?       @db.Text
+  // The thread's report (write_report tool), stored in its own ChatReport row.
+  // A thread with a non-null reportId is a "report thread" and shows under
+  // /reports. Users don't edit it directly — they re-prompt and the agent
+  // rewrites it. @unique keeps this 1:1 for now; see deleteThread's cleanup
+  // comment for what breaks if that changes.
+  reportId  String?       @unique
+  report    ChatReport?   @relation(fields: [reportId], references: [id])
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   messages  ChatMessage[]
@@ -1100,6 +1103,17 @@ model ChatThread {
   @@index([userId])
   // /reports listing: filter by user, sort by updatedAt.
   @@index([userId, updatedAt(sort: Desc)])
+}
+
+model ChatReport {
+  id        String      @id @default(cuid())
+  // Set by write_report alongside content — a report's own title, distinct
+  // from the conversation's (ChatThread.title).
+  title     String?
+  content   String      @db.Text
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  thread    ChatThread?
 }
 
 enum ChatMessageStatus {

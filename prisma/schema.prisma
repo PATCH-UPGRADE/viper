@@ -33,7 +33,6 @@ model User {
   artifactWrappers ArtifactWrapper[]
 
   apikeys           Apikey[]
-  apiKeyConnectors  ApiKeyConnector[]
   integration       Integration[]
   integrationUser   Integration?       @relation("integration_user")
   webhooks          Webhook[]
@@ -44,15 +43,16 @@ model User {
   fieldCorrections  FieldCorrection[]
 
   departmentId             String?
-  department               Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  workOrderTicketsCreated  WorkOrderTicket[] @relation("WorkOrderTicketCreator")
-  workOrderTicketsAssigned WorkOrderTicket[] @relation("WorkOrderTicketAssignee")
+  department               Department?                      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  workOrderTicketsCreated  WorkOrderTicket[]                @relation("WorkOrderTicketCreator")
+  workOrderTicketsAssigned WorkOrderTicket[]                @relation("WorkOrderTicketAssignee")
   ticketComments           TicketComment[]
   watchedTickets           TicketWatch[]
   ticketSeen               TicketSeen[]
   ticketActivities         TicketActivity[]
   notes                    Note[]
   answeredQuestions        Question[]
+  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
   @@unique([email])
   @@index([departmentId])
@@ -888,12 +888,15 @@ model Remediation {
   alohaStatus AlohaStatus?
   alohaLog    Json         @default("{}")
 
+  sourceImpact Json @default("{}")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  externalMappings ExternalRemediationMapping[]
+  externalMappings         ExternalRemediationMapping[]
   // raw TA4 submissions that produced this remediation
-  sourceRecords    SourceRecord[]
+  sourceRecords            SourceRecord[]
+  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
   @@index([vulnerabilityId])
   @@index([userId])
@@ -937,8 +940,6 @@ model Apikey {
   permissions         String?
   metadata            String?
 
-  connector ApiKeyConnector?
-
   @@index([referenceId])
   @@map("apikey")
 }
@@ -957,8 +958,6 @@ model Integration {
   syncEvery Int? // seconds. null = inherit the platform's defaultSyncEvery.
   // ^if we're polling, that's how often to poll
   enabled   Boolean @default(true)
-
-  apiKeyConnector ApiKeyConnector?
 
   // The user who created the integration
   userId String
@@ -980,35 +979,13 @@ model Integration {
   managesRelationships ManagesRelationship[]
   targetedWorkOrders   WorkOrderTicket[]     @relation(name: "WorkOrderTarget")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt                DateTime                         @default(now())
+  updatedAt                DateTime                         @updatedAt
+  medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
   @@index([userId])
   @@index([integrationUserId])
   @@map("integration")
-}
-
-// separate out to preserve between ApiKey rotations
-// TODO VW-435: clean up / delete later...
-model ApiKeyConnector {
-  id String @id @default(cuid())
-
-  name         String?
-  resourceType ResourceType?
-  lastRequest  DateTime?
-
-  apiKeyId      String?      @unique
-  apiKey        Apikey?      @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
-  integrationId String?      @unique
-  integration   Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
-  userId        String
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@map("api_key_connector")
 }
 
 enum SyncStatusEnum {
@@ -1097,6 +1074,7 @@ enum PlatformEnum {
   AI
   PARTNER
   FLEET
+  MEDISAO
 }
 
 // Traffic Light Protocol, governs information sharing
@@ -1118,11 +1096,17 @@ model ChatThread {
   userId    String
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String?
+  // Markdown report the agent wrote for this thread (write_report tool). A
+  // thread with this set is a "report thread" and shows up under /reports.
+  // Users cannot edit it directly — they re-prompt and the agent rewrites it.
+  report    String?       @db.Text
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   messages  ChatMessage[]
 
   @@index([userId])
+  // /reports listing: filter by user, sort by updatedAt.
+  @@index([userId, updatedAt(sort: Desc)])
 }
 
 enum ChatMessageStatus {
@@ -1399,6 +1383,7 @@ enum TicketActivityType {
   WORK_ORDER_CREATED
   STATUS_CHANGED
   CATEGORY_CHANGED
+  PRIORITY_CHANGED
   ASSIGNEE_CHANGED
   DEPARTMENTS_CHANGED
   SCHEDULED_AT_CHANGED
@@ -1616,6 +1601,39 @@ model SourceLink {
   @@index([notificationId])
   @@index([workOrderTicketId])
   @@map("source_link")
+}
+
+/// The pseudonym MedISAO derived for this hospital on one remediation.
+///
+/// Specific to MedISAO, which is the only platform that hosts comments. It is
+/// also the only record tying a pseudonym back to us: MedISAO never
+/// authenticated the person, so they cannot attest authorship for what we post.
+///
+/// One row per remediation and integration, not per user. We post under the
+/// deployment's hospital identifier and never send a user id, so MedISAO
+/// returns one pseudonym for everybody here. `userId` records who wrote the
+/// first comment, which the pseudonym deliberately cannot.
+model MedISAOExternalCommentIdentity {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  remediationId String
+  remediation   Remediation @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+
+  integrationId String
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  // Stable within one record and uncorrelated across records, by the platform's
+  // design. Never a user handle.
+  pseudonym String
+
+  createdAt DateTime @default(now())
+
+  @@unique([remediationId, integrationId])
+  @@index([remediationId])
+  @@map("medisao_external_comment_identity")
 }
 
 // One row per external record (an advisory, a notification on another platform),

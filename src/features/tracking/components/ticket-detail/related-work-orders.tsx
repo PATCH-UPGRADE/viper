@@ -1,5 +1,5 @@
+import { CollapsibleSectionCard } from "@/components/collapsible-section-card";
 import type { TicketDetail } from "../../types";
-import { CollapsibleSectionCard } from "./section-card";
 import { TicketRefRow } from "./shared";
 
 type Sibling = NonNullable<

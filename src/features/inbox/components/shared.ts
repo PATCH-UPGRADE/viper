@@ -1,4 +1,7 @@
-import type { RawEmailPayload } from "../types";
+import { startOfDay } from "date-fns";
+import type { SourceChannel, SourceLinkType } from "@/generated/prisma";
+import { dayGroupLabel } from "@/lib/date-utils";
+import type { NotificationReadReceipt, RawEmailPayload } from "../types";
 
 export function emailSenderName(raw: unknown): string | null {
   const from = (raw as RawEmailPayload | null)?.data?.from;
@@ -27,4 +30,108 @@ export function attachmentDownloadPath(attachmentId: string): string {
 export function fileExtensionLabel(filename: string | null): string {
   const extension = filename?.match(/\.([a-z0-9]{1,5})$/i)?.[1];
   return extension ? extension.toUpperCase() : "FILE";
+}
+
+type ActivityActor = { id: string; name: string | null; image: string | null };
+
+export type NotificationActivityRow =
+  | {
+      kind: "NOTIFICATION_CREATED" | "SOURCE_LINKED";
+      id: string;
+      createdAt: Date;
+      sourceLabel: string;
+      reasonWhy: string | null;
+    }
+  | {
+      kind: "FIELD_CHANGED";
+      id: string;
+      createdAt: Date;
+      field: string;
+      from: string | null;
+      to: string;
+      reason: string | null;
+      user: ActivityActor;
+      isAgent: boolean;
+    };
+
+type ActivitySource = {
+  sourceType: SourceLinkType;
+  reasonWhy: string | null;
+  createdAt: Date;
+  sourceRecord: { id: string; channel: SourceChannel; raw: unknown };
+};
+
+type ActivityCorrection = {
+  id: string;
+  field: string;
+  fromValue: unknown;
+  toValue: unknown;
+  reason: string | null;
+  createdAt: Date;
+  user: ActivityActor;
+  isAgent: boolean;
+};
+
+const sourceRow = (link: ActivitySource): NotificationActivityRow => ({
+  kind: link.sourceType === "Source" ? "NOTIFICATION_CREATED" : "SOURCE_LINKED",
+  id: `source-${link.sourceRecord.id}`,
+  createdAt: new Date(link.createdAt),
+  sourceLabel:
+    emailSenderName(link.sourceRecord.raw) ?? link.sourceRecord.channel,
+  reasonWhy: link.reasonWhy,
+});
+
+const fieldChangeRow = (
+  correction: ActivityCorrection,
+): NotificationActivityRow => ({
+  kind: "FIELD_CHANGED",
+  id: `correction-${correction.id}`,
+  createdAt: new Date(correction.createdAt),
+  field: correction.field,
+  from: correction.fromValue == null ? null : String(correction.fromValue),
+  to: String(correction.toValue ?? ""),
+  reason: correction.reason,
+  user: correction.user,
+  isAgent: correction.isAgent,
+});
+
+export function notificationActivityRows(notification: {
+  sourceLinks: ActivitySource[];
+  fieldCorrections: ActivityCorrection[];
+}): NotificationActivityRow[] {
+  const sourceRows = notification.sourceLinks.map(sourceRow);
+  const fieldChangeRows = notification.fieldCorrections.map(fieldChangeRow);
+  return [...sourceRows, ...fieldChangeRows];
+}
+
+export type ReadReceiptDayGroup = {
+  /** Start of the calendar day, in milliseconds. Days cannot collide on it. */
+  dayStart: number;
+  label: string;
+  receipts: NotificationReadReceipt[];
+};
+
+/**
+ * Rows inside a group keep the order they arrive in, which the server sorts
+ * newest first.
+ */
+export function groupReceiptsByDay(
+  receipts: NotificationReadReceipt[],
+): ReadReceiptDayGroup[] {
+  const byDay = new Map<number, NotificationReadReceipt[]>();
+
+  for (const receipt of receipts) {
+    const dayStart = startOfDay(receipt.readAt).getTime();
+    const list = byDay.get(dayStart) ?? [];
+    list.push(receipt);
+    byDay.set(dayStart, list);
+  }
+
+  return [...byDay.entries()]
+    .sort(([a], [b]) => b - a)
+    .map(([dayStart, dayReceipts]) => ({
+      dayStart,
+      label: dayGroupLabel(dayStart),
+      receipts: dayReceipts,
+    }));
 }

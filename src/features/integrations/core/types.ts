@@ -5,6 +5,7 @@
  */
 
 import type { z } from "zod";
+import type { SourceRecordAdapter } from "@/features/inbox/source-adapter";
 import type {
   PlatformEnum,
   ResourceType,
@@ -133,6 +134,13 @@ export interface ResourceModule<
     config: TConfig,
   ): Promise<{ externalId: string; raw: unknown }>;
 
+  /**
+   * Only for a `notifications` module: how a snapshot this resource recorded
+   * becomes a Notification. Declaring it is what lets the generic
+   * `process-source-record` job handle this platform without naming it.
+   */
+  sourceRecords?: SourceRecordAdapter;
+
   /** how often this resource should sync, in seconds. null = no opinion. */
   defaultSyncEvery: number | null;
 }
@@ -234,6 +242,7 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
   // biome-ignore lint/suspicious/noExplicitAny: TRaw/TDraft vary per platform and are erased here, exactly as `AnyConnectorModule` erases TConfig/TCreds.
   workOrders?: WorkOrderModule<any, TConfig, TCreds, any>;
   assets?: ResourceModule<unknown, unknown, TConfig, TCreds>;
+  remediations?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   notifications?: ResourceModule<unknown, unknown, TConfig, TCreds>;
 }
 

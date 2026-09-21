@@ -7,6 +7,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { makeRecordNoteTool } from "./note-tool";
 import { makeQueryPlatformDataTool } from "./query-platform-tool";
+import { makeWriteReportTool } from "./report-tool";
 import { makeWorkOrderTools } from "./work-order-tools";
 
 /** ```viper-ask-user ...``` block the chat UI parses to render question chips. */
@@ -53,11 +54,13 @@ const askUserQuestions = tool(
  * same set — `chat/graph.ts` and `recommendations/graph.ts` both call it — so a tool
  * added here is armed for all of them and must be described in each agent's prompt.
  */
-export function buildAgentTools(userId: string) {
+export function buildAgentTools(userId: string, reportThreadId?: string) {
   return [
     makeQueryPlatformDataTool(userId),
     askUserQuestions,
     ...makeWorkOrderTools(userId),
     makeRecordNoteTool(userId),
+    // write_report only when given a thread to write to (chat yes, recommendations no).
+    ...(reportThreadId ? [makeWriteReportTool(userId, reportThreadId)] : []),
   ];
 }

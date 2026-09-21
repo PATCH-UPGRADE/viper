@@ -38,3 +38,8 @@ export function getBaseUrl(): string {
 export function getApiUrl(endpoint: string): string {
   return `${getBaseUrl()}${endpoint}`;
 }
+
+/** Absolute URL for a possibly-relative href; an http(s) href is left as-is. */
+export function toAbsoluteUrl(href: string): string {
+  return /^https?:\/\//.test(href) ? href : getApiUrl(href);
+}

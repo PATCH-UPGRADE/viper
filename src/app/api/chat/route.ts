@@ -71,6 +71,7 @@ export async function POST(req: Request) {
   const userText = textOf(newUserMessage);
   const threadId = body.threadId ?? crypto.randomUUID();
   const { agent, assetData, vulnerabilityData } = body;
+  let userMessageSaved = false;
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
@@ -82,8 +83,9 @@ export async function POST(req: Request) {
 
       // Persist the user's turn, then hydrate the full conversation from the DB
       // (authoritative — we don't trust client-side message state).
-      await ensureThread(threadId, userId, userText);
+      const thread = await ensureThread(threadId, userId, userText);
       await saveUserMessage(threadId, newUserMessage.id, userText);
+      userMessageSaved = true;
       const history = await loadHistoryMessages(threadId);
 
       const graph =
@@ -94,7 +96,12 @@ export async function POST(req: Request) {
               assetData,
               vulnerabilityData,
             })
-          : buildChatGraph({ userId, userRole });
+          : buildChatGraph({
+              userId,
+              userRole,
+              threadId,
+              report: thread.report,
+            });
 
       await streamGraphToUI({ graph, input: { messages: history }, writer });
       writer.write({ type: "finish" });
@@ -102,6 +109,7 @@ export async function POST(req: Request) {
     onError: (error) =>
       error instanceof Error ? error.message : String(error),
     onFinish: async ({ responseMessage }) => {
+      if (!userMessageSaved) return;
       const { content, toolCalls } = splitAssistant(responseMessage);
       if (content.trim() || toolCalls.length) {
         await saveAssistantMessage(threadId, content, toolCalls);

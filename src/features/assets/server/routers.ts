@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import { resolveEffectiveIssuesByAsset } from "@/features/issues/server/effective-issues";
 import {
   attachNote,
   attachNotes,
@@ -246,7 +247,7 @@ export const assetsRouter = createTRPCRouter({
           return sortValue;
         }
 
-        return fetchPaginated(prisma.asset, input, {
+        const result = await fetchPaginated(prisma.asset, input, {
           where,
           include: assetDashboardInclude,
           orderBy: sort
@@ -258,15 +259,34 @@ export const assetsRouter = createTRPCRouter({
               ]
             : { updatedAt: "desc" },
         });
+        const effectiveIssues = await resolveEffectiveIssuesByAsset(
+          result.items,
+          assetDashboardInclude.issues.include,
+        );
+        return {
+          ...result,
+          items: result.items.map((asset) => ({
+            ...asset,
+            issues: effectiveIssues.get(asset.id) ?? [],
+          })),
+        };
       }
 
       const totalCount = await prisma.asset.count({ where });
       const meta = buildPaginationMeta(input, totalCount);
 
-      const allAssets = await prisma.asset.findMany({
+      const fetchedAssets = await prisma.asset.findMany({
         where,
         include: assetDashboardInclude,
       });
+      const effectiveIssues = await resolveEffectiveIssuesByAsset(
+        fetchedAssets,
+        assetDashboardInclude.issues.include,
+      );
+      const allAssets = fetchedAssets.map((asset) => ({
+        ...asset,
+        issues: effectiveIssues.get(asset.id) ?? [],
+      }));
 
       type AssetRow = (typeof allAssets)[number];
 
@@ -330,57 +350,63 @@ export const assetsRouter = createTRPCRouter({
       return createPaginatedResponse(items, meta);
     }),
 
+  // TODO: VW-511 -- full table load-and-merge: every asset plus all effective issues,
+  // worst case O(assets * vulnerabilities), on every dashboard load and status change
   getIssueMetricsInternal: protectedProcedure.query(async () => {
     const severities = Object.values(Severity);
 
-    const [activeResults, activeWithRemResults, remediatedResults] =
-      await Promise.all([
-        Promise.all(
-          severities.map((s) =>
-            prisma.issue.count({
-              where: {
-                status: IssueStatus.AFFECTED,
-                vulnerability: { severity: s },
-              },
-            }),
-          ),
-        ),
-        Promise.all(
-          severities.map((s) =>
-            prisma.issue.count({
-              where: {
-                status: IssueStatus.AFFECTED,
-                vulnerability: { severity: s, remediations: { some: {} } },
-              },
-            }),
-          ),
-        ),
-        Promise.all(
-          severities.map((s) =>
-            prisma.issue.count({
-              where: {
-                status: IssueStatus.FIXED,
-                vulnerability: { severity: s },
-              },
-            }),
-          ),
-        ),
-      ]);
-
-    return severities.reduce(
-      (acc, severity, i) => {
-        acc[severity] = {
-          active: activeResults[i],
-          activeWithRemediations: activeWithRemResults[i],
-          remediated: remediatedResults[i],
-        };
-        return acc;
+    const assets = await prisma.asset.findMany({
+      select: { id: true, deviceGroupId: true },
+    });
+    const effectiveIssuesByAssetId = await resolveEffectiveIssuesByAsset(
+      assets,
+      {
+        vulnerability: {
+          select: {
+            severity: true,
+            _count: { select: { remediations: true } },
+          },
+        },
       },
-      {} as Record<
-        Severity,
-        { active: number; activeWithRemediations: number; remediated: number }
-      >,
     );
+
+    const counts = {} as Record<
+      Severity,
+      { active: number; activeWithRemediations: number; remediated: number }
+    >;
+    const totals = {
+      active: 0,
+      activeWithRemediations: 0,
+      remediated: 0,
+    };
+    for (const severity of severities) {
+      counts[severity] = {
+        active: 0,
+        activeWithRemediations: 0,
+        remediated: 0,
+      };
+    }
+
+    for (const effectiveIssues of effectiveIssuesByAssetId.values()) {
+      for (const issue of effectiveIssues) {
+        const severityCounts = counts[issue.vulnerability.severity];
+        const hasRemediation = issue.vulnerability._count.remediations > 0;
+
+        if (issue.status === IssueStatus.AFFECTED) {
+          severityCounts.active++;
+          totals.active++;
+          if (hasRemediation) {
+            severityCounts.activeWithRemediations++;
+            totals.activeWithRemediations++;
+          }
+        } else if (issue.status === IssueStatus.FIXED) {
+          severityCounts.remediated++;
+          totals.remediated++;
+        }
+      }
+    }
+
+    return { ...counts, totals };
   }),
 
   // Internal API for asset vulnerability matching
@@ -645,20 +671,28 @@ export const assetsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input }) => {
-      const where = {
-        createdAt: { gte: input.createdAfter },
-        issues: { some: { status: IssueStatus.AFFECTED } },
+      const recentAssets = await prisma.asset.findMany({
+        where: { createdAt: { gte: input.createdAfter } },
+        include: assetDashboardInclude,
+        orderBy: { createdAt: "desc" },
+      });
+      const effectiveIssues = await resolveEffectiveIssuesByAsset(
+        recentAssets,
+        assetDashboardInclude.issues.include,
+      );
+      const recentAssetsWithEffectiveIssues = recentAssets.map((asset) => ({
+        ...asset,
+        issues: effectiveIssues.get(asset.id) ?? [],
+      }));
+      const newlyVulnerableAssets = recentAssetsWithEffectiveIssues.filter(
+        (asset) =>
+          asset.issues.some((issue) => issue.status === IssueStatus.AFFECTED),
+      );
+
+      return {
+        items: newlyVulnerableAssets.slice(0, input.pageSize),
+        totalCount: newlyVulnerableAssets.length,
       };
-      const [totalCount, items] = await Promise.all([
-        prisma.asset.count({ where }),
-        prisma.asset.findMany({
-          where,
-          include: assetDashboardInclude,
-          orderBy: { createdAt: "desc" },
-          take: input.pageSize,
-        }),
-      ]);
-      return { items, totalCount };
     }),
 
   // DELETE /api/assets/{asset_id} - Delete asset (only creator can delete)

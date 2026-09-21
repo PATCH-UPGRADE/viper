@@ -71,7 +71,7 @@ const WorkOrderRow = ({
                 <Badge
                   key={assetId}
                   variant="secondary"
-                  className="font-mono text-[11px]"
+                  className="font-mono text-[11px] dark:bg-accent"
                 >
                   {label(assetId)}
                 </Badge>
@@ -170,7 +170,7 @@ export const OtherAssetWorkOrdersCard = ({
           // Radix emits "" when the active item is clicked again.
           onValueChange={(next) => next && setMode(next as GroupMode)}
           aria-label="Group other work orders"
-          className="h-9 shrink-0 rounded-lg bg-accent p-[3px] dark:bg-muted"
+          className="h-9 shrink-0 rounded-lg bg-accent p-[3px] dark:bg-background"
         >
           {MODES.map(({ value, label }) => (
             <ToggleGroupItem
@@ -204,7 +204,7 @@ export const OtherAssetWorkOrdersCard = ({
                 value={group.key}
                 className="overflow-hidden rounded-lg border border-b"
               >
-                <AccordionTrigger className="items-center bg-muted px-4 py-3 hover:no-underline">
+                <AccordionTrigger className="items-center bg-muted px-4 py-3 hover:no-underline dark:bg-background">
                   <div className="flex w-full items-center gap-2.5">
                     <span
                       className={cn(
@@ -219,7 +219,7 @@ export const OtherAssetWorkOrdersCard = ({
                         {group.subLabel}
                       </span>
                     )}
-                    <Badge variant="secondary" className="ml-auto shrink-0">
+                    <Badge variant="secondary" className="ml-auto shrink-0 dark:bg-accent">
                       {group.workOrders.length}
                     </Badge>
                   </div>

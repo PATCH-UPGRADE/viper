@@ -1163,6 +1163,108 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
       },
     ],
   },
+  // ── Neighbouring work on the two Cisco ASA appliances ──────────────────
+  // Standalone tickets from several departments that touch rad-fw-001 and
+  // rad-vpn-001. Populates the "Other active work orders on these assets"
+  // card on the EXTRABACON ticket: the firewall group exceeds the five-row
+  // cap ("Show 3 more"), the VPN gateway group exceeds it by one, and the
+  // Done ticket at the end must not appear.
+  {
+    summary: "Restrict SNMP on the perimeter firewall to the management VLAN",
+    description:
+      "Interim control until the ASA upgrade lands: ACL the SNMP community to the management VLAN only.",
+    status: TicketStatus.IN_PROGRESS,
+    category: TicketCategory.NETWORK_REMEDIATION,
+    department: "IT",
+    scheduledAt: inDays(1),
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+  },
+  {
+    summary: "Quarterly firewall rule review — perimeter",
+    description: "Review and prune stale inbound rules on rad-fw-001.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.CONFIG_CHANGE,
+    department: "IT",
+    scheduledAt: inDays(2),
+    linkedAssetIds: ["rad-fw-001"],
+  },
+  {
+    summary: "Rotate the VPN gateway TLS certificate",
+    description: "Current certificate expires in 30 days.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.CONFIG_CHANGE,
+    department: "IT",
+    scheduledAt: inDays(5),
+    linkedAssetIds: ["rad-vpn-001"],
+  },
+  {
+    summary: "Enable SNMPv3 with auth and encryption on both ASA appliances",
+    description:
+      "Replace the SNMPv2c community string once the upgrade completes.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.CONFIG_CHANGE,
+    department: "IT",
+    scheduledAt: inDays(4),
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+  },
+  {
+    summary: "Verify remote radiology VPN failover after the ASA upgrade",
+    description:
+      "Confirm after-hours read coverage reconnects within the SLA once rad-vpn-001 is back.",
+    status: TicketStatus.REQUIRES_APPROVAL,
+    category: TicketCategory.CLINICAL_REVIEW,
+    department: "Radiology",
+    scheduledAt: inDays(8),
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+  },
+  {
+    summary:
+      "Confirm ED telemetry traffic survives the firewall maintenance window",
+    description:
+      "Telemetry alarms route through the perimeter to the paging vendor. Validate the failover path.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.CLINICAL_REVIEW,
+    department: "Emergency Department",
+    scheduledAt: inDays(6),
+    linkedAssetIds: ["rad-fw-001"],
+  },
+  {
+    summary: "Change-window sign-off — perimeter firewall maintenance",
+    description:
+      "Approve the 30-minute external outage and notify affected departments.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.OTHER,
+    department: "Administration",
+    scheduledAt: inDays(6),
+    linkedAssetIds: ["rad-fw-001"],
+  },
+  {
+    summary: "Procure ASA 5506-X replacements for the end-of-life 5505s",
+    description:
+      "Both 5505 appliances are past end-of-support. Quote replacements for the next capital cycle.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.NEW_ASSET_PROCUREMENT,
+    department: "Procurement",
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+  },
+  {
+    summary: "Validate SNMP trap forwarding to the SIEM after the upgrade",
+    description:
+      "Traps from both appliances must still reach the SIEM collector on the new release.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.CONFIG_CHANGE,
+    department: "IT",
+    scheduledAt: inDays(9),
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+  },
+  {
+    summary: "Archive the legacy ASA 8.2 configurations",
+    description: "Configs exported to the change-management share.",
+    status: TicketStatus.DONE,
+    category: TicketCategory.OTHER,
+    department: "IT",
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+  },
 ];
 
 async function clearDatabase() {

@@ -69,6 +69,11 @@ export function buildMitigationPlansSchema(refs: EntityRefs) {
     detailedDescription: z
       .string()
       .describe("full description of the work to perform"),
+    performedBy: z
+      .enum(["vendor", "hospital"])
+      .describe(
+        "Who carries out this work. 'vendor' when only the servicing vendor can do it — firmware, hardware, calibration, anything needing their service credentials or an engineer on site. 'hospital' when your own staff do it — account changes, network rules, configuration, monitoring, policy. Judge the work itself, not who owns the device: a hospital-run account audit on a vendor-serviced scanner is 'hospital'.",
+      ),
     vulnerabilityIds: idArray(
       refs.vulnerabilityRefs,
       "refs (e.g. vuln-1) of ONLY the vulnerabilities this specific work order addresses; empty if none",
@@ -161,6 +166,7 @@ export type PlanCards = z.infer<typeof planCardsSchema>;
 export type PlanWorkOrder = {
   shortDescription: string;
   detailedDescription: string;
+  performedBy: "vendor" | "hospital";
   vulnerabilityIds: string[];
   remediationIds: string[];
   deviceGroups: Array<{

@@ -7,6 +7,7 @@ import type {
 } from "@/features/integrations/core/types";
 import { attachExternalMapping } from "@/features/tracking/server/asset-tickets";
 import { SubmissionState } from "@/generated/prisma";
+import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { labelFor } from "./targets";
 
@@ -98,6 +99,59 @@ export async function releaseClaim(
           : String(error ?? "Unknown error"),
     },
   });
+}
+
+/**
+ * Claim a promoted ticket and queue the job that files it.
+ *
+ * Both approval paths — a chat proposal and an accepted mitigation plan — end
+ * here, so the claim and the queueing stay in step. The filing itself runs as a
+ * job because one work order can cover dozens of assets and signing in to a
+ * vendor is slow.
+ *
+ * Never throws. A caller that must surface the failure reads `error`; a caller
+ * approving many tickets at once carries on with the rest.
+ */
+export async function dispatchSubmission(
+  ticketId: string,
+  actorId: string,
+): Promise<{ submissionState: SubmissionState; error?: string }> {
+  // Two approvals racing each other both read PENDING; only one claim wins, and
+  // the loser must not send a second order.
+  if (!(await claimForSubmission(ticketId))) {
+    const current = await prisma.workOrderTicket.findUniqueOrThrow({
+      where: { id: ticketId },
+      select: { submissionState: true },
+    });
+    return { submissionState: current.submissionState };
+  }
+
+  // The claim is held from here on. If the job is never queued, nothing else
+  // releases it, and the ticket stays SUBMITTING forever with no filing and no
+  // retry, so hand it back before reporting the failure.
+  try {
+    await inngest.send({
+      name: "workOrder/submit.requested",
+      data: { ticketId, actorId },
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "Unknown error";
+    try {
+      await releaseClaim(ticketId, error);
+    } catch (releaseError) {
+      console.error(
+        `dispatchSubmission: ${ticketId} is stuck in SUBMITTING — releasing the claim failed`,
+        releaseError,
+      );
+      return {
+        submissionState: SubmissionState.SUBMITTING,
+        error: `${reason} (the claim could not be released, so this work order needs manual attention)`,
+      };
+    }
+    return { submissionState: SubmissionState.FAILED, error: reason };
+  }
+
+  return { submissionState: SubmissionState.SUBMITTING };
 }
 
 interface SubmissionFailure {

@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  assetIdsForMatchings,
+  type DraftTarget,
+  resolveDraftTarget,
+} from "@/features/work-orders/server/drafts";
 import type { PdfAttachment } from "@/lib/agent-messages";
 import { getAutomationUser } from "@/lib/automation-user";
 import prisma from "@/lib/db";
@@ -42,6 +47,23 @@ export async function persistMitigationPlans(
     resolveValidIds(plans.flatMap((p) => p.workOrders)),
   ]);
 
+  const matchingIdsFor = (w: PlanWorkOrder) =>
+    keepValidIds(
+      w.deviceGroups.map((d) => d.id),
+      valid.deviceGroupMatching,
+    );
+
+  const vendorWorkOrders = plans
+    .flatMap((plan) => plan.workOrders)
+    .filter((w) => w.performedBy === "vendor");
+  const targets = new Map<PlanWorkOrder, DraftTarget>();
+  await Promise.all(
+    vendorWorkOrders.map(async (w) => {
+      const assetIds = await assetIdsForMatchings(prisma, matchingIdsFor(w));
+      targets.set(w, await resolveDraftTarget(assetIds));
+    }),
+  );
+
   let dropped = 0;
   const linksFor = (w: PlanWorkOrder) => {
     const vulnerabilityIds = keepValidIds(
@@ -49,10 +71,7 @@ export async function persistMitigationPlans(
       valid.vulnerability,
     );
     const remediationIds = keepValidIds(w.remediationIds, valid.remediation);
-    const deviceGroupIds = keepValidIds(
-      w.deviceGroups.map((d) => d.id),
-      valid.deviceGroupMatching,
-    );
+    const deviceGroupIds = matchingIdsFor(w);
     dropped +=
       w.vulnerabilityIds.length -
       vulnerabilityIds.length +
@@ -93,6 +112,7 @@ export async function persistMitigationPlans(
               isDraft: true,
               creatorId: automation.id,
               notificationId,
+              ...targets.get(w),
               ...linksFor(w),
             })),
           },

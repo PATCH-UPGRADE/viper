@@ -6,6 +6,7 @@ import {
   proposeWorkOrderSchema,
   type WorkOrderProposal,
 } from "@/features/work-orders/schemas";
+import { draftTargetFields } from "@/features/work-orders/server/drafts";
 import {
   type FileableTarget,
   keepFileableTargets,
@@ -15,7 +16,7 @@ import {
   labelFor,
   resolveWorkOrderTargets,
 } from "@/features/work-orders/server/targets";
-import { SubmissionState, TicketStatus } from "@/generated/prisma";
+import { TicketStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { TOOL_REJECTED_PREFIX } from "../shared/build-graph";
 
@@ -191,11 +192,7 @@ const makeProposeWorkOrder = (userId: string) =>
             // Hidden from the tracking board until it is approved.
             isDraft: true,
             creatorId: userId,
-            targetIntegrationId: target?.integrationId ?? null,
-            platformPayload: target ? payload : undefined,
-            submissionState: target
-              ? SubmissionState.PENDING
-              : SubmissionState.NONE,
+            ...draftTargetFields(target ?? null, payload),
           },
           select: {
             id: true,

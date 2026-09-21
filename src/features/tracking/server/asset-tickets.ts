@@ -1,11 +1,8 @@
 import "server-only";
+import { assetsForMatchings } from "@/features/work-orders/server/drafts";
 import type { Priority, TicketCategory } from "@/generated/prisma";
 import { TicketStatus } from "@/generated/prisma";
 import type { TransactionClient } from "@/lib/db";
-import {
-  deviceGroupWhereForMatching,
-  matchingAppliesToDeviceGroup,
-} from "@/lib/device-matching";
 import { recordAssetActivity } from "./activities";
 
 interface ParentFields {
@@ -156,34 +153,8 @@ export async function attachMatchingAssets(
   const { parentTicketId, matchingIds, actorId } = params;
   if (matchingIds.length === 0) return;
 
-  const matchings = await tx.deviceGroupMatching.findMany({
-    where: { id: { in: matchingIds } },
-    select: {
-      manufacturerId: true,
-      productId: true,
-      versionId: true,
-      versionRange: true,
-    },
-  });
-  const candidates = await tx.asset.findMany({
-    where: {
-      deviceGroup: { OR: matchings.map(deviceGroupWhereForMatching) },
-    },
-    select: {
-      id: true,
-      hostname: true,
-      ip: true,
-      deviceGroup: {
-        select: {
-          id: true,
-          manufacturerId: true,
-          productId: true,
-          versionId: true,
-          version: { select: { canonicalName: true } },
-        },
-      },
-    },
-  });
+  const assets = await assetsForMatchings(tx, matchingIds);
+
   // Read once for the whole fan-out. Every child copies the same parent, so
   // leaving this to createAssetTicket would re-read it for each asset.
   const parent = await tx.workOrderTicket.findUniqueOrThrow({
@@ -203,12 +174,8 @@ export async function attachMatchingAssets(
   // Guards against creating the same asset's child ticket twice — findMany
   // already returns each asset once, so this only matters if that changes.
   const attachedAssetIds = new Set<string>();
-  for (const asset of candidates) {
+  for (const asset of assets) {
     if (attachedAssetIds.has(asset.id)) continue;
-    const matches = matchings.some((matching) =>
-      matchingAppliesToDeviceGroup(matching, asset.deviceGroup),
-    );
-    if (!matches) continue;
     attachedAssetIds.add(asset.id);
 
     await createAssetTicket(tx, {

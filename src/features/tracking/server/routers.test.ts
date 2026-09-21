@@ -1172,7 +1172,7 @@ describe("trackingRouter.getOtherAssetWorkOrders", () => {
     expect(result[0]).toMatchObject({ id: "w1", assetIds: ["a1", "a2"] });
   });
 
-  it("excludes this ticket, its parent, its sub-tickets, drafts, Done, and per-asset children", async () => {
+  it("excludes this ticket, its parent, its sub-tickets, drafts, Done parents, Done per-asset children, and child rows", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
       id: "child",
@@ -1185,6 +1185,7 @@ describe("trackingRouter.getOtherAssetWorkOrders", () => {
 
     expect(mockPrisma.assetTicket.findMany.mock.calls[0][0].where).toEqual({
       assetId: { in: ["a1"] },
+      ticket: { status: { not: "DONE" } },
       parentTicket: {
         id: { notIn: ["child", "parent"] },
         isDraft: false,

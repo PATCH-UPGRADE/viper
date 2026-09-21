@@ -428,6 +428,9 @@ export const trackingRouter = createTRPCRouter({
       const rows = await prisma.assetTicket.findMany({
         where: {
           assetId: { in: assetIds },
+          // Per-asset status, as the asset page uses: a work order that is
+          // Done for this asset but still open elsewhere is not active here.
+          ticket: { status: { not: TicketStatus.DONE } },
           parentTicket: {
             id: { notIn: excludedIds },
             isDraft: false,

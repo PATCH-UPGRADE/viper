@@ -26,7 +26,7 @@ import {
   useSetWatching,
   useSuspenseTrackingTicket,
 } from "../../hooks/use-tracking";
-import { TicketActivityTimeline } from "./activity-timeline";
+import { ActivityTimeline } from "./activity-timeline";
 import { AdditionalDetailsCard } from "./additional-details-card";
 import { DescriptionCard } from "./description-card";
 import { TicketEditForm } from "./edit-form";
@@ -198,7 +198,7 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
             <AdditionalDetailsCard
               assetIds={data.assets.map((a) => a.asset.id)}
             />
-            <TicketActivityTimeline
+            <ActivityTimeline
               ticketId={data.id}
               comments={data.comments}
               activities={data.activities}

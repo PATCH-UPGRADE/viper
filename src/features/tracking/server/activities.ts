@@ -1,9 +1,5 @@
 import "server-only";
-import type {
-  Priority,
-  TicketCategory,
-  TicketStatus,
-} from "@/generated/prisma";
+import type { TicketCategory, TicketStatus } from "@/generated/prisma";
 import prisma, { type TransactionClient } from "@/lib/db";
 
 // Activity rows are intentionally lightweight: `type` is the discriminator,
@@ -24,7 +20,6 @@ type BeforeTicket = {
   body: string | null;
   status: TicketStatus;
   category: TicketCategory;
-  priority: Priority;
   scheduledAt: Date | null;
   assigneeId: string | null;
   assignee: AssigneeSnapshot;
@@ -39,7 +34,6 @@ type UpdateInput = {
   body?: string | null;
   status?: TicketStatus;
   category?: TicketCategory;
-  priority?: Priority;
   departmentIds?: string[];
   descriptions?: DescriptionInput[];
   assigneeId?: string | null;
@@ -61,7 +55,6 @@ export async function snapshotBeforeUpdate(
       body: true,
       status: true,
       category: true,
-      priority: true,
       scheduledAt: true,
       assigneeId: true,
       assignee: { select: { id: true, name: true } },
@@ -151,12 +144,6 @@ export async function recordUpdateActivities(
       data: { from: before.category, to: input.category },
     });
   }
-  if (input.priority !== undefined && input.priority !== before.priority) {
-    rows.push({
-      type: "PRIORITY_CHANGED",
-      data: { from: before.priority, to: input.priority },
-    });
-  }
   if (
     input.scheduledAt !== undefined &&
     (input.scheduledAt?.getTime() ?? null) !==
@@ -213,7 +200,6 @@ export async function recordUpdateActivities(
       type: r.type as
         | "STATUS_CHANGED"
         | "CATEGORY_CHANGED"
-        | "PRIORITY_CHANGED"
         | "ASSIGNEE_CHANGED"
         | "DEPARTMENTS_CHANGED"
         | "SCHEDULED_AT_CHANGED"

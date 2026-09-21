@@ -49,24 +49,6 @@ export const useCreateIntegration = () => {
   );
 };
 
-export const useUpdateIntegration = () => {
-  const trpc = useTRPC();
-  const invalidateIntegrations = useInvalidateIntegrations();
-
-  return useMutation(
-    trpc.integrations.update.mutationOptions({
-      onSuccess: () => {
-        toast.success("Integration updated");
-        invalidateIntegrations();
-      },
-      onError: (error) => {
-        toast.error(`Failed to update Integration: ${error.message}`);
-        console.error(error);
-      },
-    }),
-  );
-};
-
 export const useRemoveIntegration = () => {
   const trpc = useTRPC();
   const invalidateIntegrations = useInvalidateIntegrations();

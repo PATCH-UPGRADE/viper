@@ -1,7 +1,6 @@
 import "server-only";
 import { generateFollowUpQuestion } from "@/features/inbox/agent/question";
 import { triageNotification } from "@/features/inbox/agent/triage";
-import { persistTriageResult } from "@/features/inbox/agent/triage/persist";
 import { sortVulnerabilities } from "@/features/inbox/agent/vex";
 import { gatherVexContextForIssue } from "@/features/inbox/agent/vex/context";
 import { applyVexDeterminations } from "@/features/inbox/agent/vex/process_output";
@@ -55,7 +54,14 @@ export const reevaluateIssueOnAnswer = inngest.createFunction(
           source.id,
           question.notificationId,
         );
-        await persistTriageResult(question.notificationId, result);
+        await prisma.notification.update({
+          where: { id: question.notificationId },
+          data: {
+            priority: result.priority,
+            priorityReasonWhy: result.priorityReasonWhy,
+            hospitalImpact: result.hospitalImpact,
+          },
+        });
       });
     } else {
       const roundCount = await prisma.question.count({ where: { issueId } });

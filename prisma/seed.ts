@@ -133,16 +133,6 @@ const SAMPLE_DEVICE_GROUPS = [
     modelName: "SOMATOM go.Top",
     version: "N/A",
   },
-  // ── MedISAO integration test device ─────────────────────────────────────────
-  // Matches the ViperMD / ViperDevice channel the MedISAO dev instance
-  // publishes on, so its advisories land on a real asset's Advisories tab.
-  // The version is exact so a VERS range like "vers:semver/<=6.0.2" resolves.
-  {
-    cpe: "cpe:2.3:h:vipermd:viperdevice:6.0.2:*:*:*:*:*:*:*",
-    manufacturer: "ViperMD",
-    modelName: "ViperDevice",
-    version: "6.0.2",
-  },
 ];
 
 // Used to simulate imaging device utilization throughout the week
@@ -556,24 +546,6 @@ const SAMPLE_ASSETS = [
     },
     status: "Active",
     utilization: IMAGING_UTILIZATION,
-  },
-  // ── MedISAO integration test device ─────────────────────────────────────────
-  // The only asset the MedISAO dev channel can reach. Without it every
-  // advisory that syncs is stored but matches nothing in this hospital.
-  {
-    id: "medisao-test-001",
-    ip: "10.90.1.10",
-    cpe: "cpe:2.3:h:vipermd:viperdevice:6.0.2:*:*:*:*:*:*:*",
-    role: "Ventilator",
-    networkSegment: "BIOMED-VLAN-90",
-    hostname: "VENT-VIPERMD-001",
-    macAddress: "00:1A:2B:3C:90:10",
-    serialNumber: "VMD-VD-2026-001",
-    location: {
-      building: "Critical Care",
-      room: "ICU Bay 1",
-    },
-    status: "Active",
   },
 ];
 
@@ -1429,20 +1401,14 @@ async function seedFleetIntegration(userId: string) {
           create: [
             { resource: ResourceType.WorkOrder },
             { resource: ResourceType.Asset },
-            { resource: ResourceType.SourceRecord },
           ],
         },
       },
     }));
 
-  const allResourceTypes = [
-    ResourceType.WorkOrder,
-    ResourceType.Asset,
-    ResourceType.SourceRecord,
-  ];
   // A re-seed against an existing integration must still gain any sync rows
   // added since it was first created (e.g. Asset, VW-434).
-  for (const resource of allResourceTypes) {
+  for (const resource of [ResourceType.WorkOrder, ResourceType.Asset]) {
     await prisma.integrationResourceSync.upsert({
       where: {
         integrationId_resource: { integrationId: integration.id, resource },

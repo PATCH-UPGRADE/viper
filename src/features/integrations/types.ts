@@ -49,13 +49,11 @@ export const resourceTypeSchema = z.enum(
 export const integrationInputSchema = z.object({
   name: z.string().min(1, "Name is required"),
   platform: z.enum(PlatformEnum),
-  /** Omitted on edit means "keep what is stored" — same as `credentials` below. */
   syncEvery: z
     .number()
     .int()
     .positive()
-    .min(INTEGRATION_SYNC_EVERY_MIN * 60)
-    .optional(),
+    .min(INTEGRATION_SYNC_EVERY_MIN * 60),
   config: z.record(z.string(), z.unknown()),
   /**
    * Opaque for the same reason `config` is — not every platform uses `authSchema`.

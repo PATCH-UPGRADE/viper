@@ -9,7 +9,6 @@ import {
   UserCheckIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { CollapsibleSectionCard } from "@/components/collapsible-section-card";
 import {
   Accordion,
   AccordionContent,
@@ -17,6 +16,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { AssetUtilizationAnswer } from "@/features/assets/components/asset-utilization-grid";
+import { CollapsibleSectionCard } from "./section-card";
 
 type StubQuestion = {
   id: string;

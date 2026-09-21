@@ -1,8 +1,6 @@
 import "server-only";
-import type { SourceRecordAdapter } from "@/features/inbox/source-adapter";
 import type { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { ai } from "../platforms/ai";
-import { medisao } from "../platforms/medisao";
 import { partner } from "../platforms/partner";
 import { teamplayFleet } from "../platforms/teamplay-fleet";
 import type { Category } from "../types";
@@ -16,7 +14,6 @@ export const registry: Partial<Record<PlatformEnum, AnyConnectorModule>> = {
   AI: ai,
   PARTNER: partner,
   FLEET: teamplayFleet,
-  MEDISAO: medisao,
 };
 
 export const requirePlatform = (platform: PlatformEnum): AnyConnectorModule => {
@@ -36,15 +33,6 @@ export const displayNameFor = (platform: PlatformEnum): string =>
 
 export const categoriesFor = (platform: PlatformEnum): Category[] =>
   registry[platform]?.definition.categories ?? [];
-
-/**
- * How this platform's recorded snapshots become Notifications, if it records
- * any. Undefined for a platform that has no notifications resource.
- */
-export const sourceAdapterFor = (
-  platform: PlatformEnum,
-): SourceRecordAdapter | undefined =>
-  registry[platform]?.notifications?.sourceRecords;
 
 /** The platform author's own sense of how fast this resource moves. */
 export const defaultSyncEveryFor = (

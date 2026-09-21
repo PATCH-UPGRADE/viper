@@ -3,7 +3,7 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
-import { MailIcon, RssIcon } from "lucide-react";
+import { MailIcon } from "lucide-react";
 import { PriorityBadge } from "@/components/priority-badge";
 import { Badge } from "@/components/ui/badge";
 import { SortableHeader } from "@/components/ui/data-table";
@@ -26,24 +26,19 @@ function SourceDisplay({
 }: {
   source: NotificationWithRelations["sourceLinks"][number]["sourceRecord"];
 }) {
-  const isEmail = source.channel === "Email";
-  const raw = isEmail ? (source.raw as unknown as RawEmailPayload) : null;
-
-  // An email is known by its sender. Everything else is known by the
-  // integration an operator configured, which beats the bare channel name.
-  const label = isEmail
-    ? (raw?.data?.from ?? "Email")
-    : (source.mapping?.integration.name ?? source.channel);
-
+  const raw =
+    source.channel === "Email"
+      ? (source.raw as unknown as RawEmailPayload)
+      : null;
   return (
     <span className="flex flex-col gap-0.5">
       <span className="flex items-center gap-1 text-sm">
-        {isEmail ? (
+        {source.channel === "Email" && (
           <MailIcon className="size-3 shrink-0 text-muted-foreground" />
-        ) : (
-          <RssIcon className="size-3 shrink-0 text-muted-foreground" />
         )}
-        <span className="truncate max-w-[200px]">{label}</span>
+        <span className="truncate max-w-[200px]">
+          {raw?.data?.from ?? source.channel}
+        </span>
       </span>
       <span className="text-xs text-muted-foreground">
         {formatDistanceToNow(source.observedAt, { addSuffix: true })}

@@ -1,4 +1,4 @@
-import { format, isThisYear, isToday, isYesterday } from "date-fns";
+import { format } from "date-fns";
 
 // `separator` sits between the date and the time (e.g. "Jul 21, 2026 at 3:00
 // PM" vs "· 3:00 PM"); it is a date-fns literal, so it is not interpreted.
@@ -9,13 +9,6 @@ export const formatScheduled = (
   if (!date) return null;
   const d = date instanceof Date ? date : new Date(date);
   return format(d, `MMM d, yyyy '${separator}' h:mm a`);
-};
-
-/** Heading for a group of items that share a calendar day */
-export const dayGroupLabel = (date: Date | string | number): string => {
-  if (isToday(date)) return "Today";
-  if (isYesterday(date)) return "Yesterday";
-  return format(date, isThisYear(date) ? "MMM d" : "MMM d, yyyy");
 };
 
 /** Three-letter English month abbreviations, indexed 0 = Jan … 11 = Dec. */

@@ -58,7 +58,10 @@ const integrationRow = (syncEvery: number | null, nextSyncAt: Date | null) => ({
     },
   ],
 });
-const existingIntegration = { id: "integration-1" };
+const existingIntegration = {
+  id: "integration-1",
+  platform: PlatformEnum.PARTNER,
+};
 
 mockDefaultSyncEveryFor.mockReturnValue(900);
 mockCategoriesFor.mockReturnValue([]);
@@ -272,6 +275,16 @@ describe("integrationsRouter.update", () => {
       caller.update({ id: "missing", data: baseData }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(mockPrisma.integration.update).not.toHaveBeenCalled();
+  });
+
+  it("ignores a platform sent by the client, keeping the one actually stored", async () => {
+    await caller.update({
+      id: "integration-1",
+      data: { ...baseData, platform: PlatformEnum.AI },
+    });
+
+    const call = mockPrisma.integration.update.mock.calls[0][0];
+    expect(call.data.platform).toBe(PlatformEnum.PARTNER);
   });
 
   it("merges one dirty field into the existing credentials, preserving the rest", async () => {

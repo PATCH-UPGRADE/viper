@@ -184,7 +184,7 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
                 <FormLabel>Header Value *</FormLabel>
                 <FormControl>
                   <Input
-                    type="text"
+                    type="password"
                     placeholder="Header value"
                     {...field}
                     value={(field.value as string | undefined) ?? ""}

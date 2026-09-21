@@ -146,9 +146,9 @@ const asBadRequest = <T>(fn: () => T): T => {
 const requireIntegration = async (id: string) => {
   const existing = await prisma.integration.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, platform: true },
   });
-  requireExistence(existing, "Integration");
+  return requireExistence(existing, "Integration");
 };
 
 export const integrationsRouter = createTRPCRouter({
@@ -252,7 +252,7 @@ export const integrationsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { id, data } = input;
       // Existence check and credentials fetch are independent reads — run concurrently, not sequentially.
-      const [, existingRow] = await Promise.all([
+      const [integration, existingRow] = await Promise.all([
         requireIntegration(id),
         data.credentials
           ? prisma.integration.findUnique({
@@ -261,7 +261,11 @@ export const integrationsRouter = createTRPCRouter({
             })
           : null,
       ]);
-      const { row, module, config } = asBadRequest(() => toRowShape(data));
+      // Platform is fixed at creation — ignore whatever the client sent and
+      // keep using what's actually stored.
+      const { row, module, config } = asBadRequest(() =>
+        toRowShape({ ...data, platform: integration.platform }),
+      );
       const credentials = asBadRequest(() =>
         credentialsPatch(module, data, existingRow?.credentials ?? null),
       );

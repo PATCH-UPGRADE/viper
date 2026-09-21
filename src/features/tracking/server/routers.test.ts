@@ -1153,16 +1153,17 @@ describe("trackingRouter.getOtherAssetWorkOrders", () => {
     ).rejects.toThrow(/not found/i);
   });
 
-  it("de-duplicates a work order that touches two linked assets", async () => {
+  it("de-duplicates a work order that touches two linked assets, with sorted assetIds", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
       id: "t1",
       parentId: null,
       assets: [{ assetId: "a1" }, { assetId: "a2" }],
     });
+    // Reversed on purpose: the query has no orderBy, so row order is arbitrary.
     mockPrisma.assetTicket.findMany.mockResolvedValue([
-      { assetId: "a1", parentTicket: otherTicket("w1") },
       { assetId: "a2", parentTicket: otherTicket("w1") },
+      { assetId: "a1", parentTicket: otherTicket("w1") },
     ]);
 
     const result = await caller.getOtherAssetWorkOrders({ ticketId: "t1" });

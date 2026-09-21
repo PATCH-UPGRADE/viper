@@ -219,7 +219,10 @@ export const OtherAssetWorkOrdersCard = ({
                         {group.subLabel}
                       </span>
                     )}
-                    <Badge variant="secondary" className="ml-auto shrink-0 dark:bg-accent">
+                    <Badge
+                      variant="secondary"
+                      className="ml-auto shrink-0 dark:bg-accent"
+                    >
                       {group.workOrders.length}
                     </Badge>
                   </div>

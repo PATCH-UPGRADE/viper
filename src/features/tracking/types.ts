@@ -71,8 +71,9 @@ export type OtherAssetWorkOrder = OtherAssetWorkOrderTicket & {
   assetIds: string[];
 };
 
-// The sort is a total order (scheduledAt, then summary, then id), so the result
-// never depends on database row order and the query needs no `orderBy`.
+// Both sorts are total orders (assetIds by id; work orders by scheduledAt,
+// then summary, then id), so the result never depends on database row order
+// and the query needs no `orderBy`.
 export const dedupeOtherAssetWorkOrders = (
   rows: { assetId: string; parentTicket: OtherAssetWorkOrderTicket }[],
 ): OtherAssetWorkOrder[] => {
@@ -82,6 +83,7 @@ export const dedupeOtherAssetWorkOrders = (
     if (existing) existing.assetIds.push(assetId);
     else byId.set(parentTicket.id, { ...parentTicket, assetIds: [assetId] });
   }
+  for (const workOrder of byId.values()) workOrder.assetIds.sort();
   return [...byId.values()].sort(
     (a, b) =>
       (a.scheduledAt?.getTime() ?? Number.POSITIVE_INFINITY) -

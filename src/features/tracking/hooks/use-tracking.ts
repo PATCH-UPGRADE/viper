@@ -25,7 +25,7 @@ const invalidateTicketAssetLinks = (
     trpc.tracking.listAttachableAssets.queryFilter({ ticketId }),
   );
   queryClient.invalidateQueries(
-    trpc.tracking.getOtherAssetWorkOrders.queryFilter({ ticketId }),
+    trpc.tracking.getOtherAssetWorkOrders.queryFilter(),
   );
 };
 

@@ -1564,15 +1564,6 @@ model SourceLink {
   @@map("source_link")
 }
 
-// One row per external record (an advisory, a notification on another platform),
-// owning many snapshots of it.
-// The pseudonym a comment platform derived from the identifier we sent for one
-// person on one record. Written after a successful post.
-//
-// Two reasons it is kept. It is what lets a reader see which comments are their
-// own, since the platform's feed is deliberately anonymous. And it is the only
-// record anywhere that ties a pseudonym back to a person: the platform never
-// authenticated them, so authorship can only ever be attested from this side.
 /// The pseudonym MedISAO derived for this hospital on one remediation.
 ///
 /// Specific to MedISAO, which is the only platform that hosts comments. It is
@@ -1606,6 +1597,8 @@ model MedISAOExternalCommentIdentity {
   @@map("medisao_external_comment_identity")
 }
 
+// One row per external record (an advisory, a notification on another platform),
+// owning many snapshots of it.
 model ExternalSourceRecordMapping {
   id            String      @id @default(cuid())
   integrationId String

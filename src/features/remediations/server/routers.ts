@@ -87,8 +87,6 @@ async function platformTargetFor(remediationId: string) {
   if (!mapping) return null;
 
   return {
-    comments: medisaoComments,
-    inquiries: medisaoInquiries,
     externalId: mapping.externalId,
     integrationId: mapping.integration.id,
   };
@@ -110,14 +108,14 @@ export const remediationsRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       const target = await platformTargetFor(input.remediationId);
-      if (!target?.inquiries) {
+      if (!target) {
         return { items: [], nextCursor: null, supported: false };
       }
 
       const platformCtx = medisaoCallCtx(
         await loadIntegrationContext(target.integrationId),
       );
-      const page = await target.inquiries.list(
+      const page = await medisaoInquiries.list(
         platformCtx,
         target.externalId,
         input.cursor,
@@ -141,17 +139,17 @@ export const remediationsRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       const target = await platformTargetFor(input.remediationId);
-      if (!target?.inquiries) {
+      if (!target) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "This remediation has no platform that accepts inquiries.",
+          message: "This remediation is not tracked on MedISAO.",
         });
       }
 
       const platformCtx = medisaoCallCtx(
         await loadIntegrationContext(target.integrationId),
       );
-      return target.inquiries.create(platformCtx, target.externalId, {
+      return medisaoInquiries.create(platformCtx, target.externalId, {
         body: input.body,
       });
     }),
@@ -172,14 +170,14 @@ export const remediationsRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       const target = await platformTargetFor(input.remediationId);
-      if (!target?.comments) {
+      if (!target) {
         return { items: [], nextCursor: null, supported: false };
       }
 
       const platformCtx = medisaoCallCtx(
         await loadIntegrationContext(target.integrationId),
       );
-      const page = await target.comments.list(
+      const page = await medisaoComments.list(
         platformCtx,
         target.externalId,
         input.cursor,
@@ -231,17 +229,17 @@ export const remediationsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const target = await platformTargetFor(input.remediationId);
-      if (!target?.comments) {
+      if (!target) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "This remediation has no platform that accepts comments.",
+          message: "This remediation is not tracked on MedISAO.",
         });
       }
 
       const platformCtx = medisaoCallCtx(
         await loadIntegrationContext(target.integrationId),
       );
-      const comment = await target.comments.create(
+      const comment = await medisaoComments.create(
         platformCtx,
         target.externalId,
         {

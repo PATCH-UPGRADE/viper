@@ -1276,6 +1276,9 @@ model WorkOrderTicket {
   externalMappings ExternalWorkOrderMapping[]
   lastCommentAt    DateTime?
 
+  linksAsA WorkOrderTicketLink[] @relation("WorkOrderTicketLinkA")
+  linksAsB WorkOrderTicketLink[] @relation("WorkOrderTicketLinkB")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1287,6 +1290,24 @@ model WorkOrderTicket {
   @@index([mitigationPlanId])
   @@index([notificationId])
   @@map("work_order_ticket")
+}
+
+model WorkOrderTicketLink {
+  id String @id @default(cuid())
+
+  ticketAId String
+  ticketA   WorkOrderTicket @relation("WorkOrderTicketLinkA", fields: [ticketAId], references: [id], onDelete: Cascade)
+
+  ticketBId String
+  ticketB   WorkOrderTicket @relation("WorkOrderTicketLinkB", fields: [ticketBId], references: [id], onDelete: Cascade)
+
+  reason String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@unique([ticketAId, ticketBId])
+  @@index([ticketBId])
+  @@map("work_order_ticket_link")
 }
 
 model AssetTicket {
@@ -1351,6 +1372,8 @@ enum TicketActivityType {
   CHILD_DETACHED
   ASSET_ATTACHED
   ASSET_DETACHED
+  TICKET_LINKED
+  TICKET_UNLINKED
 }
 
 model TicketActivity {

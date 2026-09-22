@@ -5,6 +5,7 @@ import { SquareCheckBigIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   SelectContent,
   SelectItem,
@@ -76,19 +77,29 @@ export const StatusChip = ({
   </Badge>
 );
 
-// Row linking to another ticket; `action` is the optional hover-reveal
-// button sub-tickets.tsx uses that related-work-orders.tsx doesn't need.
+// Row linking to another ticket. `action` is the optional hover-reveal button
+// (see RowHoverAction). `leading` sits before the summary on the first line;
+// `details` is an optional second line. `assigneeName` undefined hides the
+// assignee column; null shows "Unassigned".
 export const TicketRefRow = ({
   id,
   summary,
   status,
   assigneeName,
+  icon = (
+    <SquareCheckBigIcon className="size-4 shrink-0 text-muted-foreground" />
+  ),
+  leading,
+  details,
   action,
 }: {
   id: string;
   summary: string;
   status: TicketStatus;
-  assigneeName: string | null;
+  assigneeName?: string | null;
+  icon?: ReactNode;
+  leading?: ReactNode;
+  details?: ReactNode;
   action?: ReactNode;
 }) => (
   <li className="group relative flex items-center py-2.5">
@@ -100,19 +111,53 @@ export const TicketRefRow = ({
           "transition-[padding] group-hover:pr-8 group-focus-within:pr-8",
       )}
     >
-      <SquareCheckBigIcon className="size-4 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 flex-1 truncate text-sm font-medium group-hover:underline">
-        {summary}
-      </span>
+      {icon}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-0 items-center gap-2">
+          {leading}
+          <span className="min-w-0 flex-1 truncate text-sm font-medium group-hover:underline">
+            {summary}
+          </span>
+        </div>
+        {details && (
+          <div className="flex min-w-0 items-center gap-2">{details}</div>
+        )}
+      </div>
       <div className="flex shrink-0 items-center gap-3">
-        <span className="text-xs text-muted-foreground">
-          {assigneeName ?? "Unassigned"}
-        </span>
+        {assigneeName !== undefined && (
+          <span className="text-xs text-muted-foreground">
+            {assigneeName ?? "Unassigned"}
+          </span>
+        )}
         <StatusChip status={status} />
       </div>
     </Link>
     {action}
   </li>
+);
+
+// Icon button revealed on row hover/focus, for TicketRefRow's `action` slot.
+export const RowHoverAction = ({
+  label,
+  onClick,
+  disabled,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+}) => (
+  <Button
+    variant="ghost"
+    size="icon"
+    className="absolute right-0 top-1/2 size-7 -translate-y-1/2 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+    onClick={onClick}
+    disabled={disabled}
+    aria-label={label}
+  >
+    {children}
+  </Button>
 );
 
 // Trigger + option list for a ticket-status Select. Callers still own the

@@ -33,6 +33,7 @@ import { TicketEditForm } from "./edit-form";
 import { LinkedAssetsTabContent } from "./linked-assets";
 import { OverviewCard } from "./overview-card";
 import { RawJsonListCard } from "./raw-json-list-card";
+import { RelatedTicketsSection } from "./related-tickets";
 import { RelatedWorkOrdersSection } from "./related-work-orders";
 import { SubTicketsSection } from "./sub-tickets";
 
@@ -197,6 +198,10 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
             />
             <AdditionalDetailsCard
               assetIds={data.assets.map((a) => a.asset.id)}
+            />
+            <RelatedTicketsSection
+              ticketId={data.id}
+              relatedTickets={data.relatedTickets}
             />
             <TicketActivityTimeline
               ticketId={data.id}

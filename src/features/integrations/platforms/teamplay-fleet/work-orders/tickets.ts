@@ -16,7 +16,7 @@ import "server-only";
 import { z } from "zod";
 import type { TicketCategory } from "@/generated/prisma";
 import { MONTHS_SHORT } from "@/lib/date-utils";
-import type { Session } from "../../../core/types";
+import type { Session, WorkOrderDraftInput } from "../../../core/types";
 import { WORK_ORDER_CREATE_URL } from "../urls";
 import {
   type FleetSiteAddress,
@@ -28,6 +28,7 @@ import type {
   FleetPatientDanger,
   FleetSupportType,
 } from "./constants";
+import { fleetContactFor, fleetWorkOrderPayloadSchema } from "./payload";
 
 /**
  * Fleet support-ticket type (typeID). Confirmed legend: 11 = Technical Support,
@@ -86,10 +87,10 @@ export interface FleetWorkOrderDraft {
  * call. The chat card and the approval mutation both refuse earlier for the sake
  * of the message, and this is the backstop that no caller can bypass.
  */
-export function assertSubmittable(draft: {
-  dangerForPatient: FleetPatientDanger;
+export function assertSubmittable(payload: {
+  dangerForPatient?: string;
 }): void {
-  if (draft.dangerForPatient === "yes") {
+  if (payload.dangerForPatient === "yes") {
     throw new Error(
       "A patient-safety issue cannot be filed as an online work order — Siemens Healthineers requires you to report it by phone.",
     );
@@ -239,6 +240,35 @@ export const provisionalExternalId = (
   reference: string,
   equipmentKey: string,
 ): string => `${PROVISIONAL_PREFIX}${reference}:${equipmentKey}`;
+
+/**
+ * Join what VIPER knows about the order to the Fleet-specific choices the model
+ * made. Fleet files per piece of equipment, so the asset must carry the
+ * equipment key its own inventory sync recorded.
+ */
+export function toDraft(
+  input: WorkOrderDraftInput,
+  config: FleetWorkOrderConfig,
+): FleetWorkOrderDraft {
+  const payload = fleetWorkOrderPayloadSchema.parse(input.payload);
+
+  if (!input.asset.externalId) {
+    throw new Error(
+      `${input.asset.hostname ?? input.asset.id} has no teamplay Fleet equipment key, so Siemens cannot be told which device the order is for.`,
+    );
+  }
+
+  return {
+    equipmentKey: input.asset.externalId,
+    summary: input.summary,
+    description: input.description,
+    category: input.category,
+    scheduledAt: input.scheduledAt,
+    ...payload,
+    contact: fleetContactFor(input.actor, config.contactPhone),
+    ownIncidentNumber: input.reference,
+  };
+}
 
 /** POST one work order to Fleet. Throws on a non-2xx or an unusable response. */
 export async function create(

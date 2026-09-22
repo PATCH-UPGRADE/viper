@@ -38,6 +38,7 @@ const goldenPlan = {
       shortDescription: "Block TCP 32912/32914 at the imaging VLAN boundary",
       detailedDescription:
         "Add deny rules for TCP 32912 and 32914 inbound to the imaging VLAN.",
+      performedBy: "hospital",
       vulnerabilityIds: ["vuln-1"],
       remediationIds: [],
       deviceGroups: [
@@ -223,6 +224,7 @@ describe("buildMitigationPlansSchema", () => {
     const workOrder = {
       shortDescription: "Ask the vendor for an advisory",
       detailedDescription: "No hospital entities resolved yet.",
+      performedBy: "vendor",
       vulnerabilityIds: [],
       remediationIds: [],
       deviceGroups: [],

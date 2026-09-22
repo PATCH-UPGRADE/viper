@@ -36,6 +36,7 @@ export type LinkEntities = (
    * Every stage here guards on it rather than assuming the classifier ran.
    */
   notificationId: string | null,
+  ctx?: { sourceId: string; attachments?: PdfAttachment[] },
 ) => Promise<unknown>;
 
 export interface NotificationPipelineInput {
@@ -107,7 +108,10 @@ export async function runNotificationPipeline({
     return notification.id;
   });
 
-  const linkSummary = await linkEntities(step, notificationId);
+  const linkSummary = await linkEntities(step, notificationId, {
+    sourceId,
+    attachments,
+  });
 
   // VEX sort: if the notification has linked vulnerabilities, sort each
   // baseline Issue into at-risk / possibly-at-risk / unaffected. Runs before

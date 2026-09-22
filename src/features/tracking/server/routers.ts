@@ -768,7 +768,7 @@ export const trackingRouter = createTRPCRouter({
         .$transaction(async (tx) => {
           const tickets = await tx.workOrderTicket.findMany({
             where: { id: { in: [input.ticketId, input.relatedTicketId] } },
-            select: { id: true, summary: true },
+            select: { id: true, summary: true, isDraft: true },
           });
           const self = tickets.find((t) => t.id === input.ticketId);
           const other = tickets.find((t) => t.id === input.relatedTicketId);
@@ -776,6 +776,13 @@ export const trackingRouter = createTRPCRouter({
             throw new TRPCError({
               code: "NOT_FOUND",
               message: "Ticket not found",
+            });
+          }
+          // A draft is not committed work, so it has nothing to relate yet.
+          if (self.isDraft || other.isDraft) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Cannot link a draft work order",
             });
           }
           const reason = input.reason || null;
@@ -835,8 +842,8 @@ export const trackingRouter = createTRPCRouter({
       });
     }),
 
-  // Picker candidates. Drafts and per-asset child tickets are hidden here to
-  // keep the list short, not because linkTicket rejects them.
+  // Picker candidates. linkTicket also rejects drafts. Per-asset child tickets
+  // are hidden here only to keep the list short.
   listLinkableTickets: protectedProcedure
     .input(z.object({ ticketId: z.string() }))
     .query(async ({ input }) =>

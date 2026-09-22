@@ -136,7 +136,9 @@ export const TicketRefRow = ({
   </li>
 );
 
-// Icon button revealed on row hover/focus, for TicketRefRow's `action` slot.
+// Icon button for TicketRefRow's `action` slot. It hides until hover or focus,
+// but only where a pointer can hover. On a touch screen it stays visible,
+// because there is no hover to reveal it.
 export const RowHoverAction = ({
   label,
   onClick,
@@ -151,7 +153,7 @@ export const RowHoverAction = ({
   <Button
     variant="ghost"
     size="icon"
-    className="absolute right-0 top-1/2 size-7 -translate-y-1/2 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+    className="absolute right-0 top-1/2 size-7 -translate-y-1/2 transition [@media(hover:hover)]:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
     onClick={onClick}
     disabled={disabled}
     aria-label={label}

@@ -1500,8 +1500,8 @@ describe("trackingRouter.listAttachableChildren", () => {
 
 describe("trackingRouter.linkTicket", () => {
   const bothTickets = [
-    { id: "b1", summary: "Ticket B" },
-    { id: "a1", summary: "Ticket A" },
+    { id: "b1", summary: "Ticket B", isDraft: false },
+    { id: "a1", summary: "Ticket A", isDraft: false },
   ];
 
   it("stores the pair in canonical order with the reason", async () => {
@@ -1549,6 +1549,19 @@ describe("trackingRouter.linkTicket", () => {
     await expect(
       caller.linkTicket({ ticketId: "b1", relatedTicketId: "missing" }),
     ).rejects.toThrow(/not found/i);
+    expect(mockPrisma.workOrderTicketLink.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a link when either ticket is still a draft", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      bothTickets[0],
+      { id: "a1", summary: "Ticket A", isDraft: true },
+    ]);
+
+    await expect(
+      caller.linkTicket({ ticketId: "b1", relatedTicketId: "a1" }),
+    ).rejects.toThrow(/draft/i);
     expect(mockPrisma.workOrderTicketLink.create).not.toHaveBeenCalled();
   });
 
@@ -1862,8 +1875,8 @@ describe("activity writes", () => {
   it("records TICKET_LINKED on both tickets, each naming the other", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      { id: "a1", summary: "Ticket A" },
-      { id: "b1", summary: "Ticket B" },
+      { id: "a1", summary: "Ticket A", isDraft: false },
+      { id: "b1", summary: "Ticket B", isDraft: false },
     ]);
     mockPrisma.workOrderTicketLink.create.mockResolvedValue({ id: "link-1" });
 

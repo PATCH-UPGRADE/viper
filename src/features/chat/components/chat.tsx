@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  FileText,
   Fullscreen,
   Loader2,
   MessageSquarePlus,
@@ -57,13 +58,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/user-avatar";
+import { ReportAttachment } from "@/features/chat/components/report-modal";
 import { useChatUI } from "@/features/chat/context/chat-panel-context";
 import { useSuggestedQuestions } from "@/features/chat/context/suggested-questions-context";
 import {
   useViperChat,
   type ViperChat,
 } from "@/features/chat/hooks/use-viper-chat";
-import type { UseChatAgentConfig } from "@/features/chat/types";
+import type { ChatThread, UseChatAgentConfig } from "@/features/chat/types";
 import { USER_ROLES, type UserRole } from "@/features/chat/utils";
 import {
   useApproveWorkOrder,
@@ -845,9 +847,15 @@ function ChatInputForm({
   );
 }
 
-interface ThreadListItem {
-  id: string;
-  title: string | null;
+type ThreadListItem = Pick<ChatThread, "id" | "title" | "reportId">;
+
+function ReportAttachedLabel() {
+  return (
+    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+      <FileText className="size-3 shrink-0" />
+      Report attached
+    </span>
+  );
 }
 
 function ThreadSelector({
@@ -863,8 +871,8 @@ function ThreadSelector({
   threadsLoading: boolean;
   selectThread: (threadId: string) => void;
 }) {
-  const currentTitle =
-    threads.find((t) => t.id === currentThreadId)?.title ?? null;
+  const currentThread = threads.find((t) => t.id === currentThreadId);
+  const currentTitle = currentThread?.title ?? null;
   const currentThreadExists = threads?.some((t) => t.id === currentThreadId);
 
   const [displayedTitle, setDisplayedTitle] = useState<string | null>(null);
@@ -903,9 +911,12 @@ function ThreadSelector({
       <SelectTrigger className="w-[240px]">
         <SelectValue placeholder="New Chat">
           {displayedTitle !== null ? (
-            <span className="truncate max-w-[200px] block">
-              {displayedTitle}
-              {isAnimating ? "▌" : ""}
+            <span className="block max-w-[200px]">
+              <span className="truncate block">
+                {displayedTitle}
+                {isAnimating ? "▌" : ""}
+              </span>
+              {currentThread?.reportId && <ReportAttachedLabel />}
             </span>
           ) : undefined}
         </SelectValue>
@@ -913,8 +924,11 @@ function ThreadSelector({
       <SelectContent>
         {threads.map((thread) => (
           <SelectItem key={thread.id} value={thread.id}>
-            <span className="truncate max-w-[200px] block">
-              {thread.title || "New Chat"}
+            <span className="block max-w-[200px]">
+              <span className="truncate block">
+                {thread.title || "New Chat"}
+              </span>
+              {thread.reportId && <ReportAttachedLabel />}
             </span>
           </SelectItem>
         ))}
@@ -957,6 +971,8 @@ function ChatInner({
     newThread,
     deleteThread,
     isLoadingHistory,
+    report,
+    reportTitle,
   } = useViperChat(config, controlledThreadId);
 
   const [input, setInput] = useState("");
@@ -1115,6 +1131,12 @@ function ChatInner({
       {status === "error" && error && (
         <ChatError error={error} onClear={clearError} />
       )}
+
+      <ReportAttachment
+        threadId={currentThreadId}
+        title={reportTitle}
+        report={report}
+      />
 
       <ChatInputForm
         input={input}

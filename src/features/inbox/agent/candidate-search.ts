@@ -3,7 +3,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { normalizeName } from "@/lib/router-utils";
+import { nameOrClauses, normalizeName } from "@/lib/router-utils";
 import type {
   ExtractedAsset,
   ExtractedDeviceGroup,
@@ -63,12 +63,6 @@ export type Candidates = {
     matches: AssetCandidate[];
   }>;
 };
-
-const nameOrClauses = (term: string) => [
-  { canonicalName: { contains: term, mode: "insensitive" as const } },
-  { canonicalDisplayName: { contains: term, mode: "insensitive" as const } },
-  { nameMappings: { has: normalizeName(term) } },
-];
 
 const manufacturerNameOr = (term: string): Prisma.ManufacturerWhereInput[] =>
   nameOrClauses(term);

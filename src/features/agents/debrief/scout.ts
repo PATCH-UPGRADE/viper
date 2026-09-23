@@ -22,7 +22,7 @@ const SCOUT_RECURSION_LIMIT = 60;
 /**
  * The scout binds ONLY query_platform_data — deliberately not `buildAgentTools`.
  *
- * That registry contains `ask_user_questions` and `propose_fleet_work_order`,
+ * That registry contains `ask_user_questions` and `propose_work_order`,
  * both of which are HALT_TOOLS: the graph ends the turn and waits for a human.
  * The scout runs from a nightly cron with nobody to answer, so a single such
  * call would end the run with no findings. It also contains `record_note`,

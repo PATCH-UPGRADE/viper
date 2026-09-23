@@ -33,6 +33,7 @@ import { requireExistence } from "@/trpc/middleware";
 import { TRACKING_TABS } from "../params";
 import {
   integrationWorkOrderInputSchema,
+  openParentWorkOrderWhere,
   paginatedWorkOrderListResponseSchema,
   ticketBaseInclude,
   ticketCommentResponseSchema,
@@ -40,6 +41,9 @@ import {
   workOrderDetailResponseSchema,
   workOrderListFilterSchema,
   workOrderListInclude,
+  workOrderLlmDetailSelect,
+  workOrderLlmFilterSchema,
+  workOrderLlmSelect,
 } from "../types";
 import {
   recordAssetActivity,
@@ -361,6 +365,96 @@ export const trackingRouter = createTRPCRouter({
         ...ticket,
         commentCount: _count.comments,
       }));
+    }),
+
+  // Agent-only (query_platform_data). Not exposed over OpenAPI.
+  getManyForLlm: protectedProcedure
+    .input(paginationInputSchema.extend(workOrderLlmFilterSchema.shape))
+    .query(async ({ input }) => {
+      const { search, notificationId, vulnerabilityId, assetId, departmentId } =
+        input;
+      const filters: Prisma.WorkOrderTicketWhereInput[] = [
+        {
+          ...openParentWorkOrderWhere,
+          ...(input.status?.length && { status: { in: input.status } }),
+        },
+        createSearchFilter(search),
+      ];
+
+      // Most tickets (chat, email, Fleet sync) carry no notification FK, so a
+      // ticket that shares a vulnerability with the notification also counts.
+      if (notificationId) {
+        const mappings = await prisma.notificationVulnerabilityMapping.findMany(
+          {
+            where: { notificationId },
+            select: { vulnerabilityId: true },
+          },
+        );
+        filters.push({
+          OR: [
+            { notificationId },
+            { mitigationPlan: { notificationId } },
+            {
+              vulnerabilities: {
+                some: { id: { in: mappings.map((m) => m.vulnerabilityId) } },
+              },
+            },
+          ],
+        });
+      }
+      if (vulnerabilityId) {
+        filters.push({ vulnerabilities: { some: { id: vulnerabilityId } } });
+      }
+      if (assetId) {
+        filters.push({ assets: { some: { assetId } } });
+      }
+      if (departmentId) {
+        filters.push({ departments: { some: { id: departmentId } } });
+      }
+
+      const result = await fetchPaginated(prisma.workOrderTicket, input, {
+        where: { AND: filters },
+        select: {
+          ...workOrderLlmSelect,
+          notificationId: true,
+          mitigationPlan: { select: { notificationId: true } },
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+
+      return {
+        ...result,
+        items: result.items.map(
+          ({ notificationId: directId, mitigationPlan, ...ticket }) => ({
+            ...ticket,
+            ...(notificationId && {
+              relation:
+                directId === notificationId ||
+                mitigationPlan?.notificationId === notificationId
+                  ? ("direct" as const)
+                  : ("sharedVulnerability" as const),
+            }),
+          }),
+        ),
+      };
+    }),
+
+  getOneForLlm: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const ticket = await prisma.workOrderTicket.findUnique({
+        where: { id: input.id },
+        select: workOrderLlmDetailSelect,
+      });
+      const { assets, ...rest } = requireExistence(ticket, "Ticket");
+      return {
+        ...rest,
+        assets: assets.map(({ asset, ticket }) => ({
+          ...asset,
+          status: ticket.status,
+          externalMappings: ticket.externalMappings,
+        })),
+      };
     }),
 
   getOne: protectedProcedure

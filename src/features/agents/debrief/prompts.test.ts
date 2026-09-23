@@ -31,6 +31,7 @@ const base = {
   departmentDescription: "Maintains and services clinical devices.",
   workOrders: ["WO-101 — replace dialysis line sets"],
   previousBullets: [] as DebriefBullet[],
+  previousAgeDays: 1,
 };
 
 describe("SCOUT_SYSTEM_PROMPT", () => {
@@ -43,6 +44,33 @@ describe("SCOUT_SYSTEM_PROMPT", () => {
     // The scout is the only source of ids. If it rewrites one, validate.ts
     // drops the link and the reader gets prose with nothing to click.
     expect(SCOUT_SYSTEM_PROMPT).toMatch(/exactly as it appeared/);
+  });
+
+  it("sends the scout to the work-order lookup instead of guessing", () => {
+    // Without the lookup the scout can only infer "being worked" from the
+    // item itself, and the writer repeats that guess as fact.
+    expect(SCOUT_SYSTEM_PROMPT).toContain("_links.workOrders");
+    expect(SCOUT_SYSTEM_PROMPT).toContain("no open work order found");
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(/parallel tool calls in one turn/);
+  });
+
+  it("makes the scout give the notification id for an advisory", () => {
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(/always give the notification id/);
+  });
+
+  it("forbids 'only' or 'all' about devices without a count", () => {
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(/only if you counted the\s+assets/);
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(
+      /Count by\s+device type across every asset, not by model/,
+    );
+  });
+
+  it("makes the scout report every open child of a work order", () => {
+    // A scout that names one open sub-ticket reads it as the last blocker.
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(
+      /every sub-ticket in its "children" list/,
+    );
+    expect(SCOUT_SYSTEM_PROMPT).toContain('"the remaining blocker"');
   });
 
   it("embeds the platform catalog, so the tool list cannot drift from the prompt", () => {
@@ -66,6 +94,13 @@ describe("buildWriterPrompt — the findings reach the model intact", () => {
     expect(prompt).toContain("Biomedical Engineering");
     expect(prompt).toContain("Maintains and services clinical devices.");
     expect(prompt).toContain("WO-101 — replace dialysis line sets");
+  });
+
+  it("tells the writer to link a work order as a workOrder, by exact status", () => {
+    const prompt = buildWriterPrompt(base);
+
+    expect(prompt).toMatch(/entityType\s+"workOrder"/);
+    expect(prompt).toMatch(/only\s+IN_PROGRESS means work has started/);
   });
 
   it("says so plainly when a department has no open work orders", () => {
@@ -148,6 +183,22 @@ describe("buildWriterPrompt — previous debrief", () => {
     );
     expect(prompt).not.toContain("{{0}} was still unpatched");
     expect(prompt).toMatch(/Do not repeat these word for word/);
-    expect(prompt).toMatch(/still open and for how long/);
+    expect(prompt).toContain("Yesterday you told this department:");
+  });
+
+  it.each([
+    [0, "Earlier today you told this department:"],
+    [3, "3 days ago you told this department:"],
+  ])("labels a run %i days old as %j", (previousAgeDays, label) => {
+    // The writer counts "open for how long" from this label, so a same-day
+    // regenerate must not read as a day old.
+    const prompt = buildWriterPrompt({
+      ...base,
+      previousBullets: PREVIOUS,
+      previousAgeDays,
+    });
+
+    expect(prompt).toContain(label);
+    expect(prompt).toMatch(/never add a day for each debrief/);
   });
 });

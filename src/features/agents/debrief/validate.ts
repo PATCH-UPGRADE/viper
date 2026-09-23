@@ -108,6 +108,11 @@ const SENTENCE_BOUNDARY = /(?<=[.!?])\s+(?=[A-Z0-9{])/;
  * Drops whole sentences, so every surviving one stays grammatical. Joining with
  * a single space also normalises any newline the writer put between sentences.
  */
+const countSentences = (text: string) => text.split(SENTENCE_BOUNDARY).length;
+
+const markerIndices = (text: string) =>
+  [...text.matchAll(DEBRIEF_PLACEHOLDER)].map((m) => Number(m[1]));
+
 function dropExtraSentences(text: string): string {
   const sentences = text.split(SENTENCE_BOUNDARY);
   if (sentences.length <= DEBRIEF_MAX_BULLET_SENTENCES) return text;
@@ -135,21 +140,70 @@ function clampToChars(text: string): string {
   return `${cut.replace(partialMarker, "").trimEnd()}\u2026`;
 }
 
+const escapeRegExp = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Give a marker to every resolving link that the writer supplied but never
+ * referenced. Without this the link is lost, because only a marker keeps a link.
+ *
+ * The link's label is replaced in place when the text contains it. Otherwise a
+ * "See {{n}}." sentence is appended, but only while the bullet is under the
+ * sentence limit, so the shortening pass never cuts the new sentence away.
+ */
+function attachUnreferencedLinks(
+  text: string,
+  links: DebriefLink[],
+  linkUsable: boolean[],
+): string {
+  const referenced = new Set(markerIndices(text));
+  let result = text;
+  const unplaced: number[] = [];
+
+  links.forEach((link, index) => {
+    if (!linkUsable[index] || referenced.has(index)) return;
+    const label = link.label.trim();
+    const before = result;
+    if (label) {
+      // Not global, so only the first mention is replaced.
+      const wholeWord = new RegExp(
+        `(?<![\\p{L}\\p{N}])${escapeRegExp(label)}(?![\\p{L}\\p{N}])`,
+        "iu",
+      );
+      result = result.replace(wholeWord, `{{${index}}}`);
+    }
+    if (result === before) unplaced.push(index);
+  });
+
+  if (
+    unplaced.length === 0 ||
+    countSentences(result) >= DEBRIEF_MAX_BULLET_SENTENCES
+  )
+    return result;
+
+  const markers = unplaced.map((index) => `{{${index}}}`).join(" and ");
+  const trimmed = result.trimEnd();
+  const ended = /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+  return `${ended} See ${markers}.`;
+}
+
 /**
  * Rewrite one bullet so its text and its links agree.
  *
- * Three passes, in this order, and the order is the whole design:
+ * Four passes, in this order, and the order is the whole design:
  *
- * 1. Inline. A marker whose link did not resolve is replaced by the label the
- *    writer wrote, so the fact survives even when the link does not. This runs
- *    FIRST because a label is longer than a marker, and the length rules below
- *    must measure the text that will actually be stored.
- * 2. Shorten. Sentence rule, then the storage backstop.
- * 3. Renumber. Only markers that survived the shortening keep a link, and they
+ * 1. Attach. A resolving link with no marker gets one (see
+ *    `attachUnreferencedLinks`).
+ * 2. Inline. A marker whose link did not resolve is replaced by the label the
+ *    writer wrote, so the fact survives even when the link does not.
+ *    Passes 1 and 2 both lengthen the text, so they run before the length
+ *    rules, which must measure the text that will actually be stored.
+ * 3. Shorten. Sentence rule, then the storage backstop.
+ * 4. Renumber. Only markers that survived the shortening keep a link, and they
  *    are renumbered in order, so a new index is never wider than the old one
  *    and the clamped length still holds.
  *
- * After pass 1, a `{{n}}` can only remain where the link resolved — every other
+ * After pass 2, a `{{n}}` can only remain where the link resolved — every other
  * marker, including an out-of-range one, was already replaced. So the surviving
  * markers ARE the surviving links, and no second predicate is needed.
  */
@@ -163,7 +217,13 @@ function rewrite(
     (link, index) => index < DEBRIEF_MAX_BULLET_LINKS && resolves(link),
   );
 
-  const inlined = bullet.text.replace(
+  const attached = attachUnreferencedLinks(
+    bullet.text,
+    bullet.links,
+    idResolves,
+  );
+
+  const inlined = attached.replace(
     DEBRIEF_PLACEHOLDER,
     (marker, digits: string) => {
       if (idResolves[Number(digits)]) return marker;
@@ -179,11 +239,7 @@ function rewrite(
   const shortened = clampToChars(dropExtraSentences(inlined));
 
   // Read in order, so renumbering is ascending by construction.
-  const kept = [
-    ...new Set(
-      [...shortened.matchAll(DEBRIEF_PLACEHOLDER)].map((m) => Number(m[1])),
-    ),
-  ].sort((a, b) => a - b);
+  const kept = [...new Set(markerIndices(shortened))].sort((a, b) => a - b);
 
   const text = shortened.replace(
     DEBRIEF_PLACEHOLDER,

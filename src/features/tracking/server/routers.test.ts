@@ -50,6 +50,9 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     department: {
       findMany: vi.fn(),
     },
+    notificationVulnerabilityMapping: {
+      findMany: vi.fn(),
+    },
     // The router uses prisma.$transaction(async (tx) => {...}) — invoke the
     // callback with the same mocked client so call assertions still work.
     $transaction: vi.fn(
@@ -1107,6 +1110,167 @@ describe("trackingRouter.getManyByAssetId", () => {
     await expect(
       caller.getManyByAssetId({ assetId: "missing" }),
     ).rejects.toThrow(/not found/i);
+  });
+});
+
+describe("trackingRouter.getManyForLlm", () => {
+  const row = (overrides: Record<string, unknown> = {}) => ({
+    id: "wo_1",
+    summary: "Patch EternalBlue",
+    status: "IN_PROGRESS",
+    category: "PATCH",
+    notificationId: null,
+    mitigationPlan: null,
+    _count: { assets: 5, children: 5, comments: 0 },
+    ...overrides,
+  });
+
+  const whereOf = () =>
+    mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where.AND;
+
+  beforeEach(() => {
+    mockPrisma.workOrderTicket.count.mockResolvedValue(1);
+    mockPrisma.notificationVulnerabilityMapping.findMany.mockResolvedValue([]);
+  });
+
+  it("excludes drafts, per-asset children, and DONE by default", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([row()]);
+
+    await caller.getManyForLlm({});
+
+    expect(whereOf()).toContainEqual({
+      isDraft: false,
+      ticket: null,
+      status: { not: "DONE" },
+    });
+  });
+
+  it("uses an explicit status filter instead of the default", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+
+    await caller.getManyForLlm({ status: ["DONE"] });
+
+    expect(whereOf()).toContainEqual({
+      isDraft: false,
+      ticket: null,
+      status: { in: ["DONE"] },
+    });
+  });
+
+  it("matches a notification directly, by plan, or by shared vulnerability", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+    mockPrisma.notificationVulnerabilityMapping.findMany.mockResolvedValue([
+      { vulnerabilityId: "v1" },
+      { vulnerabilityId: "v2" },
+    ]);
+
+    await caller.getManyForLlm({ notificationId: "n1" });
+
+    expect(whereOf()).toContainEqual({
+      OR: [
+        { notificationId: "n1" },
+        { mitigationPlan: { notificationId: "n1" } },
+        { vulnerabilities: { some: { id: { in: ["v1", "v2"] } } } },
+      ],
+    });
+  });
+
+  it("labels each row with how it relates to the notification", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      row({ id: "direct", notificationId: "n1" }),
+      row({ id: "plan", mitigationPlan: { notificationId: "n1" } }),
+      row({ id: "shared" }),
+    ]);
+
+    const result = await caller.getManyForLlm({ notificationId: "n1" });
+
+    expect(
+      result.items.map((i) => [i.id, "relation" in i ? i.relation : null]),
+    ).toEqual([
+      ["direct", "direct"],
+      ["plan", "direct"],
+      ["shared", "sharedVulnerability"],
+    ]);
+    expect(result.items[0]).not.toHaveProperty("notificationId");
+    expect(result.items[0]).not.toHaveProperty("mitigationPlan");
+  });
+
+  it("omits relation when no notification was asked about", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([row()]);
+
+    const result = await caller.getManyForLlm({});
+
+    expect(result.items[0]).not.toHaveProperty("relation");
+  });
+
+  it("filters by vulnerability, asset, and department", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+
+    await caller.getManyForLlm({
+      vulnerabilityId: "v1",
+      assetId: "a1",
+      departmentId: "d1",
+    });
+
+    expect(whereOf()).toEqual(
+      expect.arrayContaining([
+        { vulnerabilities: { some: { id: "v1" } } },
+        { assets: { some: { assetId: "a1" } } },
+        { departments: { some: { id: "d1" } } },
+      ]),
+    );
+  });
+});
+
+describe("trackingRouter.getOneForLlm", () => {
+  it("flattens each asset with its per-asset status and external ids", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "wo_1",
+      summary: "Patch EternalBlue",
+      _count: { assets: 25, children: 0, comments: 1 },
+      assets: [
+        {
+          asset: { id: "a1", hostname: "pacs-01" },
+          ticket: {
+            status: "IN_PROGRESS",
+            externalMappings: [
+              { externalId: "fleet-9", webUrl: null, integration: null },
+            ],
+          },
+        },
+      ],
+      comments: [{ body: "Started", createdAt: new Date(), author: null }],
+    });
+
+    const result = await caller.getOneForLlm({ id: "wo_1" });
+
+    expect(result.assets).toEqual([
+      {
+        id: "a1",
+        hostname: "pacs-01",
+        status: "IN_PROGRESS",
+        externalMappings: [
+          { externalId: "fleet-9", webUrl: null, integration: null },
+        ],
+      },
+    ]);
+    expect(result.comments).toHaveLength(1);
+  });
+
+  it("throws NOT_FOUND for a missing ticket", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(null);
+
+    await expect(caller.getOneForLlm({ id: "missing" })).rejects.toThrow(
+      /not found/i,
+    );
   });
 });
 

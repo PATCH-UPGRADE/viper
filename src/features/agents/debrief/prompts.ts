@@ -1,5 +1,8 @@
 import "server-only";
-import { PLATFORM_CATALOG } from "@/features/agents/tools/query-platform-tool";
+import {
+  PLATFORM_CATALOG,
+  WORK_ORDER_STATUS_GUIDE,
+} from "@/features/agents/tools/query-platform-tool";
 import {
   DEBRIEF_MAX_BULLET_LINKS,
   DEBRIEF_MAX_BULLET_SENTENCES,
@@ -34,7 +37,8 @@ Weigh these together:
 - Known exploitation (KEV) and a high EPSS. These beat a bare CVSS.
 - How many assets are affected, and what clinical work they support.
 - Whether a fix exists and is waiting.
-- Whether the item is already being worked. Say so if it is.
+- Whether the item is already being worked (see 'Work orders' above). Make the
+  work-order lookups for all your findings as parallel tool calls in one turn.
 - New inbox notifications since yesterday.
 </what_to_look_for>
 
@@ -43,17 +47,37 @@ Write 6 to 10 findings as a plain list. For each one give:
 - what it is, in one sentence a nurse manager would understand
 - the exact entity type and id you retrieved it from
 - why it matters today
-- whether anyone is already working it
+- the work orders you retrieved for it: each one's id, status, departments, and
+  relation if present. If the lookup returned none, write
+  "no open work order found".
+- for a work order with sub-tickets: every sub-ticket in its "children" list,
+  with its summary and status. That list holds only the sub-tickets that are not
+  DONE. Never call one of them "the remaining blocker" or "the last step" while
+  others are still open.
 
 Write the id exactly as it appeared in the retrieved data. The writer can only
 link to ids you supply, so an id you paraphrase becomes a fact with no link.
+For a finding about an inbox advisory, always give the notification id, even
+when you also give a vulnerability or asset id.
+
+Write "only", "all", "every", or "none" about devices only if you counted the
+assets with query_platform_data. Give the count and what you counted. Count by
+device type across every asset, not by model: one SOMATOM go.Top does not mean
+one CT scanner, because another vendor's CT scanner can exist. A phrase such as
+"both scanners" in an advisory is not a count of the hospital's fleet.
 
 Do not write bullet points for a brief. Do not rank into a top 3. Give the
 writer more than it needs and let it choose.
 </output>`;
 
+function describeAge(days: number): string {
+  if (days <= 0) return "Earlier today";
+  if (days === 1) return "Yesterday";
+  return `${days} days ago`;
+}
+
 /** One previous bullet, rendered for the writer's context. */
-function renderPrevious(bullets: DebriefBullet[]): string {
+function renderPrevious(bullets: DebriefBullet[], ageDays: number): string {
   if (bullets.length === 0) {
     return `<previous_debrief>
 None. This is the first debrief for this department, so treat everything as new.
@@ -75,12 +99,14 @@ None. This is the first debrief for this department, so treat everything as new.
     })
     .join("\n");
   return `<previous_debrief>
-Yesterday you told this department:
+${describeAge(ageDays)} you told this department:
 
 ${lines}
 
 Do not repeat these word for word. If something here is still unaddressed, say
-that it is still open and for how long. If it is resolved, drop it.
+that it is still open. Say for how long only from a date in the data. A debrief
+can be regenerated on the same day, so never add a day for each debrief. If it
+is resolved, drop it.
 </previous_debrief>`;
 }
 
@@ -88,10 +114,15 @@ export type WriterPromptInput = {
   findings: string;
   departmentName: string;
   departmentDescription?: string | null;
-  /** Open work orders for this department, already rendered one per line. */
+  /**
+   * Open work orders for this department, already rendered one per line with
+   * the ticket id, so the writer can link one.
+   */
   workOrders: string[];
-  /** Yesterday's bullets. Empty on a department's first ever run. */
+  /** The newest Ready run's bullets. Empty on a department's first ever run. */
   previousBullets: DebriefBullet[];
+  /** Whole days since that run was written. 0 after a same-day regenerate. */
+  previousAgeDays: number;
 };
 
 export function buildWriterPrompt(input: WriterPromptInput): string {
@@ -119,7 +150,7 @@ hear, and to say why they matter to them.
 ${input.findings}
 </findings>
 
-${renderPrevious(input.previousBullets)}
+${renderPrevious(input.previousBullets, input.previousAgeDays)}
 
 <how_to_write>
 Write 3 to 5 bullets. Never more than 5. Aim for 3 even on a quiet day; write
@@ -138,6 +169,9 @@ needs more room than that, it is really two bullets, or it is carrying detail
 the reader can get by following its link.
 
 Say what is true and no more. Never invent a device count, a date, or an id.
+
+Say that a work order exists only if it appears in the department's list or in
+the findings. ${WORK_ORDER_STATUS_GUIDE}
 </how_to_write>
 
 <links>
@@ -156,8 +190,13 @@ At most ${DEBRIEF_MAX_BULLET_LINKS} links per bullet. Extra ones are removed
 before the reader sees them, and their text is folded back into the sentence.
 
 Each link needs a "label" the reader sees, an "entityType", and an "entityId"
-copied exactly from the findings. Never invent an entityId. A link whose id
-does not exist is removed before the reader sees it.
+copied exactly from the findings, or from the department's work-order list.
+Never invent an entityId. A link whose id does not exist is
+removed before the reader sees it.
+
+When a bullet mentions a work order, link the work order itself with entityType
+"workOrder" and its id, not the vulnerability it fixes. When a bullet is about an
+inbox advisory, link the advisory with entityType "notification" and its id.
 
 A bullet may have no links at all. That is better than a made-up one.
 </links>

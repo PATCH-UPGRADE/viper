@@ -28,6 +28,7 @@ const DOMAIN_PHRASES: Record<string, string> = {
   deviceGroups: "device groups",
   workflows: "clinical workflows",
   notifications: "notifications",
+  tracking: "work orders",
 };
 
 function allowlistedPrefixes(): string[] {
@@ -193,14 +194,28 @@ describe("addNavigationLinks — notifications", () => {
     expect(result.items[0]._links.detail.input.id).toBe("notif_1");
   });
 
-  it("does not point the detail result back at itself", () => {
-    // affectedAssets is only on the getOne payload. A "detail" link there is a
-    // call that returns what the model already holds.
-    const detail = { ...notification(), affectedAssets: { AFFECTED: [] } };
+  it("does not point the detail result back at the call that produced it", () => {
+    // A "detail" link on the getOne result returns what the model already holds.
+    const result = addNavigationLinks(notification(), {
+      procedure: "notifications.getOne",
+      input: { id: "notif_1" },
+    }) as { _links: Record<string, unknown> };
 
-    const result = addNavigationLinks(detail) as { _links?: unknown };
+    expect(result._links).toEqual({
+      workOrders: {
+        procedure: "tracking.getManyForLlm",
+        input: { notificationId: "notif_1" },
+      },
+    });
+  });
 
-    expect(result._links).toBeUndefined();
+  it("keeps a detail link that points at a different record", () => {
+    const result = addNavigationLinks(notification(), {
+      procedure: "notifications.getOne",
+      input: { id: "notif_2" },
+    }) as { _links: Record<string, unknown> };
+
+    expect(Object.keys(result._links).sort()).toEqual(["detail", "workOrders"]);
   });
 
   it("leaves objects without hospitalImpact alone", () => {
@@ -229,6 +244,7 @@ describe("addNavigationLinks — notifications", () => {
     expect(Object.keys(result._links).sort()).toEqual([
       "detail",
       "utilization",
+      "workOrders",
       "workflows",
     ]);
   });
@@ -375,6 +391,10 @@ describe("addNavigationLinks — existing behaviour is preserved", () => {
     expect(result.utilization).toBeUndefined();
     expect(result._links.workflows.procedure).toBe("workflows.getManyByAsset");
     expect(result._links.utilization.procedure).toBe("assets.getUtilization");
+    expect(result._links.workOrders).toEqual({
+      procedure: "tracking.getManyForLlm",
+      input: { assetId: "a_1" },
+    });
   });
 
   it("still linkifies device groups and strips their href keys", () => {
@@ -391,5 +411,63 @@ describe("addNavigationLinks — existing behaviour is preserved", () => {
 
     expect(result.assetsUrl).toBeUndefined();
     expect(result._links.assets.procedure).toBe("assets.getManyByDeviceGroup");
+  });
+});
+
+describe("addNavigationLinks — work orders", () => {
+  const vulnerability = () => ({
+    id: "v_1",
+    cveId: "CVE-2017-0144",
+    cvssScore: 8.1,
+    inKEV: true,
+  });
+
+  const workOrderRow = () => ({
+    id: "wo_1",
+    summary: "Patch EternalBlue on the imaging network",
+    status: "IN_PROGRESS",
+    category: "PATCH",
+    vulnerabilities: [{ id: "v_1", cveId: "CVE-2017-0144" }],
+  });
+
+  it("points a full vulnerability record at its work orders", () => {
+    const result = addNavigationLinks(vulnerability()) as {
+      _links: { workOrders: unknown };
+    };
+
+    expect(result._links.workOrders).toEqual({
+      procedure: "tracking.getManyForLlm",
+      input: { vulnerabilityId: "v_1" },
+    });
+  });
+
+  it("leaves the { id, cveId } stubs nested in a work order alone", () => {
+    const result = addNavigationLinks(workOrderRow()) as {
+      vulnerabilities: { _links?: unknown }[];
+    };
+
+    expect(result.vulnerabilities[0]._links).toBeUndefined();
+  });
+
+  it("points a work-order list row at its detail call", () => {
+    const page = { items: [workOrderRow()], meta: { page: 1 } };
+
+    const result = addNavigationLinks(page) as {
+      items: { _links: { detail: unknown } }[];
+    };
+
+    expect(result.items[0]._links.detail).toEqual({
+      procedure: "tracking.getOneForLlm",
+      input: { id: "wo_1" },
+    });
+  });
+
+  it("drops the whole _links map when its only link is the current call", () => {
+    const result = addNavigationLinks(workOrderRow(), {
+      procedure: "tracking.getOneForLlm",
+      input: { id: "wo_1" },
+    }) as { _links?: unknown };
+
+    expect(result._links).toBeUndefined();
   });
 });

@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { externalMappingWithSyncSelect } from "@/features/integrations/core/urls";
+import {
+  externalMappingSelect,
+  externalMappingWithSyncSelect,
+} from "@/features/integrations/core/urls";
 import {
   AssetStatus,
   IssueStatus,
@@ -266,6 +269,92 @@ export type WorkOrderListItem = Prisma.WorkOrderTicketGetPayload<{
   include: typeof workOrderListInclude;
 }>;
 
+/** A submitted, top-level ticket that is not DONE. Excludes per-asset children. */
+export const openParentWorkOrderWhere = {
+  isDraft: false,
+  ticket: null,
+  status: { not: TicketStatus.DONE },
+} satisfies Prisma.WorkOrderTicketWhereInput;
+
+export const WORK_ORDER_LLM_ASSET_LIMIT = 20;
+export const WORK_ORDER_LLM_COMMENT_LIMIT = 5;
+export const WORK_ORDER_LLM_VULNERABILITY_LIMIT = 5;
+export const WORK_ORDER_LLM_OPEN_CHILD_LIMIT = 10;
+
+// Select shapes for the agent-only procedures. Every field here costs model
+// context on every call, so keep them to what answers "who is doing what, and
+// how far along is it".
+export const workOrderLlmSelect = {
+  id: true,
+  summary: true,
+  status: true,
+  category: true,
+  priority: true,
+  scheduledAt: true,
+  updatedAt: true,
+  departments: { select: { name: true }, orderBy: { name: "asc" as const } },
+  assignee: { select: { name: true } },
+  vulnerabilities: {
+    select: { id: true, cveId: true },
+    take: WORK_ORDER_LLM_VULNERABILITY_LIMIT,
+  },
+  children: {
+    where: { ticket: null, status: { not: TicketStatus.DONE } },
+    select: { id: true, summary: true, status: true },
+    orderBy: { createdAt: "asc" as const },
+    take: WORK_ORDER_LLM_OPEN_CHILD_LIMIT,
+  },
+  _count: {
+    select: {
+      assets: true,
+      children: { where: { ticket: null } },
+      comments: true,
+      vulnerabilities: true,
+    },
+  },
+} satisfies Prisma.WorkOrderTicketSelect;
+
+export const workOrderLlmDetailSelect = {
+  ...workOrderLlmSelect,
+  notification: { select: { id: true, title: true } },
+  body: true,
+  submissionState: true,
+  descriptions: {
+    select: { body: true, department: { select: { name: true } } },
+    orderBy: { department: { name: "asc" as const } },
+  },
+  children: {
+    where: { ticket: null },
+    select: { id: true, summary: true, status: true },
+    orderBy: { createdAt: "asc" as const },
+  },
+  // Per-asset platforms file one external record per asset, so the mapping
+  // lives on the per-asset ticket, not on the parent.
+  assets: {
+    select: {
+      asset: { select: { id: true, hostname: true } },
+      ticket: {
+        select: {
+          status: true,
+          externalMappings: externalMappingSelect,
+        },
+      },
+    },
+    take: WORK_ORDER_LLM_ASSET_LIMIT,
+  },
+  remediations: { select: { id: true, description: true } },
+  externalMappings: externalMappingSelect,
+  comments: {
+    select: {
+      body: true,
+      createdAt: true,
+      author: { select: { name: true } },
+    },
+    orderBy: { createdAt: "desc" as const },
+    take: WORK_ORDER_LLM_COMMENT_LIMIT,
+  },
+} satisfies Prisma.WorkOrderTicketSelect;
+
 // --- Integration ingestion -------------------------------------------------
 
 // One work-order item as pushed by an integration (e.g. a Fleet activity mapped
@@ -305,6 +394,14 @@ export const integrationWorkOrderInputSchema = createIntegrationInputSchema(
 export const workOrderListFilterSchema = z.object({
   departmentIds: z.array(z.string()).optional(),
   assigneeIds: z.array(z.string()).optional(),
+});
+
+export const workOrderLlmFilterSchema = z.object({
+  notificationId: z.string().optional(),
+  vulnerabilityId: z.string().optional(),
+  assetId: z.string().optional(),
+  departmentId: z.string().optional(),
+  status: z.array(z.enum(TicketStatus)).optional(),
 });
 
 // --- Output ---------------------------------------------------------------

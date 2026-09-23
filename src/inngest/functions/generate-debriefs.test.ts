@@ -92,10 +92,21 @@ function contextResolves(previousBullets: unknown[] = []) {
     description: "Services clinical devices.",
   });
   mockPrisma.debrief.findFirst.mockResolvedValue(
-    previousBullets.length ? { bullets: previousBullets } : null,
+    previousBullets.length
+      ? {
+          bullets: previousBullets,
+          createdAt: new Date(Date.now() - 7 * 60_000),
+        }
+      : null,
   );
   mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-    { summary: "Replace line sets", status: "TO_DO" },
+    {
+      id: "wo_1",
+      summary: "Replace line sets",
+      status: "TO_DO",
+      vulnerabilities: [{ cveId: "CVE-2017-0144" }, { cveId: null }],
+      _count: { vulnerabilities: 7 },
+    },
   ]);
   mockPrisma.debrief.update.mockResolvedValue({
     id: "run-1",
@@ -272,8 +283,34 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     });
 
     expect(mockWriter).toHaveBeenCalledWith(
-      expect.objectContaining({ previousBullets: [BULLET] }),
+      expect.objectContaining({
+        previousBullets: [BULLET],
+        previousAgeDays: 0,
+      }),
     );
+  });
+
+  it("gives the writer each work order's id, so it can link one", async () => {
+    contextResolves([]);
+    mockWriter.mockResolvedValue({ bullets: [BULLET], model: "m" });
+    const { step, logger } = makeStep();
+
+    await deptDebrief.handler({
+      event: event({ findings: "f" }),
+      step,
+      logger,
+    });
+
+    expect(mockWriter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workOrders: [
+          "workOrder wo_1 — Replace line sets — status TO_DO — fixes CVE-2017-0144 and 6 more",
+        ],
+      }),
+    );
+    expect(
+      mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where,
+    ).toMatchObject({ isDraft: false, ticket: null });
   });
 
   it("passes an empty previousBullets on a department's first run", async () => {

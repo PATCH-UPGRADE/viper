@@ -67,8 +67,10 @@ describe("SCOUT_SYSTEM_PROMPT", () => {
 
   it("makes the scout report every open child of a work order", () => {
     // A scout that names one open sub-ticket reads it as the last blocker.
+    // The detail call's "children" includes DONE sub-tickets, so the filter must
+    // live in the rule, not in a claim about the list.
     expect(SCOUT_SYSTEM_PROMPT).toMatch(
-      /every sub-ticket in its "children" list/,
+      /every sub-ticket in its "children" list\s+whose status is not DONE/,
     );
     expect(SCOUT_SYSTEM_PROMPT).toContain('"the remaining blocker"');
   });

@@ -50,10 +50,9 @@ Write 6 to 10 findings as a plain list. For each one give:
 - the work orders you retrieved for it: each one's id, status, departments, and
   relation if present. If the lookup returned none, write
   "no open work order found".
-- for a work order with sub-tickets: every sub-ticket in its "children" list,
-  with its summary and status. That list holds only the sub-tickets that are not
-  DONE. Never call one of them "the remaining blocker" or "the last step" while
-  others are still open.
+- for a work order with sub-tickets: every sub-ticket in its "children" list
+  whose status is not DONE, with its summary and status. Never call one of them
+  "the remaining blocker" or "the last step" while others are still open.
 
 Write the id exactly as it appeared in the retrieved data. The writer can only
 link to ids you supply, so an id you paraphrase becomes a fact with no link.

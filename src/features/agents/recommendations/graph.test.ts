@@ -19,6 +19,7 @@ const DOMAIN_PHRASES: Record<string, string> = {
   deviceGroups: "device groups",
   workflows: "clinical workflows",
   notifications: "notifications",
+  tracking: "work orders",
 };
 
 const prefixes = () => [

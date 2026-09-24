@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { externalMappingWithSyncSelect } from "@/features/integrations/core/urls";
+import {
+  externalMappingSelect,
+  externalMappingWithSyncSelect,
+} from "@/features/integrations/core/urls";
 import {
   AssetStatus,
   IssueStatus,
@@ -308,6 +311,108 @@ export type WorkOrderListItem = Prisma.WorkOrderTicketGetPayload<{
   include: typeof workOrderListInclude;
 }>;
 
+/**
+ * A submitted work order that is not DONE, at the top of its tree. Per-asset
+ * tickets are always excluded. With a department, a sub-ticket is included
+ * only when its parent does not have that department, so no list shows a
+ * ticket both as a row and under its parent's children.
+ */
+export const topLevelOpenWorkOrderWhere = (
+  departmentId?: string,
+): Prisma.WorkOrderTicketWhereInput => ({
+  isDraft: false,
+  ticket: null,
+  status: { not: TicketStatus.DONE },
+  ...(departmentId
+    ? {
+        departments: { some: { id: departmentId } },
+        OR: [
+          { parentId: null },
+          { parent: { departments: { none: { id: departmentId } } } },
+        ],
+      }
+    : { parentId: null }),
+});
+
+export const WORK_ORDER_LLM_ASSET_LIMIT = 20;
+export const WORK_ORDER_LLM_COMMENT_LIMIT = 5;
+export const WORK_ORDER_LLM_VULNERABILITY_LIMIT = 5;
+export const WORK_ORDER_LLM_OPEN_CHILD_LIMIT = 10;
+
+// Select shapes for the agent-only procedures. Every field here costs model
+// context on every call, so keep them to what answers "who is doing what, and
+// how far along is it".
+export const workOrderLlmSelect = {
+  id: true,
+  summary: true,
+  status: true,
+  category: true,
+  priority: true,
+  scheduledAt: true,
+  updatedAt: true,
+  departments: { select: { name: true }, orderBy: { name: "asc" as const } },
+  assignee: { select: { name: true } },
+  vulnerabilities: {
+    select: { id: true, cveId: true },
+    take: WORK_ORDER_LLM_VULNERABILITY_LIMIT,
+  },
+  children: {
+    where: { ticket: null, status: { not: TicketStatus.DONE } },
+    select: { id: true, summary: true, status: true },
+    orderBy: { createdAt: "asc" as const },
+    take: WORK_ORDER_LLM_OPEN_CHILD_LIMIT,
+  },
+  _count: {
+    select: {
+      assets: true,
+      children: { where: { ticket: null } },
+      comments: true,
+      vulnerabilities: true,
+    },
+  },
+} satisfies Prisma.WorkOrderTicketSelect;
+
+export const workOrderLlmDetailSelect = {
+  ...workOrderLlmSelect,
+  notification: { select: { id: true, title: true } },
+  body: true,
+  submissionState: true,
+  descriptions: {
+    select: { body: true, department: { select: { name: true } } },
+    orderBy: { department: { name: "asc" as const } },
+  },
+  children: {
+    where: { ticket: null },
+    select: { id: true, summary: true, status: true },
+    orderBy: { createdAt: "asc" as const },
+  },
+  // Per-asset platforms file one external record per asset, so the mapping
+  // lives on the per-asset ticket, not on the parent.
+  assets: {
+    select: {
+      asset: { select: { id: true, hostname: true } },
+      ticket: {
+        select: {
+          status: true,
+          externalMappings: externalMappingSelect,
+        },
+      },
+    },
+    take: WORK_ORDER_LLM_ASSET_LIMIT,
+  },
+  remediations: { select: { id: true, description: true } },
+  externalMappings: externalMappingSelect,
+  comments: {
+    select: {
+      body: true,
+      createdAt: true,
+      author: { select: { name: true } },
+    },
+    orderBy: { createdAt: "desc" as const },
+    take: WORK_ORDER_LLM_COMMENT_LIMIT,
+  },
+} satisfies Prisma.WorkOrderTicketSelect;
+
 // --- Integration ingestion -------------------------------------------------
 
 // One work-order item as pushed by an integration (e.g. a Fleet activity mapped
@@ -347,6 +452,14 @@ export const integrationWorkOrderInputSchema = createIntegrationInputSchema(
 export const workOrderListFilterSchema = z.object({
   departmentIds: z.array(z.string()).optional(),
   assigneeIds: z.array(z.string()).optional(),
+});
+
+export const workOrderLlmFilterSchema = z.object({
+  notificationId: z.string().optional(),
+  vulnerabilityId: z.string().optional(),
+  assetId: z.string().optional(),
+  departmentId: z.string().optional(),
+  status: z.array(z.enum(TicketStatus)).optional(),
 });
 
 // --- Output ---------------------------------------------------------------

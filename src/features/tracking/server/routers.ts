@@ -861,7 +861,7 @@ export const trackingRouter = createTRPCRouter({
           status: true,
           externalMappings: { select: { externalId: true }, take: 1 },
         },
-        orderBy: { summary: "asc" },
+        orderBy: [{ summary: "asc" }, { id: "asc" }],
         take: 100,
       }),
     ),

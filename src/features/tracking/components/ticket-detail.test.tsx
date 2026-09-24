@@ -1280,6 +1280,17 @@ describe("TicketDetailContent — related tickets", () => {
     },
   };
 
+  const defaultCandidate = {
+    id: "cand-1",
+    summary: "Candidate ticket A",
+    status: "TO_DO",
+    externalMappings: [{ externalId: "INC0048512" }],
+  };
+
+  beforeEach(() => {
+    mockUseLinkableTickets.mockReturnValue({ data: [defaultCandidate] });
+  });
+
   it("is collapsed by default and shows an empty state once expanded", async () => {
     const user = userEvent.setup();
     renderDetail();
@@ -1378,6 +1389,64 @@ describe("TicketDetailContent — related tickets", () => {
       ticketId: "ticket-1",
       relatedTicketId: "cand-1",
       reason: "Same CVE, different department",
+    });
+  });
+
+  it("shows the external id under the summary, and omits the line without one", async () => {
+    const user = userEvent.setup();
+    mockUseLinkableTickets.mockReturnValue({
+      data: [
+        defaultCandidate,
+        {
+          ...defaultCandidate,
+          id: "cand-2",
+          summary: "No mapping",
+          externalMappings: [],
+        },
+      ],
+    });
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+
+    // The summary is not truncated away by the id, and both sit in one option.
+    const withId = await screen.findByRole("option", {
+      name: /candidate ticket a/i,
+    });
+    expect(within(withId).getByText("INC0048512")).toBeInTheDocument();
+    expect(within(withId).getByText("Candidate ticket A")).toBeInTheDocument();
+
+    const withoutId = screen.getByRole("option", { name: /no mapping/i });
+    expect(within(withoutId).queryByText(/INC/)).toBeNull();
+  });
+
+  it("tells two candidates with the same summary apart", async () => {
+    const user = userEvent.setup();
+    mockUseLinkableTickets.mockReturnValue({
+      data: [
+        { ...defaultCandidate, id: "dup-1", summary: "Patch the pumps" },
+        { ...defaultCandidate, id: "dup-2", summary: "Patch the pumps" },
+      ],
+    });
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+    const options = await screen.findAllByRole("option", {
+      name: /patch the pumps/i,
+    });
+    expect(options).toHaveLength(2);
+
+    // Keyboard selection resolves the item by its cmdk value, so a shared
+    // value sends the wrong ticket.
+    await user.keyboard("{ArrowDown}{Enter}");
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: /^link ticket$/i,
+      }),
+    );
+
+    expect(mockLinkMutate.mock.calls[0][0]).toMatchObject({
+      relatedTicketId: "dup-2",
     });
   });
 

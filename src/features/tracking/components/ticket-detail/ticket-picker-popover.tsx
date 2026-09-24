@@ -33,6 +33,7 @@ export const TicketPickerPopover = <T extends TicketPickerCandidate>({
   onSelect,
   isPending,
   renderItemPrefix,
+  renderItemMeta,
   searchKeywords,
   confirmWithReason = false,
 }: {
@@ -42,8 +43,12 @@ export const TicketPickerPopover = <T extends TicketPickerCandidate>({
   onSelect: (candidate: T, close: () => void, reason: string | null) => void;
   isPending: boolean;
   renderItemPrefix?: (candidate: T) => ReactNode;
+  // Detail shown under the summary. A candidate that returns something here
+  // gets a two-line row, so the summary keeps the full width.
+  renderItemMeta?: (candidate: T) => ReactNode;
   // Extra terms the search box matches besides the summary, for anything
-  // renderItemPrefix shows that the user can be expected to type.
+  // renderItemPrefix or renderItemMeta shows that the user can be expected
+  // to type.
   searchKeywords?: (candidate: T) => string[];
   // Picking a ticket opens a second step with an optional reason field
   // instead of submitting at once.
@@ -125,19 +130,37 @@ export const TicketPickerPopover = <T extends TicketPickerCandidate>({
             <CommandList>
               <CommandEmpty>No eligible tickets found.</CommandEmpty>
               <CommandGroup>
-                {(candidates ?? []).map((t) => (
-                  <CommandItem
-                    key={t.id}
-                    value={t.summary}
-                    keywords={searchKeywords?.(t)}
-                    onSelect={() => pick(t)}
-                    disabled={isPending}
-                  >
-                    {renderItemPrefix?.(t)}
-                    <span className="truncate flex-1">{t.summary}</span>
-                    <StatusChip status={t.status} className="ml-2 text-xs" />
-                  </CommandItem>
-                ))}
+                {(candidates ?? []).map((t) => {
+                  const meta = renderItemMeta?.(t);
+                  return (
+                    <CommandItem
+                      key={t.id}
+                      value={t.id}
+                      keywords={[t.summary, ...(searchKeywords?.(t) ?? [])]}
+                      onSelect={() => pick(t)}
+                      disabled={isPending}
+                    >
+                      {renderItemPrefix?.(t)}
+                      {meta ? (
+                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                          <span className="truncate">{t.summary}</span>
+                          <span className="flex min-w-0 items-center gap-2">
+                            {meta}
+                            <StatusChip status={t.status} className="text-xs" />
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="truncate flex-1">{t.summary}</span>
+                          <StatusChip
+                            status={t.status}
+                            className="ml-2 text-xs"
+                          />
+                        </>
+                      )}
+                    </CommandItem>
+                  );
+                })}
               </CommandGroup>
             </CommandList>
           </Command>

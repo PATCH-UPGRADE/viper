@@ -34,9 +34,11 @@ const LinkTicketPopover = ({ ticketId }: { ticketId: string }) => {
         )
       }
       confirmWithReason
-      renderItemPrefix={(t) => (
-        <ExternalId externalId={t.externalMappings[0]?.externalId} />
-      )}
+      renderItemMeta={(t) =>
+        t.externalMappings[0] ? (
+          <ExternalId externalId={t.externalMappings[0].externalId} />
+        ) : null
+      }
       searchKeywords={(t) => t.externalMappings.map((m) => m.externalId)}
     />
   );

@@ -102,17 +102,17 @@ async function resolveExistingIds(
  */
 const SENTENCE_BOUNDARY = /(?<=[.!?])\s+(?=[A-Z0-9{])/;
 
+const countSentences = (text: string) => text.split(SENTENCE_BOUNDARY).length;
+
+const markerIndices = (text: string) =>
+  [...text.matchAll(DEBRIEF_PLACEHOLDER)].map((m) => Number(m[1]));
+
 /**
  * Enforce the readability rule: at most DEBRIEF_MAX_BULLET_SENTENCES sentences.
  *
  * Drops whole sentences, so every surviving one stays grammatical. Joining with
  * a single space also normalises any newline the writer put between sentences.
  */
-const countSentences = (text: string) => text.split(SENTENCE_BOUNDARY).length;
-
-const markerIndices = (text: string) =>
-  [...text.matchAll(DEBRIEF_PLACEHOLDER)].map((m) => Number(m[1]));
-
 function dropExtraSentences(text: string): string {
   const sentences = text.split(SENTENCE_BOUNDARY);
   if (sentences.length <= DEBRIEF_MAX_BULLET_SENTENCES) return text;

@@ -14,8 +14,8 @@ import {
  * filed on.
  *
  * A platform that declares a work order module can also authenticate for it,
- * because `openFiler` is part of that module. So the module alone decides
- * whether a platform is offered to a model.
+ * because every platform with a resource module declares `createSession`. So
+ * the module alone decides whether a platform is offered to a model.
  *
  * Pure: the registry is an in-memory table, so knowing the platform is enough.
  */

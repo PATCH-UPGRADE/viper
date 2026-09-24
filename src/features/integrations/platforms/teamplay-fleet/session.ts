@@ -1,4 +1,6 @@
+import type { Session, SessionInput } from "../../core/types";
 import { BASE_URL, type FleetCreds, type SessionLoginConfig } from "./config";
+import { fingerprintOf, getCookie, invalidate } from "./cookie-cache";
 
 const MAX_RETRY_ATTEMPT = 2;
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -105,45 +107,33 @@ function normalizeHeaders(
   return headers ? Object.fromEntries(new Headers(headers)) : {};
 }
 
-export async function createFleetSession(creds: FleetCreds) {
-  const { username, password } = creds;
-  const login = async () => {
-    const sessionCookie = await grabSessionCookie(
-      FLEET_LOGIN_CONFIG,
-      username,
-      password,
-    );
-    return sessionCookie;
-  };
+export function createFleetSession({
+  integrationId,
+  creds,
+}: SessionInput<unknown, FleetCreds>): Session {
+  const fingerprint = fingerprintOf(creds);
+  const login = () =>
+    grabSessionCookie(FLEET_LOGIN_CONFIG, creds.username, creds.password);
 
-  let session = await login();
-
-  const expired = () =>
-    session.expiresAt !== null && session.expiresAt.getTime() <= Date.now();
-
-  const request = async (
-    url: string,
-    init: RequestInit = {},
-    retry = false,
-  ): Promise<Response> => {
-    if (expired()) session = await login();
-
-    const res = await fetch(url, {
+  const send = (url: string, init: RequestInit, cookie: CapturedSession) =>
+    fetch(url, {
       ...init,
       headers: {
         ...normalizeHeaders(init.headers),
-        [session.header]: session.value,
+        [cookie.header]: cookie.value,
       },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
-    if ((res.status === 401 || res.status === 403) && !retry) {
-      session = await login();
-      return request(url, init, true);
-    }
-    return res;
+
+  return {
+    async request(url, init = {}) {
+      const cookie = await getCookie(integrationId, fingerprint, login);
+      const res = await send(url, init, cookie);
+      if (res.status !== 401 && res.status !== 403) return res;
+
+      invalidate(integrationId, cookie);
+      const fresh = await getCookie(integrationId, fingerprint, login);
+      return send(url, init, fresh);
+    },
   };
-
-  return { request };
 }
-
-export type FleetSession = Awaited<ReturnType<typeof createFleetSession>>;

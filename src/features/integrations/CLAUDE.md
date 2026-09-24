@@ -83,11 +83,11 @@ and saying so beats a resource that looks perpetually up to date. **Nothing bran
 platform it is**, only on what the module declares.
 
 A platform-level `sync` owns one `(integration, resource)` attempt end to end and receives a
-`SyncCtx`. A resource module's `sync` gets the same thing minus `resource` — it already knows
-which one it is:
+`SyncCtx`. A resource module's `sync` gets the same base fields without `resource` — it already
+knows which one it is — plus the `session` that core opens with the platform's `createSession`:
 
 ```ts
-interface ResourceSyncCtx<TConfig, TCreds> {
+interface BaseSyncCtx<TConfig, TCreds> {
   integrationId: string;
   config: TConfig;                    // parsed by your configSchema
   creds: TCreds;                      // decrypted, parsed by your credentialSchema
@@ -96,7 +96,11 @@ interface ResourceSyncCtx<TConfig, TCreds> {
   callback(): Promise<CallbackConfig>; // mint a one-time upload URL + JSON Schema
 }
 
-interface SyncCtx<TConfig, TCreds> extends ResourceSyncCtx<TConfig, TCreds> {
+interface ResourceSyncCtx<TConfig, TCreds> extends BaseSyncCtx<TConfig, TCreds> {
+  session: Session;                   // opened by core; sign-in happens on the first request
+}
+
+interface SyncCtx<TConfig, TCreds> extends BaseSyncCtx<TConfig, TCreds> {
   resource: ResourceType;
 }
 ```
@@ -137,32 +141,44 @@ export interface ResourceModule<TCanonical, TRaw, TConfig, TCreds>
 module knows how to sync itself — the pull and push helpers are the pieces a `sync` is usually
 built out of, not obligations. A resource we only ever write to needs none of them.
 
-A `Session` is a platform's own, built inside `sync` from that platform's auth helper — see
-`teamplay-fleet/assets/sync.ts`, which calls `createFleetSession(ctx.creds)`. Core never makes
-one.
+### Sessions
+
+A platform with resource modules must declare `createSession` on its `ConnectorModule`:
+
+```ts
+createSession?(input: { integrationId: string; config: TConfig; creds: TCreds }): Session;
+```
+
+Core calls it through `openSession` (`core/session.ts`) and gives the result to the module:
+`ctx.session` in `sync`, and the `session` argument of `create`. A module never signs in by
+itself. A platform-level `sync` (ai, partner) gets no session, because those platforms push to us.
+
+Rules for an implementation:
+
+- Return at once, and sign in on the first `request`. Core opens a session before it knows
+  whether it will send anything.
+- Keep login reuse inside `createSession`. Only the platform knows what a login is and when it
+  goes stale. See `teamplay-fleet/cookie-cache.ts`: one cookie per integration, in process
+  memory, replaced on a credential change, an expiry, or a 401/403.
+- Do not save a session to the database. A session cookie or token is a live credential.
 
 ### Filing work orders
 
-A work order module extends `ResourceModule` with the push half, and `openFiler` carries the
-auth for it:
+A work order module extends `ResourceModule` with the push half:
 
 ```ts
 export interface WorkOrderModule<TRaw, TConfig, TCreds, TDraft>
   extends ResourceModule<unknown, TRaw, TConfig, TCreds, TDraft> {
-  openFiler(input: { config: TConfig; creds: TCreds }): Promise<WorkOrderFiler<TDraft>>;
+  create(session: Session, draft: TDraft, config: TConfig): Promise<{ externalId: string; raw: unknown }>;
   payloadSchema: z.ZodObject<any>;
   toDraft(input: WorkOrderDraftInput, config: TConfig): TDraft;
   assertSubmittable?(payload: Record<string, unknown>): void;
 }
-
-export interface WorkOrderFiler<TDraft> {
-  file(draft: TDraft): Promise<{ externalId: string; raw: unknown }>;
-}
 ```
 
-Core opens a filer once per submission and calls `file` once per asset, because one work order
-covers N assets. **Sign in inside `openFiler`, not inside `file`.** A Fleet login drives a
-headless browser, so a per-call session costs one browser launch per asset.
+Core opens one session per submission and calls `create` once per asset, because one work order
+covers N assets. **Do not sign in inside `create`.** A Fleet login drives a headless browser, so
+a login per call costs one browser launch per asset.
 
 
 ## Registering a new platform
@@ -178,7 +194,8 @@ Inside `platforms/<name>/` — write these three:
    - *We call their API* → a directory per resource, each with an `index.ts` exporting its
      `ResourceModule` and a `sync.ts` exporting that module's sync. No root `sync.ts`.
 3. **`index.ts`** — the `ConnectorModule`, with `definition.platform` set to your enum member,
-   and either `sync` or your resource modules wired in.
+   and either `sync` or your resource modules wired in. With resource modules, also declare
+   `createSession` (see [Sessions](#sessions)).
 
 Outside the directory — **two edits**:
 

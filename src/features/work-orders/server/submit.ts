@@ -1,10 +1,8 @@
 import "server-only";
 import { decryptCredentials } from "@/features/integrations/core/credentials";
 import { requirePlatform } from "@/features/integrations/core/registry";
-import type {
-  WorkOrderDraftInput,
-  WorkOrderFiler,
-} from "@/features/integrations/core/types";
+import { openSession } from "@/features/integrations/core/session";
+import type { WorkOrderDraftInput } from "@/features/integrations/core/types";
 import { attachExternalMapping } from "@/features/tracking/server/asset-tickets";
 import { SubmissionState } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
@@ -20,12 +18,13 @@ import { labelFor } from "./targets";
  */
 
 /**
- * Read the platform's module and settings, and hand back a way to open a filer.
+ * Read the platform's module and settings, and open its session.
  *
  * Signing in can be expensive — Fleet drives a headless browser — so a
- * submission that covers several assets opens one filer and files every asset
- * through it, and a submission with nothing left to file opens none at all.
- * How that session is made is the platform's business, not this file's.
+ * submission that covers several assets files every asset through one session.
+ * The session signs in on its first request, so a submission with nothing left
+ * to file never signs in. How that session is made is the platform's business,
+ * not this file's.
  */
 async function prepareFiling(integrationId: string) {
   const integration = await prisma.integration.findUniqueOrThrow({
@@ -58,7 +57,7 @@ async function prepareFiling(integrationId: string) {
   return {
     module,
     config,
-    open: () => module.openFiler({ config, creds }),
+    session: openSession(connector, { integrationId, config, creds }),
   };
 }
 
@@ -201,7 +200,7 @@ export async function fileClaimedTicket(
     select: { name: true, email: true },
   });
 
-  const { open, config, module } = await prepareFiling(integrationId);
+  const { session, config, module } = await prepareFiling(integrationId);
   const payload = module.payloadSchema.parse(ticket.platformPayload ?? {});
   // Re-checked at the point of sending. The proposal was validated when it was
   // drafted, but a stored payload can outlive the rules that accepted it.
@@ -237,11 +236,6 @@ export async function fileClaimedTicket(
   const externalIds: string[] = [];
   const failures: SubmissionFailure[] = [];
 
-  // Opened on the first asset that still needs sending, never before: signing in
-  // to the vendor is expensive, and a retry of a fully filed order — or an order
-  // that reached no assets at all — must not pay for a login it never uses.
-  let filer: WorkOrderFiler<unknown> | undefined;
-
   for (const { asset, ticketId: childTicketId } of ticket.assets) {
     const alreadyOpen = alreadyFiled.get(childTicketId);
     if (alreadyOpen) {
@@ -251,7 +245,6 @@ export async function fileClaimedTicket(
 
     const label = labelFor(asset);
     try {
-      filer ??= await open();
       const input: WorkOrderDraftInput = {
         summary: ticket.summary,
         description: ticket.body ?? "",
@@ -268,7 +261,11 @@ export async function fileClaimedTicket(
         reference: ticket.id,
       };
 
-      const result = await filer.file(module.toDraft(input, config));
+      const result = await module.create(
+        session,
+        module.toDraft(input, config),
+        config,
+      );
       externalIds.push(result.externalId);
 
       // One write per asset, deliberately: an order the vendor accepted is

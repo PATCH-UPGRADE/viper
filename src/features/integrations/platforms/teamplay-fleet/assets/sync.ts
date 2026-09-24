@@ -10,7 +10,6 @@ import {
   type FleetCreds,
   SIEMENS_HEALTHINEERS,
 } from "../config";
-import { createFleetSession } from "../session";
 import { syncFleetContracts } from "./contracts";
 import {
   computeWeakSerials,
@@ -103,7 +102,7 @@ async function ingestFleetAssets(
 export async function syncAssets(
   ctx: ResourceSyncCtx<FleetConfig, FleetCreds>,
 ): Promise<SyncOutcome> {
-  const session = await createFleetSession(ctx.creds);
+  const { session } = ctx;
   const items: FleetAssetItem[] = [];
   for await (const page of listChanged(session, ctx.cursor)) {
     items.push(...page.items.map((raw) => toCanonical(raw)));

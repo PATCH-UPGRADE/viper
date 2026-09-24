@@ -15,7 +15,8 @@ import { moduleForResource } from "../sync/resources";
 
 /**
  * Importing this module runs the registry's load-time assertion, so simply
- * getting here proves no platform is keyed under the wrong enum.
+ * getting here proves no platform is keyed under the wrong enum, and every
+ * platform with resource modules declares `createSession`.
  */
 
 describe("registry", () => {

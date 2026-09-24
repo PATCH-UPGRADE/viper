@@ -10,6 +10,7 @@ import {
   SIEMENS_HEALTHINEERS,
 } from "./config";
 import { onCreate } from "./on-create";
+import { createFleetSession } from "./session";
 import { workOrders } from "./work-orders";
 
 export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
@@ -22,6 +23,7 @@ export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
     credentialSchema,
   },
   onCreate,
+  createSession: createFleetSession,
   assets,
   workOrders,
   notifications,

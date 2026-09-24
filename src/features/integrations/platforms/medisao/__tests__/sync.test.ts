@@ -25,9 +25,6 @@ vi.mock("@/lib/router-utils", () => ({
 }));
 
 const request = vi.fn();
-vi.mock("../session", () => ({
-  createMedIsaoSession: (): Session => ({ request }),
-}));
 
 const { describeRemediation, syncRemediations } = await import(
   "../remediations/sync"
@@ -69,6 +66,7 @@ const ctx = (
     integrationId: "int-1",
     config: { apiUrl: API },
     creds: { apiToken: "test-token" },
+    session: { request } satisfies Session,
     cursor: null,
     lastSuccessfulSync: null,
     callback: vi.fn(),

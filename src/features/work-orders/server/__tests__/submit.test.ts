@@ -135,7 +135,8 @@ describe("finishSubmission", () => {
 });
 
 describe("fileClaimedTicket", () => {
-  const openFiler = vi.fn();
+  const request = vi.fn();
+  const create = vi.fn();
 
   /** A ticket whose one child already carries a mapping for this integration. */
   const fullyFiled = () => {
@@ -173,8 +174,9 @@ describe("fileClaimedTicket", () => {
         configSchema: { parse: (c: unknown) => c },
         credentialSchema: { parse: (c: unknown) => c },
       },
+      createSession: () => ({ request }),
       workOrders: {
-        openFiler,
+        create,
         payloadSchema: { parse: (p: unknown) => p },
         toDraft: (input: unknown) => input,
       },
@@ -182,13 +184,14 @@ describe("fileClaimedTicket", () => {
   };
 
   it("does not sign in when every asset was already filed", async () => {
-    // Opening a filer launches a headless browser on Fleet. A retry of a fully
+    // A Fleet request signs in with a headless browser. A retry of a fully
     // filed order must cost nothing.
     fullyFiled();
 
     const result = await fileClaimedTicket("wo-1", "user-1");
 
-    expect(openFiler).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
     expect(result).toEqual({ externalIds: ["FLEET-9"], failures: [] });
   });
 });

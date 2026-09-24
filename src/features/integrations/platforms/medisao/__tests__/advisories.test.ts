@@ -19,9 +19,6 @@ const send = vi.fn();
 vi.mock("@/inngest/client", () => ({ inngest: { send } }));
 
 const request = vi.fn();
-vi.mock("../session", () => ({
-  createMedIsaoSession: (): Session => ({ request }),
-}));
 
 const { rawAdvisorySchema, toCanonical, toMarkdown } = await import(
   "../advisories/feed"
@@ -63,6 +60,7 @@ const ctx = (
     integrationId: "int-1",
     config: { apiUrl: API },
     creds: {},
+    session: { request } satisfies Session,
     cursor: null,
     lastSuccessfulSync: null,
     callback: vi.fn(),

@@ -6,7 +6,7 @@ import { medisao } from "../platforms/medisao";
 import { partner } from "../platforms/partner";
 import { teamplayFleet } from "../platforms/teamplay-fleet";
 import type { Category } from "../types";
-import { moduleForResource } from "./sync/resources";
+import { hasResourceModules, moduleForResource } from "./sync/resources";
 import type { AnyConnectorModule } from "./types";
 
 /**
@@ -62,5 +62,8 @@ for (const [key, module] of Object.entries(registry)) {
     throw new Error(
       `Registry key "${key}" does not match definition.platform "${module.definition.platform}".`,
     );
+  }
+  if (module && hasResourceModules(module) && !module.createSession) {
+    throw new Error(`${key} has resource modules but no createSession.`);
   }
 }

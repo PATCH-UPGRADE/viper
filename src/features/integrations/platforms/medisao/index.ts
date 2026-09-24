@@ -9,6 +9,7 @@ import {
   type MedIsaoCreds,
 } from "./config";
 import { remediations } from "./remediations";
+import { createMedIsaoSession } from "./session";
 
 /**
  * A channel is one manufacturer and product pair, and both resources are polled
@@ -25,6 +26,7 @@ export const medisao: ConnectorModule<MedIsaoConfig, MedIsaoCreds> = {
     configSchema,
     credentialSchema,
   },
+  createSession: ({ creds }) => createMedIsaoSession(creds),
   remediations,
   notifications: advisories,
 };

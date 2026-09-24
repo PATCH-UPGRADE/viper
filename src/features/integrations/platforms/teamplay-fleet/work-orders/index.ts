@@ -8,10 +8,10 @@ import {
   toCanonical,
 } from "./activities";
 import { fleetWorkOrderPayloadSchema } from "./payload";
-import { openFiler } from "./submit";
 import { syncWorkOrders } from "./sync";
 import {
   assertSubmittable,
+  create,
   type FleetWorkOrderDraft,
   PROVISIONAL_PREFIX,
   toDraft,
@@ -38,11 +38,11 @@ export const workOrders: WorkOrderModule<
   toCanonical,
 
   // The push half. `payloadSchema` is what a model fills in, `toDraft` joins
-  // that to what VIPER already knows, and `openFiler` files the result.
+  // that to what VIPER already knows, and `create` files the result.
   payloadSchema: fleetWorkOrderPayloadSchema,
   toDraft,
   assertSubmittable,
-  openFiler,
+  create,
 
   apiUrlFor: () => ACTIVITIES_URL,
   // A provisional id is ours, not Fleet's, so it names no page there. Resolve to

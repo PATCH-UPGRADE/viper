@@ -7,7 +7,6 @@ import type { ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import { listChannels } from "../channels";
 import type { MedIsaoConfig, MedIsaoCreds } from "../config";
 import { MedIsaoRequestError } from "../paginate";
-import { createMedIsaoSession } from "../session";
 import {
   type ChannelWatermarks,
   highWaterMark,
@@ -147,7 +146,7 @@ async function unprocessedSnapshotIds(
 export async function syncAdvisories(
   ctx: ResourceSyncCtx<MedIsaoConfig, MedIsaoCreds>,
 ): Promise<SyncOutcome> {
-  const session = createMedIsaoSession(ctx.creds);
+  const { session } = ctx;
   const { apiUrl } = ctx.config;
 
   const watermarks = parseCursor(ctx.cursor);

@@ -59,14 +59,21 @@ export interface Session {
 }
 
 /**
- * Everything one resource-module sync attempt needs. The module opens its own
- * session from `creds`, with its platform's own auth helper.
+ * What a platform's `createSession` gets. `integrationId` is there so a platform
+ * that caches a login can key it per integration.
  */
-export interface ResourceSyncCtx<TConfig = unknown, TCreds = unknown> {
+export interface SessionInput<TConfig = unknown, TCreds = unknown> {
   integrationId: string;
   config: TConfig;
-  /** `ai` forwards these to n8n, which authenticates as us. That is the point. */
   creds: TCreds;
+}
+
+/**
+ * The fields every sync attempt carries, whichever shape runs it. `creds`: `ai`
+ * forwards these to n8n, which authenticates as us. That is the point.
+ */
+export interface BaseSyncCtx<TConfig = unknown, TCreds = unknown>
+  extends SessionInput<TConfig, TCreds> {
   cursor: Cursor | null;
   /** Where `partner`'s `since` comes from. */
   lastSuccessfulSync: Date | null;
@@ -75,11 +82,20 @@ export interface ResourceSyncCtx<TConfig = unknown, TCreds = unknown> {
 }
 
 /**
+ * Everything one resource-module sync attempt needs. Core opens `session` with
+ * the platform's `createSession`, so a module never signs in by itself.
+ */
+export interface ResourceSyncCtx<TConfig = unknown, TCreds = unknown>
+  extends BaseSyncCtx<TConfig, TCreds> {
+  session: Session;
+}
+
+/**
  * Everything one platform-level `(integration, resource)` sync attempt needs.
- * Extend with resource for generic platforms
+ * There is no session: these platforms push to us.
  */
 export interface SyncCtx<TConfig = unknown, TCreds = unknown>
-  extends ResourceSyncCtx<TConfig, TCreds> {
+  extends BaseSyncCtx<TConfig, TCreds> {
   resource: ResourceType;
 }
 
@@ -170,11 +186,6 @@ export interface WorkOrderDraftInput {
   reference: string;
 }
 
-/** One authenticated run of filing, held open across several assets. */
-export interface WorkOrderFiler<TDraft> {
-  file(draft: TDraft): Promise<{ externalId: string; raw: unknown }>;
-}
-
 /**
  * A resource module that can also be filed *into* from VIPER.
  *
@@ -187,19 +198,12 @@ export interface WorkOrderModule<
   TCreds = unknown,
   TDraft = unknown,
 > extends ResourceModule<unknown, TRaw, TConfig, TCreds, TDraft> {
-  /**
-   * Sign in once, then file as many orders as the caller needs.
-   *
-   * The platform's own auth helper lives behind this, so core never holds a
-   * session. One order per asset is the normal case, so a platform must
-   * authenticate here rather than inside `file`. A Fleet login drives a
-   * headless browser, and a per-call session costs one browser launch per
-   * asset.
-   */
-  openFiler(input: {
-    config: TConfig;
-    creds: TCreds;
-  }): Promise<WorkOrderFiler<TDraft>>;
+  /** Called once per asset, all with one session. */
+  create(
+    session: Session,
+    draft: TDraft,
+    config: TConfig,
+  ): Promise<{ externalId: string; raw: unknown }>;
   // biome-ignore lint/suspicious/noExplicitAny: a zod object of unknown shape; `unknown` loses `.shape`, which the catalog and JSON Schema generation both read.
   payloadSchema: z.ZodObject<any>;
   toDraft(input: WorkOrderDraftInput, config: TConfig): TDraft;
@@ -238,6 +242,17 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
    */
   sync?: SyncStrategy<TConfig, TCreds>;
   onCreate?(): Promise<void>;
+
+  /**
+   * Required when the platform has resource modules. Core calls it and hands
+   * the session to every module method.
+   *
+   * Must return at once and sign in on the first `request`: a caller opens a
+   * session before it knows whether it will send anything. Reuse of a login
+   * across calls belongs here too, since only the platform knows what a login
+   * is and when it goes stale.
+   */
+  createSession?(input: SessionInput<TConfig, TCreds>): Session;
 
   // biome-ignore lint/suspicious/noExplicitAny: TRaw/TDraft vary per platform and are erased here, exactly as `AnyConnectorModule` erases TConfig/TCreds.
   workOrders?: WorkOrderModule<any, TConfig, TCreds, any>;

@@ -1133,7 +1133,7 @@ describe("trackingRouter.getManyForLlm", () => {
     mockPrisma.notificationVulnerabilityMapping.findMany.mockResolvedValue([]);
   });
 
-  it("excludes drafts, per-asset children, and DONE by default", async () => {
+  it("excludes drafts, per-asset tickets, sub-tickets, and DONE by default", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([row()]);
 
@@ -1143,6 +1143,27 @@ describe("trackingRouter.getManyForLlm", () => {
       isDraft: false,
       ticket: null,
       status: { not: "DONE" },
+      parentId: null,
+    });
+  });
+
+  it("lists a sub-ticket for a department only when its parent lacks it", async () => {
+    // Otherwise the model sees the sub-ticket twice: as a row, and in its
+    // parent's children.
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+
+    await caller.getManyForLlm({ departmentId: "d1" });
+
+    expect(whereOf()).toContainEqual({
+      isDraft: false,
+      ticket: null,
+      status: { not: "DONE" },
+      departments: { some: { id: "d1" } },
+      OR: [
+        { parentId: null },
+        { parent: { departments: { none: { id: "d1" } } } },
+      ],
     });
   });
 
@@ -1156,6 +1177,7 @@ describe("trackingRouter.getManyForLlm", () => {
       isDraft: false,
       ticket: null,
       status: { in: ["DONE"] },
+      parentId: null,
     });
   });
 
@@ -1208,21 +1230,16 @@ describe("trackingRouter.getManyForLlm", () => {
     expect(result.items[0]).not.toHaveProperty("relation");
   });
 
-  it("filters by vulnerability, asset, and department", async () => {
+  it("filters by vulnerability and asset", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
 
-    await caller.getManyForLlm({
-      vulnerabilityId: "v1",
-      assetId: "a1",
-      departmentId: "d1",
-    });
+    await caller.getManyForLlm({ vulnerabilityId: "v1", assetId: "a1" });
 
     expect(whereOf()).toEqual(
       expect.arrayContaining([
         { vulnerabilities: { some: { id: "v1" } } },
         { assets: { some: { assetId: "a1" } } },
-        { departments: { some: { id: "d1" } } },
       ]),
     );
   });

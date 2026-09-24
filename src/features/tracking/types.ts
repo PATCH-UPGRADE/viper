@@ -269,12 +269,28 @@ export type WorkOrderListItem = Prisma.WorkOrderTicketGetPayload<{
   include: typeof workOrderListInclude;
 }>;
 
-/** A submitted, top-level ticket that is not DONE. Excludes per-asset children. */
-export const openParentWorkOrderWhere = {
+/**
+ * A submitted work order that is not DONE, at the top of its tree. Per-asset
+ * tickets are always excluded. With a department, a sub-ticket is included
+ * only when its parent does not have that department, so no list shows a
+ * ticket both as a row and under its parent's children.
+ */
+export const topLevelOpenWorkOrderWhere = (
+  departmentId?: string,
+): Prisma.WorkOrderTicketWhereInput => ({
   isDraft: false,
   ticket: null,
   status: { not: TicketStatus.DONE },
-} satisfies Prisma.WorkOrderTicketWhereInput;
+  ...(departmentId
+    ? {
+        departments: { some: { id: departmentId } },
+        OR: [
+          { parentId: null },
+          { parent: { departments: { none: { id: departmentId } } } },
+        ],
+      }
+    : { parentId: null }),
+});
 
 export const WORK_ORDER_LLM_ASSET_LIMIT = 20;
 export const WORK_ORDER_LLM_COMMENT_LIMIT = 5;

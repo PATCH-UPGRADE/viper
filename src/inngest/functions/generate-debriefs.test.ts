@@ -310,7 +310,15 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     );
     expect(
       mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where,
-    ).toMatchObject({ isDraft: false, ticket: null });
+    ).toMatchObject({
+      isDraft: false,
+      ticket: null,
+      departments: { some: { id: "d1" } },
+      OR: [
+        { parentId: null },
+        { parent: { departments: { none: { id: "d1" } } } },
+      ],
+    });
   });
 
   it("passes an empty previousBullets on a department's first run", async () => {

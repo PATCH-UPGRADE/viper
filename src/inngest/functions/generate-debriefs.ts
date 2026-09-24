@@ -9,7 +9,7 @@ import {
   pruneSupersededDebriefs,
 } from "@/features/debrief/server/runs";
 import {
-  openParentWorkOrderWhere,
+  topLevelOpenWorkOrderWhere,
   WORK_ORDER_LLM_VULNERABILITY_LIMIT,
 } from "@/features/tracking/types";
 import prisma from "@/lib/db";
@@ -154,10 +154,7 @@ export const generateDepartmentDebrief = inngest.createFunction(
             select: { bullets: true, createdAt: true },
           }),
           prisma.workOrderTicket.findMany({
-            where: {
-              ...openParentWorkOrderWhere,
-              departments: { some: { id: departmentId } },
-            },
+            where: topLevelOpenWorkOrderWhere(departmentId),
             orderBy: { updatedAt: "desc" },
             take: WORK_ORDER_LIMIT,
             select: {

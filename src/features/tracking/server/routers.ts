@@ -33,11 +33,11 @@ import { requireExistence } from "@/trpc/middleware";
 import { TRACKING_TABS } from "../params";
 import {
   integrationWorkOrderInputSchema,
-  openParentWorkOrderWhere,
   paginatedWorkOrderListResponseSchema,
   ticketBaseInclude,
   ticketCommentResponseSchema,
   ticketDetailInclude,
+  topLevelOpenWorkOrderWhere,
   workOrderDetailResponseSchema,
   workOrderListFilterSchema,
   workOrderListInclude,
@@ -375,7 +375,7 @@ export const trackingRouter = createTRPCRouter({
         input;
       const filters: Prisma.WorkOrderTicketWhereInput[] = [
         {
-          ...openParentWorkOrderWhere,
+          ...topLevelOpenWorkOrderWhere(departmentId),
           ...(input.status?.length && { status: { in: input.status } }),
         },
         createSearchFilter(search),
@@ -407,9 +407,6 @@ export const trackingRouter = createTRPCRouter({
       }
       if (assetId) {
         filters.push({ assets: { some: { assetId } } });
-      }
-      if (departmentId) {
-        filters.push({ departments: { some: { id: departmentId } } });
       }
 
       const result = await fetchPaginated(prisma.workOrderTicket, input, {

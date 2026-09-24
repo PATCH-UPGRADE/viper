@@ -274,12 +274,7 @@ export function renderFindings(findings: EnrichedFinding[]): string {
         lines.push("- Work orders: none open");
       } else {
         lines.push(`- Work orders (${totalCount}):`);
-        // A sub-ticket is also a row of its own. Show it once, under its parent.
-        const shownAsChild = new Set(
-          rows.flatMap((row) => row.children.map((child) => child.id)),
-        );
-        for (const row of rows)
-          if (!shownAsChild.has(row.id)) lines.push(...renderWorkOrder(row));
+        for (const row of rows) lines.push(...renderWorkOrder(row));
         if (totalCount > rows.length)
           lines.push(`  - and ${totalCount - rows.length} more`);
       }

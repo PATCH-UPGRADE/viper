@@ -117,46 +117,6 @@ describe("renderFindings", () => {
     );
   });
 
-  it("shows a sub-ticket once, under its parent, not also as its own row", () => {
-    const child = {
-      id: "wo_child",
-      summary: "Patch PACS server",
-      status: "REQUIRES_APPROVAL" as const,
-    };
-    const text = renderFindings([
-      {
-        ...finding(),
-        label: null,
-        related: [],
-        workOrders: {
-          rows: [
-            workOrder({
-              id: "wo_child",
-              summary: child.summary,
-              status: child.status,
-            }),
-            workOrder({
-              children: [child],
-              _count: {
-                assets: 5,
-                children: 1,
-                comments: 0,
-                vulnerabilities: 1,
-              },
-            }),
-          ],
-          totalCount: 2,
-        },
-      },
-    ]);
-
-    expect(text).not.toContain("workOrder wo_child");
-    expect(text).toContain(
-      'Open sub-tickets (1 of 1): "Patch PACS server" REQUIRES_APPROVAL',
-    );
-    expect(text).not.toContain("and 1 more");
-  });
-
   it("says so when no open work order covers a finding", () => {
     const text = renderFindings([
       {

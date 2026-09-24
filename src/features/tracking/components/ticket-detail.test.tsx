@@ -833,6 +833,14 @@ describe("OtherAssetWorkOrdersCard", () => {
     ).toBeInTheDocument();
   });
 
+  it("leaves out linked assets that have no overlapping work orders", () => {
+    // asset-2 is linked but untouched, so it gets no group at all.
+    renderCard([cardWorkOrder("w1", ["asset-1"])]);
+
+    expect(screen.getByText("AST-DIA-01")).toBeInTheDocument();
+    expect(screen.queryByText("AST-DIA-02")).not.toBeInTheDocument();
+  });
+
   it("groups by asset by default, without asset chips on the rows", () => {
     renderCard([cardWorkOrder("w1", ["asset-1", "asset-2"], [biomed])]);
 

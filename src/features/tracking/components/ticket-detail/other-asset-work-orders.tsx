@@ -100,14 +100,6 @@ const WorkOrderGroupRows = ({
   // Per group, so expanding one does not expand the rest.
   const [showAll, setShowAll] = useState(false);
 
-  if (group.workOrders.length === 0) {
-    return (
-      <p className="px-4 py-3 text-sm text-muted-foreground">
-        No other open work orders on this asset.
-      </p>
-    );
-  }
-
   const hidden = group.workOrders.length - VISIBLE_ROWS;
   const shown = showAll
     ? group.workOrders

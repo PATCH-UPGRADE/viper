@@ -40,17 +40,22 @@ describe("groupByAsset", () => {
   it("keeps the given asset order", () => {
     const groups = groupByAsset(
       [assetTicket("a-2"), assetTicket("a-1")],
-      [workOrder("w1", ["a-1"])],
+      [workOrder("w1", ["a-1", "a-2"])],
     );
     expect(groups.map((g) => g.key)).toEqual(["a-2", "a-1"]);
   });
 
-  it("keeps a group for an asset with no other work orders", () => {
+  it("leaves out an asset with no other work orders", () => {
     const groups = groupByAsset(
       [assetTicket("a-1"), assetTicket("a-2")],
       [workOrder("w1", ["a-1"])],
     );
-    expect(groups[1]?.workOrders).toEqual([]);
+    expect(groups.map((g) => g.key)).toEqual(["a-1"]);
+  });
+
+  it("returns no groups when nothing overlaps", () => {
+    const groups = groupByAsset([assetTicket("a-1"), assetTicket("a-2")], []);
+    expect(groups).toEqual([]);
   });
 
   it("places a work order touching two assets in both groups", () => {
@@ -67,7 +72,7 @@ describe("groupByAsset", () => {
   it("labels a group by hostname, falling back to the asset id", () => {
     const groups = groupByAsset(
       [assetTicket("a-1", "AST-DIA-01"), assetTicket("a-2")],
-      [],
+      [workOrder("w1", ["a-1", "a-2"])],
     );
     expect(groups.map((g) => g.label)).toEqual(["AST-DIA-01", "a-2"]);
   });
@@ -78,7 +83,7 @@ describe("groupByAsset", () => {
         assetTicket("a-1", null, { building: "Dialysis Unit", room: "3" }),
         assetTicket("a-2"),
       ],
-      [],
+      [workOrder("w1", ["a-1", "a-2"])],
     );
     expect(groups[0]?.subLabel).toBe("Dialysis Unit · 3");
     expect(groups[1]?.subLabel).toBeUndefined();

@@ -17,18 +17,21 @@ export const assetLabelsById = (
     assetTickets.map(({ asset }) => [asset.id, assetLabel(asset)]),
   );
 
-// Assets with nothing overlapping still get a group, so every linked asset is
-// accounted for.
+// One group per linked asset that has overlapping work, in the order given.
+// A ticket can link dozens of assets, so an asset with nothing overlapping is
+// left out rather than rendered as an empty group.
 export const groupByAsset = (
   assetTickets: DetailAssetTicket[],
   workOrders: OtherAssetWorkOrder[],
 ): WorkOrderGroup[] =>
-  assetTickets.map(({ asset }) => ({
-    key: asset.id,
-    label: assetLabel(asset),
-    subLabel: locationLabel(asset.location) ?? undefined,
-    workOrders: workOrders.filter((wo) => wo.assetIds.includes(asset.id)),
-  }));
+  assetTickets
+    .map(({ asset }) => ({
+      key: asset.id,
+      label: assetLabel(asset),
+      subLabel: locationLabel(asset.location) ?? undefined,
+      workOrders: workOrders.filter((wo) => wo.assetIds.includes(asset.id)),
+    }))
+    .filter((group) => group.workOrders.length > 0);
 
 // One group per department, alphabetical, with a trailing "No team" group. A
 // work order in two departments appears under both, so the group counts sum to

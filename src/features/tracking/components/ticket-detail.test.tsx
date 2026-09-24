@@ -893,6 +893,26 @@ describe("OtherAssetWorkOrdersCard", () => {
     ).toHaveAttribute("href", "/tracking/w1");
   });
 
+  it("explains the team counts only when a work order has several teams", async () => {
+    const user = userEvent.setup();
+    const note = /listed under each/i;
+    const facilities = { id: "d-fac", name: "Facilities" };
+
+    const { unmount } = renderCard([
+      cardWorkOrder("w1", ["asset-1"], [biomed]),
+    ]);
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+    expect(screen.queryByText(note)).not.toBeInTheDocument();
+    unmount();
+
+    renderCard([cardWorkOrder("w1", ["asset-1"], [biomed, facilities])]);
+    // Asset mode never splits a work order, so the note stays out of it.
+    expect(screen.queryByText(note)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+    expect(screen.getByText(note)).toBeInTheDocument();
+  });
+
   it("leaves out linked assets that have no overlapping work orders", () => {
     // asset-2 is linked but untouched, so it gets no group at all.
     renderCard([cardWorkOrder("w1", ["asset-1"])]);

@@ -156,6 +156,10 @@ export const OtherAssetWorkOrdersCard = ({
       : groupByTeam(workOrders);
   const assetLabels =
     mode === "team" ? assetLabelsById(assetTickets) : undefined;
+  // A work order can belong to several departments, so team groups list it
+  // under each one and their counts sum to more than the header total.
+  const hasSharedWorkOrder =
+    mode === "team" && workOrders.some((wo) => wo.departments.length > 1);
 
   return (
     <Card className="gap-0 py-0">
@@ -168,6 +172,11 @@ export const OtherAssetWorkOrdersCard = ({
           <p className="mt-0.5 text-xs text-muted-foreground">
             Open work orders from any team that touch the assets linked here.
           </p>
+          {hasSharedWorkOrder && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              (A work order owned by more than one team is listed under each.)
+            </p>
+          )}
         </div>
         <ToggleGroup
           type="single"

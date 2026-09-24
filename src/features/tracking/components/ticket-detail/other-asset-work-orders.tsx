@@ -38,22 +38,31 @@ type GroupMode = (typeof MODES)[number]["value"];
 
 const WorkOrderRow = ({
   workOrder,
+  assetId,
   assetLabels,
 }: {
   workOrder: OtherAssetWorkOrder;
+  /** Set in asset mode: scopes the status and the link to that one asset. */
+  assetId?: string;
   assetLabels?: Record<string, string>;
 }) => {
   const teams =
     workOrder.departments.map((d) => d.name).join(", ") || NO_TEAM_LABEL;
-  const visibleAssetIds = workOrder.assetIds.slice(0, VISIBLE_CHIPS);
-  const hiddenAssetIds = workOrder.assetIds.slice(VISIBLE_CHIPS);
-  const label = (assetId: string) => assetLabels?.[assetId] ?? assetId;
+  const assetIds = workOrder.assetTickets.map((link) => link.assetId);
+  const visibleAssetIds = assetIds.slice(0, VISIBLE_CHIPS);
+  const hiddenAssetIds = assetIds.slice(VISIBLE_CHIPS);
+  const label = (id: string) => assetLabels?.[id] ?? id;
+  // A work order can be In Progress overall while still To Do on this asset,
+  // so a row about one asset reports that asset's own child ticket.
+  const link = assetId
+    ? workOrder.assetTickets.find((l) => l.assetId === assetId)
+    : undefined;
 
   return (
     <div className="flex items-start gap-3 border-t px-4 py-3 first:border-t-0 hover:bg-muted/40">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link
-          href={`/tracking/${workOrder.id}`}
+          href={`/tracking/${link?.ticketId ?? workOrder.id}`}
           title={workOrder.summary}
           className="truncate text-sm font-medium hover:underline"
         >
@@ -85,7 +94,10 @@ const WorkOrderRow = ({
           )}
         </div>
       </div>
-      <StatusChip status={workOrder.status} className="shrink-0" />
+      <StatusChip
+        status={link?.status ?? workOrder.status}
+        className="shrink-0"
+      />
     </div>
   );
 };
@@ -111,6 +123,7 @@ const WorkOrderGroupRows = ({
         <WorkOrderRow
           key={workOrder.id}
           workOrder={workOrder}
+          assetId={group.assetId}
           assetLabels={assetLabels}
         />
       ))}

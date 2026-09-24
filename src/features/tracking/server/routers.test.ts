@@ -1130,6 +1130,11 @@ describe("trackingRouter.getOtherAssetWorkOrders", () => {
     departments: [],
   });
 
+  const child = (workOrderId: string, assetId: string) => ({
+    id: `${workOrderId}-${assetId}`,
+    status: "TO_DO" as const,
+  });
+
   it("returns an empty list without querying when no assets are linked", async () => {
     const caller = setup();
     mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
@@ -1162,14 +1167,46 @@ describe("trackingRouter.getOtherAssetWorkOrders", () => {
     });
     // Reversed on purpose: the query has no orderBy, so row order is arbitrary.
     mockPrisma.assetTicket.findMany.mockResolvedValue([
-      { assetId: "a2", parentTicket: otherTicket("w1") },
-      { assetId: "a1", parentTicket: otherTicket("w1") },
+      {
+        assetId: "a2",
+        ticket: child("w1", "a2"),
+        parentTicket: otherTicket("w1"),
+      },
+      {
+        assetId: "a1",
+        ticket: child("w1", "a1"),
+        parentTicket: otherTicket("w1"),
+      },
     ]);
 
     const result = await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ id: "w1", assetIds: ["a1", "a2"] });
+    expect(result[0]?.assetTickets).toEqual([
+      { assetId: "a1", ticketId: "w1-a1", status: "TO_DO" },
+      { assetId: "a2", ticketId: "w1-a2", status: "TO_DO" },
+    ]);
+  });
+
+  it("carries each asset's own child ticket status, not the parent's", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [{ assetId: "a1" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([
+      {
+        assetId: "a1",
+        ticket: { id: "w1-a1", status: "TO_DO" },
+        parentTicket: { ...otherTicket("w1"), status: "IN_PROGRESS" },
+      },
+    ]);
+
+    const result = await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
+
+    expect(result[0]?.status).toBe("IN_PROGRESS");
+    expect(result[0]?.assetTickets[0]?.status).toBe("TO_DO");
   });
 
   it("excludes this ticket, its parent, its sub-tickets, drafts, Done parents, Done per-asset children, and child rows", async () => {
@@ -1222,11 +1259,17 @@ describe("trackingRouter.getOtherAssetWorkOrders", () => {
     mockPrisma.assetTicket.findMany.mockResolvedValue([
       {
         assetId: "a1",
+        ticket: child("late", "a1"),
         parentTicket: otherTicket("late", new Date("2026-09-02")),
       },
-      { assetId: "a1", parentTicket: otherTicket("none", null) },
       {
         assetId: "a1",
+        ticket: child("none", "a1"),
+        parentTicket: otherTicket("none", null),
+      },
+      {
+        assetId: "a1",
+        ticket: child("early", "a1"),
         parentTicket: otherTicket("early", new Date("2026-08-08")),
       },
     ]);

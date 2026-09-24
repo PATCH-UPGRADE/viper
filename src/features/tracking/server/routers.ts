@@ -444,6 +444,9 @@ export const trackingRouter = createTRPCRouter({
         },
         select: {
           assetId: true,
+          // The per-asset child ticket, so the By asset view can show this
+          // asset's own status rather than the work order's overall status.
+          ticket: { select: { id: true, status: true } },
           parentTicket: { select: otherAssetWorkOrderSelect },
         },
       });

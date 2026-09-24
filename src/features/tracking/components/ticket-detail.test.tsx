@@ -801,13 +801,18 @@ describe("OtherAssetWorkOrdersCard", () => {
     id: string,
     assetIds: string[],
     departments: { id: string; name: string }[] = [],
+    statusByAsset: Record<string, string> = {},
   ) => ({
     id,
     summary: `Work order ${id}`,
     status: "TO_DO",
     scheduledAt: null,
     departments,
-    assetIds,
+    assetTickets: assetIds.map((assetId) => ({
+      assetId,
+      ticketId: `${id}-${assetId}`,
+      status: statusByAsset[assetId] ?? "TO_DO",
+    })),
   });
 
   const biomed = { id: "d-biomed", name: "Biomed Engineering" };
@@ -833,6 +838,31 @@ describe("OtherAssetWorkOrdersCard", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows each asset's own status in asset mode, and the work order's in team mode", async () => {
+    const user = userEvent.setup();
+    // In Progress overall, but still To Do on asset-1.
+    renderCard([
+      cardWorkOrder("w1", ["asset-1", "asset-2"], [biomed], {
+        "asset-2": "IN_PROGRESS",
+      }),
+    ]);
+
+    const asset1Group = screen.getByRole("region", { name: /AST-DIA-01/ });
+    expect(within(asset1Group).getByText("To Do")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+
+    // Team mode is about the work order as a whole, so it keeps the parent
+    // status and links to the parent.
+    const teamGroup = screen.getByRole("region", {
+      name: /Biomed Engineering/,
+    });
+    expect(within(teamGroup).getByText("To Do")).toBeInTheDocument();
+    expect(
+      within(teamGroup).getByRole("link", { name: "Work order w1" }),
+    ).toHaveAttribute("href", "/tracking/w1");
+  });
+
   it("leaves out linked assets that have no overlapping work orders", () => {
     // asset-2 is linked but untouched, so it gets no group at all.
     renderCard([cardWorkOrder("w1", ["asset-1"])]);
@@ -846,9 +876,11 @@ describe("OtherAssetWorkOrdersCard", () => {
 
     expect(screen.getByText("AST-DIA-01")).toBeInTheDocument();
     expect(screen.getByText("AST-DIA-02")).toBeInTheDocument();
+    // Asset mode scopes the row to one asset, so it links to that asset's
+    // child ticket, as the Linked Assets table above does.
     expect(screen.getByRole("link", { name: "Work order w1" })).toHaveAttribute(
       "href",
-      "/tracking/w1",
+      "/tracking/w1-asset-1",
     );
     expect(screen.queryByText("Biomed Engineering")).toBeInTheDocument();
     // The chips carry the asset label; in asset mode they are absent, so the

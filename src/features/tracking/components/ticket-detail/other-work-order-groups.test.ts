@@ -30,7 +30,11 @@ const workOrder = (
   status: TicketStatus.TO_DO,
   scheduledAt: null,
   departments,
-  assetIds,
+  assetTickets: assetIds.map((assetId) => ({
+    assetId,
+    ticketId: `${id}-${assetId}`,
+    status: TicketStatus.TO_DO,
+  })),
 });
 
 const BIOMED = { id: "d-biomed", name: "Biomed Engineering" };

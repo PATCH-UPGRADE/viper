@@ -66,24 +66,45 @@ export type OtherAssetWorkOrderTicket = Prisma.WorkOrderTicketGetPayload<{
   select: typeof otherAssetWorkOrderSelect;
 }>;
 
-/** A neighbouring work order plus which of this ticket's linked assets it touches. */
-export type OtherAssetWorkOrder = OtherAssetWorkOrderTicket & {
-  assetIds: string[];
+/**
+ * One of this ticket's linked assets that a neighbouring work order touches,
+ * with the per-asset child ticket that tracks the work on that asset. The
+ * child status can differ from the parent's: a work order can be In Progress
+ * overall while still To Do on this particular asset.
+ */
+export type OtherAssetWorkOrderLink = {
+  assetId: string;
+  ticketId: string;
+  status: TicketStatus;
 };
 
-// Both sorts are total orders (assetIds by id; work orders by scheduledAt,
+/** A neighbouring work order plus which of this ticket's linked assets it touches. */
+export type OtherAssetWorkOrder = OtherAssetWorkOrderTicket & {
+  assetTickets: OtherAssetWorkOrderLink[];
+};
+
+// Both sorts are total orders (links by asset id; work orders by scheduledAt,
 // then summary, then id), so the result never depends on database row order
 // and the query needs no `orderBy`.
 export const dedupeOtherAssetWorkOrders = (
-  rows: { assetId: string; parentTicket: OtherAssetWorkOrderTicket }[],
+  rows: {
+    assetId: string;
+    ticket: { id: string; status: TicketStatus } | null;
+    parentTicket: OtherAssetWorkOrderTicket;
+  }[],
 ): OtherAssetWorkOrder[] => {
   const byId = new Map<string, OtherAssetWorkOrder>();
-  for (const { assetId, parentTicket } of rows) {
+  for (const { assetId, ticket, parentTicket } of rows) {
+    // Every AssetTicket row has a child ticket; the relation is required.
+    if (!ticket) continue;
+    const link = { assetId, ticketId: ticket.id, status: ticket.status };
     const existing = byId.get(parentTicket.id);
-    if (existing) existing.assetIds.push(assetId);
-    else byId.set(parentTicket.id, { ...parentTicket, assetIds: [assetId] });
+    if (existing) existing.assetTickets.push(link);
+    else byId.set(parentTicket.id, { ...parentTicket, assetTickets: [link] });
   }
-  for (const workOrder of byId.values()) workOrder.assetIds.sort();
+  for (const workOrder of byId.values()) {
+    workOrder.assetTickets.sort((a, b) => a.assetId.localeCompare(b.assetId));
+  }
   return [...byId.values()].sort(
     (a, b) =>
       (a.scheduledAt?.getTime() ?? Number.POSITIVE_INFINITY) -

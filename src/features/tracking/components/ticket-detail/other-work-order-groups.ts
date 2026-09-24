@@ -7,6 +7,7 @@ export type WorkOrderGroup = {
   key: string;
   label: string;
   subLabel?: string;
+  assetId?: string;
   workOrders: OtherAssetWorkOrder[];
 };
 
@@ -29,7 +30,10 @@ export const groupByAsset = (
       key: asset.id,
       label: assetLabel(asset),
       subLabel: locationLabel(asset.location) ?? undefined,
-      workOrders: workOrders.filter((wo) => wo.assetIds.includes(asset.id)),
+      assetId: asset.id,
+      workOrders: workOrders.filter((wo) =>
+        wo.assetTickets.some((link) => link.assetId === asset.id),
+      ),
     }))
     .filter((group) => group.workOrders.length > 0);
 
@@ -79,7 +83,7 @@ export const countOtherWorkOrdersByAsset = (
 ): Record<string, number> => {
   const counts: Record<string, number> = {};
   for (const workOrder of workOrders) {
-    for (const assetId of workOrder.assetIds) {
+    for (const { assetId } of workOrder.assetTickets) {
       counts[assetId] = (counts[assetId] ?? 0) + 1;
     }
   }

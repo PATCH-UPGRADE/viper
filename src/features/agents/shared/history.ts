@@ -9,8 +9,8 @@
  * text-only hydration is both safe and sufficient. `toolCalls` is still
  * persisted for the UI to render.
  *
- * Call ensureThread first to authorize the thread before loading its report
- * or using the threadId-only message helpers below.
+ * Call ensureThread first to authorize the thread before using the
+ * threadId-only message helpers below.
  */
 import "server-only";
 import {
@@ -20,13 +20,13 @@ import {
 } from "@langchain/core/messages";
 import prisma from "@/lib/db";
 
-/** Create the thread lazily and return its current report for revisions. */
+/** Create the thread lazily. */
 export async function ensureThread(
   threadId: string,
   userId: string,
   firstUserContent: string,
-): Promise<{ report: string | null }> {
-  return prisma.chatThread.upsert({
+): Promise<void> {
+  await prisma.chatThread.upsert({
     where: { id: threadId, userId },
     update: { updatedAt: new Date() },
     create: {
@@ -34,7 +34,6 @@ export async function ensureThread(
       userId,
       title: firstUserContent.slice(0, 50),
     },
-    select: { report: true },
   });
 }
 

@@ -1117,7 +1117,7 @@ model ChatThread {
   userId    String
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String?
-  // Markdown report the agent wrote for this thread (write_report tool). A
+  // Markdown report the agent wrote for this thread (write_report/edit_report). A
   // thread with this set is a "report thread" and shows up under /reports.
   // Users cannot edit it directly — they re-prompt and the agent rewrites it.
   report    String?       @db.Text

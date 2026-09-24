@@ -21,7 +21,11 @@ import { TicketCategory } from "@/generated/prisma";
 import { TOOL_REJECTED_PREFIX } from "../shared/build-graph";
 import { makeRecordNoteTool } from "./note-tool";
 import { makeQueryPlatformDataTool } from "./query-platform-tool";
-import { makeWriteReportTool } from "./report-tool";
+import {
+  makeEditReportTool,
+  makeReadReportTool,
+  makeWriteReportTool,
+} from "./report-tool";
 
 /** ```viper-ask-user ...``` block the chat UI parses to render question chips. */
 const askUserQuestions = tool(
@@ -221,7 +225,13 @@ export function buildAgentTools(userId: string, reportThreadId?: string) {
     listFleetManagedAssetsTool,
     proposeFleetWorkOrder,
     makeRecordNoteTool(userId),
-    // write_report only when given a thread to write to (chat yes, recommendations no).
-    ...(reportThreadId ? [makeWriteReportTool(userId, reportThreadId)] : []),
+    // Report tools only when given a thread to write to (chat yes, recommendations no).
+    ...(reportThreadId
+      ? [
+          makeReadReportTool(userId, reportThreadId),
+          makeEditReportTool(userId, reportThreadId),
+          makeWriteReportTool(userId, reportThreadId),
+        ]
+      : []),
   ];
 }

@@ -355,6 +355,58 @@ export const useDetachChild = (parentId: string) => {
   );
 };
 
+export const useLinkableTickets = (ticketId: string) => {
+  const trpc = useTRPC();
+  return useQuery(trpc.tracking.listLinkableTickets.queryOptions({ ticketId }));
+};
+
+// A link changes both tickets' detail and each one's candidate list. The
+// tracking list does not select links, so it is left alone.
+const useInvalidateLinkedTickets = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return (ticketIds: string[]) => {
+    for (const id of ticketIds) {
+      queryClient.invalidateQueries(trpc.tracking.getOne.queryFilter({ id }));
+      queryClient.invalidateQueries(
+        trpc.tracking.listLinkableTickets.queryFilter({ ticketId: id }),
+      );
+    }
+  };
+};
+
+export const useLinkTicket = () => {
+  const trpc = useTRPC();
+  const invalidate = useInvalidateLinkedTickets();
+  return useMutation(
+    trpc.tracking.linkTicket.mutationOptions({
+      onSuccess: (data) => {
+        invalidate(data.ticketIds);
+        toast.success("Ticket linked");
+      },
+      onError: (error) => {
+        toast.error(`Failed to link ticket: ${error.message}`);
+      },
+    }),
+  );
+};
+
+export const useUnlinkTicket = () => {
+  const trpc = useTRPC();
+  const invalidate = useInvalidateLinkedTickets();
+  return useMutation(
+    trpc.tracking.unlinkTicket.mutationOptions({
+      onSuccess: (data) => {
+        invalidate(data.ticketIds);
+        toast.success("Ticket unlinked");
+      },
+      onError: (error) => {
+        toast.error(`Failed to unlink ticket: ${error.message}`);
+      },
+    }),
+  );
+};
+
 export const useAttachableAssets = (ticketId: string) => {
   const trpc = useTRPC();
   return useQuery(

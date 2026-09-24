@@ -258,6 +258,21 @@ const renderActivity = (a: Activity): React.ReactNode => {
           </span>
         </>
       );
+    case "TICKET_LINKED":
+    case "TICKET_UNLINKED":
+      return (
+        <>
+          {a.type === "TICKET_LINKED"
+            ? "linked related ticket"
+            : "unlinked related ticket"}{" "}
+          <span className="font-medium">
+            {(data.relatedTicketSummary as string) ?? data.relatedTicketId}
+          </span>
+          {data.reason ? (
+            <span className="text-muted-foreground"> — {data.reason}</span>
+          ) : null}
+        </>
+      );
   }
 };
 

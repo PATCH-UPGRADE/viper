@@ -1213,6 +1213,25 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
   },
 ];
 
+// Related-ticket links between seeded tickets, resolved by summary after
+// creation because ticket ids are cuids. Mirrors linkTicket() in
+// src/features/tracking/server/routers.ts.
+const SAMPLE_RELATED_TICKET_LINKS: { a: string; b: string; reason: string }[] =
+  [
+    {
+      a: "Block TCP/445 at imaging switch (rad-sw-001)",
+      b: "Patch PACS Server EternalBlue (rad-pacs-001)",
+      reason:
+        "Switch ACL is the compensating control for the same EternalBlue exposure until the PACS patch is approved.",
+    },
+    {
+      a: "Verify DICOM VLAN ACL enforcement",
+      b: "Isolate GE imaging devices to a dedicated DICOM VLAN",
+      reason:
+        "Both change the DICOM VLAN ACLs; re-run the verification once the GE devices are moved.",
+    },
+  ];
+
 async function clearDatabase() {
   console.log("🗑️  Clearing database...");
 
@@ -2326,18 +2345,64 @@ async function seedWorkOrderTickets(userId: string) {
 
   let parentCount = 0;
   let childCount = 0;
+  const idBySummary = new Map<string, string>();
 
   for (const parent of SAMPLE_CHANGE_TICKETS) {
     const created = await createWorkOrderTicket(parent, userId, null);
+    idBySummary.set(created.summary, created.id);
     parentCount++;
     for (const child of parent.children ?? []) {
-      await createWorkOrderTicket(child, userId, created.id);
+      const createdChild = await createWorkOrderTicket(
+        child,
+        userId,
+        created.id,
+      );
+      idBySummary.set(createdChild.summary, createdChild.id);
       childCount++;
     }
   }
 
   console.log(
     `✅ Seeded ${parentCount} parent tickets and ${childCount} child tickets`,
+  );
+
+  await seedRelatedTicketLinks(idBySummary, userId);
+}
+
+async function seedRelatedTicketLinks(
+  idBySummary: Map<string, string>,
+  userId: string,
+) {
+  for (const { a, b, reason } of SAMPLE_RELATED_TICKET_LINKS) {
+    const aId = idBySummary.get(a);
+    const bId = idBySummary.get(b);
+    if (!aId || !bId) {
+      throw new Error(`Related-ticket seed: missing "${a}" or "${b}"`);
+    }
+    const [ticketAId, ticketBId] = aId < bId ? [aId, bId] : [bId, aId];
+    await prisma.workOrderTicketLink.create({
+      data: { ticketAId, ticketBId, reason },
+    });
+    await prisma.ticketActivity.createMany({
+      data: [
+        {
+          ticketId: aId,
+          userId,
+          type: "TICKET_LINKED",
+          data: { relatedTicketId: bId, relatedTicketSummary: b, reason },
+        },
+        {
+          ticketId: bId,
+          userId,
+          type: "TICKET_LINKED",
+          data: { relatedTicketId: aId, relatedTicketSummary: a, reason },
+        },
+      ],
+    });
+  }
+
+  console.log(
+    `✅ Seeded ${SAMPLE_RELATED_TICKET_LINKS.length} related-ticket links`,
   );
 }
 

@@ -49,6 +49,11 @@ const {
   mockUseAttachAsset,
   mockUseDetachAsset,
   mockUseAttachableAssets,
+  mockLinkMutate,
+  mockUnlinkMutate,
+  mockUseLinkTicket,
+  mockUseUnlinkTicket,
+  mockUseLinkableTickets,
 } = vi.hoisted(() => {
   const mockMutate = vi.fn();
   const mockAddCommentMutate = vi.fn();
@@ -58,6 +63,8 @@ const {
   const mockDetachMutate = vi.fn();
   const mockAttachAssetMutate = vi.fn();
   const mockDetachAssetMutate = vi.fn();
+  const mockLinkMutate = vi.fn();
+  const mockUnlinkMutate = vi.fn();
   return {
     mockMutate,
     mockAddCommentMutate,
@@ -67,6 +74,26 @@ const {
     mockDetachMutate,
     mockAttachAssetMutate,
     mockDetachAssetMutate,
+    mockLinkMutate,
+    mockUnlinkMutate,
+    mockUseLinkTicket: vi.fn(() => ({
+      mutate: mockLinkMutate,
+      isPending: false,
+    })),
+    mockUseUnlinkTicket: vi.fn(() => ({
+      mutate: mockUnlinkMutate,
+      isPending: false,
+    })),
+    mockUseLinkableTickets: vi.fn(() => ({
+      data: [
+        {
+          id: "cand-1",
+          summary: "Candidate ticket A",
+          status: "TO_DO",
+          externalMappings: [{ externalId: "INC0048512" }],
+        },
+      ],
+    })),
     mockUseAttachAsset: vi.fn(() => ({
       mutate: mockAttachAssetMutate,
       isPending: false,
@@ -172,6 +199,9 @@ vi.mock("../hooks/use-tracking", () => ({
   useAttachAsset: mockUseAttachAsset,
   useDetachAsset: mockUseDetachAsset,
   useAttachableAssets: mockUseAttachableAssets,
+  useLinkTicket: mockUseLinkTicket,
+  useUnlinkTicket: mockUseUnlinkTicket,
+  useLinkableTickets: mockUseLinkableTickets,
 }));
 
 vi.mock("@/lib/auth-client", () => ({
@@ -799,6 +829,7 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
   updatedAt: new Date("2026-05-01T00:00:00Z"),
   parent: null,
   children: [],
+  relatedTickets: [],
   assets: [],
   vulnerabilities: [],
   issues: [],
@@ -1231,6 +1262,270 @@ describe("TicketDetailContent — sub-tickets attach/detach", () => {
 
     expect(mockDetachMutate).toHaveBeenCalledTimes(1);
     expect(mockDetachMutate).toHaveBeenCalledWith({ ticketId: "child-1" });
+  });
+});
+
+describe("TicketDetailContent — related tickets", () => {
+  const relatedLink = {
+    linkId: "link-1",
+    reason: "Same EternalBlue exposure",
+    createdAt: new Date("2026-05-02T00:00:00Z"),
+    ticket: {
+      id: "rt-1",
+      summary: "Patch PACS Server",
+      status: "REQUIRES_APPROVAL",
+      assignee: null,
+      departments: [{ id: "d-it", name: "IT", color: "purple" }],
+      externalMappings: [{ externalId: "INC0048512" }],
+    },
+  };
+
+  const defaultCandidate = {
+    id: "cand-1",
+    summary: "Candidate ticket A",
+    status: "TO_DO",
+    externalMappings: [{ externalId: "INC0048512" }],
+  };
+
+  beforeEach(() => {
+    mockUseLinkableTickets.mockReturnValue({ data: [defaultCandidate] });
+  });
+
+  it("is collapsed by default and shows an empty state once expanded", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    expect(
+      screen.getByRole("button", { name: /^link ticket$/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/no related tickets yet/i)).toBeNull();
+
+    await user.click(
+      screen.getByRole("button", { name: /related tickets\s*\(0\)/i }),
+    );
+    expect(screen.getByText(/no related tickets yet/i)).toBeInTheDocument();
+  });
+
+  it("renders each related ticket with external id, department, reason, and status", async () => {
+    const user = userEvent.setup();
+    renderDetail({ relatedTickets: [relatedLink] });
+
+    await user.click(
+      screen.getByRole("button", { name: /related tickets\s*\(1\)/i }),
+    );
+
+    expect(screen.getByText("INC0048512")).toBeInTheDocument();
+    expect(screen.getByText("Patch PACS Server")).toBeInTheDocument();
+    expect(screen.getByText("Same EternalBlue exposure")).toBeInTheDocument();
+    expect(screen.getByText("Requires Approval")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /patch pacs server/i }),
+    ).toHaveAttribute("href", "/tracking/rt-1");
+  });
+
+  it("calls unlinkTicket with the link id when the Unlink button is clicked", async () => {
+    const user = userEvent.setup();
+    renderDetail({ relatedTickets: [relatedLink] });
+
+    await user.click(
+      screen.getByRole("button", { name: /related tickets\s*\(1\)/i }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /unlink patch pacs server/i }),
+    );
+
+    expect(mockUnlinkMutate).toHaveBeenCalledTimes(1);
+    expect(mockUnlinkMutate.mock.calls[0][0]).toEqual({ linkId: "link-1" });
+  });
+
+  it("picking a candidate opens a confirm step; Link submits with a null reason when empty", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+    await user.click(
+      await screen.findByRole("option", { name: /candidate ticket a/i }),
+    );
+
+    // Nothing is submitted until the user confirms.
+    expect(mockLinkMutate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/reason \(optional\)/i)).toBeInTheDocument();
+
+    // The trigger and the confirm button share a label; the confirm one is
+    // inside the open popover (role="dialog").
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: /^link ticket$/i,
+      }),
+    );
+
+    expect(mockLinkMutate).toHaveBeenCalledTimes(1);
+    expect(mockLinkMutate.mock.calls[0][0]).toEqual({
+      ticketId: "ticket-1",
+      relatedTicketId: "cand-1",
+      reason: null,
+    });
+  });
+
+  it("sends the typed reason with the link", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+    await user.click(
+      await screen.findByRole("option", { name: /candidate ticket a/i }),
+    );
+    await user.type(
+      screen.getByLabelText(/reason \(optional\)/i),
+      "  Same CVE, different department  ",
+    );
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: /^link ticket$/i,
+      }),
+    );
+
+    expect(mockLinkMutate.mock.calls[0][0]).toEqual({
+      ticketId: "ticket-1",
+      relatedTicketId: "cand-1",
+      reason: "Same CVE, different department",
+    });
+  });
+
+  it("shows the external id under the summary, and omits the line without one", async () => {
+    const user = userEvent.setup();
+    mockUseLinkableTickets.mockReturnValue({
+      data: [
+        defaultCandidate,
+        {
+          ...defaultCandidate,
+          id: "cand-2",
+          summary: "No mapping",
+          externalMappings: [],
+        },
+      ],
+    });
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+
+    // The summary is not truncated away by the id, and both sit in one option.
+    const withId = await screen.findByRole("option", {
+      name: /candidate ticket a/i,
+    });
+    expect(within(withId).getByText("INC0048512")).toBeInTheDocument();
+    expect(within(withId).getByText("Candidate ticket A")).toBeInTheDocument();
+
+    const withoutId = screen.getByRole("option", { name: /no mapping/i });
+    expect(within(withoutId).queryByText(/INC/)).toBeNull();
+  });
+
+  it("tells two candidates with the same summary apart", async () => {
+    const user = userEvent.setup();
+    mockUseLinkableTickets.mockReturnValue({
+      data: [
+        { ...defaultCandidate, id: "dup-1", summary: "Patch the pumps" },
+        { ...defaultCandidate, id: "dup-2", summary: "Patch the pumps" },
+      ],
+    });
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+    const options = await screen.findAllByRole("option", {
+      name: /patch the pumps/i,
+    });
+    expect(options).toHaveLength(2);
+
+    // Keyboard selection resolves the item by its cmdk value, so a shared
+    // value sends the wrong ticket.
+    await user.keyboard("{ArrowDown}{Enter}");
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: /^link ticket$/i,
+      }),
+    );
+
+    expect(mockLinkMutate.mock.calls[0][0]).toMatchObject({
+      relatedTicketId: "dup-2",
+    });
+  });
+
+  it("Back returns to the candidate list without submitting", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+    await user.click(
+      await screen.findByRole("option", { name: /candidate ticket a/i }),
+    );
+    await user.click(screen.getByRole("button", { name: /^back$/i }));
+
+    expect(
+      await screen.findByRole("option", { name: /candidate ticket a/i }),
+    ).toBeInTheDocument();
+    expect(mockLinkMutate).not.toHaveBeenCalled();
+  });
+
+  it("finds a picker candidate by the external id the row displays", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+    await user.type(
+      await screen.findByPlaceholderText(/search tickets/i),
+      "INC0048512",
+    );
+
+    expect(
+      await screen.findByRole("option", { name: /candidate ticket a/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders TICKET_LINKED and TICKET_UNLINKED activities with the other ticket's summary", () => {
+    renderDetail({
+      activities: [
+        {
+          id: "a1",
+          ticketId: "ticket-1",
+          userId: "u1",
+          type: "TICKET_LINKED",
+          data: {
+            relatedTicketId: "rt-1",
+            relatedTicketSummary: "Patch PACS Server",
+            reason: "Same EternalBlue exposure",
+          },
+          createdAt: new Date("2026-05-15T12:00:00Z"),
+          user: { id: "u1", name: "Alice", image: null },
+        },
+        {
+          id: "a2",
+          ticketId: "ticket-1",
+          userId: "u1",
+          type: "TICKET_UNLINKED",
+          data: {
+            relatedTicketId: "rt-1",
+            relatedTicketSummary: "Patch PACS Server",
+            reason: null,
+          },
+          createdAt: new Date("2026-05-15T13:00:00Z"),
+          user: { id: "u1", name: "Alice", image: null },
+        },
+      ],
+    });
+
+    const linked = screen.getByLabelText("Activity: TICKET_LINKED");
+    expect(
+      within(linked).getByText(/linked related ticket/i),
+    ).toBeInTheDocument();
+    expect(within(linked).getByText("Patch PACS Server")).toBeInTheDocument();
+    expect(
+      within(linked).getByText(/same eternalblue exposure/i),
+    ).toBeInTheDocument();
+
+    const unlinked = screen.getByLabelText("Activity: TICKET_UNLINKED");
+    expect(
+      within(unlinked).getByText(/unlinked related ticket/i),
+    ).toBeInTheDocument();
   });
 });
 

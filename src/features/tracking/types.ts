@@ -92,6 +92,19 @@ export type TrackingTicketRow = Omit<
   children: TrackingTicketChildRow[];
 };
 
+const relatedTicketRefSelect = {
+  id: true,
+  summary: true,
+  status: true,
+  departments: {
+    select: { id: true, name: true, color: true },
+    orderBy: { name: "asc" as const },
+  },
+  externalMappings: { select: { externalId: true }, take: 1 },
+} satisfies Prisma.WorkOrderTicketSelect;
+
+const relatedLinkSelect = { id: true, reason: true, createdAt: true } as const;
+
 export const ticketDetailInclude = {
   departments: {
     select: { id: true, name: true, color: true },
@@ -232,14 +245,43 @@ export const ticketDetailInclude = {
       },
     },
   },
+  // Both sides of the undirected link table; the server flattens them into
+  // `relatedTickets` (see withRelatedTickets in server/routers.ts).
+  linksAsA: {
+    select: {
+      ...relatedLinkSelect,
+      ticketB: { select: relatedTicketRefSelect },
+    },
+  },
+  linksAsB: {
+    select: {
+      ...relatedLinkSelect,
+      ticketA: { select: relatedTicketRefSelect },
+    },
+  },
 } satisfies Prisma.WorkOrderTicketInclude;
 
+type TicketDetailPayload = Prisma.WorkOrderTicketGetPayload<{
+  include: typeof ticketDetailInclude;
+}>;
+
+export type RelatedTicketRef =
+  TicketDetailPayload["linksAsA"][number]["ticketB"];
+
+export type RelatedTicketLink = {
+  linkId: string;
+  reason: string | null;
+  createdAt: Date;
+  ticket: RelatedTicketRef;
+};
+
 // What clients receive from the detail endpoints: the per-user `watchers`
-// include is collapsed server-side into an `isWatching` boolean.
+// include is collapsed server-side into an `isWatching` boolean, and the two
+// link sides into one `relatedTickets` list.
 export type TicketDetail = Omit<
-  Prisma.WorkOrderTicketGetPayload<{ include: typeof ticketDetailInclude }>,
-  "watchers"
-> & { isWatching: boolean };
+  TicketDetailPayload,
+  "watchers" | "linksAsA" | "linksAsB"
+> & { isWatching: boolean; relatedTickets: RelatedTicketLink[] };
 
 // Include shape for the public list endpoint — base ticket fields plus the linked
 // entities most callers want to slice on.
@@ -387,6 +429,21 @@ const siblingWorkOrderSchema = z.object({
 const ticketChildRefSchema = siblingWorkOrderSchema.extend({
   departments: z.array(departmentItemSchema),
   _count: z.object({ comments: z.number() }),
+});
+
+const relatedTicketRefSchema = z.object({
+  id: z.string(),
+  summary: z.string(),
+  status: z.enum(TicketStatus),
+  departments: z.array(departmentItemSchema),
+  externalMappings: z.array(z.object({ externalId: z.string() })),
+});
+
+const relatedTicketLinkSchema = z.object({
+  linkId: z.string(),
+  reason: z.string().nullable(),
+  createdAt: z.date(),
+  ticket: relatedTicketRefSchema,
 });
 
 const ticketMitigationPlanSchema = z.object({
@@ -555,6 +612,7 @@ export const workOrderDetailResponseSchema = z.object({
   creator: ticketCreatorSchema,
   parent: ticketParentRefSchema,
   children: z.array(ticketChildRefSchema),
+  relatedTickets: z.array(relatedTicketLinkSchema),
   assets: z.array(detailAssetTicketSchema),
   vulnerabilities: z.array(linkedVulnerabilitySchema),
   remediations: z.array(detailLinkedRemediationSchema),

@@ -51,8 +51,8 @@ export interface UrlBuilders<TConfig = unknown> {
 }
 
 /**
- * One resource on a platform whose protocol *we* speak (Fleet, ServiceNow).
- * A platform owns whatever client its methods need, including the session abstraction
+ * An authenticated client for one platform whose protocol *we* speak (Fleet,
+ * ServiceNow). Only that platform's `createSession` makes one.
  */
 export interface Session {
   request(url: string, init?: RequestInit): Promise<Response>;
@@ -65,13 +65,11 @@ export interface Session {
 export interface SessionInput<TConfig = unknown, TCreds = unknown> {
   integrationId: string;
   config: TConfig;
+  /** `ai` forwards these to n8n, which authenticates as us. That is the point. */
   creds: TCreds;
 }
 
-/**
- * The fields every sync attempt carries, whichever shape runs it. `creds`: `ai`
- * forwards these to n8n, which authenticates as us. That is the point.
- */
+/** The fields every sync attempt carries, whichever shape runs it. */
 export interface BaseSyncCtx<TConfig = unknown, TCreds = unknown>
   extends SessionInput<TConfig, TCreds> {
   cursor: Cursor | null;

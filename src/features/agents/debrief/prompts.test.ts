@@ -46,33 +46,31 @@ describe("SCOUT_SYSTEM_PROMPT", () => {
     expect(SCOUT_SYSTEM_PROMPT).toMatch(/exactly as it appeared/);
   });
 
-  it("sends the scout to the work-order lookup instead of guessing", () => {
-    // Without the lookup the scout can only infer "being worked" from the
-    // item itself, and the writer repeats that guess as fact.
-    expect(SCOUT_SYSTEM_PROMPT).toContain("_links.workOrders");
-    expect(SCOUT_SYSTEM_PROMPT).toContain("no open work order found");
-    expect(SCOUT_SYSTEM_PROMPT).toMatch(/parallel tool calls in one turn/);
+  it("has the scout record findings, not write them as text", () => {
+    // Only record_finding calls reach the writer. Prose is discarded.
+    expect(SCOUT_SYSTEM_PROMPT).toContain("record_finding");
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(/Text you write does not/);
   });
 
-  it("makes the scout give the notification id for an advisory", () => {
-    expect(SCOUT_SYSTEM_PROMPT).toMatch(/always give the notification id/);
-  });
-
-  it("forbids 'only' or 'all' about devices without a count", () => {
-    expect(SCOUT_SYSTEM_PROMPT).toMatch(/only if you counted the\s+assets/);
+  it("leaves work orders to the platform", () => {
+    // The work-order lines are attached from the database, so a lookup by the
+    // scout costs tool calls and adds nothing.
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(/Do not look up work orders/);
+    // Scout prose about tickets contradicted the attached lines.
     expect(SCOUT_SYSTEM_PROMPT).toMatch(
-      /Count by\s+device type across every asset, not by model/,
+      /Do not describe work orders, tickets, or their status/,
     );
   });
 
-  it("makes the scout report every open child of a work order", () => {
-    // A scout that names one open sub-ticket reads it as the last blocker.
-    // The detail call's "children" includes DONE sub-tickets, so the filter must
-    // live in the rule, not in a claim about the list.
+  it("makes the notification the record for an advisory", () => {
     expect(SCOUT_SYSTEM_PROMPT).toMatch(
-      /every sub-ticket in its "children" list\s+whose status is not DONE/,
+      /For an inbox advisory, use the\s+notification/,
     );
-    expect(SCOUT_SYSTEM_PROMPT).toContain('"the remaining blocker"');
+  });
+
+  it("forbids 'only' or 'all' about the hospital's devices", () => {
+    // No tool counts devices by type, so the claim cannot be checked.
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(/Never write "only", "all", "every"/);
   });
 
   it("embeds the platform catalog, so the tool list cannot drift from the prompt", () => {
@@ -82,6 +80,28 @@ describe("SCOUT_SYSTEM_PROMPT", () => {
 });
 
 describe("buildWriterPrompt — the findings reach the model intact", () => {
+  it("tells the writer to trust the attached work-order lines", () => {
+    const prompt = buildWriterPrompt(base);
+
+    expect(prompt).toMatch(/come\s+from the database, not from the scout/);
+    expect(prompt).toContain('"Work orders: none open"');
+  });
+
+  it("forbids 'only' or 'all' about devices, even when the findings say it", () => {
+    const prompt = buildWriterPrompt(base);
+
+    expect(prompt).toMatch(/Never write "only", "all", "every"/);
+    expect(prompt).toContain("Do not copy such a word from the findings.");
+  });
+
+  it("forbids calling one open sub-ticket the last step", () => {
+    // A writer that sees one open sub-ticket reads it as the last blocker.
+    const prompt = buildWriterPrompt(base);
+
+    expect(prompt).toContain('"the remaining blocker"');
+    expect(prompt).toContain('"the last step"');
+  });
+
   it("carries every entity id through verbatim", () => {
     const prompt = buildWriterPrompt(base);
 

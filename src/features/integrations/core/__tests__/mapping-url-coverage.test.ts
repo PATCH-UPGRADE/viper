@@ -50,12 +50,6 @@ describe("every include that selects mappings still resolves", () => {
         vulnerabilityByPriorityInclude,
         ResourceType.Vulnerability,
       ],
-      [
-        "ticketDetailInclude",
-        "WorkOrderTicket",
-        ticketDetailInclude,
-        ResourceType.WorkOrder,
-      ],
     ];
 
   for (const [name, model, include, resource] of cases) {
@@ -65,4 +59,17 @@ describe("every include that selects mappings still resolves", () => {
       ]);
     });
   }
+
+  // Related tickets select their own external id for the row label, so the
+  // walk finds those nested mappings too.
+  it("ticketDetailInclude", () => {
+    const resource = ResourceType.WorkOrder;
+    expect(
+      mappingPaths("WorkOrderTicket", { include: ticketDetailInclude }),
+    ).toEqual([
+      { path: ["externalMappings"], resource },
+      { path: ["linksAsA", "ticketB", "externalMappings"], resource },
+      { path: ["linksAsB", "ticketA", "externalMappings"], resource },
+    ]);
+  });
 });

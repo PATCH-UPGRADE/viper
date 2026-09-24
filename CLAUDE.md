@@ -238,7 +238,7 @@ registry is armed for all of them — describe it in each agent's `<tools>` prom
 block or that agent can call something it was never told about.
 
 `buildAgentGraph` ends the turn after any tool in `HALT_TOOLS` —
-`ask_user_questions` and `propose_fleet_work_order` — so the graph stops until the
+`ask_user_questions` and `propose_work_order` — so the graph stops until the
 user answers or accepts. A halting tool can suppress its own stop by prefixing its
 result with `TOOL_REJECTED_PREFIX` (`"REJECTED:"`): the turn then continues, so the
 model sees its own refusal and can correct or explain it, and the UI does not render

@@ -22,7 +22,10 @@ import {
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { findDeviceGroupIdsForMatchings } from "@/lib/router-utils";
+import {
+  findDeviceGroupIdsForMatchings,
+  resolvedDeviceGroupAssetCount,
+} from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
   fieldCorrectionInclude,
@@ -80,25 +83,6 @@ const createSearchFilter = (search: string) => {
     OR: [{ title: insensitive }, { summary: insensitive }],
   };
 };
-
-async function resolvedDeviceGroupAssetCount(
-  matching: MatchingIdentity,
-): Promise<number> {
-  const candidates = await prisma.deviceGroup.findMany({
-    where: deviceGroupWhereForMatching(matching),
-    select: {
-      id: true,
-      manufacturerId: true,
-      productId: true,
-      versionId: true,
-      version: { select: { canonicalName: true } },
-      _count: { select: { assets: true } },
-    },
-  });
-  return candidates
-    .filter((dg) => matchingAppliesToDeviceGroup(matching, dg))
-    .reduce((sum, dg) => sum + dg._count.assets, 0);
-}
 
 async function unknownVersionAssetCount(
   matching: MatchingIdentity,

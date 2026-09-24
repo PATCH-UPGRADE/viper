@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { externalMappingWithSyncSelect } from "@/features/integrations/core/urls";
+import {
+  externalMappingSelect,
+  externalMappingWithSyncSelect,
+} from "@/features/integrations/core/urls";
 import {
   AssetStatus,
   IssueStatus,
@@ -10,6 +13,7 @@ import {
   Severity,
   SourceChannel,
   SourceLinkType,
+  SubmissionState,
   TicketActivityType,
   TicketCategory,
   TicketStatus,
@@ -155,6 +159,19 @@ export type TrackingTicketRow = Omit<
   children: TrackingTicketChildRow[];
 };
 
+const relatedTicketRefSelect = {
+  id: true,
+  summary: true,
+  status: true,
+  departments: {
+    select: { id: true, name: true, color: true },
+    orderBy: { name: "asc" as const },
+  },
+  externalMappings: { select: { externalId: true }, take: 1 },
+} satisfies Prisma.WorkOrderTicketSelect;
+
+const relatedLinkSelect = { id: true, reason: true, createdAt: true } as const;
+
 export const ticketDetailInclude = {
   departments: {
     select: { id: true, name: true, color: true },
@@ -295,14 +312,43 @@ export const ticketDetailInclude = {
       },
     },
   },
+  // Both sides of the undirected link table; the server flattens them into
+  // `relatedTickets` (see withRelatedTickets in server/routers.ts).
+  linksAsA: {
+    select: {
+      ...relatedLinkSelect,
+      ticketB: { select: relatedTicketRefSelect },
+    },
+  },
+  linksAsB: {
+    select: {
+      ...relatedLinkSelect,
+      ticketA: { select: relatedTicketRefSelect },
+    },
+  },
 } satisfies Prisma.WorkOrderTicketInclude;
 
+type TicketDetailPayload = Prisma.WorkOrderTicketGetPayload<{
+  include: typeof ticketDetailInclude;
+}>;
+
+export type RelatedTicketRef =
+  TicketDetailPayload["linksAsA"][number]["ticketB"];
+
+export type RelatedTicketLink = {
+  linkId: string;
+  reason: string | null;
+  createdAt: Date;
+  ticket: RelatedTicketRef;
+};
+
 // What clients receive from the detail endpoints: the per-user `watchers`
-// include is collapsed server-side into an `isWatching` boolean.
+// include is collapsed server-side into an `isWatching` boolean, and the two
+// link sides into one `relatedTickets` list.
 export type TicketDetail = Omit<
-  Prisma.WorkOrderTicketGetPayload<{ include: typeof ticketDetailInclude }>,
-  "watchers"
-> & { isWatching: boolean };
+  TicketDetailPayload,
+  "watchers" | "linksAsA" | "linksAsB"
+> & { isWatching: boolean; relatedTickets: RelatedTicketLink[] };
 
 // Include shape for the public list endpoint — base ticket fields plus the linked
 // entities most callers want to slice on.
@@ -328,6 +374,108 @@ export const workOrderListInclude = {
 export type WorkOrderListItem = Prisma.WorkOrderTicketGetPayload<{
   include: typeof workOrderListInclude;
 }>;
+
+/**
+ * A submitted work order that is not DONE, at the top of its tree. Per-asset
+ * tickets are always excluded. With a department, a sub-ticket is included
+ * only when its parent does not have that department, so no list shows a
+ * ticket both as a row and under its parent's children.
+ */
+export const topLevelOpenWorkOrderWhere = (
+  departmentId?: string,
+): Prisma.WorkOrderTicketWhereInput => ({
+  isDraft: false,
+  ticket: null,
+  status: { not: TicketStatus.DONE },
+  ...(departmentId
+    ? {
+        departments: { some: { id: departmentId } },
+        OR: [
+          { parentId: null },
+          { parent: { departments: { none: { id: departmentId } } } },
+        ],
+      }
+    : { parentId: null }),
+});
+
+export const WORK_ORDER_LLM_ASSET_LIMIT = 20;
+export const WORK_ORDER_LLM_COMMENT_LIMIT = 5;
+export const WORK_ORDER_LLM_VULNERABILITY_LIMIT = 5;
+export const WORK_ORDER_LLM_OPEN_CHILD_LIMIT = 10;
+
+// Select shapes for the agent-only procedures. Every field here costs model
+// context on every call, so keep them to what answers "who is doing what, and
+// how far along is it".
+export const workOrderLlmSelect = {
+  id: true,
+  summary: true,
+  status: true,
+  category: true,
+  priority: true,
+  scheduledAt: true,
+  updatedAt: true,
+  departments: { select: { name: true }, orderBy: { name: "asc" as const } },
+  assignee: { select: { name: true } },
+  vulnerabilities: {
+    select: { id: true, cveId: true },
+    take: WORK_ORDER_LLM_VULNERABILITY_LIMIT,
+  },
+  children: {
+    where: { ticket: null, status: { not: TicketStatus.DONE } },
+    select: { id: true, summary: true, status: true },
+    orderBy: { createdAt: "asc" as const },
+    take: WORK_ORDER_LLM_OPEN_CHILD_LIMIT,
+  },
+  _count: {
+    select: {
+      assets: true,
+      children: { where: { ticket: null } },
+      comments: true,
+      vulnerabilities: true,
+    },
+  },
+} satisfies Prisma.WorkOrderTicketSelect;
+
+export const workOrderLlmDetailSelect = {
+  ...workOrderLlmSelect,
+  notification: { select: { id: true, title: true } },
+  body: true,
+  submissionState: true,
+  descriptions: {
+    select: { body: true, department: { select: { name: true } } },
+    orderBy: { department: { name: "asc" as const } },
+  },
+  children: {
+    where: { ticket: null },
+    select: { id: true, summary: true, status: true },
+    orderBy: { createdAt: "asc" as const },
+  },
+  // Per-asset platforms file one external record per asset, so the mapping
+  // lives on the per-asset ticket, not on the parent.
+  assets: {
+    select: {
+      asset: { select: { id: true, hostname: true } },
+      ticket: {
+        select: {
+          status: true,
+          externalMappings: externalMappingSelect,
+        },
+      },
+    },
+    take: WORK_ORDER_LLM_ASSET_LIMIT,
+  },
+  remediations: { select: { id: true, description: true } },
+  externalMappings: externalMappingSelect,
+  comments: {
+    select: {
+      body: true,
+      createdAt: true,
+      author: { select: { name: true } },
+    },
+    orderBy: { createdAt: "desc" as const },
+    take: WORK_ORDER_LLM_COMMENT_LIMIT,
+  },
+} satisfies Prisma.WorkOrderTicketSelect;
 
 // --- Integration ingestion -------------------------------------------------
 
@@ -368,6 +516,14 @@ export const integrationWorkOrderInputSchema = createIntegrationInputSchema(
 export const workOrderListFilterSchema = z.object({
   departmentIds: z.array(z.string()).optional(),
   assigneeIds: z.array(z.string()).optional(),
+});
+
+export const workOrderLlmFilterSchema = z.object({
+  notificationId: z.string().optional(),
+  vulnerabilityId: z.string().optional(),
+  assetId: z.string().optional(),
+  departmentId: z.string().optional(),
+  status: z.array(z.enum(TicketStatus)).optional(),
 });
 
 // --- Output ---------------------------------------------------------------
@@ -450,6 +606,21 @@ const siblingWorkOrderSchema = z.object({
 const ticketChildRefSchema = siblingWorkOrderSchema.extend({
   departments: z.array(departmentItemSchema),
   _count: z.object({ comments: z.number() }),
+});
+
+const relatedTicketRefSchema = z.object({
+  id: z.string(),
+  summary: z.string(),
+  status: z.enum(TicketStatus),
+  departments: z.array(departmentItemSchema),
+  externalMappings: z.array(z.object({ externalId: z.string() })),
+});
+
+const relatedTicketLinkSchema = z.object({
+  linkId: z.string(),
+  reason: z.string().nullable(),
+  createdAt: z.date(),
+  ticket: relatedTicketRefSchema,
 });
 
 const ticketMitigationPlanSchema = z.object({
@@ -597,8 +768,16 @@ export const workOrderDetailResponseSchema = z.object({
   sourceLabel: z.string().nullable(),
   body: z.string().nullable(),
   suggestedAssignee: z.string().nullable(),
-  // Set when the ticket came from accepting an agent's Fleet work-order proposal.
+  // Set when the ticket came from accepting an agent's work-order proposal.
   chatToolCallId: z.string().nullable(),
+  // Where this order is filed, and how far the filing has got. Null target means
+  // VIPER tracks it and no vendor platform is involved.
+  targetIntegrationId: z.string().nullable(),
+  // Prisma's Json column — see the note on `location` above.
+  platformPayload: z.any(),
+  submissionState: z.enum(SubmissionState),
+  submissionError: z.string().nullable(),
+  submittedAt: z.date().nullable(),
   priority: z.enum(Priority),
   priorityReasonWhy: z.string().nullable(),
   isDraft: z.boolean(),
@@ -610,6 +789,7 @@ export const workOrderDetailResponseSchema = z.object({
   creator: ticketCreatorSchema,
   parent: ticketParentRefSchema,
   children: z.array(ticketChildRefSchema),
+  relatedTickets: z.array(relatedTicketLinkSchema),
   assets: z.array(detailAssetTicketSchema),
   vulnerabilities: z.array(linkedVulnerabilitySchema),
   remediations: z.array(detailLinkedRemediationSchema),

@@ -8,6 +8,10 @@ import {
   parseBullets,
   pruneSupersededDebriefs,
 } from "@/features/debrief/server/runs";
+import {
+  topLevelOpenWorkOrderWhere,
+  WORK_ORDER_LLM_VULNERABILITY_LIMIT,
+} from "@/features/tracking/types";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
 import {
@@ -16,8 +20,32 @@ import {
   debriefEvent,
 } from "../events/debrief";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** UTC calendar days. A regenerate at 18:00 after the 05:00 cron is day 0, not 1. */
+const utcDaysBetween = (from: Date, to: Date): number =>
+  Math.floor(to.getTime() / DAY_MS) - Math.floor(from.getTime() / DAY_MS);
+
 /** Open work orders shown to the writer, newest first. */
 const WORK_ORDER_LIMIT = 10;
+
+function formatWorkOrderLine(workOrder: {
+  id: string;
+  summary: string;
+  status: string;
+  vulnerabilities: { cveId: string | null }[];
+  _count: { vulnerabilities: number };
+}): string {
+  const cves = workOrder.vulnerabilities
+    .map((v) => v.cveId)
+    .filter((cve): cve is string => cve !== null);
+  const more = workOrder._count.vulnerabilities - cves.length;
+  const fixes =
+    cves.length > 0
+      ? ` — fixes ${cves.join(", ")}${more > 0 ? ` and ${more} more` : ""}`
+      : "";
+  return `workOrder ${workOrder.id} — ${workOrder.summary} — status ${workOrder.status}${fixes}`;
+}
 
 /**
  * Departments per batched send. Each event carries the full findings text (up
@@ -123,17 +151,22 @@ export const generateDepartmentDebrief = inngest.createFunction(
           }),
           prisma.debrief.findFirst({
             ...newestReadyRun(departmentId),
-            select: { bullets: true },
+            select: { bullets: true, createdAt: true },
           }),
           prisma.workOrderTicket.findMany({
-            where: {
-              departments: { some: { id: departmentId } },
-              status: { not: "DONE" },
-              isDraft: false,
-            },
+            where: topLevelOpenWorkOrderWhere(departmentId),
             orderBy: { updatedAt: "desc" },
             take: WORK_ORDER_LIMIT,
-            select: { summary: true, status: true },
+            select: {
+              id: true,
+              summary: true,
+              status: true,
+              vulnerabilities: {
+                select: { cveId: true },
+                take: WORK_ORDER_LLM_VULNERABILITY_LIMIT,
+              },
+              _count: { select: { vulnerabilities: true } },
+            },
           }),
         ]);
 
@@ -144,7 +177,10 @@ export const generateDepartmentDebrief = inngest.createFunction(
           departmentName: department.name,
           departmentDescription: department.description,
           previousBullets: previous ? parseBullets(previous.bullets) : [],
-          workOrders: workOrders.map((w) => `${w.summary} (${w.status})`),
+          previousAgeDays: previous
+            ? utcDaysBetween(previous.createdAt, new Date())
+            : 0,
+          workOrders: workOrders.map(formatWorkOrderLine),
         };
       });
 

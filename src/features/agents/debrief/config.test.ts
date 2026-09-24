@@ -52,9 +52,11 @@ describe("scout model configuration", () => {
 
   // The registry holds two HALT_TOOLS and a note writer. A nightly cron has
   // nobody to answer ask_user_questions, so binding it ends the run empty.
-  it("binds only query_platform_data, never the shared registry", () => {
+  it("binds only query_platform_data and record_finding, never the shared registry", () => {
     const src = read("scout.ts");
-    expect(src).toContain("makeQueryPlatformDataTool");
+    expect(src).toMatch(
+      /tools = \[\s*makeQueryPlatformDataTool\(AUTOMATION_USER_ID\),\s*recordFindingTool,?\s*\]/,
+    );
     // Match the import, not the word: the comment above the tool list explains
     // why the registry is wrong, so it names buildAgentTools deliberately.
     expect(src).not.toMatch(/import\s*\{[^}]*buildAgentTools/);

@@ -292,6 +292,44 @@ export async function recordChildActivity(
   });
 }
 
+type TicketSnapshot = { id: string; summary: string };
+
+// One row on each side of a related-ticket link; `data` names the other ticket.
+export async function recordLinkActivity(
+  tx: TransactionClient,
+  userId: string,
+  action: "linked" | "unlinked",
+  a: TicketSnapshot,
+  b: TicketSnapshot,
+  reason: string | null,
+): Promise<void> {
+  const type = action === "linked" ? "TICKET_LINKED" : "TICKET_UNLINKED";
+  await tx.ticketActivity.createMany({
+    data: [
+      {
+        ticketId: a.id,
+        userId,
+        type,
+        data: {
+          relatedTicketId: b.id,
+          relatedTicketSummary: b.summary,
+          reason,
+        },
+      },
+      {
+        ticketId: b.id,
+        userId,
+        type,
+        data: {
+          relatedTicketId: a.id,
+          relatedTicketSummary: a.summary,
+          reason,
+        },
+      },
+    ],
+  });
+}
+
 export async function recordAssetActivity(
   tx: TransactionClient,
   ticketId: string,

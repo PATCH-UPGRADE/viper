@@ -52,6 +52,19 @@ vi.mock("@/lib/auth-utils", () => ({
   verifyApiKey: vi.fn(),
 }));
 
+const { mockValidatePayload, mockDispatch } = vi.hoisted(() => ({
+  mockValidatePayload: vi.fn(),
+  mockDispatch: vi.fn(),
+}));
+
+vi.mock("@/features/work-orders/server/payload", () => ({
+  validatePlatformPayload: mockValidatePayload,
+}));
+
+vi.mock("@/features/work-orders/server/submit", () => ({
+  dispatchSubmission: mockDispatch,
+}));
+
 import { createCallerFactory } from "@/trpc/init";
 import { mitigationRouter } from "./routers";
 
@@ -109,6 +122,117 @@ beforeEach(() => {
   });
   mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
   mockPrisma.assetTicket.findUnique.mockResolvedValue(null);
+  mockValidatePayload.mockResolvedValue({ ok: true, payload: {} });
+  mockDispatch.mockResolvedValue({ submissionState: "SUBMITTING" });
+});
+
+describe("mitigationRouter.accept — filing", () => {
+  /** A promoted draft, as the accept transaction reads it back. */
+  const promoted = (id: string, targetIntegrationId: string | null) => ({
+    id,
+    targetIntegrationId,
+    deviceGroups: [],
+  });
+
+  it("files the work orders a platform manages", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      promoted("t-fleet", "int-fleet"),
+    ]);
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
+      targetIntegrationId: "int-fleet",
+      platformPayload: {},
+    });
+
+    await setup().accept({ planId: PLAN_ID });
+
+    expect(mockDispatch).toHaveBeenCalledWith("t-fleet", FAKE_USER_ID);
+  });
+
+  it("sends nothing for a work order VIPER tracks alone", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      promoted("t-viper", null),
+    ]);
+
+    await setup().accept({ planId: PLAN_ID });
+
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+
+  // A plan is accepted as a whole. One device's platform problem must not stop
+  // the other work orders from being created, so the ticket falls back to what
+  // VIPER can always do — track it, and record why it went no further.
+  it("keeps accepting when a payload no longer fits its platform", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      promoted("t-stale", "int-fleet"),
+    ]);
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
+      targetIntegrationId: "int-fleet",
+      platformPayload: {},
+    });
+    mockValidatePayload.mockResolvedValue({
+      ok: false,
+      reason: "That asset has no equipment key.",
+    });
+
+    await expect(setup().accept({ planId: PLAN_ID })).resolves.toBeDefined();
+
+    expect(mockDispatch).not.toHaveBeenCalled();
+    const [args] = mockPrisma.workOrderTicket.update.mock.calls.at(-1) ?? [];
+    expect(args.where).toEqual({ id: "t-stale" });
+    expect(args.data.targetIntegrationId).toBeNull();
+    expect(args.data.submissionError).toBe("That asset has no equipment key.");
+  });
+
+  // The claim is taken and the event queued outside the transaction. An event
+  // sent inside one that later rolls back files a vendor order for a ticket
+  // that does not exist, and nothing would ever recall it.
+  it("files only after the transaction commits", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      promoted("t-fleet", "int-fleet"),
+    ]);
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
+      targetIntegrationId: "int-fleet",
+      platformPayload: {},
+    });
+    let committed = false;
+    mockPrisma.$transaction.mockImplementation(
+      // biome-ignore lint/suspicious/noExplicitAny: callback shape varies
+      async (cb: (tx: any) => Promise<unknown>) => {
+        const result = await cb(mockPrisma);
+        committed = true;
+        return result;
+      },
+    );
+    mockDispatch.mockImplementation(async () => {
+      expect(committed).toBe(true);
+      return { submissionState: "SUBMITTING" };
+    });
+
+    await setup().accept({ planId: PLAN_ID });
+
+    expect(mockDispatch).toHaveBeenCalled();
+  });
+
+  // Accepting is what the user asked for. A queue that is down is worth logging,
+  // not worth losing their decision over.
+  it("still accepts when the job cannot be queued", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      promoted("t-fleet", "int-fleet"),
+    ]);
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
+      targetIntegrationId: "int-fleet",
+      platformPayload: {},
+    });
+    mockDispatch.mockResolvedValue({
+      submissionState: "FAILED",
+      error: "event bus unavailable",
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(setup().accept({ planId: PLAN_ID })).resolves.toBeDefined();
+
+    logged.mockRestore();
+  });
 });
 
 describe("mitigationRouter.accept", () => {

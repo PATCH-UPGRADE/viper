@@ -1,16 +1,25 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { loadIntegrationContext } from "@/features/integrations/core/context";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import {
+  medisaoCallCtx,
+  comments as medisaoComments,
+  inquiries as medisaoInquiries,
+} from "@/features/integrations/platforms/medisao/remediations";
 import {
   attachNote,
   attachNotes,
 } from "@/features/notes/server/get-relevant-notes";
 import {
   type AlohaStatus,
+  PlatformEnum,
   type Prisma,
   ResourceType,
 } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
+import { hospitalIdentifier } from "@/lib/hospital";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
   cpesToMatchingConnect,
@@ -59,7 +68,208 @@ const createSearchFilter = (search: string) => {
     : {};
 };
 
+/**
+ * Find where this remediation lives on MedISAO.
+ */
+async function platformTargetFor(remediationId: string) {
+  const mapping = await prisma.externalRemediationMapping.findFirst({
+    where: {
+      itemId: remediationId,
+      integration: { platform: PlatformEnum.MEDISAO },
+    },
+    select: {
+      externalId: true,
+      integration: { select: { id: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (!mapping) return null;
+
+  return {
+    externalId: mapping.externalId,
+    integrationId: mapping.integration.id,
+  };
+}
+
 export const remediationsRouter = createTRPCRouter({
+  /**
+   * Questions this hospital put to the manufacturer about this remediation.
+   *
+   * Private by construction: the platform scopes inquiries to the token that
+   * raised them, so this returns ours and never another consumer's.
+   */
+  getInquiries: protectedProcedure
+    .input(
+      z.object({
+        remediationId: z.string(),
+        cursor: z.string().nullish(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const target = await platformTargetFor(input.remediationId);
+      if (!target) {
+        return { items: [], nextCursor: null, supported: false };
+      }
+
+      const platformCtx = medisaoCallCtx(
+        await loadIntegrationContext(target.integrationId),
+      );
+      const page = await medisaoInquiries.list(
+        platformCtx,
+        target.externalId,
+        input.cursor,
+      );
+      return { ...page, supported: true };
+    }),
+
+  /**
+   * Ask the manufacturer a question about this remediation.
+   *
+   * Attributed, unlike a comment: the platform knows which consumer asked,
+   * because the answer has to come back to somebody. Nothing is recorded on our
+   * side, since the platform already scopes the thread to us.
+   */
+  addInquiry: protectedProcedure
+    .input(
+      z.object({
+        remediationId: z.string(),
+        body: z.string().trim().min(1).max(10_000),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const target = await platformTargetFor(input.remediationId);
+      if (!target) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This remediation is not tracked on MedISAO.",
+        });
+      }
+
+      const platformCtx = medisaoCallCtx(
+        await loadIntegrationContext(target.integrationId),
+      );
+      return medisaoInquiries.create(platformCtx, target.externalId, {
+        body: input.body,
+      });
+    }),
+
+  /**
+   * Comments other hospitals left on this remediation, one page at a time.
+   *
+   * Returns an empty page rather than an error for a remediation no platform
+   * keeps comments for, because "no comment surface" is a normal state and the
+   * page renders the same either way.
+   */
+  getComments: protectedProcedure
+    .input(
+      z.object({
+        remediationId: z.string(),
+        cursor: z.string().nullish(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const target = await platformTargetFor(input.remediationId);
+      if (!target) {
+        return { items: [], nextCursor: null, supported: false };
+      }
+
+      const platformCtx = medisaoCallCtx(
+        await loadIntegrationContext(target.integrationId),
+      );
+      const page = await medisaoComments.list(
+        platformCtx,
+        target.externalId,
+        input.cursor,
+      );
+
+      // The feed is deliberately anonymous, so the only way to know which
+      // comments are ours is the pseudonym we recorded when one was posted.
+      // Not scoped to the caller: every user here shares one author id, so a
+      // colleague's comment is this hospital's too. Nothing in this query can
+      // identify anybody outside it.
+      const ours = await prisma.medISAOExternalCommentIdentity.findMany({
+        where: {
+          remediationId: input.remediationId,
+          integrationId: target.integrationId,
+        },
+        select: { pseudonym: true },
+      });
+      const ourPseudonyms = new Set(ours.map((row) => row.pseudonym));
+
+      return {
+        ...page,
+        items: page.items.map((comment) => ({
+          ...comment,
+          fromYourHospital: ourPseudonyms.has(comment.pseudonym),
+        })),
+        supported: true,
+      };
+    }),
+
+  /**
+   * Post a comment to the platform, as this user.
+   *
+   * Posted under this deployment's hospital identifier, so MedISAO sees a
+   * single voice rather than one per member of staff. Their API requires an
+   * author field and refuses a blank one, but what actually identifies us is
+   * the token: the realm secret behind the pseudonym is scoped to it.
+   *
+   * The row we write still records which user posted, because only this side
+   * holds any mapping back to a person. That is coarser than it was: two
+   * colleagues commenting on the same remediation share a pseudonym, so we can
+   * say the hospital wrote a comment and when, but not which of them.
+   */
+  addComment: protectedProcedure
+    .input(
+      z.object({
+        remediationId: z.string(),
+        body: z.string().trim().min(1).max(10_000),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const target = await platformTargetFor(input.remediationId);
+      if (!target) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This remediation is not tracked on MedISAO.",
+        });
+      }
+
+      const platformCtx = medisaoCallCtx(
+        await loadIntegrationContext(target.integrationId),
+      );
+      const comment = await medisaoComments.create(
+        platformCtx,
+        target.externalId,
+        {
+          body: input.body,
+          authorExternalUserId: hospitalIdentifier(),
+        },
+      );
+
+      // We post under the hospital's name and never send a user id, so MedISAO
+      // returns one pseudonym for everybody here. One row per remediation, and
+      // `userId` records whoever commented first.
+      await prisma.medISAOExternalCommentIdentity.upsert({
+        where: {
+          remediationId_integrationId: {
+            remediationId: input.remediationId,
+            integrationId: target.integrationId,
+          },
+        },
+        create: {
+          userId: ctx.auth.user.id,
+          remediationId: input.remediationId,
+          integrationId: target.integrationId,
+          pseudonym: comment.pseudonym,
+        },
+        update: { pseudonym: comment.pseudonym },
+      });
+
+      return { ...comment, fromYourHospital: true };
+    }),
+
   // GET /api/remediations - List all remediations (any authenticated user can see all)
   getMany: protectedProcedure
     .input(paginationInputSchema)

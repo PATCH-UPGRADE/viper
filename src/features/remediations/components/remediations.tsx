@@ -42,6 +42,12 @@ import type {
   RemediationCard as RemediationCardType,
   RemediationResponse,
 } from "../types";
+import { MedIsaoRemediationComments } from "./medisao-remediation-comments";
+import {
+  hasStatedImpact,
+  MedIsaoRemediationImpact,
+} from "./medisao-remediation-impact";
+import { MedIsaoRemediationInquiries } from "./medisao-remediation-inquiries";
 
 export const RemediationsSearch = () => {
   const [params, setParams] = useRemediationsParams();
@@ -269,6 +275,41 @@ function RemediationDrawer({
                     </p>
                   }
                 />
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <h3 className="font-semibold">MedISAO</h3>
+              <p className="text-xs text-muted-foreground">
+                Provided by MedISAO for this remediation.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-4 border-l pl-4">
+              {hasStatedImpact(remediation.sourceImpact ?? {}) && (
+                <div className="flex flex-col gap-2">
+                  <h4 className="text-sm font-medium">Manufacturer impact</h4>
+                  <MedIsaoRemediationImpact
+                    impact={remediation.sourceImpact ?? {}}
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <h4 className="text-sm font-medium">
+                  Comments from other hospitals
+                </h4>
+                <MedIsaoRemediationComments remediationId={remediation.id} />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <h4 className="text-sm font-medium">
+                  Your questions to the manufacturer
+                </h4>
+                <MedIsaoRemediationInquiries remediationId={remediation.id} />
               </div>
             </div>
           </div>

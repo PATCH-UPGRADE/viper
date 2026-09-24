@@ -31,6 +31,7 @@ const base = {
   departmentDescription: "Maintains and services clinical devices.",
   workOrders: ["WO-101 — replace dialysis line sets"],
   previousBullets: [] as DebriefBullet[],
+  previousAgeDays: 1,
 };
 
 describe("SCOUT_SYSTEM_PROMPT", () => {
@@ -45,6 +46,33 @@ describe("SCOUT_SYSTEM_PROMPT", () => {
     expect(SCOUT_SYSTEM_PROMPT).toMatch(/exactly as it appeared/);
   });
 
+  it("has the scout record findings, not write them as text", () => {
+    // Only record_finding calls reach the writer. Prose is discarded.
+    expect(SCOUT_SYSTEM_PROMPT).toContain("record_finding");
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(/Text you write does not/);
+  });
+
+  it("leaves work orders to the platform", () => {
+    // The work-order lines are attached from the database, so a lookup by the
+    // scout costs tool calls and adds nothing.
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(/Do not look up work orders/);
+    // Scout prose about tickets contradicted the attached lines.
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(
+      /Do not describe work orders, tickets, or their status/,
+    );
+  });
+
+  it("makes the notification the record for an advisory", () => {
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(
+      /For an inbox advisory, use the\s+notification/,
+    );
+  });
+
+  it("forbids 'only' or 'all' about the hospital's devices", () => {
+    // No tool counts devices by type, so the claim cannot be checked.
+    expect(SCOUT_SYSTEM_PROMPT).toMatch(/Never write "only", "all", "every"/);
+  });
+
   it("embeds the platform catalog, so the tool list cannot drift from the prompt", () => {
     expect(SCOUT_SYSTEM_PROMPT).toContain("query_platform_data");
     expect(SCOUT_SYSTEM_PROMPT).toContain("notifications.getMany");
@@ -52,6 +80,28 @@ describe("SCOUT_SYSTEM_PROMPT", () => {
 });
 
 describe("buildWriterPrompt — the findings reach the model intact", () => {
+  it("tells the writer to trust the attached work-order lines", () => {
+    const prompt = buildWriterPrompt(base);
+
+    expect(prompt).toMatch(/come\s+from the database, not from the scout/);
+    expect(prompt).toContain('"Work orders: none open"');
+  });
+
+  it("forbids 'only' or 'all' about devices, even when the findings say it", () => {
+    const prompt = buildWriterPrompt(base);
+
+    expect(prompt).toMatch(/Never write "only", "all", "every"/);
+    expect(prompt).toContain("Do not copy such a word from the findings.");
+  });
+
+  it("forbids calling one open sub-ticket the last step", () => {
+    // A writer that sees one open sub-ticket reads it as the last blocker.
+    const prompt = buildWriterPrompt(base);
+
+    expect(prompt).toContain('"the remaining blocker"');
+    expect(prompt).toContain('"the last step"');
+  });
+
   it("carries every entity id through verbatim", () => {
     const prompt = buildWriterPrompt(base);
 
@@ -66,6 +116,13 @@ describe("buildWriterPrompt — the findings reach the model intact", () => {
     expect(prompt).toContain("Biomedical Engineering");
     expect(prompt).toContain("Maintains and services clinical devices.");
     expect(prompt).toContain("WO-101 — replace dialysis line sets");
+  });
+
+  it("tells the writer to link a work order as a workOrder, by exact status", () => {
+    const prompt = buildWriterPrompt(base);
+
+    expect(prompt).toMatch(/entityType\s+"workOrder"/);
+    expect(prompt).toMatch(/only\s+IN_PROGRESS means work has started/);
   });
 
   it("says so plainly when a department has no open work orders", () => {
@@ -148,6 +205,22 @@ describe("buildWriterPrompt — previous debrief", () => {
     );
     expect(prompt).not.toContain("{{0}} was still unpatched");
     expect(prompt).toMatch(/Do not repeat these word for word/);
-    expect(prompt).toMatch(/still open and for how long/);
+    expect(prompt).toContain("Yesterday you told this department:");
+  });
+
+  it.each([
+    [0, "Earlier today you told this department:"],
+    [3, "3 days ago you told this department:"],
+  ])("labels a run %i days old as %j", (previousAgeDays, label) => {
+    // The writer counts "open for how long" from this label, so a same-day
+    // regenerate must not read as a day old.
+    const prompt = buildWriterPrompt({
+      ...base,
+      previousBullets: PREVIOUS,
+      previousAgeDays,
+    });
+
+    expect(prompt).toContain(label);
+    expect(prompt).toMatch(/never add a day for each debrief/);
   });
 });

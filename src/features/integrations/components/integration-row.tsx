@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { RefreshCw, TrashIcon } from "lucide-react";
+import { PencilIcon, RefreshCw, TrashIcon } from "lucide-react";
 import ms from "ms";
 import { useState } from "react";
 import {
@@ -25,6 +25,7 @@ import {
 import { SyncStatusEnum } from "@/generated/prisma";
 import { initialsOf } from "@/lib/string-utils";
 import { cn } from "@/lib/utils";
+import type { CatalogEntry } from "../core/catalog";
 import {
   useRemoveIntegration,
   useSetIntegrationEnabled,
@@ -36,6 +37,7 @@ import type {
   IntegrationResourceSyncItem,
 } from "../types";
 import { resourceTypeLabel } from "../types";
+import { IntegrationFormDialog } from "./create-integration-dialog";
 
 const relativeTime = (date: Date) =>
   formatDistanceToNow(date, { addSuffix: true });
@@ -164,12 +166,15 @@ const ResourceStatus = ({
 
 const IntegrationActionsMenu = ({
   integration,
+  catalogEntry,
 }: {
   integration: IntegrationListItem;
+  catalogEntry?: CatalogEntry;
 }) => {
   const removeItem = useRemoveIntegration();
   const triggerSync = useTriggerSync();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const canSync =
     integration.enabled && integration.resourceSyncs.some((s) => s.enabled);
 
@@ -187,6 +192,11 @@ const IntegrationActionsMenu = ({
             onClick: () => triggerSync.mutate({ id: integration.id }),
             disabled: triggerSync.isPending || !canSync,
           },
+          catalogEntry && {
+            label: "Edit Integration",
+            icon: <PencilIcon />,
+            onClick: () => setEditOpen(true),
+          },
           {
             label: "Remove Integration",
             icon: <TrashIcon />,
@@ -195,6 +205,16 @@ const IntegrationActionsMenu = ({
           },
         ]}
       />
+
+      {catalogEntry && (
+        <IntegrationFormDialog
+          entry={catalogEntry}
+          mode="edit"
+          integration={integration}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+        />
+      )}
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
@@ -228,8 +248,10 @@ const IntegrationActionsMenu = ({
 
 const IntegrationHeaderRow = ({
   integration,
+  catalogEntry,
 }: {
   integration: IntegrationListItem;
+  catalogEntry?: CatalogEntry;
 }) => {
   const setEnabled = useSetIntegrationEnabled();
   const singleSync =
@@ -281,7 +303,10 @@ const IntegrationHeaderRow = ({
         aria-label={`${integration.enabled ? "Disable" : "Enable"} ${integration.name}`}
       />
 
-      <IntegrationActionsMenu integration={integration} />
+      <IntegrationActionsMenu
+        integration={integration}
+        catalogEntry={catalogEntry}
+      />
     </div>
   );
 };
@@ -318,11 +343,16 @@ const ResourceRow = ({
 
 export const IntegrationCard = ({
   integration,
+  catalogEntry,
 }: {
   integration: IntegrationListItem;
+  catalogEntry?: CatalogEntry;
 }) => (
   <>
-    <IntegrationHeaderRow integration={integration} />
+    <IntegrationHeaderRow
+      integration={integration}
+      catalogEntry={catalogEntry}
+    />
     {integration.resourceSyncs.length > 1 && (
       <div className="mx-4 mb-3 rounded-lg border divide-y">
         {integration.resourceSyncs.map((sync) => (

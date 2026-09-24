@@ -8,6 +8,7 @@ import {
   listChanged,
   toCanonical,
 } from "./advisories";
+import { advisorySourceAdapter } from "./notification-source";
 import { syncAdvisories } from "./sync";
 
 export const notifications: ResourceModule<
@@ -22,5 +23,6 @@ export const notifications: ResourceModule<
   toCanonical,
   apiUrlFor: () => ADVISORIES_URL,
   webUrlFor: (externalId) => advisoryWebUrl(externalId),
+  sourceRecords: advisorySourceAdapter,
   defaultSyncEvery: 3600,
 };

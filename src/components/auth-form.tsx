@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { FieldValues, Path, UseFormReturn } from "react-hook-form";
 import {
   FormControl,
@@ -24,6 +25,13 @@ interface AuthenticationFieldsProps<TFieldValues extends FieldValues> {
   name?: string;
 }
 
+/** Which authentication.* leaves belong to each auth type. */
+const AUTH_TYPE_FIELDS: Partial<Record<AuthType, string[]>> = {
+  Basic: ["username", "password"],
+  Bearer: ["token"],
+  Header: ["header", "value"],
+};
+
 export const AuthenticationFields = <TFieldValues extends FieldValues>({
   form,
   name,
@@ -32,6 +40,25 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
     (name ? `${name}.${field}` : field) as Path<TFieldValues>;
 
   const authType = form.watch(path("authType")) as AuthType;
+
+  // authenticationSchema is a plain union: an unset field fails it (only a
+  // real "" satisfies a variant), but leaving another type's blank field as
+  // "" lets that variant match first, silently dropping the active type's
+  // own value — so blank the active type's fields and unblank every other
+  // type's, leaving anything actually typed alone either way.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run when authType itself changes.
+  useEffect(() => {
+    const activeFields = new Set(AUTH_TYPE_FIELDS[authType] ?? []);
+    for (const field of Object.values(AUTH_TYPE_FIELDS).flat()) {
+      const fieldPath = path(`authentication.${field}`);
+      const value = form.getValues(fieldPath);
+      if (activeFields.has(field) && value === undefined) {
+        form.setValue(fieldPath, "" as never);
+      } else if (!activeFields.has(field) && value === "") {
+        form.setValue(fieldPath, undefined as never);
+      }
+    }
+  }, [authType]);
 
   return (
     <>
@@ -76,7 +103,12 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
               <FormItem>
                 <FormLabel>Username *</FormLabel>
                 <FormControl>
-                  <Input type="text" placeholder="Username" {...field} />
+                  <Input
+                    type="text"
+                    placeholder="Username"
+                    {...field}
+                    value={(field.value as string | undefined) ?? ""}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -89,7 +121,12 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
               <FormItem>
                 <FormLabel>Password *</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="Password" {...field} />
+                  <Input
+                    type="password"
+                    placeholder="Password"
+                    {...field}
+                    value={(field.value as string | undefined) ?? ""}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -106,7 +143,12 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
             <FormItem>
               <FormLabel>Token *</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="Bearer token" {...field} />
+                <Input
+                  type="password"
+                  placeholder="Bearer token"
+                  {...field}
+                  value={(field.value as string | undefined) ?? ""}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -123,7 +165,12 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
               <FormItem>
                 <FormLabel>Header Name *</FormLabel>
                 <FormControl>
-                  <Input type="text" placeholder="X-API-Key" {...field} />
+                  <Input
+                    type="text"
+                    placeholder="X-API-Key"
+                    {...field}
+                    value={(field.value as string | undefined) ?? ""}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -136,7 +183,12 @@ export const AuthenticationFields = <TFieldValues extends FieldValues>({
               <FormItem>
                 <FormLabel>Header Value *</FormLabel>
                 <FormControl>
-                  <Input type="text" placeholder="Header value" {...field} />
+                  <Input
+                    type="password"
+                    placeholder="Header value"
+                    {...field}
+                    value={(field.value as string | undefined) ?? ""}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

@@ -20,13 +20,13 @@ import {
 } from "@langchain/core/messages";
 import prisma from "@/lib/db";
 
-/** Create the thread lazily and return its current report text for revisions. */
+/** Create the thread lazily. */
 export async function ensureThread(
   threadId: string,
   userId: string,
   firstUserContent: string,
-): Promise<{ report: string | null }> {
-  const thread = await prisma.chatThread.upsert({
+): Promise<void> {
+  await prisma.chatThread.upsert({
     where: { id: threadId, userId },
     update: { updatedAt: new Date() },
     create: {
@@ -34,9 +34,7 @@ export async function ensureThread(
       userId,
       title: firstUserContent.slice(0, 50),
     },
-    select: { report: { select: { content: true } } },
   });
-  return { report: thread.report?.content ?? null };
 }
 
 /** Persist the user's message before the agent runs (idempotent by id). */

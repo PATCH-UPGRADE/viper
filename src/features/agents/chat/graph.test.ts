@@ -41,7 +41,7 @@ describe("chat system prompt — write_report", () => {
     expect(buildSystemPrompt("hospital administration")).not.toMatch(marker);
   });
 
-  it("preloads notes alone for a new report", async () => {
+  it("preloads notes only and registers the report tools", async () => {
     buildChatGraph({
       userId: "user",
       threadId: "thread",
@@ -49,23 +49,13 @@ describe("chat system prompt — write_report", () => {
     });
     const config = vi.mocked(buildAgentGraph).mock.calls[0][0];
     expect(await config.preload()).toBe("Hospital notes");
-    expect(config.tools.some((tool) => tool.name === "write_report")).toBe(
-      true,
-    );
-  });
-
-  it("preloads the current report verbatim without promoting it to system instructions", async () => {
-    const report = "# CT Scanner Briefing\n\nExisting content.";
-    buildChatGraph({
-      userId: "user",
-      threadId: "thread",
-      report,
-      loadNotes: async () => "Hospital notes",
-    });
-    const config = vi.mocked(buildAgentGraph).mock.calls[0][0];
-    expect(await config.preload()).toBe(
-      `Hospital notes\n\n## Current report\n\n${report}`,
-    );
-    expect(config.systemMessage.content).not.toContain(report);
+    for (const name of [
+      "search_report",
+      "read_report",
+      "edit_report",
+      "write_report",
+    ]) {
+      expect(config.tools.some((tool) => tool.name === name)).toBe(true);
+    }
   });
 });

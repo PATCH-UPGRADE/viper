@@ -84,7 +84,7 @@ export async function POST(req: Request) {
 
       // Persist the user's turn, then hydrate the full conversation from the DB
       // (authoritative — we don't trust client-side message state).
-      const thread = await ensureThread(threadId, userId, userText);
+      await ensureThread(threadId, userId, userText);
       await saveUserMessage(threadId, newUserMessage.id, userText);
       userMessageSaved = true;
       const history = await loadHistoryMessages(threadId);
@@ -101,7 +101,6 @@ export async function POST(req: Request) {
               userId,
               userRole,
               threadId,
-              report: thread.report,
               fromReports,
             });
 

@@ -46,7 +46,7 @@ export function useViperChat(
     .filter(
       (part) =>
         isToolUIPart(part) &&
-        getToolName(part) === "write_report" &&
+        /^(write|edit)_report$/.test(getToolName(part)) &&
         part.state === "output-available",
     ).length;
   useEffect(() => {

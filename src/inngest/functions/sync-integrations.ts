@@ -11,12 +11,16 @@ import {
   defaultSyncEveryFor,
   requirePlatform,
 } from "@/features/integrations/core/registry";
+import { openSession } from "@/features/integrations/core/session";
 import {
   computeNextSyncAt,
   effectiveSyncEvery,
 } from "@/features/integrations/core/sync/cadence";
 import { moduleForResource } from "@/features/integrations/core/sync/resources";
-import type { SyncCtx, SyncOutcome } from "@/features/integrations/core/types";
+import type {
+  BaseSyncCtx,
+  SyncOutcome,
+} from "@/features/integrations/core/types";
 import { Prisma, SyncStatusEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
@@ -161,11 +165,10 @@ export const syncIntegration = inngest.createFunction(
             : (decrypted ?? {}),
         );
 
-        const ctx: SyncCtx = {
+        const base: BaseSyncCtx = {
           integrationId,
           config,
           creds,
-          resource,
           cursor: loaded.cursor,
           lastSuccessfulSync: loaded.lastSuccessfulSync
             ? new Date(loaded.lastSuccessfulSync)
@@ -179,9 +182,12 @@ export const syncIntegration = inngest.createFunction(
         const resourceModule = moduleForResource(module, resource);
         let result: SyncOutcome;
         if (resourceModule) {
-          result = await resourceModule.sync(ctx);
+          result = await resourceModule.sync({
+            ...base,
+            session: openSession(module, base),
+          });
         } else if (module.sync) {
-          result = await module.sync(ctx);
+          result = await module.sync({ ...base, resource });
         } else {
           throw new Error(`${loaded.platform} has no sync for ${resource}`);
         }

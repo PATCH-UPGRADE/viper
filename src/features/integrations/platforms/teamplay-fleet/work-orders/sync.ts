@@ -7,7 +7,6 @@ import type { IntegrationResponse } from "@/lib/schemas";
 import { sourceContentHash } from "@/lib/source-hash";
 import type { Cursor, ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import type { FleetConfig, FleetCreds } from "../config";
-import { createFleetSession } from "../session";
 import {
   type FleetWorkOrderItem,
   listChanged,
@@ -246,7 +245,7 @@ async function recordSources(
 export async function syncWorkOrders(
   ctx: ResourceSyncCtx<FleetConfig, FleetCreds>,
 ): Promise<SyncOutcome> {
-  const session = await createFleetSession(ctx.creds);
+  const { session } = ctx;
 
   // Keyed by vendorId so one activity appearing twice in a response is carried
   // once. A repeat would otherwise write two identical snapshots, only one of

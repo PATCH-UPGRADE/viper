@@ -26,9 +26,7 @@ const stubResourceModule = (): ResourceModule<unknown, unknown, unknown> => ({
 /** A resource that can also be filed into needs the whole push half declared. */
 const stubWorkOrderModule = (): WorkOrderModule => ({
   ...stubResourceModule(),
-  openFiler: async () => ({
-    file: async () => ({ externalId: "x", raw: null }),
-  }),
+  create: async () => ({ externalId: "x", raw: null }),
   // biome-ignore lint/suspicious/noExplicitAny: schemas are irrelevant here
   payloadSchema: {} as any,
   toDraft: (input) => input,

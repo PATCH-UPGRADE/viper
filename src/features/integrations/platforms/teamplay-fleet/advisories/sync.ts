@@ -8,7 +8,6 @@ import { SourceChannel } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { sourceContentHash } from "@/lib/source-hash";
 import type { FleetConfig, FleetCreds } from "../config";
-import { createFleetSession } from "../session";
 import {
   type FleetAdvisoryItem,
   hashableOf,
@@ -134,7 +133,7 @@ async function recordAdvisories(pending: PendingAdvisory[]): Promise<void> {
 export async function syncAdvisories(
   ctx: ResourceSyncCtx<FleetConfig, FleetCreds>,
 ): Promise<SyncOutcome> {
-  const session = await createFleetSession(ctx.creds);
+  const { session } = ctx;
 
   // Keyed by vendorId so one advisory appearing twice in a response is carried
   // once. A repeat would otherwise write two identical snapshots, because the

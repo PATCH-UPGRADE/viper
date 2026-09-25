@@ -81,12 +81,15 @@ const makeStep = () => {
   };
 };
 
+const SESSION = { request: vi.fn() };
+
 const PLATFORM_MODULE = {
   definition: {
     configSchema: { parse: (value: unknown) => value },
     credentialSchema: { parse: (value: unknown) => value },
   },
   sync: mockStrategy,
+  createSession: vi.fn(() => SESSION),
 };
 
 const loadedRow = (overrides: Record<string, unknown> = {}) => ({
@@ -154,6 +157,25 @@ describe("syncIntegration — dispatch", () => {
       cursor: null,
       lastSuccessfulSync: null,
     });
+  });
+
+  it("opens the platform session for the resource module", async () => {
+    const resourceSync = vi.fn().mockResolvedValue({ cursor: null });
+    mockModuleForResource.mockReturnValue({ sync: resourceSync });
+
+    await runSync(makeStep());
+
+    expect(PLATFORM_MODULE.createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ integrationId: "integration-1" }),
+    );
+    expect(resourceSync.mock.calls[0][0].session).toBe(SESSION);
+  });
+
+  it("gives a platform sync no session", async () => {
+    await runSync(makeStep());
+
+    expect(PLATFORM_MODULE.createSession).not.toHaveBeenCalled();
+    expect(mockStrategy.mock.calls[0][0]).not.toHaveProperty("session");
   });
 
   it("falls back to the platform sync when no resource module owns it", async () => {

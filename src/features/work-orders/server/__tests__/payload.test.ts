@@ -12,13 +12,10 @@ vi.mock("@/features/integrations/core/registry", () => ({
 import { keepFileableTargets } from "../payload";
 import type { ResolvedTargets } from "../targets";
 
-// A platform that can be filed on declares a work order module, and that
-// module carries its own auth.
+// A platform that can be filed on declares a work order module.
 const FILEABLE = {
   workOrders: {
-    openFiler: async () => ({
-      file: async () => ({ externalId: "x", raw: null }),
-    }),
+    create: async () => ({ externalId: "x", raw: null }),
   },
 };
 // One that cannot: no work order module at all.

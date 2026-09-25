@@ -12,7 +12,6 @@ vi.mock("@/features/integrations/core/sync/upsert", () => ({
   processIntegrationSync: vi.fn(),
 }));
 vi.mock("@/lib/router-utils", () => ({ resolveDeviceGroup: vi.fn() }));
-vi.mock("../../session", () => ({ createFleetSession: vi.fn() }));
 vi.mock("../manages-relationship", () => ({
   connectUncontractedAssets: vi.fn(),
 }));
@@ -21,9 +20,8 @@ vi.mock("../contracts", () => ({ syncFleetContracts: vi.fn() }));
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import { resolveDeviceGroup } from "@/lib/router-utils";
-import type { ResourceSyncCtx } from "../../../../core/types";
+import type { ResourceSyncCtx, Session } from "../../../../core/types";
 import type { FleetConfig, FleetCreds } from "../../config";
-import { createFleetSession } from "../../session";
 import { syncFleetContracts } from "../contracts";
 import { connectUncontractedAssets } from "../manages-relationship";
 import { syncAssets } from "../sync";
@@ -67,12 +65,21 @@ const okResponse = {
   syncedAt: new Date(0).toISOString(),
 };
 
+const session: Session = {
+  request: async () =>
+    ({
+      ok: true,
+      json: async () => [EQUIPMENT, ...CARBON_PAIR],
+    }) as unknown as Response,
+};
+
 const makeCtx = (
   overrides: Partial<ResourceSyncCtx<FleetConfig, FleetCreds>> = {},
 ): ResourceSyncCtx<FleetConfig, FleetCreds> => ({
   integrationId: "int-1",
   config: {},
   creds: { username: "svc@example.com", password: "pw" },
+  session,
   cursor: null,
   lastSuccessfulSync: null,
   callback: async () => {
@@ -82,13 +89,6 @@ const makeCtx = (
 });
 
 beforeEach(() => {
-  vi.mocked(createFleetSession).mockResolvedValue({
-    request: async () =>
-      ({
-        ok: true,
-        json: async () => [EQUIPMENT, ...CARBON_PAIR],
-      }) as unknown as Response,
-  });
   db.integration.findUniqueOrThrow.mockResolvedValue({
     integrationUserId: "shadow-1",
   });

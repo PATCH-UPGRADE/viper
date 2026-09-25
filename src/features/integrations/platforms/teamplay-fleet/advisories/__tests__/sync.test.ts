@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("../../session", () => ({ createFleetSession: vi.fn() }));
 const { send } = vi.hoisted(() => ({ send: vi.fn() }));
 vi.mock("@/inngest/client", () => ({ inngest: { send } }));
 
@@ -9,7 +8,6 @@ import type { ResourceSyncCtx } from "@/features/integrations/core/types";
 import { PlatformEnum, SourceChannel } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import type { FleetConfig, FleetCreds } from "../../config";
-import { createFleetSession } from "../../session";
 import { syncAdvisories } from "../sync";
 
 const SAMPLE = {
@@ -58,16 +56,6 @@ describe("Fleet advisories sync", () => {
 
   beforeAll(async () => {
     send.mockResolvedValue(undefined);
-    vi.mocked(createFleetSession).mockResolvedValue({
-      request: async (url: string) =>
-        ({
-          ok: true,
-          json: async () =>
-            url.includes("/security-advisories/active")
-              ? advisories
-              : [ATTACHMENT],
-        }) as unknown as Response,
-    });
     const integration = await prisma.integration.findFirst({
       where: { platform: PlatformEnum.FLEET },
       select: { id: true, name: true },
@@ -84,6 +72,16 @@ describe("Fleet advisories sync", () => {
       integrationId,
       config: {},
       creds: { username: "unused", password: "unused" },
+      session: {
+        request: async (url: string) =>
+          ({
+            ok: true,
+            json: async () =>
+              url.includes("/security-advisories/active")
+                ? advisories
+                : [ATTACHMENT],
+          }) as unknown as Response,
+      },
       cursor: null,
       lastSuccessfulSync: null,
       callback: async () => {

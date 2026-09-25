@@ -32,7 +32,7 @@ export type VulnerabilityCandidate = {
 
 export type RemediationCandidate = {
   id: string;
-  linkedCveId: string | null;
+  linkedCveIds: string[];
   description: string | null;
 };
 
@@ -204,10 +204,12 @@ async function searchRemediation(
   extracted: ExtractedRemediation,
 ): Promise<RemediationCandidate[]> {
   const or: Prisma.RemediationWhereInput[] = [];
-  if (extracted.linkedCveId) {
+  if (extracted.linkedCveIds?.length) {
     or.push({
-      vulnerability: {
-        cveId: { contains: extracted.linkedCveId, mode: "insensitive" },
+      vulnerabilities: {
+        some: {
+          cveId: { in: extracted.linkedCveIds, mode: "insensitive" },
+        },
       },
     });
   }
@@ -224,7 +226,7 @@ async function searchRemediation(
     select: {
       id: true,
       description: true,
-      vulnerability: { select: { cveId: true } },
+      vulnerabilities: { select: { cveId: true } },
       deviceGroupMatchings: {
         select: {
           manufacturer: { select: { canonicalDisplayName: true } },
@@ -238,7 +240,9 @@ async function searchRemediation(
 
   return rows.map((row) => ({
     id: row.id,
-    linkedCveId: row.vulnerability?.cveId ?? null,
+    linkedCveIds: row.vulnerabilities.flatMap((v) =>
+      v.cveId ? [v.cveId] : [],
+    ),
     description: row.description ?? null,
   }));
 }

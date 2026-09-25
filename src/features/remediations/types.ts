@@ -31,10 +31,19 @@ const matchingInclude = {
 } as const;
 
 // Validation schemas
+
+// Zod drops unknown keys, so without this a client that still sends the old
+// single-id field gets a 200 and a remediation with no vulnerability.
+const removedVulnerabilityIdSchema = z
+  .never({ error: "vulnerabilityId was removed. Use vulnerabilityIds." })
+  .optional()
+  .describe("Removed. Use vulnerabilityIds.");
+
 export const remediationInputSchema = z.object({
   // TA3/TA4 upload affected devices as CPE strings; resolved to matchings server-side.
   cpes: z.array(cpeSchema).optional(),
-  vulnerabilityId: z.string().nullish(),
+  vulnerabilityIds: z.array(z.string()).optional(),
+  vulnerabilityId: removedVulnerabilityIdSchema,
   description: z.string().nullish(),
   narrative: z.string().nullish(),
   artifacts: z
@@ -49,7 +58,9 @@ export const integrationRemediationInputSchema = createIntegrationInputSchema(
 export const remediationUpdateSchema = z.object({
   id: z.string(),
   cpes: z.array(cpeSchema).optional(),
-  vulnerabilityId: z.string().nullish(),
+  // Replaces the whole set when present. An empty array clears every link.
+  vulnerabilityIds: z.array(z.string()).optional(),
+  vulnerabilityId: removedVulnerabilityIdSchema,
   description: z.string().nullish(),
   narrative: z.string().nullish(),
   artifacts: z.array(artifactInputSchema).optional(),
@@ -111,7 +122,7 @@ export const remediationResponseSchema = z.object({
   description: z.string().nullish(),
   narrative: z.string().nullish(),
   sourceImpact: sourceImpactSchema,
-  vulnerability: vulnerabilitySchema.nullish(),
+  vulnerabilities: z.array(vulnerabilitySchema),
   user: userSchema,
   artifacts: z.array(artifactWrapperWithUrlsSchema),
   createdAt: z.date(),
@@ -145,7 +156,7 @@ const remediationVulnerabilitySelect = {
 export const remediationInclude = {
   user: userIncludeSelect,
   deviceGroupMatchings: matchingInclude,
-  vulnerability: remediationVulnerabilitySelect,
+  vulnerabilities: remediationVulnerabilitySelect,
   artifacts: artifactWrapperSelect,
   externalMappings: externalMappingSelect,
 };

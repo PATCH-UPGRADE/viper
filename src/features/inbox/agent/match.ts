@@ -34,10 +34,6 @@ const detailsFieldsSchema = z.object({
     .string()
     .regex(/^CVE-\d{4}-\d{4,}$/i)
     .nullish(),
-  linkedCveId: z
-    .string()
-    .regex(/^CVE-\d{4}-\d{4,}$/i)
-    .nullish(),
   description: z.string().nullish(),
   cvssScore: z.number().min(0).max(10).nullish(),
   cvssVector: z.string().nullish(),
@@ -168,13 +164,13 @@ function renderCandidates(candidates: Candidates): string {
         candidates.remediations
           .map((entry, i) => {
             const e = entry.extracted;
-            const line = `Remediations #${i + 1} extracted: linkedtoCveId=${e.linkedCveId ?? "?"} | description=${e.description ?? "?"}`;
+            const line = `Remediations #${i + 1} extracted: linkedtoCveIds=${e.linkedCveIds?.join(", ") || "?"} | description=${e.description ?? "?"}`;
             const matches =
               entry.matches.length > 0
                 ? entry.matches
                     .map(
                       (m) =>
-                        ` - id: ${m.id} | linkedtoCveId: ${m.linkedCveId ?? "(none)"} | description: ${m.description ?? "(none)"}`,
+                        ` - id: ${m.id} | linkedtoCveIds: ${m.linkedCveIds.join(", ") || "(none)"} | description: ${m.description ?? "(none)"}`,
                     )
                     .join("\n")
                 : "    - (no candidates found)";
@@ -223,7 +219,6 @@ function cleanFields(fields: Decision["fields"]): {
   udi?: string;
   cveId?: string;
   description?: string;
-  linkedCveId?: string;
   cvssScore?: number;
   cvssVector?: string;
   macAddress?: string;
@@ -237,7 +232,6 @@ function cleanFields(fields: Decision["fields"]): {
     "version",
     "versionRange",
     "cveId",
-    "linkedCveId",
     "cpe",
     "udi",
     "description",

@@ -1863,7 +1863,7 @@ async function seedRemediations(userId: string) {
         data: {
           description: remediation.description,
           narrative: remediation.narrative,
-          vulnerabilityId: vulnerability.id,
+          vulnerabilities: { connect: { id: vulnerability.id } },
           deviceGroupMatchings: matchingId
             ? { connect: { id: matchingId } }
             : undefined,
@@ -2341,7 +2341,9 @@ async function createWorkOrderTicket(
 
   const linkedRemediations = ticket.linkedCveIds?.length
     ? await prisma.remediation.findMany({
-        where: { vulnerability: { cveId: { in: ticket.linkedCveIds } } },
+        where: {
+          vulnerabilities: { some: { cveId: { in: ticket.linkedCveIds } } },
+        },
         select: { id: true },
       })
     : [];

@@ -34,6 +34,7 @@ const {
   mockUseDepartments,
   mockUseAddTicketComment,
   mockUseSuspenseTrackingTicket,
+  mockUseSuspenseOtherAssetWorkOrders,
   mockUseSession,
   mockSetWatchingMutate,
   mockUseSetWatching,
@@ -49,6 +50,11 @@ const {
   mockUseAttachAsset,
   mockUseDetachAsset,
   mockUseAttachableAssets,
+  mockLinkMutate,
+  mockUnlinkMutate,
+  mockUseLinkTicket,
+  mockUseUnlinkTicket,
+  mockUseLinkableTickets,
 } = vi.hoisted(() => {
   const mockMutate = vi.fn();
   const mockAddCommentMutate = vi.fn();
@@ -58,6 +64,8 @@ const {
   const mockDetachMutate = vi.fn();
   const mockAttachAssetMutate = vi.fn();
   const mockDetachAssetMutate = vi.fn();
+  const mockLinkMutate = vi.fn();
+  const mockUnlinkMutate = vi.fn();
   return {
     mockMutate,
     mockAddCommentMutate,
@@ -67,6 +75,26 @@ const {
     mockDetachMutate,
     mockAttachAssetMutate,
     mockDetachAssetMutate,
+    mockLinkMutate,
+    mockUnlinkMutate,
+    mockUseLinkTicket: vi.fn(() => ({
+      mutate: mockLinkMutate,
+      isPending: false,
+    })),
+    mockUseUnlinkTicket: vi.fn(() => ({
+      mutate: mockUnlinkMutate,
+      isPending: false,
+    })),
+    mockUseLinkableTickets: vi.fn(() => ({
+      data: [
+        {
+          id: "cand-1",
+          summary: "Candidate ticket A",
+          status: "TO_DO",
+          externalMappings: [{ externalId: "INC0048512" }],
+        },
+      ],
+    })),
     mockUseAttachAsset: vi.fn(() => ({
       mutate: mockAttachAssetMutate,
       isPending: false,
@@ -150,6 +178,7 @@ const {
       isPending: false,
     })),
     mockUseSuspenseTrackingTicket: vi.fn(),
+    mockUseSuspenseOtherAssetWorkOrders: vi.fn(() => ({ data: [] })),
     mockUseSession: vi.fn(() => ({
       data: {
         user: { id: "u1", name: "Alice", email: "alice@example.com" },
@@ -164,6 +193,7 @@ vi.mock("../hooks/use-tracking", () => ({
   useDepartments: mockUseDepartments,
   useAddTicketComment: mockUseAddTicketComment,
   useSuspenseTrackingTicket: mockUseSuspenseTrackingTicket,
+  useSuspenseOtherAssetWorkOrders: mockUseSuspenseOtherAssetWorkOrders,
   useSetWatching: mockUseSetWatching,
   useMarkTicketSeen: mockUseMarkTicketSeen,
   useAttachChild: mockUseAttachChild,
@@ -172,6 +202,9 @@ vi.mock("../hooks/use-tracking", () => ({
   useAttachAsset: mockUseAttachAsset,
   useDetachAsset: mockUseDetachAsset,
   useAttachableAssets: mockUseAttachableAssets,
+  useLinkTicket: mockUseLinkTicket,
+  useUnlinkTicket: mockUseUnlinkTicket,
+  useLinkableTickets: mockUseLinkableTickets,
 }));
 
 vi.mock("@/lib/auth-client", () => ({
@@ -182,6 +215,7 @@ import {
   AddCommentForm,
   DepartmentMultiSelect,
   LinkedAssetsTable,
+  OtherAssetWorkOrdersCard,
   TicketDetailContent,
   TicketEditForm,
 } from "./ticket-detail";
@@ -761,6 +795,237 @@ describe("LinkedAssetsTable", () => {
       status: "DONE",
     });
   });
+
+  it("renders the other-work-order count for each asset, defaulting to 0", () => {
+    render(
+      <LinkedAssetsTable
+        parentTicketId="t1"
+        assetTickets={
+          [
+            sampleAssetTicket({ id: "asset-1" }, { id: "child-1" }),
+            sampleAssetTicket({ id: "asset-2" }, { id: "child-2" }),
+          ] as never
+        }
+        otherWorkOrderCounts={{ "asset-1": 8 }}
+      />,
+    );
+
+    expect(screen.getByText("Other work orders")).toBeInTheDocument();
+    expect(screen.getByText("8")).toBeInTheDocument();
+    expect(screen.getByText("0")).toBeInTheDocument();
+  });
+});
+
+describe("OtherAssetWorkOrdersCard", () => {
+  const cardAssetTickets = [
+    sampleAssetTicket({ id: "asset-1", hostname: "AST-DIA-01" }),
+    sampleAssetTicket(
+      { id: "asset-2", hostname: "AST-DIA-02" },
+      {
+        id: "child-2",
+      },
+    ),
+  ];
+
+  const cardWorkOrder = (
+    id: string,
+    assetIds: string[],
+    departments: { id: string; name: string }[] = [],
+    statusByAsset: Record<string, string> = {},
+  ) => ({
+    id,
+    summary: `Work order ${id}`,
+    status: "TO_DO",
+    scheduledAt: null,
+    departments,
+    assetTickets: assetIds.map((assetId) => ({
+      assetId,
+      ticketId: `${id}-${assetId}`,
+      status: statusByAsset[assetId] ?? "TO_DO",
+    })),
+  });
+
+  const biomed = { id: "d-biomed", name: "Biomed Engineering" };
+
+  const renderCard = (workOrders: ReturnType<typeof cardWorkOrder>[]) =>
+    render(
+      <OtherAssetWorkOrdersCard
+        assetTickets={cardAssetTickets as never}
+        workOrders={workOrders as never}
+      />,
+    );
+
+  it("shows the distinct work-order total in the header", () => {
+    renderCard([
+      cardWorkOrder("w1", ["asset-1", "asset-2"]),
+      cardWorkOrder("w2", ["asset-1"]),
+    ]);
+
+    expect(
+      screen.getByRole("heading", {
+        name: /other active work orders on these assets \(2\)/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows each asset's own status in asset mode, and the work order's in team mode", async () => {
+    const user = userEvent.setup();
+    // In Progress overall, but still To Do on asset-1.
+    renderCard([
+      cardWorkOrder("w1", ["asset-1", "asset-2"], [biomed], {
+        "asset-2": "IN_PROGRESS",
+      }),
+    ]);
+
+    const asset1Group = screen.getByRole("region", { name: /AST-DIA-01/ });
+    expect(within(asset1Group).getByText("To Do")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+
+    // Team mode is about the work order as a whole, so it keeps the parent
+    // status and links to the parent.
+    const teamGroup = screen.getByRole("region", {
+      name: /Biomed Engineering/,
+    });
+    expect(within(teamGroup).getByText("To Do")).toBeInTheDocument();
+    expect(
+      within(teamGroup).getByRole("link", { name: "Work order w1" }),
+    ).toHaveAttribute("href", "/tracking/w1");
+  });
+
+  it("explains the team counts only when a work order has several teams", async () => {
+    const user = userEvent.setup();
+    const note = /listed under each/i;
+    const facilities = { id: "d-fac", name: "Facilities" };
+
+    const { unmount } = renderCard([
+      cardWorkOrder("w1", ["asset-1"], [biomed]),
+    ]);
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+    expect(screen.queryByText(note)).not.toBeInTheDocument();
+    unmount();
+
+    renderCard([cardWorkOrder("w1", ["asset-1"], [biomed, facilities])]);
+    // Asset mode never splits a work order, so the note stays out of it.
+    expect(screen.queryByText(note)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+    expect(screen.getByText(note)).toBeInTheDocument();
+  });
+
+  it("leaves out linked assets that have no overlapping work orders", () => {
+    // asset-2 is linked but untouched, so it gets no group at all.
+    renderCard([cardWorkOrder("w1", ["asset-1"])]);
+
+    expect(screen.getByText("AST-DIA-01")).toBeInTheDocument();
+    expect(screen.queryByText("AST-DIA-02")).not.toBeInTheDocument();
+  });
+
+  it("groups by asset by default, without asset chips on the rows", () => {
+    renderCard([cardWorkOrder("w1", ["asset-1", "asset-2"], [biomed])]);
+
+    expect(screen.getByText("AST-DIA-01")).toBeInTheDocument();
+    expect(screen.getByText("AST-DIA-02")).toBeInTheDocument();
+    // Asset mode scopes the row to one asset, so it links to that asset's
+    // child ticket, as the Linked Assets table above does.
+    expect(screen.getByRole("link", { name: "Work order w1" })).toHaveAttribute(
+      "href",
+      "/tracking/w1-asset-1",
+    );
+    expect(screen.queryByText("Biomed Engineering")).toBeInTheDocument();
+    // The chips carry the asset label; in asset mode they are absent, so the
+    // only "AST-DIA-01" on screen is the group heading.
+    expect(screen.getAllByText("AST-DIA-01")).toHaveLength(1);
+  });
+
+  it("re-groups by department and adds asset chips when By team is selected", async () => {
+    const user = userEvent.setup();
+    renderCard([cardWorkOrder("w1", ["asset-1", "asset-2"], [biomed])]);
+
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+
+    // One department group, and the row repeats the team beneath its summary.
+    expect(screen.getAllByText("Biomed Engineering")).toHaveLength(2);
+    // Asset names now appear only as chips on the row.
+    expect(screen.getByText("AST-DIA-01")).toBeInTheDocument();
+    expect(screen.getByText("AST-DIA-02")).toBeInTheDocument();
+  });
+
+  it("caps the asset chips on a row and collapses the rest into +N more", async () => {
+    const user = userEvent.setup();
+    render(
+      <OtherAssetWorkOrdersCard
+        assetTickets={
+          Array.from({ length: 6 }, (_, i) =>
+            sampleAssetTicket(
+              { id: `asset-${i}`, hostname: `AST-${i}` },
+              { id: `child-${i}` },
+            ),
+          ) as never
+        }
+        workOrders={
+          [
+            cardWorkOrder(
+              "w1",
+              Array.from({ length: 6 }, (_, i) => `asset-${i}`),
+              [biomed],
+            ),
+          ] as never
+        }
+      />,
+    );
+
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+
+    expect(screen.getByText("AST-3")).toBeInTheDocument();
+    expect(screen.queryByText("AST-4")).not.toBeInTheDocument();
+    expect(screen.getByText("+2 more")).toHaveAttribute(
+      "title",
+      "AST-4, AST-5",
+    );
+  });
+
+  it("puts a work order with no department in a No team group", async () => {
+    const user = userEvent.setup();
+    renderCard([cardWorkOrder("w1", ["asset-1"])]);
+
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+
+    expect(screen.getAllByText("No team").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("caps a group at five rows and keeps the full count on the badge", async () => {
+    const user = userEvent.setup();
+    renderCard(
+      Array.from({ length: 8 }, (_, i) => cardWorkOrder(`w${i}`, ["asset-1"])),
+    );
+
+    expect(screen.getAllByRole("link", { name: /^Work order w/ })).toHaveLength(
+      5,
+    );
+    expect(screen.getByText("8")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Show 3 more" }));
+
+    expect(screen.getAllByRole("link", { name: /^Work order w/ })).toHaveLength(
+      8,
+    );
+    expect(screen.getByText("8")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Show fewer" }),
+    ).toBeInTheDocument();
+  });
+
+  it("tells the user when nothing overlaps in team mode", async () => {
+    const user = userEvent.setup();
+    renderCard([]);
+
+    await user.click(screen.getByRole("radio", { name: "By team" }));
+
+    expect(
+      screen.getByText("No other open work orders touch these assets."),
+    ).toBeInTheDocument();
+  });
 });
 
 const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
@@ -799,6 +1064,7 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
   updatedAt: new Date("2026-05-01T00:00:00Z"),
   parent: null,
   children: [],
+  relatedTickets: [],
   assets: [],
   vulnerabilities: [],
   issues: [],
@@ -1231,6 +1497,270 @@ describe("TicketDetailContent — sub-tickets attach/detach", () => {
 
     expect(mockDetachMutate).toHaveBeenCalledTimes(1);
     expect(mockDetachMutate).toHaveBeenCalledWith({ ticketId: "child-1" });
+  });
+});
+
+describe("TicketDetailContent — related tickets", () => {
+  const relatedLink = {
+    linkId: "link-1",
+    reason: "Same EternalBlue exposure",
+    createdAt: new Date("2026-05-02T00:00:00Z"),
+    ticket: {
+      id: "rt-1",
+      summary: "Patch PACS Server",
+      status: "REQUIRES_APPROVAL",
+      assignee: null,
+      departments: [{ id: "d-it", name: "IT", color: "purple" }],
+      externalMappings: [{ externalId: "INC0048512" }],
+    },
+  };
+
+  const defaultCandidate = {
+    id: "cand-1",
+    summary: "Candidate ticket A",
+    status: "TO_DO",
+    externalMappings: [{ externalId: "INC0048512" }],
+  };
+
+  beforeEach(() => {
+    mockUseLinkableTickets.mockReturnValue({ data: [defaultCandidate] });
+  });
+
+  it("is collapsed by default and shows an empty state once expanded", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    expect(
+      screen.getByRole("button", { name: /^link ticket$/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/no related tickets yet/i)).toBeNull();
+
+    await user.click(
+      screen.getByRole("button", { name: /related tickets\s*\(0\)/i }),
+    );
+    expect(screen.getByText(/no related tickets yet/i)).toBeInTheDocument();
+  });
+
+  it("renders each related ticket with external id, department, reason, and status", async () => {
+    const user = userEvent.setup();
+    renderDetail({ relatedTickets: [relatedLink] });
+
+    await user.click(
+      screen.getByRole("button", { name: /related tickets\s*\(1\)/i }),
+    );
+
+    expect(screen.getByText("INC0048512")).toBeInTheDocument();
+    expect(screen.getByText("Patch PACS Server")).toBeInTheDocument();
+    expect(screen.getByText("Same EternalBlue exposure")).toBeInTheDocument();
+    expect(screen.getByText("Requires Approval")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /patch pacs server/i }),
+    ).toHaveAttribute("href", "/tracking/rt-1");
+  });
+
+  it("calls unlinkTicket with the link id when the Unlink button is clicked", async () => {
+    const user = userEvent.setup();
+    renderDetail({ relatedTickets: [relatedLink] });
+
+    await user.click(
+      screen.getByRole("button", { name: /related tickets\s*\(1\)/i }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: /unlink patch pacs server/i }),
+    );
+
+    expect(mockUnlinkMutate).toHaveBeenCalledTimes(1);
+    expect(mockUnlinkMutate.mock.calls[0][0]).toEqual({ linkId: "link-1" });
+  });
+
+  it("picking a candidate opens a confirm step; Link submits with a null reason when empty", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+    await user.click(
+      await screen.findByRole("option", { name: /candidate ticket a/i }),
+    );
+
+    // Nothing is submitted until the user confirms.
+    expect(mockLinkMutate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/reason \(optional\)/i)).toBeInTheDocument();
+
+    // The trigger and the confirm button share a label; the confirm one is
+    // inside the open popover (role="dialog").
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: /^link ticket$/i,
+      }),
+    );
+
+    expect(mockLinkMutate).toHaveBeenCalledTimes(1);
+    expect(mockLinkMutate.mock.calls[0][0]).toEqual({
+      ticketId: "ticket-1",
+      relatedTicketId: "cand-1",
+      reason: null,
+    });
+  });
+
+  it("sends the typed reason with the link", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+    await user.click(
+      await screen.findByRole("option", { name: /candidate ticket a/i }),
+    );
+    await user.type(
+      screen.getByLabelText(/reason \(optional\)/i),
+      "  Same CVE, different department  ",
+    );
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: /^link ticket$/i,
+      }),
+    );
+
+    expect(mockLinkMutate.mock.calls[0][0]).toEqual({
+      ticketId: "ticket-1",
+      relatedTicketId: "cand-1",
+      reason: "Same CVE, different department",
+    });
+  });
+
+  it("shows the external id under the summary, and omits the line without one", async () => {
+    const user = userEvent.setup();
+    mockUseLinkableTickets.mockReturnValue({
+      data: [
+        defaultCandidate,
+        {
+          ...defaultCandidate,
+          id: "cand-2",
+          summary: "No mapping",
+          externalMappings: [],
+        },
+      ],
+    });
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+
+    // The summary is not truncated away by the id, and both sit in one option.
+    const withId = await screen.findByRole("option", {
+      name: /candidate ticket a/i,
+    });
+    expect(within(withId).getByText("INC0048512")).toBeInTheDocument();
+    expect(within(withId).getByText("Candidate ticket A")).toBeInTheDocument();
+
+    const withoutId = screen.getByRole("option", { name: /no mapping/i });
+    expect(within(withoutId).queryByText(/INC/)).toBeNull();
+  });
+
+  it("tells two candidates with the same summary apart", async () => {
+    const user = userEvent.setup();
+    mockUseLinkableTickets.mockReturnValue({
+      data: [
+        { ...defaultCandidate, id: "dup-1", summary: "Patch the pumps" },
+        { ...defaultCandidate, id: "dup-2", summary: "Patch the pumps" },
+      ],
+    });
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+    const options = await screen.findAllByRole("option", {
+      name: /patch the pumps/i,
+    });
+    expect(options).toHaveLength(2);
+
+    // Keyboard selection resolves the item by its cmdk value, so a shared
+    // value sends the wrong ticket.
+    await user.keyboard("{ArrowDown}{Enter}");
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: /^link ticket$/i,
+      }),
+    );
+
+    expect(mockLinkMutate.mock.calls[0][0]).toMatchObject({
+      relatedTicketId: "dup-2",
+    });
+  });
+
+  it("Back returns to the candidate list without submitting", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+    await user.click(
+      await screen.findByRole("option", { name: /candidate ticket a/i }),
+    );
+    await user.click(screen.getByRole("button", { name: /^back$/i }));
+
+    expect(
+      await screen.findByRole("option", { name: /candidate ticket a/i }),
+    ).toBeInTheDocument();
+    expect(mockLinkMutate).not.toHaveBeenCalled();
+  });
+
+  it("finds a picker candidate by the external id the row displays", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^link ticket$/i }));
+    await user.type(
+      await screen.findByPlaceholderText(/search tickets/i),
+      "INC0048512",
+    );
+
+    expect(
+      await screen.findByRole("option", { name: /candidate ticket a/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders TICKET_LINKED and TICKET_UNLINKED activities with the other ticket's summary", () => {
+    renderDetail({
+      activities: [
+        {
+          id: "a1",
+          ticketId: "ticket-1",
+          userId: "u1",
+          type: "TICKET_LINKED",
+          data: {
+            relatedTicketId: "rt-1",
+            relatedTicketSummary: "Patch PACS Server",
+            reason: "Same EternalBlue exposure",
+          },
+          createdAt: new Date("2026-05-15T12:00:00Z"),
+          user: { id: "u1", name: "Alice", image: null },
+        },
+        {
+          id: "a2",
+          ticketId: "ticket-1",
+          userId: "u1",
+          type: "TICKET_UNLINKED",
+          data: {
+            relatedTicketId: "rt-1",
+            relatedTicketSummary: "Patch PACS Server",
+            reason: null,
+          },
+          createdAt: new Date("2026-05-15T13:00:00Z"),
+          user: { id: "u1", name: "Alice", image: null },
+        },
+      ],
+    });
+
+    const linked = screen.getByLabelText("Activity: TICKET_LINKED");
+    expect(
+      within(linked).getByText(/linked related ticket/i),
+    ).toBeInTheDocument();
+    expect(within(linked).getByText("Patch PACS Server")).toBeInTheDocument();
+    expect(
+      within(linked).getByText(/same eternalblue exposure/i),
+    ).toBeInTheDocument();
+
+    const unlinked = screen.getByLabelText("Activity: TICKET_UNLINKED");
+    expect(
+      within(unlinked).getByText(/unlinked related ticket/i),
+    ).toBeInTheDocument();
   });
 });
 

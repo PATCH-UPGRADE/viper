@@ -32,19 +32,28 @@ import {
 import { requireExistence } from "@/trpc/middleware";
 import { TRACKING_TABS } from "../params";
 import {
+  dedupeOtherAssetWorkOrders,
   integrationWorkOrderInputSchema,
+  otherAssetWorkOrderSelect,
   paginatedWorkOrderListResponseSchema,
+  type RelatedTicketLink,
+  type RelatedTicketRef,
   ticketBaseInclude,
   ticketCommentResponseSchema,
   ticketDetailInclude,
+  topLevelOpenWorkOrderWhere,
   workOrderDetailResponseSchema,
   workOrderListFilterSchema,
   workOrderListInclude,
+  workOrderLlmDetailSelect,
+  workOrderLlmFilterSchema,
+  workOrderLlmSelect,
 } from "../types";
 import {
   recordAssetActivity,
   recordChildActivity,
   recordCreationActivity,
+  recordLinkActivity,
   recordUpdateActivities,
   snapshotBeforeUpdate,
 } from "./activities";
@@ -162,6 +171,54 @@ const withIsWatching = <T extends { watchers: { userId: string }[] }>(
   const { watchers, ...rest } = row;
   return { ...rest, isWatching: watchers.length > 0 };
 };
+
+type LinkRow = { id: string; reason: string | null; createdAt: Date };
+
+const toRelatedTicketLink = (
+  link: LinkRow,
+  ticket: RelatedTicketRef,
+): RelatedTicketLink => ({
+  linkId: link.id,
+  reason: link.reason,
+  createdAt: link.createdAt,
+  ticket,
+});
+
+// Merge both sides of the undirected link table into one list, oldest first,
+// so a pair renders identically on either ticket's page.
+const withRelatedTickets = <
+  T extends {
+    linksAsA: (LinkRow & { ticketB: RelatedTicketRef })[];
+    linksAsB: (LinkRow & { ticketA: RelatedTicketRef })[];
+  },
+>(
+  row: T,
+): Omit<T, "linksAsA" | "linksAsB"> & {
+  relatedTickets: RelatedTicketLink[];
+} => {
+  const { linksAsA, linksAsB, ...rest } = row;
+  const relatedTickets = [
+    ...linksAsA.map((l) => toRelatedTicketLink(l, l.ticketB)),
+    ...linksAsB.map((l) => toRelatedTicketLink(l, l.ticketA)),
+  ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  return { ...rest, relatedTickets };
+};
+
+const toTicketDetail = <
+  T extends { watchers: { userId: string }[] } & Parameters<
+    typeof withRelatedTickets
+  >[0],
+>(
+  row: T,
+) => withRelatedTickets(withIsWatching(row));
+
+// Canonical (A < B) ordering so the link table's unique index is
+// direction-agnostic.
+const orderTicketPair = (
+  x: string,
+  y: string,
+): { ticketAId: string; ticketBId: string } =>
+  x < y ? { ticketAId: x, ticketBId: y } : { ticketAId: y, ticketBId: x };
 
 // getMany rows additionally carry the current user's `seenBy` so we can derive
 // the unread-comments indicator. Scopes both watch + seen state to the user.
@@ -363,6 +420,152 @@ export const trackingRouter = createTRPCRouter({
       }));
     }),
 
+  getOtherAssetWorkOrders: protectedProcedure
+    .input(z.object({ ticketId: z.string() }))
+    .query(async ({ input }) => {
+      // The scope is exactly what the Linked Assets table shows: AssetTicket
+      // rows parented here. A per-asset child ticket therefore has no scope of
+      // its own — its asset hangs off the `ticket` relation, not `assets` —
+      // which matches the empty Linked Assets table on that page.
+      const ticket = requireExistence(
+        await prisma.workOrderTicket.findUnique({
+          where: { id: input.ticketId },
+          select: {
+            id: true,
+            parentId: true,
+            assets: { select: { assetId: true } },
+          },
+        }),
+        "Ticket",
+      );
+
+      const assetIds = ticket.assets.map((a) => a.assetId);
+      if (assetIds.length === 0) return [];
+
+      // This ticket and its parent are the same piece of work, not a
+      // neighbouring one.
+      const excludedIds = ticket.parentId
+        ? [ticket.id, ticket.parentId]
+        : [ticket.id];
+
+      // Driven from AssetTicket's @@index([assetId]): a handful of join rows,
+      // then their parents by primary key.
+      const rows = await prisma.assetTicket.findMany({
+        where: {
+          assetId: { in: assetIds },
+          // Per-asset status, as the asset page uses: a work order that is
+          // Done for this asset but still open elsewhere is not active here.
+          ticket: { status: { not: TicketStatus.DONE } },
+          parentTicket: {
+            id: { notIn: excludedIds },
+            isDraft: false,
+            status: { not: TicketStatus.DONE },
+            // Parent/standalone rows only — never a per-asset child ticket.
+            ticket: null,
+            // Not one of this ticket's own sub-tickets. Spelled as an explicit
+            // OR so rows with a null parentId are unambiguously kept.
+            OR: [{ parentId: null }, { parentId: { not: input.ticketId } }],
+          },
+        },
+        select: {
+          assetId: true,
+          // The per-asset child ticket, so the By asset view can show this
+          // asset's own status rather than the work order's overall status.
+          ticket: { select: { id: true, status: true } },
+          parentTicket: { select: otherAssetWorkOrderSelect },
+        },
+      });
+
+      return dedupeOtherAssetWorkOrders(rows);
+    }),
+
+  // Agent-only (query_platform_data). Not exposed over OpenAPI.
+  getManyForLlm: protectedProcedure
+    .input(paginationInputSchema.extend(workOrderLlmFilterSchema.shape))
+    .query(async ({ input }) => {
+      const { search, notificationId, vulnerabilityId, assetId, departmentId } =
+        input;
+      const filters: Prisma.WorkOrderTicketWhereInput[] = [
+        {
+          ...topLevelOpenWorkOrderWhere(departmentId),
+          ...(input.status?.length && { status: { in: input.status } }),
+        },
+        createSearchFilter(search),
+      ];
+
+      // Most tickets (chat, email, Fleet sync) carry no notification FK, so a
+      // ticket that shares a vulnerability with the notification also counts.
+      if (notificationId) {
+        const mappings = await prisma.notificationVulnerabilityMapping.findMany(
+          {
+            where: { notificationId },
+            select: { vulnerabilityId: true },
+          },
+        );
+        filters.push({
+          OR: [
+            { notificationId },
+            { mitigationPlan: { notificationId } },
+            {
+              vulnerabilities: {
+                some: { id: { in: mappings.map((m) => m.vulnerabilityId) } },
+              },
+            },
+          ],
+        });
+      }
+      if (vulnerabilityId) {
+        filters.push({ vulnerabilities: { some: { id: vulnerabilityId } } });
+      }
+      if (assetId) {
+        filters.push({ assets: { some: { assetId } } });
+      }
+
+      const result = await fetchPaginated(prisma.workOrderTicket, input, {
+        where: { AND: filters },
+        select: {
+          ...workOrderLlmSelect,
+          notificationId: true,
+          mitigationPlan: { select: { notificationId: true } },
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+
+      return {
+        ...result,
+        items: result.items.map(
+          ({ notificationId: directId, mitigationPlan, ...ticket }) => ({
+            ...ticket,
+            ...(notificationId && {
+              relation:
+                directId === notificationId ||
+                mitigationPlan?.notificationId === notificationId
+                  ? ("direct" as const)
+                  : ("sharedVulnerability" as const),
+            }),
+          }),
+        ),
+      };
+    }),
+
+  getOneForLlm: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      const ticket = await prisma.workOrderTicket.findUnique({
+        where: { id: input.id },
+        select: workOrderLlmDetailSelect,
+      });
+      const { assets, ...rest } = requireExistence(ticket, "Ticket");
+      return {
+        ...rest,
+        assets: assets.map(({ asset, ticket }) => ({
+          ...asset,
+          status: ticket.status,
+          externalMappings: ticket.externalMappings,
+        })),
+      };
+    }),
+
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .meta({
@@ -384,7 +587,7 @@ export const trackingRouter = createTRPCRouter({
           ...watchedBy(ctx.auth.user.id),
         },
       });
-      return withIsWatching(requireExistence(ticket, "Ticket"));
+      return toTicketDetail(requireExistence(ticket, "Ticket"));
     }),
 
   list: protectedProcedure
@@ -587,7 +790,7 @@ export const trackingRouter = createTRPCRouter({
             ...watchedBy(ctx.auth.user.id),
           },
         });
-        return withIsWatching(updated);
+        return toTicketDetail(updated);
       });
     }),
 
@@ -698,6 +901,123 @@ export const trackingRouter = createTRPCRouter({
       });
     }),
 
+  linkTicket: protectedProcedure
+    .input(
+      z.object({
+        ticketId: z.string(),
+        relatedTicketId: z.string(),
+        reason: z.string().trim().max(2000).nullish(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (input.ticketId === input.relatedTicketId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A ticket cannot be related to itself",
+        });
+      }
+      return prisma
+        .$transaction(async (tx) => {
+          const tickets = await tx.workOrderTicket.findMany({
+            where: { id: { in: [input.ticketId, input.relatedTicketId] } },
+            select: { id: true, summary: true, isDraft: true },
+          });
+          const self = tickets.find((t) => t.id === input.ticketId);
+          const other = tickets.find((t) => t.id === input.relatedTicketId);
+          if (!self || !other) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Ticket not found",
+            });
+          }
+          // A draft is not committed work, so it has nothing to relate yet.
+          if (self.isDraft || other.isDraft) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Cannot link a draft work order",
+            });
+          }
+          const reason = input.reason || null;
+          const link = await tx.workOrderTicketLink.create({
+            data: { ...orderTicketPair(self.id, other.id), reason },
+            select: { id: true },
+          });
+          await recordLinkActivity(
+            tx,
+            ctx.auth.user.id,
+            "linked",
+            self,
+            other,
+            reason,
+          );
+          return { linkId: link.id, ticketIds: [self.id, other.id] };
+        })
+        .catch((error) => {
+          if (isUniqueViolation(error)) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "These tickets are already linked",
+            });
+          }
+          throw error;
+        });
+    }),
+
+  unlinkTicket: protectedProcedure
+    .input(z.object({ linkId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      return prisma.$transaction(async (tx) => {
+        const link = requireExistence(
+          await tx.workOrderTicketLink.findUnique({
+            where: { id: input.linkId },
+            select: {
+              reason: true,
+              ticketA: { select: { id: true, summary: true } },
+              ticketB: { select: { id: true, summary: true } },
+            },
+          }),
+          "Link",
+        );
+        await tx.workOrderTicketLink.delete({ where: { id: input.linkId } });
+        await recordLinkActivity(
+          tx,
+          ctx.auth.user.id,
+          "unlinked",
+          link.ticketA,
+          link.ticketB,
+          link.reason,
+        );
+        return {
+          linkId: input.linkId,
+          ticketIds: [link.ticketA.id, link.ticketB.id],
+        };
+      });
+    }),
+
+  // Picker candidates. linkTicket also rejects drafts. Per-asset child tickets
+  // are hidden here only to keep the list short.
+  listLinkableTickets: protectedProcedure
+    .input(z.object({ ticketId: z.string() }))
+    .query(async ({ input }) =>
+      prisma.workOrderTicket.findMany({
+        where: {
+          id: { not: input.ticketId },
+          ticket: null,
+          isDraft: false,
+          linksAsA: { none: { ticketBId: input.ticketId } },
+          linksAsB: { none: { ticketAId: input.ticketId } },
+        },
+        select: {
+          id: true,
+          summary: true,
+          status: true,
+          externalMappings: { select: { externalId: true }, take: 1 },
+        },
+        orderBy: [{ summary: "asc" }, { id: "asc" }],
+        take: 100,
+      }),
+    ),
+
   attachAsset: protectedProcedure
     .input(z.object({ ticketId: z.string(), assetId: z.string() }))
     .meta({
@@ -728,7 +1048,7 @@ export const trackingRouter = createTRPCRouter({
               ...watchedBy(ctx.auth.user.id),
             },
           });
-          return withIsWatching(refetched);
+          return toTicketDetail(refetched);
         })
         .catch((error) => {
           if (isUniqueViolation(error)) {
@@ -792,7 +1112,7 @@ export const trackingRouter = createTRPCRouter({
             ...watchedBy(ctx.auth.user.id),
           },
         });
-        return withIsWatching(refetched);
+        return toTicketDetail(refetched);
       });
     }),
 

@@ -1211,7 +1211,128 @@ const SAMPLE_CHANGE_TICKETS: SampleParentTicket[] = [
       },
     ],
   },
+  // ── Neighbouring work on the two Cisco ASA appliances ──────────────────
+  // Standalone tickets from several departments that touch rad-fw-001 and
+  // rad-vpn-001. Populates the "Other active work orders on these assets"
+  // card on the EXTRABACON ticket: the firewall group exceeds the five-row
+  // cap ("Show 3 more"), the VPN gateway group exceeds it by one, and the
+  // Done ticket at the end must not appear.
+  {
+    summary: "Restrict SNMP on the perimeter firewall to the management VLAN",
+    description:
+      "Interim control until the ASA upgrade lands: ACL the SNMP community to the management VLAN only.",
+    status: TicketStatus.IN_PROGRESS,
+    category: TicketCategory.NETWORK_REMEDIATION,
+    department: "IT",
+    scheduledAt: inDays(1),
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+  },
+  {
+    summary: "Quarterly firewall rule review — perimeter",
+    description: "Review and prune stale inbound rules on rad-fw-001.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.CONFIG_CHANGE,
+    department: "IT",
+    scheduledAt: inDays(2),
+    linkedAssetIds: ["rad-fw-001"],
+  },
+  {
+    summary: "Rotate the VPN gateway TLS certificate",
+    description: "Current certificate expires in 30 days.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.CONFIG_CHANGE,
+    department: "IT",
+    scheduledAt: inDays(5),
+    linkedAssetIds: ["rad-vpn-001"],
+  },
+  {
+    summary: "Enable SNMPv3 with auth and encryption on both ASA appliances",
+    description:
+      "Replace the SNMPv2c community string once the upgrade completes.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.CONFIG_CHANGE,
+    department: "IT",
+    scheduledAt: inDays(4),
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+  },
+  {
+    summary: "Verify remote radiology VPN failover after the ASA upgrade",
+    description:
+      "Confirm after-hours read coverage reconnects within the SLA once rad-vpn-001 is back.",
+    status: TicketStatus.REQUIRES_APPROVAL,
+    category: TicketCategory.CLINICAL_REVIEW,
+    department: "Radiology",
+    scheduledAt: inDays(8),
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+  },
+  {
+    summary:
+      "Confirm ED telemetry traffic survives the firewall maintenance window",
+    description:
+      "Telemetry alarms route through the perimeter to the paging vendor. Validate the failover path.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.CLINICAL_REVIEW,
+    department: "Emergency Department",
+    scheduledAt: inDays(6),
+    linkedAssetIds: ["rad-fw-001"],
+  },
+  {
+    summary: "Change-window sign-off — perimeter firewall maintenance",
+    description:
+      "Approve the 30-minute external outage and notify affected departments.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.OTHER,
+    department: "Administration",
+    scheduledAt: inDays(6),
+    linkedAssetIds: ["rad-fw-001"],
+  },
+  {
+    summary: "Procure ASA 5506-X replacements for the end-of-life 5505s",
+    description:
+      "Both 5505 appliances are past end-of-support. Quote replacements for the next capital cycle.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.NEW_ASSET_PROCUREMENT,
+    department: "Procurement",
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+  },
+  {
+    summary: "Validate SNMP trap forwarding to the SIEM after the upgrade",
+    description:
+      "Traps from both appliances must still reach the SIEM collector on the new release.",
+    status: TicketStatus.TO_DO,
+    category: TicketCategory.CONFIG_CHANGE,
+    department: "IT",
+    scheduledAt: inDays(9),
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+  },
+  {
+    summary: "Archive the legacy ASA 8.2 configurations",
+    description: "Configs exported to the change-management share.",
+    status: TicketStatus.DONE,
+    category: TicketCategory.OTHER,
+    department: "IT",
+    linkedAssetIds: ["rad-fw-001", "rad-vpn-001"],
+  },
 ];
+
+// Related-ticket links between seeded tickets, resolved by summary after
+// creation because ticket ids are cuids. Mirrors linkTicket() in
+// src/features/tracking/server/routers.ts.
+const SAMPLE_RELATED_TICKET_LINKS: { a: string; b: string; reason: string }[] =
+  [
+    {
+      a: "Block TCP/445 at imaging switch (rad-sw-001)",
+      b: "Patch PACS Server EternalBlue (rad-pacs-001)",
+      reason:
+        "Switch ACL is the compensating control for the same EternalBlue exposure until the PACS patch is approved.",
+    },
+    {
+      a: "Verify DICOM VLAN ACL enforcement",
+      b: "Isolate GE imaging devices to a dedicated DICOM VLAN",
+      reason:
+        "Both change the DICOM VLAN ACLs; re-run the verification once the GE devices are moved.",
+    },
+  ];
 
 async function clearDatabase() {
   console.log("🗑️  Clearing database...");
@@ -2326,18 +2447,64 @@ async function seedWorkOrderTickets(userId: string) {
 
   let parentCount = 0;
   let childCount = 0;
+  const idBySummary = new Map<string, string>();
 
   for (const parent of SAMPLE_CHANGE_TICKETS) {
     const created = await createWorkOrderTicket(parent, userId, null);
+    idBySummary.set(created.summary, created.id);
     parentCount++;
     for (const child of parent.children ?? []) {
-      await createWorkOrderTicket(child, userId, created.id);
+      const createdChild = await createWorkOrderTicket(
+        child,
+        userId,
+        created.id,
+      );
+      idBySummary.set(createdChild.summary, createdChild.id);
       childCount++;
     }
   }
 
   console.log(
     `✅ Seeded ${parentCount} parent tickets and ${childCount} child tickets`,
+  );
+
+  await seedRelatedTicketLinks(idBySummary, userId);
+}
+
+async function seedRelatedTicketLinks(
+  idBySummary: Map<string, string>,
+  userId: string,
+) {
+  for (const { a, b, reason } of SAMPLE_RELATED_TICKET_LINKS) {
+    const aId = idBySummary.get(a);
+    const bId = idBySummary.get(b);
+    if (!aId || !bId) {
+      throw new Error(`Related-ticket seed: missing "${a}" or "${b}"`);
+    }
+    const [ticketAId, ticketBId] = aId < bId ? [aId, bId] : [bId, aId];
+    await prisma.workOrderTicketLink.create({
+      data: { ticketAId, ticketBId, reason },
+    });
+    await prisma.ticketActivity.createMany({
+      data: [
+        {
+          ticketId: aId,
+          userId,
+          type: "TICKET_LINKED",
+          data: { relatedTicketId: bId, relatedTicketSummary: b, reason },
+        },
+        {
+          ticketId: bId,
+          userId,
+          type: "TICKET_LINKED",
+          data: { relatedTicketId: aId, relatedTicketSummary: a, reason },
+        },
+      ],
+    });
+  }
+
+  console.log(
+    `✅ Seeded ${SAMPLE_RELATED_TICKET_LINKS.length} related-ticket links`,
   );
 }
 

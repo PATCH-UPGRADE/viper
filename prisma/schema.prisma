@@ -1306,6 +1306,9 @@ model WorkOrderTicket {
   externalMappings ExternalWorkOrderMapping[]
   lastCommentAt    DateTime?
 
+  linksAsA WorkOrderTicketLink[] @relation("WorkOrderTicketLinkA")
+  linksAsB WorkOrderTicketLink[] @relation("WorkOrderTicketLinkB")
+
   // A draft is a work order VIPER has not committed to yet: it is hidden from
   // the ticket lists, and it is what a mitigation plan holds until the plan is
   // accepted. It is not about the vendor — a ticket leaves draft whether or not
@@ -1343,6 +1346,24 @@ model WorkOrderTicket {
   @@index([submissionState])
   @@index([targetIntegrationId])
   @@map("work_order_ticket")
+}
+
+model WorkOrderTicketLink {
+  id String @id @default(cuid())
+
+  ticketAId String
+  ticketA   WorkOrderTicket @relation("WorkOrderTicketLinkA", fields: [ticketAId], references: [id], onDelete: Cascade)
+
+  ticketBId String
+  ticketB   WorkOrderTicket @relation("WorkOrderTicketLinkB", fields: [ticketBId], references: [id], onDelete: Cascade)
+
+  reason String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@unique([ticketAId, ticketBId])
+  @@index([ticketBId])
+  @@map("work_order_ticket_link")
 }
 
 model AssetTicket {
@@ -1407,6 +1428,8 @@ enum TicketActivityType {
   CHILD_DETACHED
   ASSET_ATTACHED
   ASSET_DETACHED
+  TICKET_LINKED
+  TICKET_UNLINKED
 }
 
 model TicketActivity {

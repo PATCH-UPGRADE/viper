@@ -46,8 +46,17 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     },
     assetTicket: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
+    },
+    workOrderTicketLink: {
+      create: vi.fn(),
+      delete: vi.fn(),
+      findUnique: vi.fn(),
     },
     department: {
+      findMany: vi.fn(),
+    },
+    notificationVulnerabilityMapping: {
       findMany: vi.fn(),
     },
     // The router uses prisma.$transaction(async (tx) => {...}) — invoke the
@@ -139,11 +148,23 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   externalMappings: [],
   notification: null,
   mitigationPlan: null,
+  linksAsA: [],
+  linksAsB: [],
   targetIntegrationId: null,
   platformPayload: null,
   submissionState: "NONE",
   submissionError: null,
   submittedAt: null,
+  ...overrides,
+});
+
+// biome-ignore lint/suspicious/noExplicitAny: test fixture
+const makeRelatedTicketRef = (overrides: Record<string, any> = {}): any => ({
+  id: "rt-1",
+  summary: "Related ticket",
+  status: "TO_DO",
+  departments: [],
+  externalMappings: [],
   ...overrides,
 });
 
@@ -661,6 +682,51 @@ describe("trackingRouter.getOne", () => {
       /not found/i,
     );
   });
+
+  it("flattens both link sides into relatedTickets, oldest first", async () => {
+    const caller = setup();
+    const older = new Date("2026-01-01T00:00:00Z");
+    const newer = new Date("2026-02-01T00:00:00Z");
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
+      makeTicketDetail({
+        linksAsA: [
+          {
+            id: "link-b",
+            reason: "Same CVE",
+            createdAt: newer,
+            ticketB: makeRelatedTicketRef({ id: "rt-b", summary: "B side" }),
+          },
+        ],
+        linksAsB: [
+          {
+            id: "link-a",
+            reason: null,
+            createdAt: older,
+            ticketA: makeRelatedTicketRef({ id: "rt-a", summary: "A side" }),
+          },
+        ],
+      }),
+    );
+
+    const result = await caller.getOne({ id: "t1" });
+
+    expect(result.relatedTickets).toEqual([
+      {
+        linkId: "link-a",
+        reason: null,
+        createdAt: older,
+        ticket: expect.objectContaining({ id: "rt-a", summary: "A side" }),
+      },
+      {
+        linkId: "link-b",
+        reason: "Same CVE",
+        createdAt: newer,
+        ticket: expect.objectContaining({ id: "rt-b", summary: "B side" }),
+      },
+    ]);
+    expect(result).not.toHaveProperty("linksAsA");
+    expect(result).not.toHaveProperty("linksAsB");
+  });
 });
 
 describe("trackingRouter.addComment", () => {
@@ -1110,6 +1176,347 @@ describe("trackingRouter.getManyByAssetId", () => {
   });
 });
 
+describe("trackingRouter.getOtherAssetWorkOrders", () => {
+  const otherTicket = (
+    id: string,
+    scheduledAt: Date | null = null,
+    summary = `Work order ${id}`,
+  ) => ({
+    id,
+    summary,
+    status: "TO_DO",
+    scheduledAt,
+    departments: [],
+  });
+
+  const child = (workOrderId: string, assetId: string) => ({
+    id: `${workOrderId}-${assetId}`,
+    status: "TO_DO" as const,
+  });
+
+  it("returns an empty list without querying when no assets are linked", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [],
+    });
+
+    await expect(
+      caller.getOtherAssetWorkOrders({ ticketId: "t1" }),
+    ).resolves.toEqual([]);
+    expect(mockPrisma.assetTicket.findMany).not.toHaveBeenCalled();
+  });
+
+  it("throws NOT_FOUND for a missing ticket", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(null);
+
+    await expect(
+      caller.getOtherAssetWorkOrders({ ticketId: "missing" }),
+    ).rejects.toThrow(/not found/i);
+  });
+
+  it("de-duplicates a work order that touches two linked assets, with sorted assetIds", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [{ assetId: "a1" }, { assetId: "a2" }],
+    });
+    // Reversed on purpose: the query has no orderBy, so row order is arbitrary.
+    mockPrisma.assetTicket.findMany.mockResolvedValue([
+      {
+        assetId: "a2",
+        ticket: child("w1", "a2"),
+        parentTicket: otherTicket("w1"),
+      },
+      {
+        assetId: "a1",
+        ticket: child("w1", "a1"),
+        parentTicket: otherTicket("w1"),
+      },
+    ]);
+
+    const result = await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.assetTickets).toEqual([
+      { assetId: "a1", ticketId: "w1-a1", status: "TO_DO" },
+      { assetId: "a2", ticketId: "w1-a2", status: "TO_DO" },
+    ]);
+  });
+
+  it("carries each asset's own child ticket status, not the parent's", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [{ assetId: "a1" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([
+      {
+        assetId: "a1",
+        ticket: { id: "w1-a1", status: "TO_DO" },
+        parentTicket: { ...otherTicket("w1"), status: "IN_PROGRESS" },
+      },
+    ]);
+
+    const result = await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
+
+    expect(result[0]?.status).toBe("IN_PROGRESS");
+    expect(result[0]?.assetTickets[0]?.status).toBe("TO_DO");
+  });
+
+  it("excludes this ticket, its parent, its sub-tickets, drafts, Done parents, Done per-asset children, and child rows", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "child",
+      parentId: "parent",
+      assets: [{ assetId: "a1" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([]);
+
+    await caller.getOtherAssetWorkOrders({ ticketId: "child" });
+
+    expect(mockPrisma.assetTicket.findMany.mock.calls[0][0].where).toEqual({
+      assetId: { in: ["a1"] },
+      ticket: { status: { not: "DONE" } },
+      parentTicket: {
+        id: { notIn: ["child", "parent"] },
+        isDraft: false,
+        status: { not: "DONE" },
+        ticket: null,
+        OR: [{ parentId: null }, { parentId: { not: "child" } }],
+      },
+    });
+  });
+
+  it("excludes only this ticket when it has no parent", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [{ assetId: "a1" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([]);
+
+    await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
+
+    expect(
+      mockPrisma.assetTicket.findMany.mock.calls[0][0].where.parentTicket.id,
+    ).toEqual({ notIn: ["t1"] });
+  });
+
+  it("sorts soonest-scheduled first, with unscheduled work orders last", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [{ assetId: "a1" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([
+      {
+        assetId: "a1",
+        ticket: child("late", "a1"),
+        parentTicket: otherTicket("late", new Date("2026-09-02")),
+      },
+      {
+        assetId: "a1",
+        ticket: child("none", "a1"),
+        parentTicket: otherTicket("none", null),
+      },
+      {
+        assetId: "a1",
+        ticket: child("early", "a1"),
+        parentTicket: otherTicket("early", new Date("2026-08-08")),
+      },
+    ]);
+
+    const result = await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
+
+    expect(result.map((w) => w.id)).toEqual(["early", "late", "none"]);
+  });
+});
+
+describe("trackingRouter.getManyForLlm", () => {
+  const row = (overrides: Record<string, unknown> = {}) => ({
+    id: "wo_1",
+    summary: "Patch EternalBlue",
+    status: "IN_PROGRESS",
+    category: "PATCH",
+    notificationId: null,
+    mitigationPlan: null,
+    _count: { assets: 5, children: 5, comments: 0 },
+    ...overrides,
+  });
+
+  const whereOf = () =>
+    mockPrisma.workOrderTicket.findMany.mock.calls[0][0].where.AND;
+
+  beforeEach(() => {
+    mockPrisma.workOrderTicket.count.mockResolvedValue(1);
+    mockPrisma.notificationVulnerabilityMapping.findMany.mockResolvedValue([]);
+  });
+
+  it("excludes drafts, per-asset tickets, sub-tickets, and DONE by default", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([row()]);
+
+    await caller.getManyForLlm({});
+
+    expect(whereOf()).toContainEqual({
+      isDraft: false,
+      ticket: null,
+      status: { not: "DONE" },
+      parentId: null,
+    });
+  });
+
+  it("lists a sub-ticket for a department only when its parent lacks it", async () => {
+    // Otherwise the model sees the sub-ticket twice: as a row, and in its
+    // parent's children.
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+
+    await caller.getManyForLlm({ departmentId: "d1" });
+
+    expect(whereOf()).toContainEqual({
+      isDraft: false,
+      ticket: null,
+      status: { not: "DONE" },
+      departments: { some: { id: "d1" } },
+      OR: [
+        { parentId: null },
+        { parent: { departments: { none: { id: "d1" } } } },
+      ],
+    });
+  });
+
+  it("uses an explicit status filter instead of the default", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+
+    await caller.getManyForLlm({ status: ["DONE"] });
+
+    expect(whereOf()).toContainEqual({
+      isDraft: false,
+      ticket: null,
+      status: { in: ["DONE"] },
+      parentId: null,
+    });
+  });
+
+  it("matches a notification directly, by plan, or by shared vulnerability", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+    mockPrisma.notificationVulnerabilityMapping.findMany.mockResolvedValue([
+      { vulnerabilityId: "v1" },
+      { vulnerabilityId: "v2" },
+    ]);
+
+    await caller.getManyForLlm({ notificationId: "n1" });
+
+    expect(whereOf()).toContainEqual({
+      OR: [
+        { notificationId: "n1" },
+        { mitigationPlan: { notificationId: "n1" } },
+        { vulnerabilities: { some: { id: { in: ["v1", "v2"] } } } },
+      ],
+    });
+  });
+
+  it("labels each row with how it relates to the notification", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      row({ id: "direct", notificationId: "n1" }),
+      row({ id: "plan", mitigationPlan: { notificationId: "n1" } }),
+      row({ id: "shared" }),
+    ]);
+
+    const result = await caller.getManyForLlm({ notificationId: "n1" });
+
+    expect(
+      result.items.map((i) => [i.id, "relation" in i ? i.relation : null]),
+    ).toEqual([
+      ["direct", "direct"],
+      ["plan", "direct"],
+      ["shared", "sharedVulnerability"],
+    ]);
+    expect(result.items[0]).not.toHaveProperty("notificationId");
+    expect(result.items[0]).not.toHaveProperty("mitigationPlan");
+  });
+
+  it("omits relation when no notification was asked about", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([row()]);
+
+    const result = await caller.getManyForLlm({});
+
+    expect(result.items[0]).not.toHaveProperty("relation");
+  });
+
+  it("filters by vulnerability and asset", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+
+    await caller.getManyForLlm({ vulnerabilityId: "v1", assetId: "a1" });
+
+    expect(whereOf()).toEqual(
+      expect.arrayContaining([
+        { vulnerabilities: { some: { id: "v1" } } },
+        { assets: { some: { assetId: "a1" } } },
+      ]),
+    );
+  });
+});
+
+describe("trackingRouter.getOneForLlm", () => {
+  it("flattens each asset with its per-asset status and external ids", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "wo_1",
+      summary: "Patch EternalBlue",
+      _count: { assets: 25, children: 0, comments: 1 },
+      assets: [
+        {
+          asset: { id: "a1", hostname: "pacs-01" },
+          ticket: {
+            status: "IN_PROGRESS",
+            externalMappings: [
+              { externalId: "fleet-9", webUrl: null, integration: null },
+            ],
+          },
+        },
+      ],
+      comments: [{ body: "Started", createdAt: new Date(), author: null }],
+    });
+
+    const result = await caller.getOneForLlm({ id: "wo_1" });
+
+    expect(result.assets).toEqual([
+      {
+        id: "a1",
+        hostname: "pacs-01",
+        status: "IN_PROGRESS",
+        externalMappings: [
+          { externalId: "fleet-9", webUrl: null, integration: null },
+        ],
+      },
+    ]);
+    expect(result.comments).toHaveLength(1);
+  });
+
+  it("throws NOT_FOUND for a missing ticket", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(null);
+
+    await expect(caller.getOneForLlm({ id: "missing" })).rejects.toThrow(
+      /not found/i,
+    );
+  });
+});
+
 describe("trackingRouter.markSeen", () => {
   it("upserts a TicketSeen row for (current user, ticket)", async () => {
     const caller = setup();
@@ -1436,6 +1843,131 @@ describe("trackingRouter.listAttachableChildren", () => {
   });
 });
 
+describe("trackingRouter.linkTicket", () => {
+  const bothTickets = [
+    { id: "b1", summary: "Ticket B", isDraft: false },
+    { id: "a1", summary: "Ticket A", isDraft: false },
+  ];
+
+  it("stores the pair in canonical order with the reason", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue(bothTickets);
+    mockPrisma.workOrderTicketLink.create.mockResolvedValue({ id: "link-1" });
+
+    const result = await caller.linkTicket({
+      ticketId: "b1",
+      relatedTicketId: "a1",
+      reason: "Same exposure",
+    });
+
+    expect(mockPrisma.workOrderTicketLink.create).toHaveBeenCalledWith({
+      data: { ticketAId: "a1", ticketBId: "b1", reason: "Same exposure" },
+      select: { id: true },
+    });
+    expect(result).toEqual({ linkId: "link-1", ticketIds: ["b1", "a1"] });
+  });
+
+  it("stores a null reason when none is given", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue(bothTickets);
+    mockPrisma.workOrderTicketLink.create.mockResolvedValue({ id: "link-1" });
+
+    await caller.linkTicket({ ticketId: "a1", relatedTicketId: "b1" });
+
+    expect(
+      mockPrisma.workOrderTicketLink.create.mock.calls[0][0].data.reason,
+    ).toBeNull();
+  });
+
+  it("rejects linking a ticket to itself", async () => {
+    const caller = setup();
+    await expect(
+      caller.linkTicket({ ticketId: "t1", relatedTicketId: "t1" }),
+    ).rejects.toThrow(/related to itself/i);
+    expect(mockPrisma.workOrderTicketLink.create).not.toHaveBeenCalled();
+  });
+
+  it("returns NOT_FOUND when either ticket is missing", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([bothTickets[0]]);
+
+    await expect(
+      caller.linkTicket({ ticketId: "b1", relatedTicketId: "missing" }),
+    ).rejects.toThrow(/not found/i);
+    expect(mockPrisma.workOrderTicketLink.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a link when either ticket is still a draft", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      bothTickets[0],
+      { id: "a1", summary: "Ticket A", isDraft: true },
+    ]);
+
+    await expect(
+      caller.linkTicket({ ticketId: "b1", relatedTicketId: "a1" }),
+    ).rejects.toThrow(/draft/i);
+    expect(mockPrisma.workOrderTicketLink.create).not.toHaveBeenCalled();
+  });
+
+  it("maps a unique violation to CONFLICT", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue(bothTickets);
+    mockPrisma.workOrderTicketLink.create.mockRejectedValue({ code: "P2002" });
+
+    await expect(
+      caller.linkTicket({ ticketId: "a1", relatedTicketId: "b1" }),
+    ).rejects.toThrow(/already linked/i);
+  });
+});
+
+describe("trackingRouter.unlinkTicket", () => {
+  it("deletes the link and returns both ticket ids", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicketLink.findUnique.mockResolvedValue({
+      reason: null,
+      ticketA: { id: "a1", summary: "Ticket A" },
+      ticketB: { id: "b1", summary: "Ticket B" },
+    });
+
+    const result = await caller.unlinkTicket({ linkId: "link-1" });
+
+    expect(mockPrisma.workOrderTicketLink.delete).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+    });
+    expect(result).toEqual({ linkId: "link-1", ticketIds: ["a1", "b1"] });
+  });
+
+  it("returns NOT_FOUND when the link does not exist", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicketLink.findUnique.mockResolvedValue(null);
+
+    await expect(caller.unlinkTicket({ linkId: "missing" })).rejects.toThrow(
+      /not found/i,
+    );
+    expect(mockPrisma.workOrderTicketLink.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe("trackingRouter.listLinkableTickets", () => {
+  it("excludes self, drafts, asset-tickets, and tickets already linked on either side", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([]);
+
+    await caller.listLinkableTickets({ ticketId: "t1" });
+
+    const arg = mockPrisma.workOrderTicket.findMany.mock.calls[0][0];
+    expect(arg.where).toEqual({
+      id: { not: "t1" },
+      ticket: null,
+      isDraft: false,
+      linksAsA: { none: { ticketBId: "t1" } },
+      linksAsB: { none: { ticketAId: "t1" } },
+    });
+    expect(arg.take).toBe(100);
+  });
+});
+
 describe("trackingRouter.attachAsset", () => {
   it("creates a dedicated child ticket + AssetTicket join row for the asset", async () => {
     const caller = setup();
@@ -1682,6 +2214,82 @@ describe("activity writes", () => {
         type: "ASSET_DETACHED",
         data: { assetId: "a1", assetLabel: "10.0.0.42" },
       },
+    });
+  });
+
+  it("records TICKET_LINKED on both tickets, each naming the other", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      { id: "a1", summary: "Ticket A", isDraft: false },
+      { id: "b1", summary: "Ticket B", isDraft: false },
+    ]);
+    mockPrisma.workOrderTicketLink.create.mockResolvedValue({ id: "link-1" });
+
+    await caller.linkTicket({
+      ticketId: "a1",
+      relatedTicketId: "b1",
+      reason: "Same CVE",
+    });
+
+    expect(mockPrisma.ticketActivity.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          ticketId: "a1",
+          userId: FAKE_USER_ID,
+          type: "TICKET_LINKED",
+          data: {
+            relatedTicketId: "b1",
+            relatedTicketSummary: "Ticket B",
+            reason: "Same CVE",
+          },
+        },
+        {
+          ticketId: "b1",
+          userId: FAKE_USER_ID,
+          type: "TICKET_LINKED",
+          data: {
+            relatedTicketId: "a1",
+            relatedTicketSummary: "Ticket A",
+            reason: "Same CVE",
+          },
+        },
+      ],
+    });
+  });
+
+  it("records TICKET_UNLINKED on both tickets", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicketLink.findUnique.mockResolvedValue({
+      reason: null,
+      ticketA: { id: "a1", summary: "Ticket A" },
+      ticketB: { id: "b1", summary: "Ticket B" },
+    });
+
+    await caller.unlinkTicket({ linkId: "link-1" });
+
+    expect(mockPrisma.ticketActivity.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          ticketId: "a1",
+          userId: FAKE_USER_ID,
+          type: "TICKET_UNLINKED",
+          data: {
+            relatedTicketId: "b1",
+            relatedTicketSummary: "Ticket B",
+            reason: null,
+          },
+        },
+        {
+          ticketId: "b1",
+          userId: FAKE_USER_ID,
+          type: "TICKET_UNLINKED",
+          data: {
+            relatedTicketId: "a1",
+            relatedTicketSummary: "Ticket A",
+            reason: null,
+          },
+        },
+      ],
     });
   });
 });

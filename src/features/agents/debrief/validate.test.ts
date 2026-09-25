@@ -132,16 +132,64 @@ describe("validateBullets — malformed drafts", () => {
     expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
   });
 
-  it("drops a link the text never references", async () => {
-    // An unreferenced link fails the strict schema, so it cannot be kept.
+  it("appends a See sentence for a link the text never references", async () => {
+    // Only a marker keeps a link, so a resolving link with no marker gets one.
     idsExist("vulnerability");
 
     const { bullets } = await validateBullets([
-      { text: "No marker here at all.", links: [vulnLink()] },
+      { text: "No marker here at all", links: [vulnLink()] },
     ]);
 
+    expect(bullets[0].text).toBe("No marker here at all. See {{0}}.");
+    expect(bullets[0].links).toHaveLength(1);
+    expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
+  });
+
+  it("puts the marker where the text already names the label", async () => {
+    idsExist("vulnerability");
+
+    const { bullets } = await validateBullets([
+      { text: "The Nephrotek flaw is still open.", links: [vulnLink()] },
+    ]);
+
+    expect(bullets[0].text).toBe("{{0}} is still open.");
+    expect(bullets[0].links).toHaveLength(1);
+  });
+
+  it("does not put the marker inside a longer word", async () => {
+    idsExist("vulnerability");
+
+    const { bullets } = await validateBullets([
+      {
+        text: "Two affected scanners",
+        links: [{ ...vulnLink(), label: "CT" }],
+      },
+    ]);
+
+    expect(bullets[0].text).toBe("Two affected scanners. See {{0}}.");
+  });
+
+  it("drops an unreferenced link when the bullet has no room for a sentence", async () => {
+    idsExist("vulnerability");
+
+    const { bullets } = await validateBullets([
+      { text: "One. Two. Three.", links: [vulnLink()] },
+    ]);
+
+    expect(bullets[0].text).toBe("One. Two. Three.");
     expect(bullets[0].links).toHaveLength(0);
     expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
+  });
+
+  it("does not attach an unreferenced link whose id does not exist", async () => {
+    idsMissing("vulnerability");
+
+    const { bullets } = await validateBullets([
+      { text: "No marker here at all.", links: [vulnLink("ghost")] },
+    ]);
+
+    expect(bullets[0].text).toBe("No marker here at all.");
+    expect(bullets[0].links).toHaveLength(0);
   });
 
   it("clamps to five bullets", async () => {
@@ -205,9 +253,10 @@ describe("validateBullets — text and links stay in step", () => {
       },
     ]);
 
-    // B is dropped because nothing points at it; C renumbers 2 -> 1.
-    expect(bullets[0].text).toBe("See {{0}} and {{1}}.");
-    expect(bullets[0].links.map((l) => l.entityId)).toEqual(["A", "C"]);
+    // B has no marker, so it is attached at the end. Every marker still points
+    // at its own link, although they no longer read in index order.
+    expect(bullets[0].text).toBe("See {{0}} and {{2}}. See {{1}}.");
+    expect(bullets[0].links.map((l) => l.entityId)).toEqual(["A", "B", "C"]);
     expect(debriefBulletsSchema.safeParse(bullets).success).toBe(true);
   });
 

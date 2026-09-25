@@ -68,6 +68,21 @@ const createSearchFilter = (search: string) => {
     : {};
 };
 
+async function vulnerabilityConnect(ids: string[]) {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return [];
+  const found = await prisma.vulnerability.count({
+    where: { id: { in: unique } },
+  });
+  if (found !== unique.length) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Vulnerability not found",
+    });
+  }
+  return unique.map((id) => ({ id }));
+}
+
 /**
  * Find where this remediation lives on MedISAO.
  */
@@ -345,21 +360,16 @@ export const remediationsRouter = createTRPCRouter({
     })
     .output(remediationUploadResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { artifacts, cpes, ...dataInput } = input;
+      const { artifacts, cpes, vulnerabilityIds, ...dataInput } = input;
       const userId = ctx.auth.user.id;
+      const vulnerabilities = await vulnerabilityConnect(
+        vulnerabilityIds ?? [],
+      );
       const matchingConnect = cpes ? await cpesToMatchingConnect(cpes) : [];
 
       // Handle S3 upload URL -- if the user included a hash/size but no downloadUrl, they want us to host it
       const { processedArtifacts, uploadInstructions } =
         await processArtifactHosting(artifacts);
-
-      // Verify the vulnerability exists
-      if (input.vulnerabilityId) {
-        const vuln = await prisma.vulnerability.findUnique({
-          where: { id: input.vulnerabilityId },
-        });
-        requireExistence(vuln, "Vulnerability");
-      }
 
       // Create remediation with wrappers and initial artifacts in a transaction
       const result = await prisma.$transaction(async (tx) => {
@@ -368,6 +378,7 @@ export const remediationsRouter = createTRPCRouter({
           data: {
             ...dataInput,
             deviceGroupMatchings: { connect: matchingConnect },
+            vulnerabilities: { connect: vulnerabilities },
             userId,
           },
         });
@@ -433,6 +444,7 @@ export const remediationsRouter = createTRPCRouter({
               vendorId: _vendorId,
               artifacts,
               cpes,
+              vulnerabilityIds,
               upstreamApi: _upstreamApi,
               webUrl: _webUrl,
               ...itemData
@@ -440,12 +452,16 @@ export const remediationsRouter = createTRPCRouter({
             const matchingConnect = cpes
               ? await cpesToMatchingConnect(cpes)
               : [];
+            const vulnerabilities =
+              vulnerabilityIds &&
+              [...new Set(vulnerabilityIds)].map((id) => ({ id }));
 
             return {
               createData: {
                 ...itemData,
                 userId,
                 deviceGroupMatchings: { connect: matchingConnect },
+                vulnerabilities: { connect: vulnerabilities ?? [] },
               },
               updateData: {
                 ...itemData,
@@ -454,6 +470,7 @@ export const remediationsRouter = createTRPCRouter({
                 ...(cpes
                   ? { deviceGroupMatchings: { set: matchingConnect } }
                   : {}),
+                vulnerabilities: vulnerabilities && { set: vulnerabilities },
               },
               uniqueFieldConditions: [],
               artifactsData: {
@@ -580,6 +597,10 @@ export const remediationsRouter = createTRPCRouter({
 
       const { id, artifacts = [], ...updateData } = input;
 
+      const vulnerabilities = updateData.vulnerabilityIds
+        ? await vulnerabilityConnect(updateData.vulnerabilityIds)
+        : undefined;
+
       // Prepare update data
       const { processedArtifacts, uploadInstructions } =
         await processArtifactHosting(artifacts);
@@ -592,8 +613,8 @@ export const remediationsRouter = createTRPCRouter({
           ...(updateData.description !== undefined && {
             description: updateData.description,
           }),
-          ...(updateData.vulnerabilityId !== undefined && {
-            vulnerabilityId: updateData.vulnerabilityId,
+          ...(vulnerabilities && {
+            vulnerabilities: { set: vulnerabilities },
           }),
         };
 

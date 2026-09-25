@@ -20,7 +20,7 @@
             "cpes": [
                 "cpe:2.3:h:tester:dummy:*:*:*:*:*:*:*:*"
             ],
-            "vulnerabilityId": "cmkojdbok001sy95b18ad1q4t",
+            "vulnerabilityIds": ["cmkojdbok001sy95b18ad1q4t"],
             "description": "Dummy remediation to test artifact upload",
             "artifacts": [
                 {

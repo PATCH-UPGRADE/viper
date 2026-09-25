@@ -13,6 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { countAffectedRemediations } from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
 import { deviceGroupLabel } from "@/lib/markdown";
@@ -83,23 +84,6 @@ function createSeverityColumn(
   };
 }
 
-function countUniqueRemediations(issues: AssetIssue[]): number {
-  const ids = new Set<string>();
-  for (const issue of issues) {
-    if (issue.status === IssueStatus.AFFECTED) {
-      ids.add(issue.vulnerabilityId);
-    }
-  }
-  let total = 0;
-  for (const issue of issues) {
-    if (ids.has(issue.vulnerabilityId)) {
-      total += issue.vulnerability._count.remediations;
-      ids.delete(issue.vulnerabilityId);
-    }
-  }
-  return total;
-}
-
 export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
   {
     id: "role",
@@ -142,9 +126,9 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
     header: ({ column }) => (
       <SortableHeader header="Remediations Available" column={column} />
     ),
-    accessorFn: (row) => countUniqueRemediations(row.issues),
+    accessorFn: (row) => countAffectedRemediations(row.issues),
     cell: ({ row }) => {
-      const count = countUniqueRemediations(row.original.issues);
+      const count = countAffectedRemediations(row.original.issues);
       return (
         <Badge variant={count === 0 ? "destructive" : "secondary"}>
           {count === 0 ? "None" : count}

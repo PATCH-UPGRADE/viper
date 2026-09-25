@@ -39,10 +39,16 @@ async function prepareRemediationNotification(
 ): Promise<PreparedRemediation> {
   const remediation = await prisma.remediation.findUnique({
     where: { id: remediationId },
-    select: { description: true, narrative: true, vulnerabilityId: true },
+    select: {
+      description: true,
+      narrative: true,
+      vulnerabilities: { select: { id: true, cveId: true } },
+    },
   });
-  if (!remediation?.vulnerabilityId) return { skipped: "no-vulnerability" };
-  const vulnerabilityId = remediation.vulnerabilityId;
+  if (!remediation?.vulnerabilities.length) {
+    return { skipped: "no-vulnerability" };
+  }
+  const { vulnerabilities } = remediation;
 
   const existing = await findExistingSource(remediationId);
   const existingNotificationId = existing?.links[0]?.notificationId;
@@ -50,12 +56,9 @@ async function prepareRemediationNotification(
     return { notificationId: existingNotificationId, sourceId: existing.id };
   }
 
-  const vuln = await prisma.vulnerability.findUnique({
-    where: { id: vulnerabilityId },
-    select: { cveId: true },
-  });
-
-  const title = `Update available for ${vuln?.cveId ?? "a tracked vulnerability"}`;
+  const [first, ...rest] = vulnerabilities;
+  const more = rest.length > 0 ? ` and ${rest.length} more` : "";
+  const title = `Update available for ${first.cveId ?? "a tracked vulnerability"}${more}`;
   const summary = remediation.description || remediation.narrative || null;
   const markdown = remediation.narrative || remediation.description || null;
   const raw = { remediationId };
@@ -81,13 +84,13 @@ async function prepareRemediationNotification(
           },
         },
       });
-      await tx.notificationVulnerabilityMapping.create({
-        data: {
+      await tx.notificationVulnerabilityMapping.createMany({
+        data: vulnerabilities.map((v) => ({
           notificationId: notification.id,
-          vulnerabilityId,
-          confidence: "Matched",
+          vulnerabilityId: v.id,
+          confidence: "Matched" as const,
           reasonWhy: "Vulnerability declared by the TA4 remediation.",
-        },
+        })),
       });
       await tx.notificationRemediationMapping.create({
         data: {

@@ -262,24 +262,26 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(deleteRes.body.id).toBe(remediationId);
   });
 
-  it("POST /remediations - Create with vulnerability reference", async () => {
-    // First create a vulnerability
+  it("POST /remediations - Create with vulnerability references", async () => {
+    // First create two vulnerabilities
     const newCpe = generateCPE("rem_with_vuln_ref_v1");
-    const vulnRes = await request(BASE_URL)
-      .post("/vulnerabilities")
-      .set(authHeader)
-      .send({
-        ...vulnerabilityPayload,
-        cpes: [newCpe],
-      });
+    const vulnerabilityIds: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const vulnRes = await request(BASE_URL)
+        .post("/vulnerabilities")
+        .set(authHeader)
+        .send({
+          ...vulnerabilityPayload,
+          cpes: [newCpe],
+        });
+      expect(vulnRes.status).toBe(200);
+      vulnerabilityIds.push(vulnRes.body.id);
+    }
 
-    expect(vulnRes.status).toBe(200);
-    const vulnerabilityId = vulnRes.body.id;
-
-    // Create remediation linked to the vulnerability
+    // Create remediation linked to both vulnerabilities
     const payloadWithVuln = {
       ...payload,
-      vulnerabilityId,
+      vulnerabilityIds,
     };
 
     const createRes = await request(BASE_URL)
@@ -289,6 +291,12 @@ describe("Remediations Endpoint (/remediations)", () => {
 
     expect(createRes.status).toBe(200);
     const remediationId = createRes.body.remediation.id;
+
+    // PUT replaces the whole set
+    const updateRes = await request(BASE_URL)
+      .put(`/remediations/${remediationId}`)
+      .set(authHeader)
+      .send({ vulnerabilityIds: [vulnerabilityIds[1]] });
 
     // Creating a remediation fires remediation/analysis.requested
     // (fire-and-forget). Delete the remediation now so that job's prepare step
@@ -327,7 +335,7 @@ describe("Remediations Endpoint (/remediations)", () => {
         .delete({ where: { id: remediationId } })
         .catch(() => {});
       await prisma.vulnerability
-        .delete({ where: { id: vulnerabilityId } })
+        .deleteMany({ where: { id: { in: vulnerabilityIds } } })
         .catch(() => {});
       await prisma.deviceGroup
         .deleteMany({ where: { cpe: { has: newCpe } } })
@@ -338,14 +346,20 @@ describe("Remediations Endpoint (/remediations)", () => {
     // Clean this up and add appropriate tests once a more permanent S3 artifact upload solution is in place
     createRes.body = createRes.body.remediation;
 
-    expect(createRes.body.vulnerability).toBeDefined();
-    expect(createRes.body.vulnerability?.id).toBe(vulnerabilityId);
+    expect(
+      createRes.body.vulnerabilities.map((v: { id: string }) => v.id).sort(),
+    ).toEqual([...vulnerabilityIds].sort());
+
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.remediation.vulnerabilities).toEqual([
+      expect.objectContaining({ id: vulnerabilityIds[1] }),
+    ]);
   });
 
   it("POST /remediations - Create with invalid vulnerability ID should fail", async () => {
     const payloadWithInvalidVuln = {
       ...payload,
-      vulnerabilityId: "nonexistent-vuln-id",
+      vulnerabilityIds: ["nonexistent-vuln-id"],
     };
 
     const res = await request(BASE_URL)
@@ -356,6 +370,31 @@ describe("Remediations Endpoint (/remediations)", () => {
     expect(res.status).toBe(404);
     expect(res.body.code).toBe("NOT_FOUND");
     expect(res.body.message).toContain("Vulnerability not found");
+  });
+
+  it("POST /remediations - Rejects the removed vulnerabilityId field", async () => {
+    const res = await request(BASE_URL)
+      .post("/remediations")
+      .set(authHeader)
+      .send({ ...payload, vulnerabilityId: "any-vuln-id" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.issues).toContainEqual(
+      expect.objectContaining({ path: ["vulnerabilityId"] }),
+    );
+  });
+
+  it("PUT /remediations/{id} - Rejects the removed vulnerabilityId field", async () => {
+    // Input validation runs before the ownership check, so any id reaches it.
+    const res = await request(BASE_URL)
+      .put("/remediations/any-remediation-id")
+      .set(authHeader)
+      .send({ vulnerabilityId: null });
+
+    expect(res.status).toBe(400);
+    expect(res.body.issues).toContainEqual(
+      expect.objectContaining({ path: ["vulnerabilityId"] }),
+    );
   });
 
   it("POST /remediations - Create with multiple artifacts", async () => {

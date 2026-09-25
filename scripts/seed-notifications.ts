@@ -190,7 +190,7 @@ async function seedSyngoPlazaVexScenario(userId: string) {
   const remediation =
     (await prisma.remediation.findFirst({
       where: {
-        vulnerabilityId: vulnerability.id,
+        vulnerabilities: { some: { id: vulnerability.id } },
         description: REMEDIATION_TEXT,
       },
     })) ??
@@ -199,7 +199,7 @@ async function seedSyngoPlazaVexScenario(userId: string) {
         description: REMEDIATION_TEXT,
         narrative:
           "Siemens Healthineers has released hot fix HF07 for syngo.plaza VB30E. Apply the hot fix during the next maintenance window to remediate the insecure password encryption.",
-        vulnerabilityId: vulnerability.id,
+        vulnerabilities: { connect: { id: vulnerability.id } },
         userId,
         deviceGroupMatchings: { connect: { id: matching.id } },
       },

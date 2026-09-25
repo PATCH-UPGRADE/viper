@@ -77,7 +77,7 @@ export async function gatherTriageContext(
                       version: true,
                     },
                   },
-                  vulnerability: { select: { id: true, cveId: true } },
+                  vulnerabilities: { select: { id: true, cveId: true } },
                 },
               },
               issues: true,
@@ -92,7 +92,7 @@ export async function gatherTriageContext(
               deviceGroupMatchings: {
                 include: { manufacturer: true, product: true, version: true },
               },
-              vulnerability: { select: { id: true, cveId: true } },
+              vulnerabilities: { select: { id: true, cveId: true } },
             },
           },
         },
@@ -270,11 +270,12 @@ export async function gatherTriageContext(
   const refs = buildEntityRefs({
     ...linkableIds,
     assetIds: affectedAssetIds,
-    // A remediation's target vulnerability may not be linked to the notification;
-    // remediationToMarkdown falls back to its raw id when it has no cveId.
-    swapOnlyVulnerabilityIds: remediations
-      .map((r) => r.vulnerability?.id ?? r.vulnerabilityId)
-      .filter((id): id is string => id != null),
+    // A remediation's target vulnerabilities may not be linked to the
+    // notification; remediationToMarkdown falls back to a raw id when a
+    // vulnerability has no cveId.
+    swapOnlyVulnerabilityIds: remediations.flatMap((r) =>
+      r.vulnerabilities.map((v) => v.id),
+    ),
   });
 
   return {

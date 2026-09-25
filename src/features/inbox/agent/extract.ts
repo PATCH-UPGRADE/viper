@@ -34,10 +34,7 @@ export const extractedVulnerabilitySchema = z.object({
 });
 
 export const extractedRemediationSchema = z.object({
-  linkedCveId: z
-    .string()
-    .regex(/^CVE-\d{4}-\d{4,}$/i)
-    .nullish(),
+  linkedCveIds: z.array(z.string().regex(/^CVE-\d{4}-\d{4,}$/i)).nullish(),
   description: z.string().nullish(),
 });
 
@@ -84,7 +81,7 @@ FOR VULNERABILITIES: CVEids or security issues explicitly named
 - cvssVector: the CVSS vector string (e.g CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H), only if explicitly stated. Omit if not given.
 
 FOR REMEDIATIONS: Patches, firmware updates, or mitigations explicitly described
-- linkedCveId: must match format CVE-YYYY-NNNNN (e.g CVE-2020-25175). Omit if not explicitly named.
+- linkedCveIds: every CVE that this fix explicitly addresses. Each must match format CVE-YYYY-NNNNN (e.g CVE-2020-25175). Omit if none are explicitly named.
 - description: a short description of the fix (e.g Apply GE Healthcare ICS security controls per CISA advisory)
 
 FOR ASSETS: Specific devices named by network identity

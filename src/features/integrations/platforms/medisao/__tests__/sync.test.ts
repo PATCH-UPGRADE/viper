@@ -237,8 +237,8 @@ describe("syncRemediations", () => {
 });
 
 describe("the description we store", () => {
-  // Viper keeps one vulnerability per remediation and MedISAO lists many, so
-  // anything unresolved would otherwise vanish: the sync stores no raw payload.
+  // An identifier Viper does not hold links to nothing, and the sync stores no
+  // raw payload, so the description is the only place it survives.
   it("names every vulnerability the remediation claims to fix", () => {
     expect(
       describeRemediation({
@@ -248,7 +248,7 @@ describe("the description we store", () => {
     ).toBe("patch it\n\nFixes: CVE-2026-0001, GHSA-abc, VENDOR-7");
   });
 
-  it("names the one we did link, so the text does not depend on what Viper holds", () => {
+  it("names a linked vulnerability too, so the text does not depend on what Viper holds", () => {
     expect(
       describeRemediation({
         description: "patch it",
@@ -325,7 +325,7 @@ describe("the ingest mapping", () => {
 
     // One resolved and is linked; the other exists nowhere in Viper, so the
     // description is the only place it survives.
-    expect(createData.vulnerabilityId).toBe("vuln-1");
+    expect(createData.vulnerabilities).toEqual({ connect: [{ id: "vuln-1" }] });
     expect(createData.description).toContain(
       "Fixes: CVE-2026-0001, GHSA-unknown",
     );
@@ -386,28 +386,19 @@ describe("the ingest mapping", () => {
     expect(updateData).not.toHaveProperty("userId");
   });
 
-  it("links a vulnerability when exactly one identifier resolves", async () => {
-    prismaMock.vulnerability.findMany.mockResolvedValue([
-      { id: "vuln-1", cveId: "CVE-2026-0001" },
-    ]);
-
-    const { createData } = await transformOf({
-      fixed_vulnerabilities: ["CVE-2026-0001", "GHSA-unknown"],
-    });
-
-    expect(createData.vulnerabilityId).toBe("vuln-1");
-  });
-
-  it("links none when the answer is ambiguous", async () => {
+  it("links every vulnerability that resolves, on create and on update", async () => {
     prismaMock.vulnerability.findMany.mockResolvedValue([
       { id: "vuln-1", cveId: "CVE-2026-0001" },
       { id: "vuln-2", cveId: "CVE-2026-0002" },
     ]);
 
-    const { createData } = await transformOf({
+    const { createData, updateData } = await transformOf({
       fixed_vulnerabilities: ["CVE-2026-0001", "CVE-2026-0002"],
     });
 
-    expect(createData).not.toHaveProperty("vulnerabilityId");
+    const expected = { connect: [{ id: "vuln-1" }, { id: "vuln-2" }] };
+    expect(createData.vulnerabilities).toEqual(expected);
+    // `connect`, not `set`: a re-sync must not drop a link a user added.
+    expect(updateData.vulnerabilities).toEqual(expected);
   });
 });

@@ -25,7 +25,7 @@ type RemediationInput = z.input<typeof remediationInputSchema>;
 // follows the update-package naming SSA-220609 uses for its other products (VJ30C-UD01,
 // VB22A-UD03). Distinct from the port-restriction workaround, which is a compensating
 // control on an individual scanner rather than a fix.
-const REMEDIATION: Omit<RemediationInput, "vulnerabilityId"> = {
+const REMEDIATION: Omit<RemediationInput, "vulnerabilityIds"> = {
   description:
     "MAGNETOM NUMARIS X VA31A-UD01 firmware update — remediates CVE-2022-29875 (SSA-220609)",
   narrative:
@@ -66,7 +66,10 @@ async function main() {
     "run 'just seed' first",
   );
 
-  const body: RemediationInput = { ...REMEDIATION, vulnerabilityId };
+  const body: RemediationInput = {
+    ...REMEDIATION,
+    vulnerabilityIds: [vulnerabilityId],
+  };
 
   // Stamped immediately before the request so container-exec and tsx startup stay out
   // of the submit-to-complete wall clock evaluate.sh reports.

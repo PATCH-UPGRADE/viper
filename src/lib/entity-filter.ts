@@ -161,7 +161,6 @@ const vulnerabilityFilterSchema = buildWhereSchema({
 
 const remediationFilterSchema = buildWhereSchema({
   id: stringFilter,
-  vulnerabilityId: stringFilter,
   createdAt: dateFilter,
 });
 

@@ -65,7 +65,7 @@ export function buildAgentTools(userId: string, reportThreadId?: string) {
     askUserQuestions,
     ...makeWorkOrderTools(userId),
     makeRecordNoteTool(userId),
-    // Report tools only when given a thread to write to (chat yes, recommendations no).
+    // report tools only when given a thread (chat yes, recommendations no).
     ...(reportThreadId
       ? [
           makeSearchReportTool(userId, reportThreadId),

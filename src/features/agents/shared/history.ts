@@ -9,8 +9,8 @@
  * text-only hydration is both safe and sufficient. `toolCalls` is still
  * persisted for the UI to render.
  *
- * Call ensureThread first to authorize the thread before using the
- * threadId-only message helpers below.
+ * Call ensureThread first to authorize the thread before loading its report
+ * or using the threadId-only message helpers below.
  */
 import "server-only";
 import {

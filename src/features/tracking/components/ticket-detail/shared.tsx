@@ -243,11 +243,17 @@ export const countAssetTicketsByStatus = (
     }))
     .filter((c) => c.count > 0);
 
-export const formatLocation = (location: unknown): string => {
-  if (!location || typeof location !== "object") return "—";
+export const assetLabel = (asset: { hostname: string | null; id: string }) =>
+  asset.hostname ?? asset.id;
+
+export const locationLabel = (location: unknown): string | null => {
+  if (!location || typeof location !== "object") return null;
   const loc = location as Record<string, unknown>;
   const parts = [loc.building, loc.floor, loc.room].filter(
     (v): v is string => typeof v === "string" && v.length > 0,
   );
-  return parts.length > 0 ? parts.join(" · ") : "—";
+  return parts.length > 0 ? parts.join(" · ") : null;
 };
+
+export const formatLocation = (location: unknown): string =>
+  locationLabel(location) ?? "—";

@@ -46,6 +46,7 @@ const { mockPrisma, mockGetSession } = vi.hoisted(() => {
     },
     assetTicket: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
     },
     workOrderTicketLink: {
       create: vi.fn(),
@@ -1172,6 +1173,169 @@ describe("trackingRouter.getManyByAssetId", () => {
     await expect(
       caller.getManyByAssetId({ assetId: "missing" }),
     ).rejects.toThrow(/not found/i);
+  });
+});
+
+describe("trackingRouter.getOtherAssetWorkOrders", () => {
+  const otherTicket = (
+    id: string,
+    scheduledAt: Date | null = null,
+    summary = `Work order ${id}`,
+  ) => ({
+    id,
+    summary,
+    status: "TO_DO",
+    scheduledAt,
+    departments: [],
+  });
+
+  const child = (workOrderId: string, assetId: string) => ({
+    id: `${workOrderId}-${assetId}`,
+    status: "TO_DO" as const,
+  });
+
+  it("returns an empty list without querying when no assets are linked", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [],
+    });
+
+    await expect(
+      caller.getOtherAssetWorkOrders({ ticketId: "t1" }),
+    ).resolves.toEqual([]);
+    expect(mockPrisma.assetTicket.findMany).not.toHaveBeenCalled();
+  });
+
+  it("throws NOT_FOUND for a missing ticket", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(null);
+
+    await expect(
+      caller.getOtherAssetWorkOrders({ ticketId: "missing" }),
+    ).rejects.toThrow(/not found/i);
+  });
+
+  it("de-duplicates a work order that touches two linked assets, with sorted assetIds", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [{ assetId: "a1" }, { assetId: "a2" }],
+    });
+    // Reversed on purpose: the query has no orderBy, so row order is arbitrary.
+    mockPrisma.assetTicket.findMany.mockResolvedValue([
+      {
+        assetId: "a2",
+        ticket: child("w1", "a2"),
+        parentTicket: otherTicket("w1"),
+      },
+      {
+        assetId: "a1",
+        ticket: child("w1", "a1"),
+        parentTicket: otherTicket("w1"),
+      },
+    ]);
+
+    const result = await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.assetTickets).toEqual([
+      { assetId: "a1", ticketId: "w1-a1", status: "TO_DO" },
+      { assetId: "a2", ticketId: "w1-a2", status: "TO_DO" },
+    ]);
+  });
+
+  it("carries each asset's own child ticket status, not the parent's", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [{ assetId: "a1" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([
+      {
+        assetId: "a1",
+        ticket: { id: "w1-a1", status: "TO_DO" },
+        parentTicket: { ...otherTicket("w1"), status: "IN_PROGRESS" },
+      },
+    ]);
+
+    const result = await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
+
+    expect(result[0]?.status).toBe("IN_PROGRESS");
+    expect(result[0]?.assetTickets[0]?.status).toBe("TO_DO");
+  });
+
+  it("excludes this ticket, its parent, its sub-tickets, drafts, Done parents, Done per-asset children, and child rows", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "child",
+      parentId: "parent",
+      assets: [{ assetId: "a1" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([]);
+
+    await caller.getOtherAssetWorkOrders({ ticketId: "child" });
+
+    expect(mockPrisma.assetTicket.findMany.mock.calls[0][0].where).toEqual({
+      assetId: { in: ["a1"] },
+      ticket: { status: { not: "DONE" } },
+      parentTicket: {
+        id: { notIn: ["child", "parent"] },
+        isDraft: false,
+        status: { not: "DONE" },
+        ticket: null,
+        OR: [{ parentId: null }, { parentId: { not: "child" } }],
+      },
+    });
+  });
+
+  it("excludes only this ticket when it has no parent", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [{ assetId: "a1" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([]);
+
+    await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
+
+    expect(
+      mockPrisma.assetTicket.findMany.mock.calls[0][0].where.parentTicket.id,
+    ).toEqual({ notIn: ["t1"] });
+  });
+
+  it("sorts soonest-scheduled first, with unscheduled work orders last", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue({
+      id: "t1",
+      parentId: null,
+      assets: [{ assetId: "a1" }],
+    });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([
+      {
+        assetId: "a1",
+        ticket: child("late", "a1"),
+        parentTicket: otherTicket("late", new Date("2026-09-02")),
+      },
+      {
+        assetId: "a1",
+        ticket: child("none", "a1"),
+        parentTicket: otherTicket("none", null),
+      },
+      {
+        assetId: "a1",
+        ticket: child("early", "a1"),
+        parentTicket: otherTicket("early", new Date("2026-08-08")),
+      },
+    ]);
+
+    const result = await caller.getOtherAssetWorkOrders({ ticketId: "t1" });
+
+    expect(result.map((w) => w.id)).toEqual(["early", "late", "none"]);
   });
 });
 

@@ -10,6 +10,9 @@ export const prefetchTrackingTickets = (params: Input) => {
 
 export const prefetchTrackingTicket = (id: string) => {
   prefetch(trpc.tagColors.getCategoryColors.queryOptions());
+  prefetch(
+    trpc.tracking.getOtherAssetWorkOrders.queryOptions({ ticketId: id }),
+  );
   return prefetch(trpc.tracking.getOne.queryOptions({ id }));
 };
 

@@ -77,7 +77,7 @@ async function fetchReport(userId: string, threadId: string) {
     where: { id: threadId, userId },
     select: { report: { select: { id: true, content: true } } },
   });
-  return thread?.report ?? null;
+  return thread?.report?.content ? thread.report : null;
 }
 
 export function makeWriteReportTool(userId: string, threadId: string) {
@@ -181,14 +181,22 @@ export function makeReadReportTool(userId: string, threadId: string) {
         return `startLine ${startLine} is past the end of the report (${total} lines total).`;
       }
 
-      let end = Math.min(total, startLine - 1 + READ_MAX_LINES);
-      let body = lines
-        .slice(startLine - 1, end)
-        .map((line, i) => `${startLine + i}\t${line}`)
-        .join("\n");
-      if (body.length > READ_MAX_CHARS) {
-        body = body.slice(0, READ_MAX_CHARS);
-        end = startLine - 1 + body.split("\n").length;
+      let end = startLine - 1;
+      let body = "";
+      for (const line of lines.slice(
+        startLine - 1,
+        startLine - 1 + READ_MAX_LINES,
+      )) {
+        const row = `${end + 1}\t${line}`;
+        if (body.length + row.length > READ_MAX_CHARS) {
+          if (!body) {
+            body = `${row.slice(0, READ_MAX_CHARS)}… [line too long; use search_report to see text further in]`;
+            end++;
+          }
+          break;
+        }
+        body += (body ? "\n" : "") + row;
+        end++;
       }
 
       const more =
@@ -230,9 +238,11 @@ export function makeEditReportTool(userId: string, threadId: string) {
         return "That text matches more than one place in the report. Include more surrounding text so the match is unique.";
       }
 
-      const newBody =
-        current.slice(0, at) + newText + current.slice(at + oldText.length);
-      const report = await stripInvalidCitations(newBody);
+      // Only the inserted text: unrelated links elsewhere must stay untouched.
+      const report =
+        current.slice(0, at) +
+        (await stripInvalidCitations(newText)) +
+        current.slice(at + oldText.length);
 
       // Atomic compare-and-swap: only write if nothing changed the report since
       // we read `current` above, so a concurrent edit can't be silently lost.
@@ -241,7 +251,7 @@ export function makeEditReportTool(userId: string, threadId: string) {
         data: { content: report },
       });
       if (updated.count === 0) {
-        return "The report changed since you read it — re-read the affected section and try again.";
+        return "The report was changed by something else during this edit — re-read the affected section and try again.";
       }
 
       return "Replaced.";

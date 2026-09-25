@@ -41,7 +41,7 @@ describe("chat system prompt — write_report", () => {
     expect(buildSystemPrompt("hospital administration")).not.toMatch(marker);
   });
 
-  it("preloads notes only — never report content — and registers the report tools", async () => {
+  it("preloads notes only and registers the report tools", async () => {
     buildChatGraph({
       userId: "user",
       threadId: "thread",

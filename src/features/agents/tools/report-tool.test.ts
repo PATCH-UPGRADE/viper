@@ -219,6 +219,29 @@ describe("read_report", () => {
     expect(result).not.toContain("to continue");
   });
 
+  it("clips a single oversized line and still advances past it", async () => {
+    mockReport(`${"x".repeat(10000)}\nnext line`);
+    const result = await makeReadReportTool("user", "thread").invoke({});
+    expect(result.length).toBeLessThan(6300);
+    expect(result).toContain("use search_report");
+    expect(result).toContain(
+      "[Showing lines 1-1 of 2. Call read_report again with startLine: 2",
+    );
+  });
+
+  it("treats a pre-created empty report as no report", async () => {
+    mockReport("");
+    expect(await makeReadReportTool("user", "thread").invoke({})).toContain(
+      "No report has been saved",
+    );
+    expect(
+      await makeEditReportTool("user", "thread").invoke({
+        oldText: "a",
+        newText: "b",
+      }),
+    ).toContain("use write_report to create one");
+  });
+
   it("caps output size even when lines are huge", async () => {
     mockReport(Array.from({ length: 50 }, () => "x".repeat(2000)).join("\n"));
     const result = await makeReadReportTool("user", "thread").invoke({});
@@ -270,7 +293,23 @@ describe("edit_report", () => {
       oldText: "Firmware is 1.2.",
       newText: "Firmware is 1.3.",
     });
-    expect(result).toContain("changed since you read it");
+    expect(result).toContain("changed by something else");
+  });
+
+  it("leaves unrelated links untouched when editing elsewhere", async () => {
+    const current = "See [Gone](/assets/gone).\n\nFirmware is 1.2.";
+    mockReport(current);
+    vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 1 });
+    await makeEditReportTool("user", "thread").invoke({
+      oldText: "1.2.",
+      newText: "1.3.",
+    });
+    expect(prisma.asset.findMany).not.toHaveBeenCalled();
+    expect(
+      vi.mocked(prisma.chatReport.updateMany).mock.calls[0][0].data,
+    ).toEqual({
+      content: "See [Gone](/assets/gone).\n\nFirmware is 1.3.",
+    });
   });
 
   it("points to write_report when there is no report yet", async () => {

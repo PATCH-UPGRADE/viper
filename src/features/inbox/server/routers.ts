@@ -9,6 +9,7 @@ import {
   Priority,
 } from "@/generated/prisma";
 import { requestNoteAction } from "@/inngest/functions/notes-action";
+import { AUTOMATION_USER_ID } from "@/lib/automation-user";
 import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
@@ -21,13 +22,18 @@ import {
   createPaginatedResponse,
   paginationInputSchema,
 } from "@/lib/pagination";
-import { findDeviceGroupIdsForMatchings } from "@/lib/router-utils";
+import {
+  findDeviceGroupIdsForMatchings,
+  resolvedDeviceGroupAssetCount,
+} from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import {
+  fieldCorrectionInclude,
   type MatchingWithLabels,
   notificationDetailInclude,
   notificationInclude,
   type ResolvedDeviceGroupAsset,
+  readReceiptSelect,
 } from "../types";
 import {
   AFFECTED_BUCKETS,
@@ -77,25 +83,6 @@ const createSearchFilter = (search: string) => {
     OR: [{ title: insensitive }, { summary: insensitive }],
   };
 };
-
-async function resolvedDeviceGroupAssetCount(
-  matching: MatchingIdentity,
-): Promise<number> {
-  const candidates = await prisma.deviceGroup.findMany({
-    where: deviceGroupWhereForMatching(matching),
-    select: {
-      id: true,
-      manufacturerId: true,
-      productId: true,
-      versionId: true,
-      version: { select: { canonicalName: true } },
-      _count: { select: { assets: true } },
-    },
-  });
-  return candidates
-    .filter((dg) => matchingAppliesToDeviceGroup(matching, dg))
-    .reduce((sum, dg) => sum + dg._count.assets, 0);
-}
 
 async function unknownVersionAssetCount(
   matching: MatchingIdentity,
@@ -348,16 +335,30 @@ export const notificationsRouter = createTRPCRouter({
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ input, ctx }) => {
-      const notification = await prisma.notification.findUnique({
-        where: { id: input.id },
-        include: {
-          ...notificationDetailInclude,
-          reads: {
-            where: { userId: ctx.auth.user.id },
-            select: { id: true },
-          },
-        },
-      });
+      const [notification, correctionRecords, readReceipts] = await Promise.all(
+        [
+          prisma.notification.findUnique({
+            where: { id: input.id },
+            include: {
+              ...notificationDetailInclude,
+              reads: {
+                where: { userId: ctx.auth.user.id },
+                select: { id: true },
+              },
+            },
+          }),
+          prisma.fieldCorrection.findMany({
+            where: { targetType: "Notification", targetId: input.id },
+            include: fieldCorrectionInclude,
+            orderBy: { createdAt: "asc" },
+          }),
+          prisma.notificationRead.findMany({
+            where: { notificationId: input.id },
+            orderBy: { readAt: "desc" },
+            select: readReceiptSelect,
+          }),
+        ],
+      );
 
       if (!notification) {
         throw new TRPCError({ code: "NOT_FOUND" });
@@ -416,7 +417,18 @@ export const notificationsRouter = createTRPCRouter({
         assetCount: countByMatchingId.get(m.deviceGroupMatching.id) ?? 0,
       }));
 
-      return { ...notification, deviceGroupsMatchings, affectedAssets };
+      const fieldCorrections = correctionRecords.map((correction) => ({
+        ...correction,
+        isAgent: correction.userId === AUTOMATION_USER_ID,
+      }));
+
+      return {
+        ...notification,
+        deviceGroupsMatchings,
+        affectedAssets,
+        fieldCorrections,
+        readReceipts,
+      };
     }),
 
   getAffectedAssetsPage: protectedProcedure

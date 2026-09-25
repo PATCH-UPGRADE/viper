@@ -69,6 +69,7 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
   onCreate?(): Promise<void>;
   workOrders?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   assets?: ResourceModule<unknown, unknown, TConfig, TCreds>;
+  remediations?: ResourceModule<unknown, unknown, TConfig, TCreds>;
   notifications?: ResourceModule<unknown, unknown, TConfig, TCreds>;
 }
 ```
@@ -123,8 +124,10 @@ export interface ResourceModule<TCanonical, TRaw, TConfig, TCreds>
   toCanonical?(raw: TRaw, config: TConfig): TCanonical;
 
   // we push to their platform
-  create?(session: Session, draft: TCanonical): Promise<{ externalId: string; raw: TRaw }>;
   update?(session: Session, externalId: string, patch: Partial<TCanonical>): Promise<...>;
+
+  // only for a notifications module
+  sourceRecords?: SourceRecordAdapter;
 
   defaultSyncEvery: number | null;
 }
@@ -133,6 +136,33 @@ export interface ResourceModule<TCanonical, TRaw, TConfig, TCreds>
 **`sync` is the contract; everything else is optional.** Declaring a resource module means that
 module knows how to sync itself — the pull and push helpers are the pieces a `sync` is usually
 built out of, not obligations. A resource we only ever write to needs none of them.
+
+A `Session` is a platform's own, built inside `sync` from that platform's auth helper — see
+`teamplay-fleet/assets/sync.ts`, which calls `createFleetSession(ctx.creds)`. Core never makes
+one.
+
+### Filing work orders
+
+A work order module extends `ResourceModule` with the push half, and `openFiler` carries the
+auth for it:
+
+```ts
+export interface WorkOrderModule<TRaw, TConfig, TCreds, TDraft>
+  extends ResourceModule<unknown, TRaw, TConfig, TCreds, TDraft> {
+  openFiler(input: { config: TConfig; creds: TCreds }): Promise<WorkOrderFiler<TDraft>>;
+  payloadSchema: z.ZodObject<any>;
+  toDraft(input: WorkOrderDraftInput, config: TConfig): TDraft;
+  assertSubmittable?(payload: Record<string, unknown>): void;
+}
+
+export interface WorkOrderFiler<TDraft> {
+  file(draft: TDraft): Promise<{ externalId: string; raw: unknown }>;
+}
+```
+
+Core opens a filer once per submission and calls `file` once per asset, because one work order
+covers N assets. **Sign in inside `openFiler`, not inside `file`.** A Fleet login drives a
+headless browser, so a per-call session costs one browser launch per asset.
 
 
 ## Registering a new platform
@@ -161,6 +191,26 @@ Outside the directory — **two edits**:
 Only if you are also introducing a brand-new `ResourceType` do you additionally touch
 `integrationsMapping` (`../types.ts`), `MODULE_FIELDS` (`core/sync/resources.ts`), and
 `ENVELOPE_SCHEMAS` (`core/callback.ts`) — plus add the matching `integrationUpload` procedure.
+
+## A notifications resource: recording snapshots
+
+A `notifications` module records `SourceRecord` snapshots rather than mirroring rows. Turning one
+into a `Notification` is the inbox pipeline's job, not the platform's, so the platform declares
+`sourceRecords: SourceRecordAdapter` (`@/features/inbox/source-adapter`) and stops there:
+
+```ts
+prepare(raw: unknown): { doc: InboundEmail; linkEntities: LinkEntities }
+```
+
+`doc` is the sender, subject and body every agent reads. `linkEntities` attaches what the document
+names, and owns its own step ids. A source that states its device outright resolves it directly; a
+source that only describes it in prose needs the extract and match agents, which is what the email
+path does.
+
+`process-source-record` reads the snapshot, walks mapping to integration to platform, and asks the
+registry for that platform's adapter. **It never branches on which platform it is holding**, so a
+second advisory source needs no change there. A `notifications` module without an adapter is a
+registration bug, and `registry.test.ts` fails on it.
 
 ## Authentication
 

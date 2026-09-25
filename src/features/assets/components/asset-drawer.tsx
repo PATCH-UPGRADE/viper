@@ -403,7 +403,11 @@ function VulnerabilitiesSection({ asset }: { asset: AssetWithIssueRelations }) {
 
   return (
     <Suspense fallback={<Skeleton className="h-16 w-full" />}>
-      <IssuesSidebarList issues={issues} type="vulnerabilities" />
+      <IssuesSidebarList
+        issues={issues}
+        type="vulnerabilities"
+        assetId={asset.id}
+      />
     </Suspense>
   );
 }

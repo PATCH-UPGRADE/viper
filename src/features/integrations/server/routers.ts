@@ -1,7 +1,12 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { AuthType, type Prisma, ResourceType } from "@/generated/prisma";
+import {
+  AuthType,
+  type Prisma,
+  ResourceType,
+  SubmissionState,
+} from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
@@ -9,7 +14,11 @@ import { fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
 import type { AuthCredential } from "../core/credentials";
-import { encryptCredentials, usesGenericAuth } from "../core/credentials";
+import {
+  decryptCredentials,
+  encryptCredentials,
+  usesGenericAuth,
+} from "../core/credentials";
 import {
   categoriesFor,
   defaultSyncEveryFor,
@@ -48,6 +57,7 @@ const integrationListSelect = {
   name: true,
   platform: true,
   syncEvery: true,
+  config: true,
   enabled: true,
   resourceSyncs: integrationsInclude.resourceSyncs,
 } as const satisfies Prisma.IntegrationSelect;
@@ -66,7 +76,8 @@ const toRowShape = (input: IntegrationFormValues) => {
     row: {
       name: input.name,
       platform: input.platform,
-      syncEvery: input.syncEvery,
+      // Omitted means "keep what's stored" (null = inherit the platform default) — same as credentials below.
+      ...(input.syncEvery !== undefined && { syncEvery: input.syncEvery }),
       config,
     },
     module,
@@ -87,12 +98,42 @@ const toCredentialBlob = (
   return isNoneAuth ? null : encryptCredentials(parsed);
 };
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Drops the old `authentication` when `authType` changes — the auth union has no cross-check against it, so stale fields could otherwise validate as the wrong variant. */
+const mergeCredentialPatch = (
+  existing: unknown,
+  partial: Record<string, unknown>,
+): Record<string, unknown> => {
+  const base = isPlainObject(existing) ? existing : {};
+  const discriminatorChanged =
+    "authType" in partial && partial.authType !== base.authType;
+  const mergeBase = discriminatorChanged
+    ? { ...base, authentication: undefined }
+    : base;
+
+  const merged: Record<string, unknown> = { ...mergeBase };
+  for (const [key, value] of Object.entries(partial)) {
+    const baseValue = mergeBase[key];
+    merged[key] =
+      isPlainObject(value) && isPlainObject(baseValue)
+        ? { ...baseValue, ...value }
+        : value;
+  }
+  return merged;
+};
+
+/** Takes the already-fetched blob rather than fetching it itself, so a transient DB read failure surfaces as a server error, not a 400 from `asBadRequest`. */
 const credentialsPatch = (
   module: AnyConnectorModule,
   data: IntegrationFormValues,
+  existingBlob: Uint8Array | null,
 ) => {
   if (!data.credentials) return {};
-  return { credentials: toCredentialBlob(module, data.credentials) };
+  const existing = existingBlob ? decryptCredentials(existingBlob) : null;
+  const merged = mergeCredentialPatch(existing, data.credentials);
+  return { credentials: toCredentialBlob(module, merged) };
 };
 
 const asBadRequest = <T>(fn: () => T): T => {
@@ -110,9 +151,9 @@ const asBadRequest = <T>(fn: () => T): T => {
 const requireIntegration = async (id: string) => {
   const existing = await prisma.integration.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, platform: true },
   });
-  requireExistence(existing, "Integration");
+  return requireExistence(existing, "Integration");
 };
 
 export const integrationsRouter = createTRPCRouter({
@@ -133,19 +174,18 @@ export const integrationsRouter = createTRPCRouter({
 
       const now = new Date();
       const items = (result.items as IntegrationListRow[]).map(
-        ({ syncEvery, ...integration }) => ({
+        (integration) => ({
           ...integration,
           platformLabel: displayNameFor(integration.platform),
           categories: categoriesFor(integration.platform),
           resourceSyncs: integration.resourceSyncs.map((sync) => ({
             ...sync,
-            // A nested resource row never sees its parent integration's
-            // `syncEvery`, so the table can't tell "resource override" from
-            // "integration-level override" apart from `syncEvery` alone.
-            isOverridden: sync.syncEvery !== null || syncEvery !== null,
+            // A resource row doesn't see its parent's syncEvery, so isOverridden has to check both.
+            isOverridden:
+              sync.syncEvery !== null || integration.syncEvery !== null,
             effectiveSyncEvery: effectiveSyncEvery(
               sync.syncEvery,
-              syncEvery,
+              integration.syncEvery,
               defaultSyncEveryFor(integration.platform, sync.resource),
             ),
             // Same "due" check the cron uses, against the server's clock.
@@ -184,13 +224,6 @@ export const integrationsRouter = createTRPCRouter({
             resourceSyncs: {
               create: resources.map((resource) => ({ resource })),
             },
-            apiKeyConnector: {
-              create: {
-                name,
-                resourceType: resources[0],
-                userId: ctx.auth.user.id,
-              },
-            },
           },
           include: integrationsInclude,
           omit: omitCredentials,
@@ -216,9 +249,24 @@ export const integrationsRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       const { id, data } = input;
-      await requireIntegration(id);
-      const { row, module, config } = asBadRequest(() => toRowShape(data));
-      const credentials = asBadRequest(() => credentialsPatch(module, data));
+      // Existence check and credentials fetch are independent reads — run concurrently, not sequentially.
+      const [integration, existingRow] = await Promise.all([
+        requireIntegration(id),
+        data.credentials
+          ? prisma.integration.findUnique({
+              where: { id },
+              select: { credentials: true },
+            })
+          : null,
+      ]);
+      // Platform is fixed at creation — ignore whatever the client sent and
+      // keep using what's actually stored.
+      const { row, module, config } = asBadRequest(() =>
+        toRowShape({ ...data, platform: integration.platform }),
+      );
+      const credentials = asBadRequest(() =>
+        credentialsPatch(module, data, existingRow?.credentials ?? null),
+      );
       const resources = asBadRequest(() => resourcesFor(module, config));
 
       return prisma.$transaction(async (tx) => {
@@ -226,8 +274,7 @@ export const integrationsRouter = createTRPCRouter({
           where: { id },
           data: {
             ...row,
-            // Blank auth fields mean "keep the stored credential", not
-            // "clear it" — credentialsPatch returns {} so this spreads nothing.
+            // credentialsPatch returns {} when omitted, so this spread is a no-op — keeps the stored value.
             ...credentials,
             resourceSyncs: {
               updateMany: {
@@ -238,8 +285,9 @@ export const integrationsRouter = createTRPCRouter({
                 where: {
                   integrationId_resource: { integrationId: id, resource },
                 },
+                // A newly-implied resource starts enabled; an existing row's toggle (setResourceSyncEnabled) must not be reset here.
                 create: { resource },
-                update: { enabled: true },
+                update: {},
               })),
             },
           },
@@ -264,14 +312,31 @@ export const integrationsRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       await requireIntegration(input.id);
+
+      // A work order pointing here is cleared by ON DELETE SET NULL, which is
+      // right for one already filed or still waiting. It is not right mid-flight:
+      // the submission job would lose the row it is authenticating against and
+      // fail halfway through a batch, having already filed some of it.
+      const inFlight = await prisma.workOrderTicket.count({
+        where: {
+          targetIntegrationId: input.id,
+          submissionState: SubmissionState.SUBMITTING,
+        },
+      });
+      if (inFlight > 0) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `${inFlight} work order(s) are being filed on this integration right now. Wait for them to finish, then remove it.`,
+        });
+      }
+
       return prisma.integration.delete({
         where: { id: input.id },
         omit: omitCredentials,
       });
     }),
 
-  // Operator kill switch for the whole integration — distinct from `update`,
-  // which requires a full (and platform-validated) config/credentials payload.
+  // Kill switch for the whole integration — `update` requires a full, platform-validated payload instead.
   setEnabled: protectedProcedure
     .input(z.object({ id: z.string(), enabled: z.boolean() }))
     .mutation(async ({ input }) => {

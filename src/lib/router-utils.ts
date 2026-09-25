@@ -84,6 +84,21 @@ export function normalizeName(name: string): string {
   return name.trim().toLowerCase();
 }
 
+// exact canonical-name or alias match for Manufacturer/Product lookups
+export function canonicalNameWhere(name: string) {
+  const canonicalName = normalizeName(name);
+  return {
+    OR: [{ canonicalName }, { nameMappings: { has: canonicalName } }],
+  };
+}
+
+// Loose name search for Manufacturer/Product (substring on either name, or exact alias)
+export const nameOrClauses = (term: string) => [
+  { canonicalName: { contains: term, mode: "insensitive" as const } },
+  { canonicalDisplayName: { contains: term, mode: "insensitive" as const } },
+  { nameMappings: { has: normalizeName(term) } },
+];
+
 // A lost create-race surfaces as a P2002 unique violation; the row now exists.
 // Duck-typed on `code` rather than `instanceof PrismaClientKnownRequestError`:
 // across Next.js module boundaries the thrown error can be a different copy of
@@ -113,9 +128,7 @@ export async function resolveManufacturer(
   const canonicalName = normalizeName(name);
   const find = () =>
     prisma.manufacturer.findFirst({
-      where: {
-        OR: [{ canonicalName }, { nameMappings: { has: canonicalName } }],
-      },
+      where: canonicalNameWhere(name),
     });
   const existing = await find();
   if (existing) return existing;
@@ -181,9 +194,7 @@ export async function resolveProduct(
   const canonicalName = normalizeName(name);
   const find = () =>
     prisma.product.findFirst({
-      where: {
-        OR: [{ canonicalName }, { nameMappings: { has: canonicalName } }],
-      },
+      where: canonicalNameWhere(name),
     });
   const existing = await find();
   if (existing) return existing;
@@ -552,6 +563,28 @@ export async function findDeviceGroupIdsForMatchings(
   return candidateGroups
     .filter((group) => matchings.some((m) => identityAppliesToGroup(m, group)))
     .map((group) => group.id);
+}
+
+/**
+ * How many assets a matching resolves to
+ */
+export async function resolvedDeviceGroupAssetCount(
+  matching: MatchingLike,
+): Promise<number> {
+  const candidates = await prisma.deviceGroup.findMany({
+    where: deviceGroupWhereForMatching(matching),
+    select: {
+      id: true,
+      manufacturerId: true,
+      productId: true,
+      versionId: true,
+      version: { select: { canonicalName: true } },
+      _count: { select: { assets: true } },
+    },
+  });
+  return candidates
+    .filter((dg) => matchingAppliesToDeviceGroup(matching, dg))
+    .reduce((sum, dg) => sum + dg._count.assets, 0);
 }
 
 export async function fetchPaginated<

@@ -73,27 +73,34 @@ async function stripInvalidCitations(body: string): Promise<string> {
 
 /** The saved report, scoped to the authorized user + thread. Null if none yet. */
 async function fetchReport(userId: string, threadId: string) {
-  const row = await prisma.chatThread.findFirst({
+  const thread = await prisma.chatThread.findFirst({
     where: { id: threadId, userId },
-    select: { report: true },
+    select: { report: { select: { id: true, content: true } } },
   });
-  return row?.report ?? null;
+  return thread?.report ?? null;
 }
 
 export function makeWriteReportTool(userId: string, threadId: string) {
   return tool(
-    async ({ markdown }) => {
+    async ({ title, markdown }) => {
       const body = markdown.trim();
       if (!body) return "Report was empty — nothing saved.";
       const report = await stripInvalidCitations(body);
 
-      const updated = await prisma.chatThread.updateMany({
+      // Ownership check first — update() can only key on the unique id.
+      const thread = await prisma.chatThread.findFirst({
         where: { id: threadId, userId },
-        data: { report },
+        select: { id: true },
       });
-      if (updated.count === 0) {
+      if (!thread) {
         return "Could not save the report — thread not found.";
       }
+      const data = { title, content: report };
+      await prisma.chatThread.update({
+        where: { id: threadId },
+        data: { report: { upsert: { create: data, update: data } } },
+        select: { id: true },
+      });
 
       return "Report saved. Tell the user it is ready; don't paste it into chat.";
     },
@@ -102,11 +109,57 @@ export function makeWriteReportTool(userId: string, threadId: string) {
       description:
         "Create this conversation's report, or intentionally replace it in full, when asked for a report, briefing, write-up, or a full rewrite. For a small change to an existing report, use edit_report instead — it doesn't require resending the whole document. The read-only report panel supports PDF/Word export. Cite retrieved records using the routes in the report instructions; unresolved citations become plain text. Reply briefly in chat after saving.",
       schema: z.object({
+        title: z
+          .string()
+          .describe(
+            "A short descriptive title for the report (e.g. 'CT Scanner Vulnerability Report'). Replaces any existing title for the thread.",
+          ),
         markdown: z
           .string()
           .describe(
             "The full report as Markdown (headings, prose, bullet lists, tables, and citation links). This replaces any existing report for the thread.",
           ),
+      }),
+    },
+  );
+}
+
+const SEARCH_MAX_MATCHES = 5;
+const SEARCH_EXCERPT_RADIUS = 80;
+
+function clipExcerpt(line: string, matchAt: number, matchLen: number): string {
+  const start = Math.max(0, matchAt - SEARCH_EXCERPT_RADIUS);
+  const end = Math.min(line.length, matchAt + matchLen + SEARCH_EXCERPT_RADIUS);
+  return `${start > 0 ? "…" : ""}${line.slice(start, end)}${end < line.length ? "…" : ""}`;
+}
+
+export function makeSearchReportTool(userId: string, threadId: string) {
+  return tool(
+    async ({ query }) => {
+      const report = (await fetchReport(userId, threadId))?.content;
+      if (report === undefined)
+        return "No report has been saved yet for this thread.";
+
+      const needle = query.toLowerCase();
+      const hits = report.split("\n").flatMap((line, i) => {
+        const at = line.toLowerCase().indexOf(needle);
+        return at === -1
+          ? []
+          : [`Line ${i + 1}: ${clipExcerpt(line, at, query.length)}`];
+      });
+      if (!hits.length) return `No matches for "${query}" in the report.`;
+      const more = hits.length - SEARCH_MAX_MATCHES;
+      return [
+        ...hits.slice(0, SEARCH_MAX_MATCHES),
+        ...(more > 0 ? [`…${more} more; narrow your query.`] : []),
+      ].join("\n");
+    },
+    {
+      name: "search_report",
+      description:
+        "Search the saved report for text (case-insensitive). Returns up to 5 matches with line numbers and a short excerpt around each, so you can locate something without reading the whole report. Follow up with read_report for full context or edit_report to change it.",
+      schema: z.object({
+        query: z.string().min(1).describe("Text to search for."),
       }),
     },
   );
@@ -118,8 +171,8 @@ const READ_MAX_CHARS = 6000;
 export function makeReadReportTool(userId: string, threadId: string) {
   return tool(
     async ({ startLine }) => {
-      const report = await fetchReport(userId, threadId);
-      if (report === null)
+      const report = (await fetchReport(userId, threadId))?.content;
+      if (report === undefined)
         return "No report has been saved yet for this thread.";
 
       const lines = report.split("\n");
@@ -163,10 +216,11 @@ export function makeReadReportTool(userId: string, threadId: string) {
 export function makeEditReportTool(userId: string, threadId: string) {
   return tool(
     async ({ oldText, newText }) => {
-      const current = await fetchReport(userId, threadId);
-      if (current === null) {
+      const saved = await fetchReport(userId, threadId);
+      if (!saved) {
         return "No report exists yet for this thread — use write_report to create one.";
       }
+      const current = saved.content;
 
       const at = current.indexOf(oldText);
       if (at === -1) {
@@ -182,9 +236,9 @@ export function makeEditReportTool(userId: string, threadId: string) {
 
       // Atomic compare-and-swap: only write if nothing changed the report since
       // we read `current` above, so a concurrent edit can't be silently lost.
-      const updated = await prisma.chatThread.updateMany({
-        where: { id: threadId, userId, report: current },
-        data: { report },
+      const updated = await prisma.chatReport.updateMany({
+        where: { id: saved.id, content: current },
+        data: { content: report },
       });
       if (updated.count === 0) {
         return "The report changed since you read it — re-read the affected section and try again.";
@@ -195,7 +249,7 @@ export function makeEditReportTool(userId: string, threadId: string) {
     {
       name: "edit_report",
       description:
-        "Apply one exact text replacement to the saved report. oldText must match exactly one place — get it, with enough surrounding context to be unique, from read_report first. Returns a short confirmation, not the full report. Fails with an actionable error if oldText is missing, matches more than once, or if the report changed since you read it (re-read and retry). Use write_report instead to create a report or intentionally rewrite it in full.",
+        "Apply one exact text replacement to the saved report. oldText must match exactly one place — get it, with enough surrounding context to be unique, from search_report or read_report first. Returns a short confirmation, not the full report. Fails with an actionable error if oldText is missing, matches more than once, or if the report changed since you read it (re-read and retry). Use write_report instead to create a report or intentionally rewrite it in full.",
       schema: z.object({
         oldText: z
           .string()

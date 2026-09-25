@@ -1,4 +1,3 @@
-import { apiKeyConnectorsRouter } from "@/features/api-key-connectors/server/routers";
 import { artifactsRouter } from "@/features/artifacts/server/routers";
 import { assetsRouter } from "@/features/assets/server/routers";
 import { chatRouter } from "@/features/chat/server/routers";
@@ -39,7 +38,6 @@ export const appRouter = createTRPCRouter({
   webhooks: webhooksRouter,
   artifacts: artifactsRouter,
   chat: chatRouter,
-  apiKeyConnectors: apiKeyConnectorsRouter,
   network: networkRouter,
   overview: overviewRouter,
   tracking: trackingRouter,

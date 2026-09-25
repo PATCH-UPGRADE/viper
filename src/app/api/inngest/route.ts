@@ -12,6 +12,7 @@ import {
 } from "@/inngest/functions/generate-debriefs";
 import { actionNotesFn } from "@/inngest/functions/notes-action";
 import { processInboxEmail } from "@/inngest/functions/process-inbox-email";
+import { processSourceRecord } from "@/inngest/functions/process-source-record";
 import { purgeExpiredTokensFn } from "@/inngest/functions/purge-expired-user-tokens";
 import { reevaluateIssueOnAnswer } from "@/inngest/functions/reevaluate-issue-on-answer";
 import {
@@ -19,6 +20,7 @@ import {
   resolveEntityFilterFn,
 } from "@/inngest/functions/resolve-entity-filters";
 import { sendEscalationEmailFn } from "@/inngest/functions/send-escalation-email";
+import { submitWorkOrder } from "@/inngest/functions/submit-work-order";
 import {
   syncAllIntegrations,
   syncIntegration,
@@ -33,6 +35,7 @@ export const { GET, POST, PUT } = serve({
     enrichAllVulnerabilities,
     purgeExpiredTokensFn,
     processInboxEmail,
+    processSourceRecord,
     analyzeRemediation,
     resolveAllEntityFilters,
     resolveEntityFilterFn,
@@ -42,5 +45,6 @@ export const { GET, POST, PUT } = serve({
     sendEscalationEmailFn,
     generateAllDebriefs,
     generateDepartmentDebrief,
+    submitWorkOrder,
   ],
 });

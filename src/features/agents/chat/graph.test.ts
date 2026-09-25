@@ -35,6 +35,12 @@ describe("chat system prompt — write_report", () => {
     );
   });
 
+  it("adds the reports bias only when fromReports is set", () => {
+    const marker = /<surface>The user is on the reports view/;
+    expect(buildSystemPrompt("hospital administration", true)).toMatch(marker);
+    expect(buildSystemPrompt("hospital administration")).not.toMatch(marker);
+  });
+
   it("preloads notes only — never report content — and registers the report tools", async () => {
     buildChatGraph({
       userId: "user",
@@ -43,7 +49,12 @@ describe("chat system prompt — write_report", () => {
     });
     const config = vi.mocked(buildAgentGraph).mock.calls[0][0];
     expect(await config.preload()).toBe("Hospital notes");
-    for (const name of ["read_report", "edit_report", "write_report"]) {
+    for (const name of [
+      "search_report",
+      "read_report",
+      "edit_report",
+      "write_report",
+    ]) {
       expect(config.tools.some((tool) => tool.name === name)).toBe(true);
     }
   });

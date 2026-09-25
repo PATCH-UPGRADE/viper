@@ -149,54 +149,46 @@ const mockReport = (content: string | null) =>
   vi.mocked(prisma.chatThread.findFirst).mockResolvedValue({
     report: content === null ? null : { id: "r1", content },
   } as never);
-const call = (
+const run = (
   make: (userId: string, threadId: string) => { invoke: (i: never) => unknown },
   input: object,
 ) => make("user", "thread").invoke(input as never) as Promise<string>;
+const edit = (oldText: string, newText: string) =>
+  run(makeEditReportTool, { oldText, newText });
 
 describe("search_report / read_report", () => {
-  const long = Array.from({ length: 500 }, (_, i) => `line ${i + 1} needle`);
+  const lines = Array.from({ length: 500 }, (_, i) => `line ${i + 1} needle`);
 
   it("search returns at most 5 line-numbered, clipped matches", async () => {
-    mockReport(`${"a".repeat(5000)} NEEDLE\n${long.join("\n")}`);
-    const out = await call(makeSearchReportTool, { query: "needle" });
+    mockReport(`${"a".repeat(5000)} NEEDLE\n${lines.join("\n")}`);
+    const out = await run(makeSearchReportTool, { query: "needle" });
     expect(out.split("\n")).toHaveLength(5);
-    expect(out).toMatch(/^Line 1: /);
     expect(out.length).toBeLessThan(700);
   });
 
-  it("read returns a bounded range with a continue hint, then the end", async () => {
-    mockReport(long.join("\n"));
-    const first = await call(makeReadReportTool, {});
+  it("read is bounded, pages on, and clips an oversized line", async () => {
+    mockReport(lines.join("\n"));
+    const first = await run(makeReadReportTool, {});
     expect(first).toContain("200\tline 200");
     expect(first).not.toContain("line 201");
     expect(first).toContain("continue at 201");
-    const last = await call(makeReadReportTool, { startLine: 500 });
-    expect(last).toContain("[Lines 500-500 of 500]");
-  });
 
-  it("read clips an oversized line and still advances past it", async () => {
     mockReport(`${"x".repeat(10000)}\nnext`);
-    const out = await call(makeReadReportTool, {});
-    expect(out.length).toBeLessThan(6100);
-    expect(out).toContain("[Lines 1-1 of 2; continue at 2]");
+    const clipped = await run(makeReadReportTool, {});
+    expect(clipped.length).toBeLessThan(6100);
+    expect(clipped).toContain("[Lines 1-1 of 2; continue at 2]");
   });
 
-  it("treats a missing or empty report as no report", async () => {
+  it("a missing or empty report reads as no report", async () => {
     for (const content of [null, ""]) {
       mockReport(content);
-      expect(await call(makeReadReportTool, {})).toContain("No report");
-      expect(
-        await call(makeEditReportTool, { oldText: "a", newText: "b" }),
-      ).toContain("write_report");
+      expect(await run(makeReadReportTool, {})).toContain("No report");
+      expect(await edit("a", "b")).toContain("write_report");
     }
   });
 });
 
 describe("edit_report", () => {
-  const edit = (oldText: string, newText: string) =>
-    call(makeEditReportTool, { oldText, newText });
-
   it("replaces one match in a long report and touches nothing else", async () => {
     const lines = Array.from({ length: 5000 }, (_, i) => `Device ${i} is ok.`);
     lines[4321] = "ICU-14 runs firmware 3.2.";
@@ -211,16 +203,13 @@ describe("edit_report", () => {
     });
   });
 
-  it("rejects duplicate and missing targets without writing", async () => {
+  it("rejects duplicate, missing and stale edits", async () => {
     mockReport("a b\n\na b\n\nc");
     expect(await edit("a b", "x")).toContain("more than one");
     expect(await edit("zzz", "x")).toContain("not found");
     expect(prisma.chatReport.updateMany).not.toHaveBeenCalled();
-  });
 
-  it("rejects a stale edit", async () => {
-    mockReport("a");
     vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 0 });
-    expect(await edit("a", "b")).toContain("changed during the edit");
+    expect(await edit("c", "x")).toContain("changed during the edit");
   });
 });

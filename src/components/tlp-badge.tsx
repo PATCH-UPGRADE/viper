@@ -14,15 +14,22 @@ export const tlpConfig: Record<Tlp, { label: string; bg: string }> = {
   WHITE: { label: "TLP:WHITE", bg: "#FFFFFF" },
 };
 
-export const TlpBadge = ({ tlp }: { tlp: Tlp }) => {
+export const TlpBadge = ({ tlp, source }: { tlp: Tlp; source: string }) => {
   const config = tlpConfig[tlp];
   const isClear = tlp === "CLEAR" || tlp === "WHITE";
   return (
-    <Badge
-      style={{ backgroundColor: config.bg, color: "#000000" }}
-      className={isClear ? "border border-gray-300" : ""}
-    >
-      {config.label}
+    <Badge asChild variant="outline" className="gap-0 p-0">
+      <div style={{ borderColor: isClear ? undefined : config.bg }}>
+        <div className="max-w-48 truncate px-2 py-0.5 text-foreground">
+          {source}
+        </div>
+        <div
+          className="px-2 py-0.5"
+          style={{ backgroundColor: config.bg, color: "#000000" }}
+        >
+          {config.label}
+        </div>
+      </div>
     </Badge>
   );
 };

@@ -4,7 +4,7 @@
 // makes a real LLM call on first open, per plan).
 //
 // Usage: npx tsx scripts/seed-briefing-example.ts
-import { NotificationType, Priority, Tlp } from "@/generated/prisma";
+import { NotificationType, Priority } from "@/generated/prisma";
 import prisma from "../src/lib/db";
 
 const SEED_USER_EMAIL = "user@example.com";
@@ -24,7 +24,6 @@ async function main() {
         "6 infusion pumps on the clinical VLAN accept unauthenticated firmware commands over their maintenance port. A public PoC exists; the vendor confirms exploitation in the wild.",
       type: NotificationType.Advisory,
       priority: Priority.Critical,
-      tlp: Tlp.WHITE,
       hospitalImpact: {
         byline:
           "Unauthenticated RCE on infusion pumps could let an attacker alter dosing.",

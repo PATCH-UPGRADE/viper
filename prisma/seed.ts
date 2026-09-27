@@ -2647,7 +2647,6 @@ async function seedFleetAdvisoryNotification() {
   await prisma.notification.create({
     data: {
       type: NotificationType.Advisory,
-      tlp: Tlp.AMBER,
       title:
         "Siemens Healthineers advisory: privilege escalation on MAGNETOM and SOMATOM consoles",
       summary:
@@ -2682,6 +2681,7 @@ async function seedFleetAdvisoryNotification() {
           sourceRecord: {
             create: {
               channel: SourceChannel.Email,
+              tlp: Tlp.AMBER,
               raw,
               markdown: FLEET_ADVISORY_MARKDOWN,
               contentHash: sourceContentHash(raw, FLEET_ADVISORY_MARKDOWN),

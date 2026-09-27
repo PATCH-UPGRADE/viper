@@ -98,6 +98,39 @@ const QUESTION_CASES = [
   { product: "Symbia Intevo", expect: "MANUFACTURER - no contacts, input" },
 ];
 
+const MIXED_TLP_SOURCES = [
+  {
+    externalId: "seed-mixed-tlp-medisao",
+    tlp: Tlp.AMBER,
+    from: "MedISAO <advisories@medisao.org>",
+    subject: "MedISAO channel advisory: syngo.plaza credential exposure",
+    receivedAt: "2026-09-11T09:00:00.000Z",
+    reasonWhy: "Same advisory, reported through the MedISAO channel.",
+    markdown:
+      "## MedISAO channel advisory\n\nMembers report the same syngo.plaza VB30E credential weakness.",
+  },
+  {
+    externalId: "seed-mixed-tlp-cisa",
+    tlp: Tlp.WHITE,
+    from: "CISA <advisories@cisa.org>",
+    subject: "ICSMA: Siemens Healthineers syngo.plaza",
+    receivedAt: "2026-09-12T09:00:00.000Z",
+    reasonWhy: "CISA published an advisory covering the same CVE.",
+    markdown:
+      "## ICSMA-26-041-01\n\nCISA has published an ICS medical advisory covering CVE-2023-12345 in syngo.plaza VB30E",
+  },
+  {
+    externalId: "seed-mixed-tlp-productcert",
+    tlp: Tlp.GREEN,
+    from: "Siemens ProductCERT<productcert@cisa.org>",
+    subject: "SSA-016040 update: fix availability",
+    receivedAt: "2026-09-13T09:00:00.000Z",
+    reasonWhy: "Vendor follow-up on the same SSA.",
+    markdown:
+      "## SSA-016040 update\n\nProductCERT HF07confirms resolves the issue and is available for all supported installations.",
+  },
+];
+
 async function seedSyngoPlazaVexScenario(userId: string) {
   console.log("\n🌱 Seeding Siemens syngo.plaza VEX scenario...");
 
@@ -263,7 +296,6 @@ async function seedSyngoPlazaVexScenario(userId: string) {
         "Siemens Healthineers has disclosed an insecure password encryption vulnerability in syngo.plaza VB30E (CVE-2024-52334). The affected application does not encrypt passwords properly, which could allow an attacker to extract original passwords and gain unauthorized access. A hot fix (HF07) is available.",
       type: NotificationType.Advisory,
       priority: Priority.High,
-      tlp: Tlp.WHITE,
       hospitalImpact: {
         byline:
           "Credential exposure on 2 PACS workstations could grant unauthorized access to imaging systems.",
@@ -315,6 +347,7 @@ The affected application does not encrypt passwords properly. This could allow a
   await prisma.sourceRecord.create({
     data: {
       channel: SourceChannel.Email,
+      tlp: Tlp.WHITE,
       links: {
         create: { notificationId: notification.id, sourceType: "Source" },
       },
@@ -702,7 +735,6 @@ async function seedDeserializationScenario(userId: string) {
         "Siemens Healthineers has disclosed a deserialization vulnerability (CVE-2022-29875, CVSS 9.8) in the syngo platform shared across many imaging products. An unauthenticated attacker who can reach ports 32912/tcp or 32914/tcp can execute arbitrary code. Fixes are available for all affected versions; port-blocking mitigations apply where fixes cannot yet be installed.",
       type: NotificationType.Advisory,
       priority: Priority.Critical,
-      tlp: Tlp.WHITE,
       hospitalImpact: {
         byline:
           "Unauthenticated RCE across hospital-wide imaging infrastructure could halt diagnostic imaging and reporting.",
@@ -724,7 +756,7 @@ async function seedDeserializationScenario(userId: string) {
     data: {
       email_id: "seed-ssa-220609",
       created_at: "2022-06-09T09:00:00.000Z",
-      from: "psirt@siemens-healthineers.com",
+      from: "Siemens Healthcare psirt@siemens-healthineers.com",
       to: ["security@hospital.org"],
       cc: [],
       bcc: [],
@@ -753,6 +785,7 @@ The application deserialises untrusted data without sufficient validations that 
   await prisma.sourceRecord.create({
     data: {
       channel: SourceChannel.Email,
+      tlp: Tlp.WHITE,
       links: {
         create: { notificationId: notification.id, sourceType: "Source" },
       },
@@ -1018,6 +1051,61 @@ async function seedVendorCoverage() {
   });
 }
 
+async function seedMixedTlpSources() {
+  console.log(`  ✅ Seeded mixed TLP sources...`);
+  const anchor = await prisma.sourceRecord.findUnique({
+    where: {
+      channel_externalId: {
+        channel: SourceChannel.Email,
+        externalId: "seed-ssa-016040",
+      },
+    },
+    select: { links: { select: { notificationId: true } } },
+  });
+
+  const notificationId = anchor?.links[0].notificationId;
+  if (!notificationId) return;
+
+  await prisma.sourceRecord.deleteMany({
+    where: { externalId: { in: MIXED_TLP_SOURCES.map((s) => s.externalId) } },
+  });
+
+  for (const source of MIXED_TLP_SOURCES) {
+    const raw = {
+      type: "email.received",
+      created_at: source.receivedAt,
+      data: {
+        email_id: source.externalId,
+        created_at: source.receivedAt,
+        from: source.from,
+        to: ["security@hospital.org"],
+        cc: [],
+        bcc: [],
+        subject: source.subject,
+        attachments: [],
+      },
+    };
+    await prisma.sourceRecord.create({
+      data: {
+        channel: SourceChannel.Email,
+        tlp: source.tlp,
+        externalId: source.externalId,
+        contentHash: sourceContentHash(raw, source.markdown),
+        raw,
+        markdown: source.markdown,
+        observedAt: new Date(source.receivedAt),
+        links: {
+          create: {
+            notificationId,
+            sourceType: "Link",
+            reasonWhy: source.reasonWhy,
+          },
+        },
+      },
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main seed function
 // ---------------------------------------------------------------------------
@@ -1036,6 +1124,7 @@ async function main() {
   await seedDeserializationScenario(user.id);
   await seedVendorCoverage();
   await seedQuestion();
+  await seedMixedTlpSources();
 
   console.log("\n✨ Done.");
   await prisma.$disconnect();

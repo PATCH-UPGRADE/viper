@@ -117,7 +117,7 @@ const MIXED_TLP_SOURCES = [
     receivedAt: "2026-09-12T09:00:00.000Z",
     reasonWhy: "CISA published an advisory covering the same CVE.",
     markdown:
-      "## ICSMA-26-041-01\n\nCISA has published an ICS medical advisory covering CVE-2023-12345 in syngo.plaza VB30E",
+      "## ICSMA-26-041-01\n\nCISA has published an ICS medical advisory covering CVE-2024-52334 in syngo.plaza VB30E",
   },
   {
     externalId: "seed-mixed-tlp-productcert",

@@ -83,6 +83,7 @@ export const notificationDetailInclude = {
         select: {
           id: true,
           channel: true,
+          tlp: true,
           raw: true,
           markdown: true,
           observedAt: true,

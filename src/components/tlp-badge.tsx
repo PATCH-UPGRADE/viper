@@ -18,7 +18,11 @@ export const TlpBadge = ({ tlp, source }: { tlp: Tlp; source: string }) => {
   const config = tlpConfig[tlp];
   const isClear = tlp === "CLEAR" || tlp === "WHITE";
   return (
-    <Badge asChild variant="outline" className="gap-0 p-0">
+    <Badge
+      asChild
+      variant="outline"
+      className={`gap-0 p-0 ${isClear ? "border-gray-300" : ""}`}
+    >
       <div style={{ borderColor: isClear ? undefined : config.bg }}>
         <div className="max-w-48 truncate px-2 py-0.5 text-foreground">
           {source}

@@ -22,9 +22,12 @@ const ROUTE_RE = new RegExp(
   `^/(${Object.keys(FINDERS).join("|")})/([^/?#]+)/?(?:[?#].*)?$`,
 );
 
-/** Ids fetched with query_platform_data in earlier, persisted turns. */
-async function priorRetrievedIds(threadId: string): Promise<Set<string>> {
-  const ids = new Set<string>();
+/** Ids fetched this turn plus those in earlier, persisted turns. */
+async function retrievedIds(
+  threadId: string,
+  retrieved: Set<string>,
+): Promise<Set<string>> {
+  const ids = new Set(retrieved);
   const rows = await prisma.chatMessage.findMany({
     where: { threadId, role: "ASSISTANT" },
     select: { toolCalls: true },
@@ -39,25 +42,6 @@ async function priorRetrievedIds(threadId: string): Promise<Set<string>> {
   return ids;
 }
 
-// One history read per turn: the first save merges it into that turn's set.
-const seeding = new WeakMap<Set<string>, Promise<void>>();
-function seedRetrieved(threadId: string, retrieved: Set<string>) {
-  if (!seeding.has(retrieved))
-    seeding.set(
-      retrieved,
-      priorRetrievedIds(threadId).then(
-        (ids) => {
-          for (const id of ids) retrieved.add(id);
-        },
-        (error) => {
-          seeding.delete(retrieved); // retry on the next save
-          throw error;
-        },
-      ),
-    );
-  return seeding.get(retrieved);
-}
-
 /**
  * Keep only citations to records that exist and were retrieved in this thread,
  * then list retrieved assets/CVEs the text names but never cites under Sources.
@@ -68,7 +52,7 @@ async function finalizeCitations(
   retrieved: Set<string>,
   withSources = true,
 ): Promise<string> {
-  await seedRetrieved(threadId, retrieved);
+  const seen = await retrievedIds(threadId, retrieved);
 
   // Parse actual links, including references, without touching code examples.
   const nodes = [...fromMarkdown(body).children];
@@ -87,21 +71,15 @@ async function finalizeCitations(
     const match = url?.match(ROUTE_RE);
     return match ? [{ node, segment: match[1], id: match[2] }] : [];
   });
-  // Only retrieved ids are worth a lookup; existingIds skips empty segments.
   const valid = new Map(
     await Promise.all(
       Object.entries(FINDERS).map(async ([segment, findMany]) => {
         const ids = links
-          .filter((link) => link.segment === segment && retrieved.has(link.id))
+          .filter((link) => link.segment === segment && seen.has(link.id))
           .map((link) => link.id);
         return [segment, await existingIds(findMany, ids)] as const;
       }),
     ),
-  );
-  const cited = new Set(
-    links
-      .filter(({ segment, id }) => valid.get(segment)?.has(id))
-      .map(({ segment, id }) => `/${segment}/${id}`),
   );
   let report = body;
   // Work backwards so replacing a link never shifts another link's offsets.
@@ -121,10 +99,9 @@ async function finalizeCitations(
       report.slice(node.position!.end.offset!);
   }
 
-  // Only assets and CVEs have a short name a model writes into prose;
-  // remediations and device groups have none to match on.
-  if (!withSources || retrieved.size === 0) return report;
-  const ids = [...retrieved];
+  // Only assets and CVEs have a short name to spot in prose.
+  if (!withSources || seen.size === 0) return report;
+  const ids = [...seen];
   const [assets, vulnerabilities] = await Promise.all([
     prisma.asset.findMany({
       where: { id: { in: ids }, hostname: { not: null } },
@@ -135,25 +112,21 @@ async function finalizeCitations(
       select: { id: true, cveId: true },
     }),
   ]);
-  // Prose only: not code, URLs, or link targets.
   const prose = nodes
     .flatMap((node) => (node.type === "text" ? node.value : []))
     .join("\n");
   const sources = [
-    ...assets.map((a) => ({ name: a.hostname!, path: `/assets/${a.id}` })),
-    ...vulnerabilities.map((v) => ({
-      name: v.cveId!,
-      path: `/vulnerabilities/${v.id}`,
-    })),
+    ...assets.map((a) => ["assets", a.id, a.hostname!]),
+    ...vulnerabilities.map((v) => ["vulnerabilities", v.id, v.cveId!]),
   ]
     .filter(
-      ({ name, path }) =>
-        !cited.has(path) &&
+      ([segment, id, name]) =>
+        !valid.get(segment)?.has(id) && // already cited
         new RegExp(`(?<![\\w-])${escapeRegExp(name)}(?![\\w-])`, "i").test(
           prose,
         ),
     )
-    .map(({ name, path }) => `- [${name}](${path})`);
+    .map(([segment, id, name]) => `- [${name}](/${segment}/${id})`);
   if (sources.length === 0) return report;
   return report.match(/^#{1,6} .*$/gm)?.at(-1) === "## Sources"
     ? `${report.trimEnd()}\n${sources.join("\n")}`
@@ -283,7 +256,7 @@ export function makeEditReportTool(
         return "oldText matches more than one place. Add surrounding text to make it unique.";
       }
 
-      // Check only the new text so the edit touches nothing else.
+      // Check only newText so the edit touches nothing else.
       const checked = await finalizeCitations(
         newText,
         threadId,

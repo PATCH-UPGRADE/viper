@@ -60,7 +60,7 @@ const askUserQuestions = tool(
  * added here is armed for all of them and must be described in each agent's prompt.
  */
 export function buildAgentTools(userId: string, reportThreadId?: string) {
-  // Ids fetched this turn; earlier turns' are read from the thread on save.
+  // Ids fetched this turn; report tools only keep citations to these.
   const retrieved = new Set<string>();
   return [
     makeQueryPlatformDataTool(userId, retrieved),

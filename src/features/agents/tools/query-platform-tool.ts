@@ -331,10 +331,7 @@ function linkEntities(value: unknown): void {
   if (Array.isArray(obj.nodes) && !("type" in obj)) linkifyWorkflow(obj);
 }
 
-/**
- * Every record id in a result, nested ones included: an asset result carries the
- * device group the model is told to cite. Report citations are checked against it.
- */
+/** Every id in a result, nested ones too (an asset carries its device group). */
 export function collectIds(value: unknown, into: Set<string>): void {
   if (value === null || typeof value !== "object") return;
   for (const [key, v] of Object.entries(value)) {

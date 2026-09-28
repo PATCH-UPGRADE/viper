@@ -304,17 +304,6 @@ describe("citation retrieval check and Sources", () => {
     );
   });
 
-  it("retries the history read after it fails", async () => {
-    const retrieved = new Set(["a1"]);
-    vi.mocked(prisma.chatMessage.findMany)
-      .mockRejectedValueOnce(new Error("pool timeout"))
-      .mockResolvedValue([]);
-    const save = () =>
-      run(makeWriteReportTool, { title: "R", markdown: "x" }, retrieved);
-    await expect(save()).rejects.toThrow("pool timeout");
-    expect(await save()).toContain("Report saved");
-  });
-
   it("edit_report checks only the new text", async () => {
     // [B] was never retrieved, but it isn't part of the edit.
     mockReport("[B](/assets/a9) Old. MRI-01");

@@ -107,3 +107,95 @@ export function makeWriteReportTool(userId: string, threadId: string) {
     },
   );
 }
+
+async function fetchReport(userId: string, threadId: string) {
+  const thread = await prisma.chatThread.findFirst({
+    where: { id: threadId, userId },
+    select: { report: { select: { id: true, content: true } } },
+  });
+  return thread?.report?.content ? thread.report : null;
+}
+
+export function makeSearchReportTool(userId: string, threadId: string) {
+  return tool(
+    async ({ query }) => {
+      const report = (await fetchReport(userId, threadId))?.content ?? "";
+      const needle = query.toLowerCase();
+      const hits = report.split("\n").flatMap((line, i) => {
+        const at = line.toLowerCase().indexOf(needle);
+        return at < 0
+          ? []
+          : `Line ${i + 1}: ${line.slice(Math.max(0, at - 80), at + query.length + 80)}`;
+      });
+      return hits.slice(0, 5).join("\n") || `No matches for "${query}".`;
+    },
+    {
+      name: "search_report",
+      description:
+        "Case-insensitive search of the saved report. Returns up to 5 matching lines (line number + text around the match) so you can locate text without reading the whole report.",
+      schema: z.object({ query: z.string().min(1) }),
+    },
+  );
+}
+
+export function makeReadReportTool(userId: string, threadId: string) {
+  return tool(
+    async ({ startLine }) => {
+      const report = (await fetchReport(userId, threadId))?.content;
+      if (!report) return "No report has been saved yet.";
+      const lines = report.split("\n");
+
+      let end = startLine - 1;
+      let body = "";
+      for (const line of lines.slice(end, end + 200)) {
+        const row = `${end + 1}\t${line}`.slice(0, 6000);
+        if (body && body.length + row.length > 6000) break;
+        body += `${body ? "\n" : ""}${row}`;
+        end++;
+      }
+      const next = end < lines.length ? `; continue at ${end + 1}` : "";
+      return `${body}\n[Lines ${startLine}-${end} of ${lines.length}${next}]`;
+    },
+    {
+      name: "read_report",
+      description:
+        "Read up to 200 line-numbered lines of the saved report from startLine (default 1); page with the continue hint. Lines over 6000 characters are clipped — use search_report to see further into them.",
+      schema: z.object({ startLine: z.number().int().min(1).default(1) }),
+    },
+  );
+}
+
+export function makeEditReportTool(userId: string, threadId: string) {
+  return tool(
+    async ({ oldText, newText }) => {
+      const saved = await fetchReport(userId, threadId);
+      if (!saved) return "No report yet — use write_report to create one.";
+      const { id, content } = saved;
+
+      const at = content.indexOf(oldText);
+      if (at < 0)
+        return "oldText not found. Re-read the section for the exact text.";
+      if (content.indexOf(oldText, at + 1) >= 0) {
+        return "oldText matches more than one place. Add surrounding text to make it unique.";
+      }
+
+      const updated = await prisma.chatReport.updateMany({
+        // compare-and-swap: fails if the report changed since we read it
+        where: { id, content },
+        data: {
+          content:
+            content.slice(0, at) + newText + content.slice(at + oldText.length),
+        },
+      });
+      return updated.count
+        ? "Replaced."
+        : "The report changed during the edit; re-read and retry.";
+    },
+    {
+      name: "edit_report",
+      description:
+        "Replace one exact occurrence of oldText with newText in the saved report (oldText must match exactly one place; find it with search_report/read_report). Use write_report to create the report or rewrite it in full.",
+      schema: z.object({ oldText: z.string().min(1), newText: z.string() }),
+    },
+  );
+}

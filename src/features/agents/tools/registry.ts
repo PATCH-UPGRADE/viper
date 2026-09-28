@@ -7,7 +7,12 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { makeRecordNoteTool } from "./note-tool";
 import { makeQueryPlatformDataTool } from "./query-platform-tool";
-import { makeWriteReportTool } from "./report-tool";
+import {
+  makeEditReportTool,
+  makeReadReportTool,
+  makeSearchReportTool,
+  makeWriteReportTool,
+} from "./report-tool";
 import { makeWorkOrderTools } from "./work-order-tools";
 
 /** ```viper-ask-user ...``` block the chat UI parses to render question chips. */
@@ -60,7 +65,14 @@ export function buildAgentTools(userId: string, reportThreadId?: string) {
     askUserQuestions,
     ...makeWorkOrderTools(userId),
     makeRecordNoteTool(userId),
-    // write_report only when given a thread to write to (chat yes, recommendations no).
-    ...(reportThreadId ? [makeWriteReportTool(userId, reportThreadId)] : []),
+    // report tools only when given a thread (chat yes, recommendations no).
+    ...(reportThreadId
+      ? [
+          makeSearchReportTool(userId, reportThreadId),
+          makeReadReportTool(userId, reportThreadId),
+          makeEditReportTool(userId, reportThreadId),
+          makeWriteReportTool(userId, reportThreadId),
+        ]
+      : []),
   ];
 }

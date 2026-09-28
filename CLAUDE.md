@@ -231,7 +231,7 @@ conversational agent, the chat agent, and it has two model nodes:
   query procedures — mutations are not representable), `record_note`, `write_report`,
   `request_recommendation`, and `buildAgentTools`, the registry the chat graph binds.
 - `chat/` — the chat agent's graph and prompt (Haiku), plus `recommendation-prompt.ts`: the
-  remediation advisor's prompt (Opus + extended thinking) and `RECOMMENDATION_TOOL_NAMES`,
+  remediation advisor's prompt (Opus + adaptive thinking) and `RECOMMENDATION_TOOL_NAMES`,
   the subset of the registry the recommendation node binds.
 
 The chat model decides, per turn, whether a question needs the recommendation node by calling
@@ -245,10 +245,11 @@ Every tool in the registry must be described in the chat prompt, and in
 `recommendation-prompt.ts` too if it is in `RECOMMENDATION_TOOL_NAMES` — otherwise a model can call
 something it was never told about.
 
-**The recommendation node never sees the chat model's tool-call turns.** Opus runs with extended
-thinking, and the API silently disables thinking when the message list holds an
-assistant tool-call turn without a thinking block. `recommendationWindow` keeps the
-conversation text and the recommendation node's own turns only; it has a unit test, keep it green.
+**The recommendation node never sees the chat model's tool-call turns.** Opus runs with adaptive
+thinking and Haiku runs without it. A tool-use loop counts as one assistant turn, and when
+thinking is switched on partway through a turn the API does not error: it silently disables
+thinking for that request. `recommendationWindow` keeps the conversation text and the
+recommendation node's own turns only; it has a unit test, keep it green.
 
 `buildAgentGraph` ends the turn after any tool in `HALT_TOOLS` —
 `ask_user_questions` and `propose_work_order` — so the graph stops until the
@@ -268,7 +269,7 @@ may mean editing `features/chat/utils.ts`.
 It runs as a **streaming Next.js route** (`src/app/api/chat/route.ts`), not as an
 Inngest job:
 
-- Haiku for the chat model, Opus + extended thinking for the recommendation node.
+- Haiku for the chat model, Opus 5 + adaptive thinking for the recommendation node.
 - The route streams token + reasoning + tool deltas to the client via **Vercel AI SDK UI** (`useChat` in `src/features/chat/hooks/use-viper-chat.ts`); `agents/shared/stream-bridge.ts` maps LangGraph `streamEvents` onto the AI SDK UI message stream.
 - Conversation history is persisted to Prisma (`ChatThread` / `ChatMessage`); the `record_note` tool dispatches to the `actionNotesFn` Inngest function.
 

@@ -1,10 +1,18 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const { constructedModelFields } = vi.hoisted(() => ({
+  constructedModelFields: [] as Record<string, unknown>[],
+}));
+
 vi.mock("server-only", () => ({}));
 vi.mock("../shared/build-graph", () => ({ buildAgentGraph: vi.fn() }));
 vi.mock("@langchain/anthropic", () => ({
   ChatAnthropic: class {
+    constructor(fields: Record<string, unknown>) {
+      constructedModelFields.push(fields);
+    }
+
     bindTools(tools: { name: string }[]) {
       return { boundToolNames: tools.map((tool) => tool.name) };
     }
@@ -20,7 +28,10 @@ import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/type
 import { buildAgentGraph } from "../shared/build-graph";
 import { buildChatGraph, buildSystemPrompt } from "./graph";
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  constructedModelFields.length = 0;
+});
 
 const graphConfig = () => vi.mocked(buildAgentGraph).mock.calls[0][0];
 
@@ -207,5 +218,31 @@ describe("reports view", () => {
     const marker = /on this view the advisor writes the report itself/;
     expect(buildSystemPrompt("hospital administration", true)).toMatch(marker);
     expect(buildSystemPrompt("hospital administration")).not.toMatch(marker);
+  });
+});
+
+describe("recommendation model configuration", () => {
+  const recommendationModelFields = () => {
+    buildChatGraph({
+      userId: "user",
+      threadId: "thread",
+      loadNotes: async () => "Hospital notes",
+    });
+    return constructedModelFields.find((fields) => fields.thinking);
+  };
+
+  it("uses adaptive thinking with summarized display, since newer Opus rejects budget_tokens and hides thinking text by default", () => {
+    const fields = recommendationModelFields();
+    expect(fields?.thinking).toEqual({
+      type: "adaptive",
+      display: "summarized",
+    });
+    expect(fields).not.toHaveProperty("temperature");
+  });
+
+  it("sets the effort level explicitly instead of relying on the model default", () => {
+    expect(recommendationModelFields()?.outputConfig).toEqual({
+      effort: "high",
+    });
   });
 });

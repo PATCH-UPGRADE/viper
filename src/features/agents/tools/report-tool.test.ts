@@ -287,16 +287,46 @@ describe("citation retrieval check and Sources", () => {
     expect(await write(first, ["a1", "a2", "v1"])).toBe(first);
   });
 
-  it("edit_report applies the same check", async () => {
-    mockReport("Old.");
+  it("ignores names in code, and adds a new Sources section when it isn't last", async () => {
+    expect(
+      await write("## Sources\n\n## Next\n\nMRI-01 is down. `CVE-2024-1`", [
+        "a1",
+        "v1",
+      ]),
+    ).toBe(
+      "## Sources\n\n## Next\n\nMRI-01 is down. `CVE-2024-1`\n\n## Sources\n- [MRI-01](/assets/a1)",
+    );
+  });
+
+  it("keeps a retrieved reference-style citation", async () => {
+    expect(await write("[A][r]\n\n[r]: /assets/a2", ["a2"])).toBe(
+      "[A][r]\n\n[r]: /assets/a2",
+    );
+  });
+
+  it("retries the history read after it fails", async () => {
+    const retrieved = new Set(["a1"]);
+    vi.mocked(prisma.chatMessage.findMany)
+      .mockRejectedValueOnce(new Error("pool timeout"))
+      .mockResolvedValue([]);
+    const save = () =>
+      run(makeWriteReportTool, { title: "R", markdown: "x" }, retrieved);
+    await expect(save()).rejects.toThrow("pool timeout");
+    expect(await save()).toContain("Report saved");
+  });
+
+  it("edit_report checks only the new text", async () => {
+    // [B] was never retrieved, but it isn't part of the edit.
+    mockReport("[B](/assets/a9) Old. MRI-01");
     vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 1 });
-    await run(makeEditReportTool, {
-      oldText: "Old.",
-      newText: "[A](/assets/a3)",
-    });
+    await run(
+      makeEditReportTool,
+      { oldText: "Old.", newText: "[A](/assets/a3)" },
+      new Set(["a1"]),
+    );
     expect(prisma.chatReport.updateMany).toHaveBeenCalledWith({
-      where: { id: "r1", content: "Old." },
-      data: { content: "A" },
+      where: { id: "r1", content: "[B](/assets/a9) Old. MRI-01" },
+      data: { content: "[B](/assets/a9) A MRI-01" },
     });
   });
 });

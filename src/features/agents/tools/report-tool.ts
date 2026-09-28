@@ -2,9 +2,9 @@ import "server-only";
 import { tool } from "@langchain/core/tools";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { z } from "zod";
-import { escapeRegExp } from "@/features/agents/debrief/validate";
 import { existingIds } from "@/features/inbox/utils";
 import prisma from "@/lib/db";
+import { escapeRegExp } from "@/lib/string-utils";
 import { collectIds } from "./query-platform-tool";
 
 // Citable route segments; keep in step with the examples in graph.ts. The
@@ -45,9 +45,15 @@ function seedRetrieved(threadId: string, retrieved: Set<string>) {
   if (!seeding.has(retrieved))
     seeding.set(
       retrieved,
-      priorRetrievedIds(threadId).then((ids) => {
-        for (const id of ids) retrieved.add(id);
-      }),
+      priorRetrievedIds(threadId).then(
+        (ids) => {
+          for (const id of ids) retrieved.add(id);
+        },
+        (error) => {
+          seeding.delete(retrieved); // retry on the next save
+          throw error;
+        },
+      ),
     );
   return seeding.get(retrieved);
 }
@@ -60,6 +66,7 @@ async function finalizeCitations(
   body: string,
   threadId: string,
   retrieved: Set<string>,
+  withSources = true,
 ): Promise<string> {
   await seedRetrieved(threadId, retrieved);
 
@@ -116,7 +123,7 @@ async function finalizeCitations(
 
   // Only assets and CVEs have a short name a model writes into prose;
   // remediations and device groups have none to match on.
-  if (retrieved.size === 0) return report;
+  if (!withSources || retrieved.size === 0) return report;
   const ids = [...retrieved];
   const [assets, vulnerabilities] = await Promise.all([
     prisma.asset.findMany({
@@ -128,6 +135,10 @@ async function finalizeCitations(
       select: { id: true, cveId: true },
     }),
   ]);
+  // Prose only: not code, URLs, or link targets.
+  const prose = nodes
+    .flatMap((node) => (node.type === "text" ? node.value : []))
+    .join("\n");
   const sources = [
     ...assets.map((a) => ({ name: a.hostname!, path: `/assets/${a.id}` })),
     ...vulnerabilities.map((v) => ({
@@ -139,13 +150,12 @@ async function finalizeCitations(
       ({ name, path }) =>
         !cited.has(path) &&
         new RegExp(`(?<![\\w-])${escapeRegExp(name)}(?![\\w-])`, "i").test(
-          report,
+          prose,
         ),
     )
     .map(({ name, path }) => `- [${name}](${path})`);
   if (sources.length === 0) return report;
-  // ponytail: assumes an existing Sources section is the last one.
-  return /^## Sources$/m.test(report)
+  return report.match(/^#{1,6} .*$/gm)?.at(-1) === "## Sources"
     ? `${report.trimEnd()}\n${sources.join("\n")}`
     : `${report}\n\n## Sources\n${sources.join("\n")}`;
 }
@@ -273,15 +283,19 @@ export function makeEditReportTool(
         return "oldText matches more than one place. Add surrounding text to make it unique.";
       }
 
+      // Check only the new text so the edit touches nothing else.
+      const checked = await finalizeCitations(
+        newText,
+        threadId,
+        retrieved,
+        false,
+      );
       const updated = await prisma.chatReport.updateMany({
         // compare-and-swap: fails if the report changed since we read it
         where: { id, content },
         data: {
-          content: await finalizeCitations(
-            content.slice(0, at) + newText + content.slice(at + oldText.length),
-            threadId,
-            retrieved,
-          ),
+          content:
+            content.slice(0, at) + checked + content.slice(at + oldText.length),
         },
       });
       return updated.count

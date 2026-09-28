@@ -386,7 +386,7 @@ export function capPageSize(
  */
 export function makeQueryPlatformDataTool(
   userId: string,
-  retrieved = new Set<string>(),
+  retrieved?: Set<string>,
 ) {
   return tool(
     async ({ procedure, input }) => {
@@ -404,7 +404,7 @@ export function makeQueryPlatformDataTool(
           procedure,
           input: callInput,
         });
-        collectIds(result, retrieved);
+        if (retrieved) collectIds(result, retrieved);
         return JSON.stringify(result);
       } catch (error) {
         const message =

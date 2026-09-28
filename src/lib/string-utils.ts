@@ -44,3 +44,6 @@ export function initialsOf(name?: string | null): string {
     .join("")
     .toUpperCase();
 }
+
+export const escapeRegExp = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

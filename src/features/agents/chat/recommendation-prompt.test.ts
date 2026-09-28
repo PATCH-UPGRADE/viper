@@ -9,6 +9,7 @@ import { USER_ROLES } from "@/features/chat/utils";
 import {
   buildRecommendationSystemPrompt,
   RECOMMENDATION_TOOL_NAMES,
+  REPORTS_VIEW_TOOL_NAMES,
 } from "./recommendation-prompt";
 
 /**
@@ -128,6 +129,16 @@ describe("recommendation prompt names the tools the recommendation node binds", 
     );
 
     for (const toolName of RECOMMENDATION_TOOL_NAMES) {
+      expect(registryToolNames).toContain(toolName);
+    }
+  });
+
+  it("names only report tools the registry actually builds", () => {
+    const registryToolNames = buildAgentTools("user", "thread").map(
+      (tool) => tool.name,
+    );
+
+    for (const toolName of REPORTS_VIEW_TOOL_NAMES) {
       expect(registryToolNames).toContain(toolName);
     }
   });

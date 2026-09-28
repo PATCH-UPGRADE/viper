@@ -189,28 +189,39 @@ describe("reports view", () => {
     (graphConfig().recommendation?.model as unknown as BoundModel)
       .boundToolNames;
 
-  it("lets the recommendation node write the report on the reports view", () => {
+  const reportTools = [
+    "search_report",
+    "read_report",
+    "edit_report",
+    "write_report",
+  ];
+
+  it("gives the recommendation node every report tool on the reports view, since the saved report is not in its context", () => {
     buildChatGraph({
       userId: "user",
       threadId: "thread",
       fromReports: true,
       loadNotes: async () => "Hospital notes",
     });
-    expect(recommendationToolNames()).toContain("write_report");
-    expect(graphConfig().recommendation?.systemMessage.content).toMatch(
-      /write_report: create or replace/,
+    expect(recommendationToolNames()).toEqual(
+      expect.arrayContaining(reportTools),
     );
+    const prompt = graphConfig().recommendation?.systemMessage.content;
+    expect(prompt).toMatch(/search_report \/ read_report \/ edit_report:/);
+    expect(prompt).toMatch(/write_report: create the report/);
   });
 
-  it("keeps write_report away from the recommendation node outside the reports view", () => {
+  it("keeps every report tool away from the recommendation node outside the reports view", () => {
     buildChatGraph({
       userId: "user",
       threadId: "thread",
       loadNotes: async () => "Hospital notes",
     });
-    expect(recommendationToolNames()).not.toContain("write_report");
+    for (const toolName of reportTools) {
+      expect(recommendationToolNames()).not.toContain(toolName);
+    }
     expect(graphConfig().recommendation?.systemMessage.content).toMatch(
-      /you cannot write reports/,
+      /You cannot read or change this conversation's saved report/,
     );
   });
 

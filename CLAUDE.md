@@ -228,8 +228,10 @@ conversational agent, the chat agent, and it has two model nodes:
   (the message window the recommendation node sees), the `streamEvents` → AI SDK UI bridge, the
   hospital-wide notes preload, and thread persistence + titling.
 - `tools/` — model-facing tools: `query_platform_data` (a read-only allowlist of tRPC
-  query procedures — mutations are not representable), `record_note`, `write_report`,
-  `request_recommendation`, and `buildAgentTools`, the registry the chat graph binds.
+  query procedures — mutations are not representable), `record_note`, the report tools
+  (`search_report`, `read_report`, `edit_report`, `write_report`), `request_recommendation`,
+  and `buildAgentTools`, the registry the chat graph binds. The recommendation node gets the
+  report tools only on the reports view (`REPORTS_VIEW_TOOL_NAMES`).
 - `chat/` — the chat agent's graph and prompt (Haiku), plus `recommendation-prompt.ts`: the
   remediation advisor's prompt (Opus + adaptive thinking) and `RECOMMENDATION_TOOL_NAMES`,
   the subset of the registry the recommendation node binds.

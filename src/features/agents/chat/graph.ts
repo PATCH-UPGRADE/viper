@@ -17,6 +17,7 @@ import { buildAgentTools } from "../tools/registry";
 import {
   buildRecommendationSystemPrompt,
   RECOMMENDATION_TOOL_NAMES,
+  REPORTS_VIEW_TOOL_NAMES,
 } from "./recommendation-prompt";
 
 const CHAT_MODEL = "claude-haiku-4-5-20251001";
@@ -181,7 +182,7 @@ export function buildChatGraph({
 }) {
   const tools = buildAgentTools(userId, threadId);
   const recommendationToolNames = fromReports
-    ? new Set([...RECOMMENDATION_TOOL_NAMES, "write_report"])
+    ? new Set([...RECOMMENDATION_TOOL_NAMES, ...REPORTS_VIEW_TOOL_NAMES])
     : RECOMMENDATION_TOOL_NAMES;
   const recommendationTools = tools.filter((tool) =>
     recommendationToolNames.has(tool.name),

@@ -5,8 +5,8 @@ vi.mock("server-only", () => ({}));
 vi.mock("../shared/build-graph", () => ({ buildAgentGraph: vi.fn() }));
 vi.mock("@langchain/anthropic", () => ({
   ChatAnthropic: class {
-    bindTools() {
-      return {};
+    bindTools(tools: { name: string }[]) {
+      return { boundToolNames: tools.map((tool) => tool.name) };
     }
   },
 }));
@@ -169,5 +169,43 @@ describe("focus record", () => {
     expect(config.recommendation?.systemMessage.content).not.toMatch(
       /_focus>|<role_focus_(asset|vuln)/,
     );
+  });
+});
+
+describe("reports view", () => {
+  type BoundModel = { boundToolNames: string[] };
+  const recommendationToolNames = () =>
+    (graphConfig().recommendation?.model as unknown as BoundModel)
+      .boundToolNames;
+
+  it("lets the recommendation node write the report on the reports view", () => {
+    buildChatGraph({
+      userId: "user",
+      threadId: "thread",
+      fromReports: true,
+      loadNotes: async () => "Hospital notes",
+    });
+    expect(recommendationToolNames()).toContain("write_report");
+    expect(graphConfig().recommendation?.systemMessage.content).toMatch(
+      /write_report: create or replace/,
+    );
+  });
+
+  it("keeps write_report away from the recommendation node outside the reports view", () => {
+    buildChatGraph({
+      userId: "user",
+      threadId: "thread",
+      loadNotes: async () => "Hospital notes",
+    });
+    expect(recommendationToolNames()).not.toContain("write_report");
+    expect(graphConfig().recommendation?.systemMessage.content).toMatch(
+      /you cannot write reports/,
+    );
+  });
+
+  it("tells the chat model the advisor writes the report on the reports view", () => {
+    const marker = /on this view the advisor writes the report itself/;
+    expect(buildSystemPrompt("hospital administration", true)).toMatch(marker);
+    expect(buildSystemPrompt("hospital administration")).not.toMatch(marker);
   });
 });

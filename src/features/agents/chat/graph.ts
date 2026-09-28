@@ -151,7 +151,7 @@ export function buildSystemPrompt(
   focus = "",
 ): string {
   const reportsBias = fromReports
-    ? `\n\n<surface>The user is on the reports view and intends to use this conversation to create a report. Once you understand the user's goals and have enough information, use the write_report tool to create a report. Do not output a "report" to the chat interface unless asked to (use the tool instead).</surface>`
+    ? `\n\n<surface>The user is on the reports view and intends to use this conversation to create a report. Once you understand the user's goals and have enough information, use the write_report tool to create a report. Do not output a "report" to the chat interface unless asked to (use the tool instead). A recommendation question still goes to request_recommendation: on this view the advisor writes the report itself, so do not tell the user to ask again.</surface>`
     : "";
   return `${BASE_PROMPT}
 
@@ -179,8 +179,11 @@ export function buildChatGraph({
   loadNotes?: () => Promise<string>;
 }) {
   const tools = buildAgentTools(userId, threadId);
+  const recommendationToolNames = fromReports
+    ? new Set([...RECOMMENDATION_TOOL_NAMES, "write_report"])
+    : RECOMMENDATION_TOOL_NAMES;
   const recommendationTools = tools.filter((tool) =>
-    RECOMMENDATION_TOOL_NAMES.has(tool.name),
+    recommendationToolNames.has(tool.name),
   );
   const focus = buildFocusBlocks(userRole, assetData, vulnerabilityData);
 
@@ -207,7 +210,7 @@ export function buildChatGraph({
     recommendation: {
       model: recommendationModel,
       systemMessage: new SystemMessage(
-        buildRecommendationSystemPrompt(userRole, focus),
+        buildRecommendationSystemPrompt(userRole, fromReports, focus),
       ),
     },
   });

@@ -21,6 +21,7 @@ import {
 
 const CHAT_MODEL = "claude-haiku-4-5-20251001";
 const RECOMMENDATION_MODEL = "claude-opus-5";
+const CACHE_REPEATED_INPUT = { cache_control: { type: "ephemeral" } } as const;
 
 const BASE_PROMPT = `You are a helpful AI assistant for a hospital vulnerability management platform (Viper).
 You help hospital administrators and security engineers understand the operational impact
@@ -191,7 +192,7 @@ export function buildChatGraph({
     model: CHAT_MODEL,
     maxTokens: 4096,
     streaming: true,
-  }).bindTools(tools);
+  }).bindTools(tools, CACHE_REPEATED_INPUT);
 
   const recommendationModel = new ChatAnthropic({
     model: RECOMMENDATION_MODEL,
@@ -199,7 +200,7 @@ export function buildChatGraph({
     streaming: true,
     thinking: { type: "adaptive", display: "summarized" },
     outputConfig: { effort: "high" },
-  }).bindTools(recommendationTools);
+  }).bindTools(recommendationTools, CACHE_REPEATED_INPUT);
 
   return buildAgentGraph({
     model,

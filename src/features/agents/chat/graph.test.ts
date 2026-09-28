@@ -13,8 +13,8 @@ vi.mock("@langchain/anthropic", () => ({
       constructedModelFields.push(fields);
     }
 
-    bindTools(tools: { name: string }[]) {
-      return { boundToolNames: tools.map((tool) => tool.name) };
+    bindTools(tools: { name: string }[], callOptions?: unknown) {
+      return { boundToolNames: tools.map((tool) => tool.name), callOptions };
     }
   },
 }));
@@ -244,5 +244,26 @@ describe("recommendation model configuration", () => {
     expect(recommendationModelFields()?.outputConfig).toEqual({
       effort: "high",
     });
+  });
+});
+
+describe("prompt caching", () => {
+  type BoundModel = { callOptions?: unknown };
+
+  it("caches the repeated input of both the chat model and the recommendation node", () => {
+    buildChatGraph({
+      userId: "user",
+      threadId: "thread",
+      loadNotes: async () => "Hospital notes",
+    });
+    const config = graphConfig();
+    const chatModel = config.model as unknown as BoundModel;
+    const recommendationModel = config.recommendation
+      ?.model as unknown as BoundModel;
+    for (const boundModel of [chatModel, recommendationModel]) {
+      expect(boundModel.callOptions).toEqual({
+        cache_control: { type: "ephemeral" },
+      });
+    }
   });
 });

@@ -331,6 +331,18 @@ function linkEntities(value: unknown): void {
   if (Array.isArray(obj.nodes) && !("type" in obj)) linkifyWorkflow(obj);
 }
 
+/**
+ * Every record id in a result, nested ones included: an asset result carries the
+ * device group the model is told to cite. Report citations are checked against it.
+ */
+export function collectIds(value: unknown, into: Set<string>): void {
+  if (value === null || typeof value !== "object") return;
+  for (const [key, v] of Object.entries(value)) {
+    if (key === "id" && typeof v === "string") into.add(v);
+    else collectIds(v, into);
+  }
+}
+
 type PlatformProcedure = (typeof PLATFORM_QUERY_PROCEDURES)[number];
 
 /**
@@ -372,7 +384,10 @@ export function capPageSize(
 /**
  * Look up platform data on demand via the in-process authenticated tRPC caller.
  */
-export function makeQueryPlatformDataTool(userId: string) {
+export function makeQueryPlatformDataTool(
+  userId: string,
+  retrieved = new Set<string>(),
+) {
   return tool(
     async ({ procedure, input }) => {
       try {
@@ -385,10 +400,12 @@ export function makeQueryPlatformDataTool(userId: string) {
           return `Unknown procedure: ${procedure}`;
         }
         const callInput = capPageSize(procedure, input) ?? {};
-        const result = await fn(callInput);
-        return JSON.stringify(
-          addNavigationLinks(result, { procedure, input: callInput }),
-        );
+        const result = addNavigationLinks(await fn(callInput), {
+          procedure,
+          input: callInput,
+        });
+        collectIds(result, retrieved);
+        return JSON.stringify(result);
       } catch (error) {
         const message =
           error instanceof TRPCError

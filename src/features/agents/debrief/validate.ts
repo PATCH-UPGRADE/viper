@@ -140,7 +140,7 @@ function clampToChars(text: string): string {
   return `${cut.replace(partialMarker, "").trimEnd()}\u2026`;
 }
 
-const escapeRegExp = (value: string) =>
+export const escapeRegExp = (value: string) =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**

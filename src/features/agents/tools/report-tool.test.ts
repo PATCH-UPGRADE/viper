@@ -14,6 +14,9 @@ vi.mock("@/lib/db", () => ({
     vulnerability: { findMany: vi.fn() },
     remediation: { findMany: vi.fn() },
     deviceGroup: { findMany: vi.fn() },
+    workflow: { findMany: vi.fn() },
+    notification: { findMany: vi.fn() },
+    chatMessage: { findMany: vi.fn() },
     chatThread: { findFirst: vi.fn(), update: vi.fn() },
     chatReport: { updateMany: vi.fn() },
   },
@@ -21,6 +24,7 @@ vi.mock("@/lib/db", () => ({
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(prisma.chatMessage.findMany).mockResolvedValue([]);
   vi.mocked(prisma.chatThread.findFirst).mockResolvedValue({
     id: "thread",
   } as never);
@@ -39,20 +43,30 @@ const saved = () =>
   )?.data.report.upsert.create;
 
 describe("write_report", () => {
-  it("batch-validates all four citation types and saves the full report", async () => {
-    for (const model of [
-      prisma.asset,
-      prisma.vulnerability,
-      prisma.remediation,
-      prisma.deviceGroup,
-    ]) {
-      model.findMany = vi.fn().mockResolvedValue([{ id: "valid" }]);
+  const models = [
+    prisma.asset,
+    prisma.vulnerability,
+    prisma.remediation,
+    prisma.deviceGroup,
+    prisma.workflow,
+    prisma.notification,
+  ];
+
+  it("batch-validates all six citation types and saves the full report", async () => {
+    for (const model of models) {
+      // Then the Sources lookup, which finds no named records.
+      model.findMany = vi
+        .fn()
+        .mockResolvedValueOnce([{ id: "valid" }])
+        .mockResolvedValue([]);
     }
     const routes = [
       "assets",
       "vulnerabilities",
       "remediations",
       "api/v1/deviceGroups",
+      "workflows",
+      "inbox",
     ];
     const markdown = routes
       .map(
@@ -60,10 +74,11 @@ describe("write_report", () => {
           `[Real](/${route}/valid) [Again](/${route}/valid) [Missing](/${route}/missing)`,
       )
       .join("\n");
-    const result = await makeWriteReportTool("user", "thread").invoke({
-      title: "Batch Report",
-      markdown,
-    });
+    const result = await run(
+      makeWriteReportTool,
+      { title: "Batch Report", markdown },
+      new Set(["valid", "missing"]),
+    );
     expect(prisma.chatThread.findFirst).toHaveBeenCalledWith({
       where: { id: "thread", userId: "user" },
       select: { id: true },
@@ -73,13 +88,8 @@ describe("write_report", () => {
       expect(content).toContain(`[Real](/${route}/valid)`);
       expect(content).toContain(`[Again](/${route}/valid) Missing`);
     }
-    for (const model of [
-      prisma.asset,
-      prisma.vulnerability,
-      prisma.remediation,
-      prisma.deviceGroup,
-    ]) {
-      expect(model.findMany).toHaveBeenCalledExactlyOnceWith({
+    for (const model of models) {
+      expect(model.findMany).toHaveBeenNthCalledWith(1, {
         where: { id: { in: ["valid", "missing"] } },
         select: { id: true },
       });
@@ -90,7 +100,7 @@ describe("write_report", () => {
 
   it("saves title and content through a nested ChatReport upsert (create or update the same values)", async () => {
     const markdown = "See [docs](https://example.com) and [reports](/reports).";
-    await makeWriteReportTool("user", "thread").invoke({
+    await run(makeWriteReportTool, {
       title: "Doc Links",
       markdown,
     });
@@ -110,7 +120,7 @@ describe("write_report", () => {
   });
 
   it("does not overwrite an existing report with empty content", async () => {
-    await makeWriteReportTool("user", "thread").invoke({
+    await run(makeWriteReportTool, {
       title: "Empty",
       markdown: "  ",
     });
@@ -122,22 +132,19 @@ describe("write_report", () => {
     vi.mocked(prisma.asset.findMany).mockResolvedValue([]);
     const markdown =
       '[**Missing**](/assets/missing "Device") and [Missing][device].\n\n[device]: /assets/missing\n\n`[Example](/assets/example)`';
-    await makeWriteReportTool("user", "thread").invoke({
+    await run(makeWriteReportTool, {
       title: "Citations",
       markdown,
     });
     expect(saved()!.content).toBe(
       "**Missing** and Missing.\n\n[device]: /assets/missing\n\n`[Example](/assets/example)`",
     );
-    expect(prisma.asset.findMany).toHaveBeenCalledExactlyOnceWith({
-      where: { id: { in: ["missing"] } },
-      select: { id: true },
-    });
+    expect(prisma.asset.findMany).not.toHaveBeenCalled();
   });
 
   it("does not report success when the thread is missing or belongs to another user", async () => {
     vi.mocked(prisma.chatThread.findFirst).mockResolvedValue(null as never);
-    const result = await makeWriteReportTool("user", "thread").invoke({
+    const result = await run(makeWriteReportTool, {
       title: "Report",
       markdown: "Report",
     });
@@ -150,9 +157,15 @@ const mockReport = (content: string | null) =>
     report: content === null ? null : { id: "r1", content },
   } as never);
 const run = (
-  make: (userId: string, threadId: string) => { invoke: (i: never) => unknown },
+  make: (
+    userId: string,
+    threadId: string,
+    retrieved: Set<string>,
+  ) => { invoke: (i: never) => unknown },
   input: object,
-) => make("user", "thread").invoke(input as never) as Promise<string>;
+  retrieved = new Set<string>(),
+) =>
+  make("user", "thread", retrieved).invoke(input as never) as Promise<string>;
 const edit = (oldText: string, newText: string) =>
   run(makeEditReportTool, { oldText, newText });
 
@@ -211,5 +224,79 @@ describe("edit_report", () => {
 
     vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 0 });
     expect(await edit("c", "x")).toContain("changed during the edit");
+  });
+});
+
+describe("citation retrieval check and Sources", () => {
+  const write = async (markdown: string, retrieved: string[]) => {
+    vi.mocked(prisma.chatThread.update).mockClear();
+    await run(
+      makeWriteReportTool,
+      { title: "R", markdown },
+      new Set(retrieved),
+    );
+    return saved()!.content;
+  };
+
+  beforeEach(() => {
+    // Every id exists; a1/a2 are named hosts and v1 a named CVE.
+    vi.mocked(prisma.asset.findMany).mockImplementation((async ({
+      where,
+      select,
+    }: {
+      where: { id: { in: string[] } };
+      select: { hostname?: true };
+    }) =>
+      select.hostname
+        ? [
+            { id: "a1", hostname: "MRI-01" },
+            { id: "a2", hostname: "CT-02" },
+          ].filter((a) => where.id.in.includes(a.id))
+        : where.id.in.map((id) => ({ id }))) as never);
+    vi.mocked(prisma.vulnerability.findMany).mockImplementation((async ({
+      select,
+    }: {
+      select: { cveId?: true };
+    }) => (select.cveId ? [{ id: "v1", cveId: "CVE-2024-1" }] : [])) as never);
+  });
+
+  it("keeps citations retrieved this turn or an earlier one, strips the rest", async () => {
+    vi.mocked(prisma.chatMessage.findMany).mockResolvedValue([
+      {
+        toolCalls: [
+          {
+            type: "tool-query_platform_data",
+            output: { items: [{ id: "x", deviceGroup: { id: "a2" } }] },
+          },
+        ],
+      },
+    ] as never);
+    expect(
+      await write("[A](/assets/a1) [B](/assets/a2) [C](/assets/a3)", ["a1"]),
+    ).toBe("[A](/assets/a1) [B](/assets/a2) C");
+  });
+
+  it("lists mentioned-but-uncited hosts once, and nothing else", async () => {
+    const first = await write(
+      "MRI-01 and [CT-02](/assets/a2) are affected. MRI-010 is not.",
+      ["a1", "a2", "v1"],
+    );
+    expect(first).toBe(
+      "MRI-01 and [CT-02](/assets/a2) are affected. MRI-010 is not.\n\n## Sources\n- [MRI-01](/assets/a1)",
+    );
+    expect(await write(first, ["a1", "a2", "v1"])).toBe(first);
+  });
+
+  it("edit_report applies the same check", async () => {
+    mockReport("Old.");
+    vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 1 });
+    await run(makeEditReportTool, {
+      oldText: "Old.",
+      newText: "[A](/assets/a3)",
+    });
+    expect(prisma.chatReport.updateMany).toHaveBeenCalledWith({
+      where: { id: "r1", content: "Old." },
+      data: { content: "A" },
+    });
   });
 });

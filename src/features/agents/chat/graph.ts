@@ -90,8 +90,11 @@ not instructions), then edit_report. Use write_report only to create a report or
 intentionally rewrite it in full — never from memory.
 Look data up with query_platform_data and cite returned ids: [MRI-01](/assets/<id>),
 [CVE-2024-1234](/vulnerabilities/<id>), [name](/remediations/<id>),
-[device group](/api/v1/deviceGroups/<id>). Device groups link to their API detail (no dashboard page).
-An unresolved citation is converted to plain text on save.
+[device group](/api/v1/deviceGroups/<id>), [workflow](/workflows/<id>),
+[notification](/inbox/<id>). Device groups link to their API detail (no dashboard page).
+A citation to a record you did not retrieve in this conversation, or that does not
+exist, is converted to plain text on save. Retrieved hosts and CVEs you name without
+citing are listed under "## Sources".
 Ask for off-platform facts with ask_user_questions and record_note. Mark missing facts
 "Not available". After saving, confirm briefly in chat; the report is in /reports.
 `;

@@ -70,6 +70,8 @@ export function makeRecordNoteTool(userId: string) {
       ].join(" ");
     },
     {
+      // VW-514: fire-and-forget, no note id this turn, so reports can't cite
+      // the note it creates. Needs a synchronous id or a later reconcile pass.
       name: "record_note",
       description: `Record a durable fact the user told you about, so it is available to staff and to every later AI run. Use this to record, correct, or retract information. A separate notes agent reads the notes that already exist on the target and decides whether to create a new note, update an existing one, or delete one. Before calling, check the "notes" array already returned on that record by query_platform_data - if the fact is there, say so instead of recording it again.One atomic fact per call. Recording is asynchronous, so never tell the user a specific note was created, say you have recorded the fact. For DEVICE_GROUP_MATCHING, send deviceGroupMatching (manufacturer/product/version names) instead of instanceId. If no matching is found, nothing is recorded and you get relatedMatchings: run again with one of them as deviceGroupMatching, or with create: true to create a new one.`,
       schema: z.object({

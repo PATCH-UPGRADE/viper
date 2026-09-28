@@ -5,7 +5,7 @@ import { z } from "zod";
 import { existingIds } from "@/features/inbox/utils";
 import prisma from "@/lib/db";
 import { escapeRegExp } from "@/lib/string-utils";
-import { collectIds } from "./query-platform-tool";
+import { collectIds, type Retrieval } from "./query-platform-tool";
 
 // Citable route segments; keep in step with the examples in graph.ts. The
 // deviceGroups key is its API route — device groups have no dashboard page.
@@ -25,9 +25,10 @@ const ROUTE_RE = new RegExp(
 /** Ids fetched this turn plus those in earlier, persisted turns. */
 async function retrievedIds(
   threadId: string,
-  retrieved: Set<string>,
+  retrieval: Retrieval,
 ): Promise<Set<string>> {
-  const ids = new Set(retrieved);
+  await Promise.allSettled(retrieval.pending);
+  const ids = new Set(retrieval.ids);
   const rows = await prisma.chatMessage.findMany({
     where: { threadId, role: "ASSISTANT" },
     select: { toolCalls: true },
@@ -49,10 +50,10 @@ async function retrievedIds(
 async function finalizeCitations(
   body: string,
   threadId: string,
-  retrieved: Set<string>,
+  retrieval: Retrieval,
   withSources = true,
 ): Promise<string> {
-  const seen = await retrievedIds(threadId, retrieved);
+  const seen = await retrievedIds(threadId, retrieval);
 
   // Parse actual links, including references, without touching code examples.
   const nodes = [...fromMarkdown(body).children];
@@ -71,11 +72,18 @@ async function finalizeCitations(
     const match = url?.match(ROUTE_RE);
     return match ? [{ node, segment: match[1], id: match[2] }] : [];
   });
+  // Refuse rather than strip, so the model learns what it must look up.
+  const unretrieved = links.filter((link) => !seen.has(link.id));
+  if (unretrieved.length) {
+    throw new Error(
+      `Not saved. Look these up with query_platform_data first, or drop the links: ${unretrieved.map((l) => `/${l.segment}/${l.id}`).join(", ")}`,
+    );
+  }
   const valid = new Map(
     await Promise.all(
       Object.entries(FINDERS).map(async ([segment, findMany]) => {
         const ids = links
-          .filter((link) => link.segment === segment && seen.has(link.id))
+          .filter((link) => link.segment === segment)
           .map((link) => link.id);
         return [segment, await existingIds(findMany, ids)] as const;
       }),
@@ -136,13 +144,13 @@ async function finalizeCitations(
 export function makeWriteReportTool(
   userId: string,
   threadId: string,
-  retrieved: Set<string>,
+  retrieval: Retrieval,
 ) {
   return tool(
     async ({ title, markdown }) => {
       const body = markdown.trim();
       if (!body) return "Report was empty — nothing saved.";
-      const report = await finalizeCitations(body, threadId, retrieved);
+      const report = await finalizeCitations(body, threadId, retrieval);
 
       // Ownership check first — update() can only key on the unique id.
       const thread = await prisma.chatThread.findFirst({
@@ -164,7 +172,7 @@ export function makeWriteReportTool(
     {
       name: "write_report",
       description:
-        "Create or replace this conversation's full Markdown report when asked for a report, briefing, or write-up. The read-only report panel supports PDF/Word export. Cite retrieved records using the routes in the report instructions; unresolved citations become plain text. Reply briefly in chat after saving.",
+        "Create or replace this conversation's full Markdown report when asked for a report, briefing, or write-up. The read-only report panel supports PDF/Word export. Cite only records you retrieved, using the routes in the report instructions; other citations are refused. Reply briefly in chat after saving.",
       schema: z.object({
         title: z
           .string()
@@ -241,7 +249,7 @@ export function makeReadReportTool(userId: string, threadId: string) {
 export function makeEditReportTool(
   userId: string,
   threadId: string,
-  retrieved: Set<string>,
+  retrieval: Retrieval,
 ) {
   return tool(
     async ({ oldText, newText }) => {
@@ -260,7 +268,7 @@ export function makeEditReportTool(
       const checked = await finalizeCitations(
         newText,
         threadId,
-        retrieved,
+        retrieval,
         false,
       );
       const updated = await prisma.chatReport.updateMany({

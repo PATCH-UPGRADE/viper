@@ -175,7 +175,10 @@ describe("the tool applies the cap, not just the helper", () => {
 
     const { makeQueryPlatformDataTool } = await import("./query-platform-tool");
     const retrieved = new Set<string>();
-    await makeQueryPlatformDataTool("user_1", retrieved).invoke({
+    await makeQueryPlatformDataTool("user_1", {
+      ids: retrieved,
+      pending: new Set(),
+    }).invoke({
       procedure: "notifications.getMany",
     });
 

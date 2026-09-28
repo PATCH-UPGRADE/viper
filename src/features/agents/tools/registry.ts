@@ -60,10 +60,13 @@ const askUserQuestions = tool(
  * added here is armed for all of them and must be described in each agent's prompt.
  */
 export function buildAgentTools(userId: string, reportThreadId?: string) {
-  // Ids fetched this turn; report tools only keep citations to these.
-  const retrieved = new Set<string>();
+  // What was looked up this turn; report tools only accept citations to it.
+  const retrieval = {
+    ids: new Set<string>(),
+    pending: new Set<Promise<unknown>>(),
+  };
   return [
-    makeQueryPlatformDataTool(userId, retrieved),
+    makeQueryPlatformDataTool(userId, retrieval),
     askUserQuestions,
     ...makeWorkOrderTools(userId),
     makeRecordNoteTool(userId),
@@ -72,8 +75,8 @@ export function buildAgentTools(userId: string, reportThreadId?: string) {
       ? [
           makeSearchReportTool(userId, reportThreadId),
           makeReadReportTool(userId, reportThreadId),
-          makeEditReportTool(userId, reportThreadId, retrieved),
-          makeWriteReportTool(userId, reportThreadId, retrieved),
+          makeEditReportTool(userId, reportThreadId, retrieval),
+          makeWriteReportTool(userId, reportThreadId, retrieval),
         ]
       : []),
   ];

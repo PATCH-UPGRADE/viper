@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "@/lib/db";
+import type { Retrieval } from "./query-platform-tool";
 import {
   makeEditReportTool,
   makeReadReportTool,
@@ -130,16 +131,21 @@ describe("write_report", () => {
 
   it("validates titled and reference citations without rewriting code examples", async () => {
     vi.mocked(prisma.asset.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.vulnerability.findMany).mockResolvedValue([]);
     const markdown =
       '[**Missing**](/assets/missing "Device") and [Missing][device].\n\n[device]: /assets/missing\n\n`[Example](/assets/example)`';
-    await run(makeWriteReportTool, {
-      title: "Citations",
-      markdown,
-    });
+    await run(
+      makeWriteReportTool,
+      { title: "Citations", markdown },
+      new Set(["missing"]),
+    );
     expect(saved()!.content).toBe(
       "**Missing** and Missing.\n\n[device]: /assets/missing\n\n`[Example](/assets/example)`",
     );
-    expect(prisma.asset.findMany).not.toHaveBeenCalled();
+    expect(prisma.asset.findMany).toHaveBeenNthCalledWith(1, {
+      where: { id: { in: ["missing"] } },
+      select: { id: true },
+    });
   });
 
   it("does not report success when the thread is missing or belongs to another user", async () => {
@@ -160,12 +166,15 @@ const run = (
   make: (
     userId: string,
     threadId: string,
-    retrieved: Set<string>,
+    retrieval: Retrieval,
   ) => { invoke: (i: never) => unknown },
   input: object,
-  retrieved = new Set<string>(),
+  ids = new Set<string>(),
+  pending = new Set<Promise<unknown>>(),
 ) =>
-  make("user", "thread", retrieved).invoke(input as never) as Promise<string>;
+  make("user", "thread", { ids, pending }).invoke(
+    input as never,
+  ) as Promise<string>;
 const edit = (oldText: string, newText: string) =>
   run(makeEditReportTool, { oldText, newText });
 
@@ -260,7 +269,7 @@ describe("citation retrieval check and Sources", () => {
     }) => (select.cveId ? [{ id: "v1", cveId: "CVE-2024-1" }] : [])) as never);
   });
 
-  it("keeps citations retrieved this turn or an earlier one, strips the rest", async () => {
+  it("keeps citations retrieved this turn or an earlier one, refuses the rest", async () => {
     vi.mocked(prisma.chatMessage.findMany).mockResolvedValue([
       {
         toolCalls: [
@@ -271,9 +280,26 @@ describe("citation retrieval check and Sources", () => {
         ],
       },
     ] as never);
-    expect(
-      await write("[A](/assets/a1) [B](/assets/a2) [C](/assets/a3)", ["a1"]),
-    ).toBe("[A](/assets/a1) [B](/assets/a2) C");
+    expect(await write("[A](/assets/a1) [B](/assets/a2)", ["a1"])).toBe(
+      "[A](/assets/a1) [B](/assets/a2)",
+    );
+    await expect(write("[C](/assets/a3)", ["a1"])).rejects.toThrow(
+      "Not saved. Look these up with query_platform_data first, or drop the links: /assets/a3",
+    );
+  });
+
+  it("waits for a lookup still running in parallel", async () => {
+    const ids = new Set<string>();
+    const lookup = new Promise((done) =>
+      setTimeout(() => done(ids.add("a1")), 20),
+    );
+    await run(
+      makeWriteReportTool,
+      { title: "R", markdown: "[A](/assets/a1)" },
+      ids,
+      new Set([lookup]),
+    );
+    expect(saved()!.content).toBe("[A](/assets/a1)");
   });
 
   it("lists mentioned-but-uncited hosts once, and nothing else", async () => {
@@ -305,17 +331,17 @@ describe("citation retrieval check and Sources", () => {
   });
 
   it("edit_report checks only the new text", async () => {
-    // [B] was never retrieved, but it isn't part of the edit.
+    // [B] was never retrieved, but it isn't part of the edit; no Sources either.
     mockReport("[B](/assets/a9) Old. MRI-01");
     vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 1 });
     await run(
       makeEditReportTool,
-      { oldText: "Old.", newText: "[A](/assets/a3)" },
+      { oldText: "Old.", newText: "[A](/assets/a1)" },
       new Set(["a1"]),
     );
     expect(prisma.chatReport.updateMany).toHaveBeenCalledWith({
       where: { id: "r1", content: "[B](/assets/a9) Old. MRI-01" },
-      data: { content: "[B](/assets/a9) A MRI-01" },
+      data: { content: "[B](/assets/a9) [A](/assets/a1) MRI-01" },
     });
   });
 });

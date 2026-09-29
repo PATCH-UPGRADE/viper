@@ -110,7 +110,22 @@ async function finalizeCitations(
       select: { id: true, cveId: true },
     }),
   ]);
-  const { links, prose } = parse(report);
+  // A trailing Sources section is rebuilt: our entries are dropped and re-added
+  // only while still named, so edits that remove a mention remove its entry.
+  const at = report.search(/^## Sources[ \t]*$(?![\s\S]*^#{1,6} )/m);
+  const body = at < 0 ? report : report.slice(0, at).trimEnd();
+  const kept =
+    at < 0
+      ? ""
+      : report
+          .slice(at)
+          .replace(/^## Sources.*\n?/, "")
+          .replace(
+            /^- \[[^\]\n]+\]\(\/(?:assets|vulnerabilities)\/[^)\s]+\)\n?/gm,
+            "",
+          )
+          .trim();
+  const { links, prose } = parse(`${body}\n\n${kept}`);
   const sources = [
     ...assets.map((a) => [`/assets/${a.id}`, a.hostname!]),
     ...vulnerabilities.map((v) => [`/vulnerabilities/${v.id}`, v.cveId!]),
@@ -123,10 +138,9 @@ async function finalizeCitations(
         ),
     )
     .map(([path, name]) => `- [${name}](${path})`);
-  if (sources.length === 0) return report;
-  return report.match(/^#{1,6} .*$/gm)?.at(-1) === "## Sources"
-    ? `${report.trimEnd()}\n${sources.join("\n")}`
-    : `${report}\n\n## Sources\n${sources.join("\n")}`;
+  const lines = [kept, ...sources].filter(Boolean);
+  if (at < 0 && !lines.length) return report;
+  return lines.length ? `${body}\n\n## Sources\n${lines.join("\n")}` : body;
 }
 
 export function makeWriteReportTool(

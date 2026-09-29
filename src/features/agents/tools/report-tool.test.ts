@@ -332,6 +332,20 @@ describe("citation retrieval check and Sources", () => {
     );
   });
 
+  it("rebuilds Sources: drops entries no longer named, keeps other lines", async () => {
+    expect(
+      await write(
+        "Nothing named.\n\n## Sources\n- [MRI-01](/assets/a1)\n- [NVD](https://nvd.nist.gov)",
+        ["a1"],
+      ),
+    ).toBe("Nothing named.\n\n## Sources\n- [NVD](https://nvd.nist.gov)");
+    expect(
+      await write("Nothing named.\n\n## Sources\n- [MRI-01](/assets/a1)", [
+        "a1",
+      ]),
+    ).toBe("Nothing named.");
+  });
+
   it("keeps a retrieved reference-style citation", async () => {
     expect(await write("[A][r]\n\n[r]: /assets/a2", ["a2"])).toBe(
       "[A][r]\n\n[r]: /assets/a2",

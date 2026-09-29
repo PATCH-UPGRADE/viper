@@ -5,7 +5,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
 import { initialsOf } from "@/lib/string-utils";
 import type { CatalogEntry } from "../core/catalog";
-import { useIsPlatformAdded } from "../hooks/use-integrations";
+import { useAddedPlatforms } from "../hooks/use-integrations";
 import { CATEGORIES, type Category } from "../types";
 import { CreateIntegrationDialog } from "./create-integration-dialog";
 
@@ -19,14 +19,13 @@ const SECTION_SUBTITLES: Record<Category, string> = {
     "Get notified about new advisories, recalls, and platform events.",
 };
 
-const AddIntegrationButton = ({ entry }: { entry: CatalogEntry }) => {
-  const isAdded = useIsPlatformAdded(entry.platform);
-  return (
-    <CreateIntegrationDialog entry={entry} added={entry.singleton && isAdded} />
-  );
-};
-
-const PlatformCard = ({ entry }: { entry: CatalogEntry }) => (
+const PlatformCard = ({
+  entry,
+  added,
+}: {
+  entry: CatalogEntry;
+  added: boolean;
+}) => (
   <Card className="p-0 gap-0 overflow-hidden">
     <div className="flex items-center gap-3 p-4">
       <Avatar className="size-9 shrink-0 rounded-md border">
@@ -40,7 +39,7 @@ const PlatformCard = ({ entry }: { entry: CatalogEntry }) => (
       </div>
     </div>
     <div className="p-4 border-t">
-      <AddIntegrationButton entry={entry} />
+      <CreateIntegrationDialog entry={entry} added={added} />
     </div>
   </Card>
 );
@@ -52,9 +51,14 @@ const CategorySection = ({
   category: Category;
   catalog: CatalogEntry[];
 }) => {
-  const entries = catalog.filter((entry) =>
-    entry.categories.includes(category),
-  );
+  const addedPlatforms = useAddedPlatforms();
+  const isAdded = (entry: CatalogEntry) =>
+    entry.singleton && addedPlatforms.includes(entry.platform);
+
+  // A card that cannot take another integration goes last. The sort is stable, so the rest keep catalog order.
+  const entries = catalog
+    .filter((entry) => entry.categories.includes(category))
+    .sort((a, b) => Number(isAdded(a)) - Number(isAdded(b)));
   if (entries.length === 0) return null;
 
   return (
@@ -65,7 +69,11 @@ const CategorySection = ({
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {entries.map((entry) => (
-          <PlatformCard key={entry.platform} entry={entry} />
+          <PlatformCard
+            key={entry.platform}
+            entry={entry}
+            added={isAdded(entry)}
+          />
         ))}
       </div>
     </div>

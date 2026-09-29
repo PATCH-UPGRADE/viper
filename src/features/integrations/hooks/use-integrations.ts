@@ -29,10 +29,11 @@ export const useSuspenseIntegrations = () =>
   useSuspenseQuery(useIntegrationsQueryOptions());
 
 /** Re-renders only when the set of platforms changes, not on every sync-status poll. */
-export const useIsPlatformAdded = (platform: PlatformEnum) =>
+export const useAddedPlatforms = (): PlatformEnum[] =>
   useSuspenseQuery({
     ...useIntegrationsQueryOptions(),
-    select: (data) => data.items.some((item) => item.platform === platform),
+    select: (data) =>
+      [...new Set(data.items.map((item) => item.platform))].sort(),
   }).data;
 
 const useInvalidateIntegrations = () => {

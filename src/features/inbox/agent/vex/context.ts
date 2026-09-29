@@ -395,7 +395,7 @@ export async function gatherVexContextForIssue(
   ];
 
   const remediations = await prisma.remediation.findMany({
-    where: { vulnerabilityId: issue.vulnerabilityId },
+    where: { vulnerabilities: { some: { id: issue.vulnerabilityId } } },
   });
 
   const sources = await prisma.sourceRecord.findMany({

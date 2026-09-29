@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
+import { countAffectedRemediations } from "@/features/assets/utils";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { resolveEffectiveIssuesByAsset } from "@/features/issues/server/effective-issues";
 import {
@@ -298,28 +299,13 @@ export const assetsRouter = createTRPCRouter({
         ).length;
       }
 
-      function remediationCount(asset: AssetRow): number {
-        const seen = new Set<string>();
-        let total = 0;
-        for (const issue of asset.issues) {
-          if (
-            issue.status === IssueStatus.AFFECTED &&
-            !seen.has(issue.vulnerabilityId)
-          ) {
-            seen.add(issue.vulnerabilityId);
-            total += issue.vulnerability._count.remediations;
-          }
-        }
-        return total;
-      }
-
       function getComputedValue(asset: AssetRow, key: string): number | string {
         if (key.startsWith("severity_")) {
           const severity = key.replace("severity_", "") as Severity;
           return activeBySeverity(asset, severity);
         }
         if (key === "remediations") {
-          return remediationCount(asset);
+          return countAffectedRemediations(asset.issues);
         }
         const val = (asset as Record<string, unknown>)[key];
         return typeof val === "string" ? val : String(val ?? "");

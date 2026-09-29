@@ -33,11 +33,10 @@ export const extractedVulnerabilitySchema = z.object({
   cvssVector: z.string().nullish(),
 });
 
+const CVE_ID = /^CVE-\d{4}-\d{4,}$/i;
+
 export const extractedRemediationSchema = z.object({
-  linkedCveId: z
-    .string()
-    .regex(/^CVE-\d{4}-\d{4,}$/i)
-    .nullish(),
+  linkedCveIds: z.array(z.string()).nullish(),
   description: z.string().nullish(),
 });
 
@@ -84,7 +83,7 @@ FOR VULNERABILITIES: CVEids or security issues explicitly named
 - cvssVector: the CVSS vector string (e.g CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H), only if explicitly stated. Omit if not given.
 
 FOR REMEDIATIONS: Patches, firmware updates, or mitigations explicitly described
-- linkedCveId: must match format CVE-YYYY-NNNNN (e.g CVE-2020-25175). Omit if not explicitly named.
+- linkedCveIds: every CVE that this fix explicitly addresses. Each must match format CVE-YYYY-NNNNN (e.g CVE-2020-25175). Omit if none are explicitly named.
 - description: a short description of the fix (e.g Apply GE Healthcare ICS security controls per CISA advisory)
 
 FOR ASSETS: Specific devices named by network identity
@@ -111,11 +110,22 @@ export async function extractEntities(
     maxTokens: 2048,
   }).withStructuredOutput(extractSchema);
 
-  return model.invoke([
+  const result = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },
     buildUserMessage(
       emailPromptText(email, "NOTIFICATION BODY"),
       pdfAttachments,
     ),
   ]);
+  return keepWellFormedCveIds(result);
+}
+
+export function keepWellFormedCveIds(result: ExtractResult): ExtractResult {
+  return {
+    ...result,
+    remediations: result.remediations.map((r) => ({
+      ...r,
+      linkedCveIds: r.linkedCveIds?.filter((id) => CVE_ID.test(id)),
+    })),
+  };
 }

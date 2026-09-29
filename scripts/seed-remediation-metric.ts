@@ -155,7 +155,7 @@ async function teardownFixture() {
   });
 
   const remediations = await prisma.remediation.findMany({
-    where: { vulnerability: { cveId: FIXTURE_CVE } },
+    where: { vulnerabilities: { some: { cveId: FIXTURE_CVE } } },
     select: { id: true },
   });
   const remediationIds = remediations.map((r) => r.id);

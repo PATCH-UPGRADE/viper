@@ -26,6 +26,7 @@ export const notificationInclude = {
         select: {
           id: true,
           channel: true,
+          tlp: true,
           raw: true,
           observedAt: true,
           // An integration source has no sender to show, so the row it came
@@ -82,6 +83,7 @@ export const notificationDetailInclude = {
         select: {
           id: true,
           channel: true,
+          tlp: true,
           raw: true,
           markdown: true,
           observedAt: true,

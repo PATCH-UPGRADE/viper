@@ -1864,7 +1864,7 @@ async function seedRemediations(userId: string) {
         data: {
           description: remediation.description,
           narrative: remediation.narrative,
-          vulnerabilityId: vulnerability.id,
+          vulnerabilities: { connect: { id: vulnerability.id } },
           deviceGroupMatchings: matchingId
             ? { connect: { id: matchingId } }
             : undefined,
@@ -2342,7 +2342,9 @@ async function createWorkOrderTicket(
 
   const linkedRemediations = ticket.linkedCveIds?.length
     ? await prisma.remediation.findMany({
-        where: { vulnerability: { cveId: { in: ticket.linkedCveIds } } },
+        where: {
+          vulnerabilities: { some: { cveId: { in: ticket.linkedCveIds } } },
+        },
         select: { id: true },
       })
     : [];
@@ -2648,7 +2650,6 @@ async function seedFleetAdvisoryNotification() {
   await prisma.notification.create({
     data: {
       type: NotificationType.Advisory,
-      tlp: Tlp.AMBER,
       title:
         "Siemens Healthineers advisory: privilege escalation on MAGNETOM and SOMATOM consoles",
       summary:
@@ -2683,6 +2684,7 @@ async function seedFleetAdvisoryNotification() {
           sourceRecord: {
             create: {
               channel: SourceChannel.Email,
+              tlp: Tlp.AMBER,
               raw,
               markdown: FLEET_ADVISORY_MARKDOWN,
               contentHash: sourceContentHash(raw, FLEET_ADVISORY_MARKDOWN),

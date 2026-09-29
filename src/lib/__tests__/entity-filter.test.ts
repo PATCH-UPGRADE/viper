@@ -142,7 +142,7 @@ describe("validateEntityFilter", () => {
     it("accepts allowlisted remediation fields", () => {
       expect(
         validateEntityFilter("REMEDIATION", {
-          vulnerabilityId: "vuln_1",
+          id: "rem_1",
         }).success,
       ).toBe(true);
     });

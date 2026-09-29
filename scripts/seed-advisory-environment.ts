@@ -229,7 +229,7 @@ async function resetInboxEnvironment() {
     where: { isDraft: true },
   });
   const remediations = await prisma.remediation.deleteMany({
-    where: { vulnerability: { cveId: { in: ADVISORY_CVES } } },
+    where: { vulnerabilities: { some: { cveId: { in: ADVISORY_CVES } } } },
   });
   const vulnerabilities = await prisma.vulnerability.deleteMany({
     where: { cveId: { in: ADVISORY_CVES } },
@@ -366,7 +366,7 @@ async function seedSyngoPlazaEnvironment(userId: string) {
       description: "Update to VB30E_HF07 or later version",
       narrative:
         "Siemens Healthineers has released hot fix HF07 for syngo.plaza VB30E. Apply the hot fix during the next maintenance window to remediate the insecure password encryption.",
-      vulnerabilityId: vulnerability.id,
+      vulnerabilities: { connect: { id: vulnerability.id } },
       userId,
       deviceGroupMatchings: { connect: { id: matching.id } },
     },
@@ -533,7 +533,7 @@ async function seedDeserializationEnvironment(userId: string) {
         "Update to the fixed version for each affected product, or block ports 32912/tcp and 32914/tcp at an external firewall",
       narrative:
         "Siemens Healthineers provides fixes for all affected versions. Where a fix cannot yet be applied, block ports 32912/tcp and 32914/tcp at an external firewall and, for workstation-mode installations, close both ports for inbound traffic on the host Windows firewall.",
-      vulnerabilityId: vulnerability.id,
+      vulnerabilities: { connect: { id: vulnerability.id } },
       userId,
       deviceGroupMatchings: { connect: matchings.map((m) => ({ id: m.id })) },
     },

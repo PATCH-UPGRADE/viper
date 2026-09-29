@@ -191,7 +191,6 @@ export const assetDashboardInclude = {
           severity: true,
           cveId: true,
           description: true,
-          _count: { select: { remediations: true } },
           remediations: {
             include: remediationCardInclude,
           },

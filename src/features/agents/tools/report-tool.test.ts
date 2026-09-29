@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "@/lib/db";
-import { makeWriteReportTool } from "./report-tool";
+import {
+  makeEditReportTool,
+  makeReadReportTool,
+  makeSearchReportTool,
+  makeWriteReportTool,
+} from "./report-tool";
 
 vi.mock("@/lib/db", () => ({
   default: {
@@ -10,6 +15,7 @@ vi.mock("@/lib/db", () => ({
     remediation: { findMany: vi.fn() },
     deviceGroup: { findMany: vi.fn() },
     chatThread: { findFirst: vi.fn(), update: vi.fn() },
+    chatReport: { updateMany: vi.fn() },
   },
 }));
 
@@ -136,5 +142,74 @@ describe("write_report", () => {
       markdown: "Report",
     });
     expect(result).toContain("Could not save");
+  });
+});
+
+const mockReport = (content: string | null) =>
+  vi.mocked(prisma.chatThread.findFirst).mockResolvedValue({
+    report: content === null ? null : { id: "r1", content },
+  } as never);
+const run = (
+  make: (userId: string, threadId: string) => { invoke: (i: never) => unknown },
+  input: object,
+) => make("user", "thread").invoke(input as never) as Promise<string>;
+const edit = (oldText: string, newText: string) =>
+  run(makeEditReportTool, { oldText, newText });
+
+describe("search_report / read_report", () => {
+  const lines = Array.from({ length: 500 }, (_, i) => `line ${i + 1} needle`);
+
+  it("search returns at most 5 line-numbered, clipped matches", async () => {
+    mockReport(`${"a".repeat(5000)} NEEDLE\n${lines.join("\n")}`);
+    const out = await run(makeSearchReportTool, { query: "needle" });
+    expect(out.split("\n")).toHaveLength(5);
+    expect(out.length).toBeLessThan(700);
+  });
+
+  it("read is bounded, pages on, and clips an oversized line", async () => {
+    mockReport(lines.join("\n"));
+    const first = await run(makeReadReportTool, {});
+    expect(first).toContain("200\tline 200");
+    expect(first).not.toContain("line 201");
+    expect(first).toContain("continue at 201");
+
+    mockReport(`${"x".repeat(10000)}\nnext`);
+    const clipped = await run(makeReadReportTool, {});
+    expect(clipped.length).toBeLessThan(6100);
+    expect(clipped).toContain("[Lines 1-1 of 2; continue at 2]");
+  });
+
+  it("a missing or empty report reads as no report", async () => {
+    for (const content of [null, ""]) {
+      mockReport(content);
+      expect(await run(makeReadReportTool, {})).toContain("No report");
+      expect(await edit("a", "b")).toContain("write_report");
+    }
+  });
+});
+
+describe("edit_report", () => {
+  it("replaces one match in a long report and touches nothing else", async () => {
+    const lines = Array.from({ length: 5000 }, (_, i) => `Device ${i} is ok.`);
+    lines[4321] = "ICU-14 runs firmware 3.2.";
+    const current = lines.join("\n");
+    mockReport(current);
+    vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 1 });
+
+    expect(await edit("firmware 3.2.", "firmware 3.4.")).toBe("Replaced.");
+    expect(prisma.chatReport.updateMany).toHaveBeenCalledExactlyOnceWith({
+      where: { id: "r1", content: current },
+      data: { content: current.replace("3.2.", "3.4.") },
+    });
+  });
+
+  it("rejects duplicate, missing and stale edits", async () => {
+    mockReport("a b\n\na b\n\nc");
+    expect(await edit("a b", "x")).toContain("more than one");
+    expect(await edit("zzz", "x")).toContain("not found");
+    expect(prisma.chatReport.updateMany).not.toHaveBeenCalled();
+
+    vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 0 });
+    expect(await edit("c", "x")).toContain("changed during the edit");
   });
 });

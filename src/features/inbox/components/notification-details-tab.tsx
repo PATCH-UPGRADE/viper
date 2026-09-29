@@ -53,6 +53,7 @@ import {
   HospitalImpactCard,
   NotificationSummaryCard,
 } from "./notification-impact-cards";
+import { sourceLabel } from "./shared";
 
 type DeviceGroupMapping =
   NotificationDetailWithRelations["deviceGroupsMatchings"][number];
@@ -131,10 +132,29 @@ export function NotificationDetailsTab({
   const markMatchIncorrect = useMarkMatchIncorrect();
 
   const sources = notification.sourceLinks.map((link) => link.sourceRecord);
+  const marked = [...sources]
+    .sort((a, b) => b.observedAt.getTime() - a.observedAt.getTime())
+    .flatMap((source) =>
+      source.tlp
+        ? [{ id: source.id, tlp: source.tlp, label: sourceLabel(source) }]
+        : [],
+    );
+
   const detailRows: { label: string; content: ReactNode }[] = [
     {
       label: "TLP",
-      content: notification.tlp ? <TlpBadge tlp={notification.tlp} /> : "—",
+      content:
+        marked.length === 0 ? (
+          "—"
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            {marked.map(({ id, tlp, label }) => (
+              <span key={id} className="flex items-center gap-1">
+                <TlpBadge tlp={tlp} source={label} />
+              </span>
+            ))}
+          </div>
+        ),
     },
     {
       label: "First Received",

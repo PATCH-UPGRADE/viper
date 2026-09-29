@@ -6,7 +6,9 @@ vi.mock("server-only", () => ({}));
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     notification: { create: vi.fn(), update: vi.fn() },
+    sourceRecord: { update: vi.fn() },
     notificationVulnerabilityMapping: { count: vi.fn() },
+    $transaction: vi.fn(async (fn) => fn(mockPrisma)),
   },
 }));
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
@@ -80,9 +82,10 @@ describe("a marking the source stated", () => {
   it("is stored, where the classifier read none", async () => {
     await run({ tlp: "CLEAR" });
 
-    expect(mockPrisma.notification.create.mock.calls[0][0].data.tlp).toBe(
-      "CLEAR",
-    );
+    expect(mockPrisma.sourceRecord.update.mock.calls[0][0]).toEqual({
+      where: { id: "src-1" },
+      data: { tlp: "CLEAR" },
+    });
   });
 
   it("overrides the classifier, which only inferred it from prose", async () => {
@@ -96,9 +99,10 @@ describe("a marking the source stated", () => {
 
     await run({ tlp: "CLEAR" });
 
-    expect(mockPrisma.notification.create.mock.calls[0][0].data.tlp).toBe(
-      "CLEAR",
-    );
+    expect(mockPrisma.sourceRecord.update.mock.calls[0][0]).toEqual({
+      where: { id: "src-1" },
+      data: { tlp: "CLEAR" },
+    });
   });
 
   it("is stored when the source updates an advisory we already hold", async () => {
@@ -113,10 +117,10 @@ describe("a marking the source stated", () => {
     });
 
     await run({ tlp: "AMBER" });
-
-    expect(mockPrisma.notification.update.mock.calls[0][0].data.tlp).toBe(
-      "AMBER",
-    );
+    expect(mockPrisma.sourceRecord.update.mock.calls[0][0]).toEqual({
+      where: { id: "src-1" },
+      data: { tlp: "AMBER" },
+    });
   });
 });
 
@@ -132,16 +136,9 @@ describe("a source that states nothing", () => {
 
     await run();
 
-    expect(mockPrisma.notification.create.mock.calls[0][0].data.tlp).toBe(
-      "GREEN",
-    );
-  });
-
-  it("writes no marking when neither the source nor the classifier has one", async () => {
-    await run();
-
-    expect(
-      mockPrisma.notification.create.mock.calls[0][0].data,
-    ).not.toHaveProperty("tlp");
+    expect(mockPrisma.sourceRecord.update.mock.calls[0][0]).toEqual({
+      where: { id: "src-1" },
+      data: { tlp: "GREEN" },
+    });
   });
 });

@@ -103,7 +103,7 @@ export const nameOrClauses = (term: string) => [
 // Duck-typed on `code` rather than `instanceof PrismaClientKnownRequestError`:
 // across Next.js module boundaries the thrown error can be a different copy of
 // the class, so `instanceof` is unreliable.
-function isUniqueViolation(error: unknown): boolean {
+export function isUniqueViolation(error: unknown): boolean {
   return (
     typeof error === "object" &&
     error !== null &&

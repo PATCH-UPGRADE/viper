@@ -3,6 +3,7 @@ import type { LinkEntities } from "@/features/inbox/pipeline";
 import type { SourceRecordAdapter } from "@/features/inbox/source-adapter";
 import prisma from "@/lib/db";
 import { resolveMatchingId } from "@/lib/router-utils";
+import { resolveOrMintVulnerabilities } from "../vulnerabilities";
 import {
   type MedIsaoAdvisoryItem,
   rawAdvisorySchema,
@@ -17,15 +18,15 @@ const SOURCE_LABEL = "MedISAO";
  * The email path has to extract device names from prose and then fuzzy-match
  * them. A MedISAO advisory arrives on a channel that already states the
  * manufacturer and product, and names its vulnerabilities by identifier, so
- * both links are a lookup.
+ * neither link needs a model.
  *
- * Vulnerabilities are linked, never created, which is what the email path does
- * too. An identifier we do not already hold is counted as skipped rather than
- * minted, because a Vulnerability row drives issue creation and enrichment.
+ * An identifier we do not already hold is minted as a Vulnerability on the
+ * channel's matching, so triage and VEX see every vulnerability the advisory
+ * names. A user who disagrees unlinks it from the Notification.
  */
 export const linkAdvisoryEntities =
   (advisory: MedIsaoAdvisoryItem): LinkEntities =>
-  (step, notificationId) =>
+  (step, notificationId, ctx) =>
     step.run("link-channel-entities", async () => {
       if (!notificationId) {
         return { linked: 0, updated: 0, created: 0, skipped: 0 };
@@ -62,25 +63,45 @@ export const linkAdvisoryEntities =
         update: { confidence: "Matched", reasonWhy },
       });
 
-      const known = advisory.vulnerabilityIds.length
-        ? await prisma.vulnerability.findMany({
-            where: { cveId: { in: advisory.vulnerabilityIds } },
-            select: { id: true, cveId: true },
-          })
-        : [];
+      if (!ctx) {
+        throw new Error(
+          "A MedISAO advisory is linked without its SourceRecord",
+        );
+      }
+      const { mapping } = await prisma.sourceRecord.findUniqueOrThrow({
+        where: { id: ctx.sourceId },
+        select: {
+          mapping: {
+            select: {
+              integrationId: true,
+              integration: { select: { integrationUserId: true } },
+            },
+          },
+        },
+      });
+      if (!mapping) {
+        throw new Error(
+          `SourceRecord ${ctx.sourceId} has no integration mapping`,
+        );
+      }
 
-      for (const vulnerability of known) {
-        const vulnReason = `MedISAO lists ${vulnerability.cveId} on this advisory.`;
+      const { ids, created } = await resolveOrMintVulnerabilities({
+        names: advisory.vulnerabilityIds,
+        integrationId: mapping.integrationId,
+        integrationUserId: mapping.integration.integrationUserId,
+        deviceGroupMatchingId,
+        context: `Named by MedISAO on the advisory "${advisory.title}". No CVE is assigned.`,
+      });
+
+      for (const [name, vulnerabilityId] of ids) {
+        const vulnReason = `MedISAO lists ${name} on this advisory.`;
         await prisma.notificationVulnerabilityMapping.upsert({
           where: {
-            notificationId_vulnerabilityId: {
-              notificationId,
-              vulnerabilityId: vulnerability.id,
-            },
+            notificationId_vulnerabilityId: { notificationId, vulnerabilityId },
           },
           create: {
             notificationId,
-            vulnerabilityId: vulnerability.id,
+            vulnerabilityId,
             confidence: "Matched",
             reasonWhy: vulnReason,
           },
@@ -88,12 +109,7 @@ export const linkAdvisoryEntities =
         });
       }
 
-      return {
-        linked: 1 + known.length,
-        updated: 0,
-        created: 0,
-        skipped: advisory.vulnerabilityIds.length - known.length,
-      };
+      return { linked: 1 + ids.size, updated: 0, created, skipped: 0 };
     });
 
 /**

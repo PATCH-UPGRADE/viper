@@ -6,7 +6,9 @@ vi.mock("server-only", () => ({}));
 const prismaMock = {
   notificationDeviceGroupMapping: { upsert: vi.fn() },
   notificationVulnerabilityMapping: { upsert: vi.fn() },
-  vulnerability: { findMany: vi.fn() },
+  vulnerability: { findMany: vi.fn(), create: vi.fn() },
+  externalVulnerabilityMapping: { findMany: vi.fn() },
+  sourceRecord: { findUniqueOrThrow: vi.fn() },
 };
 vi.mock("@/lib/db", () => ({ default: prismaMock }));
 
@@ -39,12 +41,22 @@ const step = { run: <T>(_id: string, fn: () => Promise<T>) => fn() };
 const link = (raw: unknown, notificationId: string | null) => {
   // biome-ignore lint/suspicious/noExplicitAny: the step tools are stubbed
   const { linkEntities } = advisorySourceAdapter.prepare(raw) as any;
-  return linkEntities(step, notificationId);
+  return linkEntities(step, notificationId, { sourceId: "source-1" });
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.vulnerability.findMany.mockResolvedValue([]);
+  prismaMock.vulnerability.create.mockImplementation(({ data }) =>
+    Promise.resolve({ id: `minted-${data.cveId}` }),
+  );
+  prismaMock.externalVulnerabilityMapping.findMany.mockResolvedValue([]);
+  prismaMock.sourceRecord.findUniqueOrThrow.mockResolvedValue({
+    mapping: {
+      integrationId: "int-1",
+      integration: { integrationUserId: "shadow-user" },
+    },
+  });
   resolveMatchingId.mockResolvedValue("matching-1");
 });
 
@@ -103,28 +115,43 @@ describe("the advisory linker", () => {
     expect(args[0].create.confidence).not.toBe("Confirmed");
   });
 
-  it("links only the vulnerabilities we already hold", async () => {
+  it("links a held vulnerability and mints the one Viper lacks", async () => {
     prismaMock.vulnerability.findMany.mockResolvedValue([
       { id: "vuln-1", cveId: "CVE-2026-0001" },
     ]);
 
     const summary = await link(RAW, "notif-1");
 
-    expect(
-      prismaMock.notificationVulnerabilityMapping.upsert,
-    ).toHaveBeenCalledTimes(1);
-    // One device group plus one vulnerability; the unknown CVE is not minted.
-    expect(summary).toMatchObject({ linked: 2, created: 0, skipped: 1 });
+    expect(prismaMock.vulnerability.create).toHaveBeenCalledTimes(1);
+    const [{ data }] = prismaMock.vulnerability.create.mock.calls[0];
+    expect(data).toMatchObject({
+      cveId: "CVE-2026-0002",
+      description: null,
+      userId: "shadow-user",
+      deviceGroupMatchings: { connect: [{ id: "matching-1" }] },
+      externalMappings: {
+        create: { integrationId: "int-1", externalId: "CVE-2026-0002" },
+      },
+    });
+    const linked = prismaMock.notificationVulnerabilityMapping.upsert.mock.calls
+      .map(([args]) => args.create.vulnerabilityId)
+      .sort();
+    expect(linked).toEqual(["minted-CVE-2026-0002", "vuln-1"]);
+    expect(summary).toMatchObject({ linked: 3, created: 1, skipped: 0 });
   });
 
-  it("still links the device when no vulnerability is known", async () => {
-    const summary = await link(RAW, "notif-1");
+  it("links only the device when the advisory names no vulnerability", async () => {
+    const summary = await link(
+      { ...RAW, linked_vulnerabilities: [] },
+      "notif-1",
+    );
 
     expect(prismaMock.notificationDeviceGroupMapping.upsert).toHaveBeenCalled();
+    expect(prismaMock.vulnerability.create).not.toHaveBeenCalled();
     expect(
       prismaMock.notificationVulnerabilityMapping.upsert,
     ).not.toHaveBeenCalled();
-    expect(summary).toMatchObject({ linked: 1, skipped: 2 });
+    expect(summary).toMatchObject({ linked: 1, created: 0 });
   });
 
   it("writes nothing when the classifier produced no notification", async () => {

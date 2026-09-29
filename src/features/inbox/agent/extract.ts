@@ -33,8 +33,10 @@ export const extractedVulnerabilitySchema = z.object({
   cvssVector: z.string().nullish(),
 });
 
+const CVE_ID = /^CVE-\d{4}-\d{4,}$/i;
+
 export const extractedRemediationSchema = z.object({
-  linkedCveIds: z.array(z.string().regex(/^CVE-\d{4}-\d{4,}$/i)).nullish(),
+  linkedCveIds: z.array(z.string()).nullish(),
   description: z.string().nullish(),
 });
 
@@ -108,11 +110,22 @@ export async function extractEntities(
     maxTokens: 2048,
   }).withStructuredOutput(extractSchema);
 
-  return model.invoke([
+  const result = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },
     buildUserMessage(
       emailPromptText(email, "NOTIFICATION BODY"),
       pdfAttachments,
     ),
   ]);
+  return keepWellFormedCveIds(result);
+}
+
+export function keepWellFormedCveIds(result: ExtractResult): ExtractResult {
+  return {
+    ...result,
+    remediations: result.remediations.map((r) => ({
+      ...r,
+      linkedCveIds: r.linkedCveIds?.filter((id) => CVE_ID.test(id)),
+    })),
+  };
 }

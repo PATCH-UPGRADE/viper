@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -150,10 +150,7 @@ function EmptyState({
   onSend,
 }: {
   isDisabled: boolean;
-  onSend: (
-    message: string,
-    configOverride?: Partial<UseChatAgentConfig>,
-  ) => void;
+  onSend: (message: string) => void;
 }) {
   const questions = useSuggestedQuestions();
   return (
@@ -167,7 +164,7 @@ function EmptyState({
               key={q.label}
               type="button"
               disabled={isDisabled}
-              onClick={() => onSend(q.label, q.config)}
+              onClick={() => onSend(q.label)}
               className="rounded-full border bg-background px-3 py-1.5 text-xs text-foreground shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
             >
               {q.label}
@@ -976,8 +973,6 @@ function ChatInner({
   } = useViperChat(config, controlledThreadId);
 
   const [input, setInput] = useState("");
-  const [configOverride, setConfigOverride] =
-    useState<Partial<UseChatAgentConfig>>();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -997,22 +992,6 @@ function ChatInner({
 
   const isDisabled = isLoadingHistory || isAgentBusy || hasActiveQuestions;
 
-  const sendWithOverride = useCallback(
-    (message: string, override?: Partial<UseChatAgentConfig>) => {
-      // Explicit override (e.g. suggested-question click) is sticky.
-      if (override && Object.keys(override).length > 0) {
-        setConfigOverride(override);
-      }
-      send(message, override ?? configOverride);
-    },
-    [send, configOverride],
-  );
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset config override when thread changes
-  useEffect(() => {
-    setConfigOverride(undefined);
-  }, [currentThreadId]);
-
   useEffect(() => {
     const el = containerRef.current;
     if (messages.length && el)
@@ -1030,7 +1009,7 @@ function ChatInner({
     const value = input.trim();
     if (!value || isDisabled) return;
     setInput("");
-    sendWithOverride(value);
+    send(value);
   };
 
   const chatContent = (
@@ -1107,7 +1086,7 @@ function ChatInner({
         ) : (
           <>
             {messages.length === 0 && (
-              <EmptyState isDisabled={isDisabled} onSend={sendWithOverride} />
+              <EmptyState isDisabled={isDisabled} onSend={send} />
             )}
 
             {messages.map((message, i) => (
@@ -1117,7 +1096,7 @@ function ChatInner({
                 user={user}
                 isLast={i === messages.length - 1}
                 streaming={status === "streaming"}
-                onAnswer={(payload) => sendWithOverride(payload)}
+                onAnswer={send}
               />
             ))}
 

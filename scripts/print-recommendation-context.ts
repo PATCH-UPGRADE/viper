@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-// Debug script: prints the prompt the recommendations agent receives before its
+// Debug script: prints the prompt the remediation advisor receives before its
 // first turn — the system message plus the deterministically preloaded context
 // message — largely just for token counting.
 
@@ -25,8 +25,8 @@ mod._resolveFilename = function (request, ...rest) {
 
 async function main() {
   const { USER_ROLES } = await import("@/features/chat/utils");
-  const { buildSystemPrompt } = await import(
-    "@/features/agents/recommendations/graph"
+  const { buildRecommendationSystemPrompt } = await import(
+    "@/features/agents/chat/recommendation-prompt"
   );
   const { loadPersistentNotesMarkdown } = await import(
     "@/features/agents/shared/notes-preload"
@@ -42,9 +42,8 @@ async function main() {
   const role = roleArg as (typeof USER_ROLES)[number];
 
   try {
-    // The system message buildAgentGraph prepends to every model call in its
-    // "agent" node.
-    const systemPrompt = buildSystemPrompt(role);
+    // The system message the recommendation node prepends to every model call.
+    const systemPrompt = buildRecommendationSystemPrompt(role);
 
     // The deterministic context buildAgentGraph injects as a HumanMessage in its
     // "preload" node, before the agent's first turn.

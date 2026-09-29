@@ -1,11 +1,8 @@
 import { z } from "zod";
-import type { AssetWithIssueRelations } from "@/features/assets/types";
-import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
 
 export interface UseChatAgentConfig {
-  agent?: "chat" | "giveRecommendations";
-  assetData?: AssetWithIssueRelations;
-  vulnerabilityData?: VulnerabilityWithRelations;
+  assetId?: string;
+  vulnerabilityId?: string;
 }
 
 export const fetchThreadsSchema = z.object({

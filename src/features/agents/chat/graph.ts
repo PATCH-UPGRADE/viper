@@ -2,15 +2,30 @@ import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { SystemMessage } from "@langchain/core/messages";
 import {
+  ASSET_ROLE_INSTRUCTIONS,
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
+  VULNERABILITY_ROLE_INSTRUCTIONS,
 } from "@/features/chat/utils";
+import {
+  type AssetForMarkdown,
+  assetToMarkdown,
+  type VulnerabilityForMarkdown,
+  vulnerabilityToMarkdown,
+} from "@/lib/markdown";
 import { buildAgentGraph } from "../shared/build-graph";
 import { loadPersistentNotesMarkdown } from "../shared/notes-preload";
 import { PLATFORM_CATALOG } from "../tools/query-platform-tool";
 import { buildAgentTools } from "../tools/registry";
+import {
+  buildRecommendationSystemPrompt,
+  RECOMMENDATION_TOOL_NAMES,
+  REPORTS_VIEW_TOOL_NAMES,
+} from "./recommendation-prompt";
 
 const CHAT_MODEL = "claude-haiku-4-5-20251001";
+const RECOMMENDATION_MODEL = "claude-opus-5";
+const CACHE_REPEATED_INPUT = { cache_control: { type: "ephemeral" } } as const;
 
 const BASE_PROMPT = `You are a helpful AI assistant for a hospital vulnerability management platform (Viper).
 You help hospital administrators and security engineers understand the operational impact
@@ -18,6 +33,24 @@ of vulnerabilities and remediations across systems, safety, and clinical workflo
 Be concise, accurate, and prioritize patient safety in your recommendations.
 
 <tools>
+- request_recommendation: hand the turn to the remediation advisor, a stronger model with a
+  method for ranking fixes. Before anything else, decide whether the user wants facts or a
+  decision. For a decision or plan, call request_recommendation straight away, before
+  fetching data or answering, as your only action: no query_platform_data and no
+  ask_user_questions first, even when the message names a device or is vague. The advisor
+  retrieves what it needs and asks its own clarifying questions.
+  Decisions and plans: what to fix or do first; whether to patch now, wait, mitigate or
+  accept the risk; how to protect a device that can't be patched; whether a device is safe
+  to keep using; when to schedule downtime; how a fix affects patient care; and any
+  follow-up to an answer the advisor gave.
+  Facts stay with you: lookups, counts, definitions, notes, and reports. For example:
+    "Is there a patch for this CVE?" is a fact; "Should we apply it?" is a decision.
+    "Which devices run this firmware?" is a fact; "Which should we fix first?" is a decision.
+    "What does KEV mean?" is a definition; "Is MRI-01 safe to keep using?" is a decision.
+  The advisor owns the rest of the turn and can neither record notes nor write reports.
+  So if the user also states a durable fact, call record_note before you hand off; and if
+  they also want the plan saved as a report, say in your reply that you will write it when
+  they ask again, because the plan does not exist yet.
 - ask_user_questions: ask the user 1–4 clarifying questions with suggested answers.
   The agent turn ends here until the user replies.
 - query_platform_data: read-only lookup of assets, vulnerabilities, remediations,
@@ -40,7 +73,8 @@ Be concise, accurate, and prioritize patient safety in your recommendations.
 You are NOT given the full asset/vulnerability/remediation inventory in your
 context. When a question needs specific records, fetch them with
 query_platform_data and answer from what you retrieve — never invent ids, CVSS
-scores, versions, or hostnames.
+scores, versions, or hostnames. A decision or plan is the exception: hand it to
+request_recommendation without fetching first.
 
 ${PLATFORM_CATALOG}
 
@@ -96,19 +130,52 @@ Ask for off-platform facts with ask_user_questions and record_note. Mark missing
 "Not available". After saving, confirm briefly in chat; the report is in /reports.
 `;
 
-export function buildSystemPrompt(role: UserRole, fromReports = false): string {
+function buildFocusBlocks(
+  role: UserRole,
+  assetData?: AssetForMarkdown,
+  vulnerabilityData?: VulnerabilityForMarkdown,
+): string {
+  const blocks: string[] = [];
+
+  if (assetData) {
+    const assetMd = assetToMarkdown(assetData, { includeIssues: false });
+    blocks.push(
+      `<role_focus_asset>${ASSET_ROLE_INSTRUCTIONS[role]}</role_focus_asset>\n\n<asset_focus>Unless otherwise specified, the user is asking about this asset:\n\n${assetMd}</asset_focus>`,
+    );
+  }
+
+  if (vulnerabilityData) {
+    const vulnMd = vulnerabilityToMarkdown(vulnerabilityData, {
+      includeAssets: false,
+      includeRemediations: false,
+    });
+    blocks.push(
+      `<role_focus_vuln>${VULNERABILITY_ROLE_INSTRUCTIONS[role]}</role_focus_vuln>\n\n<vuln_focus>Unless otherwise specified, the user is asking about this vulnerability:\n\n${vulnMd}</vuln_focus>`,
+    );
+  }
+
+  return blocks.map((block) => `\n\n${block}`).join("");
+}
+
+export function buildSystemPrompt(
+  role: UserRole,
+  fromReports = false,
+  focus = "",
+): string {
   const reportsBias = fromReports
-    ? `\n\n<surface>The user is on the reports view and intends to use this conversation to create a report. Once you understand the user's goals and have enough information, use the write_report tool to create a report. Do not output a "report" to the chat interface unless asked to (use the tool instead).</surface>`
+    ? `\n\n<surface>The user is on the reports view and intends to use this conversation to create a report. Once you understand the user's goals and have enough information, use the write_report tool to create a report. Do not output a "report" to the chat interface unless asked to (use the tool instead). A recommendation question still goes to request_recommendation: on this view the advisor writes the report itself, so do not tell the user to ask again.</surface>`
     : "";
   return `${BASE_PROMPT}
 
-<user_role>The user's role is: ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</user_role>${reportsBias}`;
+<user_role>The user's role is: ${role}. ${RECOMMENDATION_ROLE_INSTRUCTIONS[role]}</user_role>${reportsBias}${focus}`;
 }
 
 export function buildChatGraph({
   userId,
   userRole = "hospital administration",
   threadId,
+  assetData,
+  vulnerabilityData,
   fromReports,
   loadNotes = loadPersistentNotesMarkdown,
 }: {
@@ -116,22 +183,48 @@ export function buildChatGraph({
   userRole?: UserRole;
   /** The thread being written to — enables write_report. */
   threadId: string;
+  /** The record the user has open, when the chat is embedded in a drawer. */
+  assetData?: AssetForMarkdown;
+  vulnerabilityData?: VulnerabilityForMarkdown;
   /** Request came from the /reports view — bias the prompt toward write_report. */
   fromReports?: boolean;
   loadNotes?: () => Promise<string>;
 }) {
-  // Passing threadId adds write_report; the recommendations graph omits it.
   const tools = buildAgentTools(userId, threadId);
+  const recommendationToolNames = fromReports
+    ? new Set([...RECOMMENDATION_TOOL_NAMES, ...REPORTS_VIEW_TOOL_NAMES])
+    : RECOMMENDATION_TOOL_NAMES;
+  const recommendationTools = tools.filter((tool) =>
+    recommendationToolNames.has(tool.name),
+  );
+  const focus = buildFocusBlocks(userRole, assetData, vulnerabilityData);
+
   const model = new ChatAnthropic({
     model: CHAT_MODEL,
     maxTokens: 4096,
     streaming: true,
-  }).bindTools(tools);
+  }).bindTools(tools, CACHE_REPEATED_INPUT);
+
+  const recommendationModel = new ChatAnthropic({
+    model: RECOMMENDATION_MODEL,
+    maxTokens: 16000,
+    streaming: true,
+    thinking: { type: "adaptive", display: "summarized" },
+    outputConfig: { effort: "high" },
+  }).bindTools(recommendationTools, CACHE_REPEATED_INPUT);
 
   return buildAgentGraph({
     model,
     tools,
-    systemMessage: new SystemMessage(buildSystemPrompt(userRole, fromReports)),
+    systemMessage: new SystemMessage(
+      buildSystemPrompt(userRole, fromReports, focus),
+    ),
     preload: loadNotes,
+    recommendation: {
+      model: recommendationModel,
+      systemMessage: new SystemMessage(
+        buildRecommendationSystemPrompt(userRole, fromReports, focus),
+      ),
+    },
   });
 }

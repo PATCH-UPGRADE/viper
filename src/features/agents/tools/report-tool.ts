@@ -88,17 +88,16 @@ function parse(markdown: string) {
 }
 
 /**
- * Refuse citations in newText to records not retrieved in this thread, then
- * append retrieved assets/CVEs the report names but never cites under Sources.
+ * Refuse citations to records not retrieved in this thread, then append
+ * retrieved assets/CVEs the report names but never cites under Sources.
  */
 async function finalizeCitations(
   report: string,
-  newText: string,
   threadId: string,
   retrieval: Retrieval,
 ): Promise<string> {
   const seen = await retrievedIds(threadId, retrieval);
-  const added = parse(newText).links;
+  const added = parse(report).links;
   const valid = new Map(
     await Promise.all(
       Object.entries(FINDERS).map(async ([segment, findMany]) => {
@@ -171,7 +170,7 @@ export function makeWriteReportTool(
     async ({ title, markdown }) => {
       const body = markdown.trim();
       if (!body) return "Report was empty — nothing saved.";
-      const report = await finalizeCitations(body, body, threadId, retrieval);
+      const report = await finalizeCitations(body, threadId, retrieval);
 
       // Ownership check first — update() can only key on the unique id.
       const thread = await prisma.chatThread.findFirst({
@@ -291,7 +290,6 @@ export function makeEditReportTool(
         data: {
           content: await finalizeCitations(
             content.slice(0, at) + newText + content.slice(at + oldText.length),
-            newText,
             threadId,
             retrieval,
           ),

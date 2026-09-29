@@ -351,21 +351,29 @@ describe("citation retrieval check and Sources", () => {
     );
   });
 
-  it("edit_report checks only the new text and rechecks Sources", async () => {
-    // [B] was never retrieved, but it isn't part of the edit.
-    mockReport("[B](/assets/a9) Old. MRI-01");
+  it("edit_report checks the whole edited report and rechecks Sources", async () => {
+    mockReport("[B](/assets/a2) Old. MRI-01");
     vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 1 });
     await run(
       makeEditReportTool,
-      { oldText: "Old.", newText: "[A](/assets/a2)" },
+      { oldText: "Old.", newText: "New." },
       new Set(["a1", "a2"]),
     );
     expect(prisma.chatReport.updateMany).toHaveBeenCalledWith({
-      where: { id: "r1", content: "[B](/assets/a9) Old. MRI-01" },
+      where: { id: "r1", content: "[B](/assets/a2) Old. MRI-01" },
       data: {
         content:
-          "[B](/assets/a9) [A](/assets/a2) MRI-01\n\n## Sources\n- [MRI-01](/assets/a1)",
+          "[B](/assets/a2) New. MRI-01\n\n## Sources\n- [MRI-01](/assets/a1)",
       },
     });
+
+    // Retargeting a link in place is still checked.
+    await expect(
+      run(
+        makeEditReportTool,
+        { oldText: "/assets/a2", newText: "/assets/a3" },
+        new Set(["a1", "a2"]),
+      ),
+    ).rejects.toThrow("drop the links: /assets/a3");
   });
 });

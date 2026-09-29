@@ -11,6 +11,7 @@ const { mockCategoriesFor, mockDefaultSyncEveryFor, mockInngest, mockPrisma } =
     mockPrisma: {
       integration: {
         count: vi.fn(),
+        create: vi.fn(),
         delete: vi.fn(),
         findFirst: vi.fn(),
         findMany: vi.fn(),
@@ -18,7 +19,9 @@ const { mockCategoriesFor, mockDefaultSyncEveryFor, mockInngest, mockPrisma } =
         update: vi.fn(),
       },
       integrationResourceSync: { findUnique: vi.fn(), update: vi.fn() },
+      user: { create: vi.fn() },
       workOrderTicket: { count: vi.fn() },
+      $executeRaw: vi.fn(),
       $transaction: vi.fn(),
     },
   }));
@@ -217,6 +220,62 @@ describe("integrationsRouter enable controls", () => {
       }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(mockPrisma.integrationResourceSync.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("integrationsRouter.create", () => {
+  const medisaoInput = {
+    name: "MedISAO",
+    platform: PlatformEnum.MEDISAO,
+    config: { apiUrl: "https://medisao.example" },
+  };
+  const partnerInput = {
+    name: "Partner feed",
+    platform: PlatformEnum.PARTNER,
+    config: {
+      resource: ResourceType.Asset,
+      integrationUri: "https://partner.example",
+    },
+  };
+
+  beforeEach(() => {
+    mockPrisma.user.create.mockResolvedValue({ id: "integration-user" });
+    mockPrisma.integration.create.mockResolvedValue({ id: "integration-2" });
+  });
+
+  it("rejects a second integration of a singleton platform", async () => {
+    mockPrisma.integration.findFirst.mockResolvedValue({ id: "integration-1" });
+
+    await expect(caller.create(medisaoInput)).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    expect(mockPrisma.integration.findFirst).toHaveBeenCalledWith({
+      where: { platform: PlatformEnum.MEDISAO },
+      select: { id: true },
+    });
+    expect(mockPrisma.integration.create).not.toHaveBeenCalled();
+  });
+
+  it("locks the platform, then creates its first integration", async () => {
+    mockPrisma.integration.findFirst.mockResolvedValue(null);
+
+    await caller.create(medisaoInput);
+
+    const [strings, key] = mockPrisma.$executeRaw.mock.calls[0];
+    expect(strings.join("?")).toContain("pg_advisory_xact_lock");
+    expect(key).toBe(`integration:${PlatformEnum.MEDISAO}`);
+    expect(mockPrisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      mockPrisma.integration.findFirst.mock.invocationCallOrder[0],
+    );
+    expect(mockPrisma.integration.create).toHaveBeenCalledOnce();
+  });
+
+  it("allows many integrations of a platform that is not a singleton", async () => {
+    await caller.create(partnerInput);
+
+    expect(mockPrisma.$executeRaw).not.toHaveBeenCalled();
+    expect(mockPrisma.integration.findFirst).not.toHaveBeenCalled();
+    expect(mockPrisma.integration.create).toHaveBeenCalledOnce();
   });
 });
 

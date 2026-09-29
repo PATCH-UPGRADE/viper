@@ -5,24 +5,36 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { INTEGRATIONS_POLL_INTERVAL_MS, PAGINATION } from "@/config/constants";
+import type { PlatformEnum } from "@/generated/prisma";
 import { usePaginationParams } from "@/lib/pagination";
 import { useTRPC } from "@/trpc/client";
 
 // Category counts/filtering need every integration, not one page of them —
 // a hospital's connector list is bounded, so max page size is effectively "all".
-export const useSuspenseIntegrations = () => {
+const useIntegrationsQueryOptions = () => {
   const trpc = useTRPC();
   const [params] = usePaginationParams();
 
-  return useSuspenseQuery({
+  return {
     ...trpc.integrations.getMany.queryOptions({
       ...params,
       pageSize: PAGINATION.MAX_PAGE_SIZE,
     }),
     refetchInterval: INTEGRATIONS_POLL_INTERVAL_MS,
     refetchIntervalInBackground: true,
-  });
+  };
 };
+
+export const useSuspenseIntegrations = () =>
+  useSuspenseQuery(useIntegrationsQueryOptions());
+
+/** Re-renders only when the set of platforms changes, not on every sync-status poll. */
+export const useAddedPlatforms = (): PlatformEnum[] =>
+  useSuspenseQuery({
+    ...useIntegrationsQueryOptions(),
+    select: (data) =>
+      [...new Set(data.items.map((item) => item.platform))].sort(),
+  }).data;
 
 const useInvalidateIntegrations = () => {
   const trpc = useTRPC();

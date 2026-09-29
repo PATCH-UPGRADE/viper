@@ -23,6 +23,7 @@ export const medisao: ConnectorModule<MedIsaoConfig, MedIsaoCreds> = {
     description:
       "Manufacturer advisories and remediations from the MedISAO channel API.",
     categories: ["Vulnerability Management Platforms", "Notifications"],
+    singleton: true,
     configSchema,
     credentialSchema,
   },

@@ -219,6 +219,8 @@ export interface ConnectorDefinition<TConfig, TCreds> {
   description: string;
   /** Which connectors-dashboard sections this platform shows under. */
   categories: Category[];
+  /** At most one Integration of this platform can exist. */
+  singleton?: boolean;
   /** Validates `Integration.config`. */
   configSchema: z.ZodType<TConfig>;
   /** Validates the decrypted `Integration.credentials`. */

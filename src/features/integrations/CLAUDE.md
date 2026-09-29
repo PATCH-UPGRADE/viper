@@ -111,6 +111,9 @@ puller loops and returns the cursor it reached; a pusher fires one request and r
 
 `onCreate?()` runs once, after the row is created (`server/routers.ts`).
 
+Set `definition.singleton: true` if a hospital needs only one Integration of the platform. The
+`create` procedure rejects a second one with `CONFLICT`, and the catalog disables its "Add" button.
+
 ## Resource modules
 
 A **resource module** is the per-resource half of a platform whose protocol *we* speak — where we

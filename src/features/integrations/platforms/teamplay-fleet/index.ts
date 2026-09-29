@@ -19,6 +19,7 @@ export const teamplayFleet: ConnectorModule<FleetConfig, FleetCreds> = {
     displayName: SIEMENS_HEALTHINEERS,
     description: "Sync device and service data from teamplay Fleet.",
     categories: ["Hospital Inventory", "Notifications", "Ticketing Platforms"],
+    singleton: true,
     configSchema,
     credentialSchema,
   },

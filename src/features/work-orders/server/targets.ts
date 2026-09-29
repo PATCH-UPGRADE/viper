@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  type AssetNameSource,
+  assetNameSelect,
+  getAssetDisplayName,
+} from "@/features/assets/utils";
 import type { PlatformEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
 
@@ -17,6 +22,8 @@ interface TargetAsset {
   id: string;
   hostname: string | null;
   ip: string | null;
+  serialNumber: string | null;
+  role: string | null;
   /** The platform's own id for this asset. Null when it was never synced. */
   externalId: string | null;
 }
@@ -39,12 +46,8 @@ export interface ResolvedTargets {
   unknownIds: string[];
 }
 
-/** How an asset is named to a person: hostname, else IP, else its id. */
-export const labelFor = (a: {
-  id: string;
-  hostname: string | null;
-  ip: string | null;
-}) => a.hostname ?? a.ip ?? a.id;
+/** How an asset is named to a person: the shared rule in `getAssetDisplayName`. */
+export const labelFor = (a: AssetNameSource) => getAssetDisplayName(a);
 
 export async function resolveWorkOrderTargets(
   assetIds: string[],
@@ -68,9 +71,7 @@ export async function resolveWorkOrderTargets(
       assets: {
         where: { id: { in: unique } },
         select: {
-          id: true,
-          hostname: true,
-          ip: true,
+          ...assetNameSelect,
           externalMappings: {
             select: { integrationId: true, externalId: true },
           },
@@ -108,6 +109,8 @@ export async function resolveWorkOrderTargets(
         id: asset.id,
         hostname: asset.hostname,
         ip: asset.ip,
+        serialNumber: asset.serialNumber,
+        role: asset.role,
         externalId:
           asset.externalMappings.find((m) => m.integrationId === integration.id)
             ?.externalId ?? null,
@@ -121,7 +124,7 @@ export async function resolveWorkOrderTargets(
   const rows = missing.length
     ? await prisma.asset.findMany({
         where: { id: { in: missing } },
-        select: { id: true, hostname: true, ip: true },
+        select: assetNameSelect,
       })
     : [];
 

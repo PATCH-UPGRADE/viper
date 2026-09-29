@@ -109,7 +109,9 @@ export const LinkedAssetsTable = ({
               <TableCell className="text-sm">
                 <ClampedCell text={model} />
               </TableCell>
-              <TableCell className="font-mono text-xs">{asset.ip}</TableCell>
+              <TableCell className="font-mono text-xs">
+                {asset.ip ?? "—"}
+              </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 <ClampedCell text={formatLocation(asset.location)} />
               </TableCell>
@@ -123,7 +125,7 @@ export const LinkedAssetsTable = ({
                     size="sm"
                     onClick={() => onDetach(asset.id)}
                     disabled={detachPending}
-                    aria-label={`Detach ${asset.hostname ?? asset.ip}`}
+                    aria-label={`Detach ${assetLabel(asset)}`}
                   >
                     <XIcon className="size-4" />
                   </Button>

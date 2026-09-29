@@ -1,4 +1,5 @@
 import { assetUtilizationSchema } from "@/features/assets/types";
+import { getAssetDisplayName } from "@/features/assets/utils";
 import { deviceGroupCpeList, deviceGroupLabel } from "./device-group";
 import type { CanonicalRef } from "./shared";
 
@@ -122,7 +123,7 @@ export function assetToMarkdown(
   a: AssetForMarkdown,
   opts: { includeIssues?: boolean } = { includeIssues: true },
 ): string {
-  const label = a.hostname ?? a.ip ?? a.id;
+  const label = getAssetDisplayName(a);
   const lines = [
     `### ${label} (${a.id})`,
     `- **IP**: ${a.ip ?? "N/A"}`,

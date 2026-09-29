@@ -102,6 +102,7 @@ vi.mock("@/inngest/client", () => ({
 }));
 
 import { createCallerFactory } from "@/trpc/init";
+import { ticketDetailInclude, workOrderListInclude } from "../types";
 import { trackingRouter } from "./routers";
 
 const createCaller = createCallerFactory(trackingRouter);
@@ -946,7 +947,17 @@ describe("trackingRouter.list", () => {
       sourceLabel: null,
       departments: [],
       assignee: null,
-      assets: [],
+      assets: [
+        {
+          asset: {
+            id: "a1",
+            hostname: null,
+            ip: null,
+            serialNumber: "63014",
+            role: "Computed Tomography (CT)",
+          },
+        },
+      ],
       vulnerabilities: [],
       advisories: [],
       remediations: [],
@@ -2010,7 +2021,15 @@ describe("trackingRouter.detachAsset", () => {
       },
       select: {
         ticketId: true,
-        asset: { select: { hostname: true, ip: true } },
+        asset: {
+          select: {
+            id: true,
+            hostname: true,
+            ip: true,
+            serialNumber: true,
+            role: true,
+          },
+        },
       },
     });
     expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({
@@ -2042,6 +2061,46 @@ describe("trackingRouter.listAttachableAssets", () => {
     });
     expect(arg.take).toBe(100);
     expect(arg.orderBy).toEqual([{ hostname: "asc" }, { ip: "asc" }]);
+  });
+
+  it("searches every field the display name can use, so serial-named assets are reachable past the 100-row cap", async () => {
+    const caller = setup();
+    mockPrisma.asset.findMany.mockResolvedValue([]);
+
+    await caller.listAttachableAssets({ ticketId: "t1", search: "63014" });
+
+    const arg = mockPrisma.asset.findMany.mock.calls[0][0];
+    expect(arg.where).toEqual({
+      assetTickets: { none: { parentTicketId: "t1" } },
+      OR: [
+        { hostname: { contains: "63014", mode: "insensitive" } },
+        { ip: { contains: "63014", mode: "insensitive" } },
+        { serialNumber: { contains: "63014", mode: "insensitive" } },
+        { role: { contains: "63014", mode: "insensitive" } },
+      ],
+    });
+  });
+});
+
+describe("linked-asset include and output schema", () => {
+  const fieldsLinkedAssetSchemaRequires = [
+    "id",
+    "hostname",
+    "ip",
+    "serialNumber",
+    "role",
+  ];
+
+  it("is selected by the list include — dropping one here makes every GET /work-orders response fail output validation", () => {
+    expect(
+      Object.keys(workOrderListInclude.assets.select.asset.select),
+    ).toEqual(expect.arrayContaining(fieldsLinkedAssetSchemaRequires));
+  });
+
+  it("is selected by the detail include — dropping one here makes every GET /work-orders/{id} response fail output validation", () => {
+    expect(Object.keys(ticketDetailInclude.assets.select.asset.select)).toEqual(
+      expect.arrayContaining(fieldsLinkedAssetSchemaRequires),
+    );
   });
 });
 
@@ -2290,6 +2349,33 @@ describe("activity writes", () => {
           },
         },
       ],
+    });
+  });
+
+  it("names the child ticket and the ASSET_ATTACHED row by serial number when the asset has no hostname or ip", async () => {
+    const caller = setup();
+    mockPrisma.asset.findUniqueOrThrow.mockResolvedValueOnce({
+      id: "a1",
+      hostname: null,
+      ip: null,
+      serialNumber: "63014",
+      role: "Computed Tomography (CT)",
+    });
+
+    await caller.attachAsset({ ticketId: "t1", assetId: "a1" });
+
+    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ summary: "Test ticket — 63014" }),
+      }),
+    );
+    expect(mockPrisma.ticketActivity.create).toHaveBeenCalledWith({
+      data: {
+        ticketId: "t1",
+        userId: FAKE_USER_ID,
+        type: "ASSET_ATTACHED",
+        data: { assetId: "a1", assetLabel: "63014" },
+      },
     });
   });
 });

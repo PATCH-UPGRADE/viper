@@ -444,10 +444,10 @@ export const useUnlinkTicket = () => {
   );
 };
 
-export const useAttachableAssets = (ticketId: string) => {
+export const useAttachableAssets = (ticketId: string, search: string) => {
   const trpc = useTRPC();
   return useQuery(
-    trpc.tracking.listAttachableAssets.queryOptions({ ticketId }),
+    trpc.tracking.listAttachableAssets.queryOptions({ ticketId, search }),
   );
 };
 

@@ -81,19 +81,17 @@ export function useViperChat(
   );
 
   const send = useCallback(
-    (text: string, override?: Partial<UseChatAgentConfig>) => {
+    (text: string) => {
       const threadId = currentThreadId ?? crypto.randomUUID();
       if (!currentThreadId) setCurrentThreadId(threadId);
-      const cfg = { ...config, ...override };
       void sendMessage(
         { text },
         {
           body: {
             threadId,
             userRole,
-            agent: cfg.agent ?? "chat",
-            assetData: cfg.assetData,
-            vulnerabilityData: cfg.vulnerabilityData,
+            assetId: config?.assetId,
+            vulnerabilityId: config?.vulnerabilityId,
             fromReports: !!controlledThreadId,
           },
         },

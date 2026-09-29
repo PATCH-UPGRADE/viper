@@ -1,4 +1,5 @@
 import "server-only";
+import { assetNameSelect } from "@/features/assets/utils";
 import { SubmissionState } from "@/generated/prisma";
 import type { TransactionClient } from "@/lib/db";
 import {
@@ -48,9 +49,7 @@ export async function assetsForMatchings(
   const candidates = await db.asset.findMany({
     where: { deviceGroup: { OR: matchings.map(deviceGroupWhereForMatching) } },
     select: {
-      id: true,
-      hostname: true,
-      ip: true,
+      ...assetNameSelect,
       deviceGroup: {
         select: {
           id: true,

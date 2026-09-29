@@ -501,10 +501,14 @@ function AssetInfoColumn({ asset }: { asset: AssetWithIssueRelations }) {
     {
       header: "Network Information",
       items: [
-        {
-          header: "IP Address",
-          content: <CopyCode>{asset.ip}</CopyCode>,
-        },
+        ...(asset.ip
+          ? [
+              {
+                header: "IP Address",
+                content: <CopyCode>{asset.ip}</CopyCode>,
+              },
+            ]
+          : []),
         ...(asset.networkSegment
           ? [
               {
@@ -608,22 +612,31 @@ export function AssetDashboardDrawer({
         label:
           "What happens to patient monitoring if this device goes offline?",
       },
-      { label: "Are there any safety risks for patients?" },
+      {
+        label:
+          "What should we do about any patient-safety risks on this device?",
+      },
     ],
     "IT staff": [
       { label: "Advise me on creating a remediation plan for this asset." },
-      { label: "What is the expected downtime for remediation?" },
+      {
+        label:
+          "When should we schedule this work, and how much downtime will it need?",
+      },
       { label: "Are there dependencies on other systems?" },
     ],
     "hospital administration": [
       { label: "Advise me on creating a remediation plan for this asset." },
       { label: "How does this affect our regulatory compliance?" },
-      { label: "What is the risk of delaying remediation?" },
+      {
+        label:
+          "Should we act now or can this wait, and what is the risk either way?",
+      },
     ],
     "biomedical engineer": [
       { label: "Advise me on creating a remediation plan for this asset." },
       { label: "Are there manufacturer advisories for this device?" },
-      { label: "What is the clinical impact of applying this patch?" },
+      { label: "How would applying this patch affect patient care?" },
     ],
   };
   const visibleQuestions = suggestedQuestions[userRole] ?? [];
@@ -642,7 +655,7 @@ export function AssetDashboardDrawer({
       icon: MessageSquare,
       content: (
         <SuggestedQuestionsProvider questions={visibleQuestions}>
-          <AIChat config={{ agent: "giveRecommendations", assetData: asset }} />
+          <AIChat config={{ assetId: asset.id }} />
         </SuggestedQuestionsProvider>
       ),
       rawContent: true,

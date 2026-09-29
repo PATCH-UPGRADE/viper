@@ -74,38 +74,52 @@ export async function runNotificationPipeline({
     const tlp = known?.tlp ?? result.tlp;
 
     if (result.action === "update") {
-      await prisma.notification.update({
-        where: { id: result.notificationId },
-        data: {
-          type: result.type,
-          title: result.title,
-          summary: result.summary,
-          ...(tlp ? { tlp } : {}),
-          sourceLinks: {
-            create: {
-              sourceRecordId: sourceId,
-              sourceType: "Link",
-              reasonWhy: result.reasonWhy,
+      await prisma.$transaction(async (tx) => {
+        await tx.notification.update({
+          where: { id: result.notificationId },
+          data: {
+            type: result.type,
+            title: result.title,
+            summary: result.summary,
+            sourceLinks: {
+              create: {
+                sourceRecordId: sourceId,
+                sourceType: "Link",
+                reasonWhy: result.reasonWhy,
+              },
             },
           },
-        },
+        });
+        if (tlp) {
+          await tx.sourceRecord.update({
+            where: { id: sourceId },
+            data: { tlp },
+          });
+        }
       });
 
       return result.notificationId;
     }
 
-    const notification = await prisma.notification.create({
-      data: {
-        type: result.type,
-        title: result.title,
-        summary: result.summary,
-        ...(tlp ? { tlp } : {}),
-        sourceLinks: {
-          create: { sourceRecordId: sourceId, sourceType: "Source" },
+    return prisma.$transaction(async (tx) => {
+      const notification = await tx.notification.create({
+        data: {
+          type: result.type,
+          title: result.title,
+          summary: result.summary,
+          sourceLinks: {
+            create: { sourceRecordId: sourceId, sourceType: "Source" },
+          },
         },
-      },
+      });
+      if (tlp) {
+        await tx.sourceRecord.update({
+          where: { id: sourceId },
+          data: { tlp },
+        });
+      }
+      return notification.id;
     });
-    return notification.id;
   });
 
   const linkSummary = await linkEntities(step, notificationId, {

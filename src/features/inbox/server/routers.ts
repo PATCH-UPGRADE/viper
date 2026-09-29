@@ -570,6 +570,8 @@ export const notificationsRouter = createTRPCRouter({
           id: true,
           ip: true,
           hostname: true,
+          serialNumber: true,
+          role: true,
           location: true,
           status: true,
           deviceGroup: {
@@ -586,6 +588,8 @@ export const notificationsRouter = createTRPCRouter({
         id: a.id,
         ip: a.ip,
         hostname: a.hostname,
+        serialNumber: a.serialNumber,
+        role: a.role,
         location: a.location,
         status: a.status,
         version: a.deviceGroup.version?.canonicalName ?? null,

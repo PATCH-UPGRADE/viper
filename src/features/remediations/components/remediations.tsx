@@ -221,22 +221,30 @@ function RemediationDrawer({
 
           <Separator />
 
-          {/* Related Vulnerability */}
-          {remediation.vulnerability && (
+          {/* Related Vulnerabilities */}
+          {remediation.vulnerabilities.length > 0 && (
             <div className="flex flex-col gap-2">
               <h3 className="font-semibold text-destructive">
-                Related Vulnerability
+                {remediation.vulnerabilities.length === 1
+                  ? "Related Vulnerability"
+                  : "Related Vulnerabilities"}
               </h3>
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangleIcon className="size-4 text-destructive" />
-                  <span className="font-medium text-sm">
-                    <Link href={remediation.vulnerability.url}>
-                      {remediation.vulnerability.id}
-                    </Link>
-                  </span>
-                </div>
-              </div>
+              <ul className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 flex flex-col gap-2">
+                {remediation.vulnerabilities.map((vulnerability) => (
+                  <li
+                    key={vulnerability.id}
+                    className="flex items-center gap-2"
+                  >
+                    <AlertTriangleIcon
+                      className="size-4 text-destructive"
+                      aria-hidden
+                    />
+                    <span className="font-medium text-sm">
+                      <Link href={vulnerability.url}>{vulnerability.id}</Link>
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

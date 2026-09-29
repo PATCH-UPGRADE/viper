@@ -725,7 +725,7 @@ model Vulnerability {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  remediations         Remediation[]
+  remediations         Remediation[]                      @relation("RemediationVulnerabilities")
   issues               Issue[]
   workOrderTickets     WorkOrderTicket[]                  @relation("WorkOrderTicketVulns")
   notificationMappings NotificationVulnerabilityMapping[]
@@ -875,8 +875,7 @@ model Remediation {
   description          String?               @db.Text // description of remediation
   narrative            String?               @db.Text // how a remediation can be applied
 
-  vulnerabilityId String?
-  vulnerability   Vulnerability? @relation(fields: [vulnerabilityId], references: [id], onDelete: SetNull)
+  vulnerabilities Vulnerability[] @relation("RemediationVulnerabilities")
 
   issueRemediations    IssueRemediation[]
   workOrderTickets     WorkOrderTicket[]                @relation("WorkOrderTicketRemediations")
@@ -898,7 +897,6 @@ model Remediation {
   sourceRecords            SourceRecord[]
   medisaoCommentIdentities MedISAOExternalCommentIdentity[]
 
-  @@index([vulnerabilityId])
   @@index([userId])
   @@map("remediation")
 }
@@ -1513,7 +1511,6 @@ enum SourceLinkType {
 model Notification {
   id      String           @id @default(cuid())
   type    NotificationType
-  tlp     Tlp?
   title   String?
   summary String?          @db.Text
   details Json? // unindexed, NotificationType-specific fields
@@ -1589,6 +1586,7 @@ model PlanBriefing {
 model SourceRecord {
   id      String        @id @default(cuid())
   channel SourceChannel
+  tlp     Tlp?
 
   // null for email / TA4 sources, since those aren't mirrored rows.
   // INVARIANT: mappingId set => externalId null

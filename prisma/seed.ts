@@ -1,4 +1,5 @@
 import { hashPassword } from "better-auth/crypto";
+import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
 import {
   type ArtifactType,
   type AssetStatus,
@@ -1863,7 +1864,7 @@ async function seedRemediations(userId: string) {
         data: {
           description: remediation.description,
           narrative: remediation.narrative,
-          vulnerabilityId: vulnerability.id,
+          vulnerabilities: { connect: { id: vulnerability.id } },
           deviceGroupMatchings: matchingId
             ? { connect: { id: matchingId } }
             : undefined,
@@ -2282,11 +2283,11 @@ async function seedAssetTicket(
 ) {
   const asset = await prisma.asset.findUniqueOrThrow({
     where: { id: assetId },
-    select: { hostname: true, ip: true },
+    select: assetNameSelect,
   });
   await prisma.workOrderTicket.create({
     data: {
-      summary: `${parentTicket.summary} — ${asset.hostname ?? asset.ip}`,
+      summary: `${parentTicket.summary} — ${getAssetDisplayName(asset)}`,
       category: parentTicket.category,
       sourceLabel: parentTicket.sourceLabel,
       scheduledAt: parentTicket.scheduledAt,
@@ -2300,7 +2301,7 @@ async function seedAssetTicket(
       ticketId: parentTicket.id,
       userId,
       type: "ASSET_ATTACHED",
-      data: { assetId, assetLabel: asset.hostname ?? asset.ip },
+      data: { assetId, assetLabel: getAssetDisplayName(asset) },
     },
   });
 }
@@ -2341,7 +2342,9 @@ async function createWorkOrderTicket(
 
   const linkedRemediations = ticket.linkedCveIds?.length
     ? await prisma.remediation.findMany({
-        where: { vulnerability: { cveId: { in: ticket.linkedCveIds } } },
+        where: {
+          vulnerabilities: { some: { cveId: { in: ticket.linkedCveIds } } },
+        },
         select: { id: true },
       })
     : [];
@@ -2647,7 +2650,6 @@ async function seedFleetAdvisoryNotification() {
   await prisma.notification.create({
     data: {
       type: NotificationType.Advisory,
-      tlp: Tlp.AMBER,
       title:
         "Siemens Healthineers advisory: privilege escalation on MAGNETOM and SOMATOM consoles",
       summary:
@@ -2682,6 +2684,7 @@ async function seedFleetAdvisoryNotification() {
           sourceRecord: {
             create: {
               channel: SourceChannel.Email,
+              tlp: Tlp.AMBER,
               raw,
               markdown: FLEET_ADVISORY_MARKDOWN,
               contentHash: sourceContentHash(raw, FLEET_ADVISORY_MARKDOWN),

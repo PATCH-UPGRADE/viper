@@ -26,6 +26,7 @@ export const notificationInclude = {
         select: {
           id: true,
           channel: true,
+          tlp: true,
           raw: true,
           observedAt: true,
           // An integration source has no sender to show, so the row it came
@@ -82,6 +83,7 @@ export const notificationDetailInclude = {
         select: {
           id: true,
           channel: true,
+          tlp: true,
           raw: true,
           markdown: true,
           observedAt: true,
@@ -109,6 +111,8 @@ export type ResolvedDeviceGroupAsset = {
   id: string;
   ip: string | null;
   hostname: string | null;
+  serialNumber: string | null;
+  role: string | null;
   location: unknown;
   version: string | null;
   versionStatus: VersionStatus;

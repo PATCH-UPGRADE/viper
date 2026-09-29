@@ -7,6 +7,7 @@ import {
   fileExtensionLabel,
   notificationActivityRows,
   nvdUrl,
+  sourceLabel,
 } from "./shared";
 
 describe("emailSenderName", () => {
@@ -179,5 +180,40 @@ describe("notificationActivityRows", () => {
       isAgent: false,
     });
     expect(rows).toHaveLength(3);
+  });
+});
+
+describe("sourceLabel", () => {
+  it("names an integration source by its integration", () => {
+    expect(
+      sourceLabel({
+        channel: "Integration",
+        raw: {},
+        mapping: { integration: { name: "MedISAO" } },
+      }),
+    ).toBe("MedISAO");
+  });
+
+  it("prefers the integration over anything in the payload", () => {
+    expect(
+      sourceLabel({
+        channel: "Integration",
+        raw: { data: { from: "noreply@cisa.org" } },
+        mapping: { integration: { name: "CISA" } },
+      }),
+    ).toBe("CISA");
+  });
+
+  it("names an email source by its sender", () => {
+    expect(
+      sourceLabel({
+        channel: "Email",
+        raw: { data: { from: "email sender" } },
+      }),
+    ).toBe("email sender");
+  });
+
+  it("falls back to the channel when there is neither", () => {
+    expect(sourceLabel({ channel: "TA4", raw: {}, mapping: null })).toBe("TA4");
   });
 });

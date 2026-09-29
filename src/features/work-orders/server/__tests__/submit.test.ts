@@ -194,4 +194,43 @@ describe("fileClaimedTicket", () => {
     expect(request).not.toHaveBeenCalled();
     expect(result).toEqual({ externalIds: ["FLEET-9"], failures: [] });
   });
+
+  it("names a failed filing by serial number when the asset has no hostname or ip", async () => {
+    fullyFiled();
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValue({
+      id: "wo-1",
+      summary: "Patch",
+      body: null,
+      category: "PATCH",
+      scheduledAt: null,
+      platformPayload: {},
+      targetIntegrationId: "int-1",
+      assets: [
+        {
+          asset: {
+            id: "a1",
+            hostname: null,
+            ip: null,
+            serialNumber: "63014",
+            role: "Computed Tomography (CT)",
+          },
+          ticketId: "child-1",
+        },
+      ],
+    });
+    mockPrisma.externalWorkOrderMapping.findMany.mockResolvedValue([]);
+    create.mockRejectedValueOnce(new Error("503 Service Unavailable"));
+
+    const result = await fileClaimedTicket("wo-1", "user-1");
+
+    const ticketQuery =
+      mockPrisma.workOrderTicket.findUniqueOrThrow.mock.calls[0][0];
+    expect(ticketQuery.select.assets.select.asset.select).toMatchObject({
+      serialNumber: true,
+      role: true,
+    });
+    expect(result.failures).toEqual([
+      { asset: "63014", message: "503 Service Unavailable" },
+    ]);
+  });
 });

@@ -43,10 +43,9 @@ async function resolveVulnerabilityIds(
  * The description we store, with every vulnerability the remediation claims to
  * fix named in it.
  *
- * Viper holds one vulnerability per remediation and MedISAO lists many, so the
- * rest would be lost: the sync stores no raw payload, and an identifier we do
- * not already hold resolves to nothing. Naming them keeps them readable and
- * searchable even when Viper has never heard of them.
+ * An identifier we do not already hold resolves to nothing, and the sync
+ * stores no raw payload, so it would be lost. Naming them keeps them readable
+ * and searchable even when Viper has never heard of them.
  *
  * Built from the feed alone. Marking which ones Viper holds would rewrite this
  * text every time a vulnerability was added, so a re-sync would churn the row.
@@ -107,36 +106,29 @@ async function ingestRemediations(
           matchingIdCache.set(identity, matchingId);
         }
 
-        // Viper holds one vulnerability per remediation, MedISAO lists many.
-        // Link only when the answer is unambiguous.
-        const resolved = [
+        const vulnerabilities = [
           ...new Set(
             item.fixedVulnerabilities
               .map((name) => vulnerabilityIdByName.get(name))
               .filter((id): id is string => Boolean(id)),
           ),
-        ];
-        const vulnerabilityId = resolved.length === 1 ? resolved[0] : null;
+        ].map((id) => ({ id }));
 
         const fields = {
           description: describeRemediation(item),
           narrative: item.narrative,
           sourceImpact: item.sourceImpact,
-          ...(vulnerabilityId ? { vulnerabilityId } : {}),
+          // `connect` is idempotent, so on re-sync a matching or vulnerability
+          // already attached stays attached exactly once, and a link a user
+          // added survives.
+          deviceGroupMatchings: { connect: [{ id: matchingId }] },
+          vulnerabilities: { connect: vulnerabilities },
         };
 
         return {
-          createData: {
-            ...fields,
-            userId,
-            deviceGroupMatchings: { connect: [{ id: matchingId }] },
-          },
-          // Never reassign the creator on re-sync. `connect` is idempotent, so
-          // a matching already attached stays attached exactly once.
-          updateData: {
-            ...fields,
-            deviceGroupMatchings: { connect: [{ id: matchingId }] },
-          },
+          createData: { ...fields, userId },
+          // Never reassign the creator on re-sync.
+          updateData: fields,
           // A remediation has no natural business key, so with no external
           // mapping there is nothing to match on and the record is new.
           uniqueFieldConditions: [],

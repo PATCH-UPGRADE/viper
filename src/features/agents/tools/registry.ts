@@ -7,7 +7,10 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { REQUEST_RECOMMENDATION_TOOL } from "../shared/recommendation-window";
 import { makeRecordNoteTool } from "./note-tool";
-import { makeQueryPlatformDataTool } from "./query-platform-tool";
+import {
+  makeQueryPlatformDataTool,
+  type Retrieval,
+} from "./query-platform-tool";
 import {
   makeEditReportTool,
   makeReadReportTool,
@@ -73,10 +76,7 @@ const requestRecommendation = tool(
  */
 export function buildAgentTools(userId: string, reportThreadId: string) {
   // What was looked up this turn; report tools only accept citations to it.
-  const retrieval = {
-    ids: new Set<string>(),
-    pending: new Set<Promise<unknown>>(),
-  };
+  const retrieval: Retrieval = [];
   return [
     makeQueryPlatformDataTool(userId, retrieval),
     askUserQuestions,

@@ -331,15 +331,6 @@ function linkEntities(value: unknown): void {
   if (Array.isArray(obj.nodes) && !("type" in obj)) linkifyWorkflow(obj);
 }
 
-/** Every id in a result, nested ones too (an asset carries its device group). */
-export function collectIds(value: unknown, into: Set<string>): void {
-  if (value === null || typeof value !== "object") return;
-  for (const [key, v] of Object.entries(value)) {
-    if (key === "id" && typeof v === "string") into.add(v);
-    else collectIds(v, into);
-  }
-}
-
 type PlatformProcedure = (typeof PLATFORM_QUERY_PROCEDURES)[number];
 
 /**
@@ -381,8 +372,8 @@ export function capPageSize(
 /**
  * Look up platform data on demand via the in-process authenticated tRPC caller.
  */
-/** Ids the model looked up this turn, plus lookups still running. */
-export type Retrieval = { ids: Set<string>; pending: Set<Promise<unknown>> };
+/** This turn's lookup outputs, still pending if a call runs in parallel. */
+export type Retrieval = Promise<string>[];
 
 export function makeQueryPlatformDataTool(
   userId: string,
@@ -406,7 +397,6 @@ export function makeQueryPlatformDataTool(
         procedure,
         input: callInput,
       });
-      if (retrieval) collectIds(result, retrieval.ids);
       return JSON.stringify(result);
     } catch (error) {
       const message =
@@ -417,11 +407,10 @@ export function makeQueryPlatformDataTool(
     }
   };
   return tool(
-    // Parallel tool calls: a report save waits on lookups still pending.
     ({ procedure, input }) => {
       const work = lookup(procedure, input);
-      retrieval?.pending.add(work);
-      return work.finally(() => retrieval?.pending.delete(work));
+      retrieval?.push(work);
+      return work;
     },
     {
       name: "query_platform_data",

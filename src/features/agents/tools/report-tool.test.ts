@@ -178,11 +178,11 @@ const run = (
   ) => { invoke: (i: never) => unknown },
   input: object,
   ids = new Set<string>(),
-  pending = new Set<Promise<unknown>>(),
+  retrieval: Retrieval = [
+    Promise.resolve(JSON.stringify([...ids].map((id) => ({ id })))),
+  ],
 ) =>
-  make("user", "thread", { ids, pending }).invoke(
-    input as never,
-  ) as Promise<string>;
+  make("user", "thread", retrieval).invoke(input as never) as Promise<string>;
 const edit = (oldText: string, newText: string) =>
   run(makeEditReportTool, { oldText, newText });
 
@@ -297,15 +297,14 @@ describe("citation retrieval check and Sources", () => {
   });
 
   it("waits for a lookup still running in parallel", async () => {
-    const ids = new Set<string>();
-    const lookup = new Promise((done) =>
-      setTimeout(() => done(ids.add("a1")), 20),
+    const lookup = new Promise<string>((done) =>
+      setTimeout(() => done('{"id":"a1"}'), 20),
     );
     await run(
       makeWriteReportTool,
       { title: "R", markdown: "[A](/assets/a1)" },
-      ids,
-      new Set([lookup]),
+      new Set(),
+      [lookup],
     );
     expect(saved()!.content).toBe("[A](/assets/a1)");
   });

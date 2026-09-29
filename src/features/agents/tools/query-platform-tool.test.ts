@@ -164,7 +164,7 @@ describe("the tool applies the cap, not just the helper", () => {
     expect(getMany).toHaveBeenCalledWith({ pageSize: 10, search: "siemens" });
   });
 
-  it("records every id in the result, nested ones included", async () => {
+  it("hands each lookup's output to the report tools", async () => {
     vi.resetModules();
     const getMany = vi
       .fn()
@@ -174,15 +174,13 @@ describe("the tool applies the cap, not just the helper", () => {
     }));
 
     const { makeQueryPlatformDataTool } = await import("./query-platform-tool");
-    const retrieved = new Set<string>();
-    await makeQueryPlatformDataTool("user_1", {
-      ids: retrieved,
-      pending: new Set(),
-    }).invoke({
+    const retrieval: Promise<string>[] = [];
+    const output = await makeQueryPlatformDataTool("user_1", retrieval).invoke({
       procedure: "notifications.getMany",
     });
 
-    expect(retrieved).toEqual(new Set(["n1", "a1"]));
+    expect(retrieval).toHaveLength(1);
+    expect(await retrieval[0]).toBe(output);
   });
 });
 

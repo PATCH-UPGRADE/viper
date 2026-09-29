@@ -5,7 +5,7 @@ import { z } from "zod";
 import { existingIds } from "@/features/inbox/utils";
 import prisma from "@/lib/db";
 import { escapeRegExp } from "@/lib/string-utils";
-import { collectIds, type Retrieval } from "./query-platform-tool";
+import type { Retrieval } from "./query-platform-tool";
 
 // Citable route segments; keep in step with the examples in graph.ts. The
 // deviceGroups key is its API route — device groups have no dashboard page.
@@ -22,13 +22,31 @@ const ROUTE_RE = new RegExp(
   `^/(${Object.keys(FINDERS).join("|")})/([^/?#]+)/?(?:[?#].*)?$`,
 );
 
-/** Ids fetched this turn plus those in earlier, persisted turns. */
+/** Every id in a result, nested ones too (an asset carries its device group). */
+function collectIds(value: unknown, into: Set<string>): void {
+  if (value === null || typeof value !== "object") return;
+  for (const [key, v] of Object.entries(value)) {
+    if (key === "id" && typeof v === "string") into.add(v);
+    else collectIds(v, into);
+  }
+}
+
+/**
+ * Ids fetched this turn plus those in earlier, persisted turns. Awaiting this
+ * turn's lookups covers one running in parallel with the report call.
+ */
 async function retrievedIds(
   threadId: string,
   retrieval: Retrieval,
 ): Promise<Set<string>> {
-  await Promise.allSettled(retrieval.pending);
-  const ids = new Set(retrieval.ids);
+  const ids = new Set<string>();
+  for (const output of await Promise.all(retrieval)) {
+    try {
+      collectIds(JSON.parse(output), ids);
+    } catch {
+      // an error message, not a result
+    }
+  }
   const rows = await prisma.chatMessage.findMany({
     where: { threadId, role: "ASSISTANT" },
     select: { toolCalls: true },
@@ -59,7 +77,9 @@ function parse(markdown: string) {
     const url =
       node.type === "link" ? node.url : definitions.get(node.identifier);
     const match = url?.match(ROUTE_RE);
-    return match ? [`/${match[1]}/${match[2]}`] : [];
+    return match
+      ? [{ path: `/${match[1]}/${match[2]}`, segment: match[1], id: match[2] }]
+      : [];
   });
   const prose = nodes
     .flatMap((node) => (node.type === "text" ? node.value : []))
@@ -78,22 +98,22 @@ async function finalizeCitations(
   retrieval: Retrieval,
 ): Promise<string> {
   const seen = await retrievedIds(threadId, retrieval);
-  const added = parse(newText).links.map((path) => path.match(ROUTE_RE)!);
+  const added = parse(newText).links;
   const valid = new Map(
     await Promise.all(
       Object.entries(FINDERS).map(async ([segment, findMany]) => {
         const ids = added
-          .filter(([, s, id]) => s === segment && seen.has(id))
-          .map(([, , id]) => id);
+          .filter((link) => link.segment === segment && seen.has(link.id))
+          .map((link) => link.id);
         return [segment, await existingIds(findMany, ids)] as const;
       }),
     ),
   );
   // Refuse rather than strip, so the model learns what it must look up.
-  const bad = added.filter(([, segment, id]) => !valid.get(segment)?.has(id));
+  const bad = added.filter(({ segment, id }) => !valid.get(segment)?.has(id));
   if (bad.length) {
     throw new Error(
-      `Not saved. Cite only records you retrieved with query_platform_data; look these up or drop the links: ${bad.map(([path]) => path).join(", ")}`,
+      `Not saved. Cite only records you retrieved with query_platform_data; look these up or drop the links: ${bad.map((link) => link.path).join(", ")}`,
     );
   }
 
@@ -132,14 +152,13 @@ async function finalizeCitations(
   ]
     .filter(
       ([path, name]) =>
-        !links.includes(path) &&
+        !links.some((link) => link.path === path) &&
         new RegExp(`(?<![\\w-])${escapeRegExp(name)}(?![\\w-])`, "i").test(
           prose,
         ),
     )
     .map(([path, name]) => `- [${name}](${path})`);
   const lines = [kept, ...sources].filter(Boolean);
-  if (at < 0 && !lines.length) return report;
   return lines.length ? `${body}\n\n## Sources\n${lines.join("\n")}` : body;
 }
 

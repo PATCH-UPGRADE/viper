@@ -18,9 +18,9 @@ import {
   streamGraphToUI,
   writeRecommendationMarker,
 } from "@/features/agents/shared/stream-bridge";
-import type { AssetWithIssueRelations } from "@/features/assets/types";
 import { USER_ROLES, type UserRole } from "@/features/chat/utils";
-import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
+import { deviceGroupSelect } from "@/features/device-groups/types";
+import { deviceGroupMatchingInclude } from "@/features/vulnerabilities/types";
 import { getSession } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
 
@@ -31,8 +31,8 @@ interface ChatBody {
   messages: UIMessage[];
   threadId?: string;
   userRole?: UserRole;
-  assetData?: AssetWithIssueRelations;
-  vulnerabilityData?: VulnerabilityWithRelations;
+  assetId?: string;
+  vulnerabilityId?: string;
   fromReports?: boolean;
 }
 
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
   }
   const userText = textOf(newUserMessage);
   const threadId = body.threadId ?? crypto.randomUUID();
-  const { assetData, vulnerabilityData, fromReports } = body;
+  const { assetId, vulnerabilityId, fromReports } = body;
   let userMessageSaved = false;
 
   const stream = createUIMessageStream({
@@ -94,12 +94,25 @@ export async function POST(req: Request) {
       userMessageSaved = true;
       const history = await loadHistoryMessages(threadId);
 
+      const openAsset = assetId
+        ? await prisma.asset.findUnique({
+            where: { id: assetId },
+            include: { deviceGroup: deviceGroupSelect },
+          })
+        : null;
+      const openVulnerability = vulnerabilityId
+        ? await prisma.vulnerability.findUnique({
+            where: { id: vulnerabilityId },
+            include: { deviceGroupMatchings: deviceGroupMatchingInclude },
+          })
+        : null;
+
       const graph = buildChatGraph({
         userId,
         userRole,
         threadId,
-        assetData,
-        vulnerabilityData,
+        assetData: openAsset ?? undefined,
+        vulnerabilityData: openVulnerability ?? undefined,
         fromReports,
       });
 

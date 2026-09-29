@@ -23,8 +23,10 @@ vi.mock("@/lib/markdown", () => ({
   vulnerabilityToMarkdown: () => "VULNERABILITY MARKDOWN",
 }));
 
-import type { AssetWithIssueRelations } from "@/features/assets/types";
-import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
+import type {
+  AssetForMarkdown,
+  VulnerabilityForMarkdown,
+} from "@/lib/markdown";
 import { buildAgentGraph } from "../shared/build-graph";
 import { buildChatGraph, buildSystemPrompt } from "./graph";
 
@@ -142,10 +144,10 @@ describe("chat system prompt — request_recommendation", () => {
 });
 
 describe("focus record", () => {
-  const asset = { id: "asset-1" } as unknown as AssetWithIssueRelations;
+  const asset = { id: "asset-1" } as unknown as AssetForMarkdown;
   const vulnerability = {
     id: "vuln-1",
-  } as unknown as VulnerabilityWithRelations;
+  } as unknown as VulnerabilityForMarkdown;
 
   it("appends the asset the user has open to both prompts", () => {
     buildChatGraph({

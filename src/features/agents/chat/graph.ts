@@ -1,15 +1,18 @@
 import "server-only";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { SystemMessage } from "@langchain/core/messages";
-import type { AssetWithIssueRelations } from "@/features/assets/types";
 import {
   ASSET_ROLE_INSTRUCTIONS,
   RECOMMENDATION_ROLE_INSTRUCTIONS,
   type UserRole,
   VULNERABILITY_ROLE_INSTRUCTIONS,
 } from "@/features/chat/utils";
-import type { VulnerabilityWithRelations } from "@/features/vulnerabilities/types";
-import { assetToMarkdown, vulnerabilityToMarkdown } from "@/lib/markdown";
+import {
+  type AssetForMarkdown,
+  assetToMarkdown,
+  type VulnerabilityForMarkdown,
+  vulnerabilityToMarkdown,
+} from "@/lib/markdown";
 import { buildAgentGraph } from "../shared/build-graph";
 import { loadPersistentNotesMarkdown } from "../shared/notes-preload";
 import { PLATFORM_CATALOG } from "../tools/query-platform-tool";
@@ -129,8 +132,8 @@ Ask for off-platform facts with ask_user_questions and record_note. Mark missing
 
 function buildFocusBlocks(
   role: UserRole,
-  assetData?: AssetWithIssueRelations,
-  vulnerabilityData?: VulnerabilityWithRelations,
+  assetData?: AssetForMarkdown,
+  vulnerabilityData?: VulnerabilityForMarkdown,
 ): string {
   const blocks: string[] = [];
 
@@ -181,8 +184,8 @@ export function buildChatGraph({
   /** The thread being written to — enables write_report. */
   threadId: string;
   /** The record the user has open, when the chat is embedded in a drawer. */
-  assetData?: AssetWithIssueRelations;
-  vulnerabilityData?: VulnerabilityWithRelations;
+  assetData?: AssetForMarkdown;
+  vulnerabilityData?: VulnerabilityForMarkdown;
   /** Request came from the /reports view — bias the prompt toward write_report. */
   fromReports?: boolean;
   loadNotes?: () => Promise<string>;

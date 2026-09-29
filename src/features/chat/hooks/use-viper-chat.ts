@@ -90,8 +90,8 @@ export function useViperChat(
           body: {
             threadId,
             userRole,
-            assetData: config?.assetData,
-            vulnerabilityData: config?.vulnerabilityData,
+            assetId: config?.assetId,
+            vulnerabilityId: config?.vulnerabilityId,
             fromReports: !!controlledThreadId,
           },
         },

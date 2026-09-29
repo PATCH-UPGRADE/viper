@@ -85,7 +85,7 @@ describe("chat system prompt — request_recommendation", () => {
     expect(prompt).toMatch(
       /request_recommendation: hand the turn to the remediation advisor/,
     );
-    expect(prompt).toMatch(/before fetching data or answering/);
+    expect(prompt).toMatch(/before\s+fetching data or answering/);
     expect(prompt).toMatch(/follow-up to an\s+answer the advisor gave/);
   });
 
@@ -97,7 +97,27 @@ describe("chat system prompt — request_recommendation", () => {
     expect(prompt).toMatch(/can neither\s+record notes nor write reports/);
     expect(prompt).toMatch(/call\s+record_note before you hand off/);
     expect(prompt).toMatch(
-      /say in your reply that you will write it when they ask again/,
+      /say in your reply that you will write it when\s+they ask again/,
+    );
+  });
+
+  it("gives request_recommendation's own description the fact-versus-decision examples, since Haiku picks tools mostly from their descriptions", () => {
+    buildChatGraph({
+      userId: "user",
+      threadId: "thread",
+      loadNotes: async () => "Hospital notes",
+    });
+    const requestRecommendation = graphConfig().tools.find(
+      (tool) => tool.name === "request_recommendation",
+    );
+    expect(requestRecommendation?.description).toMatch(
+      /Call it first and on its own/,
+    );
+    expect(requestRecommendation?.description).toMatch(
+      /'Should we apply it\?' is a decision/,
+    );
+    expect(requestRecommendation?.description).toMatch(
+      /'Is MRI-01 safe to keep using\?' is a decision/,
     );
   });
 

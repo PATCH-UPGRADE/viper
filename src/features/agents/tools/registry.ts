@@ -60,7 +60,7 @@ const requestRecommendation = tool(
   {
     name: REQUEST_RECOMMENDATION_TOOL,
     description:
-      "Hand this conversation to the remediation advisor. Use it when the user asks what to do, which devices to fix first, whether to patch now or wait, when to schedule downtime, or how a fix affects patient care, and for any follow-up to a recommendation it gave. Do not use it for lookups, for recording notes, or for writing reports.",
+      "Hand this conversation to the remediation advisor. Call it first and on its own whenever the user wants a decision or plan rather than facts, even when the message names a device or is vague. Do not look anything up or ask clarifying questions first: the advisor does both. Decisions and plans: what to fix or do first; whether to patch now, wait, mitigate or accept the risk; how to protect a device that can't be patched; whether a device is safe to keep using; when to schedule downtime; how a fix affects patient care; any follow-up to a recommendation it gave. Examples: 'Is there a patch for this CVE?' is a fact, 'Should we apply it?' is a decision. 'Which devices run this firmware?' is a fact, 'Which should we fix first?' is a decision. 'What does KEV mean?' is a definition, 'Is MRI-01 safe to keep using?' is a decision. Not for lookups, counts, definitions, recording notes, or writing reports.",
     schema: z.object({}),
   },
 );

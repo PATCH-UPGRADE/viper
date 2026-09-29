@@ -209,7 +209,7 @@ export const integrationsRouter = createTRPCRouter({
 
       const integration = await prisma.$transaction(async (tx) => {
         if (module.definition.singleton) {
-          // No unique constraint backs the singleton rule, so serialize concurrent creates of the same platform before the count.
+          // No unique constraint backs the singleton rule, so serialize concurrent creates of the same platform before the existence check.
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`integration:${row.platform}`}))`;
           const existing = await tx.integration.findFirst({
             where: { platform: row.platform },

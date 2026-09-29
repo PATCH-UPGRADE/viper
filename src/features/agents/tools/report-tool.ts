@@ -43,20 +43,9 @@ async function retrievedIds(
   return ids;
 }
 
-/**
- * Keep only citations to records that exist and were retrieved in this thread,
- * then list retrieved assets/CVEs the text names but never cites under Sources.
- */
-async function finalizeCitations(
-  body: string,
-  threadId: string,
-  retrieval: Retrieval,
-  withSources = true,
-): Promise<string> {
-  const seen = await retrievedIds(threadId, retrieval);
-
-  // Parse actual links, including references, without touching code examples.
-  const nodes = [...fromMarkdown(body).children];
+/** Route citations and prose text; code blocks and link targets are skipped. */
+function parse(markdown: string) {
+  const nodes = [...fromMarkdown(markdown).children];
   for (const node of nodes) {
     if ("children" in node) nodes.push(...node.children);
   }
@@ -70,45 +59,46 @@ async function finalizeCitations(
     const url =
       node.type === "link" ? node.url : definitions.get(node.identifier);
     const match = url?.match(ROUTE_RE);
-    return match ? [{ node, segment: match[1], id: match[2] }] : [];
+    return match ? [`/${match[1]}/${match[2]}`] : [];
   });
-  // Refuse rather than strip, so the model learns what it must look up.
-  const unretrieved = links.filter((link) => !seen.has(link.id));
-  if (unretrieved.length) {
-    throw new Error(
-      `Not saved. Look these up with query_platform_data first, or drop the links: ${unretrieved.map((l) => `/${l.segment}/${l.id}`).join(", ")}`,
-    );
-  }
+  const prose = nodes
+    .flatMap((node) => (node.type === "text" ? node.value : []))
+    .join("\n");
+  return { links, prose };
+}
+
+/**
+ * Refuse citations in newText to records not retrieved in this thread, then
+ * append retrieved assets/CVEs the report names but never cites under Sources.
+ */
+async function finalizeCitations(
+  report: string,
+  newText: string,
+  threadId: string,
+  retrieval: Retrieval,
+): Promise<string> {
+  const seen = await retrievedIds(threadId, retrieval);
+  const added = parse(newText).links.map((path) => path.match(ROUTE_RE)!);
   const valid = new Map(
     await Promise.all(
       Object.entries(FINDERS).map(async ([segment, findMany]) => {
-        const ids = links
-          .filter((link) => link.segment === segment)
-          .map((link) => link.id);
+        const ids = added
+          .filter(([, s, id]) => s === segment && seen.has(id))
+          .map(([, , id]) => id);
         return [segment, await existingIds(findMany, ids)] as const;
       }),
     ),
   );
-  let report = body;
-  // Work backwards so replacing a link never shifts another link's offsets.
-  for (const { node, segment, id } of links.sort(
-    (a, b) => b.node.position!.start.offset! - a.node.position!.start.offset!,
-  )) {
-    if (valid.get(segment)?.has(id)) continue;
-    const label = node.children.length
-      ? body.slice(
-          node.children[0].position!.start.offset!,
-          node.children.at(-1)!.position!.end.offset!,
-        )
-      : "";
-    report =
-      report.slice(0, node.position!.start.offset!) +
-      label +
-      report.slice(node.position!.end.offset!);
+  // Refuse rather than strip, so the model learns what it must look up.
+  const bad = added.filter(([, segment, id]) => !valid.get(segment)?.has(id));
+  if (bad.length) {
+    throw new Error(
+      `Not saved. Cite only records you retrieved with query_platform_data; look these up or drop the links: ${bad.map(([path]) => path).join(", ")}`,
+    );
   }
 
   // Only assets and CVEs have a short name to spot in prose.
-  if (!withSources || seen.size === 0) return report;
+  if (seen.size === 0) return report;
   const ids = [...seen];
   const [assets, vulnerabilities] = await Promise.all([
     prisma.asset.findMany({
@@ -120,21 +110,19 @@ async function finalizeCitations(
       select: { id: true, cveId: true },
     }),
   ]);
-  const prose = nodes
-    .flatMap((node) => (node.type === "text" ? node.value : []))
-    .join("\n");
+  const { links, prose } = parse(report);
   const sources = [
-    ...assets.map((a) => ["assets", a.id, a.hostname!]),
-    ...vulnerabilities.map((v) => ["vulnerabilities", v.id, v.cveId!]),
+    ...assets.map((a) => [`/assets/${a.id}`, a.hostname!]),
+    ...vulnerabilities.map((v) => [`/vulnerabilities/${v.id}`, v.cveId!]),
   ]
     .filter(
-      ([segment, id, name]) =>
-        !valid.get(segment)?.has(id) && // already cited
+      ([path, name]) =>
+        !links.includes(path) &&
         new RegExp(`(?<![\\w-])${escapeRegExp(name)}(?![\\w-])`, "i").test(
           prose,
         ),
     )
-    .map(([segment, id, name]) => `- [${name}](/${segment}/${id})`);
+    .map(([path, name]) => `- [${name}](${path})`);
   if (sources.length === 0) return report;
   return report.match(/^#{1,6} .*$/gm)?.at(-1) === "## Sources"
     ? `${report.trimEnd()}\n${sources.join("\n")}`
@@ -150,7 +138,7 @@ export function makeWriteReportTool(
     async ({ title, markdown }) => {
       const body = markdown.trim();
       if (!body) return "Report was empty — nothing saved.";
-      const report = await finalizeCitations(body, threadId, retrieval);
+      const report = await finalizeCitations(body, body, threadId, retrieval);
 
       // Ownership check first — update() can only key on the unique id.
       const thread = await prisma.chatThread.findFirst({
@@ -264,19 +252,16 @@ export function makeEditReportTool(
         return "oldText matches more than one place. Add surrounding text to make it unique.";
       }
 
-      // Check only newText so the edit touches nothing else.
-      const checked = await finalizeCitations(
-        newText,
-        threadId,
-        retrieval,
-        false,
-      );
       const updated = await prisma.chatReport.updateMany({
         // compare-and-swap: fails if the report changed since we read it
         where: { id, content },
         data: {
-          content:
-            content.slice(0, at) + checked + content.slice(at + oldText.length),
+          content: await finalizeCitations(
+            content.slice(0, at) + newText + content.slice(at + oldText.length),
+            newText,
+            threadId,
+            retrieval,
+          ),
         },
       });
       return updated.count

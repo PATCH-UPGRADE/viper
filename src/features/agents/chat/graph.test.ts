@@ -27,7 +27,6 @@ describe("chat system prompt — write_report", () => {
     const prompt = buildSystemPrompt("hospital administration");
     expect(prompt).toContain("[MRI-01](/assets/<id>)");
     expect(prompt).toMatch(/not retrieved[\s\S]*is refused/);
-    expect(prompt).toMatch(/does not exist becomes plain text/);
   });
 
   it("tells the model to say so instead of leaving the report looking complete", () => {

@@ -93,8 +93,7 @@ Look data up with query_platform_data and cite returned ids: [MRI-01](/assets/<i
 [device group](/api/v1/deviceGroups/<id>), [workflow](/workflows/<id>),
 [notification](/inbox/<id>). Device groups link to their API detail (no dashboard page).
 A report citing a record you have not retrieved in this conversation is refused; look it
-up first. A citation to a record that does not exist becomes plain text. write_report lists retrieved hosts and CVEs
-you name without citing under "## Sources".
+up first. Retrieved hosts and CVEs you name without citing are listed under "## Sources".
 Ask for off-platform facts with ask_user_questions and record_note. Mark missing facts
 "Not available". After saving, confirm briefly in chat; the report is in /reports.
 `;

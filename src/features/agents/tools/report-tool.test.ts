@@ -26,6 +26,8 @@ vi.mock("@/lib/db", () => ({
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(prisma.chatMessage.findMany).mockResolvedValue([]);
+  vi.mocked(prisma.asset.findMany).mockResolvedValue([]);
+  vi.mocked(prisma.vulnerability.findMany).mockResolvedValue([]);
   vi.mocked(prisma.chatThread.findFirst).mockResolvedValue({
     id: "thread",
   } as never);
@@ -53,7 +55,7 @@ describe("write_report", () => {
     prisma.notification,
   ];
 
-  it("batch-validates all six citation types and saves the full report", async () => {
+  it("batch-validates all six citation types and refuses a missing record", async () => {
     for (const model of models) {
       // Then the Sources lookup, which finds no named records.
       model.findMany = vi
@@ -75,28 +77,37 @@ describe("write_report", () => {
           `[Real](/${route}/valid) [Again](/${route}/valid) [Missing](/${route}/missing)`,
       )
       .join("\n");
-    const result = await run(
-      makeWriteReportTool,
-      { title: "Batch Report", markdown },
-      new Set(["valid", "missing"]),
-    );
-    expect(prisma.chatThread.findFirst).toHaveBeenCalledWith({
-      where: { id: "thread", userId: "user" },
-      select: { id: true },
-    });
-    const { content } = saved()!;
-    for (const route of routes) {
-      expect(content).toContain(`[Real](/${route}/valid)`);
-      expect(content).toContain(`[Again](/${route}/valid) Missing`);
-    }
+    await expect(
+      run(
+        makeWriteReportTool,
+        { title: "Batch Report", markdown },
+        new Set(["valid", "missing"]),
+      ),
+    ).rejects.toThrow(routes.map((route) => `/${route}/missing`).join(", "));
     for (const model of models) {
       expect(model.findMany).toHaveBeenNthCalledWith(1, {
         where: { id: { in: ["valid", "missing"] } },
         select: { id: true },
       });
     }
+
+    for (const model of models)
+      vi.mocked(model.findMany).mockResolvedValueOnce([
+        { id: "valid" },
+      ] as never);
+    const good = markdown.replace(/ \[Missing\]\([^)]*\)/g, "");
+    const result = await run(
+      makeWriteReportTool,
+      { title: "Batch Report", markdown: good },
+      new Set(["valid"]),
+    );
+    expect(prisma.chatThread.findFirst).toHaveBeenCalledWith({
+      where: { id: "thread", userId: "user" },
+      select: { id: true },
+    });
+    expect(saved()!.content).toBe(good);
     expect(result).toContain("Report saved");
-    expect(result).not.toContain(markdown);
+    expect(result).not.toContain(good);
   });
 
   it("saves title and content through a nested ChatReport upsert (create or update the same values)", async () => {
@@ -129,19 +140,16 @@ describe("write_report", () => {
     expect(prisma.chatThread.update).not.toHaveBeenCalled();
   });
 
-  it("validates titled and reference citations without rewriting code examples", async () => {
-    vi.mocked(prisma.asset.findMany).mockResolvedValue([]);
-    vi.mocked(prisma.vulnerability.findMany).mockResolvedValue([]);
+  it("checks titled and reference citations but not code examples", async () => {
     const markdown =
       '[**Missing**](/assets/missing "Device") and [Missing][device].\n\n[device]: /assets/missing\n\n`[Example](/assets/example)`';
-    await run(
-      makeWriteReportTool,
-      { title: "Citations", markdown },
-      new Set(["missing"]),
-    );
-    expect(saved()!.content).toBe(
-      "**Missing** and Missing.\n\n[device]: /assets/missing\n\n`[Example](/assets/example)`",
-    );
+    await expect(
+      run(
+        makeWriteReportTool,
+        { title: "Citations", markdown },
+        new Set(["missing"]),
+      ),
+    ).rejects.toThrow("drop the links: /assets/missing, /assets/missing");
     expect(prisma.asset.findMany).toHaveBeenNthCalledWith(1, {
       where: { id: { in: ["missing"] } },
       select: { id: true },
@@ -284,7 +292,7 @@ describe("citation retrieval check and Sources", () => {
       "[A](/assets/a1) [B](/assets/a2)",
     );
     await expect(write("[C](/assets/a3)", ["a1"])).rejects.toThrow(
-      "Not saved. Look these up with query_platform_data first, or drop the links: /assets/a3",
+      "drop the links: /assets/a3",
     );
   });
 
@@ -330,18 +338,21 @@ describe("citation retrieval check and Sources", () => {
     );
   });
 
-  it("edit_report checks only the new text", async () => {
-    // [B] was never retrieved, but it isn't part of the edit; no Sources either.
+  it("edit_report checks only the new text and rechecks Sources", async () => {
+    // [B] was never retrieved, but it isn't part of the edit.
     mockReport("[B](/assets/a9) Old. MRI-01");
     vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 1 });
     await run(
       makeEditReportTool,
-      { oldText: "Old.", newText: "[A](/assets/a1)" },
-      new Set(["a1"]),
+      { oldText: "Old.", newText: "[A](/assets/a2)" },
+      new Set(["a1", "a2"]),
     );
     expect(prisma.chatReport.updateMany).toHaveBeenCalledWith({
       where: { id: "r1", content: "[B](/assets/a9) Old. MRI-01" },
-      data: { content: "[B](/assets/a9) [A](/assets/a1) MRI-01" },
+      data: {
+        content:
+          "[B](/assets/a9) [A](/assets/a2) MRI-01\n\n## Sources\n- [MRI-01](/assets/a1)",
+      },
     });
   });
 });

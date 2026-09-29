@@ -29,6 +29,14 @@ describe("registry", () => {
     );
   });
 
+  it("marks only MedISAO and teamplay Fleet as singletons", () => {
+    const singletons = Object.values(registry)
+      .filter((module) => module.definition.singleton)
+      .map((module) => module.definition.platform)
+      .sort();
+    expect(singletons).toEqual([PlatformEnum.FLEET, PlatformEnum.MEDISAO]);
+  });
+
   it("registers templay Fleet", () => {
     expect(requirePlatform(PlatformEnum.FLEET).definition.platform).toBe(
       PlatformEnum.FLEET,

@@ -35,6 +35,7 @@ export interface CatalogEntry {
   displayName: string;
   description: string;
   categories: Category[];
+  singleton: boolean;
   configFields: FieldSpec[];
   credentialFields: FieldSpec[];
   credentialsAreAuthShaped: boolean;
@@ -53,6 +54,7 @@ export const catalogEntries = (): CatalogEntry[] =>
       displayName: definition.displayName,
       description: definition.description,
       categories: definition.categories,
+      singleton: definition.singleton ?? false,
       configFields: fieldSpecsFor(definition.configSchema),
       credentialFields: fieldSpecsFor(definition.credentialSchema),
       credentialsAreAuthShaped: usesGenericAuth(definition.credentialSchema),

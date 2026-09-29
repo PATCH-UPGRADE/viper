@@ -6,6 +6,7 @@ import type { CatalogEntry } from "../core/catalog";
 import type { FieldSpec, IntegrationListItem } from "../types";
 import {
   buildCredentialsPatch,
+  CreateIntegrationDialog,
   IntegrationFormDialog,
   relaxedAuthSchema,
   relaxedShapeFor,
@@ -188,5 +189,17 @@ describe("edit: selecting an auth type without typing a new secret", () => {
       authType: "Bearer",
       authentication: { token: "brand-new-token" },
     });
+  });
+});
+
+describe("CreateIntegrationDialog", () => {
+  it("offers Add when the platform can take another integration", () => {
+    render(<CreateIntegrationDialog entry={authShapedEntry} />);
+    expect(screen.getByRole("button", { name: "Add" })).toBeEnabled();
+  });
+
+  it("disables the button once a singleton platform is added", () => {
+    render(<CreateIntegrationDialog entry={authShapedEntry} added />);
+    expect(screen.getByRole("button", { name: "Added" })).toBeDisabled();
   });
 });

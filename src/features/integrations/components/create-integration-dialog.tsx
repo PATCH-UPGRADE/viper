@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PlusIcon } from "lucide-react";
+import { CheckIcon, PlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -371,12 +371,19 @@ export const IntegrationFormDialog = ({
   );
 };
 
-export const CreateIntegrationDialog = ({ entry }: { entry: CatalogEntry }) => {
+export const CreateIntegrationDialog = ({
+  entry,
+  added = false,
+}: {
+  entry: CatalogEntry;
+  added?: boolean;
+}) => {
   const [open, setOpen] = useState(false);
+  const Icon = added ? CheckIcon : PlusIcon;
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
-        <PlusIcon /> Add
+      <Button size="sm" disabled={added} onClick={() => setOpen(true)}>
+        <Icon /> {added ? "Added" : "Add"}
       </Button>
       <IntegrationFormDialog
         entry={entry}

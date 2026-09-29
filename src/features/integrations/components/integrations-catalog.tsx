@@ -5,6 +5,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { SettingsSubheader } from "@/features/settings/components/settings-layout";
 import { initialsOf } from "@/lib/string-utils";
 import type { CatalogEntry } from "../core/catalog";
+import { useIsPlatformAdded } from "../hooks/use-integrations";
 import { CATEGORIES, type Category } from "../types";
 import { CreateIntegrationDialog } from "./create-integration-dialog";
 
@@ -16,6 +17,13 @@ const SECTION_SUBTITLES: Record<Category, string> = {
     "Route findings and work orders to your ticketing system.",
   Notifications:
     "Get notified about new advisories, recalls, and platform events.",
+};
+
+const AddIntegrationButton = ({ entry }: { entry: CatalogEntry }) => {
+  const isAdded = useIsPlatformAdded(entry.platform);
+  return (
+    <CreateIntegrationDialog entry={entry} added={entry.singleton && isAdded} />
+  );
 };
 
 const PlatformCard = ({ entry }: { entry: CatalogEntry }) => (
@@ -32,7 +40,7 @@ const PlatformCard = ({ entry }: { entry: CatalogEntry }) => (
       </div>
     </div>
     <div className="p-4 border-t">
-      <CreateIntegrationDialog entry={entry} />
+      <AddIntegrationButton entry={entry} />
     </div>
   </Card>
 );

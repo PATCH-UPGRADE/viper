@@ -72,6 +72,12 @@ type ActivityCorrection = {
   isAgent: boolean;
 };
 
+type LabelSource = {
+  channel: string;
+  raw: unknown;
+  mapping?: { integration: { name: string } } | null;
+};
+
 const sourceRow = (link: ActivitySource): NotificationActivityRow => ({
   kind: link.sourceType === "Source" ? "NOTIFICATION_CREATED" : "SOURCE_LINKED",
   id: `source-${link.sourceRecord.id}`,
@@ -134,4 +140,12 @@ export function groupReceiptsByDay(
       label: dayGroupLabel(dayStart),
       receipts: dayReceipts,
     }));
+}
+
+export function sourceLabel(source: LabelSource) {
+  return (
+    source.mapping?.integration.name ??
+    emailSenderName(source.raw) ??
+    source.channel
+  );
 }

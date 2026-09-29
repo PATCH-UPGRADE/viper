@@ -1513,7 +1513,6 @@ enum SourceLinkType {
 model Notification {
   id      String           @id @default(cuid())
   type    NotificationType
-  tlp     Tlp?
   title   String?
   summary String?          @db.Text
   details Json? // unindexed, NotificationType-specific fields
@@ -1589,6 +1588,7 @@ model PlanBriefing {
 model SourceRecord {
   id      String        @id @default(cuid())
   channel SourceChannel
+  tlp     Tlp?
 
   // null for email / TA4 sources, since those aren't mirrored rows.
   // INVARIANT: mappingId set => externalId null

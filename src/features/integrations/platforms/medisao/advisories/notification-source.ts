@@ -22,7 +22,12 @@ const SOURCE_LABEL = "MedISAO";
  *
  * An identifier we do not already hold is minted as a Vulnerability on the
  * channel's matching, so triage and VEX see every vulnerability the advisory
- * names. A user who disagrees unlinks it from the Notification.
+ * names. A user who disagrees sets its Issue on the matching to `NOT_AFFECTED`.
+ * The link to the Notification stays, because reprocessing the advisory adds it
+ * back.
+ *
+ * TODO VW-540: remove bad identifiers through a durable VulnerabilityIdentifier
+ * model.
  */
 export const linkAdvisoryEntities =
   (advisory: MedIsaoAdvisoryItem): LinkEntities =>
@@ -93,23 +98,33 @@ export const linkAdvisoryEntities =
         context: `Named by MedISAO on the advisory "${advisory.title}". No CVE is assigned.`,
       });
 
-      for (const [name, vulnerabilityId] of ids) {
-        const vulnReason = `MedISAO lists ${name} on this advisory.`;
-        await prisma.notificationVulnerabilityMapping.upsert({
-          where: {
-            notificationId_vulnerabilityId: { notificationId, vulnerabilityId },
-          },
-          create: {
+      if (ids.size > 0) {
+        // Keeps a confidence that a human set: only a NeedsReview link is raised to Matched.
+        await prisma.notificationVulnerabilityMapping.createMany({
+          data: [...ids].map(([name, vulnerabilityId]) => ({
             notificationId,
             vulnerabilityId,
-            confidence: "Matched",
-            reasonWhy: vulnReason,
+            confidence: "Matched" as const,
+            reasonWhy: `MedISAO lists ${name} on this advisory.`,
+          })),
+          skipDuplicates: true,
+        });
+        await prisma.notificationVulnerabilityMapping.updateMany({
+          where: {
+            notificationId,
+            vulnerabilityId: { in: [...ids.values()] },
+            confidence: "NeedsReview",
           },
-          update: { confidence: "Matched", reasonWhy: vulnReason },
+          data: { confidence: "Matched" },
         });
       }
 
-      return { linked: 1 + ids.size, updated: 0, created, skipped: 0 };
+      return {
+        linked: 1 + ids.size - created,
+        updated: 0,
+        created,
+        skipped: 0,
+      };
     });
 
 /**

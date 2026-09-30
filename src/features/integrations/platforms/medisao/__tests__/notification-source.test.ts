@@ -5,7 +5,10 @@ vi.mock("server-only", () => ({}));
 
 const prismaMock = {
   notificationDeviceGroupMapping: { upsert: vi.fn() },
-  notificationVulnerabilityMapping: { upsert: vi.fn() },
+  notificationVulnerabilityMapping: {
+    createMany: vi.fn(),
+    updateMany: vi.fn(),
+  },
   vulnerability: { findMany: vi.fn(), create: vi.fn() },
   externalVulnerabilityMapping: { findMany: vi.fn() },
   sourceRecord: { findUniqueOrThrow: vi.fn() },
@@ -133,11 +136,34 @@ describe("the advisory linker", () => {
         create: { integrationId: "int-1", externalId: "CVE-2026-0002" },
       },
     });
-    const linked = prismaMock.notificationVulnerabilityMapping.upsert.mock.calls
-      .map(([args]) => args.create.vulnerabilityId)
-      .sort();
-    expect(linked).toEqual(["minted-CVE-2026-0002", "vuln-1"]);
-    expect(summary).toMatchObject({ linked: 3, created: 1, skipped: 0 });
+    const [[{ data: links, skipDuplicates }]] =
+      prismaMock.notificationVulnerabilityMapping.createMany.mock.calls;
+    expect(skipDuplicates).toBe(true);
+    expect(
+      links
+        .map((link: { vulnerabilityId: string }) => link.vulnerabilityId)
+        .sort(),
+    ).toEqual(["minted-CVE-2026-0002", "vuln-1"]);
+    expect(summary).toMatchObject({ linked: 2, created: 1, skipped: 0 });
+  });
+
+  it("raises only a NeedsReview link, so a human's confidence stays", async () => {
+    prismaMock.vulnerability.findMany.mockResolvedValue([
+      { id: "vuln-1", cveId: "CVE-2026-0001" },
+    ]);
+
+    await link(RAW, "notif-1");
+
+    expect(
+      prismaMock.notificationVulnerabilityMapping.updateMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        notificationId: "notif-1",
+        vulnerabilityId: { in: expect.arrayContaining(["vuln-1"]) },
+        confidence: "NeedsReview",
+      },
+      data: { confidence: "Matched" },
+    });
   });
 
   it("links only the device when the advisory names no vulnerability", async () => {
@@ -149,7 +175,7 @@ describe("the advisory linker", () => {
     expect(prismaMock.notificationDeviceGroupMapping.upsert).toHaveBeenCalled();
     expect(prismaMock.vulnerability.create).not.toHaveBeenCalled();
     expect(
-      prismaMock.notificationVulnerabilityMapping.upsert,
+      prismaMock.notificationVulnerabilityMapping.createMany,
     ).not.toHaveBeenCalled();
     expect(summary).toMatchObject({ linked: 1, created: 0 });
   });

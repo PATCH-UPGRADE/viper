@@ -21,44 +21,20 @@ const ROUTE_RE = new RegExp(
   `^/(${Object.keys(FINDERS).join("|")})/([^/?#]+)/?(?:[?#].*)?$`,
 );
 
-/** Every id in a result, nested ones too (an asset carries its device group). */
-function collectIds(value: unknown, into: Set<string>): void {
-  if (value === null || typeof value !== "object") return;
-  for (const [key, v] of Object.entries(value)) {
-    if (key === "id" && typeof v === "string") into.add(v);
-    else collectIds(v, into);
-  }
-}
-
 /**
- * Ids looked up this turn. Awaiting the lookups covers one running in parallel
- * with the report call.
+ * Whether a lookup returned a record with this id, nested ones included (an
+ * asset carries its device group). The database does the search, so saved
+ * history is never loaded. Outputs are compact JSON, saved jsonb is spaced.
  */
-async function turnIds(retrieval: Retrieval) {
-  const ids = new Set<string>();
-  for (const output of await Promise.all(retrieval)) {
-    try {
-      collectIds(JSON.parse(output), ids);
-    } catch {
-      // an error message, not a result
-    }
-  }
-  return ids;
-}
-
-/** Ids looked up in earlier turns, read from the saved tool calls. */
-async function earlierIds(threadId: string, ids: Set<string>) {
-  const rows = await prisma.chatMessage.findMany({
-    where: { threadId, role: "ASSISTANT" },
-    select: { toolCalls: true },
-  });
-  for (const { toolCalls } of rows) {
-    if (!Array.isArray(toolCalls)) continue;
-    for (const part of toolCalls as { type?: string; output?: unknown }[]) {
-      if (part?.type === "tool-query_platform_data")
-        collectIds(part.output, ids);
-    }
-  }
+async function wasRetrieved(id: string, threadId: string, outputs: string[]) {
+  if (outputs.some((output) => output.includes(`"id":"${id}"`))) return true;
+  const needle = `"id": "${id}"`;
+  const rows = await prisma.$queryRaw<unknown[]>`
+    select 1 from "ChatMessage"
+    where "threadId" = ${threadId} and role::text = 'ASSISTANT'
+      and strpos("toolCalls"::text, ${needle}) > 0
+    limit 1`;
+  return rows.length > 0;
 }
 
 /** Citations to /segment/id routes; code blocks and link targets are skipped. */
@@ -91,10 +67,17 @@ async function checkCitations(
 ) {
   const cited = citations(report);
   if (!cited.length) return;
-  // Saved history is only read when this turn's lookups don't cover everything.
-  const seen = await turnIds(retrieval);
-  if (cited.some((link) => !seen.has(link.id)))
-    await earlierIds(threadId, seen);
+  // Awaiting this turn's lookups covers one running in parallel with this call.
+  const outputs = await Promise.all(retrieval);
+  const seen = new Set(
+    (
+      await Promise.all(
+        [...new Set(cited.map((link) => link.id))].map(async (id) =>
+          (await wasRetrieved(id, threadId, outputs)) ? id : null,
+        ),
+      )
+    ).filter((id) => id !== null),
+  );
   const valid = new Map(
     await Promise.all(
       Object.entries(FINDERS).map(async ([segment, findMany]) => {

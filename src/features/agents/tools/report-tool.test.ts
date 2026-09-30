@@ -17,7 +17,7 @@ vi.mock("@/lib/db", () => ({
     deviceGroup: { findMany: vi.fn() },
     workflow: { findMany: vi.fn() },
     notification: { findMany: vi.fn() },
-    chatMessage: { findMany: vi.fn() },
+    $queryRaw: vi.fn(),
     chatThread: { findFirst: vi.fn(), update: vi.fn() },
     chatReport: { updateMany: vi.fn() },
   },
@@ -25,7 +25,7 @@ vi.mock("@/lib/db", () => ({
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(prisma.chatMessage.findMany).mockResolvedValue([]);
+  vi.mocked(prisma.$queryRaw).mockResolvedValue([]);
   vi.mocked(prisma.asset.findMany).mockResolvedValue([]);
   vi.mocked(prisma.vulnerability.findMany).mockResolvedValue([]);
   vi.mocked(prisma.chatThread.findFirst).mockResolvedValue({
@@ -81,7 +81,7 @@ describe("write_report", () => {
       run(
         makeWriteReportTool,
         { title: "Batch Report", markdown },
-        new Set(["valid", "missing"]),
+        looked("valid", "missing"),
       ),
     ).rejects.toThrow(routes.map((route) => `/${route}/missing`).join(", "));
     for (const model of models) {
@@ -99,7 +99,7 @@ describe("write_report", () => {
     const result = await run(
       makeWriteReportTool,
       { title: "Batch Report", markdown: good },
-      new Set(["valid"]),
+      looked("valid"),
     );
     expect(prisma.chatThread.findFirst).toHaveBeenCalledWith({
       where: { id: "thread", userId: "user" },
@@ -147,7 +147,7 @@ describe("write_report", () => {
       run(
         makeWriteReportTool,
         { title: "Citations", markdown },
-        new Set(["missing"]),
+        looked("missing"),
       ),
     ).rejects.toThrow("drop the links: /assets/missing, /assets/missing");
     expect(prisma.asset.findMany).toHaveBeenNthCalledWith(1, {
@@ -177,12 +177,13 @@ const run = (
     retrieval: Retrieval,
   ) => { invoke: (i: never) => unknown },
   input: object,
-  ids = new Set<string>(),
-  retrieval: Retrieval = [
-    Promise.resolve(JSON.stringify([...ids].map((id) => ({ id })))),
-  ],
+  retrieval: Retrieval = [],
 ) =>
   make("user", "thread", retrieval).invoke(input as never) as Promise<string>;
+/** This turn's lookups, as query_platform_data returns them. */
+const looked = (...ids: string[]): Retrieval => [
+  Promise.resolve(JSON.stringify(ids.map((id) => ({ id })))),
+];
 const edit = (oldText: string, newText: string) =>
   run(makeEditReportTool, { oldText, newText });
 
@@ -245,13 +246,9 @@ describe("edit_report", () => {
 });
 
 describe("citation retrieval check", () => {
-  const write = async (markdown: string, retrieved: string[]) => {
+  const write = async (markdown: string, ...ids: string[]) => {
     vi.mocked(prisma.chatThread.update).mockClear();
-    await run(
-      makeWriteReportTool,
-      { title: "R", markdown },
-      new Set(retrieved),
-    );
+    await run(makeWriteReportTool, { title: "R", markdown }, looked(...ids));
     return saved()!.content;
   };
 
@@ -265,20 +262,19 @@ describe("citation retrieval check", () => {
   });
 
   it("keeps citations retrieved this turn or an earlier one, refuses the rest", async () => {
-    vi.mocked(prisma.chatMessage.findMany).mockResolvedValue([
-      {
-        toolCalls: [
-          {
-            type: "tool-query_platform_data",
-            output: { items: [{ id: "x", deviceGroup: { id: "a2" } }] },
-          },
-        ],
-      },
-    ] as never);
-    expect(await write("[A](/assets/a1) [B](/assets/a2)", ["a1"])).toBe(
-      "[A](/assets/a1) [B](/assets/a2)",
+    // a1 is in this turn's lookups; a2 is found in saved history; a3 is nowhere.
+    vi.mocked(prisma.$queryRaw).mockImplementation((async (
+      _: unknown,
+      ...values: unknown[]
+    ) => (values.includes('"id": "a2"') ? [{}] : [])) as never);
+    const lookups = [Promise.resolve('{"id":"x","deviceGroup":{"id":"a1"}}')];
+    await run(
+      makeWriteReportTool,
+      { title: "R", markdown: "[A](/assets/a1) [B](/assets/a2)" },
+      lookups,
     );
-    await expect(write("[C](/assets/a3)", ["a1"])).rejects.toThrow(
+    expect(saved()!.content).toBe("[A](/assets/a1) [B](/assets/a2)");
+    await expect(write("[C](/assets/a3)", "a1")).rejects.toThrow(
       "drop the links: /assets/a3",
     );
   });
@@ -290,20 +286,19 @@ describe("citation retrieval check", () => {
     await run(
       makeWriteReportTool,
       { title: "R", markdown: "[A](/assets/a1)" },
-      new Set(),
       [lookup],
     );
     expect(saved()!.content).toBe("[A](/assets/a1)");
   });
 
   it("skips the saved history when this turn's lookups cover every citation", async () => {
-    await write("[A](/assets/a1)", ["a1"]);
-    await write("No links.", []);
-    expect(prisma.chatMessage.findMany).not.toHaveBeenCalled();
+    await write("[A](/assets/a1)", "a1");
+    await write("No links.");
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
   });
 
   it("keeps a retrieved reference-style citation", async () => {
-    expect(await write("[A][r]\n\n[r]: /assets/a2", ["a2"])).toBe(
+    expect(await write("[A][r]\n\n[r]: /assets/a2", "a2")).toBe(
       "[A][r]\n\n[r]: /assets/a2",
     );
   });
@@ -314,7 +309,7 @@ describe("citation retrieval check", () => {
     await run(
       makeEditReportTool,
       { oldText: "Old.", newText: "New." },
-      new Set(["a1", "a2"]),
+      looked("a1", "a2"),
     );
     expect(prisma.chatReport.updateMany).toHaveBeenCalledWith({
       where: { id: "r1", content: "[B](/assets/a2) Old." },
@@ -326,7 +321,7 @@ describe("citation retrieval check", () => {
       run(
         makeEditReportTool,
         { oldText: "/assets/a2", newText: "/assets/a3" },
-        new Set(["a1", "a2"]),
+        looked("a1", "a2"),
       ),
     ).rejects.toThrow("drop the links: /assets/a3");
   });

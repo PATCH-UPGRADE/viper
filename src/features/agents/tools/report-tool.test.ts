@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import prisma from "@/lib/db";
+import type { Retrieval } from "./query-platform-tool";
 import {
   makeEditReportTool,
   makeReadReportTool,
@@ -14,6 +15,9 @@ vi.mock("@/lib/db", () => ({
     vulnerability: { findMany: vi.fn() },
     remediation: { findMany: vi.fn() },
     deviceGroup: { findMany: vi.fn() },
+    workflow: { findMany: vi.fn() },
+    notification: { findMany: vi.fn() },
+    $queryRaw: vi.fn(),
     chatThread: { findFirst: vi.fn(), update: vi.fn() },
     chatReport: { updateMany: vi.fn() },
   },
@@ -21,6 +25,9 @@ vi.mock("@/lib/db", () => ({
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(prisma.$queryRaw).mockResolvedValue([]);
+  vi.mocked(prisma.asset.findMany).mockResolvedValue([]);
+  vi.mocked(prisma.vulnerability.findMany).mockResolvedValue([]);
   vi.mocked(prisma.chatThread.findFirst).mockResolvedValue({
     id: "thread",
   } as never);
@@ -39,20 +46,30 @@ const saved = () =>
   )?.data.report.upsert.create;
 
 describe("write_report", () => {
-  it("batch-validates all four citation types and saves the full report", async () => {
-    for (const model of [
-      prisma.asset,
-      prisma.vulnerability,
-      prisma.remediation,
-      prisma.deviceGroup,
-    ]) {
-      model.findMany = vi.fn().mockResolvedValue([{ id: "valid" }]);
+  const models = [
+    prisma.asset,
+    prisma.vulnerability,
+    prisma.remediation,
+    prisma.deviceGroup,
+    prisma.workflow,
+    prisma.notification,
+  ];
+
+  it("batch-validates all six citation types and refuses a missing record", async () => {
+    for (const model of models) {
+      // Then the Sources lookup, which finds no named records.
+      model.findMany = vi
+        .fn()
+        .mockResolvedValueOnce([{ id: "valid" }])
+        .mockResolvedValue([]);
     }
     const routes = [
       "assets",
       "vulnerabilities",
       "remediations",
       "api/v1/deviceGroups",
+      "workflows",
+      "inbox",
     ];
     const markdown = routes
       .map(
@@ -60,37 +77,42 @@ describe("write_report", () => {
           `[Real](/${route}/valid) [Again](/${route}/valid) [Missing](/${route}/missing)`,
       )
       .join("\n");
-    const result = await makeWriteReportTool("user", "thread").invoke({
-      title: "Batch Report",
-      markdown,
-    });
-    expect(prisma.chatThread.findFirst).toHaveBeenCalledWith({
-      where: { id: "thread", userId: "user" },
-      select: { id: true },
-    });
-    const { content } = saved()!;
-    for (const route of routes) {
-      expect(content).toContain(`[Real](/${route}/valid)`);
-      expect(content).toContain(`[Again](/${route}/valid) Missing`);
-    }
-    for (const model of [
-      prisma.asset,
-      prisma.vulnerability,
-      prisma.remediation,
-      prisma.deviceGroup,
-    ]) {
-      expect(model.findMany).toHaveBeenCalledExactlyOnceWith({
+    await expect(
+      run(
+        makeWriteReportTool,
+        { title: "Batch Report", markdown },
+        looked("valid", "missing"),
+      ),
+    ).rejects.toThrow(routes.map((route) => `/${route}/missing`).join(", "));
+    for (const model of models) {
+      expect(model.findMany).toHaveBeenNthCalledWith(1, {
         where: { id: { in: ["valid", "missing"] } },
         select: { id: true },
       });
     }
+
+    for (const model of models)
+      vi.mocked(model.findMany).mockResolvedValueOnce([
+        { id: "valid" },
+      ] as never);
+    const good = markdown.replace(/ \[Missing\]\([^)]*\)/g, "");
+    const result = await run(
+      makeWriteReportTool,
+      { title: "Batch Report", markdown: good },
+      looked("valid"),
+    );
+    expect(prisma.chatThread.findFirst).toHaveBeenCalledWith({
+      where: { id: "thread", userId: "user" },
+      select: { id: true },
+    });
+    expect(saved()!.content).toBe(good);
     expect(result).toContain("Report saved");
-    expect(result).not.toContain(markdown);
+    expect(result).not.toContain(good);
   });
 
   it("saves title and content through a nested ChatReport upsert (create or update the same values)", async () => {
     const markdown = "See [docs](https://example.com) and [reports](/reports).";
-    await makeWriteReportTool("user", "thread").invoke({
+    await run(makeWriteReportTool, {
       title: "Doc Links",
       markdown,
     });
@@ -110,7 +132,7 @@ describe("write_report", () => {
   });
 
   it("does not overwrite an existing report with empty content", async () => {
-    await makeWriteReportTool("user", "thread").invoke({
+    await run(makeWriteReportTool, {
       title: "Empty",
       markdown: "  ",
     });
@@ -118,18 +140,17 @@ describe("write_report", () => {
     expect(prisma.chatThread.update).not.toHaveBeenCalled();
   });
 
-  it("validates titled and reference citations without rewriting code examples", async () => {
-    vi.mocked(prisma.asset.findMany).mockResolvedValue([]);
+  it("checks titled and reference citations but not code examples", async () => {
     const markdown =
       '[**Missing**](/assets/missing "Device") and [Missing][device].\n\n[device]: /assets/missing\n\n`[Example](/assets/example)`';
-    await makeWriteReportTool("user", "thread").invoke({
-      title: "Citations",
-      markdown,
-    });
-    expect(saved()!.content).toBe(
-      "**Missing** and Missing.\n\n[device]: /assets/missing\n\n`[Example](/assets/example)`",
-    );
-    expect(prisma.asset.findMany).toHaveBeenCalledExactlyOnceWith({
+    await expect(
+      run(
+        makeWriteReportTool,
+        { title: "Citations", markdown },
+        looked("missing"),
+      ),
+    ).rejects.toThrow("drop the links: /assets/missing, /assets/missing");
+    expect(prisma.asset.findMany).toHaveBeenNthCalledWith(1, {
       where: { id: { in: ["missing"] } },
       select: { id: true },
     });
@@ -137,7 +158,7 @@ describe("write_report", () => {
 
   it("does not report success when the thread is missing or belongs to another user", async () => {
     vi.mocked(prisma.chatThread.findFirst).mockResolvedValue(null as never);
-    const result = await makeWriteReportTool("user", "thread").invoke({
+    const result = await run(makeWriteReportTool, {
       title: "Report",
       markdown: "Report",
     });
@@ -150,9 +171,19 @@ const mockReport = (content: string | null) =>
     report: content === null ? null : { id: "r1", content },
   } as never);
 const run = (
-  make: (userId: string, threadId: string) => { invoke: (i: never) => unknown },
+  make: (
+    userId: string,
+    threadId: string,
+    retrieval: Retrieval,
+  ) => { invoke: (i: never) => unknown },
   input: object,
-) => make("user", "thread").invoke(input as never) as Promise<string>;
+  retrieval: Retrieval = [],
+) =>
+  make("user", "thread", retrieval).invoke(input as never) as Promise<string>;
+/** This turn's lookups, as query_platform_data returns them. */
+const looked = (...ids: string[]): Retrieval => [
+  Promise.resolve(JSON.stringify(ids.map((id) => ({ id })))),
+];
 const edit = (oldText: string, newText: string) =>
   run(makeEditReportTool, { oldText, newText });
 
@@ -211,5 +242,87 @@ describe("edit_report", () => {
 
     vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 0 });
     expect(await edit("c", "x")).toContain("changed during the edit");
+  });
+});
+
+describe("citation retrieval check", () => {
+  const write = async (markdown: string, ...ids: string[]) => {
+    vi.mocked(prisma.chatThread.update).mockClear();
+    await run(makeWriteReportTool, { title: "R", markdown }, looked(...ids));
+    return saved()!.content;
+  };
+
+  beforeEach(() => {
+    // Every cited id exists.
+    vi.mocked(prisma.asset.findMany).mockImplementation((async ({
+      where,
+    }: {
+      where: { id: { in: string[] } };
+    }) => where.id.in.map((id) => ({ id }))) as never);
+  });
+
+  it("keeps citations retrieved this turn or an earlier one, refuses the rest", async () => {
+    // a1 is in this turn's lookups; a2 is found in saved history; a3 is nowhere.
+    vi.mocked(prisma.$queryRaw).mockImplementation((async (
+      _: unknown,
+      ...values: unknown[]
+    ) => (values.includes('"id": "a2"') ? [{}] : [])) as never);
+    const lookups = [Promise.resolve('{"id":"x","deviceGroup":{"id":"a1"}}')];
+    await run(
+      makeWriteReportTool,
+      { title: "R", markdown: "[A](/assets/a1) [B](/assets/a2)" },
+      lookups,
+    );
+    expect(saved()!.content).toBe("[A](/assets/a1) [B](/assets/a2)");
+    await expect(write("[C](/assets/a3)", "a1")).rejects.toThrow(
+      "drop the links: /assets/a3",
+    );
+  });
+
+  it("waits for a lookup still running in parallel", async () => {
+    const lookup = new Promise<string>((done) =>
+      setTimeout(() => done('{"id":"a1"}'), 20),
+    );
+    await run(
+      makeWriteReportTool,
+      { title: "R", markdown: "[A](/assets/a1)" },
+      [lookup],
+    );
+    expect(saved()!.content).toBe("[A](/assets/a1)");
+  });
+
+  it("skips the saved history when this turn's lookups cover every citation", async () => {
+    await write("[A](/assets/a1)", "a1");
+    await write("No links.");
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it("keeps a retrieved reference-style citation", async () => {
+    expect(await write("[A][r]\n\n[r]: /assets/a2", "a2")).toBe(
+      "[A][r]\n\n[r]: /assets/a2",
+    );
+  });
+
+  it("edit_report checks the whole edited report", async () => {
+    mockReport("[B](/assets/a2) Old.");
+    vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 1 });
+    await run(
+      makeEditReportTool,
+      { oldText: "Old.", newText: "New." },
+      looked("a1", "a2"),
+    );
+    expect(prisma.chatReport.updateMany).toHaveBeenCalledWith({
+      where: { id: "r1", content: "[B](/assets/a2) Old." },
+      data: { content: "[B](/assets/a2) New." },
+    });
+
+    // Retargeting a link in place is still checked.
+    await expect(
+      run(
+        makeEditReportTool,
+        { oldText: "/assets/a2", newText: "/assets/a3" },
+        looked("a1", "a2"),
+      ),
+    ).rejects.toThrow("drop the links: /assets/a3");
   });
 });

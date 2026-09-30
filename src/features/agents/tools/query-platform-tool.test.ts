@@ -163,6 +163,25 @@ describe("the tool applies the cap, not just the helper", () => {
 
     expect(getMany).toHaveBeenCalledWith({ pageSize: 10, search: "siemens" });
   });
+
+  it("hands each lookup's output to the report tools", async () => {
+    vi.resetModules();
+    const getMany = vi
+      .fn()
+      .mockResolvedValue({ items: [{ id: "n1", asset: { id: "a1" } }] });
+    vi.doMock("@/trpc/agent-caller", () => ({
+      createAgentCaller: () => ({ notifications: { getMany } }),
+    }));
+
+    const { makeQueryPlatformDataTool } = await import("./query-platform-tool");
+    const retrieval: Promise<string>[] = [];
+    const output = await makeQueryPlatformDataTool("user_1", retrieval).invoke({
+      procedure: "notifications.getMany",
+    });
+
+    expect(retrieval).toHaveLength(1);
+    expect(await retrieval[0]).toBe(output);
+  });
 });
 
 describe("addNavigationLinks — notifications", () => {

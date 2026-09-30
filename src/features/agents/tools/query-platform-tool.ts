@@ -372,30 +372,45 @@ export function capPageSize(
 /**
  * Look up platform data on demand via the in-process authenticated tRPC caller.
  */
-export function makeQueryPlatformDataTool(userId: string) {
-  return tool(
-    async ({ procedure, input }) => {
-      try {
-        const caller = createAgentCaller(userId);
-        const fn = procedure
-          .split(".")
-          // biome-ignore lint/suspicious/noExplicitAny: navigating the caller tree by dot-path
-          .reduce<any>((obj, key) => obj?.[key], caller);
-        if (typeof fn !== "function") {
-          return `Unknown procedure: ${procedure}`;
-        }
-        const callInput = capPageSize(procedure, input) ?? {};
-        const result = await fn(callInput);
-        return JSON.stringify(
-          addNavigationLinks(result, { procedure, input: callInput }),
-        );
-      } catch (error) {
-        const message =
-          error instanceof TRPCError
-            ? error.message
-            : "an unexpected error occurred";
-        return `Error calling ${procedure}: ${message}`;
+/** This turn's lookup outputs, still pending if a call runs in parallel. */
+export type Retrieval = Promise<string>[];
+
+export function makeQueryPlatformDataTool(
+  userId: string,
+  retrieval?: Retrieval,
+) {
+  const lookup = async (
+    procedure: PlatformProcedure,
+    input: Record<string, unknown> | undefined,
+  ) => {
+    try {
+      const caller = createAgentCaller(userId);
+      const fn = procedure
+        .split(".")
+        // biome-ignore lint/suspicious/noExplicitAny: navigating the caller tree by dot-path
+        .reduce<any>((obj, key) => obj?.[key], caller);
+      if (typeof fn !== "function") {
+        return `Unknown procedure: ${procedure}`;
       }
+      const callInput = capPageSize(procedure, input) ?? {};
+      const result = addNavigationLinks(await fn(callInput), {
+        procedure,
+        input: callInput,
+      });
+      return JSON.stringify(result);
+    } catch (error) {
+      const message =
+        error instanceof TRPCError
+          ? error.message
+          : "an unexpected error occurred";
+      return `Error calling ${procedure}: ${message}`;
+    }
+  };
+  return tool(
+    ({ procedure, input }) => {
+      const work = lookup(procedure, input);
+      retrieval?.push(work);
+      return work;
     },
     {
       name: "query_platform_data",

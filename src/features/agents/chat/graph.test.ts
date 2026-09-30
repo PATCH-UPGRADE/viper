@@ -47,7 +47,7 @@ describe("chat system prompt — write_report", () => {
   it("tells the model how to cite records and what happens to a bad citation", () => {
     const prompt = buildSystemPrompt("hospital administration");
     expect(prompt).toContain("[MRI-01](/assets/<id>)");
-    expect(prompt).toMatch(/converted to plain text on save/);
+    expect(prompt).toMatch(/not retrieved[\s\S]*is refused/);
   });
 
   it("tells the model to say so instead of leaving the report looking complete", () => {

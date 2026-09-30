@@ -4,6 +4,7 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { z } from "zod";
 import { existingIds } from "@/features/inbox/utils";
 import prisma from "@/lib/db";
+import type { Retrieval } from "./query-platform-tool";
 
 // Citable route segments; keep in step with the examples in graph.ts. The
 // deviceGroups key is its API route — device groups have no dashboard page.
@@ -13,63 +14,96 @@ const FINDERS = {
   vulnerabilities: (a) => prisma.vulnerability.findMany(a),
   remediations: (a) => prisma.remediation.findMany(a),
   "api/v1/deviceGroups": (a) => prisma.deviceGroup.findMany(a),
+  workflows: (a) => prisma.workflow.findMany(a),
+  inbox: (a) => prisma.notification.findMany(a),
 } satisfies Record<string, Finder>;
 const ROUTE_RE = new RegExp(
   `^/(${Object.keys(FINDERS).join("|")})/([^/?#]+)/?(?:[?#].*)?$`,
 );
 
-export function makeWriteReportTool(userId: string, threadId: string) {
+/**
+ * Whether a lookup returned a record with this id, nested ones included (an
+ * asset carries its device group). The database does the search, so saved
+ * history is never loaded. Outputs are compact JSON, saved jsonb is spaced.
+ */
+async function wasRetrieved(id: string, threadId: string, outputs: string[]) {
+  if (outputs.some((output) => output.includes(`"id":"${id}"`))) return true;
+  const needle = `"id": "${id}"`;
+  const rows = await prisma.$queryRaw<unknown[]>`
+    select 1 from "ChatMessage"
+    where "threadId" = ${threadId} and role::text = 'ASSISTANT'
+      and strpos("toolCalls"::text, ${needle}) > 0
+    limit 1`;
+  return rows.length > 0;
+}
+
+/** Citations to /segment/id routes; code blocks and link targets are skipped. */
+function citations(markdown: string) {
+  const nodes = [...fromMarkdown(markdown).children];
+  for (const node of nodes) {
+    if ("children" in node) nodes.push(...node.children);
+  }
+  const definitions = new Map(
+    nodes
+      .filter((node) => node.type === "definition")
+      .map((node) => [node.identifier, node.url]),
+  );
+  return nodes.flatMap((node) => {
+    if (node.type !== "link" && node.type !== "linkReference") return [];
+    const url =
+      node.type === "link" ? node.url : definitions.get(node.identifier);
+    const match = url?.match(ROUTE_RE);
+    return match
+      ? [{ path: `/${match[1]}/${match[2]}`, segment: match[1], id: match[2] }]
+      : [];
+  });
+}
+
+/** Refuse citations to records that were not retrieved in this thread. */
+async function checkCitations(
+  report: string,
+  threadId: string,
+  retrieval: Retrieval,
+) {
+  const cited = citations(report);
+  if (!cited.length) return;
+  // Awaiting this turn's lookups covers one running in parallel with this call.
+  const outputs = await Promise.all(retrieval);
+  const seen = new Set<string>();
+  await Promise.all(
+    [...new Set(cited.map((link) => link.id))].map(async (id) => {
+      if (await wasRetrieved(id, threadId, outputs)) seen.add(id);
+    }),
+  );
+  const valid = new Map(
+    await Promise.all(
+      Object.entries(FINDERS).map(async ([segment, findMany]) => {
+        const ids = cited
+          .filter((link) => link.segment === segment && seen.has(link.id))
+          .map((link) => link.id);
+        return [segment, await existingIds(findMany, ids)] as const;
+      }),
+    ),
+  );
+  // Refuse rather than strip, so the model learns what it must look up.
+  const bad = cited.filter(({ segment, id }) => !valid.get(segment)?.has(id));
+  if (bad.length) {
+    throw new Error(
+      `Not saved. Cite only records you retrieved with query_platform_data; look these up or drop the links: ${bad.map((link) => link.path).join(", ")}`,
+    );
+  }
+}
+
+export function makeWriteReportTool(
+  userId: string,
+  threadId: string,
+  retrieval: Retrieval,
+) {
   return tool(
     async ({ title, markdown }) => {
       const body = markdown.trim();
       if (!body) return "Report was empty — nothing saved.";
-
-      // Parse actual links, including references, without touching code examples.
-      const nodes = [...fromMarkdown(body).children];
-      for (const node of nodes) {
-        if ("children" in node) nodes.push(...node.children);
-      }
-      const definitions = new Map(
-        nodes
-          .filter((node) => node.type === "definition")
-          .map((node) => [node.identifier, node.url]),
-      );
-      const links = nodes.flatMap((node) => {
-        if (node.type !== "link" && node.type !== "linkReference") return [];
-        const url =
-          node.type === "link" ? node.url : definitions.get(node.identifier);
-        const match = url?.match(ROUTE_RE);
-        return match ? [{ node, segment: match[1], id: match[2] }] : [];
-      });
-      // existingIds skips the DB when a segment has no cited ids.
-      const valid = new Map(
-        await Promise.all(
-          Object.entries(FINDERS).map(async ([segment, findMany]) => {
-            const ids = links
-              .filter((link) => link.segment === segment)
-              .map((link) => link.id);
-            return [segment, await existingIds(findMany, ids)] as const;
-          }),
-        ),
-      );
-      let report = body;
-      // Work backwards so replacing a link never shifts another link's offsets.
-      for (const { node, segment, id } of links.sort(
-        (a, b) =>
-          b.node.position!.start.offset! - a.node.position!.start.offset!,
-      )) {
-        if (valid.get(segment)?.has(id)) continue;
-        const label = node.children.length
-          ? body.slice(
-              node.children[0].position!.start.offset!,
-              node.children.at(-1)!.position!.end.offset!,
-            )
-          : "";
-        report =
-          report.slice(0, node.position!.start.offset!) +
-          label +
-          report.slice(node.position!.end.offset!);
-      }
+      await checkCitations(body, threadId, retrieval);
 
       // Ownership check first — update() can only key on the unique id.
       const thread = await prisma.chatThread.findFirst({
@@ -79,7 +113,7 @@ export function makeWriteReportTool(userId: string, threadId: string) {
       if (!thread) {
         return "Could not save the report — thread not found.";
       }
-      const data = { title, content: report };
+      const data = { title, content: body };
       await prisma.chatThread.update({
         where: { id: threadId },
         data: { report: { upsert: { create: data, update: data } } },
@@ -91,7 +125,7 @@ export function makeWriteReportTool(userId: string, threadId: string) {
     {
       name: "write_report",
       description:
-        "Create or replace this conversation's full Markdown report when asked for a report, briefing, or write-up. The read-only report panel supports PDF/Word export. Cite retrieved records using the routes in the report instructions; unresolved citations become plain text. Reply briefly in chat after saving.",
+        "Create or replace this conversation's full Markdown report when asked for a report, briefing, or write-up. The read-only report panel supports PDF/Word export. Cite only records you retrieved, using the routes in the report instructions; other citations are refused. Reply briefly in chat after saving.",
       schema: z.object({
         title: z
           .string()
@@ -165,7 +199,11 @@ export function makeReadReportTool(userId: string, threadId: string) {
   );
 }
 
-export function makeEditReportTool(userId: string, threadId: string) {
+export function makeEditReportTool(
+  userId: string,
+  threadId: string,
+  retrieval: Retrieval,
+) {
   return tool(
     async ({ oldText, newText }) => {
       const saved = await fetchReport(userId, threadId);
@@ -179,12 +217,14 @@ export function makeEditReportTool(userId: string, threadId: string) {
         return "oldText matches more than one place. Add surrounding text to make it unique.";
       }
 
+      const updatedContent =
+        content.slice(0, at) + newText + content.slice(at + oldText.length);
+      await checkCitations(updatedContent, threadId, retrieval);
       const updated = await prisma.chatReport.updateMany({
         // compare-and-swap: fails if the report changed since we read it
         where: { id, content },
         data: {
-          content:
-            content.slice(0, at) + newText + content.slice(at + oldText.length),
+          content: updatedContent,
         },
       });
       return updated.count

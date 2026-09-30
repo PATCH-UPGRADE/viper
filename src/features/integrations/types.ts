@@ -88,7 +88,7 @@ export type IntegrationResourceSyncItem =
 /** A config/credentialSchema field, reduced to plain data to cross the Server->Client boundary. */
 export interface FieldSpec {
   key: string;
-  kind: "text" | "password" | "url" | "number" | "select";
+  kind: "text" | "textarea" | "password" | "url" | "number" | "select";
   required: boolean;
   options?: string[];
 }

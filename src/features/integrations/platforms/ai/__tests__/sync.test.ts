@@ -27,6 +27,7 @@ const makeCtx = (
   overrides: Partial<SyncCtx<AiConfig, AiCreds>> = {},
 ): SyncCtx<AiConfig, AiCreds> => ({
   integrationId: "int-1",
+  integrationUserId: "shadow-1",
   config: {
     integrationUri: "https://vendor.example.com/advisories",
     resource: ResourceType.Vulnerability,

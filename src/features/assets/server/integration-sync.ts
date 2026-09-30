@@ -1,0 +1,69 @@
+import "server-only";
+import type { z } from "zod";
+import { UNKNOWN_CPE_STRING } from "@/config/constants";
+import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
+import { type Prisma, ResourceType } from "@/generated/prisma";
+import prisma from "@/lib/db";
+import { cpeToDeviceGroup } from "@/lib/router-utils";
+import type { integrationAssetInputSchema } from "../types";
+
+type IntegrationAssetItem = z.infer<
+  typeof integrationAssetInputSchema
+>["items"][number];
+
+export function processAssetIntegrationSync(
+  input: { items: IntegrationAssetItem[] },
+  userId: string,
+  integrationId: string,
+  options: { shouldRecordSyncOutcome?: boolean } = {},
+) {
+  return processIntegrationSync(
+    prisma,
+    {
+      model: prisma.asset,
+      mappingModel: prisma.externalAssetMapping,
+      shouldRecordSyncOutcome: options.shouldRecordSyncOutcome,
+      transformInputItem: async (item, userId) => {
+        const {
+          cpe,
+          vendorId: _vendorId,
+          utilization,
+          upstreamApi: _upstreamApi,
+          webUrl: _webUrl,
+          ...itemData
+        } = item;
+        const deviceGroup = await cpeToDeviceGroup(cpe ?? UNKNOWN_CPE_STRING);
+
+        const uniqueFields = [
+          "hostname",
+          "macAddress",
+          "serialNumber",
+        ] as const;
+        const uniqueFieldConditions = uniqueFields
+          .filter((field) => itemData[field])
+          .map((field) => ({ [field]: itemData[field] }));
+
+        return {
+          createData: {
+            ...itemData,
+            utilization: utilization as Prisma.InputJsonValue | undefined,
+            deviceGroupId: deviceGroup.id,
+            userId,
+          },
+          updateData: {
+            ...itemData,
+            utilization: utilization as Prisma.InputJsonValue | undefined,
+            deviceGroupId: deviceGroup.id,
+          },
+          uniqueFieldConditions,
+          artifactsData: undefined,
+          // ^asset integrations do not include artifacts
+        };
+      },
+    },
+    input,
+    userId,
+    integrationId,
+    ResourceType.Asset,
+  );
+}

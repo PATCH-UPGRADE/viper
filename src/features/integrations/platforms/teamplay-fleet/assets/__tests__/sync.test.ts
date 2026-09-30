@@ -77,6 +77,7 @@ const makeCtx = (
   overrides: Partial<ResourceSyncCtx<FleetConfig, FleetCreds>> = {},
 ): ResourceSyncCtx<FleetConfig, FleetCreds> => ({
   integrationId: "int-1",
+  integrationUserId: "shadow-1",
   config: {},
   creds: { username: "svc@example.com", password: "pw" },
   session,

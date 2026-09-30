@@ -1,6 +1,6 @@
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { ChatOpenAI } from "@langchain/openai";
 import { buildAgentGraph } from "@/features/agents/shared/build-graph";
 import { loadPersistentNotesMarkdown } from "@/features/agents/shared/notes-preload";
 import { makeQueryPlatformDataTool } from "@/features/agents/tools/query-platform-tool";
@@ -13,7 +13,7 @@ import {
 } from "./findings";
 import { SCOUT_SYSTEM_PROMPT } from "./prompts";
 
-const SCOUT_MODEL = "claude-sonnet-5";
+const SCOUT_MODEL = "gpt-6.1-sol";
 
 export const MAX_FINDINGS_CHARS = 20_000;
 
@@ -41,10 +41,12 @@ function buildScoutGraph() {
     recordFindingTool,
   ];
 
-  const model = new ChatAnthropic({
+  // Reasoning tokens count toward maxTokens, so leave room above the answer.
+  const model = new ChatOpenAI({
     model: SCOUT_MODEL,
-    maxTokens: 8000,
-    thinking: { type: "adaptive" },
+    maxTokens: 16000,
+    useResponsesApi: true,
+    reasoning: { effort: "medium" },
   }).bindTools(tools);
 
   return buildAgentGraph({

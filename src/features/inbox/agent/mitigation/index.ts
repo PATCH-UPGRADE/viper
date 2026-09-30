@@ -3,8 +3,8 @@
 // (recommended first) — or none if there isn't enough information to act on.
 
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
 import { tool } from "@langchain/core/tools";
+import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
@@ -16,7 +16,7 @@ import {
   type MitigationPlansResult,
 } from "./schema";
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "gpt-6.1-sol";
 const TOOL_NAME = "record_mitigation_plans";
 
 const SYSTEM_PROMPT = `You are a mitigation-planning agent for a hospital cybersecurity platform. Given a security notification and the resolved hospital context (linked vulnerabilities, remediations, the sorted status of each device group, affected device groups, care areas, and clinical workflows), propose a small set of distinct mitigation plans for the hospital to choose between.
@@ -93,13 +93,15 @@ export async function createMitigationPlans(
     schema,
   });
 
-  // Extended thinking requires tool_choice "auto" (no forcing), so we bind the
-  // single tool and read the call args instead of using withStructuredOutput.
-  const model = new ChatAnthropic({
+  // Bind the single recording tool, force the call, and read its args. The args
+  // are re-validated against the schema below. Reasoning tokens count toward
+  // maxTokens, so leave room for them on top of the recorded output.
+  const model = new ChatOpenAI({
     model: MODEL,
-    maxTokens: 8000,
-    thinking: { type: "enabled", budget_tokens: 4000 },
-  }).bindTools([recordTool]);
+    maxTokens: 16000,
+    useResponsesApi: true,
+    reasoning: { effort: "medium" },
+  }).bindTools([recordTool], { tool_choice: "required" });
 
   const textPrompt = buildTextPrompt({
     notificationType: notification?.type ?? "Other",

@@ -7,12 +7,12 @@
 // whose real content is only in the attachment.
 
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import { emailKindSchema } from "../types";
 import { emailPromptText, type InboundEmail } from "./prompt";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "gpt-6-luna";
 
 const SYSTEM_PROMPT = `You triage inbound email for a hospital cybersecurity and operations platform. Judge the email on its body AND any attached PDFs together — an email's real content is often only in the attachment.
 
@@ -31,10 +31,12 @@ export async function classifyEmailKind(
   email: InboundEmail,
   pdfAttachments: PdfAttachment[] = [],
 ) {
-  const model = new ChatAnthropic({
+  const model = new ChatOpenAI({
     model: MODEL,
+    useResponsesApi: true,
+    reasoning: { effort: "none" },
     maxTokens: 256,
-  }).withStructuredOutput(emailKindSchema);
+  }).withStructuredOutput(emailKindSchema, { method: "functionCalling" });
 
   return model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

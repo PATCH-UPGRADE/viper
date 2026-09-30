@@ -4,8 +4,8 @@
 // its group.
 
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
 import { tool } from "@langchain/core/tools";
+import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import {
   gatherVexContext,
@@ -16,7 +16,7 @@ import {
 import { applyVexDeterminations, type VexApplySummary } from "./process_output";
 import { buildVexSchema, type VexResult } from "./tools";
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "gpt-6.1-sol";
 
 export async function sortVulnerabilities(
   context: VexContext,
@@ -31,13 +31,15 @@ export async function sortVulnerabilities(
     schema,
   });
 
-  // Extended thinking requires tool_choice "auto" (no forcing), so we bind the
-  // single tool and read the call args instead of using withStructuredOutput.
-  const model = new ChatAnthropic({
+  // Bind the single recording tool, force the call, and read its args. The args
+  // are re-validated against the schema below. Reasoning tokens count toward
+  // maxTokens, so leave room for them on top of the recorded output.
+  const model = new ChatOpenAI({
     model: MODEL,
-    maxTokens: 8000,
-    thinking: { type: "enabled", budget_tokens: 4000 },
-  }).bindTools([recordTool]);
+    maxTokens: 16000,
+    useResponsesApi: true,
+    reasoning: { effort: "medium" },
+  }).bindTools([recordTool], { tool_choice: "required" });
 
   const res = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

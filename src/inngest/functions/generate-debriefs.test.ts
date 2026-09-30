@@ -213,7 +213,7 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     contextResolves();
     mockWriter.mockResolvedValue({
       bullets: [BULLET],
-      model: "claude-sonnet-5",
+      model: "gpt-6.1-sol",
     });
     const { step, logger } = makeStep();
 
@@ -228,7 +228,7 @@ describe("generateDepartmentDebrief — writing one department's brief", () => {
     expect(persisted.data).toMatchObject({
       status: "Ready",
       bullets: [BULLET],
-      model: "claude-sonnet-5",
+      model: "gpt-6.1-sol",
       error: null,
     });
   });

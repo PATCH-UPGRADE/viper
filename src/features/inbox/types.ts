@@ -212,7 +212,7 @@ export type HospitalImpact = z.infer<typeof hospitalImpactSchema>;
 
 // The single triage decision for an inbound email: drop it, or route it to an
 // informational Notification or an actionable Work Order. Kept a flat object
-// (Anthropic tool-schema rule).
+// (tool schemas must be a top-level object).
 export const emailKindSchema = z.object({
   kind: z.enum(["not_relevant", "notification", "work_order"]),
   reasonWhy: z.string(),

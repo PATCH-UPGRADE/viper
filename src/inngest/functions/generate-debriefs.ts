@@ -59,7 +59,7 @@ const SEND_BATCH_SIZE = 20;
  * 05:00 is after the 02:00 vulnerability enrichment, so the scout reads freshly
  * enriched EPSS and KEV data.
  *
- * The scout is the expensive half — one thinking pass with tool calls — so it
+ * The scout is the expensive half — one reasoning pass with tool calls — so it
  * runs once here and every department's writer reuses its findings.
  */
 export const generateAllDebriefs = inngest.createFunction(

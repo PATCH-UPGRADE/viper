@@ -68,8 +68,8 @@ npm run format
 - **State Management**: Jotai (global), TanStack Query (server), nuqs (URL)
 - **Visual Editor**: XYFlow React 12
 - **UI**: Radix UI + Tailwind CSS 4 + shadcn/ui (New York style)
-- **AI / Chat**: LangGraph + LangChain (`ChatAnthropic`) for the chat agent and its recommendation node, streamed to the client via Vercel AI SDK UI (`useChat`)
-- **AI Providers**: Vercel AI SDK with Anthropic, OpenAI, Google
+- **AI / Chat**: LangGraph + LangChain (`ChatOpenAI`, Responses API) for the chat agent and its recommendation node, streamed to the client via Vercel AI SDK UI (`useChat`)
+- **AI Providers**: OpenAI (`OPENAI_API_KEY`) via LangChain and the Vercel AI SDK
 - **Code Quality**: Biome 2.2.0 (replaces ESLint/Prettier)
 - **Observability**: Sentry
 
@@ -232,8 +232,8 @@ conversational agent, the chat agent, and it has two model nodes:
   (`search_report`, `read_report`, `edit_report`, `write_report`), `request_recommendation`,
   and `buildAgentTools`, the registry the chat graph binds. The recommendation node gets the
   report tools only on the reports view (`REPORTS_VIEW_TOOL_NAMES`).
-- `chat/` — the chat agent's graph and prompt (Haiku), plus `recommendation-prompt.ts`: the
-  remediation advisor's prompt (Opus + adaptive thinking) and `RECOMMENDATION_TOOL_NAMES`,
+- `chat/` — the chat agent's graph and prompt (GPT-6 Luna), plus `recommendation-prompt.ts`: the
+  remediation advisor's prompt (GPT-6.1 Sol, high reasoning effort) and `RECOMMENDATION_TOOL_NAMES`,
   the subset of the registry the recommendation node binds.
 
 The chat model decides, per turn, whether a question needs the recommendation node by calling
@@ -247,11 +247,11 @@ Every tool in the registry must be described in the chat prompt, and in
 `recommendation-prompt.ts` too if it is in `RECOMMENDATION_TOOL_NAMES` — otherwise a model can call
 something it was never told about.
 
-**The recommendation node never sees the chat model's tool-call turns.** Opus runs with adaptive
-thinking and Haiku runs without it. A tool-use loop counts as one assistant turn, and when
-thinking is switched on partway through a turn the API does not error: it silently disables
-thinking for that request. `recommendationWindow` keeps the conversation text and the
-recommendation node's own turns only; it has a unit test, keep it green.
+**The recommendation node never sees the chat model's tool-call turns.** Those calls were made by
+a different model running without reasoning, and a reasoning model on the Responses API expects each
+function-call item it is handed to arrive with the reasoning item that produced it.
+`recommendationWindow` keeps the conversation text and the recommendation node's own turns only; it
+has a unit test, keep it green.
 
 `buildAgentGraph` ends the turn after any tool in `HALT_TOOLS` —
 `ask_user_questions` and `propose_work_order` — so the graph stops until the
@@ -271,7 +271,7 @@ may mean editing `features/chat/utils.ts`.
 It runs as a **streaming Next.js route** (`src/app/api/chat/route.ts`), not as an
 Inngest job:
 
-- Haiku for the chat model, Opus 5 + adaptive thinking for the recommendation node.
+- GPT-6 Luna (`reasoning.effort: "none"`) for the chat model; GPT-6.1 Sol (`effort: "high"`, `summary: "auto"`) for the recommendation node. The reasoning summary is what streams into the UI's reasoning block.
 - The route streams token + reasoning + tool deltas to the client via **Vercel AI SDK UI** (`useChat` in `src/features/chat/hooks/use-viper-chat.ts`); `agents/shared/stream-bridge.ts` maps LangGraph `streamEvents` onto the AI SDK UI message stream.
 - Conversation history is persisted to Prisma (`ChatThread` / `ChatMessage`); the `record_note` tool dispatches to the `actionNotesFn` Inngest function.
 
@@ -285,16 +285,21 @@ a user turn, so they stay beside the feature that owns the data:
 - `notes/agent/` — extract-notes, noteAction
 - `questions/agent/escalationEmail/`
 
-Typical shape: `new ChatAnthropic({ … }).withStructuredOutput(zodSchema)`.
+Typical shape: `new ChatOpenAI({ model, useResponsesApi: true, reasoning: { effort } })
+.withStructuredOutput(zodSchema, { method: "functionCalling" })`.
 
-**Constraint that shapes both shapes:** Anthropic extended thinking requires
-`tool_choice: "auto"`, and `withStructuredOutput()` forces `tool_choice` — so the two
-cannot be combined. When an agent needs thinking *and* a guaranteed output shape,
-bind a single recording tool and read its call args instead; see
-`inbox/agent/vex/index.ts` and `inbox/agent/mitigation/index.ts`. The same constraint
-is why `buildAgentGraph` preloads mandatory context deterministically instead of
-forcing a first tool call — a single forced tool turn disables thinking for the rest
-of the conversation.
+**Constraints that shape both shapes:**
+
+- **Always pass `method: "functionCalling"` to `withStructuredOutput`.** The default
+  (`jsonSchema`) hard-codes OpenAI strict mode for zod schemas, and strict mode rejects
+  `.optional()`, `.default()` and `z.record` fields with a 400 — which many of our schemas use.
+- **Reasoning tokens count toward `maxTokens`.** Budget for the reasoning as well as the
+  output whenever `effort` is above `"none"`.
+- **Sol's lowest effort is `"low"`; only Luna accepts `"none"`.** Reasoning models also
+  reject `temperature`, so never set it.
+- Agents whose output schema is built per call (vex, mitigation) bind a single recording
+  tool with `tool_choice: "required"` and validate its args themselves; see
+  `inbox/agent/vex/index.ts` and `inbox/agent/mitigation/index.ts`.
 
 ## Database
 

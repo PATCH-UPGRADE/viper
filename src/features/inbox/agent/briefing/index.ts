@@ -1,5 +1,5 @@
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { planCardsSchema } from "@/features/inbox/agent/mitigation/schema";
 import {
   type Briefing,
@@ -8,7 +8,7 @@ import {
   renderBriefing,
 } from "./schema";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "gpt-6-luna";
 
 const SYSTEM_PROMPT = `You are a briefing-writing agent for a hospital cybersecurity platform. Given a proposed mitigation plan, write the case for why it makes sense — for three audiences reading the same plan: a CISO, a CMIO, and a department head (e.g. radiology head, imaging head).
 
@@ -85,10 +85,14 @@ function renderPlanPrompt(plan: BriefingPlanInput): string {
 export async function generateBriefing(
   plan: BriefingPlanInput,
 ): Promise<Briefing> {
-  const model = new ChatAnthropic({
+  const model = new ChatOpenAI({
     model: MODEL,
+    useResponsesApi: true,
+    reasoning: { effort: "none" },
     maxTokens: 8000, // 3 audiences x 3 fields of prose can run long
-  }).withStructuredOutput(generatedBriefingSchema);
+  }).withStructuredOutput(generatedBriefingSchema, {
+    method: "functionCalling",
+  });
 
   const messages = [
     { role: "system" as const, content: SYSTEM_PROMPT },

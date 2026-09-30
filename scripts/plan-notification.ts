@@ -11,7 +11,7 @@
 //   npm run db:plan-notification            # the seeded Siemens advisory
 //   npm run db:plan-notification <id>       # any notification
 //
-// Needs ANTHROPIC_API_KEY. Re-running is safe: persistMitigationPlans deletes
+// Needs OPENAI_API_KEY. Re-running is safe: persistMitigationPlans deletes
 // the un-accepted plans for the notification before it writes new ones, and
 // refuses outright once a plan has been accepted.
 

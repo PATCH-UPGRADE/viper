@@ -2,7 +2,7 @@
  * LangGraph -> AI SDK v5 UI message stream bridge.
  *
  * Maps `graph.streamEvents(..., { version: "v2" })` onto AI SDK UI chunks:
- *   - on_chat_model_stream -> reasoning-* / text-* deltas (thinking + answer)
+ *   - on_chat_model_stream -> reasoning-* / text-* deltas (reasoning summary + answer)
  *   - on_chat_model_end    -> tool-input-available (clean tool_calls)
  *   - on_chain_end         -> tool-output-available (ToolMessages in node output)
  *
@@ -136,7 +136,7 @@ export async function streamGraphToUI({
   };
   const emitText = (delta: string) => {
     if (!delta) return;
-    // Anthropic streams all thinking before answer text.
+    // The model streams its reasoning summary before the answer text.
     closeReasoning();
     openText();
     writer.write({ type: "text-delta", id: textId as string, delta });
@@ -158,7 +158,8 @@ export async function streamGraphToUI({
         } else if (Array.isArray(content)) {
           for (const block of content) {
             if (!block || typeof block !== "object") continue;
-            if (block.type === "thinking") emitReasoning(block.thinking ?? "");
+            if (block.type === "reasoning")
+              emitReasoning(block.reasoning ?? "");
             else if (block.type === "text") emitText(block.text ?? "");
           }
         }

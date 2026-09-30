@@ -1,5 +1,5 @@
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import {
   gatherNoteActionContext,
   type NoteActionContext,
@@ -9,15 +9,17 @@ import {
 import { applyNoteAction, type NoteActionSummary } from "./process_output";
 import { type NoteActionResult, noteActionSchema } from "./schema";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "gpt-6-luna";
 
 export async function draftNoteActions(
   context: NoteActionContext,
 ): Promise<NoteActionResult> {
-  const model = new ChatAnthropic({
+  const model = new ChatOpenAI({
     model: MODEL,
+    useResponsesApi: true,
+    reasoning: { effort: "none" },
     maxTokens: 2048,
-  }).withStructuredOutput(noteActionSchema);
+  }).withStructuredOutput(noteActionSchema, { method: "functionCalling" });
 
   return model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

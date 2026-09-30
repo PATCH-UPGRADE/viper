@@ -9,6 +9,10 @@ import { listChannels } from "../channels";
 import type { MedIsaoConfig, MedIsaoCreds } from "../config";
 import { MedIsaoRequestError } from "../paginate";
 import {
+  normalizeIdentifier,
+  resolveOrMintVulnerabilities,
+} from "../vulnerabilities";
+import {
   asDate,
   type ChannelWatermarks,
   parseCursor,
@@ -17,38 +21,15 @@ import {
 import { listChanged, type MedIsaoRemediationItem } from "./feed";
 
 /**
- * MedISAO names a vulnerability by identifier, not by our id, and the array is
- * not CVE-only: GHSA and vendor identifiers appear too. Resolve against what we
- * already hold and never mint a Vulnerability here, because advisories are
- * where vulnerabilities enter the system.
- */
-async function resolveVulnerabilityIds(
-  items: MedIsaoRemediationItem[],
-): Promise<Map<string, string>> {
-  const names = [
-    ...new Set(items.flatMap((item) => item.fixedVulnerabilities)),
-  ];
-  if (names.length === 0) return new Map();
-
-  const rows = await prisma.vulnerability.findMany({
-    where: { cveId: { in: names } },
-    select: { id: true, cveId: true },
-  });
-  return new Map(
-    rows.flatMap((row) => (row.cveId ? [[row.cveId, row.id] as const] : [])),
-  );
-}
-
-/**
  * The description we store, with every vulnerability the remediation claims to
  * fix named in it.
  *
- * An identifier we do not already hold resolves to nothing, and the sync
- * stores no raw payload, so it would be lost. Naming them keeps them readable
- * and searchable even when Viper has never heard of them.
+ * The sync stores no raw payload, so this text is the only record of what
+ * MedISAO sent. It stays readable and searchable even if a user unlinks a
+ * vulnerability from the row.
  *
- * Built from the feed alone. Marking which ones Viper holds would rewrite this
- * text every time a vulnerability was added, so a re-sync would churn the row.
+ * Built from the feed alone, so a re-sync produces the same text and does not
+ * churn the row.
  */
 export const describeRemediation = (
   item: Pick<MedIsaoRemediationItem, "description" | "fixedVulnerabilities">,
@@ -68,11 +49,12 @@ async function ingestRemediations(
     select: { integrationUserId: true },
   });
 
-  const vulnerabilityIdByName = await resolveVulnerabilityIds(items);
-
   // Items from one channel share a manufacturer and product, so the same
   // identity resolves many times over a sync. Each miss is several round trips.
   const matchingIdCache = new Map<string, string>();
+  // The same holds for the vulnerabilities those items name, keyed by matching
+  // because a row minted for one channel must still be attached to the next.
+  const vulnerabilityIdCache = new Map<string, string>();
 
   return processIntegrationSync(
     prisma,
@@ -106,11 +88,25 @@ async function ingestRemediations(
           matchingIdCache.set(identity, matchingId);
         }
 
+        const cacheKey = (name: string) =>
+          JSON.stringify([matchingId, normalizeIdentifier(name)]);
+        const { ids } = await resolveOrMintVulnerabilities({
+          names: item.fixedVulnerabilities.filter(
+            (name) => !vulnerabilityIdCache.has(cacheKey(name)),
+          ),
+          integrationId,
+          integrationUserId,
+          deviceGroupMatchingId: matchingId,
+          context: `Named by MedISAO as fixed by remediation ${item.vendorId}. No CVE is assigned.`,
+        });
+        for (const [name, id] of ids) {
+          vulnerabilityIdCache.set(cacheKey(name), id);
+        }
         const vulnerabilities = [
           ...new Set(
-            item.fixedVulnerabilities
-              .map((name) => vulnerabilityIdByName.get(name))
-              .filter((id): id is string => Boolean(id)),
+            item.fixedVulnerabilities.flatMap(
+              (name) => vulnerabilityIdCache.get(cacheKey(name)) ?? [],
+            ),
           ),
         ].map((id) => ({ id }));
 

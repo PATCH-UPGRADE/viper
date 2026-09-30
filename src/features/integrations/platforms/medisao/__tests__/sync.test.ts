@@ -7,7 +7,8 @@ vi.mock("server-only", () => ({}));
 
 const prismaMock = {
   integration: { findUniqueOrThrow: vi.fn() },
-  vulnerability: { findMany: vi.fn() },
+  vulnerability: { findMany: vi.fn(), create: vi.fn() },
+  externalVulnerabilityMapping: { findMany: vi.fn() },
   remediation: {},
   externalRemediationMapping: {},
 };
@@ -102,6 +103,8 @@ beforeEach(() => {
     integrationUserId: "shadow-user",
   });
   prismaMock.vulnerability.findMany.mockResolvedValue([]);
+  prismaMock.vulnerability.create.mockResolvedValue({ id: "minted-1" });
+  prismaMock.externalVulnerabilityMapping.findMany.mockResolvedValue([]);
   resolveMatchingId.mockResolvedValue("matching-1");
   processIntegrationSync.mockResolvedValue({ message: "success" });
 });
@@ -312,7 +315,7 @@ describe("the ingest mapping", () => {
     });
   });
 
-  it("writes the fixed vulnerabilities onto the row, held or not", async () => {
+  it("links a held vulnerability and mints the one Viper lacks", async () => {
     prismaMock.vulnerability.findMany.mockResolvedValue([
       { id: "vuln-1", cveId: "CVE-2026-0001" },
     ]);
@@ -321,12 +324,46 @@ describe("the ingest mapping", () => {
       fixed_vulnerabilities: ["CVE-2026-0001", "GHSA-unknown"],
     });
 
-    // One resolved and is linked; the other exists nowhere in Viper, so the
-    // description is the only place it survives.
-    expect(createData.vulnerabilities).toEqual({ connect: [{ id: "vuln-1" }] });
+    expect(prismaMock.vulnerability.create).toHaveBeenCalledTimes(1);
+    const [{ data }] = prismaMock.vulnerability.create.mock.calls[0];
+    expect(data).toMatchObject({
+      cveId: null,
+      userId: "shadow-user",
+      deviceGroupMatchings: { connect: [{ id: "matching-1" }] },
+      externalMappings: {
+        create: { integrationId: "int-1", externalId: "GHSA-unknown" },
+      },
+    });
+    expect(data.description).toContain("GHSA-unknown");
+    expect(createData.vulnerabilities).toEqual({
+      connect: [{ id: "vuln-1" }, { id: "minted-1" }],
+    });
     expect(createData.description).toContain(
       "Fixes: CVE-2026-0001, GHSA-unknown",
     );
+  });
+
+  it("resolves a vulnerability once when two items on one channel name it", async () => {
+    serve([{ id: "chan-1" }], {
+      "chan-1": page([
+        remediation({ id: "a", fixed_vulnerabilities: ["CVE-2026-0009"] }),
+        remediation({ id: "b", fixed_vulnerabilities: ["cve-2026-0009"] }),
+      ]),
+    });
+
+    await syncRemediations(ctx());
+    const [, config, input] = processIntegrationSync.mock.calls[0];
+    const first = await config.transformInputItem(input.items[0], "u");
+    const second = await config.transformInputItem(input.items[1], "u");
+
+    expect(prismaMock.vulnerability.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.vulnerability.findMany).toHaveBeenCalledTimes(1);
+    expect(first.createData.vulnerabilities).toEqual({
+      connect: [{ id: "minted-1" }],
+    });
+    expect(second.createData.vulnerabilities).toEqual({
+      connect: [{ id: "minted-1" }],
+    });
   });
 
   it("resolves the channel to a device group matching, not a CPE", async () => {

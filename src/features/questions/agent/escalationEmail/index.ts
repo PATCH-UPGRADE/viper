@@ -1,10 +1,10 @@
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { buildSystemPrompt } from "./context";
 import { buildEscalationEmailSchema, type EscalationDraft } from "./schema";
 import type { EscalationContext } from "./types";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "gpt-6-luna";
 
 export async function draftEscalationEmail(
   context: EscalationContext,
@@ -17,10 +17,12 @@ export async function draftEscalationEmail(
     ),
   );
 
-  const model = new ChatAnthropic({
+  const model = new ChatOpenAI({
     model: MODEL,
+    useResponsesApi: true,
+    reasoning: { effort: "none" },
     maxTokens: 2000,
-  }).withStructuredOutput(schema);
+  }).withStructuredOutput(schema, { method: "functionCalling" });
 
   return model.invoke([
     { role: "system", content: buildSystemPrompt(context.audience) },

@@ -3,7 +3,7 @@
 // db item/create a new one
 
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import type { ConfidenceLevel } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -19,10 +19,10 @@ import {
 import type { Candidates } from "./candidate-search";
 import type { ExtractResult } from "./extract";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "gpt-6-luna";
 
 // Fields the LLM may set when creating/updating a device group. Kept flat and
-// optional so the schema stays a top-level object (Anthropic requirement).
+// optional so the schema stays a top-level object (tool-schema requirement).
 const detailsFieldsSchema = z.object({
   cpe: z.string().nullish(),
   udi: z.string().nullish(),
@@ -262,10 +262,12 @@ export async function matchAndLinkEntities(
     return { linked: 0, updated: 0, created: 0, skipped: 0 };
   }
 
-  const model = new ChatAnthropic({
+  const model = new ChatOpenAI({
     model: MODEL,
+    useResponsesApi: true,
+    reasoning: { effort: "none" },
     maxTokens: 2048,
-  }).withStructuredOutput(matchSchema);
+  }).withStructuredOutput(matchSchema, { method: "functionCalling" });
 
   const { decisions = [] } = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

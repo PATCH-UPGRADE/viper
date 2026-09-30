@@ -93,7 +93,7 @@ export const extractArtifactNotesFn = inngest.createFunction(
           await getNotesForInstance("DEVICE_GROUP_MATCHING", matchingIds)
         ).map((n) => ({ id: n.id, text: n.text }));
 
-        // Large manuals exceed Haiku's window as one blob, so split each PDF's
+        // Large manuals exceed the model's window as one blob, so split each PDF's
         // text into chunks and process them sequentially, threading the facts
         // captured so far so the model doesn't restate across chunk boundaries.
         const chunks = pdfs.flatMap((pdf) => chunkText(pdf.text));

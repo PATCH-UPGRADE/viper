@@ -2,7 +2,7 @@
 // classifies notification as Advisory/Recall/UpdateAvailable/Other (NotificationType)
 
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
@@ -10,9 +10,9 @@ import { notificationPayloadSchema } from "../types";
 import { fetchPdfAttachments } from "../utils";
 import { emailPromptText, type InboundEmail } from "./prompt";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "gpt-6-luna";
 
-// Flat schema required: Anthropic's tool input_schema must have a top-level "type": "object",
+// Flat schema required: a tool's parameters schema must have a top-level "type": "object",
 // which z.discriminatedUnion / z.union produce as "oneOf" and fail validation.
 const classifySchema = notificationPayloadSchema.extend({
   action: z.enum(["create", "update"]),
@@ -95,10 +95,12 @@ export async function classifyNotification(
     }),
   ]);
 
-  const model = new ChatAnthropic({
+  const model = new ChatOpenAI({
     model: MODEL,
+    useResponsesApi: true,
+    reasoning: { effort: "none" },
     maxTokens: 1024,
-  }).withStructuredOutput(classifySchema);
+  }).withStructuredOutput(classifySchema, { method: "functionCalling" });
 
   const result = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

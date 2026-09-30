@@ -94,9 +94,9 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
   https://<YOUR_TUNNEL_URL>/api/email -H 'content-type: application/json' -d '{}'
 ```
 
-## 6. Set your Anthropic key
+## 6. Set your OpenAI key
 
-The pipeline makes several Anthropic calls (relevance triage, classification, entity extraction, hospital-impact triage), so `ANTHROPIC_API_KEY` must be set in `.env` or the run fails partway through.
+The pipeline makes several OpenAI calls (relevance triage, classification, entity extraction, hospital-impact triage), so `OPENAI_API_KEY` must be set in `.env` or the run fails partway through.
 
 ## 7. Prepare the hospital environment (optional)
 

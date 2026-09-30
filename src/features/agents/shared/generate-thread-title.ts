@@ -1,9 +1,9 @@
 import "server-only";
 
-import { anthropic } from "@ai-sdk/anthropic";
+import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
-const TITLE_MODEL = "claude-haiku-4-5-20251001";
+const TITLE_MODEL = "gpt-6-luna";
 const MAX_TITLE_LENGTH = 60;
 
 const SYSTEM_PROMPT = `You name conversation threads. Given the first user message (and optionally the assistant's first reply), produce a concise 3-7 word title that captures the topic.
@@ -27,7 +27,8 @@ export async function generateThreadTitle(args: {
 
   try {
     const { text } = await generateText({
-      model: anthropic(TITLE_MODEL),
+      model: openai(TITLE_MODEL),
+      providerOptions: { openai: { reasoningEffort: "none" } },
       system: SYSTEM_PROMPT,
       prompt,
     });

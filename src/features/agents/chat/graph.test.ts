@@ -7,14 +7,14 @@ const { constructedModelFields } = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("../shared/build-graph", () => ({ buildAgentGraph: vi.fn() }));
-vi.mock("@langchain/anthropic", () => ({
-  ChatAnthropic: class {
+vi.mock("@langchain/openai", () => ({
+  ChatOpenAI: class {
     constructor(fields: Record<string, unknown>) {
       constructedModelFields.push(fields);
     }
 
-    bindTools(tools: { name: string }[], callOptions?: unknown) {
-      return { boundToolNames: tools.map((tool) => tool.name), callOptions };
+    bindTools(tools: { name: string }[]) {
+      return { boundToolNames: tools.map((tool) => tool.name) };
     }
   },
 }));
@@ -103,7 +103,7 @@ describe("chat system prompt — request_recommendation", () => {
     );
   });
 
-  it("gives request_recommendation's own description the fact-versus-decision examples, since Haiku picks tools mostly from their descriptions", () => {
+  it("gives request_recommendation's own description the fact-versus-decision examples, since the chat model picks tools mostly from their descriptions", () => {
     buildChatGraph({
       userId: "user",
       threadId: "thread",
@@ -261,42 +261,25 @@ describe("recommendation model configuration", () => {
       threadId: "thread",
       loadNotes: async () => "Hospital notes",
     });
-    return constructedModelFields.find((fields) => fields.thinking);
+    return constructedModelFields.find(
+      (fields) =>
+        (fields.reasoning as { effort?: string } | undefined)?.effort ===
+        "high",
+    );
   };
 
-  it("uses adaptive thinking with summarized display, since newer Opus rejects budget_tokens and hides thinking text by default", () => {
+  it("uses high reasoning effort with a summary, since OpenAI streams no reasoning text without one", () => {
     const fields = recommendationModelFields();
-    expect(fields?.thinking).toEqual({
-      type: "adaptive",
-      display: "summarized",
-    });
+    expect(fields?.reasoning).toEqual({ effort: "high", summary: "auto" });
     expect(fields).not.toHaveProperty("temperature");
   });
 
-  it("sets the effort level explicitly instead of relying on the model default", () => {
-    expect(recommendationModelFields()?.outputConfig).toEqual({
-      effort: "high",
-    });
-  });
-});
-
-describe("prompt caching", () => {
-  type BoundModel = { callOptions?: unknown };
-
-  it("caches the repeated input of both the chat model and the recommendation node", () => {
+  it("runs the chat model without reasoning, as the fast router", () => {
     buildChatGraph({
       userId: "user",
       threadId: "thread",
       loadNotes: async () => "Hospital notes",
     });
-    const config = graphConfig();
-    const chatModel = config.model as unknown as BoundModel;
-    const recommendationModel = config.recommendation
-      ?.model as unknown as BoundModel;
-    for (const boundModel of [chatModel, recommendationModel]) {
-      expect(boundModel.callOptions).toEqual({
-        cache_control: { type: "ephemeral" },
-      });
-    }
+    expect(constructedModelFields[0]?.reasoning).toEqual({ effort: "none" });
   });
 });

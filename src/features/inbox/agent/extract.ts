@@ -1,7 +1,7 @@
 // Extract potential VIPER db items from a notification (e.g, find potential device groups)
 
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import { fetchPdfAttachments } from "../utils";
@@ -62,7 +62,7 @@ export type ExtractedRemediation = z.infer<typeof extractedRemediationSchema>;
 export type ExtractedAsset = z.infer<typeof extractedAssetSchema>;
 export type ExtractResult = z.infer<typeof extractSchema>;
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "gpt-6-luna";
 
 // cvssScore format reference: https://nvd.nist.gov/vuln-metrics/cvss
 const SYSTEM_PROMPT = `You are an extraction agent for a hospital cybersecurity platform that reads security notifications (advisories, recalls, update notices) and their PDF attachments.
@@ -105,10 +105,12 @@ export async function extractEntities(
 ): Promise<ExtractResult> {
   const pdfAttachments = inlinedPdfs ?? (await fetchPdfAttachments(sourceId));
 
-  const model = new ChatAnthropic({
+  const model = new ChatOpenAI({
     model: MODEL,
+    useResponsesApi: true,
+    reasoning: { effort: "none" },
     maxTokens: 2048,
-  }).withStructuredOutput(extractSchema);
+  }).withStructuredOutput(extractSchema, { method: "functionCalling" });
 
   const result = await model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

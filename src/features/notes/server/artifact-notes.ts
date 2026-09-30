@@ -7,7 +7,7 @@ import prisma from "@/lib/db";
 import { downloadBufferFromS3, keyFromDownloadUrl } from "@/lib/s3";
 
 // Text-chunk sizing. A manufacturer manual can run dozens of pages which as image-based PDF document
-// blocks would swamp Haiku's window; extracting text and chunking keeps each
+// blocks would swamp the model's window; extracting text and chunking keeps each
 // agent call small and cheap. ~40k chars ~= 10k tokens, well within context.
 const CHUNK_CHARS = 40_000;
 const CHUNK_OVERLAP = 2_000;

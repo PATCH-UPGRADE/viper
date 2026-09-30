@@ -18,25 +18,14 @@ const read = (file: string) =>
   );
 
 describe("writer model configuration", () => {
-  // withStructuredOutput sends a forced tool_choice. LangChain only skips
-  // forcing when thinking.type is explicitly "enabled"/"adaptive", and Sonnet 5
-  // thinks by default when the field is omitted — so an unset `thinking` pairs
-  // forced tool choice with thinking and the API rejects every call.
-  it("disables thinking explicitly", () => {
-    expect(read("writer.ts")).toMatch(
-      /thinking:\s*\{\s*type:\s*"disabled"\s*\}/,
-    );
+  // Sol's lowest accepted effort is "low"; "none" is a 400 on every call.
+  it("uses low reasoning effort, the lowest Sol accepts", () => {
+    expect(read("writer.ts")).toMatch(/reasoning:\s*\{\s*effort:\s*"low"\s*\}/);
   });
 
-  // Match the assignment, not the bare word. Both settings are worth explaining
-  // in a comment, and a comment doing so must not fail the test that guards them.
-  it("never sends budget_tokens, which Sonnet 5 rejects with a 400", () => {
-    for (const file of ["writer.ts", "scout.ts"]) {
-      expect(read(file)).not.toMatch(/budget_tokens\s*:/);
-    }
-  });
-
-  it("never sets temperature, which Sonnet 5 also rejects", () => {
+  // Match the assignment, not the bare word. The setting is worth explaining
+  // in a comment, and a comment doing so must not fail the test that guards it.
+  it("never sets temperature, which reasoning models reject", () => {
     for (const file of ["writer.ts", "scout.ts"]) {
       expect(read(file)).not.toMatch(/temperature\s*:/);
     }
@@ -44,9 +33,9 @@ describe("writer model configuration", () => {
 });
 
 describe("scout model configuration", () => {
-  it("uses adaptive thinking, the only mode Sonnet 5 accepts", () => {
+  it("reasons at medium effort", () => {
     expect(read("scout.ts")).toMatch(
-      /thinking:\s*\{\s*type:\s*"adaptive"\s*\}/,
+      /reasoning:\s*\{\s*effort:\s*"medium"\s*\}/,
     );
   });
 

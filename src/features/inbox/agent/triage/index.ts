@@ -1,5 +1,5 @@
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
@@ -7,7 +7,7 @@ import { hospitalImpactSchema } from "../../types";
 import { fetchPdfAttachments } from "../../utils";
 import { gatherTriageContext } from "./context";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "gpt-6-luna";
 
 const triageSchema = z.object({
   priority: z.enum(["Critical", "High", "Monitor", "Defer"]),
@@ -78,10 +78,12 @@ export async function triageNotification(
     gatherTriageContext(notificationId),
   ]);
 
-  const model = new ChatAnthropic({
+  const model = new ChatOpenAI({
     model: MODEL,
+    useResponsesApi: true,
+    reasoning: { effort: "none" },
     maxTokens: 2048,
-  }).withStructuredOutput(triageSchema);
+  }).withStructuredOutput(triageSchema, { method: "functionCalling" });
 
   const textPrompt = buildTextPrompt({
     notificationType: notification?.type ?? "Other",

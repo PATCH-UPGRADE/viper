@@ -1,5 +1,5 @@
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { fetchPdfAttachments } from "../../utils";
@@ -15,7 +15,7 @@ import {
 } from "./process_output";
 import { buildQuestionSchema, type QuestionResult } from "./schema";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "gpt-6-luna";
 
 export async function draftQuestion(
   context: QuestionContext,
@@ -24,10 +24,12 @@ export async function draftQuestion(
   const issueIds = context.issues.map((issue) => issue.issueId);
   const schema = buildQuestionSchema(issueIds);
 
-  const model = new ChatAnthropic({
+  const model = new ChatOpenAI({
     model: MODEL,
+    useResponsesApi: true,
+    reasoning: { effort: "none" },
     maxTokens: 4000,
-  }).withStructuredOutput(schema);
+  }).withStructuredOutput(schema, { method: "functionCalling" });
 
   return model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

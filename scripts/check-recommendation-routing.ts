@@ -39,7 +39,7 @@ const QUESTIONS: [expected: "hand off" | "stay", question: string][] = [
 ];
 
 async function main() {
-  const { ChatAnthropic } = await import("@langchain/anthropic");
+  const { ChatOpenAI } = await import("@langchain/openai");
   const { HumanMessage, SystemMessage } = await import(
     "@langchain/core/messages"
   );
@@ -54,8 +54,10 @@ async function main() {
     where: { email: "user@example.com" },
     select: { id: true },
   });
-  const chatModel = new ChatAnthropic({
-    model: "claude-haiku-4-5-20251001",
+  const chatModel = new ChatOpenAI({
+    model: "gpt-6-luna",
+    useResponsesApi: true,
+    reasoning: { effort: "none" },
     maxTokens: 1024,
   }).bindTools(buildAgentTools(user.id, "routing-check"));
   const system = new SystemMessage(

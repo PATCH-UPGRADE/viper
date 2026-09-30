@@ -4,10 +4,10 @@
 // sequentially so a fact spanning chunks isn't duplicated.
 
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "gpt-6-luna";
 
 /** A single note the model wants to create, or an update to an existing one. */
 export const noteOpSchema = z.object({
@@ -72,10 +72,12 @@ export async function extractNotesFromChunk(args: {
 }): Promise<NoteOps> {
   const { chunkText, existingNotes, alreadyExtracted } = args;
 
-  const model = new ChatAnthropic({
+  const model = new ChatOpenAI({
     model: MODEL,
+    useResponsesApi: true,
+    reasoning: { effort: "none" },
     maxTokens: 4096,
-  }).withStructuredOutput(noteOpsSchema);
+  }).withStructuredOutput(noteOpsSchema, { method: "functionCalling" });
 
   const prompt = [
     "Extract security-relevant notes from the following excerpt of device documentation.",

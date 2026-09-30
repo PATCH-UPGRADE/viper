@@ -3,14 +3,14 @@
 // directly; this agent only produces the structured fields around it.
 
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import { buildUserMessage, type PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
 import { type WorkOrderPayload, workOrderPayloadSchema } from "../types";
 import { fetchPdfAttachments } from "../utils";
 import { emailPromptText, type InboundEmail } from "./prompt";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "gpt-6-luna";
 
 const SYSTEM_PROMPT = `You extract structured fields for a hospital work-order ticket from an actionable email.
 
@@ -38,10 +38,14 @@ export async function extractWorkOrder(
   const validDepartments =
     departments.map((d) => d.name).join(", ") || "(none configured)";
 
-  const model = new ChatAnthropic({
+  const model = new ChatOpenAI({
     model: MODEL,
+    useResponsesApi: true,
+    reasoning: { effort: "none" },
     maxTokens: 1024,
-  }).withStructuredOutput(workOrderPayloadSchema);
+  }).withStructuredOutput(workOrderPayloadSchema, {
+    method: "functionCalling",
+  });
 
   return model.invoke([
     { role: "system", content: SYSTEM_PROMPT },

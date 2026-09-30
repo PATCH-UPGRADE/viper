@@ -11,27 +11,24 @@ export type PdfAttachment = {
 
 /**
  * Build an agent's user message from its prompt text plus any PDF attachments,
- * which ride along as Anthropic `document` blocks so the model reads them
- * beside the text rather than in a separate call.
+ * which ride along as LangChain `file` blocks (OpenAI `input_file` on the wire)
+ * so the model reads them beside the text rather than in a separate call.
+ * OpenAI requires a filename for inline file data, so every block carries one.
  */
-// https://github.com/anthropics/skills/blob/main/skills/claude-api/SKILL.md#document--file-input-quick-reference
 export function buildUserMessage(
   text: string,
   pdfAttachments: PdfAttachment[] = [],
 ): HumanMessage {
-  const content = [
-    ...pdfAttachments.map((pdf) => ({
-      type: "document",
-      source: {
-        type: "base64",
-        media_type: "application/pdf",
+  return new HumanMessage({
+    content: [
+      ...pdfAttachments.map((pdf) => ({
+        type: "file" as const,
+        source_type: "base64" as const,
+        mime_type: "application/pdf",
         data: pdf.base64,
-      },
-      title: pdf.filename ?? "attachment.pdf",
-    })),
-    { type: "text" as const, text },
-  ];
-
-  // biome-ignore lint/suspicious/noExplicitAny: LangChain's content type doesn't model Anthropic document blocks
-  return new HumanMessage({ content: content as any });
+        metadata: { filename: pdf.filename ?? "attachment.pdf" },
+      })),
+      { type: "text" as const, text },
+    ],
+  });
 }

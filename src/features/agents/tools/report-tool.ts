@@ -4,7 +4,6 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { z } from "zod";
 import { existingIds } from "@/features/inbox/utils";
 import prisma from "@/lib/db";
-import { escapeRegExp } from "@/lib/string-utils";
 import type { Retrieval } from "./query-platform-tool";
 
 // Citable route segments; keep in step with the examples in graph.ts. The
@@ -32,13 +31,10 @@ function collectIds(value: unknown, into: Set<string>): void {
 }
 
 /**
- * Ids fetched this turn plus those in earlier, persisted turns. Awaiting this
- * turn's lookups covers one running in parallel with the report call.
+ * Ids looked up this turn. Awaiting the lookups covers one running in parallel
+ * with the report call.
  */
-async function retrievedIds(
-  threadId: string,
-  retrieval: Retrieval,
-): Promise<Set<string>> {
+async function turnIds(retrieval: Retrieval) {
   const ids = new Set<string>();
   for (const output of await Promise.all(retrieval)) {
     try {
@@ -47,6 +43,11 @@ async function retrievedIds(
       // an error message, not a result
     }
   }
+  return ids;
+}
+
+/** Ids looked up in earlier turns, read from the saved tool calls. */
+async function earlierIds(threadId: string, ids: Set<string>) {
   const rows = await prisma.chatMessage.findMany({
     where: { threadId, role: "ASSISTANT" },
     select: { toolCalls: true },
@@ -58,11 +59,10 @@ async function retrievedIds(
         collectIds(part.output, ids);
     }
   }
-  return ids;
 }
 
-/** Route citations and prose text; code blocks and link targets are skipped. */
-function parse(markdown: string) {
+/** Citations to /segment/id routes; code blocks and link targets are skipped. */
+function citations(markdown: string) {
   const nodes = [...fromMarkdown(markdown).children];
   for (const node of nodes) {
     if ("children" in node) nodes.push(...node.children);
@@ -72,7 +72,7 @@ function parse(markdown: string) {
       .filter((node) => node.type === "definition")
       .map((node) => [node.identifier, node.url]),
   );
-  const links = nodes.flatMap((node) => {
+  return nodes.flatMap((node) => {
     if (node.type !== "link" && node.type !== "linkReference") return [];
     const url =
       node.type === "link" ? node.url : definitions.get(node.identifier);
@@ -81,27 +81,24 @@ function parse(markdown: string) {
       ? [{ path: `/${match[1]}/${match[2]}`, segment: match[1], id: match[2] }]
       : [];
   });
-  const prose = nodes
-    .flatMap((node) => (node.type === "text" ? node.value : []))
-    .join("\n");
-  return { links, prose };
 }
 
-/**
- * Refuse citations to records not retrieved in this thread, then append
- * retrieved assets/CVEs the report names but never cites under Sources.
- */
-async function finalizeCitations(
+/** Refuse citations to records that were not retrieved in this thread. */
+async function checkCitations(
   report: string,
   threadId: string,
   retrieval: Retrieval,
-): Promise<string> {
-  const seen = await retrievedIds(threadId, retrieval);
-  const added = parse(report).links;
+) {
+  const cited = citations(report);
+  if (!cited.length) return;
+  // Saved history is only read when this turn's lookups don't cover everything.
+  const seen = await turnIds(retrieval);
+  if (cited.some((link) => !seen.has(link.id)))
+    await earlierIds(threadId, seen);
   const valid = new Map(
     await Promise.all(
       Object.entries(FINDERS).map(async ([segment, findMany]) => {
-        const ids = added
+        const ids = cited
           .filter((link) => link.segment === segment && seen.has(link.id))
           .map((link) => link.id);
         return [segment, await existingIds(findMany, ids)] as const;
@@ -109,56 +106,12 @@ async function finalizeCitations(
     ),
   );
   // Refuse rather than strip, so the model learns what it must look up.
-  const bad = added.filter(({ segment, id }) => !valid.get(segment)?.has(id));
+  const bad = cited.filter(({ segment, id }) => !valid.get(segment)?.has(id));
   if (bad.length) {
     throw new Error(
       `Not saved. Cite only records you retrieved with query_platform_data; look these up or drop the links: ${bad.map((link) => link.path).join(", ")}`,
     );
   }
-
-  // Only assets and CVEs have a short name to spot in prose.
-  if (seen.size === 0) return report;
-  const ids = [...seen];
-  const [assets, vulnerabilities] = await Promise.all([
-    prisma.asset.findMany({
-      where: { id: { in: ids }, hostname: { not: null } },
-      select: { id: true, hostname: true },
-    }),
-    prisma.vulnerability.findMany({
-      where: { id: { in: ids }, cveId: { not: null } },
-      select: { id: true, cveId: true },
-    }),
-  ]);
-  // A trailing Sources section is rebuilt: our entries are dropped and re-added
-  // only while still named, so edits that remove a mention remove its entry.
-  const at = report.search(/^## Sources[ \t]*$(?![\s\S]*^#{1,6} )/m);
-  const body = at < 0 ? report : report.slice(0, at).trimEnd();
-  const kept =
-    at < 0
-      ? ""
-      : report
-          .slice(at)
-          .replace(/^## Sources.*\n?/, "")
-          .replace(
-            /^- \[[^\]\n]+\]\(\/(?:assets|vulnerabilities)\/[^)\s]+\)\n?/gm,
-            "",
-          )
-          .trim();
-  const { links, prose } = parse(`${body}\n\n${kept}`);
-  const sources = [
-    ...assets.map((a) => [`/assets/${a.id}`, a.hostname!]),
-    ...vulnerabilities.map((v) => [`/vulnerabilities/${v.id}`, v.cveId!]),
-  ]
-    .filter(
-      ([path, name]) =>
-        !links.some((link) => link.path === path) &&
-        new RegExp(`(?<![\\w-])${escapeRegExp(name)}(?![\\w-])`, "i").test(
-          prose,
-        ),
-    )
-    .map(([path, name]) => `- [${name}](${path})`);
-  const lines = [kept, ...sources].filter(Boolean);
-  return lines.length ? `${body}\n\n## Sources\n${lines.join("\n")}` : body;
 }
 
 export function makeWriteReportTool(
@@ -170,7 +123,7 @@ export function makeWriteReportTool(
     async ({ title, markdown }) => {
       const body = markdown.trim();
       if (!body) return "Report was empty — nothing saved.";
-      const report = await finalizeCitations(body, threadId, retrieval);
+      await checkCitations(body, threadId, retrieval);
 
       // Ownership check first — update() can only key on the unique id.
       const thread = await prisma.chatThread.findFirst({
@@ -180,7 +133,7 @@ export function makeWriteReportTool(
       if (!thread) {
         return "Could not save the report — thread not found.";
       }
-      const data = { title, content: report };
+      const data = { title, content: body };
       await prisma.chatThread.update({
         where: { id: threadId },
         data: { report: { upsert: { create: data, update: data } } },
@@ -284,15 +237,14 @@ export function makeEditReportTool(
         return "oldText matches more than one place. Add surrounding text to make it unique.";
       }
 
+      const updatedContent =
+        content.slice(0, at) + newText + content.slice(at + oldText.length);
+      await checkCitations(updatedContent, threadId, retrieval);
       const updated = await prisma.chatReport.updateMany({
         // compare-and-swap: fails if the report changed since we read it
         where: { id, content },
         data: {
-          content: await finalizeCitations(
-            content.slice(0, at) + newText + content.slice(at + oldText.length),
-            threadId,
-            retrieval,
-          ),
+          content: updatedContent,
         },
       });
       return updated.count

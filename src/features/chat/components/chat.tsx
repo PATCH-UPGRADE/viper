@@ -631,7 +631,7 @@ function ChatMessage({
         className={cn(
           "max-w-[80%] text-sm overflow-x-auto",
           role === "user"
-            ? "bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-3 py-2"
+            ? "bg-primary text-primary-foreground [&_.markdown_a]:text-primary-foreground rounded-2xl rounded-br-sm px-3 py-2"
             : hasText
               ? "bg-muted rounded-2xl rounded-bl-sm px-3 py-2"
               : "space-y-1",

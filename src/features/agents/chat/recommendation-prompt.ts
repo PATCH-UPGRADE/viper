@@ -193,7 +193,9 @@ say the full plan is in the report, rather than pasting the report into chat.
 - write_report: create the report, or rewrite it in full on purpose, never from memory. It
   replaces the whole report with Markdown.
 Cite the records you retrieved as links: [MRI-01](/assets/<id>),
-[CVE-2024-1234](/vulnerabilities/<id>), [name](/remediations/<id>). Mark missing facts
+[CVE-2024-1234](/vulnerabilities/<id>), [name](/remediations/<id>),
+[workflow](/workflows/<id>), [notification](/inbox/<id>). A report that cites a record you
+have not retrieved in this conversation is refused; look it up first. Mark missing facts
 "Not available".
 </reports_view>`;
 

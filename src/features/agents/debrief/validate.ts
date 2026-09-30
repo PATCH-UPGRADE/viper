@@ -11,7 +11,6 @@ import {
   debriefBulletSchema,
 } from "@/features/debrief/types";
 import prisma from "@/lib/db";
-import { escapeRegExp } from "@/lib/string-utils";
 
 /**
  * Where each link entity type is looked up, so a link the model invented can be
@@ -140,6 +139,9 @@ function clampToChars(text: string): string {
   const partialMarker = /\{\{?\d*$/;
   return `${cut.replace(partialMarker, "").trimEnd()}\u2026`;
 }
+
+const escapeRegExp = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * Give a marker to every resolving link that the writer supplied but never

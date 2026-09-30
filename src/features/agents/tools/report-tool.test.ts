@@ -244,7 +244,7 @@ describe("edit_report", () => {
   });
 });
 
-describe("citation retrieval check and Sources", () => {
+describe("citation retrieval check", () => {
   const write = async (markdown: string, retrieved: string[]) => {
     vi.mocked(prisma.chatThread.update).mockClear();
     await run(
@@ -256,25 +256,12 @@ describe("citation retrieval check and Sources", () => {
   };
 
   beforeEach(() => {
-    // Every id exists; a1/a2 are named hosts and v1 a named CVE.
+    // Every cited id exists.
     vi.mocked(prisma.asset.findMany).mockImplementation((async ({
       where,
-      select,
     }: {
       where: { id: { in: string[] } };
-      select: { hostname?: true };
-    }) =>
-      select.hostname
-        ? [
-            { id: "a1", hostname: "MRI-01" },
-            { id: "a2", hostname: "CT-02" },
-          ].filter((a) => where.id.in.includes(a.id))
-        : where.id.in.map((id) => ({ id }))) as never);
-    vi.mocked(prisma.vulnerability.findMany).mockImplementation((async ({
-      select,
-    }: {
-      select: { cveId?: true };
-    }) => (select.cveId ? [{ id: "v1", cveId: "CVE-2024-1" }] : [])) as never);
+    }) => where.id.in.map((id) => ({ id }))) as never);
   });
 
   it("keeps citations retrieved this turn or an earlier one, refuses the rest", async () => {
@@ -309,40 +296,10 @@ describe("citation retrieval check and Sources", () => {
     expect(saved()!.content).toBe("[A](/assets/a1)");
   });
 
-  it("lists mentioned-but-uncited hosts once, and nothing else", async () => {
-    const first = await write(
-      "MRI-01 and [CT-02](/assets/a2) are affected. MRI-010 is not.",
-      ["a1", "a2", "v1"],
-    );
-    expect(first).toBe(
-      "MRI-01 and [CT-02](/assets/a2) are affected. MRI-010 is not.\n\n## Sources\n- [MRI-01](/assets/a1)",
-    );
-    expect(await write(first, ["a1", "a2", "v1"])).toBe(first);
-  });
-
-  it("ignores names in code, and adds a new Sources section when it isn't last", async () => {
-    expect(
-      await write("## Sources\n\n## Next\n\nMRI-01 is down. `CVE-2024-1`", [
-        "a1",
-        "v1",
-      ]),
-    ).toBe(
-      "## Sources\n\n## Next\n\nMRI-01 is down. `CVE-2024-1`\n\n## Sources\n- [MRI-01](/assets/a1)",
-    );
-  });
-
-  it("rebuilds Sources: drops entries no longer named, keeps other lines", async () => {
-    expect(
-      await write(
-        "Nothing named.\n\n## Sources\n- [MRI-01](/assets/a1)\n- [NVD](https://nvd.nist.gov)",
-        ["a1"],
-      ),
-    ).toBe("Nothing named.\n\n## Sources\n- [NVD](https://nvd.nist.gov)");
-    expect(
-      await write("Nothing named.\n\n## Sources\n- [MRI-01](/assets/a1)", [
-        "a1",
-      ]),
-    ).toBe("Nothing named.");
+  it("skips the saved history when this turn's lookups cover every citation", async () => {
+    await write("[A](/assets/a1)", ["a1"]);
+    await write("No links.", []);
+    expect(prisma.chatMessage.findMany).not.toHaveBeenCalled();
   });
 
   it("keeps a retrieved reference-style citation", async () => {
@@ -351,8 +308,8 @@ describe("citation retrieval check and Sources", () => {
     );
   });
 
-  it("edit_report checks the whole edited report and rechecks Sources", async () => {
-    mockReport("[B](/assets/a2) Old. MRI-01");
+  it("edit_report checks the whole edited report", async () => {
+    mockReport("[B](/assets/a2) Old.");
     vi.mocked(prisma.chatReport.updateMany).mockResolvedValue({ count: 1 });
     await run(
       makeEditReportTool,
@@ -360,11 +317,8 @@ describe("citation retrieval check and Sources", () => {
       new Set(["a1", "a2"]),
     );
     expect(prisma.chatReport.updateMany).toHaveBeenCalledWith({
-      where: { id: "r1", content: "[B](/assets/a2) Old. MRI-01" },
-      data: {
-        content:
-          "[B](/assets/a2) New. MRI-01\n\n## Sources\n- [MRI-01](/assets/a1)",
-      },
+      where: { id: "r1", content: "[B](/assets/a2) Old." },
+      data: { content: "[B](/assets/a2) New." },
     });
 
     // Retargeting a link in place is still checked.

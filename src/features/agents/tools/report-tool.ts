@@ -69,14 +69,11 @@ async function checkCitations(
   if (!cited.length) return;
   // Awaiting this turn's lookups covers one running in parallel with this call.
   const outputs = await Promise.all(retrieval);
-  const seen = new Set(
-    (
-      await Promise.all(
-        [...new Set(cited.map((link) => link.id))].map(async (id) =>
-          (await wasRetrieved(id, threadId, outputs)) ? id : null,
-        ),
-      )
-    ).filter((id) => id !== null),
+  const seen = new Set<string>();
+  await Promise.all(
+    [...new Set(cited.map((link) => link.id))].map(async (id) => {
+      if (await wasRetrieved(id, threadId, outputs)) seen.add(id);
+    }),
   );
   const valid = new Map(
     await Promise.all(

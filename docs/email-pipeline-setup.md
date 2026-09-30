@@ -54,7 +54,7 @@ You'll get something like `anything@ab12cd34.resend.app`. The part before the `@
 
 ## 4. Expose your local app to the internet
 
-Resend has to reach your laptop, so you need a tunnel. (Same applies if you're testing with n8n.)
+Resend has to reach your laptop, so you need a tunnel.
 
 **cloudflared** is easiest — no account needed:
 

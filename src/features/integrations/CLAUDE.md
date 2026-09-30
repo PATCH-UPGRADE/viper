@@ -155,7 +155,8 @@ createSession?(input: { integrationId: string; config: TConfig; creds: TCreds })
 
 Core calls it through `openSession` (`core/session.ts`) and gives the result to the module:
 `ctx.session` in `sync`, and the `session` argument of `create`. A module never signs in by
-itself. A platform-level `sync` (ai, partner) gets no session, because those platforms push to us.
+itself. A platform-level `sync` (ai, partner) gets no session: partner pushes to us, and ai crawls
+with its own fetch tool, which sends the credentials to the integration URL's origin only.
 
 Rules for an implementation:
 

@@ -65,7 +65,7 @@ export interface Session {
 export interface SessionInput<TConfig = unknown, TCreds = unknown> {
   integrationId: string;
   config: TConfig;
-  /** `ai` forwards these to n8n, which authenticates as us. That is the point. */
+  /** `ai` sends these to the upstream it crawls, on that origin only. */
   creds: TCreds;
 }
 

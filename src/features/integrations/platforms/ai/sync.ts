@@ -1,60 +1,107 @@
 import "server-only";
+import { processAssetIntegrationSync } from "@/features/assets/server/integration-sync";
+import { processDeviceArtifactIntegrationSync } from "@/features/device-artifacts/server/integration-sync";
 import type { SyncCtx, SyncOutcome } from "@/features/integrations/core/types";
+import { processRemediationIntegrationSync } from "@/features/remediations/server/integration-sync";
+import { processVulnerabilityIntegrationSync } from "@/features/vulnerabilities/server/integration-sync";
+import { ResourceType } from "@/generated/prisma";
+import prisma from "@/lib/db";
+import type { IntegrationResponse } from "@/lib/schemas";
+import { runAiCrawler } from "./agent";
+import { type CrawlerResource, isCrawlerResource } from "./agent/schemas";
 import type { AiConfig, AiCreds } from "./config";
 
+const KNOWN_VENDOR_ID_SAMPLE = 10;
+
+function recentVendorIds(
+  resource: CrawlerResource,
+  integrationId: string,
+): Promise<{ externalId: string }[]> {
+  const query = {
+    where: { integrationId },
+    select: { externalId: true },
+    orderBy: { updatedAt: "desc" as const },
+    take: KNOWN_VENDOR_ID_SAMPLE,
+  };
+  switch (resource) {
+    case ResourceType.Asset:
+      return prisma.externalAssetMapping.findMany(query);
+    case ResourceType.Vulnerability:
+      return prisma.externalVulnerabilityMapping.findMany(query);
+    case ResourceType.Remediation:
+      return prisma.externalRemediationMapping.findMany(query);
+    case ResourceType.DeviceArtifact:
+      return prisma.externalDeviceArtifactMapping.findMany(query);
+  }
+}
+
 /**
- * VIPER fetches nothing here. It hands the job to n8n, which crawls the
- * upstream on our behalf and POSTs the results to `ctx.callback().url`.
+ * Crawl the integration URL with an AI agent, then upsert what it recorded.
  */
 export async function aiSync(
   ctx: SyncCtx<AiConfig, AiCreds>,
 ): Promise<SyncOutcome> {
-  const n8nWebhookUrl = process.env.N8N_AI_SYNC_URL;
-  const n8nKey = process.env.N8N_KEY;
-
-  if (!n8nKey || !n8nWebhookUrl) {
-    throw new Error("Either N8N_KEY or N8N_AI_SYNC_URL is not defined");
+  const { resource } = ctx;
+  if (!isCrawlerResource(resource)) {
+    throw new Error(`The AI crawler cannot sync ${resource}`);
   }
 
-  // Where n8n should respond, and what schema it should respond with.
-  const callback = await ctx.callback();
+  const known = await recentVendorIds(resource, ctx.integrationId);
+  const crawl = {
+    integrationUri: ctx.config.integrationUri,
+    additionalInstructions: ctx.config.additionalInstructions,
+    creds: ctx.creds,
+    knownVendorIds: known.map((m) => m.externalId),
+  };
+  const target = [
+    ctx.integrationUserId,
+    ctx.integrationId,
+    // finalize-sync already records this attempt. A second write double-counts consecutiveFailures.
+    { shouldRecordSyncOutcome: false },
+  ] as const;
 
-  const response = await fetch(n8nWebhookUrl, {
-    method: "POST",
-    headers: {
-      Authorization: n8nKey,
-      "Content-Type": "application/json",
-    },
-    signal: AbortSignal.timeout(30000), // 30s timeout
-    // NOTE: has to be compatible with whatever we have on n8n
-    body: JSON.stringify({
-      baseApiUrl: callback.baseApiUrl,
-      responsePath: callback.path,
-      responseSchema: callback.schema,
-      resourceType: ctx.resource,
-      integrationUri: ctx.config.integrationUri,
-      additionalInstructions: ctx.config.additionalInstructions,
-      // NOTE: this forwards the integration's credentials to n8n in
-      // plaintext, on purpose. n8n crawls the upstream on our behalf and has to
-      // authenticate as us, so `SyncCtx.creds` exists specifically for this
-      // path.
-      authType: ctx.creds.authType,
-      authentication: ctx.creds.authentication,
-    }),
-  });
+  let incomplete: string | undefined;
+  const crawlItems = async <R extends CrawlerResource>(resource: R) => {
+    const result = await runAiCrawler({ ...crawl, resource });
+    incomplete = result.incomplete;
+    return result.items;
+  };
 
-  if (!response.ok) {
-    throw new Error(`Failed to sync data: ${response.statusText}`);
+  const ingest = async (): Promise<IntegrationResponse> => {
+    switch (resource) {
+      case ResourceType.Asset:
+        return processAssetIntegrationSync(
+          { items: await crawlItems(resource) },
+          ...target,
+        );
+      case ResourceType.Vulnerability:
+        return processVulnerabilityIntegrationSync(
+          { items: await crawlItems(resource) },
+          ...target,
+        );
+      case ResourceType.Remediation:
+        return processRemediationIntegrationSync(
+          { items: await crawlItems(resource) },
+          ...target,
+        );
+      case ResourceType.DeviceArtifact:
+        return processDeviceArtifactIntegrationSync(
+          { items: await crawlItems(resource) },
+          ...target,
+        );
+    }
+  };
+
+  const response = await ingest();
+  // The items are saved by now. Throwing makes finalize-sync record Error, so a
+  // partial crawl or a failed item does not look like a complete sync.
+  const problems = [
+    incomplete,
+    response.shouldRetry ? response.message : undefined,
+  ].filter((problem) => problem !== undefined);
+  if (problems.length > 0) {
+    throw new Error(problems.join(" "));
   }
 
-  // n8n's ack. The real data arrives later, at the callback; a SyncOutcome
-  // carries only the cursor, so this is logged rather than returned.
-  console.log("ai sync handed off", {
-    resource: ctx.resource,
-    ack: await response.json().catch(() => null),
-  });
-
-  // A push platform: the callback advances things. Leave the cursor alone and
-  // stay Pending until it lands.
-  return { cursor: ctx.cursor, pending: true };
+  return { cursor: ctx.cursor };
 }

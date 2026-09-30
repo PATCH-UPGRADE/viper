@@ -17,12 +17,11 @@ const src = fs.readFileSync(
 );
 
 describe("crawler model configuration", () => {
-  it("uses adaptive thinking, the only mode Sonnet 5 accepts", () => {
-    expect(src).toMatch(/thinking:\s*\{\s*type:\s*"adaptive"\s*\}/);
+  it("reasons at medium effort", () => {
+    expect(src).toMatch(/reasoning:\s*\{\s*effort:\s*"medium"\s*\}/);
   });
 
-  it("never sends budget_tokens or temperature, which Sonnet 5 rejects", () => {
-    expect(src).not.toMatch(/budget_tokens\s*:/);
+  it("never sets temperature, which reasoning models reject", () => {
     expect(src).not.toMatch(/temperature\s*:/);
   });
 
@@ -33,10 +32,6 @@ describe("crawler model configuration", () => {
       /tools = \[\s*makeFetchUrlTool\([^)]*\),\s*recorder\.tool,?\s*\]/,
     );
     expect(src).not.toMatch(/buildAgentTools\s*\(/);
-  });
-
-  it("caches the repeated conversation prefix", () => {
-    expect(src).toMatch(/bindTools\(tools,\s*CACHE_REPEATED_INPUT\)/);
   });
 
   it("raises the recursion limit above LangGraph's default of 25", () => {

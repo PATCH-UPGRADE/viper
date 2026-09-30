@@ -1,9 +1,8 @@
 import "server-only";
-import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { ChatOpenAI } from "@langchain/openai";
 import type { z } from "zod";
 import { buildAgentGraph } from "@/features/agents/shared/build-graph";
-import { CACHE_REPEATED_INPUT } from "@/features/agents/shared/prompt-cache";
 import type { AuthCredential } from "@/features/integrations/core/credentials";
 import { makeFetchUrlTool } from "./fetch-tool";
 import { type CrawlResult, resolveCrawl } from "./outcome";
@@ -11,7 +10,7 @@ import { buildCrawlerPreload, buildCrawlerPrompt } from "./prompt";
 import { makeRecordItemsTool } from "./record-tool";
 import { CRAWLER_ITEM_SCHEMAS, type CrawlerResource } from "./schemas";
 
-const CRAWLER_MODEL = "claude-sonnet-5";
+const CRAWLER_MODEL = "gpt-6.1-sol";
 
 /**
  * Super-step budget for one crawl. Each tool round costs two super-steps
@@ -54,12 +53,13 @@ export async function runAiCrawler<R extends CrawlerResource>({
   const recorder = makeRecordItemsTool(itemSchema);
   const tools = [makeFetchUrlTool({ integrationUri, creds }), recorder.tool];
 
-  const model = new ChatAnthropic({
+  // Reasoning tokens count toward maxTokens, so leave room for a page of record_items arguments.
+  const model = new ChatOpenAI({
     model: CRAWLER_MODEL,
-    // Thinking and the record_items arguments share this budget.
     maxTokens: 16000,
-    thinking: { type: "adaptive" },
-  }).bindTools(tools, CACHE_REPEATED_INPUT);
+    useResponsesApi: true,
+    reasoning: { effort: "medium" },
+  }).bindTools(tools);
 
   const graph = buildAgentGraph({
     model,

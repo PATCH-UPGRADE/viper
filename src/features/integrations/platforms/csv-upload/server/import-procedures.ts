@@ -20,7 +20,9 @@ import {
   failuresCsvOutputSchema,
   failuresInputSchema,
   failuresOutputSchema,
+  type ImportFailure,
   type ImportStatus,
+  importFailureSchema,
   importPlanSchema,
   importStatusSchema,
   type LinkedAsset,
@@ -28,13 +30,16 @@ import {
   previewInputSchema,
   previewOutputSchema,
   type RowOutcome,
+  SEE_LIST_PAGE_SIZE,
+  type StagedRow,
   stageRowsInputSchema,
   startImportInputSchema,
 } from "../contract";
 import { findInFileConflicts } from "../import/conflicts";
 import { loadMatchContext } from "../import/context";
 import { type MatchContext, planMatches } from "../import/plan";
-import { putChunk } from "../import/staging";
+import { findStagedRows, putChunk } from "../import/staging";
+import { toCsv } from "../import/to-csv";
 
 const ownedImportSelect = {
   id: true,
@@ -107,6 +112,34 @@ function toImportStatus(csvImport: OwnedImport): ImportStatus {
     failedCount: csvImport.failedCount,
     finishedAt: csvImport.finishedAt,
   };
+}
+
+const recordedFailuresSchema = z.array(importFailureSchema);
+
+async function readFailures(
+  importId: string,
+): Promise<{ failures: ImportFailure[]; headers: string[] }> {
+  const csvImport = await prisma.csvImport.findUniqueOrThrow({
+    where: { id: importId },
+    select: { failures: true, headers: true },
+  });
+  const failures = recordedFailuresSchema.parse(csvImport.failures);
+  const failuresInFileOrder = [...failures].sort(
+    (first, second) => first.rowNumber - second.rowNumber,
+  );
+  return { failures: failuresInFileOrder, headers: csvImport.headers };
+}
+
+function failureLabel(
+  stagedRow: StagedRow | undefined,
+  rowNumber: number,
+): string {
+  const deviceName = [stagedRow?.manufacturer, stagedRow?.product]
+    .filter(Boolean)
+    .join(" ");
+  const serial = stagedRow?.serialNumber;
+  if (deviceName && serial) return `${deviceName} · ${serial}`;
+  return deviceName || serial || `Row ${rowNumber}`;
 }
 
 function linkedAssetsFor(
@@ -274,20 +307,56 @@ export const importProcedures = {
   failures: protectedProcedure
     .input(failuresInputSchema)
     .output(failuresOutputSchema)
-    .query(() => {
-      throw new TRPCError({
-        code: "METHOD_NOT_SUPPORTED",
-        message: "Not implemented yet",
-      });
+    .query(async ({ ctx, input }) => {
+      const csvImport = await requireOwnImport(
+        input.importId,
+        ctx.auth.user.id,
+      );
+      const { failures } = await readFailures(csvImport.id);
+      const pageStart = (input.page - 1) * SEE_LIST_PAGE_SIZE;
+      const failuresOnPage = failures.slice(
+        pageStart,
+        pageStart + SEE_LIST_PAGE_SIZE,
+      );
+      const stagedRows = await findStagedRows(
+        csvImport.id,
+        csvImport.chunkCount,
+        new Set(failuresOnPage.map((failure) => failure.rowNumber)),
+      );
+      const items = failuresOnPage.map((failure) => ({
+        ...failure,
+        label: failureLabel(
+          stagedRows.get(failure.rowNumber),
+          failure.rowNumber,
+        ),
+      }));
+      return { items, total: failures.length };
     }),
 
   failuresCsv: protectedProcedure
     .input(z.object({ importId: z.string() }))
     .output(failuresCsvOutputSchema)
-    .query(() => {
-      throw new TRPCError({
-        code: "METHOD_NOT_SUPPORTED",
-        message: "Not implemented yet",
+    .query(async ({ ctx, input }) => {
+      const csvImport = await requireOwnImport(
+        input.importId,
+        ctx.auth.user.id,
+      );
+      const { failures, headers } = await readFailures(csvImport.id);
+      const stagedRows = await findStagedRows(
+        csvImport.id,
+        csvImport.chunkCount,
+        new Set(failures.map((failure) => failure.rowNumber)),
+      );
+      const failedRowLines = failures.map((failure) => {
+        const originalCells = stagedRows.get(failure.rowNumber)?.raw ?? [];
+        const cellsUnderEachHeader = headers.map(
+          (_header, column) => originalCells[column] ?? "",
+        );
+        return [...cellsUnderEachHeader, failure.reason];
       });
+      return {
+        fileName: `${csvImport.integration.name}-failed-rows.csv`,
+        csv: toCsv([[...headers, "Reason"], ...failedRowLines]),
+      };
     }),
 } satisfies TRPCRouterRecord;

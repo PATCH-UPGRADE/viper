@@ -9,6 +9,7 @@ const {
   mockCreateIntegration,
   mockInngest,
   mockPutChunk,
+  mockFindStagedRows,
 } = vi.hoisted(() => ({
   mockPrisma: {
     csvImport: {
@@ -24,6 +25,7 @@ const {
   mockCreateIntegration: vi.fn(),
   mockInngest: { send: vi.fn() },
   mockPutChunk: vi.fn(),
+  mockFindStagedRows: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
@@ -34,7 +36,10 @@ vi.mock("@/features/integrations/server/create-integration", () => ({
   createIntegration: mockCreateIntegration,
 }));
 vi.mock("@/inngest/client", () => ({ inngest: mockInngest }));
-vi.mock("../import/staging", () => ({ putChunk: mockPutChunk }));
+vi.mock("../import/staging", () => ({
+  putChunk: mockPutChunk,
+  findStagedRows: mockFindStagedRows,
+}));
 
 import {
   CsvImportStatus,
@@ -395,5 +400,146 @@ describe("csvImport.status", () => {
     await expect(caller.status({ importId: "missing" })).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
+  });
+});
+
+describe("csvImport.failures", () => {
+  const recorded = [
+    { rowNumber: 1012, reason: "Manufacturer is missing" },
+    { rowNumber: 214, reason: "Serial also used by row 88 in this file" },
+    { rowNumber: 391, reason: "Model is missing" },
+  ];
+
+  beforeEach(() => {
+    mockPrisma.csvImport.findUnique.mockResolvedValue(
+      ownedImport({ chunkCount: 3, status: CsvImportStatus.PartiallyFailed }),
+    );
+    mockPrisma.csvImport.findUniqueOrThrow.mockResolvedValue({
+      failures: recorded,
+      headers: ["Mfr", "Model", "Serial"],
+    });
+  });
+
+  it("lists failures in file order, labelled from the staged row", async () => {
+    mockFindStagedRows.mockResolvedValue(
+      new Map([
+        [
+          214,
+          {
+            ...stagedRow,
+            rowNumber: 214,
+            manufacturer: "Philips",
+            product: "IntelliVue MX800",
+            serialNumber: "P-518204",
+          },
+        ],
+        [
+          1012,
+          {
+            ...stagedRow,
+            rowNumber: 1012,
+            manufacturer: null,
+            product: "Centrella",
+            serialNumber: "H-905521",
+          },
+        ],
+      ]),
+    );
+
+    const page = await caller.failures({ importId: "imp-1", page: 1 });
+
+    expect(mockFindStagedRows).toHaveBeenCalledWith(
+      "imp-1",
+      3,
+      new Set([214, 391, 1012]),
+    );
+    expect(page).toEqual({
+      items: [
+        {
+          rowNumber: 214,
+          reason: "Serial also used by row 88 in this file",
+          label: "Philips IntelliVue MX800 · P-518204",
+        },
+        { rowNumber: 391, reason: "Model is missing", label: "Row 391" },
+        {
+          rowNumber: 1012,
+          reason: "Manufacturer is missing",
+          label: "Centrella · H-905521",
+        },
+      ],
+      total: 3,
+    });
+  });
+
+  it("pages by the See list page size", async () => {
+    mockPrisma.csvImport.findUniqueOrThrow.mockResolvedValue({
+      failures: Array.from({ length: 30 }, (_, index) => ({
+        rowNumber: index + 2,
+        reason: "Model is missing",
+      })),
+      headers: ["Mfr"],
+    });
+    mockFindStagedRows.mockResolvedValue(new Map());
+
+    const secondPage = await caller.failures({ importId: "imp-1", page: 2 });
+
+    expect(secondPage.total).toBe(30);
+    expect(secondPage.items.map((item) => item.rowNumber)).toEqual([
+      27, 28, 29, 30, 31,
+    ]);
+  });
+
+  it("refuses another user's import", async () => {
+    mockPrisma.csvImport.findUnique.mockResolvedValue(
+      ownedImport({ userId: "someone-else" }),
+    );
+
+    await expect(
+      caller.failures({ importId: "imp-1", page: 1 }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});
+
+describe("csvImport.failuresCsv", () => {
+  it("rebuilds the failed rows under the original headers, with a Reason column", async () => {
+    mockPrisma.csvImport.findUnique.mockResolvedValue(
+      ownedImport({ chunkCount: 1, status: CsvImportStatus.PartiallyFailed }),
+    );
+    mockPrisma.csvImport.findUniqueOrThrow.mockResolvedValue({
+      failures: [
+        { rowNumber: 391, reason: "Model is missing" },
+        { rowNumber: 214, reason: "Serial also used by row 88 in this file" },
+      ],
+      headers: ["Mfr", "Model", "Serial", "Location"],
+    });
+    mockFindStagedRows.mockResolvedValue(
+      new Map([
+        [
+          214,
+          {
+            ...stagedRow,
+            rowNumber: 214,
+            raw: ["Philips", "IntelliVue MX800", "P-518204", "ICU, Bed 4"],
+          },
+        ],
+        [
+          391,
+          { ...stagedRow, rowNumber: 391, raw: ["Mindray", "", "MD-771930"] },
+        ],
+      ]),
+    );
+
+    const download = await caller.failuresCsv({ importId: "imp-1" });
+
+    expect(download.fileName).toBe(
+      "CSV Assets Upload - Oct 1, 2026-failed-rows.csv",
+    );
+    expect(download.csv).toBe(
+      [
+        "Mfr,Model,Serial,Location,Reason",
+        'Philips,IntelliVue MX800,P-518204,"ICU, Bed 4",Serial also used by row 88 in this file',
+        "Mindray,,MD-771930,,Model is missing",
+      ].join("\r\n"),
+    );
   });
 });

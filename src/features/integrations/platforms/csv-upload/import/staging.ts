@@ -28,3 +28,22 @@ export async function getChunk(
   const chunkJson = await downloadBufferFromS3(chunkKey(importId, chunkIndex));
   return stagedChunkSchema.parse(JSON.parse(chunkJson.toString("utf8")));
 }
+
+export async function findStagedRows(
+  importId: string,
+  chunkCount: number,
+  rowNumbers: Set<number>,
+): Promise<Map<number, StagedRow>> {
+  const rowsByNumber = new Map<number, StagedRow>();
+  for (
+    let chunkIndex = 0;
+    chunkIndex < chunkCount && rowsByNumber.size < rowNumbers.size;
+    chunkIndex++
+  ) {
+    const rows = await getChunk(importId, chunkIndex);
+    for (const row of rows) {
+      if (rowNumbers.has(row.rowNumber)) rowsByNumber.set(row.rowNumber, row);
+    }
+  }
+  return rowsByNumber;
+}

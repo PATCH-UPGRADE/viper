@@ -10,8 +10,9 @@ import {
   registry,
   requirePlatform,
   sourceAdapterFor,
+  unscheduledPlatforms,
 } from "../registry";
-import { moduleForResource } from "../sync/resources";
+import { moduleForResource, resourcesFor } from "../sync/resources";
 
 /**
  * Importing this module runs the registry's load-time assertion, so simply
@@ -32,6 +33,29 @@ describe("registry", () => {
   it("registers templay Fleet", () => {
     expect(requirePlatform(PlatformEnum.FLEET).definition.platform).toBe(
       PlatformEnum.FLEET,
+    );
+  });
+
+  it("registers CSV Upload as the only platform the cron never schedules", () => {
+    expect(
+      requirePlatform(PlatformEnum.CSV_UPLOAD).definition.unscheduled,
+    ).toBe(true);
+    expect(unscheduledPlatforms()).toEqual([PlatformEnum.CSV_UPLOAD]);
+  });
+
+  it("gives a CSV Upload integration exactly one Asset resource row", () => {
+    expect(resourcesFor(requirePlatform(PlatformEnum.CSV_UPLOAD), {})).toEqual([
+      ResourceType.Asset,
+    ]);
+  });
+
+  it("refuses to sync CSV Upload assets if a sync is ever dispatched", async () => {
+    const csvAssets = moduleForResource(
+      requirePlatform(PlatformEnum.CSV_UPLOAD),
+      ResourceType.Asset,
+    );
+    await expect(csvAssets?.sync({} as never)).rejects.toThrow(
+      "CSV Upload assets arrive only through an import",
     );
   });
 

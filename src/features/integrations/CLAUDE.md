@@ -115,6 +115,12 @@ puller loops and returns the cursor it reached; a pusher fires one request and r
 Set `definition.singleton: true` if a hospital needs only one Integration of the platform. The
 `create` procedure rejects a second one with `CONFLICT`, and the catalog disables its "Add" button.
 
+Set `definition.unscheduled: true` for a platform whose records arrive only when someone imports
+them (CSV Upload). The cron never schedules its resource rows, "Sync Now" refuses it with
+`BAD_REQUEST`, and it needs no `createSession` even though it declares a resource module. Its
+`IntegrationResourceSync` rows are still created, and its resource module's `sync` throws if anyone
+ever dispatches it.
+
 ## Resource modules
 
 A **resource module** is the per-resource half of a platform whose protocol *we* speak — where we

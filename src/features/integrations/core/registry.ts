@@ -2,6 +2,7 @@ import "server-only";
 import type { SourceRecordAdapter } from "@/features/inbox/source-adapter";
 import type { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { ai } from "../platforms/ai";
+import { csvUpload } from "../platforms/csv-upload";
 import { medisao } from "../platforms/medisao";
 import { partner } from "../platforms/partner";
 import { teamplayFleet } from "../platforms/teamplay-fleet";
@@ -17,6 +18,7 @@ export const registry: Partial<Record<PlatformEnum, AnyConnectorModule>> = {
   PARTNER: partner,
   FLEET: teamplayFleet,
   MEDISAO: medisao,
+  CSV_UPLOAD: csvUpload,
 };
 
 export const requirePlatform = (platform: PlatformEnum): AnyConnectorModule => {
@@ -36,6 +38,11 @@ export const displayNameFor = (platform: PlatformEnum): string =>
 
 export const categoriesFor = (platform: PlatformEnum): Category[] =>
   registry[platform]?.definition.categories ?? [];
+
+export const unscheduledPlatforms = (): PlatformEnum[] =>
+  (Object.values(registry) as AnyConnectorModule[])
+    .filter((module) => module.definition.unscheduled)
+    .map((module) => module.definition.platform);
 
 /**
  * How this platform's recorded snapshots become Notifications, if it records
@@ -67,7 +74,12 @@ for (const [key, module] of Object.entries(registry)) {
       `Registry key "${key}" does not match definition.platform "${module.definition.platform}".`,
     );
   }
-  if (module && hasResourceModules(module) && !module.createSession) {
+  if (
+    module &&
+    hasResourceModules(module) &&
+    !module.definition.unscheduled &&
+    !module.createSession
+  ) {
     throw new Error(`${key} has resource modules but no createSession.`);
   }
 }

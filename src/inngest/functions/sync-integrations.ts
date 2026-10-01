@@ -169,6 +169,7 @@ export const syncIntegration = inngest.createFunction(
           integrationId,
           config,
           creds,
+          integrationUserId: loaded.integrationUserId,
           cursor: loaded.cursor,
           lastSuccessfulSync: loaded.lastSuccessfulSync
             ? new Date(loaded.lastSuccessfulSync)

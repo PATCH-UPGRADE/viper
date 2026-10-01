@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
 import { countAffectedRemediations } from "@/features/assets/utils";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { resolveEffectiveIssuesByAsset } from "@/features/issues/server/effective-issues";
 import {
   attachNote,
@@ -47,6 +46,7 @@ import {
   paginatedAssetResponseSchema,
   updateAssetSchema,
 } from "../types";
+import { processAssetIntegrationSync } from "./integration-sync";
 import { fetchUtilizationGrids } from "./utilization";
 
 const createSearchFilter = (search: string) => {
@@ -593,61 +593,12 @@ export const assetsRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const { userId, integrationId, resource } = await processIntegrationToken(
+      const { userId, integrationId } = await processIntegrationToken(
         input.token,
         ResourceType.Asset,
       );
 
-      return processIntegrationSync(
-        prisma,
-        {
-          model: prisma.asset,
-          mappingModel: prisma.externalAssetMapping,
-          transformInputItem: async (item, userId) => {
-            const {
-              cpe,
-              vendorId: _vendorId,
-              utilization,
-              upstreamApi: _upstreamApi,
-              webUrl: _webUrl,
-              ...itemData
-            } = item;
-            const deviceGroup = await cpeToDeviceGroup(
-              cpe ?? UNKNOWN_CPE_STRING,
-            );
-
-            const uniqueFields = [
-              "hostname",
-              "macAddress",
-              "serialNumber",
-            ] as const;
-            const uniqueFieldConditions = uniqueFields
-              .filter((field) => itemData[field])
-              .map((field) => ({ [field]: itemData[field] }));
-
-            return {
-              createData: {
-                ...itemData,
-                utilization: utilization as Prisma.InputJsonValue | undefined,
-                deviceGroupId: deviceGroup.id,
-                userId,
-              },
-              updateData: {
-                ...itemData,
-                utilization: utilization as Prisma.InputJsonValue | undefined,
-                deviceGroupId: deviceGroup.id,
-              },
-              uniqueFieldConditions,
-              artifactsData: undefined,
-              // ^vulnerability integrations do not include artifacts
-            };
-          },
-        },
-        input,
-        userId,
-        integrationId,
-        resource,
-      );
+      return processAssetIntegrationSync(input, userId, integrationId);
     }),
 
   // not exposed on OpenAPI

@@ -1,7 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { loadIntegrationContext } from "@/features/integrations/core/context";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import {
   medisaoCallCtx,
   comments as medisaoComments,
@@ -46,6 +45,7 @@ import {
   remediationUpdateSchema,
   remediationUploadResponseSchema,
 } from "../types";
+import { processRemediationIntegrationSync } from "./integration-sync";
 
 const createSearchFilter = (search: string) => {
   const insensitive = { contains: search, mode: "insensitive" as const };
@@ -429,62 +429,12 @@ export const remediationsRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const { userId, integrationId, resource } = await processIntegrationToken(
+      const { userId, integrationId } = await processIntegrationToken(
         input.token,
         ResourceType.Remediation,
       );
 
-      return processIntegrationSync(
-        prisma,
-        {
-          model: prisma.remediation,
-          mappingModel: prisma.externalRemediationMapping,
-          transformInputItem: async (item, userId) => {
-            const {
-              vendorId: _vendorId,
-              artifacts,
-              cpes,
-              vulnerabilityIds,
-              upstreamApi: _upstreamApi,
-              webUrl: _webUrl,
-              ...itemData
-            } = item;
-            const matchingConnect = cpes
-              ? await cpesToMatchingConnect(cpes)
-              : [];
-            const vulnerabilities =
-              vulnerabilityIds &&
-              [...new Set(vulnerabilityIds)].map((id) => ({ id }));
-
-            return {
-              createData: {
-                ...itemData,
-                userId,
-                deviceGroupMatchings: { connect: matchingConnect },
-                vulnerabilities: { connect: vulnerabilities ?? [] },
-              },
-              updateData: {
-                ...itemData,
-                // Only replace matchings when CPEs were provided; omitting them
-                // on re-sync must not clear a remediation's existing matchings.
-                ...(cpes
-                  ? { deviceGroupMatchings: { set: matchingConnect } }
-                  : {}),
-                vulnerabilities: vulnerabilities && { set: vulnerabilities },
-              },
-              uniqueFieldConditions: [],
-              artifactsData: {
-                artifacts,
-                artifactWrapperParentField: "remediationId",
-              },
-            };
-          },
-        },
-        input,
-        userId,
-        integrationId,
-        resource,
-      );
+      return processRemediationIntegrationSync(input, userId, integrationId);
     }),
 
   // GET /api/remediations/{id}/aloha - Get aloha data for a remediation

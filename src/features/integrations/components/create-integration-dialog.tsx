@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { INTEGRATION_SYNC_EVERY_MIN } from "@/config/constants";
 import { authSchema } from "@/lib/schemas";
 import { humanize } from "@/lib/utils";
@@ -143,6 +144,12 @@ const DynamicField = ({
                   ))}
                 </SelectContent>
               </Select>
+            ) : spec.kind === "textarea" ? (
+              <Textarea
+                className="min-h-32"
+                value={(field.value as string | undefined) ?? ""}
+                onChange={(e) => field.onChange(e.target.value)}
+              />
             ) : (
               <Input
                 type={
@@ -237,6 +244,18 @@ export const IntegrationFormDialog = ({
     defaultValues,
   });
 
+  // Free-form text is the longest field, so it goes after everything else.
+  const inlineConfigFields = configFields.filter((s) => s.kind !== "textarea");
+  const longConfigFields = configFields.filter((s) => s.kind === "textarea");
+  const renderConfigField = (spec: FieldSpec) => (
+    <DynamicField
+      key={spec.key}
+      form={form}
+      name={`config.${spec.key}`}
+      spec={spec}
+    />
+  );
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run on open/close, not on every defaultValues/form identity change.
   useEffect(() => {
     if (open) form.reset(defaultValues);
@@ -308,14 +327,7 @@ export const IntegrationFormDialog = ({
               )}
             />
 
-            {configFields.map((spec) => (
-              <DynamicField
-                key={spec.key}
-                form={form}
-                name={`config.${spec.key}`}
-                spec={spec}
-              />
-            ))}
+            {inlineConfigFields.map(renderConfigField)}
 
             <FormField
               control={form.control}
@@ -352,6 +364,8 @@ export const IntegrationFormDialog = ({
                 />
               ))
             )}
+
+            {longConfigFields.map(renderConfigField)}
           </form>
         </Form>
         <DialogFooter className="px-6 py-4 bg-muted border-t justify-between!">

@@ -25,7 +25,9 @@ const fieldSpecsFor = (schema: z.ZodTypeAny): FieldSpec[] =>
       ? ("password" as const)
       : /url|uri/i.test(key)
         ? ("url" as const)
-        : ("text" as const);
+        : /instructions/i.test(key)
+          ? ("textarea" as const)
+          : ("text" as const);
     return { key, kind, required };
   });
 // biome-ignore-end lint/suspicious/noExplicitAny: see comment above

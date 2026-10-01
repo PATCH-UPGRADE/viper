@@ -1,7 +1,5 @@
 import { z } from "zod";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { type Prisma, ResourceType } from "@/generated/prisma";
-import { requestArtifactNoteExtraction } from "@/inngest/functions/extract-artifact-notes";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
@@ -29,6 +27,8 @@ import {
   integrationDeviceArtifactInputSchema,
   paginatedDeviceArtifactResponseSchema,
 } from "../types";
+import { processDeviceArtifactIntegrationSync } from "./integration-sync";
+import { requestArtifactNoteExtraction } from "./request-note-extraction";
 
 // TODO: do something DRY with `createSearchFilter` in other routers
 const createSearchFilter = (search: string) => {
@@ -237,55 +237,12 @@ export const deviceArtifactsRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const { userId, integrationId, resource } = await processIntegrationToken(
+      const { userId, integrationId } = await processIntegrationToken(
         input.token,
         ResourceType.DeviceArtifact,
       );
 
-      return processIntegrationSync(
-        prisma,
-        {
-          model: prisma.deviceArtifact,
-          mappingModel: prisma.externalDeviceArtifactMapping,
-          transformInputItem: async (item, userId) => {
-            const {
-              cpe,
-              vendorId: _vendorId,
-              artifacts,
-              upstreamApi: _upstreamApi,
-              webUrl: _webUrl,
-              ...itemData
-            } = item;
-            const identityMatchingId = await resolveMatchingIdFromCpe(cpe);
-            const matchingConnect = [{ id: identityMatchingId }];
-
-            return {
-              createData: {
-                ...itemData,
-                user: {
-                  connect: { id: userId },
-                },
-                deviceGroupMatchings: { connect: matchingConnect },
-              },
-              updateData: {
-                ...itemData,
-                deviceGroupMatchings: { set: matchingConnect },
-              },
-              uniqueFieldConditions: [],
-              artifactsData: {
-                artifacts,
-                artifactWrapperParentField: "deviceArtifactId",
-              },
-            };
-          },
-          // Extract notes from any uploaded PDF docs on newly-synced artifacts.
-          onItemCreated: (id) => requestArtifactNoteExtraction(id),
-        },
-        input,
-        userId,
-        integrationId,
-        resource,
-      );
+      return processDeviceArtifactIntegrationSync(input, userId, integrationId);
     }),
 
   // DELETE /api/deviceArtifacts/{deviceArtifact_id} - Delete deviceArtifact (only creator can delete)

@@ -91,6 +91,7 @@ interface BaseSyncCtx<TConfig, TCreds> {
   integrationId: string;
   config: TConfig;                    // parsed by your configSchema
   creds: TCreds;                      // decrypted, parsed by your credentialSchema
+  integrationUserId: string;          // the shadow user that owns ingested rows
   cursor: Cursor | null;              // whatever you returned last time
   lastSuccessfulSync: Date | null;    // watermark, if you'd rather use one
   callback(): Promise<CallbackConfig>; // mint a one-time upload URL + JSON Schema

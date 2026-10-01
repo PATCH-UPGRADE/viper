@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import {
   attachNote,
   attachNotes,
@@ -33,6 +32,7 @@ import {
   vulnerabilityResponseSchema,
   vulnerabilityUpdateInputSchema,
 } from "../types";
+import { processVulnerabilityIntegrationSync } from "./integration-sync";
 
 const createSearchFilter = (search: string) => {
   const insensitive = { contains: search, mode: "insensitive" as const };
@@ -267,50 +267,12 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
       // Validate provided token or throw error
-      const { userId, integrationId, resource } = await processIntegrationToken(
+      const { userId, integrationId } = await processIntegrationToken(
         input.token,
         ResourceType.Vulnerability,
       );
 
-      return processIntegrationSync(
-        prisma,
-        {
-          model: prisma.vulnerability,
-          mappingModel: prisma.externalVulnerabilityMapping,
-          transformInputItem: async (item, userId) => {
-            const {
-              cpes,
-              vendorId: _vendorId,
-              upstreamApi: _upstreamApi,
-              webUrl: _webUrl,
-              ...itemData
-            } = item;
-            const connect = cpes ? await cpesToMatchingConnect(cpes) : [];
-
-            return {
-              createData: {
-                ...itemData,
-                userId,
-                deviceGroupMatchings: { connect },
-              },
-              updateData: {
-                ...itemData,
-                // Only replace matchings when CPEs were provided; omitting them
-                // on re-sync must not clear a vulnerability's existing matchings.
-                ...(cpes ? { deviceGroupMatchings: { set: connect } } : {}),
-              },
-              uniqueFieldConditions: [],
-              // ^always create unmapped vulns
-              artifactsData: undefined,
-              // ^vulnerability integrations do not include artifacts
-            };
-          },
-        },
-        input,
-        userId,
-        integrationId,
-        resource,
-      );
+      return processVulnerabilityIntegrationSync(input, userId, integrationId);
     }),
 
   // DELETE /api/vulnerabilities/{id} - Delete vulnerability (only creator can delete)

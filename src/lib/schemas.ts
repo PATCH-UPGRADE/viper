@@ -127,6 +127,16 @@ export const integrationResponseSchema = z.object({
   syncedAt: z.string(),
 });
 export type IntegrationResponse = z.infer<typeof integrationResponseSchema>;
+/** One synced item: the resource's input plus where it came from upstream. */
+export const createIntegrationItemSchema = <T extends z.ZodRawShape>(
+  inputSchema: z.ZodObject<T>,
+) =>
+  inputSchema.extend({
+    vendorId: z.string(),
+    upstreamApi: safeUrlSchema.nullish(), // the API endpoint
+    webUrl: safeUrlSchema.nullish(), // where a human looks at it
+  });
+
 /**
  * The upload envelope a platform POSTs back to
  * `/{resource}/integrationUpload/{token}`.
@@ -134,13 +144,8 @@ export type IntegrationResponse = z.infer<typeof integrationResponseSchema>;
 export const createIntegrationInputSchema = <T extends z.ZodRawShape>(
   inputSchema: z.ZodObject<T>,
 ) => {
-  const integrationInputSchema = inputSchema.extend({
-    vendorId: z.string(),
-    upstreamApi: safeUrlSchema.nullish(), // the API endpoint
-    webUrl: safeUrlSchema.nullish(), // where a human looks at it
-  });
   const pagesWithLinksSchema = createPaginatedResponseWithLinksSchema(
-    integrationInputSchema,
+    createIntegrationItemSchema(inputSchema),
   );
   return pagesWithLinksSchema.extend({
     token: z.string(), // the user token calling this endpoint

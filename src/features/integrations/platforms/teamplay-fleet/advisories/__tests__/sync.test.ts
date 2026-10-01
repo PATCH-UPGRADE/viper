@@ -58,7 +58,7 @@ describe("Fleet advisories sync", () => {
     send.mockResolvedValue(undefined);
     const integration = await prisma.integration.findFirst({
       where: { platform: PlatformEnum.FLEET },
-      select: { id: true, name: true },
+      select: { id: true, name: true, integrationUserId: true },
     });
     if (!integration) {
       throw new Error("No templay Fleet integration");
@@ -70,6 +70,7 @@ describe("Fleet advisories sync", () => {
 
     ctx = {
       integrationId,
+      integrationUserId: integration.integrationUserId,
       config: {},
       creds: { username: "unused", password: "unused" },
       session: {

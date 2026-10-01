@@ -203,3 +203,52 @@ describe("CreateIntegrationDialog", () => {
     expect(screen.getByRole("button", { name: "Added" })).toBeDisabled();
   });
 });
+
+describe("free-form config fields", () => {
+  const entry = {
+    platform: PlatformEnum.AI,
+    displayName: "AI Crawler",
+    configFields: [
+      { key: "integrationUri", kind: "url", required: true },
+      { key: "additionalInstructions", kind: "textarea", required: false },
+    ],
+    credentialFields: [],
+    credentialsAreAuthShaped: true,
+  } as unknown as CatalogEntry;
+
+  const renderCreateDialog = () =>
+    render(
+      <IntegrationFormDialog
+        entry={entry}
+        mode="create"
+        open={true}
+        onOpenChange={() => {}}
+      />,
+    );
+
+  it("renders a textarea after the authentication fields", () => {
+    renderCreateDialog();
+
+    const instructions = screen.getByLabelText(/additional instructions/i);
+    expect(instructions.tagName).toBe("TEXTAREA");
+
+    const authType = screen.getByRole("combobox");
+    expect(
+      authType.compareDocumentPosition(instructions) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("keeps line breaks in what the operator types", async () => {
+    const user = userEvent.setup();
+    renderCreateDialog();
+
+    const instructions = screen.getByLabelText(/additional instructions/i);
+    await user.type(
+      instructions,
+      "Follow links.next.{enter}Skip empty groups.",
+    );
+
+    expect(instructions).toHaveValue("Follow links.next.\nSkip empty groups.");
+  });
+});

@@ -2583,8 +2583,25 @@ async function seedVendors() {
     },
   });
 
+  // An in-house owner beside the vendor: no workOrderIntegration, so it is not
+  // a filing target, but work orders drafted for these assets go on its team.
+  const itDepartment = await prisma.department.findUniqueOrThrow({
+    where: { name: SEED_USER_DEPARTMENT },
+  });
+  await prisma.managesRelationship.deleteMany({
+    where: { departmentId: itDepartment.id },
+  });
+  await prisma.managesRelationship.create({
+    data: {
+      responsibilities:
+        "IT patches and monitors the imaging workstations and their network segment.",
+      departmentId: itDepartment.id,
+      assets: { connect: assets.map((asset) => ({ id: asset.id })) },
+    },
+  });
+
   console.log(
-    `✅ Seeded vendor ${vendor.canonicalDisplayName} with 1 contract covering ${assets.length} assets`,
+    `✅ Seeded vendor ${vendor.canonicalDisplayName} with 1 contract covering ${assets.length} assets, co-managed by ${itDepartment.name}`,
   );
 }
 

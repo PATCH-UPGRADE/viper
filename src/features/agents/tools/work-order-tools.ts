@@ -6,6 +6,7 @@ import {
   proposeWorkOrderSchema,
   type WorkOrderProposal,
 } from "@/features/work-orders/schemas";
+import { resolveResponsibleDepartments } from "@/features/work-orders/server/departments";
 import { draftTargetFields } from "@/features/work-orders/server/drafts";
 import {
   type FileableTarget,
@@ -174,6 +175,8 @@ const makeProposeWorkOrder = (userId: string) =>
         (target?.assets ?? []).map((asset) => [asset.id, asset]),
       );
 
+      const departmentIds = await resolveResponsibleDepartments(covered);
+
       // The per-asset children are made here rather than at approval, because
       // the submitter files one order per child and records the platform's id
       // on it. Each child inherits the parent's draft state, so a proposal that
@@ -189,6 +192,7 @@ const makeProposeWorkOrder = (userId: string) =>
             // Hidden from the tracking board until it is approved.
             isDraft: true,
             creatorId: userId,
+            departments: { connect: departmentIds.map((id) => ({ id })) },
             ...draftTargetFields(target ?? null, payload),
           },
           select: {

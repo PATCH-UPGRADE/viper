@@ -9,6 +9,7 @@ const {
   mockAutomationUser,
   mockAssetIdsForMatchings,
   mockResolveDraftTarget,
+  mockResolveDepartments,
 } = vi.hoisted(() => ({
   mockPrisma: {
     mitigationPlan: {
@@ -26,6 +27,7 @@ const {
   mockAutomationUser: vi.fn(),
   mockAssetIdsForMatchings: vi.fn(),
   mockResolveDraftTarget: vi.fn(),
+  mockResolveDepartments: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
@@ -36,6 +38,9 @@ vi.mock("..", () => ({ createMitigationPlans: mockCreatePlans }));
 vi.mock("@/features/work-orders/server/drafts", () => ({
   assetIdsForMatchings: mockAssetIdsForMatchings,
   resolveDraftTarget: mockResolveDraftTarget,
+}));
+vi.mock("@/features/work-orders/server/departments", () => ({
+  resolveResponsibleDepartments: mockResolveDepartments,
 }));
 
 import { persistMitigationPlans } from "../persist";
@@ -93,6 +98,7 @@ beforeEach(() => {
   mockAutomationUser.mockResolvedValue({ id: "automation" });
   mockAssetIdsForMatchings.mockResolvedValue(["a1"]);
   mockResolveDraftTarget.mockResolvedValue(VIPER_ONLY);
+  mockResolveDepartments.mockResolvedValue([]);
 });
 
 describe("persistMitigationPlans targeting", () => {
@@ -121,9 +127,8 @@ describe("persistMitigationPlans targeting", () => {
 
     await persistMitigationPlans("src-1", "notif-1");
 
-    // Not merely untargeted — the lookup never runs for hospital work.
+    // Not merely untargeted — the target lookup never runs for hospital work.
     expect(mockResolveDraftTarget).not.toHaveBeenCalled();
-    expect(mockAssetIdsForMatchings).not.toHaveBeenCalled();
     const workOrder = createdWorkOrder();
     expect(workOrder.targetIntegrationId).toBeUndefined();
     expect(workOrder.submissionState).toBeUndefined();
@@ -169,6 +174,23 @@ describe("persistMitigationPlans targeting", () => {
 
     expect(mockResolveDraftTarget).toHaveBeenCalled();
   });
+
+  it.each(["vendor", "hospital"] as const)(
+    "puts a %s work order on the team of each department that manages its assets",
+    async (performedBy) => {
+      mockCreatePlans.mockResolvedValue({
+        plans: [planWith(["m1"], performedBy)],
+      });
+      mockResolveDepartments.mockResolvedValue(["dept-it", "dept-biomed"]);
+
+      await persistMitigationPlans("src-1", "notif-1");
+
+      expect(mockResolveDepartments).toHaveBeenCalledWith(["a1"]);
+      expect(createdWorkOrder().departments).toEqual({
+        connect: [{ id: "dept-it" }, { id: "dept-biomed" }],
+      });
+    },
+  );
 
   it("does not run the agent once a plan has been accepted", async () => {
     mockPrisma.mitigationPlan.count.mockResolvedValue(1);

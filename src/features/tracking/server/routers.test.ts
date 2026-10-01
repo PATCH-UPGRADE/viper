@@ -713,20 +713,78 @@ describe("trackingRouter.getOne", () => {
 
     expect(result.relatedTickets).toEqual([
       {
+        source: "manual",
         linkId: "link-a",
         reason: null,
+        samePlan: false,
         createdAt: older,
         ticket: expect.objectContaining({ id: "rt-a", summary: "A side" }),
       },
       {
+        source: "manual",
         linkId: "link-b",
         reason: "Same CVE",
+        samePlan: false,
         createdAt: newer,
         ticket: expect.objectContaining({ id: "rt-b", summary: "B side" }),
       },
     ]);
     expect(result).not.toHaveProperty("linksAsA");
     expect(result).not.toHaveProperty("linksAsB");
+  });
+
+  it("merges plan siblings into relatedTickets, without self, and dedupes linked siblings", async () => {
+    const caller = setup();
+    const planCreatedAt = new Date("2026-01-01T00:00:00Z");
+    const linkedAt = new Date("2026-02-01T00:00:00Z");
+    mockPrisma.workOrderTicket.findUnique.mockResolvedValue(
+      makeTicketDetail({
+        id: "t1",
+        mitigationPlanId: "plan-1",
+        mitigationPlan: {
+          title: "Segment, then patch",
+          createdAt: planCreatedAt,
+          workOrders: [
+            makeRelatedTicketRef({ id: "t1", summary: "Self" }),
+            makeRelatedTicketRef({ id: "sib-1", summary: "Sibling" }),
+            makeRelatedTicketRef({ id: "sib-2", summary: "Linked sibling" }),
+          ],
+        },
+        linksAsA: [
+          {
+            id: "link-1",
+            reason: "Compensating control",
+            createdAt: linkedAt,
+            ticketB: makeRelatedTicketRef({
+              id: "sib-2",
+              summary: "Linked sibling",
+            }),
+          },
+        ],
+      }),
+    );
+
+    const result = await caller.getOne({ id: "t1" });
+
+    expect(result.relatedTickets).toEqual([
+      {
+        source: "plan",
+        linkId: null,
+        reason: "Same mitigation plan: Segment, then patch",
+        samePlan: true,
+        createdAt: planCreatedAt,
+        ticket: expect.objectContaining({ id: "sib-1" }),
+      },
+      {
+        source: "manual",
+        linkId: "link-1",
+        reason: "Compensating control",
+        samePlan: true,
+        createdAt: linkedAt,
+        ticket: expect.objectContaining({ id: "sib-2" }),
+      },
+    ]);
+    expect(result.mitigationPlan).toEqual({ title: "Segment, then patch" });
   });
 });
 

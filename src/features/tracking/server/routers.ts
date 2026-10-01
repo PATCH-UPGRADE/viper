@@ -39,6 +39,7 @@ import {
   paginatedWorkOrderListResponseSchema,
   type RelatedTicketLink,
   type RelatedTicketRef,
+  type TicketPlanRow,
   ticketBaseInclude,
   ticketCommentResponseSchema,
   ticketDetailInclude,
@@ -178,31 +179,59 @@ type LinkRow = { id: string; reason: string | null; createdAt: Date };
 const toRelatedTicketLink = (
   link: LinkRow,
   ticket: RelatedTicketRef,
+  planTicketIds: Set<string>,
 ): RelatedTicketLink => ({
+  source: "manual",
   linkId: link.id,
   reason: link.reason,
+  samePlan: planTicketIds.has(ticket.id),
   createdAt: link.createdAt,
   ticket,
 });
 
-// Merge both sides of the undirected link table into one list, oldest first,
-// so a pair renders identically on either ticket's page.
+// Merge the plan siblings and both sides of the undirected link table into one
+// list: plan siblings first, in plan order, then links oldest first, so a pair
+// renders identically on either ticket's page. A sibling that is also linked
+// appears once, as the link, because its reason is more specific.
 const withRelatedTickets = <
   T extends {
+    id: string;
+    mitigationPlan: TicketPlanRow;
     linksAsA: (LinkRow & { ticketB: RelatedTicketRef })[];
     linksAsB: (LinkRow & { ticketA: RelatedTicketRef })[];
   },
 >(
   row: T,
-): Omit<T, "linksAsA" | "linksAsB"> & {
+): Omit<T, "linksAsA" | "linksAsB" | "mitigationPlan"> & {
   relatedTickets: RelatedTicketLink[];
+  mitigationPlan: { title: string } | null;
 } => {
-  const { linksAsA, linksAsB, ...rest } = row;
-  const relatedTickets = [
-    ...linksAsA.map((l) => toRelatedTicketLink(l, l.ticketB)),
-    ...linksAsB.map((l) => toRelatedTicketLink(l, l.ticketA)),
+  const { linksAsA, linksAsB, mitigationPlan, ...rest } = row;
+  const siblings =
+    mitigationPlan?.workOrders.filter((t) => t.id !== row.id) ?? [];
+  const planTicketIds = new Set(siblings.map((t) => t.id));
+  const manual = [
+    ...linksAsA.map((l) => toRelatedTicketLink(l, l.ticketB, planTicketIds)),
+    ...linksAsB.map((l) => toRelatedTicketLink(l, l.ticketA, planTicketIds)),
   ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-  return { ...rest, relatedTickets };
+  const linkedIds = new Set(manual.map((l) => l.ticket.id));
+  const plan: RelatedTicketLink[] = mitigationPlan
+    ? siblings
+        .filter((t) => !linkedIds.has(t.id))
+        .map((ticket) => ({
+          source: "plan",
+          linkId: null,
+          reason: `Same mitigation plan: ${mitigationPlan.title}`,
+          samePlan: true,
+          createdAt: mitigationPlan.createdAt,
+          ticket,
+        }))
+    : [];
+  return {
+    ...rest,
+    relatedTickets: [...plan, ...manual],
+    mitigationPlan: mitigationPlan && { title: mitigationPlan.title },
+  };
 };
 
 const toTicketDetail = <

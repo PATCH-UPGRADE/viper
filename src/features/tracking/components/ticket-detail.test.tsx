@@ -1505,8 +1505,10 @@ describe("TicketDetailContent — sub-tickets attach/detach", () => {
 
 describe("TicketDetailContent — related tickets", () => {
   const relatedLink = {
+    source: "manual",
     linkId: "link-1",
     reason: "Same EternalBlue exposure",
+    samePlan: false,
     createdAt: new Date("2026-05-02T00:00:00Z"),
     ticket: {
       id: "rt-1",
@@ -1574,6 +1576,53 @@ describe("TicketDetailContent — related tickets", () => {
 
     expect(mockUnlinkMutate).toHaveBeenCalledTimes(1);
     expect(mockUnlinkMutate.mock.calls[0][0]).toEqual({ linkId: "link-1" });
+  });
+
+  const planLink = {
+    source: "plan",
+    linkId: null,
+    reason: "Same mitigation plan: Segment, then patch",
+    samePlan: true,
+    createdAt: new Date("2026-05-01T00:00:00Z"),
+    ticket: {
+      id: "rt-2",
+      summary: "Verify DICOM VLAN ACL enforcement",
+      status: "TO_DO",
+      departments: [],
+      externalMappings: [],
+    },
+  };
+
+  it("opens by default and shows plan siblings without an Unlink button", () => {
+    renderDetail({ relatedTickets: [planLink, relatedLink] });
+
+    expect(
+      screen.getByRole("button", { name: /related tickets\s*\(2\)/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Same mitigation plan: Segment, then patch"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: /unlink verify dicom vlan acl enforcement/i,
+      }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /unlink patch pacs server/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/related work orders/i)).toBeNull();
+  });
+
+  it("shows a Same plan badge on a manual link to a plan sibling", async () => {
+    const user = userEvent.setup();
+    renderDetail({ relatedTickets: [{ ...relatedLink, samePlan: true }] });
+
+    await user.click(
+      screen.getByRole("button", { name: /related tickets\s*\(1\)/i }),
+    );
+
+    expect(screen.getByText("Same plan")).toBeInTheDocument();
+    expect(screen.getByText("Same EternalBlue exposure")).toBeInTheDocument();
   });
 
   it("picking a candidate opens a confirm step; Link submits with a null reason when empty", async () => {

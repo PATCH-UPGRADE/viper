@@ -34,7 +34,6 @@ import { LinkedAssetsTabContent } from "./linked-assets";
 import { OverviewCard } from "./overview-card";
 import { RawJsonListCard } from "./raw-json-list-card";
 import { RelatedTicketsSection } from "./related-tickets";
-import { RelatedWorkOrdersSection } from "./related-work-orders";
 import { SubTicketsSection } from "./sub-tickets";
 
 // Re-exports so existing import sites (`./ticket-detail`) keep working.
@@ -187,12 +186,6 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
           <TabsContent value="details" className="mt-4 flex flex-col gap-4">
             <OverviewCard data={data} />
             <DescriptionCard data={data} />
-            {data.mitigationPlan && (
-              <RelatedWorkOrdersSection
-                ticketId={data.id}
-                siblings={data.mitigationPlan.workOrders}
-              />
-            )}
             <SubTicketsSection
               parentId={data.id}
               childTickets={data.children}

@@ -298,23 +298,20 @@ export const ticketDetailInclude = {
   },
   externalMappings: externalMappingWithSyncSelect,
   notification: { select: { id: true, title: true, type: true } },
-  // Self isn't excluded here — a Prisma include can't reference its own
-  // parent's id — so callers filter it out (see related-work-orders.tsx).
+  // The plan's work orders and both sides of the undirected link table; the
+  // server merges them into `relatedTickets` (see withRelatedTickets in
+  // server/routers.ts). Self isn't excluded from `workOrders` — a Prisma include
+  // can't reference its own parent's id — so the server filters it out.
   mitigationPlan: {
     select: {
+      title: true,
+      createdAt: true,
       workOrders: {
-        select: {
-          id: true,
-          summary: true,
-          status: true,
-          assignee: { select: { id: true, name: true } },
-        },
+        select: relatedTicketRefSelect,
         orderBy: { createdAt: "asc" as const },
       },
     },
   },
-  // Both sides of the undirected link table; the server flattens them into
-  // `relatedTickets` (see withRelatedTickets in server/routers.ts).
   linksAsA: {
     select: {
       ...relatedLinkSelect,
@@ -336,20 +333,31 @@ type TicketDetailPayload = Prisma.WorkOrderTicketGetPayload<{
 export type RelatedTicketRef =
   TicketDetailPayload["linksAsA"][number]["ticketB"];
 
+export type TicketPlanRow = TicketDetailPayload["mitigationPlan"];
+
+// A "plan" entry is a sibling in the same mitigation plan and has no link row.
+// A "manual" entry is a WorkOrderTicketLink row; `samePlan` marks one whose
+// ticket is also a plan sibling, which then appears only once, as the manual entry.
 export type RelatedTicketLink = {
-  linkId: string;
+  source: "plan" | "manual";
+  linkId: string | null;
   reason: string | null;
+  samePlan: boolean;
   createdAt: Date;
   ticket: RelatedTicketRef;
 };
 
 // What clients receive from the detail endpoints: the per-user `watchers`
-// include is collapsed server-side into an `isWatching` boolean, and the two
-// link sides into one `relatedTickets` list.
+// include is collapsed server-side into an `isWatching` boolean, and the plan
+// siblings and the two link sides into one `relatedTickets` list.
 export type TicketDetail = Omit<
   TicketDetailPayload,
-  "watchers" | "linksAsA" | "linksAsB"
-> & { isWatching: boolean; relatedTickets: RelatedTicketLink[] };
+  "watchers" | "linksAsA" | "linksAsB" | "mitigationPlan"
+> & {
+  isWatching: boolean;
+  relatedTickets: RelatedTicketLink[];
+  mitigationPlan: { title: string } | null;
+};
 
 // Include shape for the public list endpoint — base ticket fields plus the linked
 // entities most callers want to slice on.
@@ -627,15 +635,15 @@ const relatedTicketRefSchema = z.object({
 });
 
 const relatedTicketLinkSchema = z.object({
-  linkId: z.string(),
+  source: z.enum(["plan", "manual"]),
+  linkId: z.string().nullable(),
   reason: z.string().nullable(),
+  samePlan: z.boolean(),
   createdAt: z.date(),
   ticket: relatedTicketRefSchema,
 });
 
-const ticketMitigationPlanSchema = z.object({
-  workOrders: z.array(siblingWorkOrderSchema),
-});
+const ticketMitigationPlanSchema = z.object({ title: z.string() });
 
 const detailAssigneeSchema = assigneeItemSchema.extend({
   department: departmentItemSchema.nullable(),

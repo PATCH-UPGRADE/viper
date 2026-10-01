@@ -24,7 +24,7 @@ const productNames = (doc: CsafDocument): Map<string, string> => {
 };
 
 const productLine = (id: string, names: Map<string, string>): string =>
-  ` - ${names.get(id) ?? id}`;
+  `- ${names.get(id) ?? id}`;
 
 export const toMarkdown = (doc: CsafDocument): string => {
   const { tracking, title, publisher, distribution } = doc.document;
@@ -35,7 +35,7 @@ export const toMarkdown = (doc: CsafDocument): string => {
     distribution?.tlp?.label && `**TLP:** ${distribution.tlp.label}`,
     tracking.version &&
       `**Version:** ${tracking.version}` +
-        `${tracking.status ? ` (${tracking.status})` : ""},`,
+        `${tracking.status ? ` (${tracking.status})` : ""}`,
     tracking.current_release_date &&
       `**Released:** ${tracking.current_release_date.slice(0, 10)}`,
   ].filter(Boolean);
@@ -54,17 +54,16 @@ export const toMarkdown = (doc: CsafDocument): string => {
     const fixed = vuln.product_status.fixed ?? [];
 
     return [
-      `### ${vuln.cve ?? "Unassigned"}` +
-        (vuln.cwe ? ` - ${vuln.cwe.id}` + ` ${vuln.cwe.name}` : ""),
+      `### ${vuln.cve ?? "Unassigned"}${vuln.cwe ? ` — ${vuln.cwe.id} ${vuln.cwe.name}` : ""}`,
       cvss &&
-        `**CVSS v3:** ${cvss.baseScore}` +
+        `** CVSS v3: ** ${cvss.baseScore}` +
           `${cvss.baseSeverity}` +
           `- \`${cvss.vectorString}\``,
       vuln.notes.find((note) => note.category === "summary")?.text,
       affected.length > 0 &&
         [
           "",
-          "**Affected**",
+          "** Affected**",
           ...affected.map((id) => productLine(id, names)),
         ].join("\n"),
       fixed.length > 0 &&
@@ -77,9 +76,7 @@ export const toMarkdown = (doc: CsafDocument): string => {
           "**Remediations**",
           ...vuln.remediations.map(
             (r) =>
-              `- _${r.category}_:` +
-              `${r.details}` +
-              (r.url ? ` - ${r.url}` : ""),
+              `- _${r.category}_: ${r.details} (r.url ?  - ${r.url} : "")`,
           ),
         ].join("\n"),
     ]
@@ -95,7 +92,7 @@ export const toMarkdown = (doc: CsafDocument): string => {
     `# ${tracking.id}: ${title}`,
     "",
     meta.join(" "),
-    summary && ["", "##Summary", "", summary].join("\n"),
+    summary && ["", "## Summary", "", summary].join("\n"),
     context.length > 0 && ["", context.join("\n\n")].join("\n"),
     vulnerabilities.length > 0 &&
       ["", "## Vulnerabilities", "", vulnerabilities.join("\n\n")].join("\n"),

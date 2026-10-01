@@ -29,11 +29,11 @@ export interface FeedEntry {
 export const fetchFeed = async (
   session: Session,
   url: string,
-  tag?: string,
-): Promise<{ unchanged: true } | { entries: FeedEntry[]; tag?: string }> => {
+  knownETag?: string,
+): Promise<{ unchanged: true } | { entries: FeedEntry[]; etag?: string }> => {
   const response = await session.request(
     url,
-    tag ? { headers: { "none-match": tag } } : undefined,
+    knownETag ? { headers: { "If-None-Match": knownETag } } : undefined,
   );
   if (response.status === 304) return { unchanged: true };
   if (!response.ok) {
@@ -49,5 +49,5 @@ export const fetchFeed = async (
       ? [{ id: entry.id, updatedAt, documentUrl }]
       : [];
   });
-  return { entries, tag: response.headers.get("tag") ?? undefined };
+  return { entries, etag: response.headers.get("etag") ?? undefined };
 };

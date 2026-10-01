@@ -22,7 +22,7 @@ import { type FeedEntry, fetchFeed } from "../rolie";
 import { MAX_DOC_BYTES, readCapped } from "../session";
 
 interface FeedCursor {
-  tag?: string;
+  etag?: string;
   seen: Record<string, string>;
 }
 interface CsafCursor {
@@ -37,7 +37,7 @@ const parseCursor = (cursor: Cursor | null): CsafCursor => {
       feeds: z.record(
         z.string(),
         z.object({
-          tag: z.string().optional(),
+          etag: z.string().optional(),
           seen: z.record(z.string(), z.string()),
         }),
       ),
@@ -176,13 +176,13 @@ export const syncAdvisories = async (
   for (const feed of feedsOf(metadata)) {
     const feedUrl = feed.url;
     const state = cursor.feeds[feedUrl];
-    const result = await fetchFeed(session, feedUrl, state?.tag);
+    const result = await fetchFeed(session, feedUrl, state?.etag);
     if ("unchanged" in result) {
       continue;
     }
     if (!state) {
       cursor.feeds[feedUrl] = {
-        tag: result.tag,
+        etag: result.etag,
         seen: seenMapOf(result.entries),
       };
       continue;
@@ -202,12 +202,14 @@ export const syncAdvisories = async (
     for (const item of items) {
       state.seen[item.entry.id] = String(item.entry.updatedAt);
     }
-    state.tag = result.tag;
+    state.etag = result.etag;
 
     const dispatched = await dispatchUnprocessedSnapshots(
       ctx.integrationId,
       wanted.map((item) => item.trackingId),
     );
+
+    console.log("dispatched---------- ", dispatched);
   }
   return { cursor };
 };

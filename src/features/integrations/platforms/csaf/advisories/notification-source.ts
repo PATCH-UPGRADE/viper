@@ -1,5 +1,5 @@
-import type { SourceRecordAdapter } from "@/features/inbox/source-adapter";
 import { aiExtractAndMatch } from "@/features/inbox/link-entities";
+import type { SourceRecordAdapter } from "@/features/inbox/source-adapter";
 import { parseTlp } from "@/lib/tlp";
 import { csafDocumentSchema } from "../document";
 import { toMarkdown } from "../markdown";

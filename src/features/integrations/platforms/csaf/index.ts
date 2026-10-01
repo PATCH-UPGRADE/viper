@@ -3,10 +3,10 @@ import type { ConnectorModule } from "@/features/integrations/core/types";
 import { PlatformEnum } from "@/generated/prisma";
 import { advisories } from "./advisories";
 import {
-  configSchema,
-  credentialSchema,
   type CsafConfig,
   type CsafCreds,
+  configSchema,
+  credentialSchema,
 } from "./config";
 import { createCsafSession } from "./session";
 

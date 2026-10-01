@@ -1512,6 +1512,7 @@ enum SourceLinkType {
 model Notification {
   id      String           @id @default(cuid())
   type    NotificationType
+  suppressed Boolean @default(false)
   title   String?
   summary String?          @db.Text
   details Json? // unindexed, NotificationType-specific fields

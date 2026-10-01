@@ -17,7 +17,7 @@ import {
   csafDocumentSchema,
 } from "../document";
 import { toMarkdown } from "../markdown";
-import { fetchProviderMetadata, feedsOf } from "../provider-metadata";
+import { feedsOf, fetchProviderMetadata } from "../provider-metadata";
 import { type FeedEntry, fetchFeed } from "../rolie";
 import { MAX_DOC_BYTES, readCapped } from "../session";
 
@@ -39,8 +39,10 @@ const parseCursor = (cursor: Cursor | null): CsafCursor => {
         z.object({
           tag: z.string().optional(),
           seen: z.record(z.string(), z.string()),
-        })),
-    }).safeParse(cursor);
+        }),
+      ),
+    })
+    .safeParse(cursor);
   return parsed.success ? parsed.data : { feeds: {} };
 };
 
@@ -122,12 +124,12 @@ const recordSnapshots = async (
       mappingByExternalId.set(mapping.externalId, mapping.id);
     }
   }
-  if(existing.length > 0) {
-  await prisma.externalSourceRecordMapping.updateMany({
-    where: { id: { in:  existing.map((mapping) => mapping.id) } },
-    data: { lastSynced: new Date() },
-  });
-}
+  if (existing.length > 0) {
+    await prisma.externalSourceRecordMapping.updateMany({
+      where: { id: { in: existing.map((mapping) => mapping.id) } },
+      data: { lastSynced: new Date() },
+    });
+  }
 
   const newest = await prisma.sourceRecord.findMany({
     where: { mappingId: { in: [...mappingByExternalId.values()] } },
@@ -175,8 +177,9 @@ export const syncAdvisories = async (
     const feedUrl = feed.url;
     const state = cursor.feeds[feedUrl];
     const result = await fetchFeed(session, feedUrl, state?.tag);
-    if ("unchanged" in result) continue;
-
+    if ("unchanged" in result) {
+      continue;
+    }
     if (!state) {
       cursor.feeds[feedUrl] = {
         tag: result.tag,
@@ -200,7 +203,8 @@ export const syncAdvisories = async (
       state.seen[item.entry.id] = String(item.entry.updatedAt);
     }
     state.tag = result.tag;
-    await dispatchUnprocessedSnapshots(
+
+    const dispatched = await dispatchUnprocessedSnapshots(
       ctx.integrationId,
       wanted.map((item) => item.trackingId),
     );

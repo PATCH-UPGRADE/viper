@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { computeWeakSerials, listChanged, toCanonical } from "../equipments";
+import { listChanged, toCanonical } from "../equipments";
 import { assets } from "../index";
 
 // Representative records from a real Fleet /rest/v1/equipments response.
@@ -94,18 +94,6 @@ describe("serial numbers", () => {
       ).toBeNull();
     },
   );
-});
-
-describe("computeWeakSerials", () => {
-  it("flags serials shared by two Fleet records", () => {
-    // Syngo Carbon installs share one serial across components (real tenant data).
-    const items = [
-      { ...canonical(SAMPLE[0]), serialNumber: "100153" },
-      { ...canonical(SAMPLE[1]), serialNumber: "100153" },
-      canonical(SAMPLE[0]),
-    ];
-    expect(computeWeakSerials(items)).toEqual(new Set(["100153"]));
-  });
 });
 
 describe("apiUrlFor", () => {

@@ -4,6 +4,7 @@ import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { resolveDeviceGroup } from "@/lib/router-utils";
 import type { IntegrationResponse } from "@/lib/schemas";
+import { computeWeakSerials } from "../../../core/sync/serials";
 import type { ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import {
   type FleetConfig,
@@ -11,12 +12,7 @@ import {
   SIEMENS_HEALTHINEERS,
 } from "../config";
 import { syncFleetContracts } from "./contracts";
-import {
-  computeWeakSerials,
-  type FleetAssetItem,
-  listChanged,
-  toCanonical,
-} from "./equipments";
+import { type FleetAssetItem, listChanged, toCanonical } from "./equipments";
 import { connectUncontractedAssets } from "./manages-relationship";
 
 async function equipmentKeysWeMayRegroup(

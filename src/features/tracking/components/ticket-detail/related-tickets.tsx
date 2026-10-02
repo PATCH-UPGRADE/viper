@@ -2,6 +2,7 @@
 
 import { LinkIcon, XIcon } from "lucide-react";
 import { CollapsibleSectionCard } from "@/components/collapsible-section-card";
+import { Badge } from "@/components/ui/badge";
 import {
   useLinkableTickets,
   useLinkTicket,
@@ -50,11 +51,12 @@ const RelatedTicketRow = ({
   isPending,
 }: {
   link: RelatedTicketLink;
-  onUnlink: () => void;
+  onUnlink: (linkId: string) => void;
   isPending: boolean;
 }) => {
-  const { ticket, reason } = link;
-  const hasDetails = ticket.departments.length > 0 || reason;
+  const { ticket, reason, linkId } = link;
+  const showPlanBadge = link.source === "manual" && link.samePlan;
+  const hasDetails = ticket.departments.length > 0 || reason || showPlanBadge;
 
   return (
     <TicketRefRow
@@ -71,6 +73,7 @@ const RelatedTicketRow = ({
             {ticket.departments.length > 0 && (
               <DepartmentChips departments={ticket.departments} />
             )}
+            {showPlanBadge && <Badge variant="outline">Same plan</Badge>}
             {reason && (
               <span className="min-w-0 truncate text-xs text-muted-foreground">
                 {reason}
@@ -80,13 +83,15 @@ const RelatedTicketRow = ({
         )
       }
       action={
-        <RowHoverAction
-          label={`Unlink ${ticket.summary}`}
-          onClick={onUnlink}
-          disabled={isPending}
-        >
-          <XIcon className="size-4" />
-        </RowHoverAction>
+        linkId && (
+          <RowHoverAction
+            label={`Unlink ${ticket.summary}`}
+            onClick={() => onUnlink(linkId)}
+            disabled={isPending}
+          >
+            <XIcon className="size-4" />
+          </RowHoverAction>
+        )
       }
     />
   );
@@ -106,15 +111,15 @@ export const RelatedTicketsSection = ({
       title="Related tickets"
       meta={`(${relatedTickets.length})`}
       action={<LinkTicketPopover ticketId={ticketId} />}
-      defaultOpen={false}
+      defaultOpen={relatedTickets.some((l) => l.source === "plan")}
     >
       {relatedTickets.length > 0 ? (
         <ul className="flex flex-col divide-y">
           {relatedTickets.map((link) => (
             <RelatedTicketRow
-              key={link.linkId}
+              key={link.ticket.id}
               link={link}
-              onUnlink={() => unlink.mutate({ linkId: link.linkId })}
+              onUnlink={(linkId) => unlink.mutate({ linkId })}
               isPending={unlink.isPending}
             />
           ))}

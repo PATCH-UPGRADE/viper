@@ -68,6 +68,7 @@ describe("every include that selects mappings still resolves", () => {
       mappingPaths("WorkOrderTicket", { include: ticketDetailInclude }),
     ).toEqual([
       { path: ["externalMappings"], resource },
+      { path: ["mitigationPlan", "workOrders", "externalMappings"], resource },
       { path: ["linksAsA", "ticketB", "externalMappings"], resource },
       { path: ["linksAsB", "ticketA", "externalMappings"], resource },
     ]);

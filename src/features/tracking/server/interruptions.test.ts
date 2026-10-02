@@ -1,0 +1,42 @@
+// @vitest-environment node
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
+
+const { mockPrisma } = vi.hoisted(() => ({
+  mockPrisma: {
+    user: { findUnique: vi.fn() },
+    assetTicket: { findMany: vi.fn() },
+    workOrderTicket: { findFirst: vi.fn() },
+  },
+}));
+
+vi.mock("@/lib/db", () => ({ default: mockPrisma }));
+
+import {
+  getInterruptionCalendar,
+  getInterruptionDetail,
+} from "./interruptions";
+
+const range = { from: new Date(2026, 2, 1), to: new Date(2026, 2, 7) };
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  mockPrisma.assetTicket.findMany.mockResolvedValue([]);
+});
+
+describe("interruptions scope", () => {
+  it("shows a user with no department nothing, without querying", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: null });
+    await expect(getInterruptionCalendar("u1", range)).resolves.toEqual([]);
+    expect(mockPrisma.assetTicket.findMany).not.toHaveBeenCalled();
+  });
+
+  it("hides the details of a ticket outside the department", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValue(null);
+    await expect(getInterruptionDetail("u1", "other")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+});

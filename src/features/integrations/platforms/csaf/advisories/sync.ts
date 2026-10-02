@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { Prisma, SourceChannel } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { canonicalNameWhere } from "@/lib/router-utils";
 import { sourceContentHash } from "@/lib/source-hash";
 import { dispatchUnprocessedSnapshots } from "../../../core/source-records";
 import type {
@@ -15,6 +16,7 @@ import {
   type CsafAdvisoryItem,
   type CsafDocument,
   csafDocumentSchema,
+  indexProductTree,
 } from "../document";
 import { toMarkdown } from "../markdown";
 import { feedsOf, fetchProviderMetadata } from "../provider-metadata";
@@ -30,7 +32,31 @@ interface CsafCursor {
   feeds: Record<string, FeedCursor>;
 }
 
-const MAX_DOC_PER_RUN = 10;
+const MIN_PUBLISHED_YEAR = 2026;
+const MAX_AGE_MONTH = 3;
+const MAX_AGE_MS = MAX_AGE_MONTH * 30 * 24 * 60 * 60 * 1000;
+const MAX_DOC_PER_RUN = 50;
+
+const inWindow = (entry: FeedEntry, now: number): boolean => {
+  if (
+    entry.publishedAt !== undefined &&
+    new Date(entry.publishedAt).getUTCFullYear() < MIN_PUBLISHED_YEAR
+  ) {
+    return false;
+  }
+  return entry.updatedAt >= now - MAX_AGE_MS;
+};
+
+const checkInventory = async (names: string[]): Promise<boolean> => {
+  if (names.length === 0) return false;
+  const count = await prisma.deviceGroup.count({
+    where: {
+      assets: { some: {} },
+      manufacturer: { OR: names.map(canonicalNameWhere) },
+    },
+  });
+  return count > 0;
+};
 
 const parseCursor = (cursor: Cursor | null): CsafCursor => {
   const parsed = z
@@ -176,32 +202,46 @@ export const syncAdvisories = async (
 
   for (const feed of feedsOf(metadata)) {
     const feedUrl = feed.url;
-    const firstRun = !cursor.feeds[feedUrl];
+    const feedLabel = feed.summary ?? feedUrl;
     const state = cursor.feeds[feedUrl] ?? { seen: {} };
     cursor.feeds[feedUrl] = state;
 
     const result = await fetchFeed(session, feedUrl, state?.etag);
     if ("unchanged" in result) {
+      console.info("csaf sync ", { feeed: feedLabel, unchanged: true });
       continue;
     }
-    // if (firstRun) {
-    //   state.seen = seenMapOf(result.entries);
-    //   const newest = [...result.entries]
-    //     .sort((a, b) => a.updatedAt - b.updatedAt)
-    //     .slice(firstBudgetRun);
-    //   for (const entry of newest) delete state.seen[entry.id];
-    // }
-    // if (!state) {
-    //   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    //   cursor.feeds[feedUrl] = {
-    //     etag: result.etag,
-    //     seen: seenMapOf(result.entries.filter((e) => e.updatedAt < cutoff)),
-    //   };
-    //   continue;
-    // }
-    const candidates = result.entries
+    if (!state) {
+      cursor.feeds[feedUrl] = {
+        etag: result.etag,
+        seen: seenMapOf(result.entries),
+      };
+      console.info("csaf sync 2 ", {
+        feed: feedLabel,
+        baselined: result.entries.length,
+      });
+      continue;
+    }
+
+    const now = Date.now();
+    console.info("csaf window ", {
+      total: result.entries.length,
+      hasPublished: result.entries.filter((e) => e.publishedAt !== undefined)
+        .length,
+      yearOk: result.entries.filter(
+        (e) =>
+          e.publishedAt !== undefined &&
+          new Date(e.publishedAt).getUTCFullYear() >= MIN_PUBLISHED_YEAR,
+      ).length,
+      windowOk: result.entries.filter((e) => e.updatedAt >= now - MAX_AGE_MS)
+        .length,
+      both: result.entries.length,
+    });
+    const entries = result.entries.filter((entry) => inWindow(entry, now));
+
+    const candidates = entries
       .filter((entry) => state.seen[entry.id] !== String(entry.updatedAt))
-      .sort((a, b) => a.updatedAt - b.updatedAt)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, MAX_DOC_PER_RUN);
 
     const items = await syncAll(session, candidates);
@@ -211,15 +251,42 @@ export const syncAdvisories = async (
 
     await recordSnapshots(wanted, ctx.integrationId);
 
+    const relevant: Downloaded[] = [];
+    for (const item of wanted) {
+      const { vendors } = indexProductTree(item.doc);
+      const ok = await checkInventory(vendors);
+      console.info("csaf gate******************** ", {
+        id: item.trackingId,
+        vendors,
+        ok,
+      });
+      if (await checkInventory(vendors)) {
+        relevant.push(item);
+      }
+    }
+
     for (const item of items) {
       state.seen[item.entry.id] = String(item.entry.updatedAt);
     }
-    state.etag = result.etag;
 
-    await dispatchUnprocessedSnapshots(
-      ctx.integrationId,
-      wanted.map((item) => item.trackingId),
+    const remaining = result.entries.filter(
+      (entry) => state.seen[entry.id] !== String(entry.updatedAt),
     );
+    if (remaining.length === 0) state.etag = result.etag;
+
+    const dispatched = await dispatchUnprocessedSnapshots(
+      ctx.integrationId,
+      relevant.map((item) => item.trackingId),
+    );
+
+    console.info("csaf sync", {
+      feed: feedLabel,
+      entries: result.entries.length,
+      candidates: candidates.length,
+      downloaded: items.length,
+      recorded: wanted.length,
+      dispatched,
+    });
   }
   return { cursor };
 };

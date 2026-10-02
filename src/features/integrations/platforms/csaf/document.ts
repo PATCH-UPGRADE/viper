@@ -112,5 +112,6 @@ export const indexProductTree = (doc: CsafDocument): ProductTreeIndex => {
       if (node.branches) walk(node.branches);
     }
   };
+  walk(((doc.product_tree ?? {}) as { branches?: unknown[] }).branches ?? []);
   return { productNames, vendors: [...vendors] };
 };

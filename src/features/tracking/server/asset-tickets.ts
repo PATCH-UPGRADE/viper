@@ -17,7 +17,6 @@ interface ParentFields {
   priority: Priority;
   creatorId: string;
   scheduledAt: Date | null;
-  durationEstimate: number | null;
   sourceLabel: string | null;
   isDraft: boolean;
 }
@@ -101,7 +100,6 @@ export async function createAssetTicket(
           priority: true,
           creatorId: true,
           scheduledAt: true,
-          durationEstimate: true,
           sourceLabel: true,
           isDraft: true,
         },
@@ -120,7 +118,6 @@ export async function createAssetTicket(
       category: parent.category,
       priority: parent.priority,
       scheduledAt: parent.scheduledAt,
-      durationEstimate: parent.durationEstimate,
       sourceLabel: parent.sourceLabel,
       // A child is as visible as its parent. A child of a draft that stayed
       // visible would put an unapproved proposal on the asset's work orders.
@@ -174,7 +171,6 @@ export async function attachMatchingAssets(
       priority: true,
       creatorId: true,
       scheduledAt: true,
-      durationEstimate: true,
       sourceLabel: true,
       isDraft: true,
     },

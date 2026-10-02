@@ -1,6 +1,9 @@
 import Image from "next/image";
+import { Suspense } from "react";
+import { LoadingView } from "@/components/entity-components";
 import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { CategoryColorProvider } from "@/features/tag-colors/context";
 import { InterruptionsCalendar } from "@/features/tracking/components/interruptions/interruptions-calendar";
 import { requireAuth } from "@/lib/auth-utils";
 
@@ -22,7 +25,11 @@ const Page = async () => {
       <ReportingErrorBoundary
         fallback={<p className="p-4">Something went wrong.</p>}
       >
-        <InterruptionsCalendar />
+        <Suspense fallback={<LoadingView message="Loading maintenance..." />}>
+          <CategoryColorProvider>
+            <InterruptionsCalendar />
+          </CategoryColorProvider>
+        </Suspense>
       </ReportingErrorBoundary>
     </>
   );

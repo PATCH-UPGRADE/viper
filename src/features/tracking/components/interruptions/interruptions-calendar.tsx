@@ -23,10 +23,12 @@ import { ErrorView, LoadingView } from "@/components/entity-components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useCategoryColor } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
+import type { TicketCategory } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { statusHue, statusLabels } from "../ticket-detail/shared";
+import { statusLabels } from "../ticket-detail/shared";
 import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
 
 const DATE_FORMAT = "yyyy-MM-dd";
@@ -35,15 +37,82 @@ const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 // Every block is this tall, in minutes.
 const BLOCK_MINUTES = 60;
 
-// Tickets starting in the same clock hour sit side by side.
-const sideBySide = (items: DrawerTicket[]) =>
-  items.map((item) => {
-    const hour = item.scheduledAt.getHours();
-    const group = items.filter(
-      (other) => other.scheduledAt.getHours() === hour,
-    );
-    return { item, index: group.indexOf(item), count: group.length };
-  });
+type Item = DrawerTicket & { workOrderId: string; category: TicketCategory };
+type Block = { items: Item[]; start: number; lane: number; lanes: number };
+
+// One block per work order and time, so a fleet update reads "3 devices".
+// Blocks that overlap share the day's width, one lane each.
+const layout = (items: Item[]): Block[] => {
+  const groups = new Map<string, Item[]>();
+  for (const item of items) {
+    const key = `${item.workOrderId}|${item.scheduledAt.getTime()}`;
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  const blocks = [...groups.values()]
+    .map((group) => ({
+      items: group,
+      start: minutesOf(group[0].scheduledAt),
+      lane: 0,
+      lanes: 1,
+    }))
+    .sort((a, b) => a.start - b.start);
+
+  const laneEnds: number[] = [];
+  let cluster: Block[] = [];
+  let clusterEnd = 0;
+  const close = () => {
+    for (const block of cluster) block.lanes = laneEnds.length;
+    cluster = [];
+    laneEnds.length = 0;
+  };
+  for (const block of blocks) {
+    if (cluster.length && block.start >= clusterEnd) close();
+    const free = laneEnds.findIndex((end) => end <= block.start);
+    block.lane = free < 0 ? laneEnds.length : free;
+    laneEnds[block.lane] = block.start + BLOCK_MINUTES;
+    clusterEnd = Math.max(clusterEnd, block.start + BLOCK_MINUTES);
+    cluster.push(block);
+  }
+  close();
+  return blocks;
+};
+
+const TicketBlock = ({ block }: { block: Block }) => {
+  const [item] = block.items;
+  const color = useCategoryColor(item.category);
+  return (
+    <div
+      className="absolute"
+      style={{
+        left: `calc(${(block.lane * 100) / block.lanes}% + 2px)`,
+        width: `calc(${100 / block.lanes}% - 4px)`,
+        top: (block.start * HOUR_HEIGHT) / 60,
+        height: (BLOCK_MINUTES * HOUR_HEIGHT) / 60 - 2,
+      }}
+    >
+      <TicketDrawer ticket={item}>
+        <button
+          type="button"
+          title={item.summary}
+          className={cn(
+            "flex h-full w-full flex-col gap-0.5 overflow-hidden rounded-md border border-l-4 px-1.5 py-0.5 text-left text-[11px] leading-tight hover:brightness-95",
+            getChipClass(color),
+          )}
+        >
+          <span className="truncate text-xs font-medium">
+            {block.items.length > 1
+              ? `${block.items.length} devices`
+              : item.assetName}
+          </span>
+          <span className="truncate">
+            {format(item.scheduledAt, "h:mm a")} · {statusLabels[item.status]}
+          </span>
+          <span className="truncate opacity-80">{item.summary}</span>
+        </button>
+      </TicketDrawer>
+    </div>
+  );
+};
 
 const minutesOf = (date: Date) => date.getHours() * 60 + date.getMinutes();
 
@@ -206,41 +275,10 @@ export const InterruptionsCalendar = () => {
                       />
                     )}
                     {/* Tickets starting in the same hour share its width. */}
-                    {sideBySide(
+                    {layout(
                       items.filter((item) => isSameDay(item.scheduledAt, day)),
-                    ).map(({ item, index, count }) => (
-                      <div
-                        key={item.id}
-                        className="absolute"
-                        style={{
-                          left: `calc(${(index * 100) / count}% + 2px)`,
-                          width: `calc(${100 / count}% - 4px)`,
-                          top: (minutesOf(item.scheduledAt) * HOUR_HEIGHT) / 60,
-                          height: (BLOCK_MINUTES * HOUR_HEIGHT) / 60 - 2,
-                        }}
-                      >
-                        <TicketDrawer ticket={item}>
-                          <button
-                            type="button"
-                            title={item.summary}
-                            className={cn(
-                              "flex h-full w-full flex-col gap-0.5 overflow-hidden rounded-md border border-l-4 px-1.5 py-0.5 text-left text-[11px] leading-tight hover:brightness-95",
-                              getChipClass(statusHue[item.status]),
-                            )}
-                          >
-                            <span className="truncate text-xs font-medium">
-                              {item.assetName}
-                            </span>
-                            <span className="truncate">
-                              {format(item.scheduledAt, "h:mm a")} ·{" "}
-                              {statusLabels[item.status]}
-                            </span>
-                            <span className="truncate opacity-80">
-                              {item.summary}
-                            </span>
-                          </button>
-                        </TicketDrawer>
-                      </div>
+                    ).map((block) => (
+                      <TicketBlock key={block.items[0].id} block={block} />
                     ))}
                   </div>
                 </section>

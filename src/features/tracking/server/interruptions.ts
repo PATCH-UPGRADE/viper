@@ -45,14 +45,23 @@ export const getInterruptionCalendar = async (
       ],
     },
     select: {
+      parentTicketId: true,
       asset: { select: assetNameSelect },
       ticket: {
-        select: { id: true, summary: true, status: true, scheduledAt: true },
+        select: {
+          id: true,
+          summary: true,
+          status: true,
+          category: true,
+          scheduledAt: true,
+        },
       },
     },
   });
-  return rows.map(({ asset, ticket }) => ({
+  return rows.map(({ parentTicketId, asset, ticket }) => ({
     id: ticket.id,
+    workOrderId: parentTicketId,
+    category: ticket.category,
     summary: ticket.summary,
     status: ticket.status,
     // The query only returns tickets with a time.

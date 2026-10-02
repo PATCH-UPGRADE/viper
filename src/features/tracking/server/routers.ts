@@ -1275,10 +1275,10 @@ export const trackingRouter = createTRPCRouter({
     .input(
       z
         .object({ from: z.date(), to: z.date() })
-        // A week; stops an unbounded scan.
+        // A month view spans at most six weeks; stops an unbounded scan.
         .refine(
           ({ from, to }) =>
-            to >= from && to.getTime() - from.getTime() <= 8 * 86_400_000,
+            to >= from && to.getTime() - from.getTime() <= 43 * 86_400_000,
           "Invalid date range",
         ),
     )

@@ -1,4 +1,5 @@
 import "server-only";
+import { resolveResponsibleDepartments } from "@/features/work-orders/server/departments";
 import {
   assetIdsForMatchings,
   type DraftTarget,
@@ -53,15 +54,24 @@ export async function persistMitigationPlans(
       valid.deviceGroupMatching,
     );
 
-  const vendorWorkOrders = plans
-    .flatMap((plan) => plan.workOrders)
-    .filter((w) => w.performedBy === "vendor");
-  const targets = new Map<PlanWorkOrder, DraftTarget>();
+  const ownership = new Map<
+    PlanWorkOrder,
+    Partial<DraftTarget> & { departments: { connect: { id: string }[] } }
+  >();
   await Promise.all(
-    vendorWorkOrders.map(async (w) => {
-      const assetIds = await assetIdsForMatchings(prisma, matchingIdsFor(w));
-      targets.set(w, await resolveDraftTarget(assetIds));
-    }),
+    plans
+      .flatMap((plan) => plan.workOrders)
+      .map(async (w) => {
+        const assetIds = await assetIdsForMatchings(prisma, matchingIdsFor(w));
+        const [departmentIds, target] = await Promise.all([
+          resolveResponsibleDepartments(assetIds),
+          w.performedBy === "vendor" ? resolveDraftTarget(assetIds) : undefined,
+        ]);
+        ownership.set(w, {
+          departments: { connect: departmentIds.map((id) => ({ id })) },
+          ...target,
+        });
+      }),
   );
 
   let dropped = 0;
@@ -112,7 +122,7 @@ export async function persistMitigationPlans(
               isDraft: true,
               creatorId: automation.id,
               notificationId,
-              ...targets.get(w),
+              ...ownership.get(w),
               ...linksFor(w),
             })),
           },

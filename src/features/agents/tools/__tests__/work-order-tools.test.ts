@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockResolve, mockKeep, mockValidate, mockPrisma } = vi.hoisted(() => ({
-  mockResolve: vi.fn(),
-  mockKeep: vi.fn(),
-  mockValidate: vi.fn(),
-  mockPrisma: { $transaction: vi.fn() },
-}));
+const { mockResolve, mockKeep, mockValidate, mockPrisma, mockDepartments } =
+  vi.hoisted(() => ({
+    mockResolve: vi.fn(),
+    mockKeep: vi.fn(),
+    mockValidate: vi.fn(),
+    mockPrisma: { $transaction: vi.fn() },
+    mockDepartments: vi.fn(),
+  }));
 
 vi.mock("@/features/work-orders/server/targets", () => ({
   resolveWorkOrderTargets: mockResolve,
@@ -19,6 +21,9 @@ vi.mock("@/features/work-orders/server/payload", () => ({
   validatePayloadForModule: mockValidate,
 }));
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
+vi.mock("@/features/work-orders/server/departments", () => ({
+  resolveResponsibleDepartments: mockDepartments,
+}));
 vi.mock("@/features/tracking/server/asset-tickets", () => ({
   createAssetTicket: vi.fn(),
 }));
@@ -58,6 +63,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockResolve.mockResolvedValue({ targets: [], unmanaged: [], unknownIds: [] });
   mockValidate.mockReturnValue({ ok: true, payload: {} });
+  mockDepartments.mockResolvedValue([]);
 });
 
 describe("list_work_order_targets", () => {
@@ -141,5 +147,47 @@ describe("propose_work_order", () => {
       });
       expect(result).not.toMatch(/^REJECTED:/);
     }
+  });
+
+  describe("departments", () => {
+    const create = vi.fn();
+
+    beforeEach(() => {
+      create.mockResolvedValue({ id: "t-1" });
+      mockPrisma.$transaction.mockImplementation(
+        async (fn: (tx: unknown) => unknown) =>
+          fn({ workOrderTicket: { create } }),
+      );
+      mockDepartments.mockResolvedValue(["dept-it"]);
+    });
+
+    it.each([
+      {
+        kind: "filed",
+        keep: { targets: [fleetTarget], unmanaged: [], unknownIds: [] },
+        input: { assetIds: ["a1"], targetIntegrationId: "int-fleet" },
+      },
+      {
+        kind: "VIPER-only",
+        keep: {
+          targets: [],
+          unmanaged: [{ id: "a2", label: "PUMP-1" }],
+          unknownIds: [],
+        },
+        input: { assetIds: ["a2"] },
+      },
+    ])(
+      "puts a $kind order on the team of each department that manages its assets",
+      async ({ keep, input }) => {
+        mockKeep.mockReturnValue(keep);
+
+        await call(proposeWorkOrder, { ...baseInput, ...input });
+
+        expect(mockDepartments).toHaveBeenCalledWith(input.assetIds);
+        expect(create.mock.calls[0][0].data.departments).toEqual({
+          connect: [{ id: "dept-it" }],
+        });
+      },
+    );
   });
 });

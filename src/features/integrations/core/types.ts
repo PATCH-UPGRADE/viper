@@ -243,6 +243,8 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
    * `Pending` until the callback lands.
    */
   sync?: SyncStrategy<TConfig, TCreds>;
+  /** How often `sync` should run, in seconds. A resource module's own value wins. */
+  defaultSyncEvery?: number | null;
   onCreate?(): Promise<void>;
 
   /**

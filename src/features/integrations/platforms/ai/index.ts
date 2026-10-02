@@ -23,4 +23,6 @@ export const ai: ConnectorModule<AiConfig, AiCreds> = {
     credentialSchema,
   },
   sync: aiSync,
+  // Each sync is a full multi-call model crawl, so not every 5 minutes.
+  defaultSyncEvery: 86400,
 };

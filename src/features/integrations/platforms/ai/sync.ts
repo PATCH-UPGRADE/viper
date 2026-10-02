@@ -7,33 +7,53 @@ import { processVulnerabilityIntegrationSync } from "@/features/vulnerabilities/
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import type { IntegrationResponse } from "@/lib/schemas";
-import { runAiCrawler } from "./agent";
+import { type CrawledItem, runAiCrawler } from "./agent";
 import { type CrawlerResource, isCrawlerResource } from "./agent/schemas";
 import type { AiConfig, AiCreds } from "./config";
 
 const KNOWN_VENDOR_ID_SAMPLE = 10;
 
-function recentVendorIds(
-  resource: CrawlerResource,
-  integrationId: string,
-): Promise<{ externalId: string }[]> {
-  const query = {
-    where: { integrationId },
-    select: { externalId: true },
-    orderBy: { updatedAt: "desc" as const },
-    take: KNOWN_VENDOR_ID_SAMPLE,
+const vendorIdQuery = (integrationId: string) => ({
+  where: { integrationId },
+  select: { externalId: true },
+  orderBy: { updatedAt: "desc" as const },
+  take: KNOWN_VENDOR_ID_SAMPLE,
+});
+
+/** Where each crawler resource keeps its mappings, and how its items are upserted. */
+const CRAWLER_RESOURCES: {
+  [R in CrawlerResource]: {
+    recentVendorIds: (
+      query: ReturnType<typeof vendorIdQuery>,
+    ) => Promise<{ externalId: string }[]>;
+    ingest: (
+      input: { items: CrawledItem<R>[] },
+      userId: string,
+      integrationId: string,
+      options: { shouldRecordSyncOutcome: boolean },
+    ) => Promise<IntegrationResponse>;
   };
-  switch (resource) {
-    case ResourceType.Asset:
-      return prisma.externalAssetMapping.findMany(query);
-    case ResourceType.Vulnerability:
-      return prisma.externalVulnerabilityMapping.findMany(query);
-    case ResourceType.Remediation:
-      return prisma.externalRemediationMapping.findMany(query);
-    case ResourceType.DeviceArtifact:
-      return prisma.externalDeviceArtifactMapping.findMany(query);
-  }
-}
+} = {
+  [ResourceType.Asset]: {
+    recentVendorIds: (query) => prisma.externalAssetMapping.findMany(query),
+    ingest: processAssetIntegrationSync,
+  },
+  [ResourceType.Vulnerability]: {
+    recentVendorIds: (query) =>
+      prisma.externalVulnerabilityMapping.findMany(query),
+    ingest: processVulnerabilityIntegrationSync,
+  },
+  [ResourceType.Remediation]: {
+    recentVendorIds: (query) =>
+      prisma.externalRemediationMapping.findMany(query),
+    ingest: processRemediationIntegrationSync,
+  },
+  [ResourceType.DeviceArtifact]: {
+    recentVendorIds: (query) =>
+      prisma.externalDeviceArtifactMapping.findMany(query),
+    ingest: processDeviceArtifactIntegrationSync,
+  },
+};
 
 /**
  * Crawl the integration URL with an AI agent, then upsert what it recorded.
@@ -45,54 +65,32 @@ export async function aiSync(
   if (!isCrawlerResource(resource)) {
     throw new Error(`The AI crawler cannot sync ${resource}`);
   }
+  return crawlAndIngest(ctx, resource);
+}
 
-  const known = await recentVendorIds(resource, ctx.integrationId);
-  const crawl = {
+// Generic over R so the table lookup keeps crawled items and ingest in step.
+async function crawlAndIngest<R extends CrawlerResource>(
+  ctx: SyncCtx<AiConfig, AiCreds>,
+  resource: R,
+): Promise<SyncOutcome> {
+  const { recentVendorIds, ingest } = CRAWLER_RESOURCES[resource];
+
+  const known = await recentVendorIds(vendorIdQuery(ctx.integrationId));
+  const { items, incomplete } = await runAiCrawler({
+    resource,
     integrationUri: ctx.config.integrationUri,
     additionalInstructions: ctx.config.additionalInstructions,
     creds: ctx.creds,
     knownVendorIds: known.map((m) => m.externalId),
-  };
-  const target = [
+  });
+
+  const response = await ingest(
+    { items },
     ctx.integrationUserId,
     ctx.integrationId,
     // finalize-sync already records this attempt. A second write double-counts consecutiveFailures.
     { shouldRecordSyncOutcome: false },
-  ] as const;
-
-  let incomplete: string | undefined;
-  const crawlItems = async <R extends CrawlerResource>(resource: R) => {
-    const result = await runAiCrawler({ ...crawl, resource });
-    incomplete = result.incomplete;
-    return result.items;
-  };
-
-  const ingest = async (): Promise<IntegrationResponse> => {
-    switch (resource) {
-      case ResourceType.Asset:
-        return processAssetIntegrationSync(
-          { items: await crawlItems(resource) },
-          ...target,
-        );
-      case ResourceType.Vulnerability:
-        return processVulnerabilityIntegrationSync(
-          { items: await crawlItems(resource) },
-          ...target,
-        );
-      case ResourceType.Remediation:
-        return processRemediationIntegrationSync(
-          { items: await crawlItems(resource) },
-          ...target,
-        );
-      case ResourceType.DeviceArtifact:
-        return processDeviceArtifactIntegrationSync(
-          { items: await crawlItems(resource) },
-          ...target,
-        );
-    }
-  };
-
-  const response = await ingest();
+  );
   // The items are saved by now. Throwing makes finalize-sync record Error, so a
   // partial crawl or a failed item does not look like a complete sync.
   const problems = [

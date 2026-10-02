@@ -20,7 +20,7 @@ const CRAWLER_MODEL = "gpt-6.1-sol";
  */
 const CRAWLER_RECURSION_LIMIT = 80;
 
-type CrawledItem<R extends CrawlerResource> = z.infer<
+export type CrawledItem<R extends CrawlerResource> = z.infer<
   (typeof CRAWLER_ITEM_SCHEMAS)[R]
 >;
 

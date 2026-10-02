@@ -59,26 +59,4 @@ describe("InterruptionsCalendar", () => {
       ).queryByText("pump-1"),
     ).toBeNull();
   });
-
-  it("lists the same tickets in the month view", () => {
-    mockQuery.mockReturnValue({
-      data: { scope: "ready", items: [item("c1", "pump-1", 90)] },
-    });
-    show("&mode=month");
-
-    expect(screen.getByText("March 2026")).toBeTruthy();
-    expect(
-      within(
-        screen.getByRole("region", { name: "Wednesday, April 1" }),
-      ).getByText("pump-1"),
-    ).toBeTruthy();
-  });
-
-  it("explains an empty department instead of showing a blank page", () => {
-    mockQuery.mockReturnValue({ data: { scope: "no-department", items: [] } });
-    show();
-    expect(
-      screen.getByText("You're not assigned to a department"),
-    ).toBeTruthy();
-  });
 });

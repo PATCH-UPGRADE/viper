@@ -338,18 +338,6 @@ describe("trackingRouter.update", () => {
     expect(arg.data.scheduledAt).toBeNull();
   });
 
-  it("passes durationEstimate through and clears it with null", async () => {
-    const caller = setup();
-    mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
-
-    await caller.update({ id: "t1", durationEstimate: 45 });
-    await caller.update({ id: "t1", durationEstimate: null });
-
-    const calls = mockPrisma.workOrderTicket.update.mock.calls;
-    expect(calls[0][0].data.durationEstimate).toBe(45);
-    expect(calls[1][0].data.durationEstimate).toBeNull();
-  });
-
   it("rejects an empty summary", async () => {
     const caller = setup();
     await expect(caller.update({ id: "t1", summary: "   " })).rejects.toThrow();

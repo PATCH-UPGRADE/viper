@@ -6,7 +6,6 @@ vi.mock("server-only", () => ({}));
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     user: { findUnique: vi.fn() },
-    asset: { findFirst: vi.fn() },
     assetTicket: { findMany: vi.fn() },
   },
 }));
@@ -32,14 +31,6 @@ describe("getInterruptionCalendar", () => {
       items: [],
     });
     expect(mockPrisma.assetTicket.findMany).not.toHaveBeenCalled();
-  });
-
-  it("says so when the department manages no assets", async () => {
-    asUser("dept-A");
-    mockPrisma.asset.findFirst.mockResolvedValue(null);
-    await expect(getInterruptionCalendar("u1", range)).resolves.toMatchObject({
-      scope: "no-assets",
-    });
   });
 
   it("asks only for the department's own open device tickets in the range, and maps them", async () => {

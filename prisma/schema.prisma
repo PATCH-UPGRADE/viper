@@ -1288,9 +1288,6 @@ model WorkOrderTicket {
 
   scheduledAt DateTime?
 
-  // Expected maintenance time, in whole minutes. Null until someone sets it.
-  durationEstimate Int?
-
   issues          Issue[]                          @relation("WorkOrderTicketIssues")
   vulnerabilities Vulnerability[]                  @relation("WorkOrderTicketVulns")
   remediations    Remediation[]                    @relation("WorkOrderTicketRemediations")

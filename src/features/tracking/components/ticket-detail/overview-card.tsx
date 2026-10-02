@@ -24,7 +24,7 @@ const FieldLabel = ({ children }: { children: React.ReactNode }) => (
   </span>
 );
 
-export const MetaField = ({
+const MetaField = ({
   label,
   children,
 }: {

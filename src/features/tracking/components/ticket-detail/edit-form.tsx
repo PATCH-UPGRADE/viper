@@ -52,6 +52,8 @@ type EditState = {
   descriptionsByDept: Record<string, string>;
   assigneeId: string;
   scheduledAt: string;
+  // Minutes, kept as the raw input text; empty means no estimate.
+  durationEstimate: string;
 };
 
 const buildEditState = (data: TicketDetail): EditState => ({
@@ -66,6 +68,7 @@ const buildEditState = (data: TicketDetail): EditState => ({
   ),
   assigneeId: data.assignee?.id ?? UNASSIGNED,
   scheduledAt: toDateTimeLocal(data.scheduledAt),
+  durationEstimate: data.durationEstimate?.toString() ?? "",
 });
 
 const editStateFingerprint = (state: EditState) =>
@@ -168,6 +171,9 @@ export const TicketEditForm = ({
         descriptions,
         assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
         scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
+        durationEstimate: form.durationEstimate
+          ? Number(form.durationEstimate)
+          : null,
       },
       { onSuccess: () => onCancel() },
     );
@@ -254,6 +260,23 @@ export const TicketEditForm = ({
               value={form.scheduledAt}
               onChange={(e) =>
                 setForm((f) => ({ ...f, scheduledAt: e.target.value }))
+              }
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="ticket-duration">
+              Estimated duration (minutes)
+            </Label>
+            <Input
+              id="ticket-duration"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={form.durationEstimate}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, durationEstimate: e.target.value }))
               }
             />
           </div>

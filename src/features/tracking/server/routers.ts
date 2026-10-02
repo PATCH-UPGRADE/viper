@@ -659,6 +659,8 @@ export const trackingRouter = createTRPCRouter({
           .optional(),
         assigneeId: z.string().nullish(),
         scheduledAt: z.coerce.date().nullish(),
+        // Expected maintenance time in whole minutes.
+        durationEstimate: z.number().int().positive().nullish(),
       }),
     )
     .meta({
@@ -668,7 +670,7 @@ export const trackingRouter = createTRPCRouter({
         tags: ["Work Orders"],
         summary: "Update a work-order ticket",
         description:
-          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt) to clear them. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
+          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt, durationEstimate) to clear them. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
       },
     })
     .output(workOrderDetailResponseSchema)
@@ -1272,10 +1274,10 @@ export const trackingRouter = createTRPCRouter({
     .input(
       z
         .object({ from: z.date(), to: z.date() })
-        // A week; stops an unbounded scan.
+        // A month view is at most six weeks; stops an unbounded scan.
         .refine(
           ({ from, to }) =>
-            to >= from && to.getTime() - from.getTime() <= 8 * 86_400_000,
+            to >= from && to.getTime() - from.getTime() <= 43 * 86_400_000,
           "Invalid date range",
         ),
     )

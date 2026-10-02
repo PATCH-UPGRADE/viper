@@ -36,7 +36,13 @@ export const getInterruptionCalendar = async (
     select: {
       asset: { select: assetNameSelect },
       ticket: {
-        select: { id: true, summary: true, status: true, scheduledAt: true },
+        select: {
+          id: true,
+          summary: true,
+          status: true,
+          scheduledAt: true,
+          durationEstimate: true,
+        },
       },
     },
   });
@@ -58,6 +64,7 @@ export const getInterruptionCalendar = async (
       status: ticket.status,
       // The query only returns tickets with a time.
       scheduledAt: ticket.scheduledAt as Date,
+      durationEstimate: ticket.durationEstimate,
       assetName: getAssetDisplayName(asset),
     })),
   };

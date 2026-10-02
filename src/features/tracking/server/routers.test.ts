@@ -116,6 +116,7 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   status: "TO_DO",
   category: "PATCH",
   scheduledAt: null,
+  durationEstimate: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   lastCommentAt: null,
@@ -335,6 +336,18 @@ describe("trackingRouter.update", () => {
 
     const arg = mockPrisma.workOrderTicket.update.mock.calls[0][0];
     expect(arg.data.scheduledAt).toBeNull();
+  });
+
+  it("passes durationEstimate through and clears it with null", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.update.mockResolvedValue(makeTicketDetail());
+
+    await caller.update({ id: "t1", durationEstimate: 45 });
+    await caller.update({ id: "t1", durationEstimate: null });
+
+    const calls = mockPrisma.workOrderTicket.update.mock.calls;
+    expect(calls[0][0].data.durationEstimate).toBe(45);
+    expect(calls[1][0].data.durationEstimate).toBeNull();
   });
 
   it("rejects an empty summary", async () => {
@@ -939,6 +952,7 @@ describe("trackingRouter.list", () => {
       status: "TO_DO",
       category: "PATCH",
       scheduledAt: null,
+      durationEstimate: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       parentId: null,
@@ -1991,6 +2005,21 @@ describe("trackingRouter.attachAsset", () => {
           parent: { connect: { id: "t1" } },
           ticket: { create: { assetId: "a1", parentTicketId: "t1" } },
         }),
+      }),
+    );
+  });
+
+  it("copies the parent's durationEstimate onto the new device ticket", async () => {
+    const caller = setup();
+    mockPrisma.workOrderTicket.findUniqueOrThrow.mockResolvedValueOnce(
+      makeTicketDetail({ durationEstimate: 90 }),
+    );
+
+    await caller.attachAsset({ ticketId: "t1", assetId: "a1" });
+
+    expect(mockPrisma.workOrderTicket.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ durationEstimate: 90 }),
       }),
     );
   });

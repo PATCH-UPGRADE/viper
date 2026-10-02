@@ -59,6 +59,7 @@ describe("getInterruptionCalendar", () => {
           summary: "Patch pump-1",
           status: "TO_DO",
           scheduledAt: at,
+          durationEstimate: 45,
         },
       },
     ]);
@@ -79,6 +80,7 @@ describe("getInterruptionCalendar", () => {
           summary: "Patch pump-1",
           status: "TO_DO",
           scheduledAt: at,
+          durationEstimate: 45,
           assetName: "pump-1",
         },
       ],

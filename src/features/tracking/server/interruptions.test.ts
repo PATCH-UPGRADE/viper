@@ -15,7 +15,7 @@ vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
 import {
   getInterruptionCalendar,
-  getInterruptionComments,
+  getInterruptionDetail,
 } from "./interruptions";
 
 const range = { from: new Date(2026, 2, 1), to: new Date(2026, 2, 7) };
@@ -32,10 +32,10 @@ describe("interruptions scope", () => {
     expect(mockPrisma.assetTicket.findMany).not.toHaveBeenCalled();
   });
 
-  it("hides comments of a ticket outside the department", async () => {
+  it("hides the details of a ticket outside the department", async () => {
     mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
     mockPrisma.workOrderTicket.findFirst.mockResolvedValue(null);
-    await expect(getInterruptionComments("u1", "other")).rejects.toMatchObject({
+    await expect(getInterruptionDetail("u1", "other")).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
   });

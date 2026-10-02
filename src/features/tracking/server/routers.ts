@@ -61,7 +61,7 @@ import {
 import { cascadeDoneStatus, createAssetTicket } from "./asset-tickets";
 import {
   getInterruptionCalendar,
-  getInterruptionComments,
+  getInterruptionDetail,
 } from "./interruptions";
 
 // A lost create-race (or a retry) surfaces as a P2002 unique violation. Duck-typed
@@ -1286,10 +1286,10 @@ export const trackingRouter = createTRPCRouter({
       getInterruptionCalendar(ctx.auth.user.id, input),
     ),
 
-  getInterruptionComments: protectedProcedure
+  getInterruptionDetail: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(({ input, ctx }) =>
-      getInterruptionComments(ctx.auth.user.id, input.id),
+      getInterruptionDetail(ctx.auth.user.id, input.id),
     ),
 
   // ─── Work orders proposed by an agent ──────────────────────────────────────

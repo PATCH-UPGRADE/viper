@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import {
   Sheet,
@@ -14,8 +14,11 @@ import {
 import type { TicketStatus } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
 import { useTRPC } from "@/trpc/client";
+import { useMarkTicketSeen } from "../../hooks/use-tracking";
 import { commentEntry } from "../ticket-detail/activity-timeline";
 import { AddCommentForm } from "../ticket-detail/add-comment-form";
+import { MetaField } from "../ticket-detail/overview-card";
+import { RawJsonListCard } from "../ticket-detail/raw-json-list-card";
 import { StatusChip } from "../ticket-detail/shared";
 
 export type DrawerTicket = {
@@ -27,16 +30,57 @@ export type DrawerTicket = {
 };
 
 // Only fetched while the drawer is open: the sheet's content mounts on open.
-const Comments = ({ id }: { id: string }) => {
+const Details = ({ id }: { id: string }) => {
   const trpc = useTRPC();
   const { data } = useQuery(
-    trpc.tracking.getInterruptionComments.queryOptions({ id }),
+    trpc.tracking.getInterruptionDetail.queryOptions({ id }),
   );
+  const markSeen = useMarkTicketSeen();
+
+  // Opening a ticket counts as reading it, once the server has confirmed the
+  // user may see it.
+  const loaded = Boolean(data);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `mutate` is stable
+  useEffect(() => {
+    if (loaded) markSeen.mutate({ ticketId: id });
+  }, [loaded, id]);
+
+  if (!data) return <p className="text-sm text-muted-foreground">Loading...</p>;
   return (
-    <ActivityTimeline
-      entries={(data ?? []).map(commentEntry)}
-      composer={<AddCommentForm ticketId={id} />}
-    />
+    <>
+      <MetaField label="Contact">{data.contactName}</MetaField>
+      <MetaField label="Why this work is needed">
+        <p className="whitespace-pre-wrap">{data.why ?? "Not provided"}</p>
+      </MetaField>
+      {data.otherDevices.length > 0 && (
+        <MetaField label="Also getting this update">
+          <ul className="divide-y rounded-lg border">
+            {data.otherDevices.map((device) => (
+              <li
+                key={device.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+              >
+                <span className="font-medium">{device.name}</span>
+                <StatusChip status={device.status} />
+              </li>
+            ))}
+          </ul>
+        </MetaField>
+      )}
+      <MetaField label="Remediation">
+        <RawJsonListCard
+          items={data.remediations}
+          emptyMessage="No remediation is linked to this ticket."
+        />
+      </MetaField>
+      <MetaField label="Read by">
+        {data.seenBy.map((r) => r.user.name).join(", ") || "No one yet"}
+      </MetaField>
+      <ActivityTimeline
+        entries={data.comments.map(commentEntry)}
+        composer={<AddCommentForm ticketId={id} />}
+      />
+    </>
   );
 };
 
@@ -64,7 +108,7 @@ export const TicketDrawer = ({
         <p className="text-sm">
           Scheduled: {formatScheduled(ticket.scheduledAt)}
         </p>
-        <Comments id={ticket.id} />
+        <Details id={ticket.id} />
       </div>
     </SheetContent>
   </Sheet>

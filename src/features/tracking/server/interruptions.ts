@@ -21,8 +21,11 @@ const departmentOf = async (userId: string) =>
     })
   )?.departmentId;
 
+const managedBy = (departmentId: string) =>
+  ({ managedBy: { some: { departmentId } } }) satisfies Prisma.AssetWhereInput;
+
 const inScope = (departmentId: string): Prisma.AssetTicketWhereInput => ({
-  asset: { managedBy: { some: { departmentId } } },
+  asset: managedBy(departmentId),
   parentTicket: open,
   ticket: open,
 });
@@ -60,16 +63,78 @@ export const getInterruptionCalendar = async (
 
 // The comments on a device ticket in the user's scope. Anything else, such as
 // another department's ticket or a work order's id, is NOT_FOUND.
-export const getInterruptionComments = async (userId: string, id: string) => {
+// What the drawer shows beyond the card, for a device ticket in the user's
+// scope. Anything else is NOT_FOUND. A device ticket has no description or
+// remediation of its own: they come from its work order.
+export const getInterruptionDetail = async (userId: string, id: string) => {
   const departmentId = await departmentOf(userId);
   const ticket = departmentId
     ? await prisma.workOrderTicket.findFirst({
         where: { id, ticket: inScope(departmentId) },
-        select: { comments: ticketDetailInclude.comments },
+        select: {
+          assignee: { select: { name: true } },
+          creator: { select: { name: true } },
+          ticket: {
+            select: {
+              parentTicket: {
+                select: {
+                  body: true,
+                  descriptions: {
+                    where: { departmentId },
+                    select: { body: true },
+                  },
+                  remediations: {
+                    select: {
+                      id: true,
+                      description: true,
+                      narrative: true,
+                      sourceImpact: true,
+                    },
+                  },
+                  // Only this department's other devices; others stay hidden.
+                  assets: {
+                    where: {
+                      ticketId: { not: id },
+                      asset: managedBy(departmentId),
+                      ticket: open,
+                    },
+                    select: {
+                      asset: { select: assetNameSelect },
+                      ticket: {
+                        select: { id: true, status: true, scheduledAt: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          seenBy: {
+            orderBy: { seenAt: "desc" },
+            select: {
+              seenAt: true,
+              user: { select: { id: true, name: true } },
+            },
+          },
+          comments: ticketDetailInclude.comments,
+        },
       })
     : null;
   if (!ticket) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
   }
-  return ticket.comments;
+  const workOrder = ticket.ticket?.parentTicket;
+  return {
+    comments: ticket.comments,
+    seenBy: ticket.seenBy,
+    contactName: ticket.assignee?.name ?? ticket.creator.name,
+    why: workOrder?.descriptions[0]?.body ?? workOrder?.body ?? null,
+    remediations: workOrder?.remediations ?? [],
+    otherDevices: (workOrder?.assets ?? []).map(({ asset, ticket }) => ({
+      id: ticket.id,
+      name: getAssetDisplayName(asset),
+      status: ticket.status,
+      scheduledAt: ticket.scheduledAt,
+    })),
+  };
 };

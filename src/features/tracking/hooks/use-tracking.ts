@@ -170,8 +170,11 @@ export const useMarkTicketSeen = () => {
           };
         });
       },
-      onSettled: () => {
+      onSettled: (_data, _error, { ticketId }) => {
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.tracking.getInterruptionDetail.queryFilter({ id: ticketId }),
+        );
       },
     }),
   );
@@ -535,7 +538,7 @@ export const useAddTicketComment = (ticketId: string) => {
         );
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
         queryClient.invalidateQueries(
-          trpc.tracking.getInterruptionComments.queryFilter({ id: ticketId }),
+          trpc.tracking.getInterruptionDetail.queryFilter({ id: ticketId }),
         );
       },
       onError: (error) => {

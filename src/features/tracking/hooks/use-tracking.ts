@@ -170,8 +170,11 @@ export const useMarkTicketSeen = () => {
           };
         });
       },
-      onSettled: () => {
+      onSettled: (_data, _error, { ticketId }) => {
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.tracking.getInterruptionDetail.queryFilter({ id: ticketId }),
+        );
       },
     }),
   );

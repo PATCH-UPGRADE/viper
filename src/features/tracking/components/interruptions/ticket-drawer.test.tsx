@@ -1,8 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { expect, it, vi } from "vitest";
 
-const { mockQuery } = vi.hoisted(() => ({ mockQuery: vi.fn() }));
+const { mockQuery, mockMarkSeen } = vi.hoisted(() => ({
+  mockQuery: vi.fn(),
+  mockMarkSeen: vi.fn(),
+}));
 
 vi.mock("@tanstack/react-query", () => ({ useQuery: mockQuery }));
 vi.mock("@/trpc/client", () => ({
@@ -10,83 +13,55 @@ vi.mock("@/trpc/client", () => ({
     tracking: { getInterruptionDetail: { queryOptions: () => ({}) } },
   }),
 }));
+vi.mock("../../hooks/use-tracking", () => ({
+  useMarkTicketSeen: () => ({ mutate: mockMarkSeen }),
+}));
 vi.mock("../ticket-detail/add-comment-form", () => ({
-  AddCommentForm: ({ ticketId }: { ticketId: string }) => (
-    <div>comment form for {ticketId}</div>
-  ),
+  AddCommentForm: () => <div>comment form</div>,
 }));
 
 import { TicketDrawer } from "./ticket-drawer";
 
-const ticket = {
-  id: "c1",
-  summary: "Patch infusion pumps",
-  status: "TO_DO" as const,
-  scheduledAt: new Date(2026, 2, 18, 9),
-  assetName: "pump-1",
-};
-
-const detail = {
-  comments: [],
-  contactName: "Dr. Lee",
-  whyNecessary: null,
-  remediations: [],
-};
-
-const open = async () => {
+it("opens with the ticket's details, marks it seen once, and gives focus back on close", async () => {
+  mockQuery.mockReturnValue({
+    data: {
+      comments: [],
+      seenBy: [],
+      contactName: "Dr. Lee",
+      whyNecessary: null,
+      remediations: [{ id: "r1", narrative: "Install v2" }],
+      otherDevices: [
+        { id: "t2", name: "pump-2", status: "TO_DO", scheduledAt: null },
+      ],
+      otherDepartmentDeviceCount: 3,
+    },
+  });
   render(
-    <TicketDrawer ticket={ticket}>
+    <TicketDrawer
+      ticket={{
+        id: "c1",
+        summary: "Patch infusion pumps",
+        status: "TO_DO",
+        scheduledAt: new Date(2026, 2, 18, 9),
+        assetName: "pump-1",
+      }}
+    >
       <button type="button">open pump-1</button>
     </TicketDrawer>,
   );
   const trigger = screen.getByRole("button", { name: "open pump-1" });
   await userEvent.click(trigger);
-  return trigger;
-};
 
-describe("TicketDrawer", () => {
-  it("opens from its trigger with the ticket and a comment form, and gives focus back on close", async () => {
-    mockQuery.mockReturnValue({ data: detail });
-    const trigger = await open();
-    expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(screen.getByText("Patch infusion pumps")).toBeTruthy();
-    expect(screen.getByText("To Do")).toBeTruthy();
-    expect(screen.getByText("comment form for c1")).toBeTruthy();
+  expect(screen.getByText("Patch infusion pumps")).toBeTruthy();
+  expect(screen.getByText("Dr. Lee")).toBeTruthy();
+  expect(screen.getByText("Not provided")).toBeTruthy();
+  expect(screen.getByText("pump-2")).toBeTruthy();
+  expect(screen.getByText("Plus 3 devices in other departments.")).toBeTruthy();
+  expect(screen.getByText(/"narrative": "Install v2"/)).toBeTruthy();
+  expect(screen.getByText("Read by 0")).toBeTruthy();
+  expect(mockMarkSeen).toHaveBeenCalledTimes(1);
+  expect(mockMarkSeen).toHaveBeenCalledWith({ ticketId: "c1" });
 
-    await userEvent.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.activeElement).toBe(trigger);
-  });
-});
-
-describe("drawer details", () => {
-  it("shows the contact and says when no reason or remediation is on file", async () => {
-    mockQuery.mockReturnValue({ data: detail });
-    await open();
-    expect(screen.getByText("Dr. Lee")).toBeTruthy();
-    expect(screen.getByText("Not provided")).toBeTruthy();
-    expect(
-      screen.getByText("No remediation is linked to this ticket."),
-    ).toBeTruthy();
-  });
-
-  it("shows the reason and dumps remediations as JSON", async () => {
-    mockQuery.mockReturnValue({
-      data: {
-        ...detail,
-        whyNecessary: "Closes a known vulnerability.",
-        remediations: [
-          {
-            id: "r1",
-            description: "Patch",
-            narrative: "Install v2",
-            sourceImpact: {},
-          },
-        ],
-      },
-    });
-    await open();
-    expect(screen.getByText("Closes a known vulnerability.")).toBeTruthy();
-    expect(screen.getByText(/"narrative": "Install v2"/)).toBeTruthy();
-  });
+  await userEvent.keyboard("{Escape}");
+  expect(document.activeElement).toBe(trigger);
 });

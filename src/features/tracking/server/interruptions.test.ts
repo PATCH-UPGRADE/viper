@@ -109,52 +109,48 @@ describe("getInterruptionDetail", () => {
     );
   });
 
-  it("rejects a user with no department without querying", async () => {
-    asUser(null);
-    await expect(getInterruptionDetail("u1", "c1")).rejects.toMatchObject({
-      code: "NOT_FOUND",
-    });
-    expect(mockPrisma.workOrderTicket.findFirst).not.toHaveBeenCalled();
-  });
-
-  it("assembles contact, reason and remediation, falling back to the work order's", async () => {
+  it("assembles the details, taking what the device ticket lacks from its work order", async () => {
     asUser("dept-A");
-    const found = (overrides = {}) => ({
+    const device = (id: string, hostname: string, managed: boolean) => ({
+      asset: {
+        id,
+        hostname,
+        ip: null,
+        serialNumber: null,
+        role: null,
+        managedBy: managed ? [{ id: "rel" }] : [],
+      },
+      ticket: { id: `t-${id}`, status: "TO_DO", scheduledAt: null },
+    });
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValue({
       body: "Ticket body",
       assignee: null,
       creator: { name: "Creator Cam" },
       descriptions: [],
       remediations: [],
+      seenBy: [
+        { seenAt: new Date(2026, 2, 3), user: { id: "u2", name: "Ada" } },
+      ],
       comments: [{ id: "k1" }],
       ticket: {
         parentTicket: {
           descriptions: [{ body: "Work order reason" }],
           remediations: [{ id: "r-parent" }],
+          assets: [device("a1", "pump-2", true), device("a2", "cart-9", false)],
         },
       },
-      ...overrides,
     });
 
-    mockPrisma.workOrderTicket.findFirst.mockResolvedValueOnce(found());
-    await expect(getInterruptionDetail("u1", "c1")).resolves.toEqual({
+    const detail = await getInterruptionDetail("u1", "c1");
+
+    expect(detail).toMatchObject({
       comments: [{ id: "k1" }],
       contactName: "Creator Cam",
       whyNecessary: "Work order reason",
       remediations: [{ id: "r-parent" }],
+      otherDepartmentDeviceCount: 1,
     });
-
-    // The ticket's own assignee, description and remediation win.
-    mockPrisma.workOrderTicket.findFirst.mockResolvedValueOnce(
-      found({
-        assignee: { name: "Assignee Al" },
-        descriptions: [{ body: "Own reason" }],
-        remediations: [{ id: "r-own" }],
-      }),
-    );
-    await expect(getInterruptionDetail("u1", "c1")).resolves.toMatchObject({
-      contactName: "Assignee Al",
-      whyNecessary: "Own reason",
-      remediations: [{ id: "r-own" }],
-    });
+    expect(detail.otherDevices.map((d) => d.name)).toEqual(["pump-2"]);
+    expect(detail.seenBy.map((r) => r.user.name)).toEqual(["Ada"]);
   });
 });

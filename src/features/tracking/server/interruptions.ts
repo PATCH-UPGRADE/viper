@@ -116,8 +116,33 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
                 select: {
                   descriptions: departmentDescription(departmentId),
                   remediations: { select: remediationSelect },
+                  // The other open devices on this work order.
+                  assets: {
+                    where: { ticketId: { not: id }, ticket: open },
+                    select: {
+                      asset: {
+                        select: {
+                          ...assetNameSelect,
+                          managedBy: {
+                            where: { departmentId },
+                            select: { id: true },
+                          },
+                        },
+                      },
+                      ticket: {
+                        select: { id: true, status: true, scheduledAt: true },
+                      },
+                    },
+                  },
                 },
               },
+            },
+          },
+          seenBy: {
+            orderBy: { seenAt: "desc" },
+            select: {
+              seenAt: true,
+              user: { select: { id: true, name: true } },
             },
           },
           comments: ticketDetailInclude.comments,
@@ -128,8 +153,21 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
     throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
   }
   const workOrder = ticket.ticket?.parentTicket;
+  // This department's devices are listed; other departments' are only counted.
+  const others = workOrder?.assets ?? [];
+  const mine = others.filter(({ asset }) => asset.managedBy.length > 0);
   return {
     comments: ticket.comments,
+    seenBy: ticket.seenBy,
+    otherDevices: mine
+      .map(({ asset, ticket }) => ({
+        id: ticket.id,
+        name: getAssetDisplayName(asset),
+        status: ticket.status,
+        scheduledAt: ticket.scheduledAt,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    otherDepartmentDeviceCount: others.length - mine.length,
     contactName: ticket.assignee?.name ?? ticket.creator.name,
     // The department's own words first, then the work order's, then the body.
     whyNecessary:

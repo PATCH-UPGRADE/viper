@@ -9,6 +9,11 @@ const { mockPrisma } = vi.hoisted(() => {
       upsert: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
     },
+    notificationVulnerabilityMapping: {
+      upsert: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    vulnerability: { findUnique: vi.fn().mockResolvedValue(null) },
     deviceGroupMatching: { findUnique: vi.fn(), update: vi.fn() },
     // applyDecisions runs inside prisma.$transaction(async (tx) => …) — invoke
     // the callback with the same mock so call assertions still work.
@@ -131,6 +136,70 @@ describe("applyDecisions — device-group mapping owner", () => {
     expect(summary).toMatchObject({ linked: 0, skipped: 1 });
     expect(
       mockPrisma.notificationDeviceGroupMapping.upsert,
+    ).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyDecisions — vulnerability mapping", () => {
+  const vulnCandidates: Candidates = {
+    ...candidates,
+    vulnerabilities: [
+      {
+        extracted: { cveId: "CVE-2026-0001" },
+        matches: [
+          {
+            id: "vuln-1",
+            cveId: "CVE-2026-0001",
+            description: null,
+            cvssScore: null,
+            cvssVector: null,
+          },
+        ],
+      },
+    ],
+  };
+  const vulnDecision: Decision = {
+    kind: "vulnerability",
+    op: "link",
+    targetId: "vuln-1",
+    confidence: "Matched",
+    reasonWhy: "same CVE",
+    fields: null,
+  };
+
+  it("links a vulnerability to the notification", async () => {
+    const summary = await applyDecisions(
+      { notificationId: "n-1" },
+      [vulnDecision],
+      vulnCandidates,
+    );
+
+    expect(summary.linked).toBe(1);
+    expect(
+      mockPrisma.notificationVulnerabilityMapping.upsert,
+    ).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips a vulnerability that a user rejected on this notification", async () => {
+    mockPrisma.notificationVulnerabilityMapping.findMany.mockResolvedValueOnce([
+      { vulnerabilityId: "vuln-1" },
+    ]);
+
+    const summary = await applyDecisions(
+      { notificationId: "n-1" },
+      [vulnDecision],
+      vulnCandidates,
+    );
+
+    expect(summary).toMatchObject({ linked: 0, skipped: 1 });
+    expect(
+      mockPrisma.notificationVulnerabilityMapping.findMany,
+    ).toHaveBeenCalledWith({
+      where: { notificationId: "n-1", confidence: "Rejected" },
+      select: { vulnerabilityId: true },
+    });
+    expect(
+      mockPrisma.notificationVulnerabilityMapping.upsert,
     ).not.toHaveBeenCalled();
   });
 });

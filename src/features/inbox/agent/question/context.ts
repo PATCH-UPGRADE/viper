@@ -13,6 +13,7 @@ import {
   renderNoteTarget,
 } from "@/lib/markdown";
 import { renderQnA } from "@/lib/markdown/note";
+import { notRejected } from "../../types";
 
 export type QuestionIssueContext = { issueId: string; vulnerabilityId: string };
 
@@ -170,6 +171,7 @@ export async function gatherQuestionContext(
     where: { id: notificationId },
     include: {
       vulnerabilities: {
+        where: notRejected,
         include: {
           vulnerability: {
             include: {

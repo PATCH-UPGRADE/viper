@@ -8,6 +8,11 @@ import {
   type VersionStatus,
 } from "@/generated/prisma";
 
+// `confidence` is nullable, and `{ not: "Rejected" }` alone also drops NULL rows.
+export const notRejected = {
+  OR: [{ confidence: null }, { confidence: { not: "Rejected" } }],
+} satisfies Prisma.NotificationVulnerabilityMappingWhereInput;
+
 export const notificationInclude = {
   deviceGroupsMatchings: {
     include: {
@@ -69,9 +74,13 @@ export const notificationDetailInclude = {
     },
   },
   vulnerabilities: {
+    where: notRejected,
     select: {
+      id: true,
       vulnerabilityId: true,
-      vulnerability: { select: { cveId: true } },
+      vulnerability: {
+        select: { cveId: true, description: true, severity: true },
+      },
     },
   },
   sourceLinks: {

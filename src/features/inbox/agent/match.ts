@@ -297,19 +297,33 @@ export async function applyDecisions(
     skipped: 0,
   };
 
-  // Pull rejectedDeviceGroupMatching ids
-  const rejectedDeviceGroupMatchingIds = new Set(
-    (
-      await prisma.notificationDeviceGroupMapping.findMany({
+  const [rejectedDeviceGroupMappings, rejectedVulnerabilityMappings] =
+    await Promise.all([
+      prisma.notificationDeviceGroupMapping.findMany({
         where: { ...owner, confidence: "Rejected" },
         select: { deviceGroupMatchingId: true },
-      })
-    ).map((m) => m.deviceGroupMatchingId),
+      }),
+      "notificationId" in owner
+        ? prisma.notificationVulnerabilityMapping.findMany({
+            where: {
+              notificationId: owner.notificationId,
+              confidence: "Rejected",
+            },
+            select: { vulnerabilityId: true },
+          })
+        : [],
+    ]);
+  const rejectedDeviceGroupMatchingIds = new Set(
+    rejectedDeviceGroupMappings.map((m) => m.deviceGroupMatchingId),
+  );
+  const rejectedVulnerabilityIds = new Set(
+    rejectedVulnerabilityMappings.map((m) => m.vulnerabilityId),
   );
 
   // Only allow link/update against ids the search actually surfaced — guards
-  // against hallucinated targetIds causing FK errors.
-
+  // against hallucinated targetIds causing FK errors. Rejected ids are left
+  // out too: the upserts below overwrite `confidence`, which would undo a
+  // user's rejection.
   const validIds = {
     deviceGroupMatching: new Set(
       candidates.deviceGroups
@@ -317,7 +331,9 @@ export async function applyDecisions(
         .filter((id) => !rejectedDeviceGroupMatchingIds.has(id)),
     ),
     vulnerability: new Set(
-      candidates.vulnerabilities.flatMap((e) => e.matches.map((m) => m.id)),
+      candidates.vulnerabilities
+        .flatMap((e) => e.matches.map((m) => m.id))
+        .filter((id) => !rejectedVulnerabilityIds.has(id)),
     ),
     remediation: new Set(
       candidates.remediations.flatMap((e) => e.matches.map((m) => m.id)),

@@ -18,6 +18,7 @@ import {
   type NoteRow,
   renderNoteTarget,
 } from "@/lib/markdown";
+import { notRejected } from "../../types";
 
 /** A baseline (device-group-matching-level) issue the agent may refine. */
 export type VexIssueContext = {
@@ -57,6 +58,7 @@ export async function gatherVexContext(
         select: { sourceRecord: { select: { markdown: true, channel: true } } },
       },
       vulnerabilities: {
+        where: notRejected,
         include: {
           vulnerability: {
             include: {

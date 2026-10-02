@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { ExternalLinkIcon, HeartIcon, MailIcon, Unlink } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
+import { SeverityBadge } from "@/components/severity-badge";
 import { TlpBadge } from "@/components/tlp-badge";
 import {
   Accordion,
@@ -36,6 +37,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { UtilizationGridList } from "@/features/assets/components/asset-utilization-grid";
+import type { MatchFeedbackTargetType } from "@/generated/prisma";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
 import { displayName } from "@/lib/markdown/device-group";
 import {
@@ -53,10 +55,46 @@ import {
   HospitalImpactCard,
   NotificationSummaryCard,
 } from "./notification-impact-cards";
-import { sourceLabel } from "./shared";
+import { nvdUrl, sourceLabel } from "./shared";
 
 type DeviceGroupMapping =
   NotificationDetailWithRelations["deviceGroupsMatchings"][number];
+type VulnerabilityMapping =
+  NotificationDetailWithRelations["vulnerabilities"][number];
+
+type RejectTarget = {
+  targetType: MatchFeedbackTargetType;
+  id: string;
+  label: string;
+  noun: "product" | "vulnerability";
+};
+
+// A vulnerability minted from a non-CVE identifier stores that identifier as
+// the first sentence of its description.
+function vulnerabilityLabel(mapping: VulnerabilityMapping): string {
+  const { cveId, description } = mapping.vulnerability;
+  return cveId ?? description?.split(". ")[0] ?? mapping.vulnerabilityId;
+}
+
+function UnlinkButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="text-destructive"
+      onClick={onClick}
+      aria-label={label}
+    >
+      <Unlink className="size-4" />
+    </Button>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // SourceReference
@@ -127,7 +165,7 @@ export function NotificationDetailsTab({
   notification: NotificationDetailWithRelations;
   firstReceived: Date;
 }) {
-  const [rejecting, setRejecting] = useState<DeviceGroupMapping | null>(null);
+  const [rejecting, setRejecting] = useState<RejectTarget | null>(null);
   const [comment, setComment] = useState("");
   const markMatchIncorrect = useMarkMatchIncorrect();
 
@@ -199,15 +237,14 @@ export function NotificationDetailsTab({
 
   const confirmUnlink = async (commentToSave: string | undefined) => {
     if (!rejecting) return;
-    const label = deviceGroupMatchingLabel(rejecting.deviceGroupMatching);
     try {
       await markMatchIncorrect.mutateAsync({
-        targetType: "NotificationDeviceGroupMapping",
+        targetType: rejecting.targetType,
         targetId: rejecting.id,
         notificationId: notification.id,
         comment: commentToSave,
       });
-      toast.success(`${label} unlinked from notification`);
+      toast.success(`${rejecting.label} unlinked from notification`);
       closeDialog();
     } catch {
       // Failure toast is surfaced by useMarkMatchIncorrect's onError; keep the
@@ -263,15 +300,19 @@ export function NotificationDetailsTab({
                           {m.assetCount}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive"
-                            onClick={() => setRejecting(m)}
-                            aria-label="Unlink this device group"
-                          >
-                            <Unlink className="size-4" />
-                          </Button>
+                          <UnlinkButton
+                            label="Unlink this device group"
+                            onClick={() =>
+                              setRejecting({
+                                targetType: "NotificationDeviceGroupMapping",
+                                id: m.id,
+                                label: deviceGroupMatchingLabel(
+                                  m.deviceGroupMatching,
+                                ),
+                                noun: "product",
+                              })
+                            }
+                          />
                         </TableCell>
                       </TableRow>
                     )),
@@ -298,6 +339,62 @@ export function NotificationDetailsTab({
                 </AccordionItem>
               </Accordion>
             </div>
+          </CollapsibleCardContent>
+        </CollapsibleCard>
+      )}
+
+      {notification.vulnerabilities.length > 0 && (
+        <CollapsibleCard defaultOpen>
+          <CollapsibleCardTrigger>Vulnerabilities</CollapsibleCardTrigger>
+          <CollapsibleCardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Identifier</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead className="w-0" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {notification.vulnerabilities.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell className="font-medium">
+                      {m.vulnerability.cveId ? (
+                        <a
+                          href={nvdUrl(m.vulnerability.cveId)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-primary hover:underline"
+                        >
+                          {m.vulnerability.cveId}
+                          <ExternalLinkIcon className="size-3 shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="block max-w-md truncate">
+                          {vulnerabilityLabel(m)}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <SeverityBadge severity={m.vulnerability.severity} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <UnlinkButton
+                        label="Unlink this vulnerability"
+                        onClick={() =>
+                          setRejecting({
+                            targetType: "NotificationVulnerabilityMapping",
+                            id: m.id,
+                            label: vulnerabilityLabel(m),
+                            noun: "vulnerability",
+                          })
+                        }
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </CollapsibleCardContent>
         </CollapsibleCard>
       )}
@@ -333,16 +430,12 @@ export function NotificationDetailsTab({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 wrap-anywhere">
               <Unlink className="size-4 text-destructive shrink-0" />
-              Unlink{" "}
-              {rejecting
-                ? deviceGroupMatchingLabel(rejecting.deviceGroupMatching)
-                : ""}
-              ?
+              Unlink {rejecting?.label}?
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             {rejecting &&
-              "This product should not have been attached to this notification"}
+              `This ${rejecting.noun} should not have been attached to this notification`}
           </p>
           <Textarea
             value={comment}

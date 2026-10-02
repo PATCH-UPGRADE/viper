@@ -32,6 +32,7 @@ import {
   type MatchingWithLabels,
   notificationDetailInclude,
   notificationInclude,
+  notRejected,
   type ResolvedDeviceGroupAsset,
   readReceiptSelect,
 } from "../types";
@@ -445,7 +446,10 @@ export const notificationsRouter = createTRPCRouter({
       const notification = await prisma.notification.findUnique({
         where: { id: notificationId },
         select: {
-          vulnerabilities: { select: { vulnerabilityId: true } },
+          vulnerabilities: {
+            where: notRejected,
+            select: { vulnerabilityId: true },
+          },
           deviceGroupsMatchings: {
             select: {
               id: true,
@@ -663,6 +667,11 @@ export const notificationsRouter = createTRPCRouter({
       const feedback = await prisma.$transaction(async (tx) => {
         if (input.targetType === "NotificationDeviceGroupMapping") {
           await tx.notificationDeviceGroupMapping.update({
+            where: { id: input.targetId },
+            data: { confidence: "Rejected" },
+          });
+        } else if (input.targetType === "NotificationVulnerabilityMapping") {
+          await tx.notificationVulnerabilityMapping.update({
             where: { id: input.targetId },
             data: { confidence: "Rejected" },
           });

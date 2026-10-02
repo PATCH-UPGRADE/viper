@@ -192,6 +192,18 @@ describe("persistMitigationPlans targeting", () => {
     },
   );
 
+  it("deletes unaccepted plans when no vulnerability link is left", async () => {
+    mockPrisma.notificationVulnerabilityMapping.count.mockResolvedValue(0);
+
+    const result = await persistMitigationPlans("src-1", "notif-1");
+
+    expect(result).toEqual({ skipped: "no-vulnerabilities" });
+    expect(mockPrisma.mitigationPlan.deleteMany).toHaveBeenCalledWith({
+      where: { notificationId: "notif-1", isAccepted: false },
+    });
+    expect(mockCreatePlans).not.toHaveBeenCalled();
+  });
+
   it("does not run the agent once a plan has been accepted", async () => {
     mockPrisma.mitigationPlan.count.mockResolvedValue(1);
 

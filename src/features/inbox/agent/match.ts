@@ -9,6 +9,7 @@ import type { ConfidenceLevel } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { deviceIdentityInline } from "@/lib/markdown";
 import { resolveMatchingId } from "@/lib/router-utils";
+import { notRejected } from "../types";
 import {
   addManufacturerAlias,
   addProductAlias,
@@ -297,33 +298,19 @@ export async function applyDecisions(
     skipped: 0,
   };
 
-  const [rejectedDeviceGroupMappings, rejectedVulnerabilityMappings] =
-    await Promise.all([
-      prisma.notificationDeviceGroupMapping.findMany({
+  const rejectedDeviceGroupMatchingIds = new Set(
+    (
+      await prisma.notificationDeviceGroupMapping.findMany({
         where: { ...owner, confidence: "Rejected" },
         select: { deviceGroupMatchingId: true },
-      }),
-      "notificationId" in owner
-        ? prisma.notificationVulnerabilityMapping.findMany({
-            where: {
-              notificationId: owner.notificationId,
-              confidence: "Rejected",
-            },
-            select: { vulnerabilityId: true },
-          })
-        : [],
-    ]);
-  const rejectedDeviceGroupMatchingIds = new Set(
-    rejectedDeviceGroupMappings.map((m) => m.deviceGroupMatchingId),
-  );
-  const rejectedVulnerabilityIds = new Set(
-    rejectedVulnerabilityMappings.map((m) => m.vulnerabilityId),
+      })
+    ).map((m) => m.deviceGroupMatchingId),
   );
 
   // Only allow link/update against ids the search actually surfaced — guards
-  // against hallucinated targetIds causing FK errors. Rejected ids are left
-  // out too: the upserts below overwrite `confidence`, which would undo a
-  // user's rejection.
+  // against hallucinated targetIds causing FK errors. Rejected device-group ids
+  // are left out too: their upsert below overwrites `confidence`, which would
+  // undo a user's rejection.
   const validIds = {
     deviceGroupMatching: new Set(
       candidates.deviceGroups
@@ -331,9 +318,7 @@ export async function applyDecisions(
         .filter((id) => !rejectedDeviceGroupMatchingIds.has(id)),
     ),
     vulnerability: new Set(
-      candidates.vulnerabilities
-        .flatMap((e) => e.matches.map((m) => m.id))
-        .filter((id) => !rejectedVulnerabilityIds.has(id)),
+      candidates.vulnerabilities.flatMap((e) => e.matches.map((m) => m.id)),
     ),
     remediation: new Set(
       candidates.remediations.flatMap((e) => e.matches.map((m) => m.id)),
@@ -509,21 +494,36 @@ export async function applyDecisions(
           summary.skipped++;
           continue;
         }
-        await tx.notificationVulnerabilityMapping.upsert({
-          where: {
-            notificationId_vulnerabilityId: {
+        // Not an upsert: a user can reject the link while this runs, and an
+        // upsert would overwrite that. Update only a link that is not rejected,
+        // else create one. A rejected row makes both write nothing.
+        const { count: updated } =
+          await tx.notificationVulnerabilityMapping.updateMany({
+            where: {
               notificationId: owner.notificationId,
               vulnerabilityId: decision.targetId,
+              ...notRejected,
             },
-          },
-          create: {
-            notificationId: owner.notificationId,
-            vulnerabilityId: decision.targetId,
-            confidence,
-            reasonWhy: decision.reasonWhy,
-          },
-          update: { confidence, reasonWhy: decision.reasonWhy },
-        });
+            data: { confidence, reasonWhy: decision.reasonWhy },
+          });
+        const { count: created } =
+          updated > 0
+            ? { count: 0 }
+            : await tx.notificationVulnerabilityMapping.createMany({
+                data: [
+                  {
+                    notificationId: owner.notificationId,
+                    vulnerabilityId: decision.targetId,
+                    confidence,
+                    reasonWhy: decision.reasonWhy,
+                  },
+                ],
+                skipDuplicates: true,
+              });
+        if (updated + created === 0) {
+          summary.skipped++;
+          continue;
+        }
         const data = cleanFields(decision.fields);
         if (decision.op === "update" && data.description) {
           await tx.vulnerability.update({

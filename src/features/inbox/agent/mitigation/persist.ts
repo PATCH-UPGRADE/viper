@@ -28,14 +28,14 @@ export async function persistMitigationPlans(
   });
   if (acceptedCount > 0) return { skipped: "accepted-exists" as const };
 
+  await prisma.mitigationPlan.deleteMany({
+    where: { notificationId, isAccepted: false },
+  });
+
   const vulnCount = await prisma.notificationVulnerabilityMapping.count({
     where: { notificationId, ...notRejected },
   });
   if (vulnCount === 0) return { skipped: "no-vulnerabilities" as const };
-
-  await prisma.mitigationPlan.deleteMany({
-    where: { notificationId, isAccepted: false },
-  });
 
   const { plans } = await createMitigationPlans(
     sourceId,

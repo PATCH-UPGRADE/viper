@@ -60,7 +60,7 @@ describe("markMatchIncorrect", () => {
     expect(
       mockPrisma.notificationVulnerabilityMapping.update,
     ).toHaveBeenCalledWith({
-      where: { id: "nvm-1" },
+      where: { id: "nvm-1", notificationId: "n-1" },
       data: { confidence: "Rejected" },
     });
     expect(
@@ -91,7 +91,7 @@ describe("markMatchIncorrect", () => {
     expect(
       mockPrisma.notificationDeviceGroupMapping.update,
     ).toHaveBeenCalledWith({
-      where: { id: "ndg-1" },
+      where: { id: "ndg-1", notificationId: "n-1" },
       data: { confidence: "Rejected" },
     });
     expect(

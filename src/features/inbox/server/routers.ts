@@ -667,12 +667,18 @@ export const notificationsRouter = createTRPCRouter({
       const feedback = await prisma.$transaction(async (tx) => {
         if (input.targetType === "NotificationDeviceGroupMapping") {
           await tx.notificationDeviceGroupMapping.update({
-            where: { id: input.targetId },
+            where: {
+              id: input.targetId,
+              notificationId: input.notificationId,
+            },
             data: { confidence: "Rejected" },
           });
         } else if (input.targetType === "NotificationVulnerabilityMapping") {
           await tx.notificationVulnerabilityMapping.update({
-            where: { id: input.targetId },
+            where: {
+              id: input.targetId,
+              notificationId: input.notificationId,
+            },
             data: { confidence: "Rejected" },
           });
         }

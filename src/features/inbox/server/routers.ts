@@ -279,6 +279,7 @@ export const notificationsRouter = createTRPCRouter({
 
       const where = {
         AND: [
+          { suppressed: false },
           createSearchFilter(search),
           priority.length > 0 ? { priority: { in: priority } } : {},
           type.length > 0 ? { type: { in: type } } : {},

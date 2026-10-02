@@ -24,12 +24,13 @@ import { MAX_DOC_BYTES, readCapped } from "../session";
 interface FeedCursor {
   etag?: string;
   seen: Record<string, string>;
+  pending?: FeedEntry[];
 }
 interface CsafCursor {
   feeds: Record<string, FeedCursor>;
 }
 
-const MAX_DOC_PER_RUN = 50;
+const MAX_DOC_PER_RUN = 10;
 
 const parseCursor = (cursor: Cursor | null): CsafCursor => {
   const parsed = z
@@ -175,18 +176,29 @@ export const syncAdvisories = async (
 
   for (const feed of feedsOf(metadata)) {
     const feedUrl = feed.url;
-    const state = cursor.feeds[feedUrl];
+    const firstRun = !cursor.feeds[feedUrl];
+    const state = cursor.feeds[feedUrl] ?? { seen: {} };
+    cursor.feeds[feedUrl] = state;
+
     const result = await fetchFeed(session, feedUrl, state?.etag);
     if ("unchanged" in result) {
       continue;
     }
-    if (!state) {
-      cursor.feeds[feedUrl] = {
-        etag: result.etag,
-        seen: seenMapOf(result.entries),
-      };
-      continue;
-    }
+    // if (firstRun) {
+    //   state.seen = seenMapOf(result.entries);
+    //   const newest = [...result.entries]
+    //     .sort((a, b) => a.updatedAt - b.updatedAt)
+    //     .slice(firstBudgetRun);
+    //   for (const entry of newest) delete state.seen[entry.id];
+    // }
+    // if (!state) {
+    //   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    //   cursor.feeds[feedUrl] = {
+    //     etag: result.etag,
+    //     seen: seenMapOf(result.entries.filter((e) => e.updatedAt < cutoff)),
+    //   };
+    //   continue;
+    // }
     const candidates = result.entries
       .filter((entry) => state.seen[entry.id] !== String(entry.updatedAt))
       .sort((a, b) => a.updatedAt - b.updatedAt)
@@ -204,12 +216,10 @@ export const syncAdvisories = async (
     }
     state.etag = result.etag;
 
-    const dispatched = await dispatchUnprocessedSnapshots(
+    await dispatchUnprocessedSnapshots(
       ctx.integrationId,
       wanted.map((item) => item.trackingId),
     );
-
-    console.log("dispatched---------- ", dispatched);
   }
   return { cursor };
 };

@@ -56,14 +56,12 @@ export const toMarkdown = (doc: CsafDocument): string => {
     return [
       `### ${vuln.cve ?? "Unassigned"}${vuln.cwe ? ` — ${vuln.cwe.id} ${vuln.cwe.name}` : ""}`,
       cvss &&
-        `** CVSS v3: ** ${cvss.baseScore}` +
-          `${cvss.baseSeverity}` +
-          `- \`${cvss.vectorString}\``,
+        `**CVSS v3:** ${cvss.baseScore} ${cvss.baseSeverity} - \`${cvss.vectorString}\``,
       vuln.notes.find((note) => note.category === "summary")?.text,
       affected.length > 0 &&
         [
           "",
-          "** Affected**",
+          "**Affected**",
           ...affected.map((id) => productLine(id, names)),
         ].join("\n"),
       fixed.length > 0 &&
@@ -76,7 +74,7 @@ export const toMarkdown = (doc: CsafDocument): string => {
           "**Remediations**",
           ...vuln.remediations.map(
             (r) =>
-              `- _${r.category}_: ${r.details} (r.url ?  - ${r.url} : "")`,
+              `- _${r.category}_: ${r.details}${r.url ? ` - ${r.url}` : ""}`,
           ),
         ].join("\n"),
     ]

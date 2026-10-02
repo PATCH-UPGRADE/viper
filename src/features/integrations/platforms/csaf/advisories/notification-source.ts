@@ -17,6 +17,7 @@ export const advisorySourceAdapter: SourceRecordAdapter = {
       doc,
       linkEntities: aiExtractAndMatch(doc),
       known: { tlp: parseTlp(distribution?.tlp?.label) },
+      suppressWhenNoAssets: true,
     };
   },
 };

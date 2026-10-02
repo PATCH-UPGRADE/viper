@@ -130,7 +130,7 @@ export async function runNotificationPipeline({
     attachments,
   });
 
-  const suppressed = await step.run("suppresss-when-no-assets", async () => {
+  const suppressed = await step.run("suppress-when-no-assets", async () => {
     if (!suppressWhenNoAssets || !notificationId) return false;
     const mappings = await prisma.notificationDeviceGroupMapping.findMany({
       where: { notificationId, confidence: { not: "Rejected" } },
@@ -151,6 +151,7 @@ export async function runNotificationPipeline({
       where: { id: notificationId },
       data: { suppressed: true },
     });
+    return true;
   });
   if (suppressed) {
     return { notificationId, linkSummary, suppressed: true };

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { type ReactNode, useEffect } from "react";
 import { ActivityTimeline } from "@/components/activity-timeline";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
@@ -50,6 +51,34 @@ const Details = ({ id }: { id: string }) => {
   if (!data) return <p className="text-sm text-muted-foreground">Loading...</p>;
   return (
     <>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span
+          className="flex items-center gap-2 text-sm text-muted-foreground"
+          title={data.seenBy.map((r) => r.user.name).join(", ")}
+        >
+          <span className="flex -space-x-1.5">
+            {data.seenBy.slice(0, 3).map(({ user }) => (
+              <Avatar
+                key={user.id}
+                className="size-6 border-2 border-background"
+              >
+                <AvatarFallback className="text-[10px]">
+                  {user.name.slice(0, 1).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            ))}
+          </span>
+          {data.seenBy.length} read
+        </span>
+        {data.workOrderId && (
+          <Link
+            href={`/tracking/${data.workOrderId}`}
+            className="text-sm underline"
+          >
+            View work order
+          </Link>
+        )}
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <CategoryChip category={data.category} />
         {data.departments.map((d) => (
@@ -57,21 +86,12 @@ const Details = ({ id }: { id: string }) => {
             {d.name}
           </Badge>
         ))}
-        {data.workOrderId && (
-          <Link
-            href={`/tracking/${data.workOrderId}`}
-            className="ml-auto text-sm underline"
-          >
-            View work order
-          </Link>
-        )}
       </div>
-      <MetaField label="Contact">{data.contactName}</MetaField>
       <MetaField label="Why this work is needed">
         <p className="whitespace-pre-wrap">{data.why ?? "Not provided"}</p>
       </MetaField>
       {data.otherDevices.length > 0 && (
-        <MetaField label="Also getting this update">
+        <MetaField label="Assets on this work order">
           <ul className="divide-y rounded-lg border">
             {data.otherDevices.map((device) => (
               <li
@@ -96,8 +116,11 @@ const Details = ({ id }: { id: string }) => {
           emptyMessage="No remediation is linked to this ticket."
         />
       </MetaField>
-      <MetaField label="Read by">
-        {data.seenBy.map((r) => r.user.name).join(", ") || "No one yet"}
+      <MetaField label="Questions about this update">
+        <p className="font-medium">{data.contact.name}</p>
+        <a href={`mailto:${data.contact.email}`} className="underline">
+          {data.contact.email}
+        </a>
       </MetaField>
       <ActivityTimeline
         entries={data.comments.map(commentEntry)}

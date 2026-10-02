@@ -2,8 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
+  addDays,
   addWeeks,
   eachDayOfInterval,
+  endOfDay,
   endOfWeek,
   format,
   isSameDay,
@@ -14,13 +16,15 @@ import {
   startOfDay,
   startOfWeek,
 } from "date-fns";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef } from "react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { getChipClass } from "@/features/tag-colors/palette";
-import { cn, plural } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { statusHue, statusLabels } from "../ticket-detail/shared";
 import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
@@ -44,22 +48,28 @@ const sideBySide = (items: DrawerTicket[]) =>
 const minutesOf = (date: Date) => date.getHours() * 60 + date.getMinutes();
 
 export const InterruptionsCalendar = () => {
-  // yyyy-MM-dd; no date means today.
+  // yyyy-MM-dd; no date means today. `view` is "day" or the default week.
   const [date, setDate] = useQueryState("date", parseAsString);
+  const [view, setView] = useQueryState("view", parseAsString);
   const trpc = useTRPC();
   const scroller = useRef<HTMLDivElement>(null);
 
   const parsed = parse(date ?? "", DATE_FORMAT, new Date());
   const anchor = startOfDay(isValid(parsed) ? parsed : new Date());
-  const start = startOfWeek(anchor);
-  const end = endOfWeek(anchor);
+  const isDay = view === "day";
+  const start = isDay ? anchor : startOfWeek(anchor);
+  const end = isDay ? endOfDay(anchor) : endOfWeek(anchor);
+  const days = eachDayOfInterval({ start, end });
   const { data: items, isError } = useQuery(
     trpc.tracking.getInterruptionCalendar.queryOptions({
       from: start,
       to: end,
     }),
   );
-  const go = (day: Date) => setDate(format(day, DATE_FORMAT));
+  const step = (n: number) =>
+    setDate(
+      format(isDay ? addDays(anchor, n) : addWeeks(anchor, n), DATE_FORMAT),
+    );
 
   // Open at the working day, not midnight.
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the grid first appears
@@ -69,38 +79,50 @@ export const InterruptionsCalendar = () => {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pt-3 pb-4">
-      <header className="flex flex-wrap items-center gap-3">
-        <h1 className="text-sm font-semibold">Device Maintenance</h1>
-        <p className="hidden text-sm text-muted-foreground md:block">
-          Open work orders for devices in your departments.
-        </p>
+      <header className="flex flex-wrap items-center gap-2">
+        <h1 className="flex items-center gap-2 border-b-2 border-primary px-1 pb-1 text-sm font-medium">
+          <CalendarIcon className="size-4" aria-hidden />
+          Calendar
+          {items && <Badge variant="secondary">{items.length}</Badge>}
+        </h1>
         <nav
-          aria-label="Week navigation"
-          className="ml-auto flex items-center gap-1"
+          aria-label="Calendar navigation"
+          className="ml-auto flex flex-wrap items-center gap-1"
         >
-          <Button variant="outline" onClick={() => setDate(null)}>
+          <Button variant="outline" size="sm" onClick={() => setDate(null)}>
             Today
           </Button>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            aria-label="Previous week"
-            onClick={() => go(addWeeks(anchor, -1))}
+            aria-label="Previous"
+            onClick={() => step(-1)}
           >
             <ChevronLeftIcon aria-hidden />
           </Button>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            aria-label="Next week"
-            onClick={() => go(addWeeks(anchor, 1))}
+            aria-label="Next"
+            onClick={() => step(1)}
           >
             <ChevronRightIcon aria-hidden />
           </Button>
-          <span aria-live="polite" className="ml-2 text-sm font-medium">
-            {format(start, "MMM d")} – {format(end, "MMM d, yyyy")}
-            {items && ` · ${items.length} ${plural("ticket", items.length)}`}
+          <span aria-live="polite" className="mx-2 text-sm font-medium">
+            {isDay
+              ? format(start, "EEE, MMM d, yyyy")
+              : `${format(start, "MMM d")} – ${format(end, "MMM d, yyyy")}`}
           </span>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={isDay ? "day" : "week"}
+            onValueChange={(v) => v && setView(v === "day" ? "day" : null)}
+          >
+            <ToggleGroupItem value="day">Day</ToggleGroupItem>
+            <ToggleGroupItem value="week">Week</ToggleGroupItem>
+          </ToggleGroup>
         </nav>
       </header>
 
@@ -134,7 +156,7 @@ export const InterruptionsCalendar = () => {
                   </div>
                 ))}
               </div>
-              {eachDayOfInterval({ start, end }).map((day) => (
+              {days.map((day) => (
                 <section
                   key={day.toISOString()}
                   aria-label={format(day, "EEEE, MMMM d")}
@@ -143,7 +165,7 @@ export const InterruptionsCalendar = () => {
                     isToday(day) && "bg-primary/5",
                   )}
                 >
-                  <h2 className="sticky top-0 z-20 flex h-9 items-center gap-1.5 border-b bg-card px-2 text-sm">
+                  <h2 className="sticky top-0 z-20 flex h-9 items-center justify-center gap-1.5 border-b bg-card px-2 text-sm">
                     <span className="text-muted-foreground">
                       {format(day, "EEE")}
                     </span>
@@ -157,6 +179,10 @@ export const InterruptionsCalendar = () => {
                       {format(day, "d")}
                     </span>
                     {isToday(day) && <span className="sr-only">(today)</span>}
+                    <span className="text-xs text-muted-foreground">
+                      {items.filter((i) => isSameDay(i.scheduledAt, day))
+                        .length || ""}
+                    </span>
                   </h2>
                   <div
                     className="relative"
@@ -173,7 +199,7 @@ export const InterruptionsCalendar = () => {
                     {isToday(day) && (
                       <div
                         aria-hidden
-                        className="absolute inset-x-0 z-10 border-t-2 border-destructive"
+                        className="absolute inset-x-0 z-10 border-t-2 border-destructive before:absolute before:-top-[6px] before:-left-1 before:size-2.5 before:rounded-full before:bg-destructive"
                         style={{
                           top: (minutesOf(new Date()) * HOUR_HEIGHT) / 60,
                         }}
@@ -198,7 +224,7 @@ export const InterruptionsCalendar = () => {
                             type="button"
                             title={item.summary}
                             className={cn(
-                              "flex h-full w-full flex-col gap-0.5 overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[11px] leading-tight hover:brightness-95",
+                              "flex h-full w-full flex-col gap-0.5 overflow-hidden rounded-md border border-l-4 px-1.5 py-0.5 text-left text-[11px] leading-tight hover:brightness-95",
                               getChipClass(statusHue[item.status]),
                             )}
                           >

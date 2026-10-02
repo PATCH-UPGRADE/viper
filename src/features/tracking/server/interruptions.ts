@@ -73,8 +73,8 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
         where: { id, ticket: inScope(departmentId) },
         select: {
           category: true,
-          assignee: { select: { name: true } },
-          creator: { select: { name: true } },
+          assignee: { select: { name: true, email: true } },
+          creator: { select: { name: true, email: true } },
           ticket: {
             select: {
               parentTicket: {
@@ -133,7 +133,7 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
     category: ticket.category,
     workOrderId: workOrder?.id,
     departments: workOrder?.departments ?? [],
-    contactName: ticket.assignee?.name ?? ticket.creator.name,
+    contact: ticket.assignee ?? ticket.creator,
     why: workOrder?.descriptions[0]?.body ?? workOrder?.body ?? null,
     remediations: workOrder?.remediations ?? [],
     otherDevices: (workOrder?.assets ?? []).map(({ asset, ticket }) => ({

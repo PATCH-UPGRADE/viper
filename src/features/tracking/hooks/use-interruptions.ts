@@ -13,3 +13,11 @@ export const useInterruptionCalendar = (range: { from: Date; to: Date }) => {
     placeholderData: keepPreviousData,
   });
 };
+
+export const useInterruptionDetail = (id: string | null) => {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.tracking.getInterruptionDetail.queryOptions({ id: id ?? "" }),
+    enabled: id !== null,
+  });
+};

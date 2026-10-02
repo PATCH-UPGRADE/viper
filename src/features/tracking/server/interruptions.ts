@@ -1,7 +1,10 @@
 import "server-only";
+import { TRPCError } from "@trpc/server";
 import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
 import { type Prisma, TicketStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { requireExistence } from "@/trpc/middleware";
+import { ticketDetailInclude } from "../types";
 
 // The device ticket (an AssetTicket's child) is the unit here. Scope comes from
 // the signed-in user's department alone, never from the client: user →
@@ -134,4 +137,137 @@ export const getInterruptionCalendar = async (
   const items = (rows.map(toTicket) as InterruptionCalendarItem[]).sort(byTime);
 
   return { scope: "ready" as const, items, assetTicketCount: items.length };
+};
+
+const ticketNotFound = () =>
+  new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
+
+// Only a device ticket the department manages. A parent work order's id, or
+// another department's ticket, finds nothing.
+const scopedTicketWhere = (
+  departmentId: string,
+  id: string,
+): Prisma.WorkOrderTicketWhereInput => ({
+  id,
+  ...openTicket,
+  ticket: inScope(departmentId),
+});
+
+/**
+ * Throws NOT_FOUND unless this is an open (not DONE, not draft) device ticket
+ * that the user's department manages.
+ */
+export const requireScopedTicket = async (userId: string, id: string) => {
+  const departmentId = await departmentOf(userId);
+  if (!departmentId) throw ticketNotFound();
+  const ticket = await prisma.workOrderTicket.findFirst({
+    where: scopedTicketWhere(departmentId, id),
+    select: { id: true },
+  });
+  if (!ticket) throw ticketNotFound();
+};
+
+// Only what the drawer shows. A remediation row also carries user ids and
+// internal fields.
+const remediationDumpSelect = {
+  id: true,
+  description: true,
+  narrative: true,
+  sourceImpact: true,
+} satisfies Prisma.RemediationSelect;
+
+export const getInterruptionDetail = async (userId: string, id: string) => {
+  const departmentId = await departmentOf(userId);
+  if (!departmentId) throw ticketNotFound();
+
+  const found = requireExistence(
+    await prisma.workOrderTicket.findFirst({
+      where: scopedTicketWhere(departmentId, id),
+      select: {
+        id: true,
+        status: true,
+        scheduledAt: true,
+        durationEstimate: true,
+        remediations: { select: remediationDumpSelect },
+        comments: ticketDetailInclude.comments,
+        seenBy: {
+          orderBy: { seenAt: "desc" },
+          select: {
+            seenAt: true,
+            user: { select: { id: true, name: true } },
+          },
+        },
+        ticket: {
+          select: {
+            asset: { select: assetNameSelect },
+            parentTicket: {
+              select: {
+                summary: true,
+                remediations: { select: remediationDumpSelect },
+                assets: {
+                  select: {
+                    asset: {
+                      select: {
+                        ...assetNameSelect,
+                        managedBy: {
+                          where: { departmentId },
+                          select: { id: true },
+                        },
+                      },
+                    },
+                    ticket: {
+                      select: {
+                        id: true,
+                        status: true,
+                        isDraft: true,
+                        scheduledAt: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+    "Ticket",
+  );
+  // The where clause guarantees a device ticket; this narrows the type.
+  if (!found.ticket) throw ticketNotFound();
+  const { asset, parentTicket: workOrder } = found.ticket;
+
+  // The other devices on this work order: this department's are listed, the
+  // rest only counted.
+  const others = workOrder.assets.filter(
+    (a) =>
+      a.ticket.id !== found.id &&
+      !a.ticket.isDraft &&
+      a.ticket.status !== TicketStatus.DONE,
+  );
+  const mine = others.filter((a) => a.asset.managedBy.length > 0);
+
+  return {
+    id: found.id,
+    status: found.status,
+    scheduledAt: found.scheduledAt,
+    durationEstimate: found.durationEstimate,
+    workOrder: { summary: workOrder.summary },
+    assetName: getAssetDisplayName(asset),
+    otherDevices: mine
+      .map((a) => ({
+        id: a.ticket.id,
+        name: getAssetDisplayName(a.asset),
+        status: a.ticket.status,
+        scheduledAt: a.ticket.scheduledAt,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    otherDepartmentDeviceCount: others.length - mine.length,
+    remediations:
+      found.remediations.length > 0
+        ? found.remediations
+        : workOrder.remediations,
+    comments: found.comments,
+    seenBy: found.seenBy,
+  };
 };

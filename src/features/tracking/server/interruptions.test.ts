@@ -14,7 +14,10 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
-import { getInterruptionCalendar } from "./interruptions";
+import {
+  getInterruptionCalendar,
+  getInterruptionDetail,
+} from "./interruptions";
 
 const USER = "user-1";
 const DEPT = "dept-A";
@@ -71,6 +74,9 @@ describe("scope", () => {
       scope: "no-department",
       items: [],
     });
+    await expect(getInterruptionDetail(USER, "c1")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
     expect(mockPrisma.assetTicket.findMany).not.toHaveBeenCalled();
   });
 
@@ -112,5 +118,75 @@ describe("queries", () => {
       ["c2", "pump-2", 45, true],
       ["c1", "pump-1", null, false],
     ]);
+  });
+});
+
+describe("getInterruptionDetail", () => {
+  const sibling = (
+    id: string,
+    hostname: string,
+    mine: boolean,
+    status = "TO_DO",
+  ) => ({
+    asset: {
+      ...asset(`asset-${id}`, hostname),
+      managedBy: mine ? [{ id: "rel" }] : [],
+    },
+    ticket: { id, status, isDraft: false, scheduledAt: null },
+  });
+
+  const found = (overrides = {}) => ({
+    id: "c1",
+    status: "TO_DO",
+    scheduledAt: null,
+    durationEstimate: 45,
+    remediations: [],
+    comments: [],
+    seenBy: [],
+    ticket: {
+      asset: asset("asset-c1", "pump-1"),
+      parentTicket: {
+        id: "p1",
+        summary: "Patch pumps",
+        remediations: [{ id: "r-parent" }],
+        assets: [
+          sibling("c1", "pump-1", true),
+          sibling("c2", "pump-2", true),
+          sibling("c3", "cart-9", false),
+          sibling("c4", "pump-4", true, "DONE"),
+        ],
+      },
+    },
+    ...overrides,
+  });
+
+  it("rejects a ticket outside the department's scope, such as a work order", async () => {
+    asUser(DEPT);
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValue(null);
+
+    await expect(getInterruptionDetail(USER, "p1")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    expect(mockPrisma.workOrderTicket.findFirst.mock.calls[0][0].where).toEqual(
+      {
+        id: "p1",
+        ...open,
+        ticket: scope,
+      },
+    );
+  });
+
+  it("assembles the drawer, falling back to the work order's remediations", async () => {
+    asUser(DEPT);
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValue(found());
+
+    const detail = await getInterruptionDetail(USER, "c1");
+
+    expect(detail.workOrder).toEqual({ summary: "Patch pumps" });
+    expect(detail.assetName).toBe("pump-1");
+    // Own department's other devices are listed; other departments' only counted.
+    expect(detail.otherDevices.map((d) => d.name)).toEqual(["pump-2"]);
+    expect(detail.otherDepartmentDeviceCount).toBe(1);
+    expect(detail.remediations).toEqual([{ id: "r-parent" }]);
   });
 });

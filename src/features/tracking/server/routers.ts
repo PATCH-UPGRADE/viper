@@ -31,6 +31,7 @@ import {
   protectedProcedure,
 } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
+import { MAX_RANGE_DAYS } from "../interruptions-dates";
 import { TRACKING_TABS } from "../params";
 import {
   dedupeOtherAssetWorkOrders,
@@ -59,6 +60,7 @@ import {
   snapshotBeforeUpdate,
 } from "./activities";
 import { cascadeDoneStatus, createAssetTicket } from "./asset-tickets";
+import { getInterruptionCalendar } from "./interruptions";
 
 // A lost create-race (or a retry) surfaces as a P2002 unique violation. Duck-typed
 // on `code` rather than `instanceof`: across Next.js module boundaries the thrown
@@ -658,6 +660,8 @@ export const trackingRouter = createTRPCRouter({
           .optional(),
         assigneeId: z.string().nullish(),
         scheduledAt: z.coerce.date().nullish(),
+        // Expected maintenance time in whole minutes.
+        durationEstimate: z.number().int().positive().nullish(),
       }),
     )
     .meta({
@@ -667,7 +671,7 @@ export const trackingRouter = createTRPCRouter({
         tags: ["Work Orders"],
         summary: "Update a work-order ticket",
         description:
-          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt) to clear them. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
+          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt, durationEstimate) to clear them. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
       },
     })
     .output(workOrderDetailResponseSchema)
@@ -1264,6 +1268,25 @@ export const trackingRouter = createTRPCRouter({
         return comment;
       });
     }),
+
+  // ─── Clinician maintenance calendar (/tracking/interruptions) ──────────────
+  // Scoped to the signed-in user's department; see ./interruptions.ts.
+
+  getInterruptionCalendar: protectedProcedure
+    .input(
+      z
+        .object({ from: z.date(), to: z.date() })
+        // Stops an unbounded scan.
+        .refine(
+          ({ from, to }) =>
+            to >= from &&
+            to.getTime() - from.getTime() <= MAX_RANGE_DAYS * 86_400_000,
+          "Invalid date range",
+        ),
+    )
+    .query(({ input, ctx }) =>
+      getInterruptionCalendar(ctx.auth.user.id, input),
+    ),
 
   // ─── Work orders proposed by an agent ──────────────────────────────────────
 

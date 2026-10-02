@@ -199,6 +199,7 @@ const makeProposeWorkOrder = (userId: string) =>
             priority: true,
             creatorId: true,
             scheduledAt: true,
+            durationEstimate: true,
             sourceLabel: true,
             isDraft: true,
           },

@@ -1,14 +1,5 @@
 import { addMinutes, format } from "date-fns";
 
-/** "45 min", "2 h", "2 h 30 min"; "No estimate" when there is none. */
-export const formatDuration = (minutes: number | null): string => {
-  if (minutes === null) return "No estimate";
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m} min`;
-  return m === 0 ? `${h} h` : `${h} h ${m} min`;
-};
-
 const clock = (date: Date) =>
   date.getMinutes() === 0 ? format(date, "h a") : format(date, "h:mm a");
 

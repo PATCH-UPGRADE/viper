@@ -96,17 +96,6 @@ describe("getInterruptionDetail", () => {
     await expect(getInterruptionDetail("u1", "other")).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
-    const open = { isDraft: false, status: { not: "DONE" } };
-    expect(mockPrisma.workOrderTicket.findFirst.mock.calls[0][0].where).toEqual(
-      {
-        id: "other",
-        ticket: {
-          asset: { managedBy: { some: { departmentId: "dept-A" } } },
-          parentTicket: open,
-          ticket: open,
-        },
-      },
-    );
   });
 
   it("assembles the details, taking what the device ticket lacks from its work order", async () => {

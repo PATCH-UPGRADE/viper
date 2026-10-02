@@ -24,6 +24,7 @@ import { useTRPC } from "@/trpc/client";
 import { useMarkTicketSeen } from "../../hooks/use-tracking";
 import { commentEntry } from "../ticket-detail/activity-timeline";
 import { AddCommentForm } from "../ticket-detail/add-comment-form";
+import { MetaField } from "../ticket-detail/overview-card";
 import { RawJsonListCard } from "../ticket-detail/raw-json-list-card";
 import { StatusChip } from "../ticket-detail/shared";
 
@@ -35,15 +36,6 @@ export type DrawerTicket = {
   assetName: string;
 };
 
-const Field = ({ label, children }: { label: string; children: ReactNode }) => (
-  <div className="flex flex-col gap-1">
-    <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-      {label}
-    </h3>
-    <div className="text-sm">{children}</div>
-  </div>
-);
-
 // Only fetched while the drawer is open: the sheet's content mounts on open.
 const Details = ({ id }: { id: string }) => {
   const trpc = useTRPC();
@@ -52,8 +44,9 @@ const Details = ({ id }: { id: string }) => {
   );
   const markSeen = useMarkTicketSeen();
 
-  // Opening a ticket counts as reading it: once per open, and only after the
-  // server has confirmed this user may see it.
+  // Opening a ticket counts as reading it. The sheet's content mounts on open,
+  // so this runs once per open, and only after the server has confirmed this
+  // user may see the ticket.
   const loaded = Boolean(data);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `mutate` is stable
   useEffect(() => {
@@ -63,15 +56,15 @@ const Details = ({ id }: { id: string }) => {
   if (!data) return <p className="text-sm text-muted-foreground">Loading...</p>;
   return (
     <>
-      <Field label="Contact">{data.contactName}</Field>
-      <Field label="Why this work is needed">
+      <MetaField label="Contact">{data.contactName}</MetaField>
+      <MetaField label="Why this work is needed">
         <p className="whitespace-pre-wrap">
           {data.whyNecessary ?? "Not provided"}
         </p>
-      </Field>
+      </MetaField>
       {(data.otherDevices.length > 0 ||
         data.otherDepartmentDeviceCount > 0) && (
-        <Field label="Also getting this update">
+        <MetaField label="Also getting this update">
           <ul className="divide-y rounded-lg border">
             {data.otherDevices.map((device) => (
               <li
@@ -95,14 +88,14 @@ const Details = ({ id }: { id: string }) => {
               </li>
             )}
           </ul>
-        </Field>
+        </MetaField>
       )}
-      <Field label="Remediation">
+      <MetaField label="Remediation">
         <RawJsonListCard
           items={data.remediations}
           emptyMessage="No remediation is linked to this ticket."
         />
-      </Field>
+      </MetaField>
       <Collapsible>
         <CollapsibleTrigger className="group flex items-center gap-1 text-sm font-medium">
           Read by {data.seenBy.length}

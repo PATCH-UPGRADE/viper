@@ -38,12 +38,11 @@ import {
 } from "@/components/ui/empty";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { formatTimeRange } from "../../duration";
 import { statusLabels } from "../ticket-detail/shared";
-import { TicketDrawer } from "./ticket-drawer";
+import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
 
 const DATE_FORMAT = "yyyy-MM-dd";
 const MODES = ["day", "week", "month"] as const;
@@ -51,18 +50,12 @@ type Mode = (typeof MODES)[number];
 
 const HOUR_HEIGHT = 72;
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
-// Blocks are drawn at least this tall (minutes), and this tall with no estimate.
+// Block heights in minutes: never shorter than MIN_BLOCK, FALLBACK_BLOCK with
+// no estimate.
 const MIN_BLOCK = 45;
 const FALLBACK_BLOCK = 60;
 
-type Item = {
-  id: string;
-  summary: string;
-  status: TicketStatus;
-  scheduledAt: Date;
-  durationEstimate: number | null;
-  assetName: string;
-};
+type Item = DrawerTicket & { durationEstimate: number | null };
 
 const emptyStates = {
   "no-department": {
@@ -245,11 +238,8 @@ const MonthGrid = ({
 );
 
 export const InterruptionsCalendar = () => {
-  // Empty (the default, so it stays out of the URL) means today / week.
-  const [date, setDate] = useQueryState(
-    "date",
-    parseAsString.withDefault("").withOptions({ clearOnDefault: true }),
-  );
+  // No date means today; no mode means week.
+  const [date, setDate] = useQueryState("date", parseAsString);
   const [mode, setMode] = useQueryState(
     "mode",
     parseAsStringLiteral(MODES)
@@ -258,7 +248,7 @@ export const InterruptionsCalendar = () => {
   );
   const trpc = useTRPC();
 
-  const parsed = parse(date, DATE_FORMAT, new Date());
+  const parsed = parse(date ?? "", DATE_FORMAT, new Date());
   const anchor = startOfDay(isValid(parsed) ? parsed : new Date());
   const { start, end } = rangeOf(anchor, mode);
   const { data, isError } = useQuery(

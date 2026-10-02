@@ -72,13 +72,16 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
     ? await prisma.workOrderTicket.findFirst({
         where: { id, ticket: inScope(departmentId) },
         select: {
+          category: true,
           assignee: { select: { name: true } },
           creator: { select: { name: true } },
           ticket: {
             select: {
               parentTicket: {
                 select: {
+                  id: true,
                   body: true,
+                  departments: { select: { id: true, name: true } },
                   descriptions: {
                     where: { departmentId },
                     select: { body: true },
@@ -127,6 +130,9 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
   return {
     comments: ticket.comments,
     seenBy: ticket.seenBy,
+    category: ticket.category,
+    workOrderId: workOrder?.id,
+    departments: workOrder?.departments ?? [],
     contactName: ticket.assignee?.name ?? ticket.creator.name,
     why: workOrder?.descriptions[0]?.body ?? workOrder?.body ?? null,
     remediations: workOrder?.remediations ?? [],

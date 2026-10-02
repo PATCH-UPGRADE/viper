@@ -1,8 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { type ReactNode, useEffect } from "react";
 import { ActivityTimeline } from "@/components/activity-timeline";
+import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
   SheetContent,
@@ -19,7 +21,7 @@ import { commentEntry } from "../ticket-detail/activity-timeline";
 import { AddCommentForm } from "../ticket-detail/add-comment-form";
 import { MetaField } from "../ticket-detail/overview-card";
 import { RawJsonListCard } from "../ticket-detail/raw-json-list-card";
-import { StatusChip } from "../ticket-detail/shared";
+import { CategoryChip, StatusChip } from "../ticket-detail/shared";
 
 export type DrawerTicket = {
   id: string;
@@ -48,6 +50,22 @@ const Details = ({ id }: { id: string }) => {
   if (!data) return <p className="text-sm text-muted-foreground">Loading...</p>;
   return (
     <>
+      <div className="flex flex-wrap items-center gap-2">
+        <CategoryChip category={data.category} />
+        {data.departments.map((d) => (
+          <Badge key={d.id} variant="secondary">
+            {d.name}
+          </Badge>
+        ))}
+        {data.workOrderId && (
+          <Link
+            href={`/tracking/${data.workOrderId}`}
+            className="ml-auto text-sm underline"
+          >
+            View work order
+          </Link>
+        )}
+      </div>
       <MetaField label="Contact">{data.contactName}</MetaField>
       <MetaField label="Why this work is needed">
         <p className="whitespace-pre-wrap">{data.why ?? "Not provided"}</p>
@@ -61,7 +79,12 @@ const Details = ({ id }: { id: string }) => {
                 className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
               >
                 <span className="font-medium">{device.name}</span>
-                <StatusChip status={device.status} />
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  {device.scheduledAt
+                    ? formatScheduled(device.scheduledAt)
+                    : "Not scheduled"}
+                  <StatusChip status={device.status} />
+                </span>
               </li>
             ))}
           </ul>

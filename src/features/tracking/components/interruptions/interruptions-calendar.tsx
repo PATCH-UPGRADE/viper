@@ -19,16 +19,29 @@ import { parseAsString, useQueryState } from "nuqs";
 import { useEffect, useRef } from "react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { Button } from "@/components/ui/button";
+import { getChipClass } from "@/features/tag-colors/palette";
 import { cn, plural } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { statusLabels } from "../ticket-detail/shared";
-import { TicketDrawer } from "./ticket-drawer";
+import { statusHue, statusLabels } from "../ticket-detail/shared";
+import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
 
 const DATE_FORMAT = "yyyy-MM-dd";
 const HOUR_HEIGHT = 72;
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 // Every block is this tall, in minutes.
 const BLOCK_MINUTES = 60;
+
+// Tickets starting in the same clock hour sit side by side.
+const sideBySide = (items: DrawerTicket[]) =>
+  items.map((item) => {
+    const hour = item.scheduledAt.getHours();
+    const group = items.filter(
+      (other) => other.scheduledAt.getHours() === hour,
+    );
+    return { item, index: group.indexOf(item), count: group.length };
+  });
+
+const minutesOf = (date: Date) => date.getHours() * 60 + date.getMinutes();
 
 export const InterruptionsCalendar = () => {
   // yyyy-MM-dd; no date means today.
@@ -58,6 +71,9 @@ export const InterruptionsCalendar = () => {
     <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pt-3 pb-4">
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="text-sm font-semibold">Device Maintenance</h1>
+        <p className="hidden text-sm text-muted-foreground md:block">
+          Open work orders for devices in your departments.
+        </p>
         <nav
           aria-label="Week navigation"
           className="ml-auto flex items-center gap-1"
@@ -107,7 +123,7 @@ export const InterruptionsCalendar = () => {
           >
             <div className="flex">
               <div aria-hidden className="w-14 shrink-0">
-                <div className="h-9 border-b" />
+                <div className="sticky top-0 z-20 h-9 border-b bg-card" />
                 {HOURS.map((hour) => (
                   <div
                     key={hour}
@@ -122,9 +138,12 @@ export const InterruptionsCalendar = () => {
                 <section
                   key={day.toISOString()}
                   aria-label={format(day, "EEEE, MMMM d")}
-                  className="min-w-36 flex-1 border-l"
+                  className={cn(
+                    "min-w-36 flex-1 border-l",
+                    isToday(day) && "bg-primary/5",
+                  )}
                 >
-                  <h2 className="flex h-9 items-center gap-1.5 border-b px-2 text-sm">
+                  <h2 className="sticky top-0 z-20 flex h-9 items-center gap-1.5 border-b bg-card px-2 text-sm">
                     <span className="text-muted-foreground">
                       {format(day, "EEE")}
                     </span>
@@ -151,41 +170,52 @@ export const InterruptionsCalendar = () => {
                         className="border-t first:border-t-0"
                       />
                     ))}
-                    {/* Tickets at the same time simply overlap. */}
-                    {items
-                      .filter((item) => isSameDay(item.scheduledAt, day))
-                      .map((item) => (
-                        <div
-                          key={item.id}
-                          className="absolute inset-x-0.5"
-                          style={{
-                            top:
-                              ((item.scheduledAt.getHours() * 60 +
-                                item.scheduledAt.getMinutes()) *
-                                HOUR_HEIGHT) /
-                              60,
-                            height: (BLOCK_MINUTES * HOUR_HEIGHT) / 60 - 2,
-                          }}
-                        >
-                          <TicketDrawer ticket={item}>
-                            <button
-                              type="button"
-                              title={item.summary}
-                              className="flex h-full w-full flex-col gap-0.5 overflow-hidden rounded-md border border-l-4 border-l-primary/70 bg-card px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-xs hover:bg-accent"
-                            >
-                              <span className="truncate text-xs font-medium">
-                                {item.assetName}
-                              </span>
-                              <span className="truncate text-muted-foreground">
-                                {format(item.scheduledAt, "h:mm a")}
-                              </span>
-                              <span className="truncate text-muted-foreground">
-                                {statusLabels[item.status]}
-                              </span>
-                            </button>
-                          </TicketDrawer>
-                        </div>
-                      ))}
+                    {isToday(day) && (
+                      <div
+                        aria-hidden
+                        className="absolute inset-x-0 z-10 border-t-2 border-destructive"
+                        style={{
+                          top: (minutesOf(new Date()) * HOUR_HEIGHT) / 60,
+                        }}
+                      />
+                    )}
+                    {/* Tickets starting in the same hour share its width. */}
+                    {sideBySide(
+                      items.filter((item) => isSameDay(item.scheduledAt, day)),
+                    ).map(({ item, index, count }) => (
+                      <div
+                        key={item.id}
+                        className="absolute"
+                        style={{
+                          left: `calc(${(index * 100) / count}% + 2px)`,
+                          width: `calc(${100 / count}% - 4px)`,
+                          top: (minutesOf(item.scheduledAt) * HOUR_HEIGHT) / 60,
+                          height: (BLOCK_MINUTES * HOUR_HEIGHT) / 60 - 2,
+                        }}
+                      >
+                        <TicketDrawer ticket={item}>
+                          <button
+                            type="button"
+                            title={item.summary}
+                            className={cn(
+                              "flex h-full w-full flex-col gap-0.5 overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[11px] leading-tight hover:brightness-95",
+                              getChipClass(statusHue[item.status]),
+                            )}
+                          >
+                            <span className="truncate text-xs font-medium">
+                              {item.assetName}
+                            </span>
+                            <span className="truncate">
+                              {format(item.scheduledAt, "h:mm a")} ·{" "}
+                              {statusLabels[item.status]}
+                            </span>
+                            <span className="truncate opacity-80">
+                              {item.summary}
+                            </span>
+                          </button>
+                        </TicketDrawer>
+                      </div>
+                    ))}
                   </div>
                 </section>
               ))}

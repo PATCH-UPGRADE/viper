@@ -8,6 +8,7 @@ export const rolieFeedSchema = z.object({
     entry: z.array(
       z.object({
         id: z.string(),
+        published: z.string().optional(),
         updated: z.string(),
         link: z.array(
           z.object({
@@ -24,6 +25,7 @@ export interface FeedEntry {
   id: string;
   updatedAt: number;
   documentUrl: string;
+  publishedAt?: number;
 }
 
 export const fetchFeed = async (
@@ -42,11 +44,21 @@ export const fetchFeed = async (
   const body = await readCapped(response, MAX_FEED_BYTES, `feed ${url}`);
   const parsed = rolieFeedSchema.parse(JSON.parse(body.toString("utf-8")));
 
-  const entries = parsed.feed.entry.flatMap((entry) => {
+  const entries: FeedEntry[] = parsed.feed.entry.flatMap((entry) => {
     const documentUrl = entry.link.find((l) => l.rel === "self")?.href;
     const updatedAt = Date.parse(entry.updated);
+    const publishedAt = entry.published
+      ? Date.parse(entry.published)
+      : undefined;
     return documentUrl && Number.isFinite(updatedAt)
-      ? [{ id: entry.id, updatedAt, documentUrl }]
+      ? [
+          {
+            id: entry.id,
+            publishedAt,
+            updatedAt,
+            documentUrl,
+          },
+        ]
       : [];
   });
   return { entries, etag: response.headers.get("etag") ?? undefined };

@@ -84,3 +84,33 @@ export interface CsafAdvisoryItem {
   markdown: string;
   raw: unknown;
 }
+
+export interface ProductTreeIndex {
+  productNames: Map<string, string>;
+  vendors: string[];
+}
+
+export const indexProductTree = (doc: CsafDocument): ProductTreeIndex => {
+  const productNames = new Map<string, string>();
+  const vendors = new Set<string>();
+  const walk = (branches: unknown[]) => {
+    for (const branch of branches) {
+      if (typeof branch !== "object" || branch === null) continue;
+      const node = branch as {
+        category?: string;
+        name?: string;
+        product?: { product_id: string; name?: string };
+        branches?: unknown[];
+      };
+      if (node.category === "vendor" && node.name) vendors.add(node.name);
+      if (node.product) {
+        productNames.set(
+          node.product.product_id,
+          node.product.name ?? node.product.product_id,
+        );
+      }
+      if (node.branches) walk(node.branches);
+    }
+  };
+  return { productNames, vendors: [...vendors] };
+};

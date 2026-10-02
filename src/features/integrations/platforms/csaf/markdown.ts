@@ -1,34 +1,11 @@
-import { release } from "os";
-import type { CsafDocument } from "./document";
-
-const productNames = (doc: CsafDocument): Map<string, string> => {
-  const names = new Map<string, string>();
-  const walk = (branches: unknown[]) => {
-    for (const branch of branches) {
-      if (typeof branch !== "object" || branch === null) continue;
-      const node = branch as {
-        product?: { product_id: string; name?: string };
-        branches?: unknown[];
-      };
-      if (node.product) {
-        names.set(
-          node.product.product_id,
-          node.product.name ?? node.product.product_id,
-        );
-      }
-      if (node.branches) walk(node.branches);
-    }
-  };
-  walk(((doc.product_tree ?? {}) as { branches?: unknown[] }).branches ?? []);
-  return names;
-};
+import { type CsafDocument, indexProductTree } from "./document";
 
 const productLine = (id: string, names: Map<string, string>): string =>
   `- ${names.get(id) ?? id}`;
 
 export const toMarkdown = (doc: CsafDocument): string => {
   const { tracking, title, publisher, distribution } = doc.document;
-  const names = productNames(doc);
+  const { productNames: names } = indexProductTree(doc);
 
   const meta = [
     `**Publisher:** ${publisher.name}`,
@@ -89,7 +66,7 @@ export const toMarkdown = (doc: CsafDocument): string => {
   return [
     `# ${tracking.id}: ${title}`,
     "",
-    meta.join(" "),
+    meta.join(" · "),
     summary && ["", "## Summary", "", summary].join("\n"),
     context.length > 0 && ["", context.join("\n\n")].join("\n"),
     vulnerabilities.length > 0 &&

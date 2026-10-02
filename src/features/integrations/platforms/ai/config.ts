@@ -8,7 +8,7 @@ import { safeUrlSchema } from "@/lib/schemas";
  */
 export const configSchema = genericConfigSchema.extend({
   integrationUri: safeUrlSchema,
-  additionalInstructions: z.string().optional(), // given to n8n agent
+  additionalInstructions: z.string().optional(), // given to the crawler agent
 });
 export type AiConfig = z.infer<typeof configSchema>;
 

@@ -39,7 +39,6 @@
 - [Playwright](https://playwright.dev/docs/intro) - End-to-end testing
 
 ### Misc 
-- [n8n](https://docs.n8n.io/) - Additional backend, AI automation workflows. Accessed with webhooks.
 - Code Rabbit - Automatic code reviews. It's free for us, we found it helpful especially initially with a smaller team.
 - [Resend](https://resend.com/emails) - Email management
 

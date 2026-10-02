@@ -10,17 +10,19 @@ import {
 import { aiSync } from "./sync";
 
 /**
- * The AI crawler platform: point it at any URL and an n8n agent works out how
+ * The AI crawler platform: point it at any URL and an AI agent works out how
  * to read it.
  */
 export const ai: ConnectorModule<AiConfig, AiCreds> = {
   definition: {
     platform: PlatformEnum.AI,
     displayName: "AI Crawler",
-    description: "Point it at any URL — an n8n agent works out how to read it.",
+    description: "Point it at any URL — an AI agent works out how to read it.",
     categories: ["Vulnerability Management Platforms"],
     configSchema,
     credentialSchema,
   },
   sync: aiSync,
+  // Each sync is a full multi-call model crawl, so not every 5 minutes.
+  defaultSyncEvery: 86400,
 };

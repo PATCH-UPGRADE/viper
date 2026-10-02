@@ -38,7 +38,6 @@ graph TB
     end
 
     subgraph external ["External Integrations"]
-        N8N["n8n<br/>Workflow Automation"]
         Webhooks["Webhooks<br/>Event Push"]
         ExternalAPI["OpenAPI Consumers<br/>External Providers"]
     end
@@ -79,7 +78,7 @@ graph TB
 
     VercelAI --> OpenAIProvider
 
-    IntegrationSync --> N8N
+    IntegrationSync --> LangChain
     IntegrationSync --> Webhooks
     IntegrationSync --> Prisma
 
@@ -96,7 +95,7 @@ graph TB
 
 **AI Chat** runs as a streaming Next.js route (`/api/chat`), not as an Inngest job. LangGraph orchestrates one chat graph with two model nodes (LangChain `ChatOpenAI` — GPT-6 Luna for chat, and a GPT-6.1 Sol high-reasoning recommendation node the chat model hands the turn to), and token + reasoning + tool deltas stream to the client through the Vercel AI SDK UI (`useChat`).
 
-**n8n** acts as an external workflow automation layer. When an integration provider doesn't follow Viper's standardized sync protocol, n8n orchestrates the crawl-and-transform pipeline that normalizes external data before submitting it to Viper's integration upload endpoints.
+**The AI Crawler integration** is for a provider that does not use the Viper sync protocol. In the Inngest sync job, a LangGraph agent crawls the provider API on the origin of the integration URL. It records items in the schema of the resource, and the sync upserts them with `processIntegrationSync`.
 
 ---
 

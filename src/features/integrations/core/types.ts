@@ -65,7 +65,7 @@ export interface Session {
 export interface SessionInput<TConfig = unknown, TCreds = unknown> {
   integrationId: string;
   config: TConfig;
-  /** `ai` forwards these to n8n, which authenticates as us. That is the point. */
+  /** `ai` sends these to the upstream it crawls, on that origin only. */
   creds: TCreds;
 }
 
@@ -243,6 +243,8 @@ export interface ConnectorModule<TConfig = unknown, TCreds = unknown> {
    * `Pending` until the callback lands.
    */
   sync?: SyncStrategy<TConfig, TCreds>;
+  /** How often `sync` should run, in seconds. A resource module's own value wins. */
+  defaultSyncEvery?: number | null;
   onCreate?(): Promise<void>;
 
   /**

@@ -53,7 +53,11 @@ export const defaultSyncEveryFor = (
 ): number | null => {
   const module = registry[platform];
   if (!module) return null;
-  return moduleForResource(module, resource)?.defaultSyncEvery ?? null;
+  return (
+    moduleForResource(module, resource)?.defaultSyncEvery ??
+    module.defaultSyncEvery ??
+    null
+  );
 };
 
 // load-time assertion

@@ -17,8 +17,8 @@ import { ResourceType } from "@/generated/prisma";
 import { createCallback } from "../callback";
 
 /**
- * These paths are a contract with every partner and with the committed n8n
- * workflow. Changing one silently breaks an integration we can't see.
+ * These paths are a contract with every partner. Changing one silently breaks
+ * an integration we can't see.
  */
 
 beforeEach(() => vi.clearAllMocks());
@@ -67,7 +67,7 @@ describe("createCallback", () => {
   it("describes the envelope the platform must send back", async () => {
     const callback = await createCallback("shadow-user", ResourceType.Asset);
 
-    // n8n reads this straight into its output parser, so it has to be a real
+    // A push platform can give this to its partner, so it has to be a real
     // JSON Schema of the upload envelope, not just any object.
     expect(callback.schema).toMatchObject({ type: "object" });
     expect(JSON.stringify(callback.schema)).toContain("vendorId");

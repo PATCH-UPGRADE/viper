@@ -83,18 +83,64 @@ export const getInterruptionCalendar = async (
   };
 };
 
-// The comments on a device ticket in the user's scope. Anything else, such as
-// another department's ticket or a work order's id, is NOT_FOUND.
-export const getInterruptionComments = async (userId: string, id: string) => {
+// A device ticket carries no description or remediation of its own: those come
+// from its work order. Only these remediation fields are sent, not the whole row.
+const departmentDescription = (departmentId: string) => ({
+  where: { departmentId },
+  select: { body: true },
+});
+const remediationSelect = {
+  id: true,
+  description: true,
+  narrative: true,
+  sourceImpact: true,
+} satisfies Prisma.RemediationSelect;
+
+// What the drawer shows beyond the card, for a device ticket in the user's
+// scope. Anything else, such as another department's ticket or a work order's
+// id, is NOT_FOUND.
+export const getInterruptionDetail = async (userId: string, id: string) => {
   const departmentId = await departmentOf(userId);
   const ticket = departmentId
     ? await prisma.workOrderTicket.findFirst({
         where: { id, ticket: inScope(departmentId) },
-        select: { comments: ticketDetailInclude.comments },
+        select: {
+          body: true,
+          assignee: { select: { name: true } },
+          creator: { select: { name: true } },
+          descriptions: departmentDescription(departmentId),
+          remediations: { select: remediationSelect },
+          ticket: {
+            select: {
+              parentTicket: {
+                select: {
+                  descriptions: departmentDescription(departmentId),
+                  remediations: { select: remediationSelect },
+                },
+              },
+            },
+          },
+          comments: ticketDetailInclude.comments,
+        },
       })
     : null;
   if (!ticket) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
   }
-  return ticket.comments;
+  const workOrder = ticket.ticket?.parentTicket;
+  return {
+    comments: ticket.comments,
+    contactName: ticket.assignee?.name ?? ticket.creator.name,
+    // The department's own words first, then the work order's, then the body.
+    whyNecessary:
+      [
+        ticket.descriptions[0]?.body,
+        workOrder?.descriptions[0]?.body,
+        ticket.body,
+      ].find((text) => text?.trim()) ?? null,
+    remediations:
+      ticket.remediations.length > 0
+        ? ticket.remediations
+        : (workOrder?.remediations ?? []),
+  };
 };

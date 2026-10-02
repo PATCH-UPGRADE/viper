@@ -15,7 +15,7 @@ vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
 import {
   getInterruptionCalendar,
-  getInterruptionComments,
+  getInterruptionDetail,
 } from "./interruptions";
 
 const range = { from: new Date(2026, 2, 1), to: new Date(2026, 2, 7) };
@@ -88,12 +88,12 @@ describe("getInterruptionCalendar", () => {
   });
 });
 
-describe("getInterruptionComments", () => {
+describe("getInterruptionDetail", () => {
   it("rejects a ticket outside the department's scope", async () => {
     asUser("dept-A");
     mockPrisma.workOrderTicket.findFirst.mockResolvedValue(null);
 
-    await expect(getInterruptionComments("u1", "other")).rejects.toMatchObject({
+    await expect(getInterruptionDetail("u1", "other")).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
     const open = { isDraft: false, status: { not: "DONE" } };
@@ -111,19 +111,50 @@ describe("getInterruptionComments", () => {
 
   it("rejects a user with no department without querying", async () => {
     asUser(null);
-    await expect(getInterruptionComments("u1", "c1")).rejects.toMatchObject({
+    await expect(getInterruptionDetail("u1", "c1")).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
     expect(mockPrisma.workOrderTicket.findFirst).not.toHaveBeenCalled();
   });
 
-  it("returns the comments of an in-scope ticket", async () => {
+  it("assembles contact, reason and remediation, falling back to the work order's", async () => {
     asUser("dept-A");
-    mockPrisma.workOrderTicket.findFirst.mockResolvedValue({
+    const found = (overrides = {}) => ({
+      body: "Ticket body",
+      assignee: null,
+      creator: { name: "Creator Cam" },
+      descriptions: [],
+      remediations: [],
       comments: [{ id: "k1" }],
+      ticket: {
+        parentTicket: {
+          descriptions: [{ body: "Work order reason" }],
+          remediations: [{ id: "r-parent" }],
+        },
+      },
+      ...overrides,
     });
-    await expect(getInterruptionComments("u1", "c1")).resolves.toEqual([
-      { id: "k1" },
-    ]);
+
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValueOnce(found());
+    await expect(getInterruptionDetail("u1", "c1")).resolves.toEqual({
+      comments: [{ id: "k1" }],
+      contactName: "Creator Cam",
+      whyNecessary: "Work order reason",
+      remediations: [{ id: "r-parent" }],
+    });
+
+    // The ticket's own assignee, description and remediation win.
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValueOnce(
+      found({
+        assignee: { name: "Assignee Al" },
+        descriptions: [{ body: "Own reason" }],
+        remediations: [{ id: "r-own" }],
+      }),
+    );
+    await expect(getInterruptionDetail("u1", "c1")).resolves.toMatchObject({
+      contactName: "Assignee Al",
+      whyNecessary: "Own reason",
+      remediations: [{ id: "r-own" }],
+    });
   });
 });

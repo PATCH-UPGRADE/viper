@@ -16,6 +16,7 @@ import { formatScheduled } from "@/lib/date-utils";
 import { useTRPC } from "@/trpc/client";
 import { commentEntry } from "../ticket-detail/activity-timeline";
 import { AddCommentForm } from "../ticket-detail/add-comment-form";
+import { RawJsonListCard } from "../ticket-detail/raw-json-list-card";
 import { StatusChip } from "../ticket-detail/shared";
 
 export type DrawerTicket = {
@@ -26,22 +27,46 @@ export type DrawerTicket = {
   assetName: string;
 };
 
+const Field = ({ label, children }: { label: string; children: ReactNode }) => (
+  <div className="flex flex-col gap-1">
+    <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      {label}
+    </h3>
+    <div className="text-sm">{children}</div>
+  </div>
+);
+
 // Only fetched while the drawer is open: the sheet's content mounts on open.
-const Comments = ({ id }: { id: string }) => {
+const Details = ({ id }: { id: string }) => {
   const trpc = useTRPC();
   const { data } = useQuery(
-    trpc.tracking.getInterruptionComments.queryOptions({ id }),
+    trpc.tracking.getInterruptionDetail.queryOptions({ id }),
   );
+  if (!data) return <p className="text-sm text-muted-foreground">Loading...</p>;
   return (
-    <ActivityTimeline
-      entries={(data ?? []).map(commentEntry)}
-      composer={<AddCommentForm ticketId={id} />}
-    />
+    <>
+      <Field label="Contact">{data.contactName}</Field>
+      <Field label="Why this work is needed">
+        <p className="whitespace-pre-wrap">
+          {data.whyNecessary ?? "Not provided"}
+        </p>
+      </Field>
+      <Field label="Remediation">
+        <RawJsonListCard
+          items={data.remediations}
+          emptyMessage="No remediation is linked to this ticket."
+        />
+      </Field>
+      <ActivityTimeline
+        entries={data.comments.map(commentEntry)}
+        composer={<AddCommentForm ticketId={id} />}
+      />
+    </>
   );
 };
 
-// The card already holds everything except the comments, so there is no detail
-// query. Being the sheet's own trigger, it gets keyboard focus back on close.
+// The card already holds the schedule, so the one query fetches only the rest.
+// Being the sheet's own trigger, the card gets keyboard focus back on close.
 export const TicketDrawer = ({
   ticket,
   children,
@@ -64,7 +89,7 @@ export const TicketDrawer = ({
         <p className="text-sm">
           Scheduled: {formatScheduled(ticket.scheduledAt)}
         </p>
-        <Comments id={ticket.id} />
+        <Details id={ticket.id} />
       </div>
     </SheetContent>
   </Sheet>

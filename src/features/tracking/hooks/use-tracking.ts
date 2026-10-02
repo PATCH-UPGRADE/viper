@@ -535,7 +535,7 @@ export const useAddTicketComment = (ticketId: string) => {
         );
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
         queryClient.invalidateQueries(
-          trpc.tracking.getInterruptionComments.queryFilter({ id: ticketId }),
+          trpc.tracking.getInterruptionDetail.queryFilter({ id: ticketId }),
         );
       },
       onError: (error) => {

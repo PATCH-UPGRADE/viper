@@ -2,9 +2,9 @@ import "server-only";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
 import { resolveVendor } from "@/lib/router-utils";
 import type { Session } from "../../../core/types";
-import { SIEMENS_HEALTHINEERS } from "../config";
 import { CONTRACTS_URL } from "../urls";
 
 const fleetContractRowSchema = z.object({
@@ -126,7 +126,8 @@ export async function syncFleetContracts(
     if (rows.length === 0) {
       return { contractedAssetIds: new Set(), errorMessage: null };
     }
-    vendorId = (await resolveVendor(SIEMENS_HEALTHINEERS)).id;
+    vendorId = (await resolveVendor(SIEMENS_HEALTHINEERS.canonicalDisplayName))
+      .id;
   } catch (error) {
     return {
       contractedAssetIds: new Set(),

@@ -5,6 +5,7 @@ import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { assetNameSelect } from "@/features/assets/utils";
+import { notRejected } from "@/features/inbox/types";
 import {
   Priority,
   type Prisma,
@@ -528,7 +529,7 @@ export const trackingRouter = createTRPCRouter({
       if (notificationId) {
         const mappings = await prisma.notificationVulnerabilityMapping.findMany(
           {
-            where: { notificationId },
+            where: { notificationId, ...notRejected },
             select: { vulnerabilityId: true },
           },
         );

@@ -22,9 +22,10 @@ const SOURCE_LABEL = "MedISAO";
  *
  * An identifier we do not already hold is minted as a Vulnerability on the
  * channel's matching, so triage and VEX see every vulnerability the advisory
- * names. A user who disagrees sets its Issue on the matching to `NOT_AFFECTED`.
- * The link to the Notification stays, because reprocessing the advisory adds it
- * back.
+ * names. A user who disagrees can unlink it from the Notification: the link is
+ * kept as `Rejected`, and `skipDuplicates` below does not overwrite it. The
+ * Vulnerability and its Issue on the matching stay. A user who also judges the
+ * devices safe sets that Issue to `NOT_AFFECTED`.
  *
  * TODO VW-540: remove bad identifiers through a durable VulnerabilityIdentifier
  * model.

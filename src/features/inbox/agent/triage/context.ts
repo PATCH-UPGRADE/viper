@@ -22,6 +22,7 @@ import {
   vulnerabilityToMarkdown,
   workflowClinicalSummary,
 } from "@/lib/markdown";
+import { notRejected } from "../../types";
 import { buildEntityRefs, type EntityRefs, swapIdsForRefs } from "../refs";
 
 export type LinkableIds = {
@@ -62,6 +63,7 @@ export async function gatherTriageContext(
         },
       },
       vulnerabilities: {
+        where: notRejected,
         include: {
           vulnerability: {
             include: {

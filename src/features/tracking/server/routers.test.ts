@@ -101,6 +101,7 @@ vi.mock("@/inngest/client", () => ({
   inngest: { send: mockInngestSend },
 }));
 
+import { notRejected } from "@/features/inbox/types";
 import { createCallerFactory } from "@/trpc/init";
 import { ticketDetailInclude, workOrderListInclude } from "../types";
 import { trackingRouter } from "./routers";
@@ -1492,6 +1493,12 @@ describe("trackingRouter.getManyForLlm", () => {
         { mitigationPlan: { notificationId: "n1" } },
         { vulnerabilities: { some: { id: { in: ["v1", "v2"] } } } },
       ],
+    });
+    expect(
+      mockPrisma.notificationVulnerabilityMapping.findMany,
+    ).toHaveBeenCalledWith({
+      where: { notificationId: "n1", ...notRejected },
+      select: { vulnerabilityId: true },
     });
   });
 

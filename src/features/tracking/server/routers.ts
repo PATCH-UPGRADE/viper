@@ -59,7 +59,10 @@ import {
   snapshotBeforeUpdate,
 } from "./activities";
 import { cascadeDoneStatus, createAssetTicket } from "./asset-tickets";
-import { getInterruptionCalendar } from "./interruptions";
+import {
+  getInterruptionCalendar,
+  getInterruptionComments,
+} from "./interruptions";
 
 // A lost create-race (or a retry) surfaces as a P2002 unique violation. Duck-typed
 // on `code` rather than `instanceof`: across Next.js module boundaries the thrown
@@ -1283,6 +1286,12 @@ export const trackingRouter = createTRPCRouter({
     )
     .query(({ input, ctx }) =>
       getInterruptionCalendar(ctx.auth.user.id, input),
+    ),
+
+  getInterruptionComments: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(({ input, ctx }) =>
+      getInterruptionComments(ctx.auth.user.id, input.id),
     ),
 
   // ─── Work orders proposed by an agent ──────────────────────────────────────

@@ -7,12 +7,16 @@ const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     user: { findUnique: vi.fn() },
     assetTicket: { findMany: vi.fn() },
+    workOrderTicket: { findFirst: vi.fn() },
   },
 }));
 
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 
-import { getInterruptionCalendar } from "./interruptions";
+import {
+  getInterruptionCalendar,
+  getInterruptionComments,
+} from "./interruptions";
 
 const range = { from: new Date(2026, 2, 1), to: new Date(2026, 2, 7) };
 const asUser = (departmentId: string | null) =>
@@ -59,9 +63,14 @@ describe("getInterruptionCalendar", () => {
 
     const open = { isDraft: false, status: { not: "DONE" } };
     expect(mockPrisma.assetTicket.findMany.mock.calls[0][0].where).toEqual({
-      asset: { managedBy: { some: { departmentId: "dept-A" } } },
-      parentTicket: open,
-      ticket: { ...open, scheduledAt: { gte: range.from, lte: range.to } },
+      AND: [
+        {
+          asset: { managedBy: { some: { departmentId: "dept-A" } } },
+          parentTicket: open,
+          ticket: open,
+        },
+        { ticket: { scheduledAt: { gte: range.from, lte: range.to } } },
+      ],
     });
     expect(result).toEqual({
       scope: "ready",
@@ -76,5 +85,45 @@ describe("getInterruptionCalendar", () => {
         },
       ],
     });
+  });
+});
+
+describe("getInterruptionComments", () => {
+  it("rejects a ticket outside the department's scope", async () => {
+    asUser("dept-A");
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValue(null);
+
+    await expect(getInterruptionComments("u1", "other")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    const open = { isDraft: false, status: { not: "DONE" } };
+    expect(mockPrisma.workOrderTicket.findFirst.mock.calls[0][0].where).toEqual(
+      {
+        id: "other",
+        ticket: {
+          asset: { managedBy: { some: { departmentId: "dept-A" } } },
+          parentTicket: open,
+          ticket: open,
+        },
+      },
+    );
+  });
+
+  it("rejects a user with no department without querying", async () => {
+    asUser(null);
+    await expect(getInterruptionComments("u1", "c1")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    expect(mockPrisma.workOrderTicket.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("returns the comments of an in-scope ticket", async () => {
+    asUser("dept-A");
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValue({
+      comments: [{ id: "k1" }],
+    });
+    await expect(getInterruptionComments("u1", "c1")).resolves.toEqual([
+      { id: "k1" },
+    ]);
   });
 });

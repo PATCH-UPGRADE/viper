@@ -298,7 +298,7 @@ const activityEntry = (activity: Activity): TimelineEntry => ({
   body: renderActivity(activity),
 });
 
-const commentEntry = (comment: Comment): TimelineEntry => ({
+export const commentEntry = (comment: Comment): TimelineEntry => ({
   id: `c-${comment.id}`,
   kind: "Comment",
   createdAt: new Date(comment.createdAt),

@@ -1,7 +1,9 @@
 import "server-only";
+import { TRPCError } from "@trpc/server";
 import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
 import { type Prisma, TicketStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { ticketDetailInclude } from "../types";
 
 // What a clinician sees is decided here, from the signed-in user alone: their
 // department → the assets it manages → those assets' device tickets. Drafts and
@@ -11,26 +13,37 @@ const open = {
   status: { not: TicketStatus.DONE },
 } satisfies Prisma.WorkOrderTicketWhereInput;
 
+const departmentOf = async (userId: string) =>
+  (
+    await prisma.user.findUnique({
+      where: { id: userId },
+      select: { departmentId: true },
+    })
+  )?.departmentId;
+
+const managedBy = (departmentId: string) =>
+  ({ managedBy: { some: { departmentId } } }) satisfies Prisma.AssetWhereInput;
+
+// A device ticket the department manages, and still open.
+const inScope = (departmentId: string): Prisma.AssetTicketWhereInput => ({
+  asset: managedBy(departmentId),
+  parentTicket: open,
+  ticket: open,
+});
+
 export const getInterruptionCalendar = async (
   userId: string,
   range: { from: Date; to: Date },
 ) => {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { departmentId: true },
-  });
-  if (!user?.departmentId) {
-    return { scope: "no-department" as const, items: [] };
-  }
-  const managed = {
-    managedBy: { some: { departmentId: user.departmentId } },
-  } satisfies Prisma.AssetWhereInput;
+  const departmentId = await departmentOf(userId);
+  if (!departmentId) return { scope: "no-department" as const, items: [] };
 
   const rows = await prisma.assetTicket.findMany({
     where: {
-      asset: managed,
-      parentTicket: open,
-      ticket: { ...open, scheduledAt: { gte: range.from, lte: range.to } },
+      AND: [
+        inScope(departmentId),
+        { ticket: { scheduledAt: { gte: range.from, lte: range.to } } },
+      ],
     },
     orderBy: { ticket: { scheduledAt: "asc" } },
     select: {
@@ -50,7 +63,7 @@ export const getInterruptionCalendar = async (
   // An empty week only means "no assets" if the department manages none.
   if (rows.length === 0) {
     const asset = await prisma.asset.findFirst({
-      where: managed,
+      where: managedBy(departmentId),
       select: { id: true },
     });
     if (!asset) return { scope: "no-assets" as const, items: [] };
@@ -68,4 +81,20 @@ export const getInterruptionCalendar = async (
       assetName: getAssetDisplayName(asset),
     })),
   };
+};
+
+// The comments on a device ticket in the user's scope. Anything else, such as
+// another department's ticket or a work order's id, is NOT_FOUND.
+export const getInterruptionComments = async (userId: string, id: string) => {
+  const departmentId = await departmentOf(userId);
+  const ticket = departmentId
+    ? await prisma.workOrderTicket.findFirst({
+        where: { id, ticket: inScope(departmentId) },
+        select: { comments: ticketDetailInclude.comments },
+      })
+    : null;
+  if (!ticket) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
+  }
+  return ticket.comments;
 };

@@ -43,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { formatTimeRange } from "../../duration";
 import { statusLabels } from "../ticket-detail/shared";
+import { TicketDrawer } from "./ticket-drawer";
 
 const DATE_FORMAT = "yyyy-MM-dd";
 const MODES = ["day", "week", "month"] as const;
@@ -88,29 +89,32 @@ const rangeOf = (anchor: Date, mode: Mode) =>
           end: endOfWeek(endOfMonth(anchor)),
         };
 
-// One ticket: a block in the time grid, or a single line in a month cell. Status
-// is spelled out, never colour alone.
+// One ticket: a block in the time grid, or a single line in a month cell, and
+// the button that opens its drawer. Status is spelled out, never colour alone.
 const Entry = ({ item, compact }: { item: Item; compact?: boolean }) => (
-  <div
-    title={item.summary}
-    className={cn(
-      "flex flex-col gap-0.5 overflow-hidden rounded-md border bg-card px-1.5 py-0.5 text-[11px] leading-tight shadow-xs",
-      !compact && "h-full border-l-4 border-l-primary/70",
-    )}
-  >
-    <span className="truncate text-xs font-medium">{item.assetName}</span>
-    <span className="truncate text-muted-foreground">
-      {compact
-        ? format(item.scheduledAt, "h:mm a")
-        : formatTimeRange(item.scheduledAt, item.durationEstimate)}
-      {!compact && item.durationEstimate === null && " · No estimate"}
-    </span>
-    {!compact && (
+  <TicketDrawer ticket={item}>
+    <button
+      type="button"
+      title={item.summary}
+      className={cn(
+        "flex w-full flex-col gap-0.5 overflow-hidden rounded-md border bg-card px-1.5 py-0.5 text-left text-[11px] leading-tight shadow-xs hover:bg-accent",
+        !compact && "h-full border-l-4 border-l-primary/70",
+      )}
+    >
+      <span className="truncate text-xs font-medium">{item.assetName}</span>
       <span className="truncate text-muted-foreground">
-        {statusLabels[item.status]}
+        {compact
+          ? format(item.scheduledAt, "h:mm a")
+          : formatTimeRange(item.scheduledAt, item.durationEstimate)}
+        {!compact && item.durationEstimate === null && " · No estimate"}
       </span>
-    )}
-  </div>
+      {!compact && (
+        <span className="truncate text-muted-foreground">
+          {statusLabels[item.status]}
+        </span>
+      )}
+    </button>
+  </TicketDrawer>
 );
 
 const TimeGrid = ({ days, items }: { days: Date[]; items: Item[] }) => {

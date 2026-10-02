@@ -70,11 +70,9 @@ export const getInterruptionCalendar = async (
   }));
 };
 
-// The comments on a device ticket in the user's scope. Anything else, such as
-// another department's ticket or a work order's id, is NOT_FOUND.
 // What the drawer shows beyond the card, for a device ticket in the user's
-// scope. Anything else is NOT_FOUND. A device ticket has no description or
-// remediation of its own: they come from its work order.
+// scope. Anything else is NOT_FOUND. A device ticket has no description of
+// its own: it comes from its work order.
 export const getInterruptionDetail = async (userId: string, id: string) => {
   const departmentId = await departmentOf(userId);
   const ticket = departmentId
@@ -90,18 +88,9 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
                 select: {
                   id: true,
                   body: true,
-                  departments: { select: { id: true, name: true } },
                   descriptions: {
                     where: { departmentId },
                     select: { body: true },
-                  },
-                  remediations: {
-                    select: {
-                      id: true,
-                      description: true,
-                      narrative: true,
-                      sourceImpact: true,
-                    },
                   },
                   // Only this department's other devices; others stay hidden.
                   assets: {
@@ -121,31 +110,27 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
               },
             },
           },
+          // Only this department's readers; other departments' users stay hidden.
           seenBy: {
-            orderBy: { seenAt: "desc" },
-            select: {
-              seenAt: true,
-              user: { select: { id: true, name: true } },
-            },
+            where: { user: { departmentId } },
+            select: { user: { select: { name: true } } },
           },
           comments: ticketDetailInclude.comments,
         },
       })
     : null;
-  if (!ticket) {
+  const workOrder = ticket?.ticket?.parentTicket;
+  if (!ticket || !workOrder) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
   }
-  const workOrder = ticket.ticket?.parentTicket;
   return {
     comments: ticket.comments,
     seenBy: ticket.seenBy,
     category: ticket.category,
-    workOrderId: workOrder?.id,
-    departments: workOrder?.departments ?? [],
+    workOrderId: workOrder.id,
     contact: ticket.assignee ?? ticket.creator,
-    why: workOrder?.descriptions[0]?.body ?? workOrder?.body ?? null,
-    remediations: workOrder?.remediations ?? [],
-    otherDevices: (workOrder?.assets ?? []).map(({ asset, ticket }) => ({
+    why: workOrder.descriptions[0]?.body ?? workOrder.body ?? null,
+    otherDevices: workOrder.assets.map(({ asset, ticket }) => ({
       id: ticket.id,
       name: getAssetDisplayName(asset),
       status: ticket.status,

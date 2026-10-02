@@ -4,8 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { type ReactNode, useEffect } from "react";
 import { ActivityTimeline } from "@/components/activity-timeline";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
   SheetContent,
@@ -21,7 +19,6 @@ import { useMarkTicketSeen } from "../../hooks/use-tracking";
 import { commentEntry } from "../ticket-detail/activity-timeline";
 import { AddCommentForm } from "../ticket-detail/add-comment-form";
 import { MetaField } from "../ticket-detail/overview-card";
-import { RawJsonListCard } from "../ticket-detail/raw-json-list-card";
 import { CategoryChip, StatusChip } from "../ticket-detail/shared";
 
 export type DrawerTicket = {
@@ -53,40 +50,19 @@ const Details = ({ id }: { id: string }) => {
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span
-          className="flex items-center gap-2 text-sm text-muted-foreground"
+          className="text-sm text-muted-foreground"
           title={data.seenBy.map((r) => r.user.name).join(", ")}
         >
-          <span className="flex -space-x-1.5">
-            {data.seenBy.slice(0, 3).map(({ user }) => (
-              <Avatar
-                key={user.id}
-                className="size-6 border-2 border-background"
-              >
-                <AvatarFallback className="text-[10px]">
-                  {user.name.slice(0, 1).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            ))}
-          </span>
           {data.seenBy.length} read
         </span>
-        {data.workOrderId && (
-          <Link
-            href={`/tracking/${data.workOrderId}`}
-            className="text-sm underline"
-          >
-            View work order
-          </Link>
-        )}
+        <Link
+          href={`/tracking/${data.workOrderId}`}
+          className="text-sm underline"
+        >
+          View work order
+        </Link>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <CategoryChip category={data.category} />
-        {data.departments.map((d) => (
-          <Badge key={d.id} variant="secondary">
-            {d.name}
-          </Badge>
-        ))}
-      </div>
+      <CategoryChip category={data.category} />
       <MetaField label="Why this work is needed">
         <p className="whitespace-pre-wrap">{data.why ?? "Not provided"}</p>
       </MetaField>
@@ -110,12 +86,6 @@ const Details = ({ id }: { id: string }) => {
           </ul>
         </MetaField>
       )}
-      <MetaField label="Remediation">
-        <RawJsonListCard
-          items={data.remediations}
-          emptyMessage="No remediation is linked to this ticket."
-        />
-      </MetaField>
       <MetaField label="Questions about this update">
         <p className="font-medium">{data.contact.name}</p>
         <a href={`mailto:${data.contact.email}`} className="underline">

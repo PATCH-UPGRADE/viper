@@ -73,9 +73,6 @@ const parseCursor = (cursor: Cursor | null): CsafCursor => {
   return parsed.success ? parsed.data : { feeds: {} };
 };
 
-const seenMapOf = (entries: FeedEntry[]): Record<string, string> =>
-  Object.fromEntries(entries.map((e) => [e.id, String(e.updatedAt)]));
-
 interface Downloaded extends CsafAdvisoryItem {
   entry: FeedEntry;
   doc: CsafDocument;
@@ -203,40 +200,17 @@ export const syncAdvisories = async (
   for (const feed of feedsOf(metadata)) {
     const feedUrl = feed.url;
     const feedLabel = feed.summary ?? feedUrl;
+
     const state = cursor.feeds[feedUrl] ?? { seen: {} };
     cursor.feeds[feedUrl] = state;
 
     const result = await fetchFeed(session, feedUrl, state?.etag);
     if ("unchanged" in result) {
-      console.info("csaf sync ", { feeed: feedLabel, unchanged: true });
-      continue;
-    }
-    if (!state) {
-      cursor.feeds[feedUrl] = {
-        etag: result.etag,
-        seen: seenMapOf(result.entries),
-      };
-      console.info("csaf sync 2 ", {
-        feed: feedLabel,
-        baselined: result.entries.length,
-      });
       continue;
     }
 
     const now = Date.now();
-    console.info("csaf window ", {
-      total: result.entries.length,
-      hasPublished: result.entries.filter((e) => e.publishedAt !== undefined)
-        .length,
-      yearOk: result.entries.filter(
-        (e) =>
-          e.publishedAt !== undefined &&
-          new Date(e.publishedAt).getUTCFullYear() >= MIN_PUBLISHED_YEAR,
-      ).length,
-      windowOk: result.entries.filter((e) => e.updatedAt >= now - MAX_AGE_MS)
-        .length,
-      both: result.entries.length,
-    });
+
     const entries = result.entries.filter((entry) => inWindow(entry, now));
 
     const candidates = entries
@@ -249,27 +223,21 @@ export const syncAdvisories = async (
       (item) => item.doc.document.tracking.status !== "draft",
     );
 
-    await recordSnapshots(wanted, ctx.integrationId);
-
     const relevant: Downloaded[] = [];
     for (const item of wanted) {
       const { vendors } = indexProductTree(item.doc);
       const ok = await checkInventory(vendors);
-      console.info("csaf gate******************** ", {
-        id: item.trackingId,
-        vendors,
-        ok,
-      });
-      if (await checkInventory(vendors)) {
+      if (ok) {
         relevant.push(item);
       }
     }
+    await recordSnapshots(wanted, ctx.integrationId);
 
     for (const item of items) {
       state.seen[item.entry.id] = String(item.entry.updatedAt);
     }
 
-    const remaining = result.entries.filter(
+    const remaining = entries.filter(
       (entry) => state.seen[entry.id] !== String(entry.updatedAt),
     );
     if (remaining.length === 0) state.etag = result.etag;

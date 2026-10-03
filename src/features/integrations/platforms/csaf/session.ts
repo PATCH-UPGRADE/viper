@@ -28,18 +28,23 @@ export const readCapped = async (
   if (Number.isFinite(declared) && declared > limit) {
     throw new Error(`${label}: declares ${declared} bytes`);
   }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error(`${label}: response had no body`);
 
   if (!response.body) throw new Error(`${label}: response had no body`);
 
   const chunks: Buffer[] = [];
   let total = 0;
 
-  for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
-    total += chunk.byteLength;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
     if (total > limit) {
-      throw new Error(`${label}: exceeded ${limit} bytes`);
+      await reader.cancel();
+      throw new Error(`${label}` + `:exceeded ${limit} bytes`);
     }
-    chunks.push(Buffer.from(chunk));
+    chunks.push(Buffer.from(value));
   }
   return Buffer.concat(chunks);
 };

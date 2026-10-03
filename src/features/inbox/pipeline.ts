@@ -146,7 +146,13 @@ export async function runNotificationPipeline({
         resolvedDeviceGroupAssetCount(mapping.deviceGroupMatching),
       ),
     );
-    if (counts.some((count) => count > 0)) return false;
+    if (counts.some((count) => count > 0)) {
+      await prisma.notification.update({
+        where: { id: notificationId },
+        data: { suppressed: false },
+      });
+      return false;
+    }
     await prisma.notification.update({
       where: { id: notificationId },
       data: { suppressed: true },

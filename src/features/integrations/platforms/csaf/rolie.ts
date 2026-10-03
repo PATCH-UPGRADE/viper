@@ -47,8 +47,11 @@ export const fetchFeed = async (
   const entries: FeedEntry[] = parsed.feed.entry.flatMap((entry) => {
     const documentUrl = entry.link.find((l) => l.rel === "self")?.href;
     const updatedAt = Date.parse(entry.updated);
-    const publishedAt = entry.published
+    const parsedPublished = entry.published
       ? Date.parse(entry.published)
+      : Number.NaN;
+    const publishedAt = Number.isFinite(parsedPublished)
+      ? parsedPublished
       : undefined;
     return documentUrl && Number.isFinite(updatedAt)
       ? [

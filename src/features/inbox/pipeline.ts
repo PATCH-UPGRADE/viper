@@ -3,6 +3,7 @@ import type { GetStepTools } from "inngest";
 import type { inngest } from "@/inngest/client";
 import type { PdfAttachment } from "@/lib/agent-messages";
 import prisma from "@/lib/db";
+import { resolvedDeviceGroupAssetCount } from "@/lib/router-utils";
 import { classifyNotification } from "./agent/classify";
 import { persistMitigationPlans } from "./agent/mitigation/persist";
 import type { InboundEmail } from "./agent/prompt";
@@ -49,6 +50,7 @@ export interface NotificationPipelineInput {
   linkEntities: LinkEntities;
   /** What the source stated for itself. Overrides the classifier. */
   known?: KnownNotificationFields;
+  suppressWhenNoAssets?: boolean;
 }
 
 /**
@@ -66,6 +68,7 @@ export async function runNotificationPipeline({
   attachments,
   linkEntities,
   known,
+  suppressWhenNoAssets,
 }: NotificationPipelineInput) {
   const notificationId = await step.run("classify-notification", async () => {
     const result = await classifyNotification(sourceId, doc, attachments);
@@ -126,6 +129,39 @@ export async function runNotificationPipeline({
     sourceId,
     attachments,
   });
+
+  const suppressed = await step.run("suppress-when-no-assets", async () => {
+    if (!suppressWhenNoAssets || !notificationId) return false;
+    const mappings = await prisma.notificationDeviceGroupMapping.findMany({
+      where: { notificationId, confidence: { not: "Rejected" } },
+      select: {
+        deviceGroupMatching: {
+          include: { manufacturer: true, product: true, version: true },
+        },
+      },
+    });
+
+    const counts = await Promise.all(
+      mappings.map((mapping) =>
+        resolvedDeviceGroupAssetCount(mapping.deviceGroupMatching),
+      ),
+    );
+    if (counts.some((count) => count > 0)) {
+      await prisma.notification.update({
+        where: { id: notificationId },
+        data: { suppressed: false },
+      });
+      return false;
+    }
+    await prisma.notification.update({
+      where: { id: notificationId },
+      data: { suppressed: true },
+    });
+    return true;
+  });
+  if (suppressed) {
+    return { notificationId, linkSummary, suppressed: true };
+  }
 
   // VEX sort: if the notification has linked vulnerabilities, sort each
   // baseline Issue into at-risk / possibly-at-risk / unaffected. Runs before

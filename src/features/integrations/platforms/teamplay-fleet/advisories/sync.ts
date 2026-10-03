@@ -7,6 +7,7 @@ import type {
 import { SourceChannel } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { sourceContentHash } from "@/lib/source-hash";
+import { dispatchUnprocessedSnapshots } from "../../../core/source-records";
 import type { FleetConfig, FleetCreds } from "../config";
 import {
   type FleetAdvisoryItem,
@@ -15,7 +16,6 @@ import {
   toCanonical,
 } from "./advisories";
 import { downloadAdvisoryPdfs } from "./attachments";
-import { dispatchUnprocessedSnapshots } from "./source-record";
 
 interface ChangedAdvisory {
   item: FleetAdvisoryItem;

@@ -75,7 +75,9 @@ export const processSourceRecord = inngest.createFunction(
       );
     }
 
-    const { doc, linkEntities, known } = adapter.prepare(snapshot.raw);
+    const { doc, linkEntities, known, suppressWhenNoAssets } = adapter.prepare(
+      snapshot.raw,
+    );
 
     const result = await runNotificationPipeline({
       step,
@@ -83,6 +85,7 @@ export const processSourceRecord = inngest.createFunction(
       doc,
       linkEntities,
       known,
+      suppressWhenNoAssets,
     });
 
     return { sourceRecordId, platform: snapshot.platform, ...result };

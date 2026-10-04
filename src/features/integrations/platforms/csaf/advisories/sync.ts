@@ -231,7 +231,7 @@ export const syncAdvisories = async (
         relevant.push(item);
       }
     }
-    await recordSnapshots(wanted, ctx.integrationId);
+    await recordSnapshots(relevant, ctx.integrationId);
 
     for (const item of items) {
       state.seen[item.entry.id] = String(item.entry.updatedAt);
@@ -252,7 +252,7 @@ export const syncAdvisories = async (
       entries: result.entries.length,
       candidates: candidates.length,
       downloaded: items.length,
-      recorded: wanted.length,
+      recorded: relevant.length,
       dispatched,
     });
   }

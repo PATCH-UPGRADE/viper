@@ -12,5 +12,5 @@ export const advisories: ResourceModule<
 > = {
   sync: syncAdvisories,
   sourceRecords: advisorySourceAdapter,
-  defaultSyncEvery: 3600,
+  defaultSyncEvery: 604800, // sync once per week
 };

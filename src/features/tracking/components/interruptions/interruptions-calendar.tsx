@@ -155,6 +155,9 @@ const TicketBlock = ({ block }: { block: Block }) => {
         </span>
         <span className="flex items-center gap-1">
           <Icon className="size-3 shrink-0" aria-hidden />
+          <span className="sr-only">
+            {availabilityStyle(item.availability).label}
+          </span>
           <span className="truncate">
             {format(item.scheduledAt, "h:mm a")}
             {item.durationEstimate &&
@@ -485,7 +488,12 @@ export const InterruptionsView = () => {
       <TabsTrigger value="list">
         <ListIcon aria-hidden />
         List
-        {all && <Badge variant="secondary">{all.length}</Badge>}
+        {all && (
+          <Badge variant="secondary">
+            {all.length}
+            {all.length >= 500 && "+"}
+          </Badge>
+        )}
       </TabsTrigger>
     </TabsList>
   );

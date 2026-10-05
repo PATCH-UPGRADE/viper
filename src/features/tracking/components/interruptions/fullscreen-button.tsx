@@ -8,7 +8,7 @@ export const FullscreenButton = () => (
     variant="ghost"
     size="icon"
     aria-label="Full screen"
-    onClick={() => document.documentElement.requestFullscreen()}
+    onClick={() => document.documentElement.requestFullscreen().catch(() => {})}
   >
     <MaximizeIcon aria-hidden />
   </Button>

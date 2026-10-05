@@ -1308,13 +1308,13 @@ model WorkOrderTicket {
   assets AssetTicket[] @relation("WorkOrderAssets")
   ticket AssetTicket?  @relation("WorkOrderAssetTicket")
 
-  comments           TicketComment[]
-  descriptions       TicketDescription[]
-  watchers           TicketWatch[]
-  seenBy             TicketSeen[]
-  activities         TicketActivity[]
-  externalMappings   ExternalWorkOrderMapping[]
-  lastCommentAt      DateTime?
+  comments         TicketComment[]
+  descriptions     TicketDescription[]
+  watchers         TicketWatch[]
+  seenBy           TicketSeen[]
+  activities       TicketActivity[]
+  externalMappings ExternalWorkOrderMapping[]
+  lastCommentAt    DateTime?
 
   linksAsA WorkOrderTicketLink[] @relation("WorkOrderTicketLinkA")
   linksAsB WorkOrderTicketLink[] @relation("WorkOrderTicketLinkB")

@@ -89,10 +89,9 @@ export const availabilityStyle = (
 };
 
 export const UnreadDot = () => (
-  <span
-    title="Not opened by you"
-    className="size-2 shrink-0 rounded-full bg-primary"
-  />
+  <span className="size-2 shrink-0 rounded-full bg-primary">
+    <span className="sr-only">Not opened by you</span>
+  </span>
 );
 
 export const formatDate = (date: Date | string | null | undefined) => {

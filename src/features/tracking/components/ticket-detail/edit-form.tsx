@@ -273,47 +273,58 @@ export const TicketEditForm = ({
             />
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="ticket-duration">
-              Estimated duration (minutes)
-            </Label>
-            <Input
-              id="ticket-duration"
-              type="number"
-              min={1}
-              value={form.durationEstimate}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, durationEstimate: e.target.value }))
-              }
-            />
-          </div>
+          {/* Device tickets take these from their work order. */}
+          {!data.parentId && (
+            <>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="ticket-duration">
+                  Estimated duration (minutes)
+                </Label>
+                <Input
+                  id="ticket-duration"
+                  inputMode="numeric"
+                  value={form.durationEstimate}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      durationEstimate: e.target.value.replace(/\D/g, ""),
+                    }))
+                  }
+                />
+              </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="ticket-availability">Availability</Label>
-            <Select
-              value={form.availability}
-              onValueChange={(v) =>
-                setForm((f) => ({
-                  ...f,
-                  availability: v as MaintenanceAvailability | typeof UNKNOWN,
-                }))
-              }
-            >
-              <SelectTrigger id="ticket-availability">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UNKNOWN}>Not confirmed</SelectItem>
-                {(
-                  Object.keys(availabilityLabels) as MaintenanceAvailability[]
-                ).map((a) => (
-                  <SelectItem key={a} value={a}>
-                    {availabilityLabels[a]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="ticket-availability">Availability</Label>
+                <Select
+                  value={form.availability}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      availability: v as
+                        | MaintenanceAvailability
+                        | typeof UNKNOWN,
+                    }))
+                  }
+                >
+                  <SelectTrigger id="ticket-availability">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNKNOWN}>Not confirmed</SelectItem>
+                    {(
+                      Object.keys(
+                        availabilityLabels,
+                      ) as MaintenanceAvailability[]
+                    ).map((a) => (
+                      <SelectItem key={a} value={a}>
+                        {availabilityLabels[a]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="ticket-category">Category</Label>

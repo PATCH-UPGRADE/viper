@@ -37,7 +37,7 @@ import {
 } from "../contract";
 import { findInFileConflicts } from "../import/conflicts";
 import { loadMatchContext } from "../import/context";
-import { type MatchContext, planMatches } from "../import/plan";
+import { type MatchContext, matchRowsToDevices } from "../import/match-rows";
 import { findStagedRows, putChunk } from "../import/staging";
 import { toCsv } from "../import/to-csv";
 
@@ -172,7 +172,7 @@ export const importProcedures = {
       assertWithinRequestLimit(input);
       const inFileConflicts = findInFileConflicts(input.rows);
       const context = await loadMatchContext(input.rows);
-      const outcomes = planMatches(input.rows, context, inFileConflicts);
+      const outcomes = matchRowsToDevices(input.rows, context, inFileConflicts);
       return { outcomes, linkedAssets: linkedAssetsFor(outcomes, context) };
     }),
 

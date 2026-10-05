@@ -22,8 +22,8 @@ import {
 import { nameBelongsToAnother } from "@/features/integrations/platforms/csv-upload/import/names";
 import {
   type MatchContext,
-  planMatches,
-} from "@/features/integrations/platforms/csv-upload/import/plan";
+  matchRowsToDevices,
+} from "@/features/integrations/platforms/csv-upload/import/match-rows";
 import { getChunk } from "@/features/integrations/platforms/csv-upload/import/staging";
 import { CsvImportStatus, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -170,7 +170,7 @@ async function recordFileLevelFailures(job: ImportJob) {
     }
   }
 
-  const outcomes = planMatches(
+  const outcomes = matchRowsToDevices(
     fileRows,
     fileContext,
     findInFileConflicts(fileRows),
@@ -204,7 +204,7 @@ async function applyStagedChunk(job: ImportJob, chunkIndex: number) {
     excludeIntegrationId: job.integrationId,
   });
   const canonicalNames = await loadCanonicalNames(plan.nameDecisions);
-  const outcomes = planMatches(rows, context, recordedReasonByRow);
+  const outcomes = matchRowsToDevices(rows, context, recordedReasonByRow);
 
   const chunkResult = await applyChunk({
     integrationId: job.integrationId,

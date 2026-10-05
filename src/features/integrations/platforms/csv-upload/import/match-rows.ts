@@ -126,7 +126,7 @@ function findDevice(
   return rowHasHardwareKey ? NO_MATCH : matchByHostname(row, lookups);
 }
 
-export function planMatches(
+export function matchRowsToDevices(
   rows: MatchKeysRow[],
   context: MatchContext,
   inFileConflicts: Map<number, string>,

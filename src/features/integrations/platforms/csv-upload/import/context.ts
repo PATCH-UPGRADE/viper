@@ -4,7 +4,7 @@ import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { displayNameFor } from "../../../core/registry";
 import type { MatchKeysRow, NameDecision, NameDecisions } from "../contract";
-import type { ContextAsset, MatchContext } from "./plan";
+import type { ContextAsset, MatchContext } from "./match-rows";
 
 export interface CanonicalNames {
   manufacturers: Map<string, string>;

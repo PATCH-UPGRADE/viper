@@ -48,7 +48,7 @@ import {
 } from "@/generated/prisma";
 import { createCallerFactory, createTRPCRouter } from "@/trpc/init";
 import type { MatchKeysRow, StagedRow } from "../contract";
-import type { ContextAsset } from "../import/plan";
+import type { ContextAsset } from "../import/match-rows";
 import { importProcedures } from "./import-procedures";
 
 const caller = createCallerFactory(createTRPCRouter(importProcedures))({

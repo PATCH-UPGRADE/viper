@@ -18,7 +18,7 @@ import { ResourceType } from "@/generated/prisma";
 import { resolveDeviceGroup } from "@/lib/router-utils";
 import type { RowOutcome, StagedRow } from "../../contract";
 import { type ApplyChunkInput, applyChunk } from "../apply";
-import type { ContextAsset } from "../plan";
+import type { ContextAsset } from "../match-rows";
 
 const stagedRow = (overrides: Partial<StagedRow> = {}): StagedRow => ({
   rowNumber: 2,

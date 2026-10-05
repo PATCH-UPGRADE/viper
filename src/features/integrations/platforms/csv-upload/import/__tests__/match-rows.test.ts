@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MatchKeysRow } from "../../contract";
-import { type ContextAsset, type MatchContext, planMatches } from "../plan";
+import { type ContextAsset, type MatchContext, matchRowsToDevices } from "../match-rows";
 
 const keysRow = (overrides: Partial<MatchKeysRow>): MatchKeysRow => ({
   rowNumber: 2,
@@ -33,9 +33,9 @@ const contextOf = (...assets: ContextAsset[]): MatchContext => ({
 
 const noConflicts = new Map<number, string>();
 
-describe("planMatches — adding and linking", () => {
+describe("matchRowsToDevices — adding and linking", () => {
   it("adds a row that matches nothing in VIPER", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [keysRow({ serialNumber: "GE-LQ-2019-001" })],
       contextOf(),
       noConflicts,
@@ -45,7 +45,7 @@ describe("planMatches — adding and linking", () => {
   });
 
   it("links a row to the one device with its serial", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [keysRow({ serialNumber: "GE-LQ-2019-001" })],
       contextOf(
         viperAsset({ id: "rad-us-001", serialNumber: "GE-LQ-2019-001" }),
@@ -59,7 +59,7 @@ describe("planMatches — adding and linking", () => {
   });
 
   it("links by MAC address when the row has no serial", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [keysRow({ macAddress: "00:1A:2B:3C:4D:5E" })],
       contextOf(
         viperAsset({
@@ -79,7 +79,7 @@ describe("planMatches — adding and linking", () => {
   });
 
   it("links by MAC address when the device has no serial on record", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [keysRow({ serialNumber: "BD-240118", macAddress: "00:1A:2B:3C:4D:5E" })],
       contextOf(viperAsset({ id: "pump-3", macAddress: "00:1A:2B:3C:4D:5E" })),
       noConflicts,
@@ -93,7 +93,7 @@ describe("planMatches — adding and linking", () => {
   });
 
   it("links when serial and MAC address name the same device", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [keysRow({ serialNumber: "S-418220", macAddress: "00:AA:BB:CC:DD:EE" })],
       contextOf(
         viperAsset({
@@ -115,7 +115,7 @@ describe("planMatches — adding and linking", () => {
   it("matches by hostname only when the row has neither serial nor MAC", () => {
     const workstation = viperAsset({ id: "ws-1", hostname: "ws-icu-01" });
 
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [
         keysRow({ rowNumber: 2, hostname: "ws-icu-01" }),
         keysRow({ rowNumber: 3, serialNumber: "NEW-1", hostname: "ws-icu-01" }),
@@ -131,7 +131,7 @@ describe("planMatches — adding and linking", () => {
   });
 });
 
-describe("planMatches — rows that fail", () => {
+describe("matchRowsToDevices — rows that fail", () => {
   const carbonGateway = viperAsset({
     id: "fleet-gateway",
     serialNumber: "100153",
@@ -143,7 +143,7 @@ describe("planMatches — rows that fail", () => {
   });
 
   it("fails a serial that two devices in VIPER share", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [keysRow({ serialNumber: "100153" })],
       contextOf(carbonGateway, carbonSolution),
       noConflicts,
@@ -157,7 +157,7 @@ describe("planMatches — rows that fail", () => {
   });
 
   it("keeps failing a shared serial even when the MAC address points at one part", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [keysRow({ serialNumber: "100153", macAddress: "00:00:00:00:01:53" })],
       contextOf(carbonGateway, carbonSolution),
       noConflicts,
@@ -170,7 +170,7 @@ describe("planMatches — rows that fail", () => {
   });
 
   it("fails a MAC address that two devices in VIPER share", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [keysRow({ macAddress: "00:1A:2B:3C:4D:5E" })],
       contextOf(
         viperAsset({ id: "a", macAddress: "00:1A:2B:3C:4D:5E" }),
@@ -186,7 +186,7 @@ describe("planMatches — rows that fail", () => {
   });
 
   it("fails a hostname that two devices in VIPER share", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [keysRow({ hostname: "ws-icu-01" })],
       contextOf(
         viperAsset({ id: "a", hostname: "ws-icu-01" }),
@@ -203,7 +203,7 @@ describe("planMatches — rows that fail", () => {
   });
 
   it("fails a row whose serial and MAC address belong to different devices", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [keysRow({ serialNumber: "S-418220", macAddress: "00:1A:2B:3C:4D:5E" })],
       contextOf(
         viperAsset({ id: "ct-1", serialNumber: "S-418220" }),
@@ -219,7 +219,7 @@ describe("planMatches — rows that fail", () => {
   });
 
   it("fails a MAC address held by a device with a different serial", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [keysRow({ serialNumber: "BD-240118", macAddress: "00:1A:2B:3C:4D:5E" })],
       contextOf(
         viperAsset({
@@ -238,7 +238,7 @@ describe("planMatches — rows that fail", () => {
   });
 
   it("fails the second row that would link to the same device", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [
         keysRow({ rowNumber: 2, serialNumber: "S-418220" }),
         keysRow({ rowNumber: 7, hostname: "ct-scanner-1" }),
@@ -264,7 +264,7 @@ describe("planMatches — rows that fail", () => {
   });
 
   it("passes an in-file conflict through without matching the row", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [keysRow({ rowNumber: 214, serialNumber: "S-418220" })],
       contextOf(viperAsset({ id: "ct-1", serialNumber: "S-418220" })),
       new Map([[214, "Serial also used by row 88 in this file"]]),
@@ -278,7 +278,7 @@ describe("planMatches — rows that fail", () => {
   });
 
   it("lets a later row link a device that a failed row also matched", () => {
-    const outcomes = planMatches(
+    const outcomes = matchRowsToDevices(
       [
         keysRow({ rowNumber: 2, product: null, serialNumber: "S-418220" }),
         keysRow({ rowNumber: 3, hostname: "ct-scanner-1" }),

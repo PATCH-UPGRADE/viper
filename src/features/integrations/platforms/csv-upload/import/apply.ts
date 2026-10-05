@@ -12,7 +12,7 @@ import {
   type StagedRow,
 } from "../contract";
 import type { CanonicalNames } from "./context";
-import type { ContextAsset, MatchContext } from "./plan";
+import type { ContextAsset, MatchContext } from "./match-rows";
 
 const SCALAR_FIELDS = [
   "ip",

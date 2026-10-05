@@ -664,7 +664,6 @@ export const trackingRouter = createTRPCRouter({
           .optional(),
         assigneeId: z.string().nullish(),
         scheduledAt: z.coerce.date().nullish(),
-        // Expected maintenance time in whole minutes.
         durationEstimate: z.number().int().positive().nullish(),
         availability: z.enum(MaintenanceAvailability).nullish(),
       }),

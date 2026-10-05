@@ -1294,10 +1294,10 @@ model WorkOrderTicket {
 
   scheduledAt DateTime?
 
-  // Expected maintenance time, in whole minutes. Null until someone sets it.
+  // In whole minutes.
   durationEstimate Int?
 
-  // Whether the device can be used during the work. Null until someone says.
+  // Null means not confirmed.
   availability MaintenanceAvailability?
 
   issues          Issue[]                          @relation("WorkOrderTicketIssues")

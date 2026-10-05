@@ -16,11 +16,9 @@ import {
 } from "../ticket-detail/shared";
 import { TicketDrawer } from "./ticket-drawer";
 
-// Work order / asset, scheduled (per work order), estimate.
 const COLUMNS =
   "grid grid-cols-[minmax(0,1fr)_14rem_8rem] items-center gap-x-4 px-4";
 
-// Open device tickets grouped by work order. <details> does the expanding.
 export const InterruptionsList = () => {
   const trpc = useTRPC();
   const { data, isError } = useQuery(

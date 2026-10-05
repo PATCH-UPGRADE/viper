@@ -53,7 +53,6 @@ import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
 const DATE_FORMAT = "yyyy-MM-dd";
 const HOUR_HEIGHT = 72;
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
-// A block is this tall, in minutes, when the work order has no estimate.
 const DEFAULT_MINUTES = 60;
 
 // The calendar only holds tickets that have a time.
@@ -104,7 +103,6 @@ const deviceLabel = (group: Item[]) =>
     ? `${group.length} devices · ${group[0].assetName}`
     : group[0].assetName;
 
-// The availability-colored button that opens a group's drawer.
 const GroupButton = ({
   group,
   className,

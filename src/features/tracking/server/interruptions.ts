@@ -91,7 +91,6 @@ export const getInterruptionCalendar = async (
   }));
 };
 
-// Every open device ticket in scope, scheduled or not, soonest first.
 export const getInterruptionList = async (userId: string) => {
   const departmentId = await departmentOf(userId);
   if (!departmentId) return [];

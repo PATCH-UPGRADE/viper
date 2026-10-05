@@ -31,6 +31,7 @@ import {
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { type ReactNode, useEffect, useState } from "react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -464,15 +465,27 @@ export const InterruptionsView = () => {
     "tab",
     parseAsStringLiteral(["calendar", "list"] as const).withDefault("calendar"),
   );
+  const trpc = useTRPC();
+  const { data: all } = useQuery(
+    trpc.tracking.getInterruptionList.queryOptions(undefined, {
+      refetchInterval: 60_000,
+    }),
+  );
   const tabs = (
     <TabsList variant="line">
       <TabsTrigger value="calendar">
         <CalendarIcon aria-hidden />
         Calendar
+        {all && (
+          <Badge variant="secondary">
+            {all.filter((i) => i.scheduledAt).length}
+          </Badge>
+        )}
       </TabsTrigger>
       <TabsTrigger value="list">
         <ListIcon aria-hidden />
         List
+        {all && <Badge variant="secondary">{all.length}</Badge>}
       </TabsTrigger>
     </TabsList>
   );

@@ -2,6 +2,7 @@ import Image from "next/image";
 import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserAvatar } from "@/components/user-avatar";
+import { FullscreenButton } from "@/features/tracking/components/interruptions/fullscreen-button";
 import { InterruptionsView } from "@/features/tracking/components/interruptions/interruptions-calendar";
 import { requireAuth } from "@/lib/auth-utils";
 
@@ -22,6 +23,7 @@ const Page = async () => {
           <UserAvatar user={user} className="border" />
           <span className="text-sm font-medium">{user.name}</span>
           <ThemeToggle />
+          <FullscreenButton />
         </div>
       </header>
       <ReportingErrorBoundary

@@ -1,17 +1,17 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { ChevronDownIcon, ClockIcon } from "lucide-react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { Badge } from "@/components/ui/badge";
-import { formatScheduled } from "@/lib/date-utils";
 import { plural } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import {
   availabilityStyle,
   categoryLabels,
   StatusChip,
+  statusLabels,
   UnreadDot,
 } from "../ticket-detail/shared";
 import { TicketDrawer } from "./ticket-drawer";
@@ -84,6 +84,12 @@ export const InterruptionsList = () => {
                         <availability.Icon aria-hidden />
                         {availability.label}
                       </Badge>
+                      {Object.entries(Object.groupBy(group, (i) => i.status))
+                        .map(
+                          ([status, items]) =>
+                            `${items?.length} ${statusLabels[status as keyof typeof statusLabels]}`,
+                        )
+                        .join(" · ")}
                     </span>
                   </span>
                 </span>
@@ -113,8 +119,19 @@ export const InterruptionsList = () => {
                           </span>
                           <StatusChip status={item.status} />
                         </span>
-                        <span>
-                          {formatScheduled(item.scheduledAt) ?? (
+                        <span className="flex flex-col">
+                          {item.scheduledAt ? (
+                            <>
+                              {format(item.scheduledAt, "EEE, MMM d · h:mm a")}
+                              {item.scheduledAt < new Date() && (
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDistanceToNow(item.scheduledAt, {
+                                    addSuffix: true,
+                                  })}
+                                </span>
+                              )}
+                            </>
+                          ) : (
                             <span className="italic text-muted-foreground">
                               No time recorded
                             </span>

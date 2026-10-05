@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { downloadBufferFromS3, uploadBufferToS3 } from "@/lib/s3";
+import { deleteFromS3, downloadBufferFromS3, uploadBufferToS3 } from "@/lib/s3";
 import { type StagedRow, stagedRowSchema } from "../contract";
 
 const stagedChunkSchema = z.array(stagedRowSchema);
@@ -27,6 +27,15 @@ export async function getChunk(
 ): Promise<StagedRow[]> {
   const chunkJson = await downloadBufferFromS3(chunkKey(importId, chunkIndex));
   return stagedChunkSchema.parse(JSON.parse(chunkJson.toString("utf8")));
+}
+
+export async function deleteChunks(
+  importId: string,
+  chunkCount: number,
+): Promise<void> {
+  for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+    await deleteFromS3(chunkKey(importId, chunkIndex));
+  }
 }
 
 export async function findStagedRows(

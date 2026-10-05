@@ -24,7 +24,10 @@ import {
   matchRowsToDevices,
 } from "@/features/integrations/platforms/csv-upload/import/match-rows";
 import { nameBelongsToAnother } from "@/features/integrations/platforms/csv-upload/import/names";
-import { getChunk } from "@/features/integrations/platforms/csv-upload/import/staging";
+import {
+  deleteChunks,
+  getChunk,
+} from "@/features/integrations/platforms/csv-upload/import/staging";
 import { CsvImportStatus, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { inngest } from "../client";
@@ -355,6 +358,16 @@ export const applyCsvImportFn = inngest.createFunction(
       stepErrorMessage = chunk.ok ? null : chunk.errorMessage;
     }
 
-    return step.run("finish", () => finishImport(job, stepErrorMessage));
+    const finished = await step.run("finish", () =>
+      finishImport(job, stepErrorMessage),
+    );
+
+    const everyRowApplied = finished.status === CsvImportStatus.Succeeded;
+    if (everyRowApplied) {
+      await step.run("delete-staged-rows", () =>
+        settle(() => deleteChunks(job.importId, job.chunkCount)),
+      );
+    }
+    return finished;
   },
 );

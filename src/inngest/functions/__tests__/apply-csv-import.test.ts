@@ -6,6 +6,7 @@ vi.mock("server-only", () => ({}));
 const {
   mockPrisma,
   mockGetChunk,
+  mockDeleteChunks,
   mockLoadMatchContext,
   mockLoadCanonicalNames,
   mockApplyChunk,
@@ -23,6 +24,7 @@ const {
     },
   },
   mockGetChunk: vi.fn(),
+  mockDeleteChunks: vi.fn(),
   mockLoadMatchContext: vi.fn(),
   mockLoadCanonicalNames: vi.fn(),
   mockApplyChunk: vi.fn(),
@@ -44,6 +46,7 @@ vi.mock("../../client", () => ({
 }));
 vi.mock("@/features/integrations/platforms/csv-upload/import/staging", () => ({
   getChunk: mockGetChunk,
+  deleteChunks: mockDeleteChunks,
 }));
 vi.mock("@/features/integrations/platforms/csv-upload/import/context", () => ({
   loadMatchContext: mockLoadMatchContext,
@@ -198,6 +201,7 @@ describe("applyCsvImportFn — steps", () => {
       "apply-chunk-0",
       "apply-chunk-1",
       "finish",
+      "delete-staged-rows",
     ]);
     expect(mockPrisma.csvImport.updateMany).toHaveBeenCalledWith({
       where: { id: "imp-1", status: CsvImportStatus.Queued },
@@ -413,6 +417,37 @@ describe("applyCsvImportFn — finishing", () => {
       ResourceType.Asset,
       expect.objectContaining({ message: "S3 timed out", shouldRetry: true }),
       expect.any(Date),
+    );
+  });
+
+  it("deletes the staged rows once every row applied", async () => {
+    await runWith();
+
+    expect(mockDeleteChunks).toHaveBeenCalledWith("imp-1", 2);
+  });
+
+  it("keeps the staged rows when some rows failed, for the failed-rows download", async () => {
+    finalCounts = {
+      totalRows: 8,
+      addedCount: 5,
+      linkedCount: 1,
+      failedCount: 2,
+    };
+    const step = makeStep();
+
+    await runWith(step);
+
+    expect(mockDeleteChunks).not.toHaveBeenCalled();
+    expect(step.order.at(-1)).toBe("finish");
+  });
+
+  it("still reports the import as Succeeded when the staged rows cannot be deleted", async () => {
+    mockDeleteChunks.mockRejectedValue(new Error("S3 timed out"));
+
+    const result = await runWith();
+
+    expect(result).toEqual(
+      expect.objectContaining({ status: CsvImportStatus.Succeeded }),
     );
   });
 

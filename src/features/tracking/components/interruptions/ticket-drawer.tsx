@@ -32,7 +32,7 @@ export type DrawerTicket = {
 // Only fetched while the drawer is open: the sheet's content mounts on open.
 const Details = ({ id }: { id: string }) => {
   const trpc = useTRPC();
-  const { data } = useQuery(
+  const { data, isError } = useQuery(
     trpc.tracking.getInterruptionDetail.queryOptions({ id }),
   );
   const markSeen = useMarkTicketSeen();
@@ -45,6 +45,11 @@ const Details = ({ id }: { id: string }) => {
     if (loaded) markSeen.mutate({ ticketId: id });
   }, [loaded, id]);
 
+  if (isError) {
+    return (
+      <p className="text-sm text-destructive">Could not load this ticket.</p>
+    );
+  }
   if (!data) return <p className="text-sm text-muted-foreground">Loading...</p>;
   return (
     <>

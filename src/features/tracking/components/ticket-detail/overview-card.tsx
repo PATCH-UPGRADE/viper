@@ -16,7 +16,12 @@ import { Card } from "@/components/ui/card";
 import { getChipClass } from "@/features/tag-colors/palette";
 import { formatScheduled } from "@/lib/date-utils";
 import type { TicketDetail } from "../../types";
-import { CategoryChip, formatDate, StatusChip } from "./shared";
+import {
+  availabilityLabels,
+  CategoryChip,
+  formatDate,
+  StatusChip,
+} from "./shared";
 
 const FieldLabel = ({ children }: { children: React.ReactNode }) => (
   <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -24,7 +29,7 @@ const FieldLabel = ({ children }: { children: React.ReactNode }) => (
   </span>
 );
 
-export const MetaField = ({
+const MetaField = ({
   label,
   children,
 }: {
@@ -167,6 +172,14 @@ export const OverviewCard = ({ data }: { data: TicketDetail }) => {
             <CalendarIcon className="size-3.5 text-muted-foreground" />
             {formatScheduled(data.scheduledAt) ?? "—"}
           </div>
+        </MetaField>
+
+        <MetaField label="Estimated duration">
+          {data.durationEstimate ? `${data.durationEstimate} min` : "—"}
+        </MetaField>
+
+        <MetaField label="Availability">
+          {data.availability ? availabilityLabels[data.availability] : "—"}
         </MetaField>
 
         <MetaField label="Category">

@@ -172,6 +172,9 @@ export const useMarkTicketSeen = () => {
       },
       onSettled: () => {
         queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
+        queryClient.invalidateQueries(
+          trpc.tracking.getInterruptionCalendar.pathFilter(),
+        );
       },
     }),
   );

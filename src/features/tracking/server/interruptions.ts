@@ -30,6 +30,44 @@ const inScope = (departmentId: string): Prisma.AssetTicketWhereInput => ({
   ticket: open,
 });
 
+const itemSelect = (userId: string) =>
+  ({
+    parentTicketId: true,
+    parentTicket: {
+      select: { summary: true, durationEstimate: true, availability: true },
+    },
+    asset: { select: assetNameSelect },
+    ticket: {
+      select: {
+        id: true,
+        summary: true,
+        status: true,
+        category: true,
+        scheduledAt: true,
+        seenBy: { where: { userId }, select: { userId: true } },
+      },
+    },
+  }) satisfies Prisma.AssetTicketSelect;
+
+type ItemRow = Prisma.AssetTicketGetPayload<{
+  select: ReturnType<typeof itemSelect>;
+}>;
+
+// Duration and availability belong to the work order; every device shares them.
+const toItem = ({ parentTicketId, parentTicket, asset, ticket }: ItemRow) => ({
+  id: ticket.id,
+  summary: ticket.summary,
+  status: ticket.status,
+  category: ticket.category,
+  scheduledAt: ticket.scheduledAt,
+  unread: ticket.seenBy.length === 0,
+  workOrderId: parentTicketId,
+  workOrderSummary: parentTicket.summary,
+  durationEstimate: parentTicket.durationEstimate,
+  availability: parentTicket.availability,
+  assetName: getAssetDisplayName(asset),
+});
+
 export const getInterruptionCalendar = async (
   userId: string,
   range: { from: Date; to: Date },
@@ -44,30 +82,27 @@ export const getInterruptionCalendar = async (
         { ticket: { scheduledAt: { gte: range.from, lte: range.to } } },
       ],
     },
-    select: {
-      parentTicketId: true,
-      asset: { select: assetNameSelect },
-      ticket: {
-        select: {
-          id: true,
-          summary: true,
-          status: true,
-          category: true,
-          scheduledAt: true,
-        },
-      },
-    },
+    select: itemSelect(userId),
   });
-  return rows.map(({ parentTicketId, asset, ticket }) => ({
-    id: ticket.id,
-    workOrderId: parentTicketId,
-    category: ticket.category,
-    summary: ticket.summary,
-    status: ticket.status,
-    // The query only returns tickets with a time.
-    scheduledAt: ticket.scheduledAt as Date,
-    assetName: getAssetDisplayName(asset),
+  // The query only returns tickets with a time.
+  return rows.map((row) => ({
+    ...toItem(row),
+    scheduledAt: row.ticket.scheduledAt as Date,
   }));
+};
+
+// Every open device ticket in scope, scheduled or not, soonest first.
+export const getInterruptionList = async (userId: string) => {
+  const departmentId = await departmentOf(userId);
+  if (!departmentId) return [];
+
+  const rows = await prisma.assetTicket.findMany({
+    where: inScope(departmentId),
+    orderBy: { ticket: { scheduledAt: { sort: "asc", nulls: "last" } } },
+    take: 500,
+    select: itemSelect(userId),
+  });
+  return rows.map(toItem);
 };
 
 // What the drawer shows beyond the card, for a device ticket in the user's

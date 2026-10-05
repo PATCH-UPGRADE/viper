@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   addDays,
+  addMinutes,
   addMonths,
   addWeeks,
   eachDayOfInterval,
@@ -20,43 +21,61 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import {
+  CalendarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CircleHelpIcon,
+  ListIcon,
+} from "lucide-react";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
-import { type ReactNode, Suspense, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
-  CategoryColorProvider,
-  useCategoryColor,
-} from "@/features/tag-colors/context";
-import { getChipClass } from "@/features/tag-colors/palette";
-import type { TicketCategory } from "@/generated/prisma";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { MaintenanceAvailability } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { statusLabels } from "../ticket-detail/shared";
+import {
+  availabilityLabels,
+  availabilityStyle,
+  UnreadDot,
+} from "../ticket-detail/shared";
+import { InterruptionsList } from "./interruptions-list";
 import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
 
 const DATE_FORMAT = "yyyy-MM-dd";
 const HOUR_HEIGHT = 72;
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
-// Every block is this tall, in minutes.
-const BLOCK_MINUTES = 60;
+// A block is this tall, in minutes, when the work order has no estimate.
+const DEFAULT_MINUTES = 60;
 
-type Item = DrawerTicket & { workOrderId: string; category: TicketCategory };
-type Block = { items: Item[]; start: number; lane: number; lanes: number };
+// The calendar only holds tickets that have a time.
+type Item = DrawerTicket & {
+  scheduledAt: Date;
+  workOrderId: string;
+  unread: boolean;
+};
+type Block = {
+  items: Item[];
+  start: number;
+  len: number;
+  lane: number;
+  lanes: number;
+};
 
 // One group per work order and time, so a fleet update reads "3 devices".
-const groupByWorkOrder = (items: Item[]) => {
-  const groups = new Map<string, Item[]>();
-  for (const item of items) {
-    const key = `${item.workOrderId}|${item.scheduledAt.getTime()}`;
-    const group = groups.get(key);
-    if (group) group.push(item);
-    else groups.set(key, [item]);
-  }
-  return [...groups.values()];
-};
+const groupByWorkOrder = (items: Item[]) => [
+  ...Map.groupBy(
+    items,
+    (item) => `${item.workOrderId}|${item.scheduledAt.getTime()}`,
+  ).values(),
+];
 
 // Blocks that overlap sit in separate lanes, sharing the day's width.
 const layout = (items: Item[]): Block[] => {
@@ -64,6 +83,7 @@ const layout = (items: Item[]): Block[] => {
     .map((group) => ({
       items: group,
       start: minutesOf(group[0].scheduledAt),
+      len: group[0].durationEstimate ?? DEFAULT_MINUTES,
       lane: 0,
       lanes: 1,
     }))
@@ -72,16 +92,18 @@ const layout = (items: Item[]): Block[] => {
   for (const block of blocks) {
     const free = laneEnds.findIndex((end) => end <= block.start);
     block.lane = free < 0 ? laneEnds.length : free;
-    laneEnds[block.lane] = block.start + BLOCK_MINUTES;
+    laneEnds[block.lane] = block.start + block.len;
   }
   for (const block of blocks) block.lanes = laneEnds.length;
   return blocks;
 };
 
 const deviceLabel = (group: Item[]) =>
-  group.length > 1 ? `${group.length} devices` : group[0].assetName;
+  group.length > 1
+    ? `${group.length} devices · ${group[0].assetName}`
+    : group[0].assetName;
 
-// The category-colored button that opens a group's drawer.
+// The availability-colored button that opens a group's drawer.
 const GroupButton = ({
   group,
   className,
@@ -92,7 +114,6 @@ const GroupButton = ({
   children: ReactNode;
 }) => {
   const [item] = group;
-  const color = useCategoryColor(item.category);
   return (
     <TicketDrawer ticket={item}>
       <button
@@ -100,7 +121,7 @@ const GroupButton = ({
         title={item.summary}
         className={cn(
           "overflow-hidden rounded border border-l-4 text-left text-[11px] hover:brightness-95",
-          getChipClass(color),
+          availabilityStyle(item.availability).className,
           className,
         )}
       >
@@ -112,6 +133,7 @@ const GroupButton = ({
 
 const TicketBlock = ({ block }: { block: Block }) => {
   const [item] = block.items;
+  const { Icon } = availabilityStyle(item.availability);
   return (
     <div
       className="absolute"
@@ -119,21 +141,25 @@ const TicketBlock = ({ block }: { block: Block }) => {
         left: `calc(${(block.lane * 100) / block.lanes}% + 2px)`,
         width: `calc(${100 / block.lanes}% - 4px)`,
         top: (block.start * HOUR_HEIGHT) / 60,
-        height: (BLOCK_MINUTES * HOUR_HEIGHT) / 60 - 2,
+        height: Math.max((block.len * HOUR_HEIGHT) / 60 - 2, 20),
       }}
     >
       <GroupButton
         group={block.items}
         className="flex h-full w-full flex-col gap-0.5 rounded-md px-1.5 py-0.5 leading-tight"
       >
-        <span className="truncate text-xs font-medium">
-          {deviceLabel(block.items)}
+        <span className="flex items-center gap-1 text-xs font-medium">
+          <span className="truncate">{deviceLabel(block.items)}</span>
+          {block.items.some((i) => i.unread) && <UnreadDot />}
         </span>
-        <span className="truncate">
-          {format(item.scheduledAt, "h:mm a")}
-          {block.items.length === 1 && ` · ${statusLabels[item.status]}`}
+        <span className="flex items-center gap-1">
+          <Icon className="size-3 shrink-0" aria-hidden />
+          <span className="truncate">
+            {format(item.scheduledAt, "h:mm a")}
+            {item.durationEstimate &&
+              ` – ${format(addMinutes(item.scheduledAt, item.durationEstimate), "h:mm a")}`}
+          </span>
         </span>
-        <span className="truncate opacity-80">{item.summary}</span>
       </GroupButton>
     </div>
   );
@@ -216,7 +242,7 @@ const scrollToWorkday = (el: HTMLDivElement | null) => {
 
 const minutesOf = (date: Date) => date.getHours() * 60 + date.getMinutes();
 
-const Calendar = () => {
+const Calendar = ({ lead }: { lead: ReactNode }) => {
   // yyyy-MM-dd; no date means today. `view` defaults to the week.
   const [date, setDate] = useQueryState("date", parseAsString);
   const [mode, setMode] = useQueryState(
@@ -235,10 +261,10 @@ const Calendar = () => {
   }[mode];
   const days = eachDayOfInterval({ start, end });
   const { data: items, isError } = useQuery(
-    trpc.tracking.getInterruptionCalendar.queryOptions({
-      from: start,
-      to: end,
-    }),
+    trpc.tracking.getInterruptionCalendar.queryOptions(
+      { from: start, to: end },
+      { refetchInterval: 60_000 },
+    ),
   );
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -256,48 +282,85 @@ const Calendar = () => {
     );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pt-3 pb-4">
-      <nav
-        aria-label="Calendar navigation"
-        className="flex flex-wrap items-center justify-end gap-1"
-      >
-        <Button variant="outline" size="sm" onClick={() => setDate(null)}>
-          Today
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Previous"
-          onClick={() => step(-1)}
+    <div className="relative flex min-h-0 flex-1 flex-col gap-3 px-4 pt-3 pb-4">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Legend"
+            className="absolute bottom-6 left-6 z-30 rounded-full"
+          >
+            <CircleHelpIcon aria-hidden />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          className="flex w-72 flex-col gap-2 text-sm"
         >
-          <ChevronLeftIcon aria-hidden />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Next"
-          onClick={() => step(1)}
+          {[
+            ...(Object.keys(availabilityLabels) as MaintenanceAvailability[]),
+            null,
+          ].map((availability) => {
+            const style = availabilityStyle(availability);
+            return (
+              <span
+                key={availability ?? "none"}
+                className="flex items-center gap-2"
+              >
+                <span
+                  className={cn("size-4 rounded border", style.className)}
+                />
+                {style.label}
+              </span>
+            );
+          })}
+          <span className="flex items-center gap-2">
+            <UnreadDot />
+            Not opened by you
+          </span>
+        </PopoverContent>
+      </Popover>
+      <div className="flex flex-wrap items-center gap-2">
+        {lead}
+        <nav
+          aria-label="Calendar navigation"
+          className="ml-auto flex flex-wrap items-center gap-1"
         >
-          <ChevronRightIcon aria-hidden />
-        </Button>
-        <span aria-live="polite" className="mx-2 text-sm font-medium">
-          {mode === "day" && format(start, "EEE, MMM d, yyyy")}
-          {mode === "month" && format(anchor, "MMMM yyyy")}
-          {mode === "week" &&
-            `${format(start, "MMM d")} – ${format(end, "MMM d, yyyy")}`}
-        </span>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          value={mode}
-          onValueChange={(v) => v && setMode(v as typeof mode)}
-        >
-          <ToggleGroupItem value="day">Day</ToggleGroupItem>
-          <ToggleGroupItem value="week">Week</ToggleGroupItem>
-          <ToggleGroupItem value="month">Month</ToggleGroupItem>
-        </ToggleGroup>
-      </nav>
+          <Button variant="outline" size="sm" onClick={() => setDate(null)}>
+            Today
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Previous"
+            onClick={() => step(-1)}
+          >
+            <ChevronLeftIcon aria-hidden />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Next"
+            onClick={() => step(1)}
+          >
+            <ChevronRightIcon aria-hidden />
+          </Button>
+          <span aria-live="polite" className="mx-2 text-sm font-medium">
+            {mode === "day" && format(start, "EEE, MMM d, yyyy")}
+            {mode === "month" && format(anchor, "MMMM yyyy")}
+            {mode === "week" &&
+              `${format(start, "MMM d")} – ${format(end, "MMM d, yyyy")}`}
+          </span>
+          <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
+            <TabsList>
+              <TabsTrigger value="day">Day</TabsTrigger>
+              <TabsTrigger value="week">Week</TabsTrigger>
+              <TabsTrigger value="month">Month</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </nav>
+      </div>
 
       {isError ? (
         <ErrorView message="Error loading maintenance" />
@@ -328,7 +391,7 @@ const Calendar = () => {
             >
               <div className="flex">
                 <div aria-hidden className="w-14 shrink-0">
-                  <div className="sticky top-0 z-20 h-9 border-b bg-card" />
+                  <div className="sticky top-0 z-20 h-12 border-b bg-card" />
                   {HOURS.map((hour) => (
                     <div
                       key={hour}
@@ -348,7 +411,7 @@ const Calendar = () => {
                       isToday(day) && "bg-primary/5",
                     )}
                   >
-                    <h2 className="sticky top-0 z-20 flex h-9 items-center justify-center gap-1.5 border-b bg-card px-2 text-sm">
+                    <h2 className="sticky top-0 z-20 flex h-12 items-center justify-center gap-1.5 border-b bg-card px-2 text-sm">
                       <span className="text-muted-foreground">
                         {format(day, "EEE")}
                       </span>
@@ -362,6 +425,9 @@ const Calendar = () => {
                         {format(day, "d")}
                       </span>
                       {isToday(day) && <span className="sr-only">(today)</span>}
+                      <span className="text-xs text-muted-foreground">
+                        {on(day).length > 0 && `· ${on(day).length}`}
+                      </span>
                     </h2>
                     <div
                       className="relative"
@@ -393,18 +459,39 @@ const Calendar = () => {
   );
 };
 
-// The category colors are a suspense query, which cannot run unauthenticated
-// during SSR, so the calendar renders on the client only.
-export const InterruptionsCalendar = () => {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  return mounted ? (
-    <Suspense fallback={<LoadingView message="Loading maintenance..." />}>
-      <CategoryColorProvider>
-        <Calendar />
-      </CategoryColorProvider>
-    </Suspense>
-  ) : (
-    <LoadingView message="Loading maintenance..." />
+export const InterruptionsView = () => {
+  const [tab, setTab] = useQueryState(
+    "tab",
+    parseAsStringLiteral(["calendar", "list"] as const).withDefault("calendar"),
+  );
+  const tabs = (
+    <TabsList variant="line">
+      <TabsTrigger value="calendar">
+        <CalendarIcon aria-hidden />
+        Calendar
+      </TabsTrigger>
+      <TabsTrigger value="list">
+        <ListIcon aria-hidden />
+        List
+      </TabsTrigger>
+    </TabsList>
+  );
+  return (
+    <Tabs
+      value={tab}
+      onValueChange={(v) => setTab(v as typeof tab)}
+      className="min-h-0 flex-1 gap-0"
+    >
+      <TabsContent value="calendar" className="flex min-h-0 flex-1 flex-col">
+        <Calendar lead={tabs} />
+      </TabsContent>
+      <TabsContent
+        value="list"
+        className="flex min-h-0 flex-1 flex-col gap-3 p-4"
+      >
+        {tabs}
+        <InterruptionsList />
+      </TabsContent>
+    </Tabs>
   );
 };

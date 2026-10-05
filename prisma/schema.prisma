@@ -1168,6 +1168,12 @@ enum TicketStatus {
   DONE
 }
 
+enum MaintenanceAvailability {
+  AVAILABLE
+  PARTIAL
+  UNAVAILABLE
+}
+
 enum TicketCategory {
   PATCH
   CONFIG_CHANGE
@@ -1288,6 +1294,12 @@ model WorkOrderTicket {
 
   scheduledAt DateTime?
 
+  // Expected maintenance time, in whole minutes. Null until someone sets it.
+  durationEstimate Int?
+
+  // Whether the device can be used during the work. Null until someone says.
+  availability MaintenanceAvailability?
+
   issues          Issue[]                          @relation("WorkOrderTicketIssues")
   vulnerabilities Vulnerability[]                  @relation("WorkOrderTicketVulns")
   remediations    Remediation[]                    @relation("WorkOrderTicketRemediations")
@@ -1296,13 +1308,13 @@ model WorkOrderTicket {
   assets AssetTicket[] @relation("WorkOrderAssets")
   ticket AssetTicket?  @relation("WorkOrderAssetTicket")
 
-  comments         TicketComment[]
-  descriptions     TicketDescription[]
-  watchers         TicketWatch[]
-  seenBy           TicketSeen[]
-  activities       TicketActivity[]
-  externalMappings ExternalWorkOrderMapping[]
-  lastCommentAt    DateTime?
+  comments           TicketComment[]
+  descriptions       TicketDescription[]
+  watchers           TicketWatch[]
+  seenBy             TicketSeen[]
+  activities         TicketActivity[]
+  externalMappings   ExternalWorkOrderMapping[]
+  lastCommentAt      DateTime?
 
   linksAsA WorkOrderTicketLink[] @relation("WorkOrderTicketLinkA")
   linksAsB WorkOrderTicketLink[] @relation("WorkOrderTicketLinkB")

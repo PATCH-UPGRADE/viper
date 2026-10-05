@@ -23,6 +23,8 @@ import { AddCommentForm } from "../ticket-detail/add-comment-form";
 import {
   availabilityStyle,
   CategoryChip,
+  END_PASSED,
+  endPassed,
   StatusChip,
 } from "../ticket-detail/shared";
 
@@ -84,6 +86,11 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
           <p className="text-xs">As recorded on the work order</p>
         </div>
       </div>
+      {endPassed(ticket) && (
+        <p className="rounded-lg border bg-muted/40 p-2 text-xs">
+          {END_PASSED}
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3 rounded-lg border p-3 text-sm">
         {[
           [

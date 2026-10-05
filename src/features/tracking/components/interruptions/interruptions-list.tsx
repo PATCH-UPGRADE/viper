@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { format, formatDistanceToNow } from "date-fns";
-import { ChevronDownIcon, ClockIcon } from "lucide-react";
+import { ChevronDownIcon, ClockIcon, SquareCheckBigIcon } from "lucide-react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { Badge } from "@/components/ui/badge";
 import { plural } from "@/lib/utils";
@@ -10,6 +10,8 @@ import { useTRPC } from "@/trpc/client";
 import {
   availabilityStyle,
   categoryLabels,
+  END_PASSED,
+  endPassed,
   StatusChip,
   statusLabels,
   UnreadDot,
@@ -52,6 +54,7 @@ export const InterruptionsList = () => {
             .sort((a, b) => +a - +b);
           const first = times[0];
           const last = times.at(-1);
+          const late = group.filter(endPassed).length;
           return (
             <details
               key={head.workOrderId}
@@ -64,6 +67,10 @@ export const InterruptionsList = () => {
                   <ChevronDownIcon
                     aria-hidden
                     className="mt-0.5 size-4 shrink-0 -rotate-90 text-muted-foreground transition-transform group-open:rotate-0"
+                  />
+                  <SquareCheckBigIcon
+                    aria-hidden
+                    className="mt-0.5 size-4 shrink-0 text-muted-foreground"
                   />
                   <span className="flex min-w-0 flex-col gap-1">
                     <span className="flex items-center gap-1.5 font-semibold">
@@ -88,6 +95,7 @@ export const InterruptionsList = () => {
                             `${items?.length} ${statusLabels[status as keyof typeof statusLabels]}`,
                         )
                         .join(" · ")}
+                      {late > 0 && ` · ${late} past estimated end`}
                     </span>
                   </span>
                 </span>
@@ -132,6 +140,11 @@ export const InterruptionsList = () => {
                           ) : (
                             <span className="italic text-muted-foreground">
                               No time recorded
+                            </span>
+                          )}
+                          {endPassed(item) && (
+                            <span className="text-xs text-muted-foreground">
+                              {END_PASSED}
                             </span>
                           )}
                         </span>

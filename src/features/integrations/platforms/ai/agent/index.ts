@@ -7,7 +7,7 @@ import type { AuthCredential } from "@/features/integrations/core/credentials";
 import { makeFetchUrlTool } from "./fetch-tool";
 import { type CrawlResult, resolveCrawl } from "./outcome";
 import { buildCrawlerPreload, buildCrawlerPrompt } from "./prompt";
-import { makeRecordItemsTool } from "./record-tool";
+import { makeRecorder } from "./record-tool";
 import { CRAWLER_ITEM_SCHEMAS, type CrawlerResource } from "./schemas";
 
 const CRAWLER_MODEL = "gpt-6.1-sol";
@@ -50,8 +50,12 @@ export async function runAiCrawler<R extends CrawlerResource>({
   const itemSchema = CRAWLER_ITEM_SCHEMAS[resource] as unknown as z.ZodType<
     CrawledItem<R>
   >;
-  const recorder = makeRecordItemsTool(itemSchema);
-  const tools = [makeFetchUrlTool({ integrationUri, creds }), recorder.tool];
+  const recorder = makeRecorder(itemSchema);
+  const tools = [
+    makeFetchUrlTool({ integrationUri, creds }),
+    recorder.recordTool,
+    recorder.reportTool,
+  ];
 
   // Reasoning tokens count toward maxTokens, so leave room for a page of record_items arguments.
   const model = new ChatOpenAI({

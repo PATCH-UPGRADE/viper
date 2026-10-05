@@ -5,18 +5,18 @@ import { z } from "zod";
 vi.mock("server-only", () => ({}));
 
 import { ResourceType } from "@/generated/prisma";
-import { makeRecordItemsTool } from "../record-tool";
+import { makeRecorder } from "../record-tool";
 import { CRAWLER_ITEM_SCHEMAS, type CrawlerResource } from "../schemas";
 
 const assetSchema = CRAWLER_ITEM_SCHEMAS[ResourceType.Asset];
 
 describe("record_items", () => {
   it("keeps items across calls", async () => {
-    const recorder = makeRecordItemsTool(assetSchema);
-    await recorder.tool.invoke({
+    const recorder = makeRecorder(assetSchema);
+    await recorder.recordTool.invoke({
       items: [{ externalId: "a", ip: "10.0.0.1" }],
     });
-    await recorder.tool.invoke({
+    await recorder.recordTool.invoke({
       items: [{ externalId: "b", ip: "10.0.0.2" }],
     });
 
@@ -26,11 +26,11 @@ describe("record_items", () => {
   });
 
   it("keeps the last version of a repeated externalId", async () => {
-    const recorder = makeRecordItemsTool(assetSchema);
-    await recorder.tool.invoke({
+    const recorder = makeRecorder(assetSchema);
+    await recorder.recordTool.invoke({
       items: [{ externalId: "a", ip: "10.0.0.1" }],
     });
-    await recorder.tool.invoke({
+    await recorder.recordTool.invoke({
       items: [{ externalId: "a", ip: "10.0.0.9" }],
     });
 
@@ -40,16 +40,16 @@ describe("record_items", () => {
   });
 
   it("keeps nothing from a rejected call, so a resent page is saved once", async () => {
-    const recorder = makeRecordItemsTool(assetSchema);
+    const recorder = makeRecorder(assetSchema);
     await expect(
-      recorder.tool.invoke({
+      recorder.recordTool.invoke({
         items: [
           { externalId: "a#1", ip: "10.0.0.1" },
           { externalId: "b#1", ip: "10.0.0.2", cpe: "philips monitor" },
         ],
       }),
     ).rejects.toThrow();
-    await recorder.tool.invoke({
+    await recorder.recordTool.invoke({
       items: [
         { externalId: "a:1", ip: "10.0.0.1" },
         { externalId: "b:1", ip: "10.0.0.2" },
@@ -62,14 +62,20 @@ describe("record_items", () => {
     ]);
   });
 
+  it("keeps the reason when the model reports no stable id", async () => {
+    const recorder = makeRecorder(assetSchema);
+    await recorder.reportTool.invoke({ reason: "Rows have no id field." });
+    expect(recorder.recorded().noStableId).toBe("Rows have no id field.");
+  });
+
   it("tells an empty recording apart from no accepted recording", async () => {
-    const empty = makeRecordItemsTool(assetSchema);
-    await empty.tool.invoke({ items: [] });
+    const empty = makeRecorder(assetSchema);
+    await empty.recordTool.invoke({ items: [] });
     expect(empty.recorded()).toEqual({ called: true, items: [] });
 
-    const rejectedOnly = makeRecordItemsTool(assetSchema);
+    const rejectedOnly = makeRecorder(assetSchema);
     await expect(
-      rejectedOnly.tool.invoke({ items: [{ externalId: "a" }] }),
+      rejectedOnly.recordTool.invoke({ items: [{ externalId: "a" }] }),
     ).rejects.toThrow();
     expect(rejectedOnly.recorded()).toEqual({ called: false, items: [] });
   });

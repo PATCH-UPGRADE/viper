@@ -26,10 +26,10 @@ describe("crawler model configuration", () => {
   });
 
   // The shared registry holds HALT_TOOLS, which end the run to wait for a person.
-  it("binds only its own fetch and record tools", () => {
-    expect(src).toMatch(/recorder = makeRecordItemsTool\(itemSchema\)/);
+  it("binds only its own fetch, record, and report tools", () => {
+    expect(src).toMatch(/recorder = makeRecorder\(itemSchema\)/);
     expect(src).toMatch(
-      /tools = \[\s*makeFetchUrlTool\([^)]*\),\s*recorder\.tool,?\s*\]/,
+      /tools = \[\s*makeFetchUrlTool\([^)]*\),\s*recorder\.recordTool,\s*recorder\.reportTool,?\s*\]/,
     );
     expect(src).not.toMatch(/buildAgentTools\s*\(/);
   });

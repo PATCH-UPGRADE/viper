@@ -1,4 +1,5 @@
 import { GraphRecursionError } from "@langchain/langgraph";
+import { NonRetriableError } from "inngest";
 
 export interface CrawlResult<T> {
   items: T[];
@@ -14,11 +15,21 @@ export interface CrawlResult<T> {
  * the sync is not reported as complete. A crawl that recorded nothing throws:
  * there is nothing to save. An empty record_items call is a real answer: the
  * source has nothing to sync.
+ *
+ * A source with no stable id throws NonRetriableError and saves nothing, not
+ * even the items already recorded: their ids can point to a different item on
+ * the next sync, so saving them can update the wrong record.
  */
 export function resolveCrawl<T>(
-  recorded: { called: boolean; items: T[] },
+  recorded: { called: boolean; items: T[]; noStableId?: string },
   error: unknown,
 ): CrawlResult<T> {
+  if (recorded.noStableId !== undefined) {
+    throw new NonRetriableError(
+      `The AI crawler stopped because the source has no stable id for its items: ${recorded.noStableId} Name a stable id field in the instructions.`,
+    );
+  }
+
   const reason =
     error === undefined
       ? undefined

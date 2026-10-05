@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { GraphRecursionError } from "@langchain/langgraph";
+import { NonRetriableError } from "inngest";
 import { describe, expect, it } from "vitest";
 import { resolveCrawl } from "../outcome";
 
@@ -44,5 +45,27 @@ describe("resolveCrawl", () => {
   it("rethrows the original error when nothing was recorded", () => {
     const error = new Error("401 invalid x-api-key");
     expect(() => resolveCrawl(nothing, error)).toThrow(error);
+  });
+
+  // Ids that can move between syncs can update the wrong record, so nothing
+  // from such a crawl is saved, not even what it already recorded.
+  it("throws a non-retryable error and saves nothing when the source has no stable id", () => {
+    const run = () =>
+      resolveCrawl(
+        { ...recorded, noStableId: "Rows have no id field." },
+        undefined,
+      );
+
+    expect(run).toThrow(NonRetriableError);
+    expect(run).toThrow(/no stable id for its items: Rows have no id field\./);
+  });
+
+  it("reports no stable id even when the crawl also failed", () => {
+    expect(() =>
+      resolveCrawl(
+        { ...nothing, noStableId: "Rows have no id field." },
+        new Error("overloaded"),
+      ),
+    ).toThrow(NonRetriableError);
   });
 });

@@ -1,9 +1,10 @@
 import { ResourceType } from "@/generated/prisma";
 import { FETCH_URL_TOOL } from "./fetch-tool";
-import { RECORD_ITEMS_TOOL } from "./record-tool";
+import { RECORD_ITEMS_TOOL, REPORT_NO_STABLE_ID_TOOL } from "./record-tool";
 import type { CrawlerResource } from "./schemas";
 
-const SHARED_FIELD_GUIDANCE = `- externalId: the stable id of the item in the source API. It must be the same every time the same item is crawled, because VIPER uses it to update the item on the next sync. Never reuse one for two items. If no single field is unique, join source fields with ":", and add the item's 0-based position in its source list only when fields alone repeat. Build every externalId with one pattern, and never add counters or suffixes of your own.
+const SHARED_FIELD_GUIDANCE = `- externalId: the id that the source API gives the item, used as it is. It must be the same every time the same item is crawled, because VIPER uses it to update the item on the next sync. Do not build an id: never join fields, and never use the item's position in a list, a counter, or a suffix of your own.
+- If the items have no id of their own in the source, do not record any items. Call ${REPORT_NO_STABLE_ID_TOOL} with the reason, then stop.
 - upstreamApi: the API URL for this one item, if the source has one.
 - webUrl: the URL where a person can view this item, if the source has one.
 - CPE fields: CPE 2.3 strings, for example "cpe:2.3:h:philips:intellivue_mx800:*:*:*:*:*:*:*:*". Build them from the vendor, product, and version in the source. Use "*" for a part that you do not know.
@@ -61,8 +62,8 @@ If ${RECORD_ITEMS_TOOL} returns a validation error, nothing from that call was r
 
 /**
  * The per-run context. `knownExternalIds` come from earlier syncs of this
- * integration: the model cannot see those runs, and an externalId built with a
- * new pattern can make a second copy of each item on every sync.
+ * integration: the model cannot see those runs, and an externalId taken from a
+ * different source field can make a second copy of each item on every sync.
  */
 export function buildCrawlerPreload({
   resource,
@@ -85,7 +86,7 @@ export function buildCrawlerPreload({
       "",
       "Earlier syncs of this integration recorded externalIds like these:",
       ...knownExternalIds.map((id) => `- ${id}`),
-      "Build every externalId with exactly the same pattern, so that VIPER updates these items and does not create copies.",
+      "Take every externalId from the same source field, so that VIPER updates these items and does not create copies.",
     );
   }
   return lines.join("\n");

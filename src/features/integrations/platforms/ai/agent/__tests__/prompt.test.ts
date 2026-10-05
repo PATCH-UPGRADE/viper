@@ -6,7 +6,7 @@ vi.mock("server-only", () => ({}));
 import { ResourceType } from "@/generated/prisma";
 import { FETCH_URL_TOOL } from "../fetch-tool";
 import { buildCrawlerPreload, buildCrawlerPrompt } from "../prompt";
-import { RECORD_ITEMS_TOOL } from "../record-tool";
+import { RECORD_ITEMS_TOOL, REPORT_NO_STABLE_ID_TOOL } from "../record-tool";
 
 const URI = "https://nvgd.example.com/api/devices";
 
@@ -28,6 +28,16 @@ describe.each([
     expect(prompt).toContain(requiredField);
   });
 
+  // A position changes when new items arrive, so the same item gets a new id.
+  it("never allows a list position in an externalId", () => {
+    expect(prompt).not.toMatch(/0-based position/);
+    expect(prompt).toContain("never use the item's position in a list");
+  });
+
+  it("tells the model to report a source with no stable id", () => {
+    expect(prompt).toContain(REPORT_NO_STABLE_ID_TOOL);
+  });
+
   it("tells the model how to report a source with no items", () => {
     expect(prompt).toMatch(/empty list/);
   });
@@ -35,7 +45,7 @@ describe.each([
   // An unstable externalId can create a second row for the same item on every sync.
   it("asks for externalIds that stay the same across syncs and retries", () => {
     expect(prompt).toContain("same every time the same item is crawled");
-    expect(prompt).toContain("never add counters or suffixes of your own");
+    expect(prompt).toContain("Do not build an id: never join fields");
     expect(prompt).toContain("Record each item once");
   });
 });
@@ -81,7 +91,7 @@ describe("crawler preload", () => {
   });
 
   // Without earlier ids, each sync picks its own pattern and can copy every item.
-  it("lists earlier externalIds and asks for the same pattern", () => {
+  it("lists earlier externalIds and asks for the same source field", () => {
     const preload = buildCrawlerPreload({
       ...base,
       knownExternalIds: ["dg_1:fuzzer:CWE-798:0", "dg_2:fuzzer:CWE-200:1"],
@@ -90,6 +100,6 @@ describe("crawler preload", () => {
     expect(preload).toContain(
       "- dg_1:fuzzer:CWE-798:0\n- dg_2:fuzzer:CWE-200:1",
     );
-    expect(preload).toContain("exactly the same pattern");
+    expect(preload).toContain("from the same source field");
   });
 });

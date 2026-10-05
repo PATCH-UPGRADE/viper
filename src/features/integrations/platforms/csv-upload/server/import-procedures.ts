@@ -69,8 +69,10 @@ const sourceNameDate = new Intl.DateTimeFormat("en-US", {
 const defaultSourceName = (today: Date): string =>
   `CSV Assets Upload - ${sourceNameDate.format(today)}`;
 
+const MAX_STAGED_CHUNKS = 200;
+
 function assertWithinRequestLimit(input: unknown): void {
-  const requestSize = JSON.stringify(input).length;
+  const requestSize = Buffer.byteLength(JSON.stringify(input));
   if (requestSize > MAX_REQUEST_BYTES) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -182,22 +184,28 @@ export const importProcedures = {
     .mutation(async ({ ctx, input }) => {
       assertWithinRequestLimit(input);
       const sourceName = input.sourceName || defaultSourceName(new Date());
+      const plan = importPlanSchema.parse(input);
       const integration = await createIntegration(
         { name: sourceName, platform: PlatformEnum.CSV_UPLOAD, config: {} },
         ctx.auth.user.id,
       );
-      const plan = importPlanSchema.parse(input);
-      const csvImport = await prisma.csvImport.create({
-        data: {
-          integrationId: integration.id,
-          userId: ctx.auth.user.id,
-          fileName: input.fileName,
-          headers: input.headers,
-          plan,
-          totalRows: input.rowCount,
-        },
-        select: { id: true },
-      });
+      let csvImport: { id: string };
+      try {
+        csvImport = await prisma.csvImport.create({
+          data: {
+            integrationId: integration.id,
+            userId: ctx.auth.user.id,
+            fileName: input.fileName,
+            headers: input.headers,
+            plan,
+            totalRows: input.rowCount,
+          },
+          select: { id: true },
+        });
+      } catch (error) {
+        await prisma.integration.delete({ where: { id: integration.id } });
+        throw error;
+      }
       return {
         importId: csvImport.id,
         integrationId: integration.id,
@@ -218,6 +226,12 @@ export const importProcedures = {
         throw new TRPCError({
           code: "CONFLICT",
           message: "This import has already started",
+        });
+      }
+      if (input.chunkIndex >= MAX_STAGED_CHUNKS) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `An import can have at most ${MAX_STAGED_CHUNKS} chunks`,
         });
       }
       if (input.chunkIndex > csvImport.chunkCount) {
@@ -287,6 +301,7 @@ export const importProcedures = {
       });
 
       await inngest.send({
+        id: `csv-import-${csvImport.id}`,
         name: CSV_IMPORT_EVENT,
         data: { importId: csvImport.id },
       });

@@ -18,6 +18,7 @@ const {
       findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
     },
+    integration: { delete: vi.fn() },
     integrationResourceSync: { update: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -240,6 +241,24 @@ describe("csvImport.createImport", () => {
       "Biomed inventory",
     );
   });
+
+  it("removes the new source when the import cannot be saved", async () => {
+    mockPrisma.csvImport.create.mockRejectedValue(
+      new Error("Database is down"),
+    );
+
+    await expect(
+      caller.createImport({
+        ...importPlan,
+        fileName: "biomed.csv",
+        headers: ["Mfr"],
+        rowCount: 1,
+      }),
+    ).rejects.toThrow("Database is down");
+    expect(mockPrisma.integration.delete).toHaveBeenCalledWith({
+      where: { id: "int-csv" },
+    });
+  });
 });
 
 describe("csvImport.stageRows", () => {
@@ -281,6 +300,21 @@ describe("csvImport.stageRows", () => {
 
     await expect(
       caller.stageRows({ importId: "imp-1", chunkIndex: 2, rows: [stagedRow] }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mockPutChunk).not.toHaveBeenCalled();
+  });
+
+  it("refuses a chunk past the most an import can have", async () => {
+    mockPrisma.csvImport.findUnique.mockResolvedValue(
+      ownedImport({ chunkCount: 200 }),
+    );
+
+    await expect(
+      caller.stageRows({
+        importId: "imp-1",
+        chunkIndex: 200,
+        rows: [stagedRow],
+      }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(mockPutChunk).not.toHaveBeenCalled();
   });
@@ -338,6 +372,7 @@ describe("csvImport.startImport", () => {
       }),
     );
     expect(mockInngest.send).toHaveBeenCalledWith({
+      id: "csv-import-imp-1",
       name: "csv-import/apply.requested",
       data: { importId: "imp-1" },
     });

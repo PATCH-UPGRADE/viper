@@ -59,6 +59,7 @@ const chunkInput = (
   outcomes: RowOutcome[],
   overrides: Partial<ApplyChunkInput> = {},
 ): ApplyChunkInput => ({
+  importId: "imp-1",
   integrationId: "int-csv",
   userId: "user-uploader",
   rows,
@@ -93,7 +94,7 @@ beforeEach(() => {
 });
 
 describe("applyChunk — adding a device", () => {
-  it("creates it under a fresh id, owned by the uploader, mapped as csv:<id>", async () => {
+  it("creates it under an id built from the import and the row, owned by the uploader, mapped as csv:<id>", async () => {
     const result = await applyChunk(
       chunkInput([stagedRow()], [{ kind: "add", rowNumber: 2 }]),
     );
@@ -106,8 +107,8 @@ describe("applyChunk — adding a device", () => {
     expect(userId).toBe("user-uploader");
     expect(integrationId).toBe("int-csv");
     expect(resource).toBe(ResourceType.Asset);
-    expect(newAssetId).toEqual(expect.any(String));
-    expect(engineInput.items[0].vendorId).toBe(`csv:${newAssetId}`);
+    expect(newAssetId).toBe("imp-1r2");
+    expect(engineInput.items[0].vendorId).toBe("csv:imp-1r2");
     expect(written.uniqueFieldConditions).toEqual([]);
     expect(result).toEqual({ added: 1, linked: 0, failures: [] });
   });

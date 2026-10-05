@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { MatchKeysRow } from "../../contract";
-import { type ContextAsset, type MatchContext, matchRowsToDevices } from "../match-rows";
+import {
+  type ContextAsset,
+  type MatchContext,
+  matchRowsToDevices,
+} from "../match-rows";
 
 const keysRow = (overrides: Partial<MatchKeysRow>): MatchKeysRow => ({
   rowNumber: 2,

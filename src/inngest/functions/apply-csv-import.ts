@@ -19,11 +19,11 @@ import {
   loadCanonicalNames,
   loadMatchContext,
 } from "@/features/integrations/platforms/csv-upload/import/context";
-import { nameBelongsToAnother } from "@/features/integrations/platforms/csv-upload/import/names";
 import {
   type MatchContext,
   matchRowsToDevices,
 } from "@/features/integrations/platforms/csv-upload/import/match-rows";
+import { nameBelongsToAnother } from "@/features/integrations/platforms/csv-upload/import/names";
 import { getChunk } from "@/features/integrations/platforms/csv-upload/import/staging";
 import { CsvImportStatus, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -162,7 +162,7 @@ async function recordFileLevelFailures(job: ImportJob) {
   for (let chunkIndex = 0; chunkIndex < job.chunkCount; chunkIndex++) {
     const chunkRows = await getChunk(job.importId, chunkIndex);
     const chunkContext = await loadMatchContext(chunkRows, {
-      excludeIntegrationId: job.integrationId,
+      excludeAssetsAddedByImportId: job.importId,
     });
     for (const row of chunkRows) fileRows.push(row);
     for (const [assetId, asset] of chunkContext.assets) {
@@ -201,12 +201,13 @@ async function applyStagedChunk(job: ImportJob, chunkIndex: number) {
   );
   const rows = await getChunk(job.importId, chunkIndex);
   const context = await loadMatchContext(rows, {
-    excludeIntegrationId: job.integrationId,
+    excludeAssetsAddedByImportId: job.importId,
   });
   const canonicalNames = await loadCanonicalNames(plan.nameDecisions);
   const outcomes = matchRowsToDevices(rows, context, recordedReasonByRow);
 
   const chunkResult = await applyChunk({
+    importId: job.importId,
     integrationId: job.integrationId,
     userId: job.userId,
     rows,
@@ -293,6 +294,11 @@ export const applyCsvImportFn = inngest.createFunction(
   {
     id: "apply-csv-import",
     concurrency: { key: "event.data.importId", limit: 1 },
+    onFailure: async ({ event, error }) => {
+      const { importId } = event.data.event.data as { importId: string };
+      const failedJob = await loadImportJob(importId);
+      if (failedJob) await finishImport(failedJob, error.message);
+    },
   },
   { event: CSV_IMPORT_EVENT },
   async ({ event, step }) => {
@@ -312,12 +318,19 @@ export const applyCsvImportFn = inngest.createFunction(
       chunkCount: loaded.chunkCount,
     };
 
-    await step.run("mark-running", async () => {
-      await prisma.csvImport.update({
-        where: { id: job.importId },
+    const claimedImport = await step.run("mark-running", async () => {
+      const { count } = await prisma.csvImport.updateMany({
+        where: { id: job.importId, status: CsvImportStatus.Queued },
         data: { status: CsvImportStatus.Running },
       });
+      return count === 1;
     });
+    if (!claimedImport) {
+      return {
+        skipped: true,
+        reason: "Another run already started this import",
+      };
+    }
 
     const aliases = await step.run("save-aliases", () =>
       settle(() => saveConfirmedAliases(job)),

@@ -3,7 +3,12 @@ import { getAssetDisplayName } from "@/features/assets/utils";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { displayNameFor } from "../../../core/registry";
-import type { MatchKeysRow, NameDecision, NameDecisions } from "../contract";
+import {
+  addedAssetIdPrefix,
+  type MatchKeysRow,
+  type NameDecision,
+  type NameDecisions,
+} from "../contract";
 import type { ContextAsset, MatchContext } from "./match-rows";
 
 export interface CanonicalNames {
@@ -80,7 +85,7 @@ function toContextAsset(assetRow: ContextAssetRow): ContextAsset {
 
 export async function loadMatchContext(
   rows: MatchKeysRow[],
-  options: { excludeIntegrationId?: string } = {},
+  options: { excludeAssetsAddedByImportId?: string } = {},
 ): Promise<MatchContext> {
   const keylessRows = rows.filter(
     (row) => row.serialNumber === null && row.macAddress === null,
@@ -97,12 +102,11 @@ export async function loadMatchContext(
   if (hostnames.length > 0) keyClauses.push({ hostname: { in: hostnames } });
   if (keyClauses.length === 0) return { assets: new Map() };
 
-  const where: Prisma.AssetWhereInput = options.excludeIntegrationId
+  const importToLeaveOut = options.excludeAssetsAddedByImportId;
+  const where: Prisma.AssetWhereInput = importToLeaveOut
     ? {
         OR: keyClauses,
-        externalMappings: {
-          none: { integrationId: options.excludeIntegrationId },
-        },
+        NOT: { id: { startsWith: addedAssetIdPrefix(importToLeaveOut) } },
       }
     : { OR: keyClauses };
 

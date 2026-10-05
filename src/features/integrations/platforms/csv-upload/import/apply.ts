@@ -4,6 +4,7 @@ import { type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { resolveDeviceGroup } from "@/lib/router-utils";
 import {
+  addedAssetIdFor,
   csvExternalId,
   type ImportFailure,
   normalizeNameKey,
@@ -48,6 +49,7 @@ interface AssetWrite {
 }
 
 export interface ApplyChunkInput {
+  importId: string;
   integrationId: string;
   userId: string;
   rows: StagedRow[];
@@ -212,7 +214,9 @@ export async function applyChunk(input: ApplyChunkInput): Promise<ChunkResult> {
     }
 
     const assetId =
-      outcome.kind === "add" ? crypto.randomUUID() : outcome.assetId;
+      outcome.kind === "add"
+        ? addedAssetIdFor(input.importId, row.rowNumber)
+        : outcome.assetId;
     const item: CsvSyncItem = {
       vendorId: csvExternalId(assetId),
       assetId,

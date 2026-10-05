@@ -91,14 +91,14 @@ describe("loadMatchContext", () => {
     expect(context.assets.size).toBe(0);
   });
 
-  it("leaves out devices this import already wrote when given its integration", async () => {
+  it("leaves out devices this import added, but not the ones it linked", async () => {
     await loadMatchContext([keysRow({ serialNumber: "S-1" })], {
-      excludeIntegrationId: "int-csv",
+      excludeAssetsAddedByImportId: "imp-1",
     });
 
     expect(mockPrisma.asset.findMany.mock.calls[0][0].where).toEqual({
       OR: [{ serialNumber: { in: ["S-1"] } }],
-      externalMappings: { none: { integrationId: "int-csv" } },
+      NOT: { id: { startsWith: "imp-1r" } },
     });
   });
 

@@ -19,6 +19,7 @@ const {
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
   mockGetChunk: vi.fn(),
@@ -34,8 +35,11 @@ const {
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("../../client", () => ({
   inngest: {
-    createFunction: (_config: unknown, _trigger: unknown, handler: unknown) =>
-      handler,
+    createFunction: (
+      config: { onFailure: unknown },
+      _trigger: unknown,
+      handler: object,
+    ) => Object.assign(handler, { onFailure: config.onFailure }),
   },
 }));
 vi.mock("@/features/integrations/platforms/csv-upload/import/staging", () => ({
@@ -69,6 +73,15 @@ type ImportHandler = (ctx: {
 }) => Promise<unknown>;
 
 const runImport = applyCsvImportFn as unknown as ImportHandler;
+
+type FailureHandler = (ctx: {
+  event: { data: { event: { data: { importId: string } } } };
+  error: Error;
+}) => Promise<void>;
+
+const runOnFailure = (
+  applyCsvImportFn as unknown as { onFailure: FailureHandler }
+).onFailure;
 
 const makeStep = () => {
   const order: string[] = [];
@@ -149,6 +162,7 @@ beforeEach(() => {
   recordedFailures = [];
   finalCounts = { totalRows: 4, addedCount: 4, linkedCount: 0, failedCount: 0 };
   mockPrisma.csvImport.findUnique.mockResolvedValue(queuedImport);
+  mockPrisma.csvImport.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.csvImport.findUniqueOrThrow.mockImplementation(
     async (args: { select: Record<string, boolean> }) =>
       args.select.plan
@@ -185,7 +199,35 @@ describe("applyCsvImportFn — steps", () => {
       "apply-chunk-1",
       "finish",
     ]);
-    expect(updateCalls()[0]).toEqual({ status: CsvImportStatus.Running });
+    expect(mockPrisma.csvImport.updateMany).toHaveBeenCalledWith({
+      where: { id: "imp-1", status: CsvImportStatus.Queued },
+      data: { status: CsvImportStatus.Running },
+    });
+  });
+
+  it("stops when another run already started the import", async () => {
+    mockPrisma.csvImport.updateMany.mockResolvedValue({ count: 0 });
+    const step = makeStep();
+
+    const result = await runWith(step);
+
+    expect(result).toEqual({
+      skipped: true,
+      reason: "Another run already started this import",
+    });
+    expect(step.order).toEqual(["load-import", "mark-running"]);
+    expect(mockApplyChunk).not.toHaveBeenCalled();
+  });
+
+  it("matches each chunk without the devices this import added, and applies it under the import's id", async () => {
+    await runWith();
+
+    expect(mockLoadMatchContext).toHaveBeenCalledWith(chunks[0], {
+      excludeAssetsAddedByImportId: "imp-1",
+    });
+    expect(mockApplyChunk).toHaveBeenCalledWith(
+      expect.objectContaining({ importId: "imp-1", rows: chunks[1] }),
+    );
   });
 
   it("never returns rows from a step", async () => {
@@ -259,7 +301,7 @@ describe("applyCsvImportFn — failures", () => {
 
     await runWith();
 
-    expect(updateCalls()[1]).toEqual({
+    expect(updateCalls()[0]).toEqual({
       failures: [
         { rowNumber: 4, reason: "Serial also used by row 2 in this file" },
       ],
@@ -280,7 +322,7 @@ describe("applyCsvImportFn — failures", () => {
 
     await runWith();
 
-    expect(updateCalls()[2]).toEqual({
+    expect(updateCalls()[1]).toEqual({
       addedCount: { increment: 1 },
       linkedCount: { increment: 0 },
       failedCount: { increment: 1 },
@@ -370,6 +412,28 @@ describe("applyCsvImportFn — finishing", () => {
       "int-csv",
       ResourceType.Asset,
       expect.objectContaining({ message: "S3 timed out", shouldRetry: true }),
+      expect.any(Date),
+    );
+  });
+
+  it("finishes Failed when Inngest gives up on the run", async () => {
+    await runOnFailure({
+      event: { data: { event: { data: { importId: "imp-1" } } } },
+      error: new Error("Function timed out"),
+    });
+
+    expect(updateCalls().at(-1)).toEqual({
+      status: CsvImportStatus.Failed,
+      finishedAt: expect.any(Date),
+      errorMessage: "Function timed out",
+    });
+    expect(mockUpsertResourceSync).toHaveBeenCalledWith(
+      "int-csv",
+      ResourceType.Asset,
+      expect.objectContaining({
+        message: "Function timed out",
+        shouldRetry: true,
+      }),
       expect.any(Date),
     );
   });

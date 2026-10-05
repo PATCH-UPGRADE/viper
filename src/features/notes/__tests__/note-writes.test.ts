@@ -14,7 +14,7 @@ const noteUpdateMany = vi.fn();
 const entityFilterCreate = vi.fn();
 const tx = {
   note: { create: noteCreate, updateMany: noteUpdateMany },
-  entityFilter: { create: entityFilterCreate }
+  entityFilter: { create: entityFilterCreate },
 } as unknown as TransactionClient;
 
 beforeEach(() => {

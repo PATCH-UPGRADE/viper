@@ -1,5 +1,6 @@
 import "server-only";
 import prisma from "@/lib/db";
+import { createNote, deleteNote, updateNote } from "../../server/note-writes";
 import type { NoteActionContext } from "./context";
 import type { NoteActionOp, NoteActionResult } from "./schema";
 
@@ -81,31 +82,25 @@ export async function applyNoteAction(
   await prisma.$transaction(async (tx) => {
     for (const write of writes) {
       if (write.action === "create") {
-        await tx.note.create({
-          data: {
-            text: write.text,
-            status: "SCOPED",
-            userId,
+        await createNote(tx, {
+          text: write.text,
+          status: "SCOPED",
+          userId,
+          scope: {
             targetModel: target.targetModel,
-            instanceId: target.instanceId,
+            instanceIds: [target.instanceId],
           },
         });
         summary.created++;
         continue;
       }
       if (write.action === "update") {
-        await tx.note.update({
-          where: { id: write.noteId },
-          data: { text: write.text },
-        });
+        await updateNote(tx, write.noteId, { text: write.text });
         summary.updated++;
         continue;
       }
 
-      await tx.note.update({
-        where: { id: write.noteId },
-        data: { deletedAt: new Date() },
-      });
+      await deleteNote(tx, write.noteId);
       summary.deleted++;
     }
   });

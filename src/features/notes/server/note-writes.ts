@@ -62,7 +62,7 @@ export async function updateNote(
 ): Promise<void> {
   const { count } = await tx.note.updateMany({
     where: { id: noteId, deletedAt: null },
-    data: { text: data.text },
+    data,
   });
   if (count === 0) throw new NoteNotFoundError(noteId);
 }

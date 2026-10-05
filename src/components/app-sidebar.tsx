@@ -2,7 +2,6 @@
 
 import {
   BugIcon,
-  CalendarIcon,
   ChevronDownIcon,
   ComputerIcon,
   CpuIcon,
@@ -65,11 +64,6 @@ const homeItems: NavItem[] = [
     title: "Work Orders",
     icon: ListChecksIcon,
     url: "/tracking",
-  },
-  {
-    title: "Maintenance Calendar",
-    icon: CalendarIcon,
-    url: "/tracking/interruptions",
   },
 ];
 

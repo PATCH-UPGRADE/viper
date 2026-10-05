@@ -39,14 +39,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { MaintenanceAvailability } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import {
-  availabilityLabels,
-  availabilityStyle,
-  UnreadDot,
-} from "../ticket-detail/shared";
+import { availabilityStyle, UnreadDot } from "../ticket-detail/shared";
 import { InterruptionsList } from "./interruptions-list";
 import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
 
@@ -78,14 +73,13 @@ const groupByWorkOrder = (items: Item[]) => [
 ];
 
 // Blocks that overlap sit in separate lanes, sharing the day's width.
-const layout = (items: Item[]): Block[] => {
+const layout = (items: Item[]) => {
   const blocks = groupByWorkOrder(items)
     .map((group) => ({
       items: group,
       start: minutesOf(group[0].scheduledAt),
       len: group[0].durationEstimate ?? DEFAULT_MINUTES,
       lane: 0,
-      lanes: 1,
     }))
     .sort((a, b) => a.start - b.start);
   const laneEnds: number[] = [];
@@ -94,8 +88,7 @@ const layout = (items: Item[]): Block[] => {
     block.lane = free < 0 ? laneEnds.length : free;
     laneEnds[block.lane] = block.start + block.len;
   }
-  for (const block of blocks) block.lanes = laneEnds.length;
-  return blocks;
+  return blocks.map((block) => ({ ...block, lanes: laneEnds.length }));
 };
 
 const deviceLabel = (group: Item[]) =>
@@ -300,23 +293,22 @@ const Calendar = ({ lead }: { lead: ReactNode }) => {
           align="start"
           className="flex w-72 flex-col gap-2 text-sm"
         >
-          {[
-            ...(Object.keys(availabilityLabels) as MaintenanceAvailability[]),
-            null,
-          ].map((availability) => {
-            const style = availabilityStyle(availability);
-            return (
-              <span
-                key={availability ?? "none"}
-                className="flex items-center gap-2"
-              >
+          {(["AVAILABLE", "PARTIAL", "UNAVAILABLE", null] as const).map(
+            (availability) => {
+              const style = availabilityStyle(availability);
+              return (
                 <span
-                  className={cn("size-4 rounded border", style.className)}
-                />
-                {style.label}
-              </span>
-            );
-          })}
+                  key={availability ?? "none"}
+                  className="flex items-center gap-2"
+                >
+                  <span
+                    className={cn("size-4 rounded border", style.className)}
+                  />
+                  {style.label}
+                </span>
+              );
+            },
+          )}
           <span className="flex items-center gap-2">
             <UnreadDot />
             Not opened by you

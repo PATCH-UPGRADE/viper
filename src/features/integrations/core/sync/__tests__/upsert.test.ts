@@ -25,7 +25,7 @@ import { type ArtifactsContent, processIntegrationSync } from "../upsert";
  */
 
 type Item = {
-  vendorId: string;
+  externalId: string;
   hostname?: string;
   upstreamApi?: string | null;
   webUrl?: string | null;
@@ -84,7 +84,7 @@ const run = (config: any, items: Item[]) =>
 
 const items = (n: number): Item[] =>
   Array.from({ length: n }, (_, i) => ({
-    vendorId: `v${i + 1}`,
+    externalId: `v${i + 1}`,
     hostname: `host-${i + 1}`,
   }));
 
@@ -216,7 +216,7 @@ describe("processIntegrationSync — mapping URLs", () => {
 
     await run(config, [
       {
-        vendorId: "v1",
+        externalId: "v1",
         hostname: "h",
         upstreamApi: "https://api.example.com/1",
         webUrl: "https://example.com/1",
@@ -238,7 +238,7 @@ describe("processIntegrationSync — mapping URLs", () => {
       itemId: "item-1",
     });
 
-    await run(config, [{ vendorId: "v1", hostname: "h" }]);
+    await run(config, [{ externalId: "v1", hostname: "h" }]);
 
     // undefined would mean "leave the column alone", so a platform that
     // removed a URL could never clear it.

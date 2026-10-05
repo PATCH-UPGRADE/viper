@@ -13,21 +13,29 @@ const assetSchema = CRAWLER_ITEM_SCHEMAS[ResourceType.Asset];
 describe("record_items", () => {
   it("keeps items across calls", async () => {
     const recorder = makeRecordItemsTool(assetSchema);
-    await recorder.tool.invoke({ items: [{ vendorId: "a", ip: "10.0.0.1" }] });
-    await recorder.tool.invoke({ items: [{ vendorId: "b", ip: "10.0.0.2" }] });
+    await recorder.tool.invoke({
+      items: [{ externalId: "a", ip: "10.0.0.1" }],
+    });
+    await recorder.tool.invoke({
+      items: [{ externalId: "b", ip: "10.0.0.2" }],
+    });
 
     const { called, items } = recorder.recorded();
     expect(called).toBe(true);
-    expect(items.map((i) => i.vendorId)).toEqual(["a", "b"]);
+    expect(items.map((i) => i.externalId)).toEqual(["a", "b"]);
   });
 
-  it("keeps the last version of a repeated vendorId", async () => {
+  it("keeps the last version of a repeated externalId", async () => {
     const recorder = makeRecordItemsTool(assetSchema);
-    await recorder.tool.invoke({ items: [{ vendorId: "a", ip: "10.0.0.1" }] });
-    await recorder.tool.invoke({ items: [{ vendorId: "a", ip: "10.0.0.9" }] });
+    await recorder.tool.invoke({
+      items: [{ externalId: "a", ip: "10.0.0.1" }],
+    });
+    await recorder.tool.invoke({
+      items: [{ externalId: "a", ip: "10.0.0.9" }],
+    });
 
     expect(recorder.recorded().items).toEqual([
-      { vendorId: "a", ip: "10.0.0.9" },
+      { externalId: "a", ip: "10.0.0.9" },
     ]);
   });
 
@@ -36,19 +44,19 @@ describe("record_items", () => {
     await expect(
       recorder.tool.invoke({
         items: [
-          { vendorId: "a#1", ip: "10.0.0.1" },
-          { vendorId: "b#1", ip: "10.0.0.2", cpe: "philips monitor" },
+          { externalId: "a#1", ip: "10.0.0.1" },
+          { externalId: "b#1", ip: "10.0.0.2", cpe: "philips monitor" },
         ],
       }),
     ).rejects.toThrow();
     await recorder.tool.invoke({
       items: [
-        { vendorId: "a:1", ip: "10.0.0.1" },
-        { vendorId: "b:1", ip: "10.0.0.2" },
+        { externalId: "a:1", ip: "10.0.0.1" },
+        { externalId: "b:1", ip: "10.0.0.2" },
       ],
     });
 
-    expect(recorder.recorded().items.map((i) => i.vendorId)).toEqual([
+    expect(recorder.recorded().items.map((i) => i.externalId)).toEqual([
       "a:1",
       "b:1",
     ]);
@@ -61,7 +69,7 @@ describe("record_items", () => {
 
     const rejectedOnly = makeRecordItemsTool(assetSchema);
     await expect(
-      rejectedOnly.tool.invoke({ items: [{ vendorId: "a" }] }),
+      rejectedOnly.tool.invoke({ items: [{ externalId: "a" }] }),
     ).rejects.toThrow();
     expect(rejectedOnly.recorded()).toEqual({ called: false, items: [] });
   });
@@ -70,7 +78,7 @@ describe("record_items", () => {
 /** Golden samples: one realistic item per resource, as the crawler records it. */
 const GOLDEN: Record<CrawlerResource, unknown> = {
   [ResourceType.Asset]: {
-    vendorId: "dev-1001",
+    externalId: "dev-1001",
     ip: "10.12.4.21",
     hostname: "icu-mon-04",
     macAddress: "00:1B:44:11:3A:B7",
@@ -82,7 +90,7 @@ const GOLDEN: Record<CrawlerResource, unknown> = {
     upstreamApi: "https://nvgd.example.com/api/devices/dev-1001",
   },
   [ResourceType.Vulnerability]: {
-    vendorId: "vuln-77",
+    externalId: "vuln-77",
     cveId: "CVE-2024-12345",
     cpes: ["cpe:2.3:a:baxter:sigma_spectrum:8.00.01:*:*:*:*:*:*:*"],
     description: "Hard-coded credentials in the pump web service.",
@@ -91,7 +99,7 @@ const GOLDEN: Record<CrawlerResource, unknown> = {
     cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
   },
   [ResourceType.Remediation]: {
-    vendorId: "rem-12",
+    externalId: "rem-12",
     description: "Update pump firmware to 8.02.",
     narrative: "Apply the vendor patch during the maintenance window.",
     cpes: ["cpe:2.3:a:baxter:sigma_spectrum:8.00.01:*:*:*:*:*:*:*"],
@@ -104,7 +112,7 @@ const GOLDEN: Record<CrawlerResource, unknown> = {
     ],
   },
   [ResourceType.DeviceArtifact]: {
-    vendorId: "art-3",
+    externalId: "art-3",
     cpe: "cpe:2.3:h:philips:intellivue_mx800:*:*:*:*:*:*:*:*",
     role: "Patient monitor",
     description: "Service manual for the MX800.",

@@ -34,7 +34,8 @@ export const linkAdvisoryVulnerabilities =
         where: { cveId: { in: cveIds } },
         select: { id: true, cveId: true },
       });
-      const label = advisory.raw.advisoryId ?? `advisory ${advisory.vendorId}`;
+      const label =
+        advisory.raw.advisoryId ?? `advisory ${advisory.externalId}`;
 
       await prisma.notificationVulnerabilityMapping.createMany({
         data: known.map((vulnerability) => ({

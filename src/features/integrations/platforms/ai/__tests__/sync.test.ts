@@ -76,7 +76,7 @@ const makeCtx = (resource: ResourceType): SyncCtx<AiConfig, AiCreds> => ({
   },
 });
 
-const ITEMS = [{ vendorId: "v-1" }];
+const ITEMS = [{ externalId: "v-1" }];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -102,7 +102,7 @@ describe("aiSync", () => {
         integrationUri: "https://vendor.example.com/api/items",
         additionalInstructions: "Only items from 2026.",
         creds: CREDS,
-        knownVendorIds: [],
+        knownExternalIds: [],
       });
       // finalize-sync records the attempt, so the helper must not record it too.
       expect(ingest).toHaveBeenCalledWith(
@@ -178,7 +178,7 @@ describe("aiSync", () => {
     [ResourceType.Remediation, "externalRemediationMapping"],
     [ResourceType.DeviceArtifact, "externalDeviceArtifactMapping"],
   ] as const)(
-    "gives the crawler recent %s vendorIds from its own mapping table",
+    "gives the crawler recent %s externalIds from its own mapping table",
     async (resource, model) => {
       mocks.mappings[model].mockResolvedValueOnce([
         { externalId: "dg_1:fuzzer:CWE-798:0" },
@@ -191,7 +191,7 @@ describe("aiSync", () => {
       );
       expect(mocks.runAiCrawler).toHaveBeenCalledWith(
         expect.objectContaining({
-          knownVendorIds: ["dg_1:fuzzer:CWE-798:0"],
+          knownExternalIds: ["dg_1:fuzzer:CWE-798:0"],
         }),
       );
     },

@@ -43,7 +43,7 @@ export const fleetAdvisoryRecordSchema = fleetAdvisorySchema.extend({
 });
 
 export interface FleetAdvisoryItem {
-  vendorId: string;
+  externalId: string;
   title: string;
   body: string;
   attachments: FleetAdvisoryAttachment[];
@@ -198,7 +198,7 @@ export function buildAdvisoryBody(advisory: FleetAdvisoryRecord): string {
 
 export function toCanonical(raw: FleetAdvisoryRecord): FleetAdvisoryItem {
   return {
-    vendorId: externalIdOf(raw),
+    externalId: externalIdOf(raw),
     title: buildText(raw.title) ?? `Fleet Advisory ${raw.id}`,
     body: buildAdvisoryBody(raw),
     attachments: raw.attachments,

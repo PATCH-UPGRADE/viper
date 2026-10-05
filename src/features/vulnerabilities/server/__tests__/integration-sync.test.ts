@@ -32,19 +32,19 @@ beforeEach(() => vi.clearAllMocks());
 describe("processVulnerabilityIntegrationSync", () => {
   // Vulnerability.sarif is a required Json column.
   it("creates a vulnerability with {} when the source gives no SARIF", async () => {
-    const { createData } = await transform({ vendorId: "v-1", cpes: [CPE] });
+    const { createData } = await transform({ externalId: "v-1", cpes: [CPE] });
     expect(createData.sarif).toEqual({});
   });
 
   it("leaves stored SARIF alone on update when the source gives none", async () => {
-    const { updateData } = await transform({ vendorId: "v-1", cpes: [CPE] });
+    const { updateData } = await transform({ externalId: "v-1", cpes: [CPE] });
     expect(updateData.sarif).toBeUndefined();
   });
 
   it("keeps SARIF that the source gives", async () => {
     const sarif = { version: "2.1.0", runs: [] };
     const { createData, updateData } = await transform({
-      vendorId: "v-1",
+      externalId: "v-1",
       cpes: [CPE],
       sarif,
     });

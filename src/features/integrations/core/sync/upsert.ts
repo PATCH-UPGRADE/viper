@@ -136,7 +136,7 @@ export interface SyncConfig<
  */
 export async function processIntegrationSync<
   TInputItem extends {
-    vendorId: string;
+    externalId: string;
     upstreamApi?: string | null;
     webUrl?: string | null;
   },
@@ -170,14 +170,14 @@ export async function processIntegrationSync<
   };
 
   for (const item of input.items) {
-    const { vendorId, upstreamApi = null, webUrl = null } = item;
+    const { externalId, upstreamApi = null, webUrl = null } = item;
     const mappingUrls = { upstreamApi, webUrl };
 
     // Look for an existing mapping first
     const foundMapping = await config.mappingModel.findFirst({
       where: {
         integrationId,
-        externalId: vendorId,
+        externalId,
       },
       select: {
         id: true,
@@ -203,7 +203,7 @@ export async function processIntegrationSync<
           }) as any,
         ]);
       } catch (error: unknown) {
-        console.error("mapping + item update failed", { vendorId, error });
+        console.error("mapping + item update failed", { externalId, error });
         errors.push(handlePrismaError(error));
         continue;
       }
@@ -231,7 +231,7 @@ export async function processIntegrationSync<
             externalMappings: {
               create: {
                 integrationId,
-                externalId: vendorId,
+                externalId,
                 lastSynced,
                 ...mappingUrls,
               },
@@ -259,7 +259,7 @@ export async function processIntegrationSync<
         // Note: if the record was created and only the artifact write failed,
         // the item exists and its mapping went in with it, so the next sync
         // takes the update branch. Only the artifacts are missing.
-        console.error("no existing Item", { vendorId, error });
+        console.error("no existing Item", { externalId, error });
         errors.push(handlePrismaError(error));
         continue;
       }
@@ -282,7 +282,7 @@ export async function processIntegrationSync<
           data: {
             itemId: foundItem.id,
             integrationId,
-            externalId: vendorId,
+            externalId,
             lastSynced,
             ...mappingUrls,
           },
@@ -293,7 +293,7 @@ export async function processIntegrationSync<
         }) as any,
       ]);
     } catch (error: unknown) {
-      console.error("Item but no mapping", { vendorId, error });
+      console.error("Item but no mapping", { externalId, error });
       errors.push(handlePrismaError(error));
       continue;
     }

@@ -70,6 +70,6 @@ describe("createCallback", () => {
     // A push platform can give this to its partner, so it has to be a real
     // JSON Schema of the upload envelope, not just any object.
     expect(callback.schema).toMatchObject({ type: "object" });
-    expect(JSON.stringify(callback.schema)).toContain("vendorId");
+    expect(JSON.stringify(callback.schema)).toContain("externalId");
   });
 });

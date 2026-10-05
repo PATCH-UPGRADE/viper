@@ -11,20 +11,20 @@ import { type CrawledItem, runAiCrawler } from "./agent";
 import { type CrawlerResource, isCrawlerResource } from "./agent/schemas";
 import type { AiConfig, AiCreds } from "./config";
 
-const KNOWN_VENDOR_ID_SAMPLE = 10;
+const KNOWN_EXTERNAL_ID_SAMPLE = 10;
 
-const vendorIdQuery = (integrationId: string) => ({
+const externalIdQuery = (integrationId: string) => ({
   where: { integrationId },
   select: { externalId: true },
   orderBy: { updatedAt: "desc" as const },
-  take: KNOWN_VENDOR_ID_SAMPLE,
+  take: KNOWN_EXTERNAL_ID_SAMPLE,
 });
 
 /** Where each crawler resource keeps its mappings, and how its items are upserted. */
 const CRAWLER_RESOURCES: {
   [R in CrawlerResource]: {
-    recentVendorIds: (
-      query: ReturnType<typeof vendorIdQuery>,
+    recentExternalIds: (
+      query: ReturnType<typeof externalIdQuery>,
     ) => Promise<{ externalId: string }[]>;
     ingest: (
       input: { items: CrawledItem<R>[] },
@@ -35,21 +35,21 @@ const CRAWLER_RESOURCES: {
   };
 } = {
   [ResourceType.Asset]: {
-    recentVendorIds: (query) => prisma.externalAssetMapping.findMany(query),
+    recentExternalIds: (query) => prisma.externalAssetMapping.findMany(query),
     ingest: processAssetIntegrationSync,
   },
   [ResourceType.Vulnerability]: {
-    recentVendorIds: (query) =>
+    recentExternalIds: (query) =>
       prisma.externalVulnerabilityMapping.findMany(query),
     ingest: processVulnerabilityIntegrationSync,
   },
   [ResourceType.Remediation]: {
-    recentVendorIds: (query) =>
+    recentExternalIds: (query) =>
       prisma.externalRemediationMapping.findMany(query),
     ingest: processRemediationIntegrationSync,
   },
   [ResourceType.DeviceArtifact]: {
-    recentVendorIds: (query) =>
+    recentExternalIds: (query) =>
       prisma.externalDeviceArtifactMapping.findMany(query),
     ingest: processDeviceArtifactIntegrationSync,
   },
@@ -73,15 +73,15 @@ async function crawlAndIngest<R extends CrawlerResource>(
   ctx: SyncCtx<AiConfig, AiCreds>,
   resource: R,
 ): Promise<SyncOutcome> {
-  const { recentVendorIds, ingest } = CRAWLER_RESOURCES[resource];
+  const { recentExternalIds, ingest } = CRAWLER_RESOURCES[resource];
 
-  const known = await recentVendorIds(vendorIdQuery(ctx.integrationId));
+  const known = await recentExternalIds(externalIdQuery(ctx.integrationId));
   const { items, incomplete } = await runAiCrawler({
     resource,
     integrationUri: ctx.config.integrationUri,
     additionalInstructions: ctx.config.additionalInstructions,
     creds: ctx.creds,
-    knownVendorIds: known.map((m) => m.externalId),
+    knownExternalIds: known.map((m) => m.externalId),
   });
 
   const response = await ingest(

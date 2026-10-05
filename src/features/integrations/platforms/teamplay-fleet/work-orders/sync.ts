@@ -38,7 +38,7 @@ export async function reconcileProvisionalMappings(
     if (!item.ownIncidentNumber || !item.equipmentKey) continue;
     realIdByProvisionalId.set(
       provisionalExternalId(item.ownIncidentNumber, item.equipmentKey),
-      item.vendorId,
+      item.externalId,
     );
   }
   if (realIdByProvisionalId.size === 0) return;
@@ -143,7 +143,7 @@ async function recordSources(
   const tickets = await prisma.externalWorkOrderMapping.findMany({
     where: {
       integrationId,
-      externalId: { in: items.map((item) => item.vendorId) },
+      externalId: { in: items.map((item) => item.externalId) },
     },
     select: { externalId: true, itemId: true },
   });
@@ -152,14 +152,16 @@ async function recordSources(
   );
 
   // An activity the ingest could not land has nothing to attach a snapshot to.
-  const landed = items.filter((item) => ticketByExternalId.has(item.vendorId));
+  const landed = items.filter((item) =>
+    ticketByExternalId.has(item.externalId),
+  );
   if (landed.length === 0) return;
 
   const lastSynced = new Date();
   const existing = await prisma.externalSourceRecordMapping.findMany({
     where: {
       integrationId,
-      externalId: { in: landed.map((item) => item.vendorId) },
+      externalId: { in: landed.map((item) => item.externalId) },
     },
     select: { id: true, externalId: true },
   });
@@ -168,14 +170,14 @@ async function recordSources(
   );
 
   const missing = landed.filter(
-    (item) => !mappingIdByExternalId.has(item.vendorId),
+    (item) => !mappingIdByExternalId.has(item.externalId),
   );
   if (missing.length > 0) {
     const created =
       await prisma.externalSourceRecordMapping.createManyAndReturn({
         data: missing.map((item) => ({
           integrationId,
-          externalId: item.vendorId,
+          externalId: item.externalId,
           lastSynced,
         })),
         select: { id: true, externalId: true },
@@ -209,7 +211,7 @@ async function recordSources(
     contentHash: string;
   }[] = [];
   for (const item of landed) {
-    const mappingId = mappingIdByExternalId.get(item.vendorId);
+    const mappingId = mappingIdByExternalId.get(item.externalId);
     if (!mappingId) continue;
     const contentHash = sourceContentHash(item.raw, item.body);
     if (newestHashByMappingId.get(mappingId) === contentHash) continue;
@@ -234,7 +236,7 @@ async function recordSources(
   await prisma.sourceLink.createMany({
     data: changed.flatMap(({ item, mappingId }) => {
       const sourceRecordId = recordIdByMappingId.get(mappingId);
-      const workOrderTicketId = ticketByExternalId.get(item.vendorId);
+      const workOrderTicketId = ticketByExternalId.get(item.externalId);
       if (!sourceRecordId || !workOrderTicketId) return [];
       return [{ sourceRecordId, workOrderTicketId }];
     }),
@@ -247,20 +249,20 @@ export async function syncWorkOrders(
 ): Promise<SyncOutcome> {
   const { session } = ctx;
 
-  // Keyed by vendorId so one activity appearing twice in a response is carried
+  // Keyed by externalId so one activity appearing twice in a response is carried
   // once. A repeat would otherwise write two identical snapshots, only one of
   // which gets a SourceLink, because the hash comparison reads the newest
   // stored record and cannot see a sibling created in the same pass.
-  const byVendorId = new Map<string, FleetWorkOrderItem>();
+  const byExternalId = new Map<string, FleetWorkOrderItem>();
   let cursor: Cursor | null = null;
   for await (const page of listChanged(session, ctx.cursor)) {
     for (const raw of page.items) {
       const item = toCanonical(raw);
-      byVendorId.set(item.vendorId, item);
+      byExternalId.set(item.externalId, item);
     }
     cursor = page.cursor;
   }
-  const items = [...byVendorId.values()];
+  const items = [...byExternalId.values()];
 
   await reconcileProvisionalMappings(items, ctx.integrationId);
   const response = await ingestFleetWorkOrders(items, ctx.integrationId);

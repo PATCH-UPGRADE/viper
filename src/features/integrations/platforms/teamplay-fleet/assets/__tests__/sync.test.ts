@@ -119,7 +119,7 @@ describe("syncAssets", () => {
       lastSyncCall();
     expect(prismaArg).toBe(db);
     expect(input.items[0]).toMatchObject({
-      vendorId: "US_1006103273",
+      externalId: "US_1006103273",
       serialNumber: "63014",
       productName: "syngo WebSpace",
       softwareVersion: "VA11A",
@@ -210,7 +210,7 @@ describe("syncAssets", () => {
 
     const [, config, input] = lastSyncCall();
     const gateway = input.items.find(
-      (i: { vendorId: string }) => i.vendorId === "US_1064970627",
+      (i: { externalId: string }) => i.externalId === "US_1064970627",
     );
     const out = await config.transformInputItem(
       gateway as Parameters<typeof config.transformInputItem>[0],

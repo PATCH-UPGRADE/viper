@@ -30,7 +30,7 @@ export function processVulnerabilityIntegrationSync(
         const {
           cpes,
           sarif,
-          vendorId: _vendorId,
+          externalId: _externalId,
           upstreamApi: _upstreamApi,
           webUrl: _webUrl,
           ...itemData

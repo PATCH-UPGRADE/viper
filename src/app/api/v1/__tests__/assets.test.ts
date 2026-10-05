@@ -66,7 +66,7 @@ describe("Assets Endpoint (/assets)", () => {
           room: "RAD-001",
         },
         status: "Active",
-        vendorId: "mockIntegration-1",
+        externalId: "mockIntegration-1",
       },
       {
         ip: "172.20.15.245",
@@ -84,7 +84,7 @@ describe("Assets Endpoint (/assets)", () => {
           room: "RAD-002",
         },
         status: "Active",
-        vendorId: "mockIntegration-2",
+        externalId: "mockIntegration-2",
       },
     ],
     page: 1,
@@ -397,8 +397,8 @@ describe("Assets Endpoint (/assets)", () => {
       ResourceType.Asset,
     );
     const assetIntegrationPayloadCopy = { ...assetIntegrationPayload };
-    assetIntegrationPayloadCopy.items[0].vendorId = "mockAssetIntegration-1";
-    assetIntegrationPayloadCopy.items[1].vendorId = "mockAssetIntegration-2";
+    assetIntegrationPayloadCopy.items[0].externalId = "mockAssetIntegration-1";
+    assetIntegrationPayloadCopy.items[1].externalId = "mockAssetIntegration-2";
 
     await prisma.deviceGroup.deleteMany({
       where: {
@@ -425,7 +425,7 @@ describe("Assets Endpoint (/assets)", () => {
     const assetPayload1 = assetIntegrationPayload.items[0];
     const mapping1 = await prisma.externalAssetMapping.findFirstOrThrow({
       where: {
-        externalId: assetPayload1.vendorId,
+        externalId: assetPayload1.externalId,
       },
     });
 
@@ -439,7 +439,7 @@ describe("Assets Endpoint (/assets)", () => {
     });
 
     expect(mapping1.integrationId).toBe(createdIntegration.id);
-    expect(mapping1.externalId).toBe(assetPayload1.vendorId);
+    expect(mapping1.externalId).toBe(assetPayload1.externalId);
 
     expect(foundAsset1.networkSegment).toBe(assetPayload1.networkSegment);
     expect(foundAsset1.role).toBe(assetPayload1.role);
@@ -453,7 +453,7 @@ describe("Assets Endpoint (/assets)", () => {
     const assetPayload2 = assetIntegrationPayload.items[1];
     const mapping2 = await prisma.externalAssetMapping.findFirstOrThrow({
       where: {
-        externalId: assetPayload2.vendorId,
+        externalId: assetPayload2.externalId,
       },
     });
 
@@ -467,7 +467,7 @@ describe("Assets Endpoint (/assets)", () => {
     });
 
     expect(mapping2.integrationId).toBe(createdIntegration.id);
-    expect(mapping2.externalId).toBe(assetPayload2.vendorId);
+    expect(mapping2.externalId).toBe(assetPayload2.externalId);
 
     expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
     expect(foundAsset2.role).toBe(assetPayload2.role);
@@ -558,7 +558,7 @@ describe("Assets Endpoint (/assets)", () => {
     const assetPayload1 = updateAssetsPayload.items[0];
     const mapping1 = await prisma.externalAssetMapping.findFirstOrThrow({
       where: {
-        externalId: assetPayload1.vendorId,
+        externalId: assetPayload1.externalId,
       },
     });
 
@@ -572,7 +572,7 @@ describe("Assets Endpoint (/assets)", () => {
     });
 
     expect(mapping1.integrationId).toBe(createdIntegration.id);
-    expect(mapping1.externalId).toBe(assetPayload1.vendorId);
+    expect(mapping1.externalId).toBe(assetPayload1.externalId);
 
     expect(foundAsset1.networkSegment).toBe(assetPayload1.networkSegment);
     expect(foundAsset1.role).toBe(assetPayload1.role);
@@ -586,7 +586,7 @@ describe("Assets Endpoint (/assets)", () => {
     const assetPayload2 = updateAssetsPayload.items[1];
     const mapping2 = await prisma.externalAssetMapping.findFirstOrThrow({
       where: {
-        externalId: assetPayload2.vendorId,
+        externalId: assetPayload2.externalId,
       },
     });
 
@@ -606,7 +606,7 @@ describe("Assets Endpoint (/assets)", () => {
     expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
 
     expect(mapping2.integrationId).toBe(createdIntegration.id);
-    expect(mapping2.externalId).toBe(assetPayload2.vendorId);
+    expect(mapping2.externalId).toBe(assetPayload2.externalId);
 
     expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
     expect(foundAsset2.role).toBe(assetPayload2.role);
@@ -692,7 +692,7 @@ describe("Assets Endpoint (/assets)", () => {
     const assetPayload1 = createWithUpdateAssets.items[0];
     const mapping1 = await prisma.externalAssetMapping.findFirstOrThrow({
       where: {
-        externalId: assetPayload1.vendorId,
+        externalId: assetPayload1.externalId,
       },
     });
 
@@ -706,7 +706,7 @@ describe("Assets Endpoint (/assets)", () => {
     });
 
     expect(mapping1.integrationId).toBe(createdIntegration.id);
-    expect(mapping1.externalId).toBe(assetPayload1.vendorId);
+    expect(mapping1.externalId).toBe(assetPayload1.externalId);
 
     expect(foundAsset1.networkSegment).toBe(assetPayload1.networkSegment);
     expect(foundAsset1.role).toBe(assetPayload1.role);
@@ -720,7 +720,7 @@ describe("Assets Endpoint (/assets)", () => {
     const assetPayload2 = assetIntegrationPayload.items[1];
     const mapping2 = await prisma.externalAssetMapping.findFirstOrThrow({
       where: {
-        externalId: assetPayload2.vendorId,
+        externalId: assetPayload2.externalId,
       },
     });
 
@@ -734,7 +734,7 @@ describe("Assets Endpoint (/assets)", () => {
     });
 
     expect(mapping2.integrationId).toBe(createdIntegration.id);
-    expect(mapping2.externalId).toBe(assetPayload2.vendorId);
+    expect(mapping2.externalId).toBe(assetPayload2.externalId);
 
     expect(foundAsset2.networkSegment).toBe(assetPayload2.networkSegment);
     expect(foundAsset2.role).toBe(assetPayload2.role);
@@ -826,7 +826,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     const mapping1 = await prisma.externalAssetMapping.findFirstOrThrow({
       where: {
-        externalId: updatedAsset.vendorId,
+        externalId: updatedAsset.externalId,
       },
     });
 
@@ -841,7 +841,7 @@ describe("Assets Endpoint (/assets)", () => {
 
     expect(mapping1.itemId).toBe(foundAsset1.id);
     expect(mapping1.integrationId).toBe(createdIntegration.id);
-    expect(mapping1.externalId).toBe(updatedAsset.vendorId);
+    expect(mapping1.externalId).toBe(updatedAsset.externalId);
 
     expect(foundAsset1.networkSegment).toBe(updatedAsset.networkSegment);
     expect(foundAsset1.role).toBe(updatedAsset.role);

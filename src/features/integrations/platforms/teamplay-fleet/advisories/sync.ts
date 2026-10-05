@@ -50,7 +50,7 @@ async function changedAdvisories(
   const existing = await prisma.externalSourceRecordMapping.findMany({
     where: {
       integrationId,
-      externalId: { in: items.map((item) => item.vendorId) },
+      externalId: { in: items.map((item) => item.externalId) },
     },
     select: { id: true, externalId: true },
   });
@@ -59,14 +59,14 @@ async function changedAdvisories(
   );
 
   const missing = items.filter(
-    (item) => !mappingIdByExternalId.has(item.vendorId),
+    (item) => !mappingIdByExternalId.has(item.externalId),
   );
   if (missing.length > 0) {
     const created =
       await prisma.externalSourceRecordMapping.createManyAndReturn({
         data: missing.map((item) => ({
           integrationId,
-          externalId: item.vendorId,
+          externalId: item.externalId,
           lastSynced,
         })),
         select: { id: true, externalId: true },
@@ -99,7 +99,7 @@ async function changedAdvisories(
 
   const changed: ChangedAdvisory[] = [];
   for (const item of items) {
-    const mappingId = mappingIdByExternalId.get(item.vendorId);
+    const mappingId = mappingIdByExternalId.get(item.externalId);
     if (!mappingId) continue;
     // `hashableOf` drops enableMail / lastEmailsSent, which describe Fleet's
     // subscriber mailing rather than the advisory: a mail going out must not
@@ -135,19 +135,19 @@ export async function syncAdvisories(
 ): Promise<SyncOutcome> {
   const { session } = ctx;
 
-  // Keyed by vendorId so one advisory appearing twice in a response is carried
+  // Keyed by externalId so one advisory appearing twice in a response is carried
   // once. A repeat would otherwise write two identical snapshots, because the
   // hash comparison reads the newest stored record and cannot see a sibling
   // created in the same pass.
-  const byVendorId = new Map<string, FleetAdvisoryItem>();
+  const byExternalId = new Map<string, FleetAdvisoryItem>();
   for await (const page of listChanged(session, ctx.cursor)) {
     for (const raw of page.items) {
       const item = toCanonical(raw);
-      byVendorId.set(item.vendorId, item);
+      byExternalId.set(item.externalId, item);
     }
   }
   const changed = await changedAdvisories(
-    [...byVendorId.values()],
+    [...byExternalId.values()],
     ctx.integrationId,
   );
 
@@ -160,7 +160,7 @@ export async function syncAdvisories(
       files = await downloadAdvisoryPdfs(session, entry.item);
     } catch (error) {
       console.warn(
-        `Fleet advisory ${entry.item.vendorId}: stored without its PDF`,
+        `Fleet advisory ${entry.item.externalId}: stored without its PDF`,
         error,
       );
     }
@@ -168,7 +168,9 @@ export async function syncAdvisories(
   }
   await recordAdvisories(pending);
 
-  await dispatchUnprocessedSnapshots(ctx.integrationId, [...byVendorId.keys()]);
+  await dispatchUnprocessedSnapshots(ctx.integrationId, [
+    ...byExternalId.keys(),
+  ]);
 
   // No cursor, advisories endpoint cannot paginate
   return { cursor: null };

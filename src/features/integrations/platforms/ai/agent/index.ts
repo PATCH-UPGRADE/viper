@@ -37,14 +37,14 @@ export async function runAiCrawler<R extends CrawlerResource>({
   integrationUri,
   additionalInstructions,
   creds,
-  knownVendorIds,
+  knownExternalIds,
 }: {
   resource: R;
   integrationUri: string;
   additionalInstructions?: string;
   creds: AuthCredential;
-  /** vendorIds from earlier syncs, so the model keeps their pattern. */
-  knownVendorIds: string[];
+  /** externalIds from earlier syncs, so the model keeps their pattern. */
+  knownExternalIds: string[];
 }): Promise<CrawlResult<CrawledItem<R>>> {
   // TypeScript does not narrow a map lookup by a generic key.
   const itemSchema = CRAWLER_ITEM_SCHEMAS[resource] as unknown as z.ZodType<
@@ -72,7 +72,7 @@ export async function runAiCrawler<R extends CrawlerResource>({
         resource,
         integrationUri,
         authType: creds.authType,
-        knownVendorIds,
+        knownExternalIds,
       }),
   });
 

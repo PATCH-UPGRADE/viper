@@ -32,8 +32,8 @@ describe.each([
     expect(prompt).toMatch(/empty list/);
   });
 
-  // An unstable vendorId can create a second row for the same item on every sync.
-  it("asks for vendorIds that stay the same across syncs and retries", () => {
+  // An unstable externalId can create a second row for the same item on every sync.
+  it("asks for externalIds that stay the same across syncs and retries", () => {
     expect(prompt).toContain("same every time the same item is crawled");
     expect(prompt).toContain("never add counters or suffixes of your own");
     expect(prompt).toContain("Record each item once");
@@ -73,7 +73,7 @@ describe("crawler preload", () => {
   } as const;
 
   it("names the resource, URL, and auth type, and no secret", () => {
-    const preload = buildCrawlerPreload({ ...base, knownVendorIds: [] });
+    const preload = buildCrawlerPreload({ ...base, knownExternalIds: [] });
 
     expect(preload).toBe(
       `Resource: Vulnerability\nIntegration URL: ${URI}\nAuthentication: Bearer`,
@@ -81,10 +81,10 @@ describe("crawler preload", () => {
   });
 
   // Without earlier ids, each sync picks its own pattern and can copy every item.
-  it("lists earlier vendorIds and asks for the same pattern", () => {
+  it("lists earlier externalIds and asks for the same pattern", () => {
     const preload = buildCrawlerPreload({
       ...base,
-      knownVendorIds: ["dg_1:fuzzer:CWE-798:0", "dg_2:fuzzer:CWE-200:1"],
+      knownExternalIds: ["dg_1:fuzzer:CWE-798:0", "dg_2:fuzzer:CWE-200:1"],
     });
 
     expect(preload).toContain(

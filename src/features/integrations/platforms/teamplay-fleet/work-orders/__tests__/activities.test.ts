@@ -41,9 +41,9 @@ const MAINTENANCE: FleetActivity = {
 };
 
 describe("toCanonical", () => {
-  it("uses ticketKey as the dedup vendorId and activityTitle as the summary", () => {
+  it("uses ticketKey as the dedup externalId and activityTitle as the summary", () => {
     const item = toCanonical(UPDATE_SERVICE);
-    expect(item.vendorId).toBe("US_400501937577");
+    expect(item.externalId).toBe("US_400501937577");
     expect(item.summary).toBe("Update Service: UI-MR049/24/P NX VA60A-SP02");
   });
 

@@ -118,7 +118,7 @@ describe("syncRemediations", () => {
     expect(processIntegrationSync).toHaveBeenCalledTimes(1);
     const [, , input] = processIntegrationSync.mock.calls[0];
     expect(input.items).toHaveLength(1);
-    expect(input.items[0].vendorId).toBe("rem-1");
+    expect(input.items[0].externalId).toBe("rem-1");
   });
 
   it("returns the newest updated_at per channel as the next cursor", async () => {
@@ -182,9 +182,9 @@ describe("syncRemediations", () => {
     const outcome = await syncRemediations(ctx());
 
     const [, , input] = processIntegrationSync.mock.calls[0];
-    expect(input.items.map((i: { vendorId: string }) => i.vendorId)).toEqual([
-      "still-here",
-    ]);
+    expect(
+      input.items.map((i: { externalId: string }) => i.externalId),
+    ).toEqual(["still-here"]);
     expect(outcome.cursor).not.toHaveProperty("gone");
   });
 

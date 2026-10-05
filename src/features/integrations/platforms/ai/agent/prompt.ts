@@ -3,7 +3,7 @@ import { FETCH_URL_TOOL } from "./fetch-tool";
 import { RECORD_ITEMS_TOOL } from "./record-tool";
 import type { CrawlerResource } from "./schemas";
 
-const SHARED_FIELD_GUIDANCE = `- vendorId: the stable id of the item in the source API. It must be the same every time the same item is crawled, because VIPER uses it to update the item on the next sync. Never reuse one for two items. If no single field is unique, join source fields with ":", and add the item's 0-based position in its source list only when fields alone repeat. Build every vendorId with one pattern, and never add counters or suffixes of your own.
+const SHARED_FIELD_GUIDANCE = `- externalId: the stable id of the item in the source API. It must be the same every time the same item is crawled, because VIPER uses it to update the item on the next sync. Never reuse one for two items. If no single field is unique, join source fields with ":", and add the item's 0-based position in its source list only when fields alone repeat. Build every externalId with one pattern, and never add counters or suffixes of your own.
 - upstreamApi: the API URL for this one item, if the source has one.
 - webUrl: the URL where a person can view this item, if the source has one.
 - CPE fields: CPE 2.3 strings, for example "cpe:2.3:h:philips:intellivue_mx800:*:*:*:*:*:*:*:*". Build them from the vendor, product, and version in the source. Use "*" for a part that you do not know.
@@ -56,36 +56,36 @@ ${RESOURCE_GUIDANCE[resource]}
 Rules for every item:
 ${SHARED_FIELD_GUIDANCE}
 
-If ${RECORD_ITEMS_TOOL} returns a validation error, nothing from that call was recorded. Fix the items that it names, and record the whole page again with the same vendorIds.${userBlock}`;
+If ${RECORD_ITEMS_TOOL} returns a validation error, nothing from that call was recorded. Fix the items that it names, and record the whole page again with the same externalIds.${userBlock}`;
 }
 
 /**
- * The per-run context. `knownVendorIds` come from earlier syncs of this
- * integration: the model cannot see those runs, and a vendorId built with a
+ * The per-run context. `knownExternalIds` come from earlier syncs of this
+ * integration: the model cannot see those runs, and an externalId built with a
  * new pattern can make a second copy of each item on every sync.
  */
 export function buildCrawlerPreload({
   resource,
   integrationUri,
   authType,
-  knownVendorIds,
+  knownExternalIds,
 }: {
   resource: CrawlerResource;
   integrationUri: string;
   authType: string;
-  knownVendorIds: string[];
+  knownExternalIds: string[];
 }): string {
   const lines = [
     `Resource: ${resource}`,
     `Integration URL: ${integrationUri}`,
     `Authentication: ${authType}`,
   ];
-  if (knownVendorIds.length > 0) {
+  if (knownExternalIds.length > 0) {
     lines.push(
       "",
-      "Earlier syncs of this integration recorded vendorIds like these:",
-      ...knownVendorIds.map((id) => `- ${id}`),
-      "Build every vendorId with exactly the same pattern, so that VIPER updates these items and does not create copies.",
+      "Earlier syncs of this integration recorded externalIds like these:",
+      ...knownExternalIds.map((id) => `- ${id}`),
+      "Build every externalId with exactly the same pattern, so that VIPER updates these items and does not create copies.",
     );
   }
   return lines.join("\n");

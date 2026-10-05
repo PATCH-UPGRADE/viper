@@ -1422,7 +1422,7 @@ export const trackingRouter = createTRPCRouter({
           mappingModel: prisma.externalWorkOrderMapping,
           transformInputItem: async (item, creatorId) => {
             const {
-              vendorId,
+              externalId,
               scheduledAt,
               source,
               upstreamApi: _upstreamApi,
@@ -1447,7 +1447,7 @@ export const trackingRouter = createTRPCRouter({
                           sourceRecord: {
                             create: {
                               channel: source.channel,
-                              externalId: source.externalId ?? vendorId,
+                              externalId: source.externalId ?? externalId,
                               markdown: source.markdown ?? null,
                               raw: source.raw ?? {},
                               contentHash: sourceContentHash(

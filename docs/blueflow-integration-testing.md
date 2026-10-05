@@ -13,7 +13,7 @@ webhook push.
                  2. create_assets → assets inserted into Blueflow's DB
                  3. test POSTs /api/viper/webhook/ {callback, since, page_size} → 202
                  4. Celery (EAGER) POSTs asset page(s) to `callback`
-                          │  {items:[{ip,upstreamApi,vendorId,hostname,...}], page,...}
+                          │  {items:[{ip,upstreamApi,externalId,hostname,...}], page,...}
                           ▼
  viper-db    ← VIPER  POST /api/v1/assets/integrationUpload/<token>
                  5. upserts assets; test GET /api/v1/assets confirms they landed

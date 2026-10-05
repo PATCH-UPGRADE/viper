@@ -9,6 +9,11 @@ const { mockPrisma } = vi.hoisted(() => {
       upsert: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
     },
+    notificationVulnerabilityMapping: {
+      updateMany: vi.fn(),
+      createMany: vi.fn(),
+    },
+    vulnerability: { findUnique: vi.fn().mockResolvedValue(null) },
     deviceGroupMatching: { findUnique: vi.fn(), update: vi.fn() },
     // applyDecisions runs inside prisma.$transaction(async (tx) => …) — invoke
     // the callback with the same mock so call assertions still work.
@@ -23,6 +28,7 @@ const { mockPrisma } = vi.hoisted(() => {
 vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 vi.mock("@/lib/router-utils", () => ({ resolveMatchingId: vi.fn() }));
 
+import { notRejected } from "../types";
 import type { Candidates } from "./candidate-search";
 import { applyDecisions, type Decision } from "./match";
 
@@ -132,5 +138,108 @@ describe("applyDecisions — device-group mapping owner", () => {
     expect(
       mockPrisma.notificationDeviceGroupMapping.upsert,
     ).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyDecisions — vulnerability mapping", () => {
+  const vulnCandidates: Candidates = {
+    ...candidates,
+    vulnerabilities: [
+      {
+        extracted: { cveId: "CVE-2026-0001" },
+        matches: [
+          {
+            id: "vuln-1",
+            cveId: "CVE-2026-0001",
+            description: null,
+            cvssScore: null,
+            cvssVector: null,
+          },
+        ],
+      },
+    ],
+  };
+  const vulnDecision: Decision = {
+    kind: "vulnerability",
+    op: "link",
+    targetId: "vuln-1",
+    confidence: "Matched",
+    reasonWhy: "same CVE",
+    fields: null,
+  };
+
+  it("creates a link when the notification has none", async () => {
+    mockPrisma.notificationVulnerabilityMapping.updateMany.mockResolvedValue({
+      count: 0,
+    });
+    mockPrisma.notificationVulnerabilityMapping.createMany.mockResolvedValue({
+      count: 1,
+    });
+
+    const summary = await applyDecisions(
+      { notificationId: "n-1" },
+      [vulnDecision],
+      vulnCandidates,
+    );
+
+    expect(summary).toMatchObject({ linked: 1, skipped: 0 });
+    expect(
+      mockPrisma.notificationVulnerabilityMapping.createMany,
+    ).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          notificationId: "n-1",
+          vulnerabilityId: "vuln-1",
+        }),
+      ],
+      skipDuplicates: true,
+    });
+  });
+
+  it("updates an existing link that is not rejected", async () => {
+    mockPrisma.notificationVulnerabilityMapping.updateMany.mockResolvedValue({
+      count: 1,
+    });
+
+    const summary = await applyDecisions(
+      { notificationId: "n-1" },
+      [vulnDecision],
+      vulnCandidates,
+    );
+
+    expect(summary).toMatchObject({ linked: 1, skipped: 0 });
+    expect(
+      mockPrisma.notificationVulnerabilityMapping.updateMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        notificationId: "n-1",
+        vulnerabilityId: "vuln-1",
+        ...notRejected,
+      },
+      data: { confidence: "Matched", reasonWhy: "same CVE" },
+    });
+    expect(
+      mockPrisma.notificationVulnerabilityMapping.createMany,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("skips a vulnerability that a user rejected on this notification", async () => {
+    // A rejected row matches neither write: the update filters it out, and the
+    // create sees a duplicate.
+    mockPrisma.notificationVulnerabilityMapping.updateMany.mockResolvedValue({
+      count: 0,
+    });
+    mockPrisma.notificationVulnerabilityMapping.createMany.mockResolvedValue({
+      count: 0,
+    });
+
+    const summary = await applyDecisions(
+      { notificationId: "n-1" },
+      [vulnDecision],
+      vulnCandidates,
+    );
+
+    expect(summary).toMatchObject({ linked: 0, skipped: 1 });
+    expect(mockPrisma.vulnerability.findUnique).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,7 @@ import { triageNotification } from "./agent/triage";
 import { persistTriageResult } from "./agent/triage/persist";
 import { sortNotificationVulnerabilities } from "./agent/vex";
 import type { KnownNotificationFields } from "./source-adapter";
+import { notRejected } from "./types";
 
 /**
  * The slice of Inngest's `step` this pipeline uses.
@@ -133,7 +134,7 @@ export async function runNotificationPipeline({
   const vexSummary = await step.run("sort-vulnerabilities", async () => {
     if (!notificationId) return { vexSkipped: true as const };
     const vulnCount = await prisma.notificationVulnerabilityMapping.count({
-      where: { notificationId },
+      where: { notificationId, ...notRejected },
     });
     if (vulnCount === 0) return { vexSkipped: true as const };
     return sortNotificationVulnerabilities(notificationId);

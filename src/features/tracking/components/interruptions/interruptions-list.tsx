@@ -10,8 +10,6 @@ import { useTRPC } from "@/trpc/client";
 import {
   availabilityStyle,
   categoryLabels,
-  END_PASSED,
-  endPassed,
   StatusChip,
   statusLabels,
   UnreadDot,
@@ -54,7 +52,6 @@ export const InterruptionsList = () => {
             .sort((a, b) => +a - +b);
           const first = times[0];
           const last = times.at(-1);
-          const late = group.filter(endPassed).length;
           return (
             <details
               key={head.workOrderId}
@@ -95,7 +92,6 @@ export const InterruptionsList = () => {
                             `${items?.length} ${statusLabels[status as keyof typeof statusLabels]}`,
                         )
                         .join(" · ")}
-                      {late > 0 && ` · ${late} past estimated end`}
                     </span>
                   </span>
                 </span>
@@ -140,11 +136,6 @@ export const InterruptionsList = () => {
                           ) : (
                             <span className="italic text-muted-foreground">
                               No time recorded
-                            </span>
-                          )}
-                          {endPassed(item) && (
-                            <span className="text-xs text-muted-foreground">
-                              {END_PASSED}
                             </span>
                           )}
                         </span>

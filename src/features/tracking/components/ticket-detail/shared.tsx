@@ -1,6 +1,6 @@
 "use client";
 
-import { addMinutes, format } from "date-fns";
+import { format } from "date-fns";
 import {
   BanIcon,
   CircleCheckIcon,
@@ -93,17 +93,6 @@ export const UnreadDot = () => (
     <span className="sr-only">Not opened by you</span>
   </span>
 );
-
-export const endPassed = (t: {
-  scheduledAt: Date | null;
-  durationEstimate: number | null;
-}) =>
-  !!t.scheduledAt &&
-  !!t.durationEstimate &&
-  addMinutes(t.scheduledAt, t.durationEstimate) < new Date();
-
-export const END_PASSED =
-  "Estimated end time passed · Completion not recorded in VIPER";
 
 export const formatDate = (date: Date | string | null | undefined) => {
   if (!date) return null;

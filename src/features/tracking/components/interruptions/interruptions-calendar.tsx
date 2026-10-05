@@ -29,13 +29,7 @@ import {
   ListIcon,
 } from "lucide-react";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,12 +41,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import {
-  availabilityStyle,
-  endPassed,
-  statusLabels,
-  UnreadDot,
-} from "../ticket-detail/shared";
+import { availabilityStyle, UnreadDot } from "../ticket-detail/shared";
 import { InterruptionsList } from "./interruptions-list";
 import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
 
@@ -134,14 +123,9 @@ const GroupButton = ({
   );
 };
 
-const chip = "rounded border bg-background/60 px-1 text-[10px]";
-
-// Short blocks show one line, taller ones add chips, and Day view the summary.
-const TicketBlock = ({ block, day }: { block: Block; day: boolean }) => {
+const TicketBlock = ({ block }: { block: Block }) => {
   const [item] = block.items;
-  const { Icon, label } = availabilityStyle(item.availability);
-  const height = Math.max((block.len * HOUR_HEIGHT) / 60 - 2, 20);
-  const size = height < 33 ? "xs" : height < 51 ? "sm" : "lg";
+  const { Icon } = availabilityStyle(item.availability);
   return (
     <div
       className="absolute"
@@ -149,7 +133,7 @@ const TicketBlock = ({ block, day }: { block: Block; day: boolean }) => {
         left: `calc(${(block.lane * 100) / block.lanes}% + 2px)`,
         width: `calc(${100 / block.lanes}% - 4px)`,
         top: (block.start * HOUR_HEIGHT) / 60,
-        height,
+        height: Math.max((block.len * HOUR_HEIGHT) / 60 - 2, 20),
       }}
     >
       <GroupButton
@@ -160,38 +144,21 @@ const TicketBlock = ({ block, day }: { block: Block; day: boolean }) => {
             "[mask-image:linear-gradient(to_bottom,#000_55%,transparent)]",
         )}
       >
-        <span className="sr-only">{label}</span>
         <span className="flex items-center gap-1 text-xs font-medium">
-          <span className="truncate">
-            {deviceLabel(block.items)}
-            {size === "xs" && ` · ${format(item.scheduledAt, "h:mm a")}`}
-          </span>
+          <span className="truncate">{deviceLabel(block.items)}</span>
           {block.items.some((i) => i.unread) && <UnreadDot />}
         </span>
-        {size !== "xs" && (
-          <span className="flex items-center gap-1">
-            <Icon className="size-3 shrink-0" aria-hidden />
-            <span className="truncate">
-              {format(item.scheduledAt, "h:mm a")}
-              {item.durationEstimate &&
-                ` – ${format(addMinutes(item.scheduledAt, item.durationEstimate), "h:mm a")}`}
-            </span>
+        <span className="flex items-center gap-1">
+          <Icon className="size-3 shrink-0" aria-hidden />
+          <span className="sr-only">
+            {availabilityStyle(item.availability).label}
           </span>
-        )}
-        {size === "lg" && (
-          <span className="flex flex-wrap gap-1">
-            {block.items.length === 1 && (
-              <span className={chip}>{statusLabels[item.status]}</span>
-            )}
-            {endPassed(item) && <span className={chip}>End time passed</span>}
-            {item.durationEstimate && (
-              <span className={chip}>{item.durationEstimate} min</span>
-            )}
+          <span className="truncate">
+            {format(item.scheduledAt, "h:mm a")}
+            {item.durationEstimate &&
+              ` – ${format(addMinutes(item.scheduledAt, item.durationEstimate), "h:mm a")}`}
           </span>
-        )}
-        {day && size === "lg" && (
-          <span className="truncate opacity-80">{item.summary}</span>
-        )}
+        </span>
       </GroupButton>
     </div>
   );
@@ -199,20 +166,11 @@ const TicketBlock = ({ block, day }: { block: Block; day: boolean }) => {
 
 const MAX_CHIPS = 3;
 
-const MonthChip = ({ group }: { group: Item[] }) => {
-  const { Icon } = availabilityStyle(group[0].availability);
-  return (
-    <GroupButton
-      group={group}
-      className="flex items-center gap-1 truncate px-1"
-    >
-      <Icon className="size-3 shrink-0" aria-hidden />
-      <span className="truncate">
-        {format(group[0].scheduledAt, "h:mmaaa")} {deviceLabel(group)}
-      </span>
-    </GroupButton>
-  );
-};
+const MonthChip = ({ group }: { group: Item[] }) => (
+  <GroupButton group={group} className="truncate px-1">
+    {format(group[0].scheduledAt, "h:mmaaa")} {deviceLabel(group)}
+  </GroupButton>
+);
 
 const MonthGrid = ({
   days,
@@ -277,8 +235,9 @@ const MonthGrid = ({
 );
 
 // Open the grid at the working day, not midnight.
-const HEADER = 48;
-const px = (minutes: number) => (minutes * HOUR_HEIGHT) / 60;
+const scrollToWorkday = (el: HTMLDivElement | null) => {
+  if (el) el.scrollTop = 7 * HOUR_HEIGHT;
+};
 
 const minutesOf = (date: Date) => date.getHours() * 60 + date.getMinutes();
 
@@ -306,13 +265,6 @@ const Calendar = ({ lead }: { lead: ReactNode }) => {
       { refetchInterval: 60_000 },
     ),
   );
-  const grid = useRef<HTMLDivElement | null>(null);
-  // Scroll position, to count tickets scrolled out of view. Opens at 7 AM.
-  const [visible, setVisible] = useState({ top: 7 * HOUR_HEIGHT, height: 0 });
-  const track = useCallback((el: HTMLDivElement | null) => {
-    grid.current = el;
-    if (el) el.scrollTop = 7 * HOUR_HEIGHT;
-  }, []);
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const tick = setInterval(() => setNow(new Date()), 60_000);
@@ -432,13 +384,7 @@ const Calendar = ({ lead }: { lead: ReactNode }) => {
             />
           ) : (
             <div
-              ref={track}
-              onScroll={(e) =>
-                setVisible({
-                  top: e.currentTarget.scrollTop,
-                  height: e.currentTarget.clientHeight,
-                })
-              }
+              ref={scrollToWorkday}
               className="min-h-0 flex-1 overflow-auto rounded-lg border bg-card"
             >
               <div className="flex">
@@ -454,96 +400,54 @@ const Calendar = ({ lead }: { lead: ReactNode }) => {
                     </div>
                   ))}
                 </div>
-                {days.map((day) => {
-                  const dayItems = on(day);
-                  const blocks = layout(dayItems);
-                  const above = blocks.filter(
-                    (b) => px(b.start + b.len) <= visible.top,
-                  );
-                  const below = blocks.filter(
-                    (b) => px(b.start) >= visible.top + visible.height - HEADER,
-                  );
-                  const goTo = (block: Block) =>
-                    grid.current?.scrollTo({
-                      top: px(block.start) - HOUR_HEIGHT,
-                      behavior: "smooth",
-                    });
-                  return (
-                    <section
-                      key={day.toISOString()}
-                      aria-label={format(day, "EEEE, MMMM d")}
-                      className={cn(
-                        "min-w-36 flex-1 border-l",
-                        isToday(day) && "bg-primary/5",
-                      )}
-                    >
-                      <h2 className="sticky top-0 z-20 flex h-12 items-center justify-center gap-1.5 border-b bg-card px-2 text-sm">
-                        <span className="text-muted-foreground">
-                          {format(day, "EEE")}
-                        </span>
-                        <span
-                          className={cn(
-                            "font-semibold",
-                            isToday(day) &&
-                              "rounded-full bg-primary px-1.5 text-primary-foreground",
-                          )}
-                        >
-                          {format(day, "d")}
-                        </span>
-                        {isToday(day) && (
-                          <span className="sr-only">(today)</span>
+                {days.map((day) => (
+                  <section
+                    key={day.toISOString()}
+                    aria-label={format(day, "EEEE, MMMM d")}
+                    className={cn(
+                      "min-w-36 flex-1 border-l",
+                      isToday(day) && "bg-primary/5",
+                    )}
+                  >
+                    <h2 className="sticky top-0 z-20 flex h-12 items-center justify-center gap-1.5 border-b bg-card px-2 text-sm">
+                      <span className="text-muted-foreground">
+                        {format(day, "EEE")}
+                      </span>
+                      <span
+                        className={cn(
+                          "font-semibold",
+                          isToday(day) &&
+                            "rounded-full bg-primary px-1.5 text-primary-foreground",
                         )}
-                        <span className="text-xs text-muted-foreground">
-                          {dayItems.length > 0 && `· ${dayItems.length}`}
-                        </span>
-                        {above.length > 0 && (
-                          <button
-                            type="button"
-                            title="Earlier tickets out of view"
-                            className="rounded-full border border-primary px-1.5 text-xs text-primary"
-                            onClick={() => goTo(above[above.length - 1])}
-                          >
-                            ↑ {above.length}
-                          </button>
-                        )}
-                      </h2>
-                      <div
-                        className="relative"
-                        style={{
-                          height: HOURS.length * HOUR_HEIGHT,
-                          backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 ${HOUR_HEIGHT - 1}px, var(--border) ${HOUR_HEIGHT - 1}px ${HOUR_HEIGHT}px)`,
-                        }}
                       >
-                        {isToday(day) && (
-                          <div
-                            aria-hidden
-                            className="absolute inset-x-0 z-10 border-t-2 border-destructive before:absolute before:-top-[6px] before:-left-1 before:size-2.5 before:rounded-full before:bg-destructive"
-                            style={{ top: px(minutesOf(now)) }}
-                          />
-                        )}
-                        {blocks.map((block) => (
-                          <TicketBlock
-                            key={block.items[0].id}
-                            block={block}
-                            day={mode === "day"}
-                          />
-                        ))}
-                      </div>
-                      {below.length > 0 && (
-                        <div className="sticky bottom-2 z-20 flex h-0 justify-center">
-                          <button
-                            type="button"
-                            title="Later tickets out of view"
-                            className="-translate-y-full rounded-full border border-primary bg-card px-2 text-xs text-primary"
-                            onClick={() => goTo(below[0])}
-                          >
-                            ↓ {below.length} later
-                          </button>
-                        </div>
+                        {format(day, "d")}
+                      </span>
+                      {isToday(day) && <span className="sr-only">(today)</span>}
+                      <span className="text-xs text-muted-foreground">
+                        {on(day).length > 0 && `· ${on(day).length}`}
+                      </span>
+                    </h2>
+                    <div
+                      className="relative"
+                      style={{
+                        height: HOURS.length * HOUR_HEIGHT,
+                        backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 ${HOUR_HEIGHT - 1}px, var(--border) ${HOUR_HEIGHT - 1}px ${HOUR_HEIGHT}px)`,
+                      }}
+                    >
+                      {isToday(day) && (
+                        <div
+                          aria-hidden
+                          className="absolute inset-x-0 z-10 border-t-2 border-destructive before:absolute before:-top-[6px] before:-left-1 before:size-2.5 before:rounded-full before:bg-destructive"
+                          style={{ top: (minutesOf(now) * HOUR_HEIGHT) / 60 }}
+                        />
                       )}
-                    </section>
-                  );
-                })}
+                      {/* Tickets starting in the same hour share its width. */}
+                      {layout(on(day)).map((block) => (
+                        <TicketBlock key={block.items[0].id} block={block} />
+                      ))}
+                    </div>
+                  </section>
+                ))}
               </div>
             </div>
           )}

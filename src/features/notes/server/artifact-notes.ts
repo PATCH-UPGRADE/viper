@@ -177,10 +177,6 @@ export async function persistArtifactNotes(args: {
     let created = 0;
     let updated = 0;
 
-    // Single matching: attach directly (cheap, no resolver). Zero matchings
-    // leaves the note scoped to nothing.
-    const directInstanceId = matchingIds.length === 1 ? matchingIds[0] : null;
-
     for (const write of writes) {
       if (write.kind === "update") {
         await updateNote(tx, write.noteId, { text: write.text });
@@ -188,32 +184,18 @@ export async function persistArtifactNotes(args: {
         continue;
       }
 
-      const note = await createNote(tx, {
+      const { filterId } = await createNote(tx, {
         text: write.text,
         status: "SCOPED",
         userId,
-        ...(directInstanceId
-          ? {
-              targetModel: "DEVICE_GROUP_MATCHING",
-              instanceId: directInstanceId,
-            }
-          : {}),
+        scope: {
+          targetModel: "DEVICE_GROUP_MATCHING",
+          instanceIds: matchingIds,
+          label,
+        },
       });
 
-      // More than one matching can't be expressed by a single instanceId, so
-      // scope via an EntityFilter for the resolver to materialize.
-      if (matchingIds.length > 1) {
-        const filter = await tx.entityFilter.create({
-          data: {
-            noteId: note.id,
-            label,
-            targetModel: "DEVICE_GROUP_MATCHING",
-            filter: { id: { in: matchingIds } },
-          },
-          select: { id: true },
-        });
-        createdFilterIds.push(filter.id);
-      }
+      if (filterId) createdFilterIds.push(filterId);
       created++;
     }
 

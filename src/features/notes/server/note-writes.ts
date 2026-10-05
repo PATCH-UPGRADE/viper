@@ -24,7 +24,7 @@ export async function createNote(
     scope?: NoteScope;
   },
 ): Promise<{ id: string; filterId: string | null }> {
-  const { text, userId, status = "SCOPED", scope } = args;
+  const { text, userId, status, scope } = args;
   const ids = scope?.instanceIds ?? [];
   const direct = scope && ids.length === 1 ? ids[0] : null;
 

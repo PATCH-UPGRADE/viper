@@ -17,7 +17,7 @@ const tx = {
 } as unknown as TransactionClient;
 
 beforeEach(() => {
-  vi.restoreAllMocks();
+  vi.resetAllMocks();
   noteCreate.mockResolvedValue({ id: "note-1" });
   entityFilterCreate.mockResolvedValue({ id: "filter-1" });
 });
@@ -135,6 +135,8 @@ describe("deleteNote", () => {
     });
   });
   it("throws NoteNotFoundError when the note is missing or already deleted", async () => {
+    noteUpdateMany.mockResolvedValue({ count: 0 });
+
     await expect(deleteNote(tx, "note-gone")).rejects.toThrow(
       "Note note-gone not found or already deleted",
     );

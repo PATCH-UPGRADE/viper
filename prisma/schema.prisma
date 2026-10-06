@@ -789,10 +789,12 @@ enum VulnerabilitySource {
   FIRST_EPSS // EPSS scores only
   CISA_KEV // known-exploited flag only
   // TODO VW-516: Add GHSA
+  // Future TODO: Add MANUAL when we support human changes
 }
 
 /// Kind of value in a Metric row.
 enum MetricType {
+  // Future TODO: Add CVSS_V2 once we have NVD data that needs it
   CVSS_V3_0
   CVSS_V3_1
   CVSS_V4_0

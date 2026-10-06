@@ -101,39 +101,42 @@ const TimelineRow = ({
   </li>
 );
 
-export const ActivityTimeline = ({
-  entries,
-  composer,
-}: {
-  entries: TimelineEntry[];
-  composer?: ReactNode;
-}) => {
+type TimelineProps = { entries: TimelineEntry[]; composer?: ReactNode };
+
+export const ActivityTimelineBody = ({ entries, composer }: TimelineProps) => {
   const newestFirst = [...entries].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   );
   const eventCount = newestFirst.length;
 
   return (
+    <div className="flex flex-col gap-4">
+      {composer}
+      {eventCount > 0 ? (
+        <ul className="flex flex-col gap-4">
+          {newestFirst.map((entry, index) => (
+            <TimelineRow
+              key={entry.id}
+              entry={entry}
+              isLast={index === eventCount - 1}
+            />
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">No activity yet.</p>
+      )}
+    </div>
+  );
+};
+
+export const ActivityTimeline = (props: TimelineProps) => {
+  const eventCount = props.entries.length;
+  return (
     <CollapsibleSectionCard
       title="Activity"
       meta={`${eventCount} event${eventCount === 1 ? "" : "s"}`}
     >
-      <div className="flex flex-col gap-4">
-        {composer}
-        {eventCount > 0 ? (
-          <ul className="flex flex-col gap-4">
-            {newestFirst.map((entry, index) => (
-              <TimelineRow
-                key={entry.id}
-                entry={entry}
-                isLast={index === eventCount - 1}
-              />
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">No activity yet.</p>
-        )}
-      </div>
+      <ActivityTimelineBody {...props} />
     </CollapsibleSectionCard>
   );
 };

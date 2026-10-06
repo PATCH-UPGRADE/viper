@@ -68,30 +68,30 @@ type Item = DrawerTicket & {
   unread: boolean;
 };
 type Block = {
-  items: Item[];
+  item: Item;
   start: number;
   len: number;
   lane: number;
   lanes: number;
 };
 
-// One group per work order and time, so a fleet update reads "3 devices".
-const groupByWorkOrder = (items: Item[]) => [
-  ...Map.groupBy(
-    items,
-    (item) => `${item.workOrderId}|${item.scheduledAt.getTime()}`,
-  ).values(),
-];
-
-// Blocks that overlap sit in separate lanes, sharing the day's width.
-const layout = (items: Item[]) => {
-  const blocks = groupByWorkOrder(items)
-    .map((group) => ({
-      items: group,
-      start: minutesOf(group[0].scheduledAt),
-      len: group[0].durationEstimate ?? DEFAULT_MINUTES,
-      lane: 0,
-    }))
+// One block per event on this day. An event that runs past midnight continues
+// at the top of the next day. Blocks that overlap sit in separate lanes.
+const layout = (day: Date, items: Item[]) => {
+  const dayMinutes = 24 * 60;
+  const blocks = items
+    .flatMap((item) => {
+      const start = minutesOf(item.scheduledAt);
+      const length = item.durationEstimate ?? DEFAULT_MINUTES;
+      if (isSameDay(item.scheduledAt, day)) {
+        return [{ item, start, len: Math.min(length, dayMinutes - start) }];
+      }
+      const spill = start + length - dayMinutes;
+      return spill > 0 && isSameDay(addDays(item.scheduledAt, 1), day)
+        ? [{ item, start: 0, len: spill }]
+        : [];
+    })
+    .map((block) => ({ ...block, lane: 0 }))
     .sort((a, b) => a.start - b.start);
   const laneEnds: number[] = [];
   for (const block of blocks) {
@@ -102,22 +102,17 @@ const layout = (items: Item[]) => {
   return blocks.map((block) => ({ ...block, lanes: laneEnds.length }));
 };
 
-const deviceLabel = (group: Item[]) =>
-  group.length > 1
-    ? `${group.length} devices · ${group[0].assetName}`
-    : group[0].assetName;
-
-const GroupButton = ({
-  group,
+// The availability-colored button that opens an event's drawer.
+const ItemButton = ({
+  item,
   className,
   children,
 }: {
-  group: Item[];
+  item: Item;
   className: string;
   children: ReactNode;
-}) => {
-  const [item] = group;
-  const button = (
+}) => (
+  <TicketDrawer ticket={item}>
     <button
       type="button"
       title={item.summary}
@@ -129,15 +124,14 @@ const GroupButton = ({
     >
       {children}
     </button>
-  );
-  return <TicketDrawer ticket={item}>{button}</TicketDrawer>;
-};
+  </TicketDrawer>
+);
 
 const chip = "rounded border bg-background/60 px-1 text-[10px]";
 
 // Short blocks show one line, taller ones add chips, and Day view the summary.
 const TicketBlock = ({ block, day }: { block: Block; day: boolean }) => {
-  const [item] = block.items;
+  const { item } = block;
   const { Icon, label } = availabilityStyle(item.availability);
   const height = Math.max((block.len * HOUR_HEIGHT) / 60 - 2, 20);
   const size = height < 33 ? "xs" : height < 51 ? "sm" : "lg";
@@ -151,8 +145,8 @@ const TicketBlock = ({ block, day }: { block: Block; day: boolean }) => {
         height,
       }}
     >
-      <GroupButton
-        group={block.items}
+      <ItemButton
+        item={item}
         className={cn(
           "flex h-full w-full flex-col gap-0.5 rounded-md px-1.5 py-0.5 leading-tight",
           !item.durationEstimate &&
@@ -162,10 +156,10 @@ const TicketBlock = ({ block, day }: { block: Block; day: boolean }) => {
         <span className="sr-only">{label}</span>
         <span className="flex items-center gap-1 text-xs font-medium">
           <span className="truncate">
-            {deviceLabel(block.items)}
+            {item.assetName} • {item.summary}
             {size === "xs" && ` · ${format(item.scheduledAt, "h:mm a")}`}
           </span>
-          {block.items.some((i) => i.unread) && <UnreadDot />}
+          {item.unread && <UnreadDot />}
         </span>
         {size !== "xs" && (
           <span className="flex items-center gap-1">
@@ -179,9 +173,7 @@ const TicketBlock = ({ block, day }: { block: Block; day: boolean }) => {
         )}
         {size === "lg" && (
           <span className="flex flex-wrap gap-1">
-            {block.items.length === 1 && (
-              <span className={chip}>{statusLabels[item.status]}</span>
-            )}
+            <span className={chip}>{statusLabels[item.status]}</span>
             {endPassed(item) && <span className={chip}>End time passed</span>}
             {item.durationEstimate && (
               <span className={chip}>{item.durationEstimate} min</span>
@@ -191,25 +183,22 @@ const TicketBlock = ({ block, day }: { block: Block; day: boolean }) => {
         {day && size === "lg" && (
           <span className="truncate opacity-80">{item.summary}</span>
         )}
-      </GroupButton>
+      </ItemButton>
     </div>
   );
 };
 
 const MAX_CHIPS = 3;
 
-const MonthChip = ({ group }: { group: Item[] }) => {
-  const { Icon } = availabilityStyle(group[0].availability);
+const MonthChip = ({ item }: { item: Item }) => {
+  const { Icon } = availabilityStyle(item.availability);
   return (
-    <GroupButton
-      group={group}
-      className="flex items-center gap-1 truncate px-1"
-    >
+    <ItemButton item={item} className="flex items-center gap-1 truncate px-1">
       <Icon className="size-3 shrink-0" aria-hidden />
       <span className="truncate">
-        {format(group[0].scheduledAt, "h:mmaaa")} {deviceLabel(group)}
+        {format(item.scheduledAt, "h:mmaaa")} {item.assetName} • {item.summary}
       </span>
-    </GroupButton>
+    </ItemButton>
   );
 };
 
@@ -237,7 +226,7 @@ const MonthGrid = ({
     </div>
     <div className="grid flex-1 auto-rows-fr grid-cols-7">
       {days.map((day) => {
-        const groups = groupByWorkOrder(on(day));
+        const events = on(day);
         return (
           <section
             key={day.toISOString()}
@@ -258,16 +247,16 @@ const MonthGrid = ({
                 {format(day, "d")}
               </button>
             </h2>
-            {groups.slice(0, MAX_CHIPS).map((group) => (
-              <MonthChip key={group[0].id} group={group} />
+            {events.slice(0, MAX_CHIPS).map((item) => (
+              <MonthChip key={item.id} item={item} />
             ))}
-            {groups.length > MAX_CHIPS && (
+            {events.length > MAX_CHIPS && (
               <button
                 type="button"
                 className="text-left text-xs text-muted-foreground underline"
                 onClick={() => onDay(day)}
               >
-                +{groups.length - MAX_CHIPS} more
+                +{events.length - MAX_CHIPS} more
               </button>
             )}
           </section>
@@ -282,6 +271,22 @@ const HEADER = 48;
 const px = (minutes: number) => (minutes * HOUR_HEIGHT) / 60;
 
 const minutesOf = (date: Date) => date.getHours() * 60 + date.getMinutes();
+
+// Ticks on its own, so only the line re-renders each minute, not the calendar.
+const NowLine = () => {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const tick = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(tick);
+  }, []);
+  return (
+    <div
+      aria-hidden
+      className="absolute inset-x-0 z-10 border-t-2 border-destructive before:absolute before:-top-[6px] before:-left-1 before:size-2.5 before:rounded-full before:bg-destructive"
+      style={{ top: (minutesOf(now) * HOUR_HEIGHT) / 60 }}
+    />
+  );
+};
 
 const Calendar = ({ lead }: { lead: ReactNode }) => {
   // yyyy-MM-dd; no date means today. `view` defaults to the week.
@@ -313,11 +318,6 @@ const Calendar = ({ lead }: { lead: ReactNode }) => {
   const track = useCallback((el: HTMLDivElement | null) => {
     grid.current = el;
     if (el) el.scrollTop = 7 * HOUR_HEIGHT;
-  }, []);
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const tick = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(tick);
   }, []);
   const on = (day: Date) =>
     (items ?? []).filter((item) => isSameDay(item.scheduledAt, day));
@@ -449,15 +449,19 @@ const Calendar = ({ lead }: { lead: ReactNode }) => {
                     <div
                       key={hour}
                       style={{ height: HOUR_HEIGHT }}
-                      className="pr-2 text-right text-xs text-muted-foreground"
+                      className="relative text-right text-xs text-muted-foreground"
                     >
-                      {hour > 0 && format(setHours(new Date(0), hour), "h a")}
+                      {hour > 0 && (
+                        <span className="absolute -top-2 right-2">
+                          {format(setHours(new Date(0), hour), "h a")}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
                 {days.map((day) => {
                   const dayItems = on(day);
-                  const blocks = layout(dayItems);
+                  const blocks = layout(day, items ?? []);
                   const above = blocks.filter(
                     (b) => px(b.start + b.len) <= visible.top,
                   );
@@ -512,19 +516,13 @@ const Calendar = ({ lead }: { lead: ReactNode }) => {
                         className="relative"
                         style={{
                           height: HOURS.length * HOUR_HEIGHT,
-                          backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 ${HOUR_HEIGHT - 1}px, var(--border) ${HOUR_HEIGHT - 1}px ${HOUR_HEIGHT}px)`,
+                          backgroundImage: `repeating-linear-gradient(to bottom, var(--border) 0px, var(--border) 1px, transparent 1px, transparent ${HOUR_HEIGHT}px)`,
                         }}
                       >
-                        {isToday(day) && (
-                          <div
-                            aria-hidden
-                            className="absolute inset-x-0 z-10 border-t-2 border-destructive before:absolute before:-top-[6px] before:-left-1 before:size-2.5 before:rounded-full before:bg-destructive"
-                            style={{ top: px(minutesOf(now)) }}
-                          />
-                        )}
+                        {isToday(day) && <NowLine />}
                         {blocks.map((block) => (
                           <TicketBlock
-                            key={block.items[0].id}
+                            key={`${block.item.id}-${block.start}`}
                             block={block}
                             day={mode === "day"}
                           />

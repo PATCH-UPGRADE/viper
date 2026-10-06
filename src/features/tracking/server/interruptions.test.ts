@@ -6,7 +6,7 @@ vi.mock("server-only", () => ({}));
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     user: { findUnique: vi.fn() },
-    assetTicket: { findMany: vi.fn(), findFirst: vi.fn() },
+    assetTicket: { findMany: vi.fn() },
     rescheduleRequest: { create: vi.fn() },
     workOrderTicket: { findFirst: vi.fn() },
   },
@@ -44,7 +44,7 @@ describe("interruptions scope", () => {
 
   it("refuses a reschedule request for a ticket outside the department", async () => {
     mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
-    mockPrisma.assetTicket.findFirst.mockResolvedValue(null);
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValue(null);
     await expect(
       requestReschedule("u1", {
         ticketId: "other",

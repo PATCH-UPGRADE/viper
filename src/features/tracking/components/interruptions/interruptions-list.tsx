@@ -120,7 +120,6 @@ export const InterruptionsList = () => {
                       >
                         <span className="flex min-w-0 flex-col items-start gap-1">
                           <span className="flex items-center gap-1.5 font-medium">
-                            {item.unread && <UnreadDot />}
                             {item.assetName}
                           </span>
                           <StatusChip status={item.status} />

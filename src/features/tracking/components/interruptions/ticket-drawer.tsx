@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { addMinutes, format, isSameDay, isToday, isYesterday } from "date-fns";
 import Link from "next/link";
 import { type ReactNode, useEffect } from "react";
-import { ActivityTimeline } from "@/components/activity-timeline";
+import { ActivityTimelineBody } from "@/components/activity-timeline";
 import { Badge } from "@/components/ui/badge";
 import {
   Popover,
@@ -19,13 +19,17 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserAvatar } from "@/components/user-avatar";
 import type { MaintenanceAvailability, TicketStatus } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useMarkTicketSeen } from "../../hooks/use-tracking";
-import { commentEntry } from "../ticket-detail/activity-timeline";
+import {
+  activityEntry,
+  commentEntry,
+} from "../ticket-detail/activity-timeline";
 import { AddCommentForm } from "../ticket-detail/add-comment-form";
 import {
   availabilityStyle,
@@ -56,13 +60,13 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
   );
   const markSeen = useMarkTicketSeen();
 
-  // Opening a ticket counts as reading it, once the server has confirmed the
-  // user may see it.
-  const loaded = Boolean(data);
+  // Opening a ticket counts as reading its owner ticket, once the server has
+  // confirmed the user may see it.
+  const ownerId = data?.workOrderId;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `mutate` is stable
   useEffect(() => {
-    if (loaded) markSeen.mutate({ ticketId: id });
-  }, [loaded, id]);
+    if (ownerId) markSeen.mutate({ ticketId: ownerId });
+  }, [ownerId]);
 
   if (isError) {
     return (
@@ -256,10 +260,30 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
           </div>
         </div>
       </Section>
-      <ActivityTimeline
-        entries={data.comments.map(commentEntry)}
-        composer={<AddCommentForm ticketId={id} />}
-      />
+      <Tabs defaultValue="comments">
+        <TabsList variant="line">
+          <TabsTrigger value="comments">
+            Comments ({data.comments.length})
+          </TabsTrigger>
+          <TabsTrigger value="activity">
+            Activity ({data.activities.length + data.comments.length})
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="comments" className="pt-3">
+          <ActivityTimelineBody
+            entries={data.comments.map(commentEntry)}
+            composer={<AddCommentForm ticketId={id} />}
+          />
+        </TabsContent>
+        <TabsContent value="activity" className="pt-3">
+          <ActivityTimelineBody
+            entries={[
+              ...data.activities.map(activityEntry),
+              ...data.comments.map(commentEntry),
+            ]}
+          />
+        </TabsContent>
+      </Tabs>
     </>
   );
 };

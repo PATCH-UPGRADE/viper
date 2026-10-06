@@ -11,6 +11,7 @@
     "inngest:dev": "inngest-cli dev",
     "dev:all": "mprocs",
     "db:seed": "prisma db seed",
+    "db:seed-device-types": "tsx prisma/seed-device-types.ts",
     "db:export-manufacturers": "tsx scripts/export-manufacturers.ts",
     "db:upsert-manufacturers": "tsx scripts/upsert-manufacturers.ts",
     "db:create-test-api-key": "tsx scripts/create-test-api-key.ts",

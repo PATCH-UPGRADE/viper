@@ -1,9 +1,18 @@
 import { IssueStatus } from "@/generated/prisma";
 
 export const UNKNOWN_ASSET_ROLE_STRING = "Unknown Asset";
+export const UNKNOWN_DEVICE_TYPE_STRING = "Unknown";
 
 export function getAssetRoleLabel(asset: { role: string | null }): string {
   return asset.role ?? UNKNOWN_ASSET_ROLE_STRING;
+}
+
+export function getAssetDeviceTypeLabel(asset: {
+  deviceGroup: {
+    product: { deviceType: { displayName: string } | null } | null;
+  } | null;
+}): string | null {
+  return asset.deviceGroup?.product?.deviceType?.displayName ?? null;
 }
 
 export const assetNameSelect = {

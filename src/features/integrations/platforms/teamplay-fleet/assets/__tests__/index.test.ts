@@ -9,6 +9,8 @@ const SAMPLE = [
     equipmentKey: "US_1006103273",
     serialNumber: "63014",
     productName: "syngo WebSpace",
+    materialNumber: "10191201",
+    modalityCode: "03",
     modalityTranslation: "Computed Tomography (CT)",
     softwareVersion: "VA11A",
     customerName: "SIEMENS DEMO/EVALUATION",
@@ -41,19 +43,23 @@ describe("toCanonical", () => {
     expect(canonical(SAMPLE[0])).toEqual({
       externalId: "US_1006103273",
       serialNumber: "63014",
-      role: "Computed Tomography (CT)",
+      modality: "Computed Tomography (CT)",
       location: {
         facility: "SIEMENS DEMO/EVALUATION",
         building: "51 VALLEY STREAM PKWY, MALVERN, PA 19355",
       },
       productName: "syngo WebSpace",
       softwareVersion: "VA11A",
+      materialNumber: "10191201",
+      modalityCode: "03",
     });
   });
 
   it("turns empty strings into nulls", () => {
     const item = canonical(SAMPLE[1]);
     expect(item.softwareVersion).toBeNull();
+    expect(item.materialNumber).toBeNull();
+    expect(item.modalityCode).toBeNull();
   });
 });
 

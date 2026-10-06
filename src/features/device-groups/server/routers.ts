@@ -18,6 +18,7 @@ import {
   helmSbomResponseSchema,
   paginatedDeviceGroupResponseSchema,
   paginationInputWithUpdatedAtFilterFields,
+  productRefSelect,
 } from "../types";
 
 const deviceGroupResponseSchema = deviceGroupWithUrlsSchema;
@@ -29,7 +30,7 @@ const canonicalRefInclude = {
 
 const deviceGroupRelationInclude = {
   manufacturer: canonicalRefInclude,
-  product: canonicalRefInclude,
+  product: productRefSelect,
   version: canonicalRefInclude,
 } as const;
 

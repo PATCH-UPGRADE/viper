@@ -340,13 +340,33 @@ model Product {
   canonicalDisplayName String
   hasCpe               Boolean               @default(false)
   nameMappings         String[]              @default([])
+  deviceTypeId         String?
+  deviceType           DeviceType?           @relation(fields: [deviceTypeId], references: [id], onDelete: SetNull)
   deviceGroups         DeviceGroup[]
   matchings            DeviceGroupMatching[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
   @@index([canonicalName])
+  @@index([deviceTypeId])
   @@map("product")
+}
+
+// What kind of device a product is, for example "Infusion Pump". Asset.role
+// holds what one asset is used for.
+model DeviceType {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  displayName  String
+  // Lowercase only: Prisma `has` is an exact, case-sensitive match.
+  nameMappings String[] @default([])
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("device_type")
 }
 
 model Version {

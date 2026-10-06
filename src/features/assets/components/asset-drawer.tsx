@@ -37,7 +37,11 @@ import { RemediationCard } from "@/features/remediations/components/remediations
 import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
 import { useTRPC } from "@/trpc/client";
 import { type AssetWithIssueRelations, locationSchema } from "../types";
-import { getAssetRoleLabel } from "../utils";
+import {
+  getAssetDeviceTypeLabel,
+  getAssetRoleLabel,
+  UNKNOWN_DEVICE_TYPE_STRING,
+} from "../utils";
 import { AssetQrPdfLink } from "./asset-qr-pdf-link";
 import { AssetUtilizationHeatMapGridVertical } from "./asset-utilization-grid";
 
@@ -432,6 +436,14 @@ function AssetInfoColumn({ asset }: { asset: AssetWithIssueRelations }) {
     {
       header: "Device Information",
       items: [
+        {
+          header: "Device Type",
+          content: (
+            <div className="text-sm">
+              {getAssetDeviceTypeLabel(asset) ?? UNKNOWN_DEVICE_TYPE_STRING}
+            </div>
+          ),
+        },
         {
           header: "Role",
           content: <div className="text-sm">{getAssetRoleLabel(asset)}</div>,

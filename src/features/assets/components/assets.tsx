@@ -62,7 +62,11 @@ import type {
   AssetWithIssueRelations,
   AssetWithRelations,
 } from "../types";
-import { getAssetRoleLabel } from "../utils";
+import {
+  getAssetDeviceTypeLabel,
+  getAssetRoleLabel,
+  UNKNOWN_DEVICE_TYPE_STRING,
+} from "../utils";
 import { AssetDashboardDrawer } from "./asset-drawer";
 import { columns } from "./columns";
 import { assetIssueColumns, dashboardColumns } from "./dashboard-columns";
@@ -450,6 +454,15 @@ export function AssetDrawer({
           <h3 className="font-semibold">Device Information</h3>
 
           <div className="grid grid-cols-1 gap-3">
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
+                Device Type
+              </div>
+              <div className="text-sm">
+                {getAssetDeviceTypeLabel(asset) ?? UNKNOWN_DEVICE_TYPE_STRING}
+              </div>
+            </div>
+
             <div>
               <div className="text-xs font-medium text-muted-foreground mb-1">
                 Role

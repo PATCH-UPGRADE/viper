@@ -41,7 +41,21 @@ export const assetInputSchema = z.object({
   ip: z.string().min(1),
   networkSegment: z.string().nullish(),
   cpe: cpeSchema.nullish(),
-  role: z.string().min(1).nullish(),
+  role: z
+    .string()
+    .min(1)
+    .nullish()
+    .describe(
+      'How this one asset is used, for example "CT Acquisition Workstation". Put what the product is in deviceType.',
+    ),
+  deviceType: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe(
+      'DeviceType slug, for example "infusion-pump". Sets the type of the asset\'s product.',
+    ),
   hostname: z.string().nullish(),
   macAddress: z.string().nullish(),
   serialNumber: z.string().nullish(),

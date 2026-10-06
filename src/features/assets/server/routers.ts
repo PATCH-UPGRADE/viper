@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
 import { countAffectedRemediations } from "@/features/assets/utils";
+import { prepareDeviceTypeSlugs } from "@/features/device-types/server/apply-device-type";
 import { resolveEffectiveIssuesByAsset } from "@/features/issues/server/effective-issues";
 import {
   attachNote,
@@ -526,8 +527,10 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      const { cpe, utilization, ...dataInput } = input;
+      const { cpe, utilization, deviceType, ...dataInput } = input;
+      const applyDeviceType = await prepareDeviceTypeSlugs([deviceType]);
       const deviceGroup = await cpeToDeviceGroup(cpe ?? UNKNOWN_CPE_STRING);
+      await applyDeviceType(deviceGroup.productId, deviceType);
       return prisma.asset.create({
         data: {
           ...dataInput,
@@ -554,6 +557,9 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(assetArrayResponseSchema)
     .mutation(async ({ ctx, input }) => {
+      const applyDeviceType = await prepareDeviceTypeSlugs(
+        input.assets.map((asset) => asset.deviceType),
+      );
       // resolve all device groups in parallel
       const deviceGroupPromises = input.assets.map(async (asset) => {
         const { cpe } = asset;
@@ -561,11 +567,19 @@ export const assetsRouter = createTRPCRouter({
       });
 
       const deviceGroups = await Promise.all(deviceGroupPromises);
+      for (const [index, { deviceType }] of input.assets.entries()) {
+        await applyDeviceType(deviceGroups[index].productId, deviceType);
+      }
 
       // create all assets in a transaction
       return prisma.$transaction(
         input.assets.map((asset, index) => {
-          const { cpe: _cpe, utilization, ...dataInput } = asset;
+          const {
+            cpe: _cpe,
+            utilization,
+            deviceType: _deviceType,
+            ...dataInput
+          } = asset;
           return prisma.asset.create({
             data: {
               ...dataInput,
@@ -680,13 +694,22 @@ export const assetsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await requireOwnership(input.id, ctx.auth.user.id, "asset");
 
-      const { id, cpe, utilization, version, versionStatus, ...updateData } =
-        input;
+      const {
+        id,
+        cpe,
+        utilization,
+        version,
+        versionStatus,
+        deviceType,
+        ...updateData
+      } = input;
+      const applyDeviceType = await prepareDeviceTypeSlugs([deviceType]);
       const current = await prisma.asset.findUniqueOrThrow({
         where: { id },
         select: {
           deviceGroup: {
             select: {
+              productId: true,
               manufacturer: { select: { canonicalName: true } },
               product: { select: { canonicalName: true } },
             },
@@ -695,8 +718,11 @@ export const assetsRouter = createTRPCRouter({
       });
 
       let deviceGroupId: string | undefined;
+      let productId = current.deviceGroup.productId;
       if (cpe) {
-        deviceGroupId = (await cpeToDeviceGroup(cpe)).id;
+        const target = await cpeToDeviceGroup(cpe);
+        deviceGroupId = target.id;
+        productId = target.productId;
       } else if (version || versionStatus) {
         if (current.deviceGroup.manufacturer && current.deviceGroup.product) {
           const target = await resolveDeviceGroup({
@@ -708,6 +734,7 @@ export const assetsRouter = createTRPCRouter({
           deviceGroupId = target.id;
         }
       }
+      await applyDeviceType(productId, deviceType);
       const updated = await prisma.asset.update({
         where: { id },
         data: {

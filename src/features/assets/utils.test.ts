@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAssetDisplayName } from "./utils";
+import { getAssetDeviceTypeLabel, getAssetDisplayName } from "./utils";
 
 const fleetCt = {
   id: "ct_63014",
@@ -48,5 +48,25 @@ describe("getAssetDisplayName", () => {
         role: undefined,
       }),
     ).toBe("ct_63014");
+  });
+});
+
+describe("getAssetDeviceTypeLabel", () => {
+  it("reads the device type of the asset's product", () => {
+    expect(
+      getAssetDeviceTypeLabel({
+        deviceGroup: {
+          product: { deviceType: { displayName: "Infusion Pump" } },
+        },
+      }),
+    ).toBe("Infusion Pump");
+  });
+
+  it.each([
+    ["no device type", { product: { deviceType: null } }],
+    ["no product", { product: null }],
+    ["no device group", null],
+  ])("returns null for %s", (_, deviceGroup) => {
+    expect(getAssetDeviceTypeLabel({ deviceGroup })).toBeNull();
   });
 });

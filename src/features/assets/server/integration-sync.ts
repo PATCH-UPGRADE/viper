@@ -1,7 +1,7 @@
 import "server-only";
 import type { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
-import { prepareDeviceTypeSlugs } from "@/features/device-types/server/apply-device-type";
+import type { ApplyDeviceType } from "@/features/device-types/server/apply-device-type";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -12,15 +12,13 @@ type IntegrationAssetItem = z.infer<
   typeof integrationAssetInputSchema
 >["items"][number];
 
-export async function processAssetIntegrationSync(
+export function processAssetIntegrationSync(
   input: { items: IntegrationAssetItem[] },
   userId: string,
   integrationId: string,
+  applyDeviceType: ApplyDeviceType,
   options: { shouldRecordSyncOutcome?: boolean } = {},
 ) {
-  const applyDeviceType = await prepareDeviceTypeSlugs(
-    input.items.map((item) => item.deviceType),
-  );
   return processIntegrationSync(
     prisma,
     {

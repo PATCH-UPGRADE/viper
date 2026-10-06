@@ -14,9 +14,9 @@ import prisma from "@/lib/db";
 // allowlist before it is ever handed to Prisma.
 //
 // The allowlist intentionally exposes only indexed / cheap-to-filter scalar
-// fields (plus a single relation hop where it earns its keep, e.g. Asset ->
-// deviceGroup so a note can target "all infusion pumps"). Unknown fields or
-// operators are rejected
+// fields, plus relation hops where they earn their keep: Asset -> deviceGroup
+// -> product -> deviceType lets a note target "all infusion pumps". Unknown
+// fields or operators are rejected.
 
 /** Thrown when a filter is malformed, disallowed, or its query fails. */
 export class EntityFilterError extends Error {
@@ -92,8 +92,8 @@ type FieldMap = Record<string, z.ZodTypeAny>;
 
 /**
  * Build a recursive `where` schema from a scalar field allowlist plus optional
- * single-hop relation sub-schemas. Every field is optional; AND/OR/NOT compose
- * the same schema; unknown keys are rejected.
+ * relation sub-schemas, which can nest. Every field is optional; AND/OR/NOT
+ * compose the same schema; unknown keys are rejected.
  */
 function buildWhereSchema(
   fields: FieldMap,
@@ -120,22 +120,27 @@ function buildWhereSchema(
 // EntityFilterError at query time).
 // ----------------------------------------------------------------------------
 
-// Single relation hop off Asset: lets a note target e.g. all device groups of a
-// manufacturer/product ("all infusion pumps").
-const deviceGroupWhere = buildWhereSchema({
-  manufacturerId: stringFilter,
-  productId: stringFilter,
-  versionId: stringFilter,
-  versionStatus: stringFilter,
-  udi: stringFilter,
-});
+const productWhere = buildWhereSchema(
+  { deviceTypeId: stringFilter },
+  { deviceType: buildWhereSchema({ slug: stringFilter }) },
+);
+
+const deviceGroupWhere = buildWhereSchema(
+  {
+    manufacturerId: stringFilter,
+    productId: stringFilter,
+    versionId: stringFilter,
+    versionStatus: stringFilter,
+    udi: stringFilter,
+  },
+  { product: productWhere },
+);
 
 const assetFilterSchema = buildWhereSchema(
   {
     id: stringFilter,
     ip: stringFilter,
     networkSegment: stringFilter,
-    role: stringFilter,
     hostname: stringFilter,
     macAddress: stringFilter,
     serialNumber: stringFilter,

@@ -606,13 +606,23 @@ export const assetsRouter = createTRPCRouter({
     })
     .output(integrationResponseSchema)
     .mutation(async ({ input }) => {
+      // The token is one-time: reject unknown slugs before it is spent, so
+      // the partner can retry the batch with the same token.
+      const applyDeviceType = await prepareDeviceTypeSlugs(
+        input.items.map((item) => item.deviceType),
+      );
       // Validate provided token or throw error
       const { userId, integrationId } = await processIntegrationToken(
         input.token,
         ResourceType.Asset,
       );
 
-      return processAssetIntegrationSync(input, userId, integrationId);
+      return processAssetIntegrationSync(
+        input,
+        userId,
+        integrationId,
+        applyDeviceType,
+      );
     }),
 
   // not exposed on OpenAPI

@@ -53,6 +53,10 @@ export async function prepareDeviceTypeSlugs(
   };
 }
 
+export type ApplyDeviceType = Awaited<
+  ReturnType<typeof prepareDeviceTypeSlugs>
+>;
+
 /**
  * Set a product's device type only if it has none, so outside callers cannot
  * change a type that exists. Only the device type seed overwrites a type.

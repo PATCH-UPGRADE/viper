@@ -9,7 +9,7 @@ export function getAssetRoleLabel(asset: { role: string | null }): string {
 
 export function getAssetDeviceTypeLabel(asset: {
   deviceGroup: {
-    product: { deviceType: { displayName: string } | null } | null;
+    product?: { deviceType?: { displayName: string } | null } | null;
   } | null;
 }): string | null {
   return asset.deviceGroup?.product?.deviceType?.displayName ?? null;

@@ -1,5 +1,9 @@
 import { assetUtilizationSchema } from "@/features/assets/types";
-import { getAssetDisplayName } from "@/features/assets/utils";
+import {
+  getAssetDeviceTypeLabel,
+  getAssetDisplayName,
+  UNKNOWN_DEVICE_TYPE_STRING,
+} from "@/features/assets/utils";
 import { deviceGroupCpeList, deviceGroupLabel } from "./device-group";
 import type { CanonicalRef } from "./shared";
 
@@ -104,7 +108,10 @@ export interface AssetForMarkdown {
   updatedAt?: Date;
   deviceGroup: {
     manufacturer?: CanonicalRef;
-    product?: CanonicalRef;
+    product?: {
+      canonicalDisplayName: string;
+      deviceType?: { displayName: string } | null;
+    } | null;
     version?: CanonicalRef;
     cpe?: string[];
   };
@@ -128,6 +135,7 @@ export function assetToMarkdown(
     `### ${label} (${a.id})`,
     `- **IP**: ${a.ip ?? "N/A"}`,
     `- **MAC Address**: ${a.macAddress ?? "N/A"}`,
+    `- **Device Type**: ${getAssetDeviceTypeLabel(a) ?? UNKNOWN_DEVICE_TYPE_STRING}`,
     `- **Role**: ${a.role ?? "Unknown"}`,
     `- **Status**: ${a.status ?? "Unknown"}`,
     `- **Serial Number**: ${a.serialNumber ?? "N/A"}`,

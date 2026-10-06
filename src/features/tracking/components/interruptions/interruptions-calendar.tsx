@@ -308,7 +308,8 @@ const Calendar = ({ lead }: { lead: ReactNode }) => {
   const days = eachDayOfInterval({ start, end });
   const { data: items, isError } = useQuery(
     trpc.tracking.getInterruptionCalendar.queryOptions(
-      { from: start, to: end },
+      // A day earlier too, for an event that runs past midnight into `start`.
+      { from: addDays(start, -1), to: end },
       { refetchInterval: 60_000 },
     ),
   );

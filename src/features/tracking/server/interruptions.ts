@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
 import { type Prisma, TicketStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { plural } from "@/lib/utils";
 import { ticketDetailInclude } from "../types";
 
 // What a clinician sees is decided here, from the signed-in user alone: their
@@ -24,12 +25,22 @@ const departmentOf = async (userId: string) =>
 const managedBy = (departmentId: string) =>
   ({ managedBy: { some: { departmentId } } }) satisfies Prisma.AssetWhereInput;
 
+// A device ticket this department manages, on an open work order.
+const scopedDevice = (departmentId: string) =>
+  ({
+    asset: managedBy(departmentId),
+    ticket: open,
+  }) satisfies Prisma.AssetTicketWhereInput;
+
 const inScope = (departmentId: string): Prisma.AssetTicketWhereInput => ({
   asset: managedBy(departmentId),
   parentTicket: open,
   ticket: open,
 });
 
+// A work order that owns device tickets ("owner ticket") is on the calendar at
+// its own time, as "N devices". A device ticket only gets its own event when
+// its time differs from its owner's.
 export const getInterruptionCalendar = async (
   userId: string,
   range: { from: Date; to: Date },
@@ -37,77 +48,101 @@ export const getInterruptionCalendar = async (
   const departmentId = await departmentOf(userId);
   if (!departmentId) return [];
 
-  const rows = await prisma.assetTicket.findMany({
-    where: {
-      AND: [
-        inScope(departmentId),
-        { ticket: { scheduledAt: { gte: range.from, lte: range.to } } },
-      ],
-    },
-    select: {
-      parentTicketId: true,
-      asset: { select: assetNameSelect },
-      ticket: {
-        select: {
-          id: true,
-          summary: true,
-          status: true,
-          category: true,
-          scheduledAt: true,
+  const inRange = { scheduledAt: { gte: range.from, lte: range.to } };
+  const [owners, devices] = await Promise.all([
+    prisma.workOrderTicket.findMany({
+      where: {
+        ...open,
+        ...inRange,
+        assets: { some: scopedDevice(departmentId) },
+      },
+      select: {
+        id: true,
+        summary: true,
+        status: true,
+        category: true,
+        scheduledAt: true,
+        assets: { where: scopedDevice(departmentId), select: { id: true } },
+      },
+    }),
+    prisma.assetTicket.findMany({
+      where: { ...inScope(departmentId), ticket: { ...open, ...inRange } },
+      select: {
+        parentTicketId: true,
+        parentTicket: { select: { summary: true, scheduledAt: true } },
+        asset: { select: assetNameSelect },
+        ticket: {
+          select: { id: true, status: true, category: true, scheduledAt: true },
         },
       },
-    },
-  });
-  return rows.map(({ parentTicketId, asset, ticket }) => ({
-    id: ticket.id,
-    workOrderId: parentTicketId,
-    category: ticket.category,
-    summary: ticket.summary,
-    status: ticket.status,
-    // The query only returns tickets with a time.
-    scheduledAt: ticket.scheduledAt as Date,
-    assetName: getAssetDisplayName(asset),
-  }));
+    }),
+  ]);
+  // Both queries only return tickets with a time.
+  return [
+    ...owners.map((owner) => ({
+      id: owner.id,
+      workOrderId: owner.id,
+      category: owner.category,
+      summary: owner.summary,
+      status: owner.status,
+      scheduledAt: owner.scheduledAt as Date,
+      assetName: `${owner.assets.length} ${plural("device", owner.assets.length)}`,
+    })),
+    ...devices
+      .filter(
+        ({ ticket, parentTicket }) =>
+          ticket.scheduledAt?.getTime() !== parentTicket.scheduledAt?.getTime(),
+      )
+      .map(({ parentTicketId, parentTicket, asset, ticket }) => ({
+        id: ticket.id,
+        workOrderId: parentTicketId,
+        category: ticket.category,
+        summary: parentTicket.summary,
+        status: ticket.status,
+        scheduledAt: ticket.scheduledAt as Date,
+        assetName: getAssetDisplayName(asset),
+      })),
+  ];
 };
 
-// What the drawer shows beyond the card, for a device ticket in the user's
-// scope. Anything else is NOT_FOUND. A device ticket has no description of
-// its own: it comes from its work order.
+// A work order's own details, and the devices it lists: only this
+// department's, and never the one being viewed. Other departments' stay hidden.
+const workOrderFields = (departmentId: string, id: string) =>
+  ({
+    id: true,
+    body: true,
+    descriptions: { where: { departmentId }, select: { body: true } },
+    assets: {
+      where: { ticketId: { not: id }, ...scopedDevice(departmentId) },
+      select: {
+        asset: { select: assetNameSelect },
+        ticket: { select: { id: true, status: true, scheduledAt: true } },
+      },
+    },
+  }) satisfies Prisma.WorkOrderTicketSelect;
+
+// What the drawer shows beyond the card, for an owner ticket or a device ticket
+// in the user's scope. Anything else is NOT_FOUND. A device ticket has no
+// description of its own: it comes from its owner ticket.
 export const getInterruptionDetail = async (userId: string, id: string) => {
   const departmentId = await departmentOf(userId);
   const ticket = departmentId
     ? await prisma.workOrderTicket.findFirst({
-        where: { id, ticket: inScope(departmentId) },
+        where: {
+          id,
+          OR: [
+            { ticket: inScope(departmentId) },
+            { ...open, assets: { some: scopedDevice(departmentId) } },
+          ],
+        },
         select: {
+          ...workOrderFields(departmentId, id),
           category: true,
           assignee: { select: { name: true, email: true } },
           creator: { select: { name: true, email: true } },
           ticket: {
             select: {
-              parentTicket: {
-                select: {
-                  id: true,
-                  body: true,
-                  descriptions: {
-                    where: { departmentId },
-                    select: { body: true },
-                  },
-                  // Only this department's other devices; others stay hidden.
-                  assets: {
-                    where: {
-                      ticketId: { not: id },
-                      asset: managedBy(departmentId),
-                      ticket: open,
-                    },
-                    select: {
-                      asset: { select: assetNameSelect },
-                      ticket: {
-                        select: { id: true, status: true, scheduledAt: true },
-                      },
-                    },
-                  },
-                },
-              },
+              parentTicket: { select: workOrderFields(departmentId, id) },
             },
           },
           // Only this department's readers; other departments' users stay hidden.
@@ -119,10 +154,10 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
         },
       })
     : null;
-  const workOrder = ticket?.ticket?.parentTicket;
-  if (!ticket || !workOrder) {
+  if (!ticket) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
   }
+  const workOrder = ticket.ticket?.parentTicket ?? ticket;
   return {
     comments: ticket.comments,
     seenBy: ticket.seenBy,

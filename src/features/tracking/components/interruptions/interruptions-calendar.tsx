@@ -44,26 +44,14 @@ const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const BLOCK_MINUTES = 60;
 
 type Item = DrawerTicket & { workOrderId: string; category: TicketCategory };
-type Block = { items: Item[]; start: number; lane: number; lanes: number };
+type Block = { item: Item; start: number; lane: number; lanes: number };
 
-// One group per work order and time, so a fleet update reads "3 devices".
-const groupByWorkOrder = (items: Item[]) => {
-  const groups = new Map<string, Item[]>();
-  for (const item of items) {
-    const key = `${item.workOrderId}|${item.scheduledAt.getTime()}`;
-    const group = groups.get(key);
-    if (group) group.push(item);
-    else groups.set(key, [item]);
-  }
-  return [...groups.values()];
-};
-
-// Blocks that overlap sit in separate lanes, sharing the day's width.
+// Events that overlap sit in separate lanes, sharing the day's width.
 const layout = (items: Item[]): Block[] => {
-  const blocks = groupByWorkOrder(items)
-    .map((group) => ({
-      items: group,
-      start: minutesOf(group[0].scheduledAt),
+  const blocks = items
+    .map((item) => ({
+      item,
+      start: minutesOf(item.scheduledAt),
       lane: 0,
       lanes: 1,
     }))
@@ -78,20 +66,16 @@ const layout = (items: Item[]): Block[] => {
   return blocks;
 };
 
-const deviceLabel = (group: Item[]) =>
-  group.length > 1 ? `${group.length} devices` : group[0].assetName;
-
-// The category-colored button that opens a group's drawer.
-const GroupButton = ({
-  group,
+// The category-colored button that opens an event's drawer.
+const ItemButton = ({
+  item,
   className,
   children,
 }: {
-  group: Item[];
+  item: Item;
   className: string;
   children: ReactNode;
 }) => {
-  const [item] = group;
   const color = useCategoryColor(item.category);
   return (
     <TicketDrawer ticket={item}>
@@ -110,41 +94,40 @@ const GroupButton = ({
   );
 };
 
-const TicketBlock = ({ block }: { block: Block }) => {
-  const [item] = block.items;
-  return (
-    <div
-      className="absolute"
-      style={{
-        left: `calc(${(block.lane * 100) / block.lanes}% + 2px)`,
-        width: `calc(${100 / block.lanes}% - 4px)`,
-        top: (block.start * HOUR_HEIGHT) / 60,
-        height: (BLOCK_MINUTES * HOUR_HEIGHT) / 60 - 2,
-      }}
+const TicketBlock = ({
+  block: { item, start, lane, lanes },
+}: {
+  block: Block;
+}) => (
+  <div
+    className="absolute"
+    style={{
+      left: `calc(${(lane * 100) / lanes}% + 2px)`,
+      width: `calc(${100 / lanes}% - 4px)`,
+      top: (start * HOUR_HEIGHT) / 60,
+      height: (BLOCK_MINUTES * HOUR_HEIGHT) / 60 - 2,
+    }}
+  >
+    <ItemButton
+      item={item}
+      className="flex h-full w-full flex-col gap-0.5 rounded-md px-1.5 py-0.5 leading-tight"
     >
-      <GroupButton
-        group={block.items}
-        className="flex h-full w-full flex-col gap-0.5 rounded-md px-1.5 py-0.5 leading-tight"
-      >
-        <span className="truncate text-xs font-medium">
-          {deviceLabel(block.items)}
-        </span>
-        <span className="truncate">
-          {format(item.scheduledAt, "h:mm a")}
-          {block.items.length === 1 && ` · ${statusLabels[item.status]}`}
-        </span>
-        <span className="truncate opacity-80">{item.summary}</span>
-      </GroupButton>
-    </div>
-  );
-};
+      <span className="truncate text-xs font-medium">
+        {item.assetName} • {item.summary}
+      </span>
+      <span className="truncate">
+        {format(item.scheduledAt, "h:mm a")} · {statusLabels[item.status]}
+      </span>
+    </ItemButton>
+  </div>
+);
 
 const MAX_CHIPS = 3;
 
-const MonthChip = ({ group }: { group: Item[] }) => (
-  <GroupButton group={group} className="truncate px-1">
-    {format(group[0].scheduledAt, "h:mmaaa")} {deviceLabel(group)}
-  </GroupButton>
+const MonthChip = ({ item }: { item: Item }) => (
+  <ItemButton item={item} className="truncate px-1">
+    {format(item.scheduledAt, "h:mmaaa")} {item.assetName} • {item.summary}
+  </ItemButton>
 );
 
 const MonthGrid = ({
@@ -171,7 +154,7 @@ const MonthGrid = ({
     </div>
     <div className="grid flex-1 auto-rows-fr grid-cols-7">
       {days.map((day) => {
-        const groups = groupByWorkOrder(on(day));
+        const events = on(day);
         return (
           <section
             key={day.toISOString()}
@@ -190,16 +173,16 @@ const MonthGrid = ({
             >
               {format(day, "d")}
             </h2>
-            {groups.slice(0, MAX_CHIPS).map((group) => (
-              <MonthChip key={group[0].id} group={group} />
+            {events.slice(0, MAX_CHIPS).map((item) => (
+              <MonthChip key={item.id} item={item} />
             ))}
-            {groups.length > MAX_CHIPS && (
+            {events.length > MAX_CHIPS && (
               <button
                 type="button"
                 className="text-left text-xs text-muted-foreground underline"
                 onClick={() => onDay(day)}
               >
-                +{groups.length - MAX_CHIPS} more
+                +{events.length - MAX_CHIPS} more
               </button>
             )}
           </section>
@@ -215,6 +198,22 @@ const scrollToWorkday = (el: HTMLDivElement | null) => {
 };
 
 const minutesOf = (date: Date) => date.getHours() * 60 + date.getMinutes();
+
+// Ticks on its own, so only the line re-renders each minute, not the calendar.
+const NowLine = () => {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const tick = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(tick);
+  }, []);
+  return (
+    <div
+      aria-hidden
+      className="absolute inset-x-0 z-10 border-t-2 border-destructive before:absolute before:-top-[6px] before:-left-1 before:size-2.5 before:rounded-full before:bg-destructive"
+      style={{ top: (minutesOf(now) * HOUR_HEIGHT) / 60 }}
+    />
+  );
+};
 
 const Calendar = () => {
   // yyyy-MM-dd; no date means today. `view` defaults to the week.
@@ -240,11 +239,6 @@ const Calendar = () => {
       to: end,
     }),
   );
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const tick = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(tick);
-  }, []);
   const on = (day: Date) =>
     (items ?? []).filter((item) => isSameDay(item.scheduledAt, day));
   const step = (n: number) =>
@@ -333,9 +327,13 @@ const Calendar = () => {
                     <div
                       key={hour}
                       style={{ height: HOUR_HEIGHT }}
-                      className="pr-2 text-right text-xs text-muted-foreground"
+                      className="relative text-right text-xs text-muted-foreground"
                     >
-                      {hour > 0 && format(setHours(new Date(0), hour), "h a")}
+                      {hour > 0 && (
+                        <span className="absolute -top-2 right-2">
+                          {format(setHours(new Date(0), hour), "h a")}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -367,19 +365,12 @@ const Calendar = () => {
                       className="relative"
                       style={{
                         height: HOURS.length * HOUR_HEIGHT,
-                        backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 ${HOUR_HEIGHT - 1}px, var(--border) ${HOUR_HEIGHT - 1}px ${HOUR_HEIGHT}px)`,
+                        backgroundImage: `repeating-linear-gradient(to bottom, var(--border) 0px, var(--border) 1px, transparent 1px, transparent ${HOUR_HEIGHT}px)`,
                       }}
                     >
-                      {isToday(day) && (
-                        <div
-                          aria-hidden
-                          className="absolute inset-x-0 z-10 border-t-2 border-destructive before:absolute before:-top-[6px] before:-left-1 before:size-2.5 before:rounded-full before:bg-destructive"
-                          style={{ top: (minutesOf(now) * HOUR_HEIGHT) / 60 }}
-                        />
-                      )}
-                      {/* Tickets starting in the same hour share its width. */}
+                      {isToday(day) && <NowLine />}
                       {layout(on(day)).map((block) => (
-                        <TicketBlock key={block.items[0].id} block={block} />
+                        <TicketBlock key={block.item.id} block={block} />
                       ))}
                     </div>
                   </section>

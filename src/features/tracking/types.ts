@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { deviceTypeLabelSelect } from "@/features/assets/utils";
+import {
+  deviceTypeLabelSchema,
+  deviceTypeLabelSelect,
+} from "@/features/assets/utils";
 import {
   externalMappingSelect,
   externalMappingWithSyncSelect,
@@ -722,7 +725,7 @@ const detailLinkedAssetSchema = linkedAssetSchema.extend({
     product: z
       .object({
         canonicalDisplayName: z.string(),
-        deviceType: z.object({ displayName: z.string() }).nullable(),
+        deviceType: deviceTypeLabelSchema,
       })
       .nullable(),
     version: z.object({ canonicalName: z.string() }).nullable(),

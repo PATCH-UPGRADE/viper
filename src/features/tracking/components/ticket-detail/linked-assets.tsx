@@ -17,7 +17,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { getAssetDisplayName } from "@/features/assets/utils";
+import {
+  getAssetDeviceTypeLabel,
+  getAssetDisplayName,
+} from "@/features/assets/utils";
 import { getSwatchClass } from "@/features/tag-colors/palette";
 import { TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
@@ -127,7 +130,9 @@ const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
                 ]
                   .filter(Boolean)
                   .join(" ");
-                const sub = [a.role, model].filter(Boolean).join(" · ");
+                const sub = [getAssetDeviceTypeLabel(a), model]
+                  .filter(Boolean)
+                  .join(" · ");
                 return (
                   <CommandItem
                     key={a.id}

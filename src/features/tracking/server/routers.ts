@@ -5,6 +5,7 @@ import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
+  assetNameSearchTerms,
   assetNameSelect,
   deviceTypeLabelSelect,
 } from "@/features/assets/utils";
@@ -1165,12 +1166,7 @@ export const trackingRouter = createTRPCRouter({
       } as const;
       const matchesSearch = input.search
         ? {
-            OR: [
-              { hostname: insensitive },
-              { ip: insensitive },
-              { serialNumber: insensitive },
-              { role: insensitive },
-            ],
+            OR: assetNameSearchTerms(insensitive),
           }
         : {};
       // Only return assets not already attached to this ticket so the picker
@@ -1185,7 +1181,6 @@ export const trackingRouter = createTRPCRouter({
           hostname: true,
           ip: true,
           serialNumber: true,
-          role: true,
           deviceGroup: {
             select: {
               manufacturer: { select: { canonicalDisplayName: true } },

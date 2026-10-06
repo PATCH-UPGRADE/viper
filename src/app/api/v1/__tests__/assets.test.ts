@@ -1086,6 +1086,40 @@ describe("Assets Endpoint deviceType input", () => {
     expect(await prisma.asset.count()).toBe(before);
   });
 
+  it("GET /assets - searches by device type, not by role", async () => {
+    const deviceType = await createDeviceType();
+    const role = `Vitest Role ${Date.now()}`;
+    const created = await request(BASE_URL)
+      .post("/assets")
+      .set(authHeader)
+      .send({
+        ip: "10.0.0.53",
+        cpe: `cpe:2.3:h:vitest:device_type_search_${Date.now()}:1.0`,
+        role,
+        deviceType: deviceType.slug,
+      });
+    onTestFinished(async () => {
+      await request(BASE_URL)
+        .delete(`/assets/${created.body.id}`)
+        .set(authHeader);
+    });
+
+    const byType = await request(BASE_URL)
+      .get("/assets")
+      .query({ search: deviceType.displayName })
+      .set(authHeader);
+    const byRole = await request(BASE_URL)
+      .get("/assets")
+      .query({ search: role })
+      .set(authHeader);
+
+    expect(byType.status).toBe(200);
+    expect(byType.body.items).toContainEqual(
+      expect.objectContaining({ id: created.body.id }),
+    );
+    expect(byRole.body.items).toEqual([]);
+  });
+
   it("POST /assets - never types the shared unknown product", async () => {
     const deviceType = await createDeviceType();
 

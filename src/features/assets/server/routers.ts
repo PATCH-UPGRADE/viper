@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
 import {
+  assetNameSearchTerms,
   countAffectedRemediations,
   getAssetDeviceTypeLabel,
 } from "@/features/assets/utils";
@@ -58,10 +59,7 @@ const createSearchFilter = (search: string) => {
   return search
     ? {
         OR: [
-          { ip: insensitive },
-          { hostname: insensitive },
-          { serialNumber: insensitive },
-          { role: insensitive },
+          ...assetNameSearchTerms(insensitive),
           {
             deviceGroup: {
               is: { manufacturer: { is: { canonicalName: insensitive } } },

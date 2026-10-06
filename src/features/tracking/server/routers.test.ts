@@ -2130,13 +2130,22 @@ describe("trackingRouter.listAttachableAssets", () => {
     await caller.listAttachableAssets({ ticketId: "t1", search: "63014" });
 
     const arg = mockPrisma.asset.findMany.mock.calls[0][0];
+    const insensitive = { contains: "63014", mode: "insensitive" };
     expect(arg.where).toEqual({
       assetTickets: { none: { parentTicketId: "t1" } },
       OR: [
-        { hostname: { contains: "63014", mode: "insensitive" } },
-        { ip: { contains: "63014", mode: "insensitive" } },
-        { serialNumber: { contains: "63014", mode: "insensitive" } },
-        { role: { contains: "63014", mode: "insensitive" } },
+        { hostname: insensitive },
+        { ip: insensitive },
+        { serialNumber: insensitive },
+        {
+          deviceGroup: {
+            is: {
+              product: {
+                is: { deviceType: { is: { displayName: insensitive } } },
+              },
+            },
+          },
+        },
       ],
     });
   });

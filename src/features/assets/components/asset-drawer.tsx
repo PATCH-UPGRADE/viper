@@ -88,7 +88,7 @@ function getProtocolLabel(port: number, transport: "tcp" | "udp"): string {
 
 function getAssetLabel(asset: EnrichedNetworkAsset): string {
   return (
-    asset.viper_data?.role ??
+    getAssetDeviceTypeLabel(asset.viper_data) ??
     asset.viper_data?.hostname ??
     asset.manufacturer ??
     asset.id.slice(0, 8)

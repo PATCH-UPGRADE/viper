@@ -1,4 +1,5 @@
-import { IssueStatus } from "@/generated/prisma";
+import { z } from "zod";
+import { IssueStatus, type Prisma } from "@/generated/prisma";
 
 const UNKNOWN_ASSET_STRING = "Unknown Asset";
 export const UNKNOWN_DEVICE_TYPE_STRING = "Unknown";
@@ -14,11 +15,31 @@ export const deviceTypeLabelSelect = {
   deviceType: { select: { displayName: true } },
 } as const;
 
+/** The output schema for deviceTypeLabelSelect. */
+export const deviceTypeLabelSchema = z
+  .object({ displayName: z.string() })
+  .nullable();
+
 export function getAssetDeviceTypeLabel(
-  asset: DeviceTypeSource,
+  asset: DeviceTypeSource | null | undefined,
 ): string | null {
-  return asset.deviceGroup?.product?.deviceType?.displayName ?? null;
+  return asset?.deviceGroup?.product?.deviceType?.displayName ?? null;
 }
+
+/**
+ * The search terms for the fields that name an asset in the UI. Search never
+ * matches Asset.role, which is too free-form to search.
+ */
+export const assetNameSearchTerms = (match: Prisma.StringFilter) => [
+  { hostname: match },
+  { ip: match },
+  { serialNumber: match },
+  {
+    deviceGroup: {
+      is: { product: { is: { deviceType: { is: { displayName: match } } } } },
+    },
+  },
+];
 
 // The UI names an asset by what it is, never by Asset.role: the role is free
 // text that can grow long. Agents and external platforms still get the role.

@@ -3,11 +3,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import {
-  isUniqueViolation,
-  nameOrClauses,
-  normalizeName,
-} from "@/lib/router-utils";
+import { isUniqueViolation, nameOrClauses } from "@/lib/router-utils";
 import type {
   ExtractedAsset,
   ExtractedDeviceGroup,

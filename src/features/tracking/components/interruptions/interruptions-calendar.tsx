@@ -250,7 +250,8 @@ const Calendar = () => {
   const days = eachDayOfInterval({ start, end });
   const { data: items, isError } = useQuery(
     trpc.tracking.getInterruptionCalendar.queryOptions({
-      from: start,
+      // A day earlier too, for an event that runs past midnight into `start`.
+      from: addDays(start, -1),
       to: end,
     }),
   );

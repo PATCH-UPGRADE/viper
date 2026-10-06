@@ -6,6 +6,7 @@ import {
   VersionStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { upsertExampleProduct as upsertProduct } from "../prisma/device-type-seeding";
 
 const SEED_USER = {
   email: "user@example.com",
@@ -100,15 +101,6 @@ async function createOrGetSeedUser() {
 function upsertManufacturer(name: string) {
   const canonicalName = name.trim().toLowerCase();
   return prisma.manufacturer.upsert({
-    where: { canonicalName },
-    update: {},
-    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
-  });
-}
-
-function upsertProduct(name: string) {
-  const canonicalName = name.trim().toLowerCase();
-  return prisma.product.upsert({
     where: { canonicalName },
     update: {},
     create: { canonicalName, canonicalDisplayName: name, hasCpe: true },

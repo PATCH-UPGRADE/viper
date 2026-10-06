@@ -8,6 +8,7 @@ import {
   deviceGroupWhereForMatching,
   matchingAppliesToDeviceGroup,
 } from "@/lib/device-matching";
+import { upsertExampleProduct as upsertProduct } from "../prisma/device-type-seeding";
 import prisma from "../src/lib/db";
 
 const SEED_USER_EMAIL = "user@example.com";
@@ -41,15 +42,6 @@ type AssetSpec = {
 function upsertManufacturer(name: string) {
   const canonicalName = name.trim().toLowerCase();
   return prisma.manufacturer.upsert({
-    where: { canonicalName },
-    update: {},
-    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
-  });
-}
-
-function upsertProduct(name: string) {
-  const canonicalName = name.trim().toLowerCase();
-  return prisma.product.upsert({
     where: { canonicalName },
     update: {},
     create: { canonicalName, canonicalDisplayName: name, hasCpe: true },

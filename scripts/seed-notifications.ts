@@ -13,6 +13,7 @@ import {
   VersionStatus,
 } from "@/generated/prisma";
 import { sourceContentHash } from "@/lib/source-hash";
+import { upsertExampleProduct as upsertProduct } from "../prisma/device-type-seeding";
 import prisma from "../src/lib/db";
 
 const SEED_USER = {
@@ -26,15 +27,6 @@ const SEED_USER = {
 function upsertManufacturer(name: string) {
   const canonicalName = name.trim().toLowerCase();
   return prisma.manufacturer.upsert({
-    where: { canonicalName },
-    update: {},
-    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
-  });
-}
-
-function upsertProduct(name: string) {
-  const canonicalName = name.trim().toLowerCase();
-  return prisma.product.upsert({
     where: { canonicalName },
     update: {},
     create: { canonicalName, canonicalDisplayName: name, hasCpe: true },

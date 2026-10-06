@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { UNKNOWN_FLEET_PRODUCT } from "@/features/integrations/platforms/teamplay-fleet/assets/equipments";
 import { DEVICE_TYPES, FLEET_PRODUCT_DEVICE_TYPES } from "../device-types";
+
+vi.mock("@/lib/db", () => ({ default: {} }));
+
+const { EXAMPLE_PRODUCT_DEVICE_TYPES } = await import(
+  "../../../../prisma/device-type-seeding"
+);
 
 describe("DEVICE_TYPES", () => {
   it("has unique slugs", () => {
@@ -30,17 +36,31 @@ describe("DEVICE_TYPES", () => {
   });
 });
 
-describe("FLEET_PRODUCT_DEVICE_TYPES", () => {
+describe.each([
+  ["FLEET_PRODUCT_DEVICE_TYPES", FLEET_PRODUCT_DEVICE_TYPES],
+  ["EXAMPLE_PRODUCT_DEVICE_TYPES", EXAMPLE_PRODUCT_DEVICE_TYPES],
+])("%s", (_, products) => {
   it("only uses seeded slugs", () => {
     const slugs = new Set(DEVICE_TYPES.map((t) => t.slug));
-    for (const [product, slug] of Object.entries(FLEET_PRODUCT_DEVICE_TYPES)) {
+    for (const [product, slug] of Object.entries(products)) {
       expect(slugs.has(slug), product).toBe(true);
     }
   });
+});
 
+describe("FLEET_PRODUCT_DEVICE_TYPES", () => {
   it("never types the shared Fleet fallback product", () => {
     expect(FLEET_PRODUCT_DEVICE_TYPES).not.toHaveProperty(
       UNKNOWN_FLEET_PRODUCT,
     );
+  });
+});
+
+describe("EXAMPLE_PRODUCT_DEVICE_TYPES", () => {
+  // upsertExampleProduct looks products up by lowercase name.
+  it("has lowercase keys", () => {
+    for (const name of Object.keys(EXAMPLE_PRODUCT_DEVICE_TYPES)) {
+      expect(name).toBe(name.trim().toLowerCase());
+    }
   });
 });

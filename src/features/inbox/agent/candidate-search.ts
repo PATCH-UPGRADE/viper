@@ -3,7 +3,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { nameOrClauses, normalizeName } from "@/lib/router-utils";
+import { isUniqueViolation, nameOrClauses } from "@/lib/router-utils";
 import type {
   ExtractedAsset,
   ExtractedDeviceGroup,
@@ -105,17 +105,29 @@ async function searchDeviceGroupMatching(
         versionId: deviceGroup.versionId,
       };
 
-      const existingMatching = await prisma.deviceGroupMatching.findFirst({
-        where: identity,
-        select: matchingSelect,
-      });
-
-      const matching =
-        existingMatching ??
-        (await prisma.deviceGroupMatching.create({
-          data: identity,
+      const findMatching = () =>
+        prisma.deviceGroupMatching.findFirst({
+          where: identity,
           select: matchingSelect,
-        }));
+        });
+      // The identity is unique, so a concurrent create that loses the race
+      // throws P2002; re-read the winner's row.
+      const createMatching = async () => {
+        try {
+          return await prisma.deviceGroupMatching.create({
+            data: identity,
+            select: matchingSelect,
+          });
+        } catch (error) {
+          if (isUniqueViolation(error)) {
+            const row = await findMatching();
+            if (row) return row;
+          }
+          throw error;
+        }
+      };
+
+      const matching = (await findMatching()) ?? (await createMatching());
 
       matched.set(matching.id, {
         id: matching.id,

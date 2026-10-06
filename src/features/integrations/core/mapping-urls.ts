@@ -38,6 +38,7 @@ import { resolveUpstreamApi, resolveWebUrl } from "./urls";
 const RESOURCE_BY_MAPPING_MODEL: Record<string, ResourceType> = {
   ExternalAssetMapping: ResourceType.Asset,
   ExternalVulnerabilityMapping: ResourceType.Vulnerability,
+  ExternalVulnerabilityRecordMapping: ResourceType.Vulnerability,
   ExternalRemediationMapping: ResourceType.Remediation,
   ExternalDeviceArtifactMapping: ResourceType.DeviceArtifact,
   ExternalWorkOrderMapping: ResourceType.WorkOrder,

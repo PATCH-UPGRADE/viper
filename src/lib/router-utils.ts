@@ -402,6 +402,10 @@ type MatchingResolveInput = {
  * Find-or-create a shared DeviceGroupMatching for a manufacturer/product/version
  * identity (resolved to canonical rows). Identities come from CPEs, so
  * canonicals are marked CPE-backed.
+ *
+ * The identity is unique (device_group_matching_identity_key), so a concurrent
+ * create that loses the race throws P2002; we re-read the winner's row. Runs on
+ * the autocommit client for the same reason as resolveManufacturer.
  */
 export async function resolveMatchingId(
   input: MatchingResolveInput,
@@ -424,11 +428,20 @@ export async function resolveMatchingId(
     versionRange: input.versionRange ?? null,
   };
 
-  const existing = await prisma.deviceGroupMatching.findFirst({ where });
+  const find = () => prisma.deviceGroupMatching.findFirst({ where });
+  const existing = await find();
   if (existing) return existing.id;
 
-  const created = await prisma.deviceGroupMatching.create({ data: where });
-  return created.id;
+  try {
+    const created = await prisma.deviceGroupMatching.create({ data: where });
+    return created.id;
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      const row = await find();
+      if (row) return row.id;
+    }
+    throw error;
+  }
 }
 
 /**

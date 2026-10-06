@@ -49,6 +49,7 @@ model User {
   ticketComments           TicketComment[]
   watchedTickets           TicketWatch[]
   ticketSeen               TicketSeen[]
+  rescheduleRequests       RescheduleRequest[]
   ticketActivities         TicketActivity[]
   notes                    Note[]
   answeredQuestions        Question[]
@@ -1300,6 +1301,10 @@ model WorkOrderTicket {
   // Null means not confirmed.
   availability MaintenanceAvailability?
 
+  // What stops working during the work, and what looks different afterwards.
+  disruption   String? @db.Text
+  changesAfter String? @db.Text
+
   issues          Issue[]                          @relation("WorkOrderTicketIssues")
   vulnerabilities Vulnerability[]                  @relation("WorkOrderTicketVulns")
   remediations    Remediation[]                    @relation("WorkOrderTicketRemediations")
@@ -1315,6 +1320,8 @@ model WorkOrderTicket {
   activities       TicketActivity[]
   externalMappings ExternalWorkOrderMapping[]
   lastCommentAt    DateTime?
+
+  rescheduleRequests RescheduleRequest[]
 
   linksAsA WorkOrderTicketLink[] @relation("WorkOrderTicketLinkA")
   linksAsB WorkOrderTicketLink[] @relation("WorkOrderTicketLinkB")
@@ -1422,6 +1429,24 @@ model TicketSeen {
   @@index([userId])
   @@index([ticketId])
   @@map("ticket_seen")
+}
+
+// A clinician's suggested new time for one device ticket. The maintenance team
+// answers outside VIPER; the work order's schedule never changes from here.
+model RescheduleRequest {
+  id          String   @id @default(cuid())
+  ticketId    String
+  requesterId String
+  suggestedAt DateTime
+  reason      String
+  note        String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  ticket    WorkOrderTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  requester User            @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, requesterId])
+  @@map("reschedule_request")
 }
 
 enum TicketActivityType {

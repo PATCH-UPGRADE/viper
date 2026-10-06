@@ -774,6 +774,8 @@ export const workOrderDetailResponseSchema = z.object({
   scheduledAt: z.date().nullable(),
   durationEstimate: z.number().int().nullable(),
   availability: z.enum(MaintenanceAvailability).nullable(),
+  disruption: z.string().nullable(),
+  changesAfter: z.string().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
   lastCommentAt: z.date().nullable(),

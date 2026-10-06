@@ -122,6 +122,9 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
                 select: {
                   id: true,
                   body: true,
+                  departments: { select: { id: true, name: true } },
+                  disruption: true,
+                  changesAfter: true,
                   descriptions: {
                     where: { departmentId },
                     select: { body: true },
@@ -144,10 +147,25 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
               },
             },
           },
+          rescheduleRequests: {
+            where: { requesterId: userId },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              suggestedAt: true,
+              reason: true,
+              note: true,
+              createdAt: true,
+            },
+          },
           // Only this department's readers; other departments' users stay hidden.
           seenBy: {
             where: { user: { departmentId } },
-            select: { user: { select: { name: true } } },
+            orderBy: { seenAt: "desc" },
+            select: {
+              seenAt: true,
+              user: { select: { id: true, name: true, image: true } },
+            },
           },
           comments: ticketDetailInclude.comments,
         },
@@ -160,8 +178,13 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
   return {
     comments: ticket.comments,
     seenBy: ticket.seenBy,
+    rescheduleRequests: ticket.rescheduleRequests,
     category: ticket.category,
     workOrderId: workOrder.id,
+    departments: workOrder.departments,
+    viewerId: userId,
+    disruption: workOrder.disruption,
+    changesAfter: workOrder.changesAfter,
     contact: ticket.assignee ?? ticket.creator,
     why: workOrder.descriptions[0]?.body ?? workOrder.body ?? null,
     otherDevices: workOrder.assets.map(({ asset, ticket }) => ({
@@ -171,4 +194,25 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
       scheduledAt: ticket.scheduledAt,
     })),
   };
+};
+
+// A suggestion only: it is stored for the maintenance team and changes nothing
+// on the tickets. Every device ticket must be in the user's scope.
+export const requestReschedule = async (
+  userId: string,
+  input: { ticketId: string; suggestedAt: Date; reason: string; note?: string },
+) => {
+  const departmentId = await departmentOf(userId);
+  const inScopeTicket = departmentId
+    ? await prisma.assetTicket.findFirst({
+        where: { ticketId: input.ticketId, ...inScope(departmentId) },
+        select: { id: true },
+      })
+    : null;
+  if (!inScopeTicket) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
+  }
+  return prisma.rescheduleRequest.create({
+    data: { ...input, requesterId: userId },
+  });
 };

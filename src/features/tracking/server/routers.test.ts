@@ -118,6 +118,8 @@ const makeTicketDetail = (overrides: Record<string, any> = {}): any => ({
   scheduledAt: null,
   durationEstimate: null,
   availability: null,
+  disruption: null,
+  changesAfter: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   lastCommentAt: null,

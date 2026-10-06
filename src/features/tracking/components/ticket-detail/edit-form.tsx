@@ -33,6 +33,7 @@ import { DepartmentMultiSelect } from "./department-multi-select";
 import {
   availabilityLabels,
   categoryLabels,
+  maintenanceTextLabels,
   TicketStatusSelectTrigger,
 } from "./shared";
 
@@ -61,6 +62,8 @@ type EditState = {
   // Minutes, kept as the raw input text; empty means no estimate.
   durationEstimate: string;
   availability: MaintenanceAvailability | typeof UNKNOWN;
+  disruption: string;
+  changesAfter: string;
 };
 
 const buildEditState = (data: TicketDetail): EditState => ({
@@ -77,6 +80,8 @@ const buildEditState = (data: TicketDetail): EditState => ({
   scheduledAt: toDateTimeLocal(data.scheduledAt),
   durationEstimate: data.durationEstimate?.toString() ?? "",
   availability: data.availability ?? UNKNOWN,
+  disruption: data.disruption ?? "",
+  changesAfter: data.changesAfter ?? "",
 });
 
 const editStateFingerprint = (state: EditState) =>
@@ -183,6 +188,8 @@ export const TicketEditForm = ({
           ? Number(form.durationEstimate)
           : null,
         availability: form.availability === UNKNOWN ? null : form.availability,
+        disruption: form.disruption.trim() || null,
+        changesAfter: form.changesAfter.trim() || null,
       },
       { onSuccess: () => onCancel() },
     );
@@ -377,6 +384,23 @@ export const TicketEditForm = ({
             placeholder="General description of this work order"
           />
         </div>
+
+        {(["disruption", "changesAfter"] as const).map((key) => (
+          <div key={key} className="flex flex-col gap-2">
+            <Label htmlFor={`ticket-${key}`}>
+              {maintenanceTextLabels[key]}
+            </Label>
+            <Textarea
+              id={`ticket-${key}`}
+              value={form[key]}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, [key]: e.target.value }))
+              }
+              rows={3}
+              maxLength={5_000}
+            />
+          </div>
+        ))}
 
         <div className="flex flex-col gap-2">
           <Label>Department descriptions</Label>

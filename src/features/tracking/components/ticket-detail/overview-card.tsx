@@ -20,6 +20,7 @@ import {
   availabilityLabels,
   CategoryChip,
   formatDate,
+  maintenanceTextLabels,
   StatusChip,
 } from "./shared";
 
@@ -190,6 +191,15 @@ export const OverviewCard = ({ data }: { data: TicketDetail }) => {
           <StatusChip status={data.status} />
         </MetaField>
       </div>
+
+      {(["disruption", "changesAfter"] as const).map(
+        (key) =>
+          data[key] && (
+            <MetaField key={key} label={maintenanceTextLabels[key]}>
+              <p className="whitespace-pre-wrap">{data[key]}</p>
+            </MetaField>
+          ),
+      )}
 
       <CreatedFooter data={data} />
     </Card>

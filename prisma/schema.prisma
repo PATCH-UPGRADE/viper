@@ -53,6 +53,7 @@ model User {
   notes                    Note[]
   answeredQuestions        Question[]
   medisaoCommentIdentities MedISAOExternalCommentIdentity[]
+  ta3Submissions           TA3Submission[]
 
   @@unique([email])
   @@index([departmentId])
@@ -410,6 +411,9 @@ model DeviceGroupMatching {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // One row per identity to prevent duplicate race condition;
+  // migration creates this with NULLS NOT DISTINCT
+  @@unique([manufacturerId, productId, versionId, versionRange], name: "device_group_matching_identity", map: "device_group_matching_identity_key")
   @@index([manufacturerId, productId])
   @@map("device_group_matching")
 }
@@ -577,6 +581,29 @@ model ExternalVulnerabilityMapping {
   @@map("external_item_mappings")
 }
 
+/// The ID an integration knows a VulnerabilityRecord by, e.g. a partner's ID for its TA3
+/// submission. Replaces ExternalVulnerabilityMapping once records are canonical.
+/// Expand step: not written by any code path yet.
+model ExternalVulnerabilityRecordMapping {
+  id            String              @id @default(cuid())
+  itemId        String
+  integrationId String
+  externalId    String
+  item          VulnerabilityRecord @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  integration   Integration         @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  lastSynced    DateTime?
+
+  upstreamApi String?
+  webUrl      String?
+
+  @@unique([itemId, integrationId], name: "external_vulnerability_record_mappings_item_integration_key")
+  @@unique([integrationId, externalId], name: "external_vulnerability_record_mappings_integration_external_key")
+  @@index([itemId])
+  @@map("external_vulnerability_record_mappings")
+}
+
 model ArtifactWrapper {
   id String @id @default(cuid())
 
@@ -654,8 +681,9 @@ model DeviceArtifact {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  artifacts     ArtifactWrapper[]
-  vulnerability Vulnerability[]
+  artifacts      ArtifactWrapper[]
+  vulnerability  Vulnerability[]
+  ta3Submissions TA3Submission[]
 
   description String? @db.Text
   role        String?
@@ -694,17 +722,32 @@ enum AlohaStatus {
 
 model Vulnerability {
   id                   String                @id @default(cuid())
-  cveId                String?
+  /// Best human-facing ID: CVE > GHSA > other public ID > VIPER. Written alongside
+  /// identifiers
+  displayId            String? // TODO VW-540: make this non-nullable after create paths
+  cveId                String? // TODO VW_540: remove this
   description          String?               @db.Text // description of vulnerability
   narrative            String?               @db.Text // how a vulnerability could be exploited
   impact               String?               @db.Text // clinical impact
   severity             Severity              @default(Medium)
-  cvssScore            Float?
+
+  // <Getting removed in VW-540>
+  cvssScore            Float? 
   cvssVector           String?
   sarif                Json
   affectedComponents   String[]              @default([])
-  deviceGroupMatchings DeviceGroupMatching[] @relation("VulnerabilityMatchings")
   exploitUri           String?               @map("exploit-uri")
+  alohaStatus AlohaStatus?
+  alohaLog    Json         @default("{}")
+
+  deviceArtifactId String?
+  deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // </Getting removed in VW-540>
+
+  deviceGroupMatchings DeviceGroupMatching[] @relation("VulnerabilityMatchings")
 
   // EPSS (Exploit Prediction Scoring System) fields
   epss        Float? // Probability score between 0.0 and 1.0
@@ -714,16 +757,7 @@ model Vulnerability {
   inKEV        Boolean   @default(false) // Whether in CISA KEV catalog
   updatedInKev DateTime? // When KEV status was last checked/updated
 
-  priority Priority @default(Unsorted)
-
-  alohaStatus AlohaStatus?
-  alohaLog    Json         @default("{}")
-
-  deviceArtifactId String?
-  deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  priority Priority @default(Unsorted) // TODO VW-541: Move to Issue
 
   remediations         Remediation[]                      @relation("RemediationVulnerabilities")
   issues               Issue[]
@@ -735,6 +769,10 @@ model Vulnerability {
 
   externalMappings ExternalVulnerabilityMapping[]
 
+  identifiers VulnerabilityIdentifier[]
+  records     VulnerabilityRecord[]
+
+  @@index([displayId])
   @@index([userId])
   @@index([deviceArtifactId])
   @@index([severity])
@@ -742,6 +780,151 @@ model Vulnerability {
   @@index([inKEV])
   @@index([priority])
   @@map("vulnerability")
+}
+
+/// Where a VulnerabilityRecord came from
+enum VulnerabilitySource {
+  TA3 // a TA3Submission
+  VENDOR_ADVISORY // an advisory or VEX document
+  FIRST_EPSS // EPSS scores only
+  CISA_KEV // known-exploited flag only
+  // TODO VW-516: Add GHSA
+}
+
+/// Kind of value in a Metric row.
+enum MetricType {
+  CVSS_V3_0
+  CVSS_V3_1
+  CVSS_V4_0
+  QUALITATIVE // plain "HIGH" from a tool or team, with no vector
+  EPSS // score = probability, percentile set
+  KEV // present = in the KEV catalog
+}
+
+/// Every ID a vulnerability is known by, one row per ID. The unique constraint makes a CVE ID
+/// (or any other ID) resolve to exactly one Vulnerability. The kind of ID comes from its prefix
+/// (CVE-, GHSA-, VIPER- for zero-days), so a value must be globally unique on its own: prefix a
+/// vendor-local ID with its vendor, e.g. "BD:2024-001".
+// TODO VW-540: Actually use this in code (just in db for now)
+model VulnerabilityIdentifier {
+  id           String @id @default(cuid())
+  value        String @unique // trimmed + upper-cased, for lookup: "GHSA-JFH8-C2JP-5V3Q"
+  displayValue String // as published: "GHSA-jfh8-c2jp-5v3q"
+
+  vulnerabilityId String
+  vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([vulnerabilityId])
+  @@map("vulnerability_identifier")
+}
+
+/// One source's statement about one vulnerability: a TA3 submission, a vendor advisory, a
+/// or a feed's entry
+// TODO VW-540: Actually use this in code (just in db for now)
+model VulnerabilityRecord {
+  id     String              @id @default(cuid())
+  source VulnerabilitySource
+
+  /// ID of the statement inside its source (eg, GHSA-XXX, CVE-XXX). Null for TA3 submissions.
+  externalId String?
+
+  // TODO later: IF we add OSV support, what `aliases` does this record say refer to this vuln?
+  // Used to resolve and merge, and kept so a bad merge can be traced back to the record that
+  // claimed the alias.
+  // aliases    String[]
+
+  vulnerabilityId String
+  vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
+
+  /// The raw payload this record was parsed from.
+  raw Json?
+
+  summary     String?   @db.Text
+  details     String?   @db.Text
+  publishedAt DateTime?
+
+  // TODO later: modifiedAt DateTime? — the source's own modified timestamp (OSV `modified`).
+  // TODO later: withdrawnAt DateTime? — when the source withdrew / rejected the record.
+
+  // TODO later: relatedIds String[] — OSV `related`: IDs of similar-but-different
+  // vulnerabilities
+
+  ta3Submission    TA3Submission?
+  metrics          Metric[]
+  externalMappings ExternalVulnerabilityRecordMapping[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Postgres treats NULLs as distinct, so TA3 and manual records never collide.
+  @@unique([source, externalId, vulnerabilityId])
+  @@index([vulnerabilityId])
+  @@map("vulnerability_record")
+}
+
+/// One value a record asserts: a CVSS score, an EPSS probability, a KEV listing
+/// decision. Applies to the whole vulnerability.
+/// TODO VW-540: None of this code is used currently 
+model Metric {
+  id String @id @default(cuid())
+
+  recordId String
+  record   VulnerabilityRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  // TODO VW-541: affectedId String? — scopes the metric to one Affected row's products.
+
+  type       MetricType
+  vector     String? // "CVSS:3.1/AV:N/AC:L/..."
+  score      Decimal?   @db.Decimal(7, 5) // CVSS base 0–10, EPSS probability 0–1
+  percentile Decimal?   @db.Decimal(6, 5) // EPSS percentile
+  severity   Severity?
+  // Consider adding: assertedBy String? // Who inside the source made the assessment: "nvd@nist.gov", a CNA, a user id.
+  // Consider adding: assessedAt DateTime?
+  // Consider adding: extra      Json? // environmental/threat metrics, KEV dates, etc.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One value per (record, type), so re-ingest doesn't duplicate
+  @@unique([recordId, type], map: "metric_identity_key")
+  @@index([type, score])
+  @@map("metric")
+}
+
+/// One upload from a TA3 performer. A vulnerability can have many, through its records.
+/// TODO VW-540: unused currently
+model TA3Submission {
+  id       String              @id @default(cuid())
+  recordId String              @unique
+  record   VulnerabilityRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  // integration shadow user for partner uploads
+  submittedById String
+  submittedBy   User   @relation(fields: [submittedById], references: [id], onDelete: Cascade)
+
+  deviceArtifactId String?
+  deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
+
+  sarif      Json
+  narrative  String? @db.Text // how it could be exploited
+  impact     String? @db.Text // clinical impact
+  exploitUri String?
+
+  alohaStatus AlohaStatus?
+  alohaLog    Json         @default("{}")
+
+  // TODO later: tool String? — from SARIF runs[].tool.driver.name/version, for filtering by tool.
+  // TODO later: sarifUri String? — object-storage location when a SARIF log is too large for a row.
+  // TODO later: fingerprints String[] — SARIF partialFingerprints, to suggest duplicate submissions.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([submittedById])
+  @@index([deviceArtifactId])
+  @@map("ta3_submission")
 }
 
 enum IssueStatus {
@@ -973,6 +1156,8 @@ model Integration {
   vulnerabilityMappings  ExternalVulnerabilityMapping[]
   workOrderMappings      ExternalWorkOrderMapping[]
   sourceRecordMappings   ExternalSourceRecordMapping[]
+
+  vulnerabilityRecordMappings ExternalVulnerabilityRecordMapping[]
 
   managesRelationships ManagesRelationship[]
   targetedWorkOrders   WorkOrderTicket[]     @relation(name: "WorkOrderTarget")

@@ -437,10 +437,25 @@ export async function applyDecisions(
             targetMatching &&
             !targetMatching.versionRange
           ) {
-            await tx.deviceGroupMatching.update({
-              where: { id: decision.targetId },
-              data: { versionRange: data.versionRange },
+            // The identity (manufacturer, product, version, versionRange) is
+            // unique. If another matching already has the ranged identity, adding
+            // the range here would throw P2002 and abort this transaction, so
+            // leave this matching as it is.
+            const rangedTwin = await tx.deviceGroupMatching.findFirst({
+              where: {
+                manufacturerId: targetMatching.manufacturerId,
+                productId: targetMatching.productId,
+                versionId: targetMatching.versionId,
+                versionRange: data.versionRange,
+              },
+              select: { id: true },
             });
+            if (!rangedTwin) {
+              await tx.deviceGroupMatching.update({
+                where: { id: decision.targetId },
+                data: { versionRange: data.versionRange },
+              });
+            }
           }
           if (targetMatching) {
             if (data.manufacturer) {

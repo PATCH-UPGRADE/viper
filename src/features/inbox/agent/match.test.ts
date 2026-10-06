@@ -14,7 +14,11 @@ const { mockPrisma } = vi.hoisted(() => {
       createMany: vi.fn(),
     },
     vulnerability: { findUnique: vi.fn().mockResolvedValue(null) },
-    deviceGroupMatching: { findUnique: vi.fn(), update: vi.fn() },
+    deviceGroupMatching: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
     // applyDecisions runs inside prisma.$transaction(async (tx) => …) — invoke
     // the callback with the same mock so call assertions still work.
     // biome-ignore lint/suspicious/noExplicitAny: callback shape varies
@@ -138,6 +142,68 @@ describe("applyDecisions — device-group mapping owner", () => {
     expect(
       mockPrisma.notificationDeviceGroupMapping.upsert,
     ).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyDecisions — device-group update adds a versionRange", () => {
+  const updateDecision: Decision = {
+    ...linkDecision,
+    op: "update",
+    fields: { versionRange: "vers:semver/<2.0.0" },
+  };
+
+  beforeEach(() => {
+    mockPrisma.deviceGroupMatching.findUnique.mockResolvedValue({
+      versionRange: null,
+      manufacturerId: "m-1",
+      productId: "p-1",
+      versionId: null,
+    });
+  });
+
+  it("adds the range when no other matching has the ranged identity", async () => {
+    mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue(null);
+
+    const summary = await applyDecisions(
+      { notificationId: "n-1" },
+      [updateDecision],
+      candidates,
+    );
+
+    expect(summary.updated).toBe(1);
+    expect(mockPrisma.deviceGroupMatching.update).toHaveBeenCalledWith({
+      where: { id: "dg-1" },
+      data: { versionRange: "vers:semver/<2.0.0" },
+    });
+  });
+
+  it("leaves the matching alone when the ranged identity already exists", async () => {
+    // The identity is unique, so updating would throw P2002 and abort the
+    // transaction.
+    mockPrisma.deviceGroupMatching.findFirst.mockResolvedValue({
+      id: "dg-ranged",
+    });
+
+    const summary = await applyDecisions(
+      { notificationId: "n-1" },
+      [updateDecision],
+      candidates,
+    );
+
+    expect(summary.updated).toBe(1);
+    expect(mockPrisma.deviceGroupMatching.findFirst).toHaveBeenCalledWith({
+      where: {
+        manufacturerId: "m-1",
+        productId: "p-1",
+        versionId: null,
+        versionRange: "vers:semver/<2.0.0",
+      },
+      select: { id: true },
+    });
+    expect(mockPrisma.deviceGroupMatching.update).not.toHaveBeenCalled();
+    expect(
+      mockPrisma.notificationDeviceGroupMapping.upsert,
+    ).toHaveBeenCalledTimes(1);
   });
 });
 

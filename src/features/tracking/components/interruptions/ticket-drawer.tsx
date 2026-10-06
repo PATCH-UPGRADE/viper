@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { type ReactNode, useEffect } from "react";
-import { ActivityTimeline } from "@/components/activity-timeline";
+import { ActivityTimelineBody } from "@/components/activity-timeline";
 import {
   Sheet,
   SheetContent,
@@ -12,11 +12,15 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { TicketStatus } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
 import { useTRPC } from "@/trpc/client";
 import { useMarkTicketSeen } from "../../hooks/use-tracking";
-import { commentEntry } from "../ticket-detail/activity-timeline";
+import {
+  activityEntry,
+  commentEntry,
+} from "../ticket-detail/activity-timeline";
 import { AddCommentForm } from "../ticket-detail/add-comment-form";
 import { MetaField } from "../ticket-detail/overview-card";
 import { CategoryChip, StatusChip } from "../ticket-detail/shared";
@@ -97,10 +101,30 @@ const Details = ({ id }: { id: string }) => {
           {data.contact.email}
         </a>
       </MetaField>
-      <ActivityTimeline
-        entries={data.comments.map(commentEntry)}
-        composer={<AddCommentForm ticketId={id} />}
-      />
+      <Tabs defaultValue="comments">
+        <TabsList variant="line">
+          <TabsTrigger value="comments">
+            Comments ({data.comments.length})
+          </TabsTrigger>
+          <TabsTrigger value="activity">
+            Activity ({data.activities.length + data.comments.length})
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="comments" className="pt-3">
+          <ActivityTimelineBody
+            entries={data.comments.map(commentEntry)}
+            composer={<AddCommentForm ticketId={id} />}
+          />
+        </TabsContent>
+        <TabsContent value="activity" className="pt-3">
+          <ActivityTimelineBody
+            entries={[
+              ...data.activities.map(activityEntry),
+              ...data.comments.map(commentEntry),
+            ]}
+          />
+        </TabsContent>
+      </Tabs>
     </>
   );
 };

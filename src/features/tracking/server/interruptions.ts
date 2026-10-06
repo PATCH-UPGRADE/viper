@@ -151,6 +151,7 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
             select: { user: { select: { name: true } } },
           },
           comments: ticketDetailInclude.comments,
+          activities: ticketDetailInclude.activities,
         },
       })
     : null;
@@ -160,6 +161,7 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
   const workOrder = ticket.ticket?.parentTicket ?? ticket;
   return {
     comments: ticket.comments,
+    activities: ticket.activities,
     seenBy: ticket.seenBy,
     category: ticket.category,
     workOrderId: workOrder.id,

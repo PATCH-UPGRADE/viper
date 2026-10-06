@@ -44,23 +44,38 @@ const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const BLOCK_MINUTES = 60;
 
 type Item = DrawerTicket & { workOrderId: string; category: TicketCategory };
-type Block = { item: Item; start: number; lane: number; lanes: number };
+type Block = {
+  item: Item;
+  start: number;
+  len: number;
+  lane: number;
+  lanes: number;
+};
 
-// Events that overlap sit in separate lanes, sharing the day's width.
-const layout = (items: Item[]): Block[] => {
+// One block per event on this day. An event that runs past midnight continues
+// at the top of the next day. Blocks that overlap sit in separate lanes.
+const layout = (day: Date, items: Item[]): Block[] => {
+  const dayMinutes = 24 * 60;
   const blocks = items
-    .map((item) => ({
-      item,
-      start: minutesOf(item.scheduledAt),
-      lane: 0,
-      lanes: 1,
-    }))
+    .flatMap((item) => {
+      const start = minutesOf(item.scheduledAt);
+      const spill = start + BLOCK_MINUTES - dayMinutes;
+      if (isSameDay(item.scheduledAt, day)) {
+        return [
+          { item, start, len: Math.min(BLOCK_MINUTES, dayMinutes - start) },
+        ];
+      }
+      return spill > 0 && isSameDay(addDays(item.scheduledAt, 1), day)
+        ? [{ item, start: 0, len: spill }]
+        : [];
+    })
+    .map((block) => ({ ...block, lane: 0, lanes: 1 }))
     .sort((a, b) => a.start - b.start);
   const laneEnds: number[] = [];
   for (const block of blocks) {
     const free = laneEnds.findIndex((end) => end <= block.start);
     block.lane = free < 0 ? laneEnds.length : free;
-    laneEnds[block.lane] = block.start + BLOCK_MINUTES;
+    laneEnds[block.lane] = block.start + block.len;
   }
   for (const block of blocks) block.lanes = laneEnds.length;
   return blocks;
@@ -95,7 +110,7 @@ const ItemButton = ({
 };
 
 const TicketBlock = ({
-  block: { item, start, lane, lanes },
+  block: { item, start, len, lane, lanes },
 }: {
   block: Block;
 }) => (
@@ -105,7 +120,7 @@ const TicketBlock = ({
       left: `calc(${(lane * 100) / lanes}% + 2px)`,
       width: `calc(${100 / lanes}% - 4px)`,
       top: (start * HOUR_HEIGHT) / 60,
-      height: (BLOCK_MINUTES * HOUR_HEIGHT) / 60 - 2,
+      height: (len * HOUR_HEIGHT) / 60 - 2,
     }}
   >
     <ItemButton
@@ -369,8 +384,11 @@ const Calendar = () => {
                       }}
                     >
                       {isToday(day) && <NowLine />}
-                      {layout(on(day)).map((block) => (
-                        <TicketBlock key={block.item.id} block={block} />
+                      {layout(day, items).map((block) => (
+                        <TicketBlock
+                          key={`${block.item.id}-${block.start}`}
+                          block={block}
+                        />
                       ))}
                     </div>
                   </section>

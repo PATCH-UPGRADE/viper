@@ -1,45 +1,84 @@
 import { IssueStatus } from "@/generated/prisma";
 
-export const UNKNOWN_ASSET_ROLE_STRING = "Unknown Asset";
+const UNKNOWN_ASSET_STRING = "Unknown Asset";
 export const UNKNOWN_DEVICE_TYPE_STRING = "Unknown";
 
-export function getAssetRoleLabel(asset: { role: string | null }): string {
-  return asset.role ?? UNKNOWN_ASSET_ROLE_STRING;
-}
+type DeviceGroupWithType = {
+  product?: { deviceType?: { displayName: string } | null } | null;
+} | null;
 
-export function getAssetDeviceTypeLabel(asset: {
-  deviceGroup: {
-    product?: { deviceType?: { displayName: string } | null } | null;
-  } | null;
-}): string | null {
+export type DeviceTypeSource = { deviceGroup?: DeviceGroupWithType };
+
+/** Selects what getAssetDeviceTypeLabel reads, under a product select. */
+export const deviceTypeLabelSelect = {
+  deviceType: { select: { displayName: true } },
+} as const;
+
+export function getAssetDeviceTypeLabel(
+  asset: DeviceTypeSource,
+): string | null {
   return asset.deviceGroup?.product?.deviceType?.displayName ?? null;
 }
 
-export const assetNameSelect = {
+// The UI names an asset by what it is, never by Asset.role: the role is free
+// text that can grow long. Agents and external platforms still get the role.
+
+/** What an asset is, for titles and labels in the UI. */
+export function getAssetTitle(asset: DeviceTypeSource): string {
+  return getAssetDeviceTypeLabel(asset) ?? UNKNOWN_ASSET_STRING;
+}
+
+const assetNameFieldsSelect = {
   id: true,
   hostname: true,
   ip: true,
   serialNumber: true,
-  role: true,
 } as const;
 
-export type AssetNameSource = {
+type AssetNameFields = {
   id: string;
   hostname?: string | null;
   ip?: string | null;
   serialNumber?: string | null;
-  role?: string | null;
 };
 
+export const assetNameSelect = {
+  ...assetNameFieldsSelect,
+  deviceGroup: { select: { product: { select: deviceTypeLabelSelect } } },
+} as const;
+
+// deviceGroup is required, so that a caller cannot leave out the device type
+// by mistake. Pass `deviceGroup: null` to fall back to the id on purpose.
+export type AssetNameSource = AssetNameFields & {
+  deviceGroup: DeviceGroupWithType;
+};
+
+export const assetAgentNameSelect = {
+  ...assetNameFieldsSelect,
+  role: true,
+} as const;
+
+export type AgentNameSource = AssetNameFields & { role?: string | null };
+
+const firstPresent = (names: (string | null | undefined)[]) =>
+  names.find((name) => name?.trim());
+
 export function getAssetDisplayName(asset: AssetNameSource): string {
-  const candidateNames = [
-    asset.hostname,
-    asset.ip,
-    asset.serialNumber,
-    asset.role,
-  ];
-  const firstPresentName = candidateNames.find((name) => name?.trim());
-  return firstPresentName ?? asset.id;
+  return (
+    firstPresent([
+      asset.hostname,
+      asset.ip,
+      asset.serialNumber,
+      getAssetDeviceTypeLabel(asset),
+    ]) ?? asset.id
+  );
+}
+
+export function getAssetNameForAgent(asset: AgentNameSource): string {
+  return (
+    firstPresent([asset.hostname, asset.ip, asset.serialNumber, asset.role]) ??
+    asset.id
+  );
 }
 
 // One remediation can fix several of the asset's vulnerabilities, so count

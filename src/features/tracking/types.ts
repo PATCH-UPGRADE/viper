@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { deviceTypeLabelSelect } from "@/features/assets/utils";
 import {
   externalMappingSelect,
   externalMappingWithSyncSelect,
@@ -235,7 +236,7 @@ export const ticketDetailInclude = {
               product: {
                 select: {
                   canonicalDisplayName: true,
-                  deviceType: { select: { displayName: true } },
+                  ...deviceTypeLabelSelect,
                 },
               },
               version: { select: { canonicalName: true } },

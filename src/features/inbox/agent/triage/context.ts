@@ -1,4 +1,5 @@
 import "server-only";
+import { deviceTypeLabelSelect } from "@/features/assets/utils";
 import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
 import {
   workflowSerializeInclude,
@@ -148,7 +149,7 @@ export async function gatherTriageContext(
           include: {
             manufacturer: true,
             product: {
-              include: { deviceType: { select: { displayName: true } } },
+              include: deviceTypeLabelSelect,
             },
             version: true,
             assets: true,

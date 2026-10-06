@@ -1,5 +1,8 @@
 import "server-only";
-import { assetNameSelect } from "@/features/assets/utils";
+import {
+  assetNameSelect,
+  deviceTypeLabelSelect,
+} from "@/features/assets/utils";
 import { SubmissionState } from "@/generated/prisma";
 import type { TransactionClient } from "@/lib/db";
 import {
@@ -57,6 +60,9 @@ export async function assetsForMatchings(
           productId: true,
           versionId: true,
           version: { select: { canonicalName: true } },
+          product: {
+            select: deviceTypeLabelSelect,
+          },
         },
       },
     },

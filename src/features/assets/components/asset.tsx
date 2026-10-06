@@ -20,6 +20,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Card } from "@/components/ui/card";
+import { ClampedCell } from "@/components/ui/clamped-cell";
 import { CopyCode } from "@/components/ui/code";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import {
@@ -44,7 +45,7 @@ import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
 import {
   getAssetDeviceTypeLabel,
-  getAssetRoleLabel,
+  getAssetTitle,
   UNKNOWN_DEVICE_TYPE_STRING,
 } from "../utils";
 import { AssetQrPdfLink } from "./asset-qr-pdf-link";
@@ -294,14 +295,14 @@ export const AssetHeader = ({ assetId }: { assetId: string }) => {
             <SlashIcon />
           </BreadcrumbSeparator>
           <BreadcrumbItem>
-            <BreadcrumbPage>{getAssetRoleLabel(asset)}</BreadcrumbPage>
+            <BreadcrumbPage>{getAssetTitle(asset)}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
       <div className="flex items-center justify-between gap-2 pb-2">
         <h1 className="text-3xl font-semibold tracking-tight">
-          {getAssetRoleLabel(asset)}
+          {getAssetTitle(asset)}
         </h1>
         <AssetQrPdfLink assetId={assetId} />
       </div>
@@ -349,7 +350,9 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
                   <div className="text-xs font-medium text-muted-foreground mb-1">
                     Role
                   </div>
-                  <div className="text-sm">{getAssetRoleLabel(asset)}</div>
+                  <div className="text-sm">
+                    <ClampedCell text={asset.role} maxWidthClass="max-w-full" />
+                  </div>
                 </div>
 
                 <div>

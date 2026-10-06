@@ -34,6 +34,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ClampedCell } from "@/components/ui/clamped-cell";
 import { CopyCode } from "@/components/ui/code";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -64,7 +65,7 @@ import type {
 } from "../types";
 import {
   getAssetDeviceTypeLabel,
-  getAssetRoleLabel,
+  getAssetTitle,
   UNKNOWN_DEVICE_TYPE_STRING,
 } from "../utils";
 import { AssetDashboardDrawer } from "./asset-drawer";
@@ -273,7 +274,7 @@ export const NewVulnerableAssetsAlert = ({
                 className="text-orange-800 underline underline-offset-2 hover:text-orange-900"
                 onClick={() => onAssetClick(asset)}
               >
-                {getAssetRoleLabel(asset)}
+                {getAssetTitle(asset)}
               </button>
             </li>
           ))}
@@ -384,7 +385,7 @@ export const AssetItem = ({ data }: { data: DrawerAsset }) => {
         <ServerIcon className="size-5 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
-        <AssetDrawer asset={data}>{getAssetRoleLabel(data)}</AssetDrawer>
+        <AssetDrawer asset={data}>{getAssetTitle(data)}</AssetDrawer>
         <div className="text-xs text-muted-foreground mt-1">
           {data.ip ? <>{data.ip} &bull; </> : null}
           {deviceGroupLabel(data.deviceGroup)} &bull; Updated{" "}
@@ -436,7 +437,7 @@ export function AssetDrawer({
   return (
     <EntityDrawer trigger={children} {...props}>
       <DrawerHeader className="gap-1">
-        <DrawerTitle>{getAssetRoleLabel(asset)}</DrawerTitle>
+        <DrawerTitle>{getAssetTitle(asset)}</DrawerTitle>
         <DrawerDescription className="flex items-center gap-2">
           <Badge variant="outline">
             <ServerIcon className="size-3 mr-1" />
@@ -467,7 +468,9 @@ export function AssetDrawer({
               <div className="text-xs font-medium text-muted-foreground mb-1">
                 Role
               </div>
-              <div className="text-sm">{getAssetRoleLabel(asset)}</div>
+              <div className="text-sm">
+                <ClampedCell text={asset.role} maxWidthClass="max-w-full" />
+              </div>
             </div>
 
             <div>

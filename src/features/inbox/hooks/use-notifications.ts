@@ -8,7 +8,7 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { getAssetRoleLabel } from "@/features/assets/utils";
+import { getAssetTitle } from "@/features/assets/utils";
 import { useTRPC } from "@/trpc/client";
 import type { AffectedAssetsSummary } from "../types";
 import { useNotificationsParams } from "./use-notifications-params";
@@ -114,7 +114,7 @@ export const useAnswerAssetVersion = () => {
   return useMutation(
     trpc.assets.update.mutationOptions({
       onSuccess: (data, variables) => {
-        const label = getAssetRoleLabel(data);
+        const label = getAssetTitle(data);
         if ("version" in variables && variables.version) {
           toast.success(`${label} set to version ${variables.version}`);
         } else if (

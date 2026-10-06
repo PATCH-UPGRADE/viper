@@ -1,7 +1,7 @@
 import { assetUtilizationSchema } from "@/features/assets/types";
 import {
   getAssetDeviceTypeLabel,
-  getAssetDisplayName,
+  getAssetNameForAgent,
   UNKNOWN_DEVICE_TYPE_STRING,
 } from "@/features/assets/utils";
 import { deviceGroupCpeList, deviceGroupLabel } from "./device-group";
@@ -130,7 +130,7 @@ export function assetToMarkdown(
   a: AssetForMarkdown,
   opts: { includeIssues?: boolean } = { includeIssues: true },
 ): string {
-  const label = getAssetDisplayName(a);
+  const label = getAssetNameForAgent(a);
   const lines = [
     `### ${label} (${a.id})`,
     `- **IP**: ${a.ip ?? "N/A"}`,

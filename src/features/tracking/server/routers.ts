@@ -4,7 +4,10 @@ import { dispatchSubmission } from "@/features/work-orders/server/submit";
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { assetNameSelect } from "@/features/assets/utils";
+import {
+  assetNameSelect,
+  deviceTypeLabelSelect,
+} from "@/features/assets/utils";
 import { notRejected } from "@/features/inbox/types";
 import {
   Priority,
@@ -1186,7 +1189,12 @@ export const trackingRouter = createTRPCRouter({
           deviceGroup: {
             select: {
               manufacturer: { select: { canonicalDisplayName: true } },
-              product: { select: { canonicalDisplayName: true } },
+              product: {
+                select: {
+                  canonicalDisplayName: true,
+                  ...deviceTypeLabelSelect,
+                },
+              },
             },
           },
         },

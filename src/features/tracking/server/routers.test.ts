@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { assetNameSelect } from "@/features/assets/utils";
 
 vi.mock("server-only", () => ({}));
 
@@ -2088,15 +2089,7 @@ describe("trackingRouter.detachAsset", () => {
       },
       select: {
         ticketId: true,
-        asset: {
-          select: {
-            id: true,
-            hostname: true,
-            ip: true,
-            serialNumber: true,
-            role: true,
-          },
-        },
+        asset: { select: assetNameSelect },
       },
     });
     expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({

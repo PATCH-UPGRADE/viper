@@ -118,6 +118,7 @@ const Details = ({ id }: { id: string }) => {
           <ActivityTimelineBody
             entries={data.comments.map(commentEntry)}
             composer={<AddCommentForm ticketId={id} />}
+            empty="No comments yet."
           />
         </TabsContent>
         <TabsContent value="activity" className="pt-3">

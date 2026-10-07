@@ -31,20 +31,12 @@ interface CsafCursor {
   feeds: Record<string, FeedCursor>;
 }
 
-const MIN_PUBLISHED_YEAR = 2026;
-const MAX_AGE_MONTH = 3;
+const MAX_AGE_MONTH = 12;
 const MAX_AGE_MS = MAX_AGE_MONTH * 30 * 24 * 60 * 60 * 1000;
 const MAX_DOC_PER_RUN = 50;
 
-const inWindow = (entry: FeedEntry, now: number): boolean => {
-  if (
-    entry.publishedAt !== undefined &&
-    new Date(entry.publishedAt).getUTCFullYear() < MIN_PUBLISHED_YEAR
-  ) {
-    return false;
-  }
-  return entry.updatedAt >= now - MAX_AGE_MS;
-};
+const inWindow = (entry: FeedEntry, now: number): boolean =>
+  entry.updatedAt >= now - MAX_AGE_MS;
 
 const checkInventory = async (names: string[]): Promise<boolean> => {
   if (names.length === 0) return false;
@@ -228,7 +220,7 @@ export const syncAdvisories = async (
         relevant.push(item);
       }
     }
-    await recordSnapshots(relevant, ctx.integrationId);
+    await recordSnapshots(wanted, ctx.integrationId);
 
     for (const item of items) {
       state.seen[item.entry.id] = String(item.entry.updatedAt);
@@ -249,7 +241,7 @@ export const syncAdvisories = async (
       entries: result.entries.length,
       candidates: candidates.length,
       downloaded: items.length,
-      recorded: relevant.length,
+      recorded: wanted.length,
       dispatched,
     });
   }

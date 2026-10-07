@@ -35,6 +35,5 @@ export interface SourceRecordAdapter {
     doc: InboundEmail;
     linkEntities: LinkEntities;
     known?: KnownNotificationFields;
-    suppressWhenNoAssets?: boolean;
   };
 }

@@ -10,7 +10,7 @@ export const advisorySourceAdapter: SourceRecordAdapter = {
     const { tracking, title, publisher, distribution } = parsed.document;
     const doc = {
       from: publisher.name,
-      subject: `${tracking.id}` + `: ${title}`,
+      subject: `${tracking.id} : ${title}`,
       markdown: toMarkdown(parsed),
     };
     return {

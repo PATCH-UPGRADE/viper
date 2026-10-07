@@ -26,7 +26,6 @@ import { MAX_DOC_BYTES, readCapped } from "../session";
 interface FeedCursor {
   etag?: string;
   seen: Record<string, string>;
-  pending?: FeedEntry[];
 }
 interface CsafCursor {
   feeds: Record<string, FeedCursor>;
@@ -88,9 +87,7 @@ const syncAll = async (
     try {
       const response = await session.request(entry.documentUrl);
       if (!response.ok) {
-        throw new Error(
-          `${entry.documentUrl}` + ` returned ${response.status}`,
-        );
+        throw new Error(`${entry.documentUrl}returned ${response.status}`);
       }
       const body = await readCapped(response, MAX_DOC_BYTES, entry.id);
       const raw = JSON.parse(body.toString("utf-8"));

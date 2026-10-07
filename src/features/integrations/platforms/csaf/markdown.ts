@@ -61,7 +61,7 @@ export const toMarkdown = (doc: CsafDocument): string => {
 
   const references = doc.document.references
     .filter((r) => r.category === "self" && !r.url.endsWith(".json"))
-    .map((r) => `- ${r.summary ?? "Web version"}` + `: ${r.url}`);
+    .map((r) => `- ${r.summary ?? "Web version"} : ${r.url}`);
 
   return [
     `# ${tracking.id}: ${title}`,

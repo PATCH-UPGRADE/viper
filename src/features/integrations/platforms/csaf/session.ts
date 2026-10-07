@@ -31,8 +31,6 @@ export const readCapped = async (
   const reader = response.body?.getReader();
   if (!reader) throw new Error(`${label}: response had no body`);
 
-  if (!response.body) throw new Error(`${label}: response had no body`);
-
   const chunks: Buffer[] = [];
   let total = 0;
 
@@ -42,7 +40,7 @@ export const readCapped = async (
     total += value.byteLength;
     if (total > limit) {
       await reader.cancel();
-      throw new Error(`${label}` + `:exceeded ${limit} bytes`);
+      throw new Error(`${label} :exceeded ${limit} bytes`);
     }
     chunks.push(Buffer.from(value));
   }

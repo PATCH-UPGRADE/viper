@@ -216,14 +216,19 @@ Outside the directory — **two edits**:
 **Do not touch** for a new platform: the Inngest sync functions, `core/callback.ts`,
 `core/sync/cadence.ts`, `server/routers.ts`, or the UI. They are already generic.
 
-Two UI hooks exist for platforms that are not configured through the generic form. A platform
-whose "Add" button must do something else registers a component in
-`components/platform-add-overrides.ts`; the catalog card renders it instead of
-`CreateIntegrationDialog` (CSV Upload opens its import overlay this way). A platform with
-`definition.unscheduled` gets one Enabled Integrations row for all of its integrations
-(`platform-uploads-row.tsx`): it shows when the latest upload ran, has no enable switch, and expands
-to list each upload. An upload has no "Sync Now" item and its edit form has no sync interval. An
-integration that never started an upload (`lastAttemptAt` is null) is not listed.
+The UI has two special cases, for platforms that the generic "Add" form and the generic row do
+not fit. CSV Upload is the only platform that uses them today.
+
+1. **A platform with its own "Add" button.** Register a component for the platform in
+   `components/platform-add-overrides.ts`. The catalog card shows that component in place of the
+   generic `CreateIntegrationDialog`. CSV Upload uses this to open its import overlay.
+2. **A platform that never syncs on a schedule** (`definition.unscheduled: true`). The Enabled
+   Integrations list shows one row for the whole platform, not one row per integration
+   (`components/platform-uploads-row.tsx`):
+   - The row shows when the latest upload ran. It has no enable switch.
+   - The row expands to list each upload. An upload's menu has "Edit Name" and "Remove", and no
+     "Sync Now". "Edit Name" only renames the upload; there is no sync interval to set.
+   - An integration that never started an upload (`lastAttemptAt` is null) is left out.
 
 Only if you are also introducing a brand-new `ResourceType` do you additionally touch
 `integrationsMapping` (`../types.ts`), `MODULE_FIELDS` (`core/sync/resources.ts`), and

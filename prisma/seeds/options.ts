@@ -3,7 +3,6 @@ type SeedScope = "auto" | "all" | "production";
 interface SeedOptions {
   scope: SeedScope;
   onlyTickets: string[] | null;
-  shouldClearDemoTables: boolean;
 }
 
 function requestedSeedScope(requestedScope: string | undefined): SeedScope {
@@ -32,11 +31,10 @@ function requestedTickets(requestedTicketList: string | undefined) {
 export function readSeedOptions(environment: NodeJS.ProcessEnv): SeedOptions {
   const scope = requestedSeedScope(environment.SEED_SCOPE);
   const onlyTickets = requestedTickets(environment.SEED_TICKET);
-  const shouldClearDemoTables = environment.SEED_CLEAR_DB === "true";
   if (scope === "production" && onlyTickets) {
     throw new Error(
       "SEED_TICKET seeds demo data, so it cannot be combined with SEED_SCOPE=production.",
     );
   }
-  return { scope, onlyTickets, shouldClearDemoTables };
+  return { scope, onlyTickets };
 }

@@ -23,7 +23,7 @@ export async function seedVendors() {
   });
 
   // Rebuilt rather than upserted: neither model has a natural unique key, so a
-  // re-seed without SEED_CLEAR_DB would otherwise stack duplicates every run.
+  // re-seed would otherwise stack duplicates every run.
   await prisma.contract.deleteMany({ where: { vendorId: vendor.id } });
   // Contract.managesRelationshipId is SetNull, so the delete above orphans the
   // relationship rather than removing it — clear it explicitly.

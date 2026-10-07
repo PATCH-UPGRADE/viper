@@ -17,7 +17,6 @@ import { seedVulnerabilities } from "./vulnerabilities";
 import { seedWorkOrderTickets } from "./work-orders";
 import { seedWorkflows } from "./workflows";
 
-export { clearDatabase } from "./clear-database";
 export { createOrGetSeedUser, SEED_USER } from "./seed-user";
 
 const isLastBaseStepSeeded = isFleetAdvisoryNotificationSeeded;

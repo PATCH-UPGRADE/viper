@@ -1,6 +1,5 @@
 import prisma from "@/lib/db";
 import {
-  clearDatabase,
   createOrGetSeedUser,
   isBaseDemoDataLoaded,
   SEED_USER,
@@ -14,7 +13,7 @@ async function seedBaseDemoDataIfMissing(mustSeedBaseDemoData: boolean) {
   const baseDemoDataIsLoaded = await isBaseDemoDataLoaded();
   if (baseDemoDataIsLoaded && !mustSeedBaseDemoData) {
     console.log(
-      "\n⏭️  Base demo data is already loaded, so it is skipped. Run with SEED_SCOPE=all to load it again, or SEED_CLEAR_DB=true to reload it from empty.",
+      "\n⏭️  Base demo data is already loaded, so it is skipped. Run with SEED_SCOPE=all to load it again, or reset the database with `npx prisma migrate reset`.",
     );
     return createOrGetSeedUser();
   }
@@ -25,9 +24,7 @@ async function main() {
   console.log("🌱 Starting database seed...\n");
 
   try {
-    const { scope, onlyTickets, shouldClearDemoTables } = readSeedOptions(
-      process.env,
-    );
+    const { scope, onlyTickets } = readSeedOptions(process.env);
     if (scope === "production") {
       await seedProductionData();
       console.log(
@@ -38,12 +35,8 @@ async function main() {
 
     const ticketSeeds = await loadTicketSeeds(onlyTickets);
 
-    if (shouldClearDemoTables) {
-      await clearDatabase();
-    }
-
     await seedProductionData();
-    const mustSeedBaseDemoData = scope === "all" || shouldClearDemoTables;
+    const mustSeedBaseDemoData = scope === "all";
     const seedUser = await seedBaseDemoDataIfMissing(mustSeedBaseDemoData);
     await runTicketSeeds(ticketSeeds, { seedUserId: seedUser.id });
 

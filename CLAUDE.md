@@ -387,11 +387,10 @@ anything worth keeping into `prisma/seeds/dev/base/`.
   use plain `create`, so this duplicates their rows.
 - `SEED_TICKET=VW-532`: run only that ticket's folder, not every folder. Takes a comma-separated
   list (`SEED_TICKET=VW-532,VW-540`). Cannot be combined with `SEED_SCOPE=production`.
-- `SEED_CLEAR_DB=true`: delete every row in the tables the demo seed writes, then load the base
-  demo data from empty. This removes your own rows in those tables too. Ignored with
-  `SEED_SCOPE=production`.
-
 Any other value of `SEED_SCOPE`, including an empty one, stops the seed with an error.
+
+For a clean database, use Prisma's own reset: `npx prisma migrate reset` drops the database,
+re-applies every migration and runs the seed.
 
 The older `scripts/seed-*.ts` files are manual, local-only scripts from before this layout. Do
 not copy that pattern for new work.

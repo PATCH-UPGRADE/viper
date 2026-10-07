@@ -93,13 +93,13 @@ npm run db:upsert-manufacturers -- backups/manufacturers.json
 
 The export writes every manufacturer row to a JSON file. The upsert reads a file in the same format and adds what is missing, with the same add-only rules as the production seed.
 
-### Optional: Clear database before seeding
+### Optional: Start from a clean database
 
 ```bash
-SEED_CLEAR_DB=true npm run db:seed
+npx prisma migrate reset
 ```
 
-⚠️ **Warning:** This deletes every row in the tables the demo seed writes, including your own, then loads the demo data from empty.
+⚠️ **Warning:** This drops the whole database, including your own account and API keys, re-applies every migration and runs the seed.
 
 ### Login after seeding
 

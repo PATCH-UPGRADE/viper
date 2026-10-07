@@ -107,8 +107,8 @@ const ItemButton = ({
       title={item.summary}
       className={cn(
         "overflow-hidden rounded border text-left text-[11px] hover:brightness-95",
-        item.unread && "border-l-4 border-l-current",
         availabilityStyle(item.availability).className,
+        item.unread && "border-l-4 border-l-current",
         className,
       )}
     >

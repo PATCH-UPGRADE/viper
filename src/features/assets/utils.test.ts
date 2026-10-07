@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getAssetDisplayName } from "./utils";
+import { PlatformEnum } from "@/generated/prisma";
+import { getAssetDisplayName, getSourceToolLabel } from "./utils";
 
 const fleetCt = {
   id: "ct_63014",
@@ -48,5 +49,39 @@ describe("getAssetDisplayName", () => {
         role: undefined,
       }),
     ).toBe("ct_63014");
+  });
+});
+
+describe("getSourceToolLabel", () => {
+  const mappedTo = (platform: PlatformEnum) => ({ integration: { platform } });
+
+  it("names CSV Upload for a device only a CSV upload reports", () => {
+    expect(
+      getSourceToolLabel({
+        user: { name: "Dana Reyes" },
+        externalMappings: [mappedTo(PlatformEnum.CSV_UPLOAD)],
+      }),
+    ).toBe("CSV Upload");
+  });
+
+  it("keeps the owning tool's name when another platform also reports the device", () => {
+    expect(
+      getSourceToolLabel({
+        user: { name: "teamplay Fleet" },
+        externalMappings: [
+          mappedTo(PlatformEnum.FLEET),
+          mappedTo(PlatformEnum.CSV_UPLOAD),
+        ],
+      }),
+    ).toBe("teamplay Fleet");
+  });
+
+  it("shows the owner's name for a device no integration reports", () => {
+    expect(
+      getSourceToolLabel({
+        user: { name: "Dana Reyes" },
+        externalMappings: [],
+      }),
+    ).toBe("Dana Reyes");
   });
 });

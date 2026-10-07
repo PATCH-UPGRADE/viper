@@ -1,10 +1,6 @@
 import "server-only";
-import { searchCandidates } from "@/features/inbox/agent/candidate-search";
-import {
-  type ExtractResult,
-  extractEntities,
-} from "@/features/inbox/agent/extract";
-import { matchAndLinkEntities } from "@/features/inbox/agent/match";
+import { type ExtractResult } from "@/features/inbox/agent/extract";
+import { aiExtractAndMatch } from "@/features/inbox/link-entities";
 import type { LinkEntities } from "@/features/inbox/pipeline";
 import type { SourceRecordAdapter } from "@/features/inbox/source-adapter";
 import prisma from "@/lib/db";
@@ -80,27 +76,7 @@ export const advisorySourceAdapter: SourceRecordAdapter = {
         `Manufacturer: ${SIEMENS_HEALTHINEERS}` + `\n\n${advisory.body}`,
     };
 
-    const extractAndMatch: LinkEntities = async (step, notificationId, ctx) => {
-      if (!ctx) throw new Error("Fleet adapter needs the pipeline ctx");
-
-      const extracted = await step.run("extract-entities", async () =>
-        withSiemensManufacturer(
-          await extractEntities(ctx.sourceId, doc, ctx.attachments),
-        ),
-      );
-
-      return step.run("match-and-link-entities", async () => {
-        if (
-          !notificationId ||
-          Object.values(extracted).every((v) => v.length === 0)
-        ) {
-          return { linked: 0, updated: 0, created: 0, skipped: 0 };
-        }
-        const candidates = await searchCandidates(extracted);
-        return matchAndLinkEntities({ notificationId }, extracted, candidates);
-      });
-    };
-
+    const extractAndMatch = aiExtractAndMatch(doc, withSiemensManufacturer);
     const linkVulnerabilities = linkAdvisoryVulnerabilities(advisory);
     return {
       doc,

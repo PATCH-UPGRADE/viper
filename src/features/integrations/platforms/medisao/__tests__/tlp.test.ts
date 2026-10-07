@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { parseTlp } from "../tlp";
+import { parseTlp } from "@/lib/tlp";
 
 describe("parseTlp", () => {
   it("reads the marking the live feed sends", () => {

@@ -2,6 +2,7 @@ import "server-only";
 import type { SourceRecordAdapter } from "@/features/inbox/source-adapter";
 import type { PlatformEnum, ResourceType } from "@/generated/prisma";
 import { ai } from "../platforms/ai";
+import { csaf } from "../platforms/csaf";
 import { medisao } from "../platforms/medisao";
 import { partner } from "../platforms/partner";
 import { teamplayFleet } from "../platforms/teamplay-fleet";
@@ -17,6 +18,7 @@ export const registry: Partial<Record<PlatformEnum, AnyConnectorModule>> = {
   PARTNER: partner,
   FLEET: teamplayFleet,
   MEDISAO: medisao,
+  CSAF: csaf,
 };
 
 export const requirePlatform = (platform: PlatformEnum): AnyConnectorModule => {

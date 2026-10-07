@@ -3,7 +3,7 @@ import { Tlp } from "@/generated/prisma";
 const TLP_VALUES = new Set<string>(Object.values(Tlp));
 
 /**
- * Read MedISAO's stated TLP into ours.
+ * Read Integrations such as MedISAO's/CSAF's stated TLP into ours.
  *
  * Their values line up with `enum Tlp`, but the marking is written several ways
  * in the wild: with the "TLP:" prefix, and with a space or a plus where the

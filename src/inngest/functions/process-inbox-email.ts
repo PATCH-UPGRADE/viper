@@ -8,6 +8,7 @@ import { classifyEmailKind } from "@/features/inbox/agent/classify-kind";
 import { extractEntities } from "@/features/inbox/agent/extract";
 import { extractWorkOrder } from "@/features/inbox/agent/extract-work-order";
 import { matchAndLinkEntities } from "@/features/inbox/agent/match";
+import { aiExtractAndMatch } from "@/features/inbox/link-entities";
 import { runNotificationPipeline } from "@/features/inbox/pipeline";
 import {
   fetchPdfAttachmentsFromResend,
@@ -334,26 +335,7 @@ export const processInboxEmail = inngest.createFunction(
       attachments: inlinedPdfs ?? undefined,
       // An email names its devices in prose, so they have to be extracted and
       // then matched before anything can be linked.
-      linkEntities: async (pipelineStep, notificationId) => {
-        const extracted = await pipelineStep.run("extract-entities", () =>
-          extractEntities(sourceId, doc, inlinedPdfs ?? undefined),
-        );
-
-        return pipelineStep.run("match-and-link-entities", async () => {
-          if (
-            !notificationId ||
-            Object.values(extracted).every((v) => v.length === 0)
-          ) {
-            return { linked: 0, updated: 0, created: 0, skipped: 0 };
-          }
-          const candidates = await searchCandidates(extracted);
-          return matchAndLinkEntities(
-            { notificationId },
-            extracted,
-            candidates,
-          );
-        });
-      },
+      linkEntities: aiExtractAndMatch(doc),
     });
 
     return {

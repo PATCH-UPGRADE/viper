@@ -1257,9 +1257,10 @@ enum ResourceType {
 // Which platform module handles an Integration. Platforms are represented in code
 enum PlatformEnum {
   AI
-  PARTNER
+  CSAF
   FLEET
   MEDISAO
+  PARTNER
 }
 
 // Traffic Light Protocol, governs information sharing

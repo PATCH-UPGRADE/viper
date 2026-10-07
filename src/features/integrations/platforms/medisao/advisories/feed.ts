@@ -1,8 +1,8 @@
 import { z } from "zod";
 import type { Tlp } from "@/generated/prisma";
+import { parseTlp } from "@/lib/tlp";
 import type { Session } from "../../../core/types";
 import { walkPages, withSince } from "../paginate";
-import { parseTlp } from "../tlp";
 import { channelAdvisoriesUrl } from "../urls";
 import { splitVersion } from "../version";
 

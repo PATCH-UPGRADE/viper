@@ -5,6 +5,7 @@ import { ClockIcon, MailIcon } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useEffect } from "react";
 import { ActivityTimelineBody } from "@/components/activity-timeline";
+import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
   SheetContent,
@@ -18,7 +19,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { NotificationReadReceipts } from "@/features/inbox/components/notification-read-receipts";
 import type { TicketStatus } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
-import { cn } from "@/lib/utils";
+import { cn, plural } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useMarkTicketSeen } from "../../hooks/use-tracking";
 import type { Availability } from "../../types";
@@ -39,6 +40,7 @@ export type DrawerTicket = {
   status: TicketStatus;
   scheduledAt: Date | null;
   assetName: string;
+  place?: string | null;
   durationEstimate: number | null;
   availability: Availability | null;
 };
@@ -85,6 +87,11 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
       <div className="flex flex-wrap items-center gap-2">
         <StatusChip status={ticket.status} />
         <CategoryChip category={data.category} />
+        {data.departments.map((department) => (
+          <Badge key={department.id} variant="secondary">
+            {department.name}
+          </Badge>
+        ))}
       </div>
       <div
         className={cn(
@@ -125,7 +132,7 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
           {data.why ?? "Not provided"}
         </p>
       </Section>
-      {data.otherDevices.length > 0 && (
+      {(data.otherDevices.length > 0 || data.elsewhere.devices > 0) && (
         <Section
           title={
             data.isDeviceTicket
@@ -155,6 +162,16 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
                 </span>
               </li>
             ))}
+            {data.elsewhere.devices > 0 && (
+              <li className="bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                Plus {data.elsewhere.devices}{" "}
+                {plural("device", data.elsewhere.devices)}{" "}
+                {data.elsewhere.departments > 0
+                  ? `in ${data.elsewhere.departments} other ${plural("department", data.elsewhere.departments)}`
+                  : "outside your department"}
+                .
+              </li>
+            )}
           </ul>
         </Section>
       )}
@@ -239,7 +256,14 @@ export const TicketDrawer = ({
         </SheetDescription>
       </SheetHeader>
       <div className="flex flex-col gap-4 px-4 pb-6">
-        <p className="font-medium">{ticket.assetName}</p>
+        <p className="font-medium">
+          {ticket.assetName}
+          {ticket.place && (
+            <span className="ml-2 font-normal text-muted-foreground">
+              {ticket.place}
+            </span>
+          )}
+        </p>
         <Details ticket={ticket} />
       </div>
     </SheetContent>

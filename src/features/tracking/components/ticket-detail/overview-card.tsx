@@ -24,7 +24,7 @@ const FieldLabel = ({ children }: { children: React.ReactNode }) => (
   </span>
 );
 
-export const MetaField = ({
+const MetaField = ({
   label,
   children,
 }: {
@@ -167,6 +167,10 @@ export const OverviewCard = ({ data }: { data: TicketDetail }) => {
             <CalendarIcon className="size-3.5 text-muted-foreground" />
             {formatScheduled(data.scheduledAt) ?? "—"}
           </div>
+        </MetaField>
+
+        <MetaField label="Scheduled end">
+          {formatScheduled(data.scheduledEndTime) ?? "—"}
         </MetaField>
 
         <MetaField label="Category">

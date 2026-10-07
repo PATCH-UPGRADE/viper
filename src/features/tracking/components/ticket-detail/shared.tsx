@@ -1,7 +1,13 @@
 "use client";
 
 import { format } from "date-fns";
-import { SquareCheckBigIcon } from "lucide-react";
+import {
+  BanIcon,
+  CircleCheckIcon,
+  CircleHelpIcon,
+  SquareCheckBigIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +26,7 @@ import { useCategoryColor } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
 import type { TicketCategory, TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
-import type { TicketDetail } from "../../types";
+import type { Availability, TicketDetail } from "../../types";
 
 export const statusLabels: Record<TicketStatus, string> = {
   TO_DO: "To Do",
@@ -50,6 +56,37 @@ export const categoryLabels: Record<TicketCategory, string> = {
   MAINTENANCE: "Maintenance",
   OTHER: "Other",
 };
+
+export const availabilityLabels: Record<Availability, string> = {
+  AVAILABLE: "Available during maintenance",
+  PARTIAL: "Partially available during maintenance",
+  UNAVAILABLE: "Unavailable during maintenance",
+};
+
+// Chip hue and icon per availability; unset means the work order does not say.
+const availabilityLook = {
+  AVAILABLE: ["green", CircleCheckIcon],
+  PARTIAL: ["amber", TriangleAlertIcon],
+  UNAVAILABLE: ["red", BanIcon],
+  UNKNOWN: ["zinc", CircleHelpIcon],
+} as const;
+
+export const availabilityStyle = (availability: Availability | null) => {
+  const [hue, Icon] = availabilityLook[availability ?? "UNKNOWN"];
+  return {
+    Icon,
+    className: getChipClass(hue),
+    label: availability
+      ? availabilityLabels[availability]
+      : "Availability not confirmed",
+  };
+};
+
+export const UnreadDot = () => (
+  <span className="size-2 shrink-0 rounded-full bg-primary">
+    <span className="sr-only">Not opened by you</span>
+  </span>
+);
 
 export const formatDate = (date: Date | string | null | undefined) => {
   if (!date) return null;

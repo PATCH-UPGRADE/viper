@@ -64,6 +64,7 @@ import { cascadeDoneStatus, createAssetTicket } from "./asset-tickets";
 import {
   getInterruptionCalendar,
   getInterruptionDetail,
+  getInterruptionList,
 } from "./interruptions";
 
 // A lost create-race (or a retry) surfaces as a P2002 unique violation. Duck-typed
@@ -692,6 +693,7 @@ export const trackingRouter = createTRPCRouter({
           .optional(),
         assigneeId: z.string().nullish(),
         scheduledAt: z.coerce.date().nullish(),
+        scheduledEndTime: z.coerce.date().nullish(),
       }),
     )
     .meta({
@@ -701,7 +703,7 @@ export const trackingRouter = createTRPCRouter({
         tags: ["Work Orders"],
         summary: "Update a work-order ticket",
         description:
-          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt) to clear them. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
+          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt, scheduledEndTime) to clear them. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
       },
     })
     .output(workOrderDetailResponseSchema)
@@ -1315,6 +1317,10 @@ export const trackingRouter = createTRPCRouter({
     .query(({ input, ctx }) =>
       getInterruptionCalendar(ctx.auth.user.id, input),
     ),
+
+  getInterruptionList: protectedProcedure.query(({ ctx }) =>
+    getInterruptionList(ctx.auth.user.id),
+  ),
 
   getInterruptionDetail: protectedProcedure
     .input(z.object({ id: z.string() }))

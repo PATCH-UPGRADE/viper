@@ -579,12 +579,15 @@ const linkedRemediationSchema = z.object({
   description: z.string().nullable(),
 });
 
+export type Availability = "AVAILABLE" | "PARTIAL" | "UNAVAILABLE";
+
 export const workOrderListItemSchema = z.object({
   id: z.string(),
   summary: z.string(),
   status: z.enum(TicketStatus),
   category: z.enum(TicketCategory),
   scheduledAt: z.date().nullable(),
+  scheduledEndTime: z.date().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
   parentId: z.string().nullable(),
@@ -777,6 +780,7 @@ export const workOrderDetailResponseSchema = z.object({
   status: z.enum(TicketStatus),
   category: z.enum(TicketCategory),
   scheduledAt: z.date().nullable(),
+  scheduledEndTime: z.date().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
   lastCommentAt: z.date().nullable(),

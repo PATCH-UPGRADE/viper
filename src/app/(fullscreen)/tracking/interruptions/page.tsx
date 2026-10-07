@@ -1,7 +1,9 @@
 import Image from "next/image";
 import { ReportingErrorBoundary } from "@/components/reporting-error-boundary";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { InterruptionsCalendar } from "@/features/tracking/components/interruptions/interruptions-calendar";
+import { UserAvatar } from "@/components/user-avatar";
+import { FullscreenButton } from "@/features/tracking/components/interruptions/fullscreen-button";
+import { InterruptionsView } from "@/features/tracking/components/interruptions/interruptions-calendar";
 import { requireAuth } from "@/lib/auth-utils";
 
 const Page = async () => {
@@ -14,15 +16,20 @@ const Page = async () => {
         <span className="h-4 w-px bg-border" />
         <span className="font-medium">Device Maintenance</span>
         <span className="hidden truncate text-sm text-muted-foreground md:block">
-          Open work orders for devices in your departments.
+          Open work orders for devices in your departments, as recorded in
+          VIPER.
         </span>
-        <span className="ml-auto text-sm font-medium">{user.name}</span>
-        <ThemeToggle />
+        <div className="ml-auto flex items-center gap-2">
+          <UserAvatar user={user} className="border" />
+          <span className="text-sm font-medium">{user.name}</span>
+          <ThemeToggle />
+          <FullscreenButton />
+        </div>
       </header>
       <ReportingErrorBoundary
         fallback={<p className="p-4">Something went wrong.</p>}
       >
-        <InterruptionsCalendar />
+        <InterruptionsView />
       </ReportingErrorBoundary>
     </>
   );

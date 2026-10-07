@@ -16,6 +16,7 @@ vi.mock("@/lib/db", () => ({ default: mockPrisma }));
 import {
   getInterruptionCalendar,
   getInterruptionDetail,
+  getInterruptionList,
 } from "./interruptions";
 
 const range = { from: new Date(2026, 2, 1), to: new Date(2026, 2, 7) };
@@ -38,5 +39,34 @@ describe("interruptions scope", () => {
     await expect(getInterruptionDetail("u1", "other")).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
+  });
+});
+
+describe("interruption list", () => {
+  it("puts a device ticket without a time on its owner's schedule", async () => {
+    const ownerTime = new Date(2026, 2, 3, 9);
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
+    mockPrisma.assetTicket.findMany.mockResolvedValue([
+      {
+        parentTicketId: "owner",
+        parentTicket: {
+          id: "owner",
+          summary: "Patch pumps",
+          scheduledAt: ownerTime,
+          scheduledEndTime: null,
+          seenBy: [],
+        },
+        asset: { id: "a1", hostname: "pump-1" },
+        ticket: {
+          id: "t1",
+          summary: "s",
+          status: "TO_DO",
+          category: "PATCH",
+          scheduledAt: null,
+        },
+      },
+    ]);
+    const [item] = await getInterruptionList("u1");
+    expect(item.scheduledAt).toEqual(ownerTime);
   });
 });

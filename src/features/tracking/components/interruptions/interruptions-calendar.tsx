@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   addDays,
+  addMinutes,
   addMonths,
   addWeeks,
   eachDayOfInterval,
@@ -20,30 +21,41 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
-import { type ReactNode, Suspense, useEffect, useState } from "react";
-import { ErrorView, LoadingView } from "@/components/entity-components";
-import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
-  CategoryColorProvider,
-  useCategoryColor,
-} from "@/features/tag-colors/context";
-import { getChipClass } from "@/features/tag-colors/palette";
-import type { TicketCategory } from "@/generated/prisma";
+  CalendarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CircleHelpIcon,
+  ListIcon,
+} from "lucide-react";
+import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
+import { type ReactNode, useEffect, useState } from "react";
+import { ErrorView, LoadingView } from "@/components/entity-components";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { statusLabels } from "../ticket-detail/shared";
+import { availabilityStyle } from "../ticket-detail/shared";
+import { InterruptionsList } from "./interruptions-list";
 import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
 
 const DATE_FORMAT = "yyyy-MM-dd";
 const HOUR_HEIGHT = 72;
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
-// Every block is this tall, in minutes.
-const BLOCK_MINUTES = 60;
+const DEFAULT_MINUTES = 60;
 
-type Item = DrawerTicket & { workOrderId: string; category: TicketCategory };
+// The calendar only holds tickets that have a time.
+type Item = DrawerTicket & {
+  scheduledAt: Date;
+  workOrderId: string;
+  unread: boolean;
+};
 type Block = {
   item: Item;
   start: number;
@@ -54,22 +66,21 @@ type Block = {
 
 // One block per event on this day. An event that runs past midnight continues
 // at the top of the next day. Blocks that overlap sit in separate lanes.
-const layout = (day: Date, items: Item[]): Block[] => {
+const layout = (day: Date, items: Item[]) => {
   const dayMinutes = 24 * 60;
   const blocks = items
     .flatMap((item) => {
       const start = minutesOf(item.scheduledAt);
-      const spill = start + BLOCK_MINUTES - dayMinutes;
+      const length = item.durationEstimate ?? DEFAULT_MINUTES;
       if (isSameDay(item.scheduledAt, day)) {
-        return [
-          { item, start, len: Math.min(BLOCK_MINUTES, dayMinutes - start) },
-        ];
+        return [{ item, start, len: Math.min(length, dayMinutes - start) }];
       }
+      const spill = start + length - dayMinutes;
       return spill > 0 && isSameDay(addDays(item.scheduledAt, 1), day)
         ? [{ item, start: 0, len: spill }]
         : [];
     })
-    .map((block) => ({ ...block, lane: 0, lanes: 1 }))
+    .map((block) => ({ ...block, lane: 0 }))
     .sort((a, b) => a.start - b.start);
   const laneEnds: number[] = [];
   for (const block of blocks) {
@@ -77,11 +88,10 @@ const layout = (day: Date, items: Item[]): Block[] => {
     block.lane = free < 0 ? laneEnds.length : free;
     laneEnds[block.lane] = block.start + block.len;
   }
-  for (const block of blocks) block.lanes = laneEnds.length;
-  return blocks;
+  return blocks.map((block) => ({ ...block, lanes: laneEnds.length }));
 };
 
-// The category-colored button that opens an event's drawer.
+// The availability-colored button that opens an event's drawer.
 const ItemButton = ({
   item,
   className,
@@ -90,52 +100,60 @@ const ItemButton = ({
   item: Item;
   className: string;
   children: ReactNode;
-}) => {
-  const color = useCategoryColor(item.category);
+}) => (
+  <TicketDrawer ticket={item}>
+    <button
+      type="button"
+      title={item.summary}
+      className={cn(
+        "overflow-hidden rounded border text-left text-[11px] hover:brightness-95",
+        availabilityStyle(item.availability).className,
+        item.unread && "border-l-4 border-l-primary",
+        className,
+      )}
+    >
+      {children}
+    </button>
+  </TicketDrawer>
+);
+
+const TicketBlock = ({ block }: { block: Block }) => {
+  const { item } = block;
+  const { Icon, label } = availabilityStyle(item.availability);
   return (
-    <TicketDrawer ticket={item}>
-      <button
-        type="button"
-        title={item.summary}
+    <div
+      className="absolute"
+      style={{
+        left: `calc(${(block.lane * 100) / block.lanes}% + 2px)`,
+        width: `calc(${100 / block.lanes}% - 4px)`,
+        top: (block.start * HOUR_HEIGHT) / 60,
+        height: Math.max((block.len * HOUR_HEIGHT) / 60 - 2, 20),
+      }}
+    >
+      <ItemButton
+        item={item}
         className={cn(
-          "overflow-hidden rounded border border-l-4 text-left text-[11px] hover:brightness-95",
-          getChipClass(color),
-          className,
+          "flex h-full w-full flex-col gap-0.5 rounded-md px-1.5 py-0.5 leading-tight",
+          !item.durationEstimate &&
+            "[mask-image:linear-gradient(to_bottom,#000_55%,transparent)]",
         )}
       >
-        {children}
-      </button>
-    </TicketDrawer>
+        <span className="truncate text-xs font-medium">
+          {item.assetName} • {item.summary}
+        </span>
+        <span className="flex items-center gap-1">
+          <Icon className="size-3 shrink-0" aria-hidden />
+          <span className="sr-only">{label}</span>
+          <span className="truncate">
+            {format(item.scheduledAt, "h:mm a")}
+            {item.durationEstimate &&
+              ` – ${format(addMinutes(item.scheduledAt, item.durationEstimate), "h:mm a")}`}
+          </span>
+        </span>
+      </ItemButton>
+    </div>
   );
 };
-
-const TicketBlock = ({
-  block: { item, start, len, lane, lanes },
-}: {
-  block: Block;
-}) => (
-  <div
-    className="absolute"
-    style={{
-      left: `calc(${(lane * 100) / lanes}% + 2px)`,
-      width: `calc(${100 / lanes}% - 4px)`,
-      top: (start * HOUR_HEIGHT) / 60,
-      height: (len * HOUR_HEIGHT) / 60 - 2,
-    }}
-  >
-    <ItemButton
-      item={item}
-      className="flex h-full w-full flex-col gap-0.5 rounded-md px-1.5 py-0.5 leading-tight"
-    >
-      <span className="truncate text-xs font-medium">
-        {item.assetName} • {item.summary}
-      </span>
-      <span className="truncate">
-        {format(item.scheduledAt, "h:mm a")} · {statusLabels[item.status]}
-      </span>
-    </ItemButton>
-  </div>
-);
 
 const MAX_CHIPS = 3;
 
@@ -230,7 +248,7 @@ const NowLine = () => {
   );
 };
 
-const Calendar = () => {
+const Calendar = ({ lead }: { lead: ReactNode }) => {
   // yyyy-MM-dd; no date means today. `view` defaults to the week.
   const [date, setDate] = useQueryState("date", parseAsString);
   const [mode, setMode] = useQueryState(
@@ -249,11 +267,11 @@ const Calendar = () => {
   }[mode];
   const days = eachDayOfInterval({ start, end });
   const { data: items, isError } = useQuery(
-    trpc.tracking.getInterruptionCalendar.queryOptions({
+    trpc.tracking.getInterruptionCalendar.queryOptions(
       // A day earlier too, for an event that runs past midnight into `start`.
-      from: addDays(start, -1),
-      to: end,
-    }),
+      { from: addDays(start, -1), to: end },
+      { refetchInterval: 60_000 },
+    ),
   );
   const on = (day: Date) =>
     (items ?? []).filter((item) => isSameDay(item.scheduledAt, day));
@@ -266,48 +284,90 @@ const Calendar = () => {
     );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pt-3 pb-4">
-      <nav
-        aria-label="Calendar navigation"
-        className="flex flex-wrap items-center justify-end gap-1"
-      >
-        <Button variant="outline" size="sm" onClick={() => setDate(null)}>
-          Today
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Previous"
-          onClick={() => step(-1)}
+    <div className="relative flex min-h-0 flex-1 flex-col gap-3 px-4 pt-3 pb-4">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Legend"
+            className="absolute bottom-6 left-6 z-30 rounded-full"
+          >
+            <CircleHelpIcon aria-hidden />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          className="flex w-72 flex-col gap-2 text-sm"
         >
-          <ChevronLeftIcon aria-hidden />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Next"
-          onClick={() => step(1)}
+          <p className="font-semibold">Legend</p>
+          <p className="text-xs text-muted-foreground">Availability</p>
+          {(["AVAILABLE", "PARTIAL", "UNAVAILABLE", null] as const).map(
+            (availability) => {
+              const style = availabilityStyle(availability);
+              return (
+                <Badge
+                  key={availability ?? "none"}
+                  variant="outline"
+                  className={cn("self-start", style.className)}
+                >
+                  <style.Icon aria-hidden />
+                  {style.label}
+                </Badge>
+              );
+            },
+          )}
+          <hr />
+          <span className="flex items-center gap-2">
+            <span className="h-4 w-6 rounded border border-l-4 border-l-primary" />
+            Not opened by you
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="h-4 w-6 rounded border" />
+            Duration unknown (fades out)
+          </span>
+        </PopoverContent>
+      </Popover>
+      <div className="flex flex-wrap items-center gap-2">
+        {lead}
+        <nav
+          aria-label="Calendar navigation"
+          className="ml-auto flex flex-wrap items-center gap-1"
         >
-          <ChevronRightIcon aria-hidden />
-        </Button>
-        <span aria-live="polite" className="mx-2 text-sm font-medium">
-          {mode === "day" && format(start, "EEE, MMM d, yyyy")}
-          {mode === "month" && format(anchor, "MMMM yyyy")}
-          {mode === "week" &&
-            `${format(start, "MMM d")} – ${format(end, "MMM d, yyyy")}`}
-        </span>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          value={mode}
-          onValueChange={(v) => v && setMode(v as typeof mode)}
-        >
-          <ToggleGroupItem value="day">Day</ToggleGroupItem>
-          <ToggleGroupItem value="week">Week</ToggleGroupItem>
-          <ToggleGroupItem value="month">Month</ToggleGroupItem>
-        </ToggleGroup>
-      </nav>
+          <Button variant="outline" size="sm" onClick={() => setDate(null)}>
+            Today
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Previous"
+            onClick={() => step(-1)}
+          >
+            <ChevronLeftIcon aria-hidden />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Next"
+            onClick={() => step(1)}
+          >
+            <ChevronRightIcon aria-hidden />
+          </Button>
+          <span aria-live="polite" className="mx-2 text-sm font-medium">
+            {mode === "day" && format(start, "EEE, MMM d, yyyy")}
+            {mode === "month" && format(anchor, "MMMM yyyy")}
+            {mode === "week" &&
+              `${format(start, "MMM d")} – ${format(end, "MMM d, yyyy")}`}
+          </span>
+          <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
+            <TabsList>
+              <TabsTrigger value="day">Day</TabsTrigger>
+              <TabsTrigger value="week">Week</TabsTrigger>
+              <TabsTrigger value="month">Month</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </nav>
+      </div>
 
       {isError ? (
         <ErrorView message="Error loading maintenance" />
@@ -338,7 +398,7 @@ const Calendar = () => {
             >
               <div className="flex">
                 <div aria-hidden className="w-14 shrink-0">
-                  <div className="sticky top-0 z-20 h-9 border-b bg-card" />
+                  <div className="sticky top-0 z-20 h-12 border-b bg-card" />
                   {HOURS.map((hour) => (
                     <div
                       key={hour}
@@ -362,7 +422,7 @@ const Calendar = () => {
                       isToday(day) && "bg-primary/5",
                     )}
                   >
-                    <h2 className="sticky top-0 z-20 flex h-9 items-center justify-center gap-1.5 border-b bg-card px-2 text-sm">
+                    <h2 className="sticky top-0 z-20 flex h-12 items-center justify-center gap-1.5 border-b bg-card px-2 text-sm">
                       <span className="text-muted-foreground">
                         {format(day, "EEE")}
                       </span>
@@ -376,6 +436,9 @@ const Calendar = () => {
                         {format(day, "d")}
                       </span>
                       {isToday(day) && <span className="sr-only">(today)</span>}
+                      <span className="text-xs text-muted-foreground">
+                        {on(day).length > 0 && `· ${on(day).length}`}
+                      </span>
                     </h2>
                     <div
                       className="relative"
@@ -408,18 +471,56 @@ const Calendar = () => {
   );
 };
 
-// The category colors are a suspense query, which cannot run unauthenticated
-// during SSR, so the calendar renders on the client only.
-export const InterruptionsCalendar = () => {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  return mounted ? (
-    <Suspense fallback={<LoadingView message="Loading maintenance..." />}>
-      <CategoryColorProvider>
-        <Calendar />
-      </CategoryColorProvider>
-    </Suspense>
-  ) : (
-    <LoadingView message="Loading maintenance..." />
+export const InterruptionsView = () => {
+  const [tab, setTab] = useQueryState(
+    "tab",
+    parseAsStringLiteral(["calendar", "list"] as const).withDefault("calendar"),
+  );
+  const trpc = useTRPC();
+  const { data: all } = useQuery(
+    trpc.tracking.getInterruptionList.queryOptions(undefined, {
+      refetchInterval: 60_000,
+    }),
+  );
+  const tabs = (
+    <TabsList variant="line-primary">
+      <TabsTrigger value="calendar">
+        <CalendarIcon aria-hidden />
+        Calendar
+        {all && (
+          <Badge variant="secondary">
+            {all.filter((i) => i.scheduledAt).length}
+          </Badge>
+        )}
+      </TabsTrigger>
+      <TabsTrigger value="list">
+        <ListIcon aria-hidden />
+        List
+        {all && (
+          <Badge variant="secondary">
+            {all.length}
+            {all.length >= 500 && "+"}
+          </Badge>
+        )}
+      </TabsTrigger>
+    </TabsList>
+  );
+  return (
+    <Tabs
+      value={tab}
+      onValueChange={(v) => setTab(v as typeof tab)}
+      className="min-h-0 flex-1 gap-0"
+    >
+      <TabsContent value="calendar" className="flex min-h-0 flex-1 flex-col">
+        <Calendar lead={tabs} />
+      </TabsContent>
+      <TabsContent
+        value="list"
+        className="flex min-h-0 flex-1 flex-col gap-3 p-4"
+      >
+        {tabs}
+        <InterruptionsList />
+      </TabsContent>
+    </Tabs>
   );
 };

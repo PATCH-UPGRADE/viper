@@ -1,6 +1,8 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import { CalendarIcon } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   EntityContainer,
@@ -9,6 +11,7 @@ import {
   ErrorView,
   LoadingView,
 } from "@/components/entity-components";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
@@ -99,10 +102,18 @@ export const TrackingList = () => {
 
 export const TrackingHeader = () => {
   return (
-    <EntityHeader
-      title="Work Orders"
-      description="Work order tickets and approval gates for in-flight remediations."
-    />
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+      <EntityHeader
+        title="Work Orders"
+        description="Work order tickets and approval gates for in-flight remediations."
+      />
+      <Button variant="outline" size="sm" asChild>
+        <Link href="/tracking/interruptions">
+          <CalendarIcon className="size-4" />
+          Maintenance calendar
+        </Link>
+      </Button>
+    </div>
   );
 };
 

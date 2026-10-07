@@ -60,7 +60,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
         description: `${descDeleteKeyWord} -- Critical buffer overflow in imaging device`,
         narrative: "Discovered during security audit",
         impact: "Critical",
-        vendorId: "mockVuln-1",
+        externalId: "mockVuln-1",
       },
       {
         sarif: { tool: { driver: { name: "MockScanner" } } },
@@ -70,7 +70,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
         description: `${descDeleteKeyWord} -- Authentication bypass vulnerability`,
         narrative: "Found in network scan",
         impact: "High",
-        vendorId: "mockVuln-2",
+        externalId: "mockVuln-2",
       },
     ],
     page: 1,
@@ -245,7 +245,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     const mapping1 = await prisma.externalVulnerabilityMapping.findFirstOrThrow(
       {
         where: {
-          externalId: vulnPayload1.vendorId,
+          externalId: vulnPayload1.externalId,
         },
       },
     );
@@ -260,7 +260,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     });
 
     expect(mapping1.integrationId).toBe(createdIntegration.id);
-    expect(mapping1.externalId).toBe(vulnPayload1.vendorId);
+    expect(mapping1.externalId).toBe(vulnPayload1.externalId);
 
     expect(foundVuln1.description).toBe(vulnPayload1.description);
     expect(foundVuln1.narrative).toBe(vulnPayload1.narrative);
@@ -278,7 +278,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     const mapping2 = await prisma.externalVulnerabilityMapping.findFirstOrThrow(
       {
         where: {
-          externalId: vulnPayload2.vendorId,
+          externalId: vulnPayload2.externalId,
         },
       },
     );
@@ -293,7 +293,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     });
 
     expect(mapping2.integrationId).toBe(createdIntegration.id);
-    expect(mapping2.externalId).toBe(vulnPayload2.vendorId);
+    expect(mapping2.externalId).toBe(vulnPayload2.externalId);
 
     expect(foundVuln2.description).toBe(vulnPayload2.description);
     expect(foundVuln2.narrative).toBe(vulnPayload2.narrative);

@@ -26,7 +26,7 @@ export function processDeviceArtifactIntegrationSync(
       transformInputItem: async (item, userId) => {
         const {
           cpe,
-          vendorId: _vendorId,
+          externalId: _externalId,
           artifacts,
           upstreamApi: _upstreamApi,
           webUrl: _webUrl,

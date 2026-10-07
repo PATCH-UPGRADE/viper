@@ -97,7 +97,7 @@ describe("toCanonical", () => {
   );
 
   it("uses the MedISAO id as the external id", () => {
-    expect(item.vendorId).toBe(LIVE_REMEDIATION.id);
+    expect(item.externalId).toBe(LIVE_REMEDIATION.id);
   });
 
   it("takes the device identity from the channel", () => {

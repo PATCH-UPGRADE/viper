@@ -16,11 +16,11 @@ import type { FleetWorkOrderItem } from "../activities";
 import { reconcileProvisionalMappings } from "../sync";
 
 const item = (
-  vendorId: string,
+  externalId: string,
   ownIncidentNumber: string | null,
   equipmentKey: string | null = "US_1064669350",
 ): FleetWorkOrderItem => ({
-  vendorId,
+  externalId,
   equipmentKey,
   summary: "Firmware update",
   status: TicketStatus.TO_DO,
@@ -28,7 +28,7 @@ const item = (
   scheduledAt: null,
   body: "",
   ownIncidentNumber,
-  raw: { ticketKey: vendorId },
+  raw: { ticketKey: externalId },
 });
 
 beforeEach(() => {

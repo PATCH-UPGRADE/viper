@@ -81,7 +81,7 @@ async function ingestFleetAssets(
         };
         return {
           createData: { ...fields, deviceGroupId: deviceGroup.id, userId },
-          updateData: regroupableEquipmentKeys.has(item.vendorId)
+          updateData: regroupableEquipmentKeys.has(item.externalId)
             ? { ...fields, deviceGroupId: deviceGroup.id }
             : fields,
           uniqueFieldConditions:

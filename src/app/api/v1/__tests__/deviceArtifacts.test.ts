@@ -61,7 +61,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         role: "mock-deviceArtifact",
         upstreamApi: "https://mock-deviceArtifact-upstream-api.com/",
         description: "Mock -- run apt update",
-        vendorId: "mockDeviceArtifact-1",
+        externalId: "mockDeviceArtifact-1",
         artifacts: [
           {
             name: "mock-deviceArtifact-1",
@@ -75,7 +75,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
         role: "mock-deviceArtifact",
         upstreamApi: "https://mock-deviceArtifact-upstream-api.com/",
         description: "Mock - Turn it off and on again",
-        vendorId: "mockDeviceArtifact-2",
+        externalId: "mockDeviceArtifact-2",
         artifacts: [
           {
             name: "mock-deviceArtifact-2",
@@ -619,7 +619,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     const mapping1 =
       await prisma.externalDeviceArtifactMapping.findFirstOrThrow({
         where: {
-          externalId: daPayload1.vendorId,
+          externalId: daPayload1.externalId,
         },
       });
 
@@ -636,7 +636,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     });
 
     expect(mapping1.integrationId).toBe(createdIntegration.id);
-    expect(mapping1.externalId).toBe(daPayload1.vendorId);
+    expect(mapping1.externalId).toBe(daPayload1.externalId);
 
     expect(foundDeviceArtifact1.description).toBe(daPayload1.description);
     expect(
@@ -652,7 +652,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     const mapping2 =
       await prisma.externalDeviceArtifactMapping.findFirstOrThrow({
         where: {
-          externalId: daPayload2.vendorId,
+          externalId: daPayload2.externalId,
         },
       });
 
@@ -669,7 +669,7 @@ describe("DeviceArtifacts Endpoint (/deviceArtifacts)", () => {
     });
 
     expect(mapping2.integrationId).toBe(createdIntegration.id);
-    expect(mapping2.externalId).toBe(daPayload2.vendorId);
+    expect(mapping2.externalId).toBe(daPayload2.externalId);
 
     expect(foundDeviceArtifact2.description).toBe(daPayload2.description);
     expect(

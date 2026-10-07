@@ -96,28 +96,30 @@ export async function downloadAdvisoryPdfs(
   const stored: StoredAttachment[] = [];
 
   for (const att of pdfs) {
-    const url = await resolveDownloadUrl(session, item.vendorId, att.type);
+    const url = await resolveDownloadUrl(session, item.externalId, att.type);
     if (!url || !isAllowedDownloadUrl(url)) {
-      throw new Error(`Fleet advisory ${item.vendorId}: refused download url`);
+      throw new Error(
+        `Fleet advisory ${item.externalId}: refused download url`,
+      );
     }
     const res = await fetch(url, {
       signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
     });
     if (!res.ok)
       throw new Error(
-        `Fleet advisory ${item.vendorId}: PDF download returned ${res.status}`,
+        `Fleet advisory ${item.externalId}: PDF download returned ${res.status}`,
       );
     const buffer = await readCapped(
       res,
       MAX_PDF_BYTES,
-      `Fleet advisory ${item.vendorId}`,
+      `Fleet advisory ${item.externalId}`,
     );
 
     stored.push(
       await storeAttachmentBuffer(buffer, {
         filename: att.name,
         contentType: "application/pdf",
-        keyPrefix: `integrations/fleet/advisories/${item.vendorId}`,
+        keyPrefix: `integrations/fleet/advisories/${item.externalId}`,
       }),
     );
   }

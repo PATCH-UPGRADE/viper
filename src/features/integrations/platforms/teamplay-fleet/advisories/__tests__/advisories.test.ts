@@ -85,7 +85,7 @@ describe("buildAdvisoryBody", () => {
 describe("toCanonical", () => {
   it("keys on the row id and folds attachments into raw, for the hash", () => {
     const item = toCanonical({ ...SAMPLE, attachments: [ATTACHMENT] });
-    expect(item.vendorId).toBe("25");
+    expect(item.externalId).toBe("25");
     expect(item.attachments).toEqual([ATTACHMENT]);
     expect(item.raw.attachments).toEqual([ATTACHMENT]);
   });

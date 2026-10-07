@@ -39,7 +39,7 @@ const canonical = (raw: (typeof SAMPLE)[number]) => toCanonical(raw);
 describe("toCanonical", () => {
   it("maps a real equipment record onto the asset draft", () => {
     expect(canonical(SAMPLE[0])).toEqual({
-      vendorId: "US_1006103273",
+      externalId: "US_1006103273",
       serialNumber: "63014",
       role: "Computed Tomography (CT)",
       location: {

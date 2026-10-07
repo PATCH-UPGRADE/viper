@@ -132,7 +132,7 @@ export const createIntegrationItemSchema = <T extends z.ZodRawShape>(
   inputSchema: z.ZodObject<T>,
 ) =>
   inputSchema.extend({
-    vendorId: z.string(),
+    externalId: z.string(),
     upstreamApi: safeUrlSchema.nullish(), // the API endpoint
     webUrl: safeUrlSchema.nullish(), // where a human looks at it
   });

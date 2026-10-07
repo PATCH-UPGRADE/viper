@@ -23,7 +23,7 @@ const fleetEquipmentSchema = z.object({
 export type FleetEquipment = z.infer<typeof fleetEquipmentSchema>;
 
 export interface FleetAssetItem {
-  vendorId: string;
+  externalId: string;
   serialNumber: string | null;
   role: string | null;
   location: { facility?: string; building?: string };
@@ -93,7 +93,7 @@ export function toCanonical(raw: FleetEquipment): FleetAssetItem {
     .filter(Boolean)
     .join(", ");
   return {
-    vendorId: raw.equipmentKey,
+    externalId: raw.equipmentKey,
     serialNumber: serialNumberOf(raw.serialNumber),
     role: blank(raw.modalityTranslation),
     location: {

@@ -32,11 +32,11 @@ const fleetActivitySchema = z.object({
 export type FleetActivity = z.infer<typeof fleetActivitySchema>;
 
 /**
- * A Fleet activity as VIPER models it. `vendorId` is the stable external id that
+ * A Fleet activity as VIPER models it. `externalId` is the stable id that
  * `external_work_order_mappings` dedups on.
  */
 export interface FleetWorkOrderItem {
-  vendorId: string;
+  externalId: string;
   /** Fleet's id for the equipment this activity is against; null when Fleet omits it. */
   equipmentKey: string | null;
   summary: string;
@@ -177,7 +177,7 @@ export async function get(
 
 export function toCanonical(raw: FleetActivity): FleetWorkOrderItem {
   return {
-    vendorId: raw.ticketKey,
+    externalId: raw.ticketKey,
     equipmentKey: raw.equipmentKey ?? null,
     summary:
       raw.activityTitle ??

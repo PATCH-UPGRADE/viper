@@ -40,7 +40,7 @@ export type RawMedIsaoRemediation = z.infer<typeof rawRemediationSchema>;
 
 /** The platform-neutral shape the ingest consumes. */
 export interface MedIsaoRemediationItem {
-  vendorId: string;
+  externalId: string;
   upstreamApi: string | null;
   webUrl: string | null;
 
@@ -96,7 +96,7 @@ export const toCanonical = (
   apiUrl: string,
   channelId: string,
 ): MedIsaoRemediationItem => ({
-  vendorId: raw.id,
+  externalId: raw.id,
   upstreamApi: channelRemediationsUrl(apiUrl, channelId),
   // MedISAO publishes no human-facing page for a remediation.
   webUrl: null,

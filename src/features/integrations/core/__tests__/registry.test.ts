@@ -63,8 +63,16 @@ describe("registry", () => {
     expect(sourceAdapterFor(PlatformEnum.PARTNER)).toBeUndefined();
   });
 
-  it("has no cadence opinion for a platform without ResourceModules", () => {
-    expect(defaultSyncEveryFor(PlatformEnum.AI, ResourceType.Asset)).toBeNull();
+  it("uses the platform-level cadence for a platform without ResourceModules", () => {
+    expect(defaultSyncEveryFor(PlatformEnum.AI, ResourceType.Asset)).toBe(
+      86400,
+    );
+  });
+
+  it("has no cadence opinion when neither the module nor the platform has one", () => {
+    expect(
+      defaultSyncEveryFor(PlatformEnum.PARTNER, ResourceType.Asset),
+    ).toBeNull();
   });
 
   // Core dispatches to a resource module's sync, else the platform's. A module

@@ -24,7 +24,7 @@ export function processRemediationIntegrationSync(
       shouldRecordSyncOutcome: options.shouldRecordSyncOutcome,
       transformInputItem: async (item, userId) => {
         const {
-          vendorId: _vendorId,
+          externalId: _externalId,
           artifacts,
           cpes,
           vulnerabilityIds,

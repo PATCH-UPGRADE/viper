@@ -26,7 +26,7 @@ export function processAssetIntegrationSync(
       transformInputItem: async (item, userId) => {
         const {
           cpe,
-          vendorId: _vendorId,
+          externalId: _externalId,
           utilization,
           upstreamApi: _upstreamApi,
           webUrl: _webUrl,

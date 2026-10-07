@@ -70,7 +70,7 @@ describe("Remediations Endpoint (/remediations)", () => {
         upstreamApi: "https://mock-rem-upstream-api.com/",
         description: "Mock -- run apt update",
         narrative: "Discovered during security audit",
-        vendorId: "mockRemediation-1",
+        externalId: "mockRemediation-1",
         artifacts: [
           {
             name: "mock-remediation-artifact-1",
@@ -83,7 +83,7 @@ describe("Remediations Endpoint (/remediations)", () => {
         upstreamApi: "https://mock-rem-upstream-api.com/",
         description: "Mock - Turn it off and on again",
         narrative: "Discovered during security audit",
-        vendorId: "mockRemediation-2",
+        externalId: "mockRemediation-2",
         artifacts: [
           {
             name: "mock-remediation-artifact-2",
@@ -590,7 +590,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     const remPayload1 = remediationIntegrationPayload.items[0];
     const mapping1 = await prisma.externalRemediationMapping.findFirstOrThrow({
       where: {
-        externalId: remPayload1.vendorId,
+        externalId: remPayload1.externalId,
       },
     });
 
@@ -604,7 +604,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     });
 
     expect(mapping1.integrationId).toBe(createdIntegration.id);
-    expect(mapping1.externalId).toBe(remPayload1.vendorId);
+    expect(mapping1.externalId).toBe(remPayload1.externalId);
 
     expect(foundRem1.description).toBe(remPayload1.description);
     expect(foundRem1.narrative).toBe(remPayload1.narrative);
@@ -613,7 +613,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     const remPayload2 = remediationIntegrationPayload.items[1];
     const mapping2 = await prisma.externalRemediationMapping.findFirstOrThrow({
       where: {
-        externalId: remPayload2.vendorId,
+        externalId: remPayload2.externalId,
       },
     });
 
@@ -627,7 +627,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     });
 
     expect(mapping2.integrationId).toBe(createdIntegration.id);
-    expect(mapping2.externalId).toBe(remPayload2.vendorId);
+    expect(mapping2.externalId).toBe(remPayload2.externalId);
 
     expect(foundRem2.description).toBe(remPayload2.description);
     expect(foundRem2.narrative).toBe(remPayload2.narrative);
@@ -676,7 +676,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     const itemBase = {
       upstreamApi: "https://mock-rem-upstream-api.com/",
       narrative: "Discovered during security audit",
-      vendorId: externalId,
+      externalId,
       artifacts: [
         {
           name: "mock-remediation-preserve-artifact",

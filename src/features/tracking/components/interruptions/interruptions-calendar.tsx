@@ -442,11 +442,16 @@ const Calendar = ({ lead }: { lead: ReactNode }) => {
                     </h2>
                     <div
                       className="relative"
-                      style={{
-                        height: HOURS.length * HOUR_HEIGHT,
-                        backgroundImage: `repeating-linear-gradient(to bottom, var(--border) 0px, var(--border) 1px, transparent 1px, transparent ${HOUR_HEIGHT}px)`,
-                      }}
+                      style={{ height: HOURS.length * HOUR_HEIGHT }}
                     >
+                      {HOURS.slice(1).map((hour) => (
+                        <div
+                          key={hour}
+                          aria-hidden
+                          className="absolute inset-x-0 border-t"
+                          style={{ top: hour * HOUR_HEIGHT }}
+                        />
+                      ))}
                       {isToday(day) && <NowLine />}
                       {layout(day, items).map((block) => (
                         <TicketBlock

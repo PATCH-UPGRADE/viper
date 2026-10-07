@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { addMinutes, format, isSameDay, isToday, isYesterday } from "date-fns";
+import { MailIcon } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useEffect } from "react";
 import { ActivityTimelineBody } from "@/components/activity-timeline";
@@ -21,11 +22,12 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserAvatar } from "@/components/user-avatar";
-import type { MaintenanceAvailability, TicketStatus } from "@/generated/prisma";
+import type { TicketStatus } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useMarkTicketSeen } from "../../hooks/use-tracking";
+import type { Availability } from "../../types";
 import {
   activityEntry,
   commentEntry,
@@ -48,7 +50,7 @@ export type DrawerTicket = {
   scheduledAt: Date | null;
   assetName: string;
   durationEstimate: number | null;
-  availability: MaintenanceAvailability | null;
+  availability: Availability | null;
 };
 
 // Only fetched while the drawer is open: the sheet's content mounts on open.
@@ -227,7 +229,13 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
         </p>
       </Section>
       {data.otherDevices.length > 0 && (
-        <Section title="Assets on this work order">
+        <Section
+          title={
+            data.isDeviceTicket
+              ? "Also getting this update"
+              : "Assets on this work order"
+          }
+        >
           <ul className="divide-y rounded-lg border">
             {data.otherDevices.map((device) => (
               <li
@@ -249,15 +257,21 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
       <Section title="Questions about this update">
         <div className="flex items-center gap-3 rounded-lg border p-3">
           <UserAvatar user={data.contact} />
-          <div className="flex flex-col">
+          <div className="flex min-w-0 flex-1 flex-col">
             <span className="font-medium">{data.contact.name}</span>
-            <a
-              href={`mailto:${data.contact.email}`}
-              className="text-muted-foreground underline"
-            >
-              {data.contact.email}
-            </a>
+            {data.contact.department && (
+              <span className="text-xs text-muted-foreground">
+                {data.contact.department.name}
+              </span>
+            )}
           </div>
+          <a
+            href={`mailto:${data.contact.email}`}
+            className="flex items-center gap-1.5 text-muted-foreground underline"
+          >
+            <MailIcon className="size-4" aria-hidden />
+            {data.contact.email}
+          </a>
         </div>
       </Section>
       <Tabs defaultValue="comments">

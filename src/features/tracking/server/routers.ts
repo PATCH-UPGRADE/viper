@@ -6,7 +6,6 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { assetNameSelect } from "@/features/assets/utils";
 import {
-  MaintenanceAvailability,
   Priority,
   type Prisma,
   ResourceType,
@@ -665,8 +664,7 @@ export const trackingRouter = createTRPCRouter({
           .optional(),
         assigneeId: z.string().nullish(),
         scheduledAt: z.coerce.date().nullish(),
-        durationEstimate: z.number().int().positive().nullish(),
-        availability: z.enum(MaintenanceAvailability).nullish(),
+        scheduledEndTime: z.coerce.date().nullish(),
         disruption: z.string().max(5_000).nullish(),
         changesAfter: z.string().max(5_000).nullish(),
       }),
@@ -678,7 +676,7 @@ export const trackingRouter = createTRPCRouter({
         tags: ["Work Orders"],
         summary: "Update a work-order ticket",
         description:
-          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt, durationEstimate, availability, disruption, changesAfter) to clear them. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
+          "Partially update a work-order ticket. Any omitted field is left untouched. Pass null on nullable fields (assigneeId, scheduledAt, scheduledEndTime, disruption, changesAfter) to clear them. Pass an empty array on departmentIds to clear all departments. `descriptions` replaces the per-department description set wholesale; entries with empty bodies are dropped, and removed departments lose their descriptions automatically.",
       },
     })
     .output(workOrderDetailResponseSchema)

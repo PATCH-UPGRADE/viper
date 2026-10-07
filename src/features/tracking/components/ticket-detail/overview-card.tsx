@@ -17,7 +17,6 @@ import { getChipClass } from "@/features/tag-colors/palette";
 import { formatScheduled } from "@/lib/date-utils";
 import type { TicketDetail } from "../../types";
 import {
-  availabilityLabels,
   CategoryChip,
   formatDate,
   maintenanceTextLabels,
@@ -175,12 +174,8 @@ export const OverviewCard = ({ data }: { data: TicketDetail }) => {
           </div>
         </MetaField>
 
-        <MetaField label="Estimated duration">
-          {data.durationEstimate ? `${data.durationEstimate} min` : "—"}
-        </MetaField>
-
-        <MetaField label="Availability">
-          {data.availability ? availabilityLabels[data.availability] : "—"}
+        <MetaField label="Scheduled end">
+          {formatScheduled(data.scheduledEndTime) ?? "—"}
         </MetaField>
 
         <MetaField label="Category">

@@ -1169,12 +1169,6 @@ enum TicketStatus {
   DONE
 }
 
-enum MaintenanceAvailability {
-  AVAILABLE
-  PARTIAL
-  UNAVAILABLE
-}
-
 enum TicketCategory {
   PATCH
   CONFIG_CHANGE
@@ -1295,11 +1289,7 @@ model WorkOrderTicket {
 
   scheduledAt DateTime?
 
-  // In whole minutes.
-  durationEstimate Int?
-
-  // Null means not confirmed.
-  availability MaintenanceAvailability?
+  scheduledEndTime DateTime?
 
   // What stops working during the work, and what looks different afterwards.
   disruption   String? @db.Text

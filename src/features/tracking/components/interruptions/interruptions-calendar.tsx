@@ -51,7 +51,6 @@ import {
   availabilityStyle,
   endPassed,
   statusLabels,
-  UnreadDot,
 } from "../ticket-detail/shared";
 import { InterruptionsList } from "./interruptions-list";
 import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
@@ -117,7 +116,8 @@ const ItemButton = ({
       type="button"
       title={item.summary}
       className={cn(
-        "overflow-hidden rounded border border-l-4 text-left text-[11px] hover:brightness-95",
+        "overflow-hidden rounded border text-left text-[11px] hover:brightness-95",
+        item.unread && "border-l-4",
         availabilityStyle(item.availability).className,
         className,
       )}
@@ -154,12 +154,9 @@ const TicketBlock = ({ block, day }: { block: Block; day: boolean }) => {
         )}
       >
         <span className="sr-only">{label}</span>
-        <span className="flex items-center gap-1 text-xs font-medium">
-          <span className="truncate">
-            {item.assetName} • {item.summary}
-            {size === "xs" && ` · ${format(item.scheduledAt, "h:mm a")}`}
-          </span>
-          {item.unread && <UnreadDot />}
+        <span className="truncate text-xs font-medium">
+          {item.assetName} • {item.summary}
+          {size === "xs" && ` · ${format(item.scheduledAt, "h:mm a")}`}
         </span>
         {size !== "xs" && (
           <span className="flex items-center gap-1">
@@ -356,16 +353,21 @@ const Calendar = ({ lead }: { lead: ReactNode }) => {
                   className="flex items-center gap-2"
                 >
                   <span
-                    className={cn("size-4 rounded border", style.className)}
-                  />
+                    className={cn(
+                      "flex size-5 items-center justify-center rounded border",
+                      style.className,
+                    )}
+                  >
+                    <style.Icon className="size-3" aria-hidden />
+                  </span>
                   {style.label}
                 </span>
               );
             },
           )}
           <span className="flex items-center gap-2">
-            <UnreadDot />
-            Not opened by you
+            <span className="size-5 rounded border border-l-4" />
+            Left border: not opened by you
           </span>
         </PopoverContent>
       </Popover>

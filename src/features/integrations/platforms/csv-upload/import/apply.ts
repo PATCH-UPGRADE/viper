@@ -48,6 +48,13 @@ interface AssetWrite {
   artifactsData: undefined;
 }
 
+export const ROWS_BETWEEN_PROGRESS_REPORTS = 100;
+
+export interface AppliedCounts {
+  added: number;
+  linked: number;
+}
+
 export interface ApplyChunkInput {
   importId: string;
   integrationId: string;
@@ -56,6 +63,7 @@ export interface ApplyChunkInput {
   outcomes: RowOutcome[];
   context: MatchContext;
   canonicalNames: CanonicalNames;
+  onProgress?: (appliedInChunk: AppliedCounts) => Promise<void>;
 }
 
 export interface ChunkResult {
@@ -227,10 +235,18 @@ export async function applyChunk(input: ApplyChunkInput): Promise<ChunkResult> {
     const failureReason = await writeRow(item, input);
     if (failureReason !== null) {
       result.failures.push({ rowNumber: row.rowNumber, reason: failureReason });
-    } else if (outcome.kind === "add") {
+      continue;
+    }
+    if (outcome.kind === "add") {
       result.added++;
     } else {
       result.linked++;
+    }
+
+    const appliedInChunk = result.added + result.linked;
+    const isTimeToReport = appliedInChunk % ROWS_BETWEEN_PROGRESS_REPORTS === 0;
+    if (isTimeToReport) {
+      await input.onProgress?.({ added: result.added, linked: result.linked });
     }
   }
 

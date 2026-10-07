@@ -13,7 +13,10 @@ import {
   productKey,
   type StagedRow,
 } from "@/features/integrations/platforms/csv-upload/contract";
-import { applyChunk } from "@/features/integrations/platforms/csv-upload/import/apply";
+import {
+  type AppliedCounts,
+  applyChunk,
+} from "@/features/integrations/platforms/csv-upload/import/apply";
 import { findInFileConflicts } from "@/features/integrations/platforms/csv-upload/import/conflicts";
 import {
   loadCanonicalNames,
@@ -197,7 +200,11 @@ async function recordFileLevelFailures(job: ImportJob) {
   return { failedCount: fileLevelFailures.length };
 }
 
-async function applyStagedChunk(job: ImportJob, chunkIndex: number) {
+async function applyStagedChunk(
+  job: ImportJob,
+  chunkIndex: number,
+  appliedBeforeChunk: AppliedCounts,
+) {
   const { plan, recordedFailures } = await readPlanAndFailures(job.importId);
   const recordedReasonByRow = new Map(
     recordedFailures.map((failure) => [failure.rowNumber, failure.reason]),
@@ -209,6 +216,16 @@ async function applyStagedChunk(job: ImportJob, chunkIndex: number) {
   const canonicalNames = await loadCanonicalNames(plan.nameDecisions);
   const outcomes = matchRowsToDevices(rows, context, recordedReasonByRow);
 
+  const saveAppliedCounts = async (appliedInChunk: AppliedCounts) => {
+    await prisma.csvImport.update({
+      where: { id: job.importId },
+      data: {
+        addedCount: appliedBeforeChunk.added + appliedInChunk.added,
+        linkedCount: appliedBeforeChunk.linked + appliedInChunk.linked,
+      },
+    });
+  };
+
   const chunkResult = await applyChunk({
     importId: job.importId,
     integrationId: job.integrationId,
@@ -217,18 +234,20 @@ async function applyStagedChunk(job: ImportJob, chunkIndex: number) {
     outcomes,
     context,
     canonicalNames,
+    onProgress: saveAppliedCounts,
   });
   const newFailures = chunkResult.failures.filter(
     (failure) => !recordedReasonByRow.has(failure.rowNumber),
   );
+  const failuresSoFar = [...recordedFailures, ...newFailures];
 
   await prisma.csvImport.update({
     where: { id: job.importId },
     data: {
-      addedCount: { increment: chunkResult.added },
-      linkedCount: { increment: chunkResult.linked },
-      failedCount: { increment: newFailures.length },
-      failures: [...recordedFailures, ...newFailures],
+      addedCount: appliedBeforeChunk.added + chunkResult.added,
+      linkedCount: appliedBeforeChunk.linked + chunkResult.linked,
+      failedCount: failuresSoFar.length,
+      failures: failuresSoFar,
     },
   });
   return {
@@ -347,15 +366,24 @@ export const applyCsvImportFn = inngest.createFunction(
       stepErrorMessage = fileCheck.ok ? null : fileCheck.errorMessage;
     }
 
+    let appliedSoFar: AppliedCounts = { added: 0, linked: 0 };
     for (
       let chunkIndex = 0;
       chunkIndex < job.chunkCount && stepErrorMessage === null;
       chunkIndex++
     ) {
+      const appliedBeforeChunk = appliedSoFar;
       const chunk = await step.run(`apply-chunk-${chunkIndex}`, () =>
-        settle(() => applyStagedChunk(job, chunkIndex)),
+        settle(() => applyStagedChunk(job, chunkIndex, appliedBeforeChunk)),
       );
-      stepErrorMessage = chunk.ok ? null : chunk.errorMessage;
+      if (!chunk.ok) {
+        stepErrorMessage = chunk.errorMessage;
+        continue;
+      }
+      appliedSoFar = {
+        added: appliedBeforeChunk.added + chunk.value.added,
+        linked: appliedBeforeChunk.linked + chunk.value.linked,
+      };
     }
 
     const finished = await step.run("finish", () =>

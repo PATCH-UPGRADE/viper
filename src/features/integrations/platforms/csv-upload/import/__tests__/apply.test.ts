@@ -294,3 +294,26 @@ describe("applyChunk — one engine call per row", () => {
     });
   });
 });
+
+describe("applyChunk — progress", () => {
+  it("reports the rows applied so far every 100 rows", async () => {
+    const rowNumbers = Array.from(
+      { length: 250 },
+      (_unused, index) => index + 2,
+    );
+    const onProgress = vi.fn(async () => undefined);
+
+    await applyChunk(
+      chunkInput(
+        rowNumbers.map((rowNumber) => stagedRow({ rowNumber })),
+        rowNumbers.map((rowNumber) => ({ kind: "add", rowNumber })),
+        { onProgress },
+      ),
+    );
+
+    expect(onProgress.mock.calls).toEqual([
+      [{ added: 100, linked: 0 }],
+      [{ added: 200, linked: 0 }],
+    ]);
+  });
+});

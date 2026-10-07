@@ -327,14 +327,48 @@ describe("applyCsvImportFn — failures", () => {
     await runWith();
 
     expect(updateCalls()[1]).toEqual({
-      addedCount: { increment: 1 },
-      linkedCount: { increment: 0 },
-      failedCount: { increment: 1 },
+      addedCount: 1,
+      linkedCount: 0,
+      failedCount: 2,
       failures: [
         { rowNumber: 3, reason: "Model is missing" },
         { rowNumber: 2, reason: "Internal Server Error" },
       ],
     });
+  });
+});
+
+describe("applyCsvImportFn — progress", () => {
+  it("saves each chunk's counts on top of the chunks before it", async () => {
+    await runWith();
+
+    const [, firstChunkCounts, secondChunkCounts] = updateCalls();
+    expect(firstChunkCounts).toEqual(
+      expect.objectContaining({ addedCount: 2, linkedCount: 0 }),
+    );
+    expect(secondChunkCounts).toEqual(
+      expect.objectContaining({ addedCount: 4, linkedCount: 0 }),
+    );
+  });
+
+  it("saves the running counts while a chunk is still being applied", async () => {
+    mockApplyChunk.mockImplementation(
+      async (input: {
+        onProgress: (applied: {
+          added: number;
+          linked: number;
+        }) => Promise<void>;
+      }) => {
+        await input.onProgress({ added: 1, linked: 0 });
+        return { added: 2, linked: 0, failures: [] };
+      },
+    );
+
+    await runWith();
+
+    const [, firstChunkProgress, , secondChunkProgress] = updateCalls();
+    expect(firstChunkProgress).toEqual({ addedCount: 1, linkedCount: 0 });
+    expect(secondChunkProgress).toEqual({ addedCount: 3, linkedCount: 0 });
   });
 });
 

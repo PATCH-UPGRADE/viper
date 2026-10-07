@@ -119,7 +119,7 @@ const ItemButton = ({
 
 const TicketBlock = ({ block }: { block: Block }) => {
   const { item } = block;
-  const { Icon } = availabilityStyle(item.availability);
+  const { Icon, label } = availabilityStyle(item.availability);
   return (
     <div
       className="absolute"
@@ -143,9 +143,7 @@ const TicketBlock = ({ block }: { block: Block }) => {
         </span>
         <span className="flex items-center gap-1">
           <Icon className="size-3 shrink-0" aria-hidden />
-          <span className="sr-only">
-            {availabilityStyle(item.availability).label}
-          </span>
+          <span className="sr-only">{label}</span>
           <span className="truncate">
             {format(item.scheduledAt, "h:mm a")}
             {item.durationEstimate &&
@@ -450,7 +448,7 @@ const Calendar = ({ lead }: { lead: ReactNode }) => {
                       }}
                     >
                       {isToday(day) && <NowLine />}
-                      {layout(day, items ?? []).map((block) => (
+                      {layout(day, items).map((block) => (
                         <TicketBlock
                           key={`${block.item.id}-${block.start}`}
                           block={block}

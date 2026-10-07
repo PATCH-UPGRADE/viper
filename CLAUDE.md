@@ -361,16 +361,21 @@ export async function seed({ seedUserId }: TicketSeedContext) {
 }
 ```
 
-Ticket folders are found automatically and run in ticket-number order after the base demo data.
+**Which ticket folder runs.** `npm run db:seed` reads the current Git branch, takes the ticket
+code at the start of its name (`VW-532`, `vw-532` and `VW-532-some-suffix` all mean `VW-532`), and
+runs `prisma/seeds/dev/VW-532/` if that folder exists. With no ticket in the branch name, no
+matching folder, or no Git branch at all (`main`, CI, a Docker image), no ticket folder runs and
+the seed is the plain dev seed. So after checking out a PR, plain `npm run db:seed` loads that
+PR's test data.
+
 The folder name must be the upper-case ticket code (`VW-532`, not `vw-532`). Any other folder
 under `prisma/seeds/dev/`, apart from `base`, stops the seed with an error.
 
 The base demo data loads once. If a database already has it, `npm run db:seed` skips it and runs
-only the production data and the ticket folders. So after checking out a PR, plain
-`npm run db:seed` picks up that PR's ticket folder without duplicating the base rows.
+only the production data and the ticket folder, without duplicating the base rows.
 
-Every ticket seed runs on every `npm run db:seed`. That includes CI and the first boot of the
-Docker images, so a ticket seed is not private to your machine. Each one must:
+A reviewer may run a ticket seed more than once, on a database other tickets have also seeded.
+Each one must:
 
 - be safe to run twice: `upsert` on a stable id you choose, or find before create;
 - leave rows owned by the base demo data or by another ticket alone (do not move the seed user to
@@ -385,8 +390,10 @@ anything worth keeping into `prisma/seeds/dev/base/`.
 - `SEED_SCOPE=production`: production data only.
 - `SEED_SCOPE=all`: load the base demo data again even if it is already there. Several base seeds
   use plain `create`, so this duplicates their rows.
-- `SEED_TICKET=VW-532`: run only that ticket's folder, not every folder. Takes a comma-separated
-  list (`SEED_TICKET=VW-532,VW-540`). Cannot be combined with `SEED_SCOPE=production`.
+- `SEED_TICKET=VW-532`: run that ticket's folder instead of the current branch's. Takes a
+  comma-separated list (`SEED_TICKET=VW-532,VW-540`). Cannot be combined with
+  `SEED_SCOPE=production`.
+
 Any other value of `SEED_SCOPE`, including an empty one, stops the seed with an error.
 
 For a clean database, use Prisma's own reset: `npx prisma migrate reset` drops the database,

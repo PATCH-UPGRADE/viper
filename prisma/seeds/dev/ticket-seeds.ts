@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -16,6 +17,7 @@ interface LoadedTicketSeed {
 const DEV_SEEDS_DIRECTORY = __dirname;
 const SHARED_FOLDERS = ["base"];
 const TICKET_FOLDER_NAME = /^[A-Z]+-\d+$/;
+const TICKET_AT_START_OF_BRANCH_NAME = /^[a-z]+-\d+/i;
 
 function ticketNumber(ticket: string) {
   return Number(ticket.split("-")[1]);
@@ -57,9 +59,49 @@ async function loadTicketSeed(ticket: string): Promise<LoadedTicketSeed> {
   return { ticket, seed: seedModule.seed };
 }
 
+function currentBranchName() {
+  try {
+    const gitOutput = execFileSync("git", ["branch", "--show-current"], {
+      cwd: DEV_SEEDS_DIRECTORY,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return gitOutput.trim();
+  } catch {
+    return "";
+  }
+}
+
+function ticketOfBranch(branchName: string) {
+  const ticketAtStart = branchName.match(TICKET_AT_START_OF_BRANCH_NAME);
+  return ticketAtStart ? ticketAtStart[0].toUpperCase() : null;
+}
+
+function ticketsForCurrentBranch(availableTickets: string[]) {
+  const branchName = currentBranchName();
+  const branchTicket = ticketOfBranch(branchName);
+  if (!branchTicket) {
+    console.log(
+      "🌿 No ticket in the current branch name, so no ticket seed runs.",
+    );
+    return [];
+  }
+  if (!availableTickets.includes(branchTicket)) {
+    console.log(
+      `🌿 Branch ${branchName} has no prisma/seeds/dev/${branchTicket} folder, so no ticket seed runs.`,
+    );
+    return [];
+  }
+  console.log(
+    `🌿 Branch ${branchName} matches prisma/seeds/dev/${branchTicket}, so that ticket seed runs.`,
+  );
+  return [branchTicket];
+}
+
 export async function loadTicketSeeds(onlyTickets: string[] | null) {
   const availableTickets = ticketsWithSeeds();
-  const requestedTickets = onlyTickets ?? availableTickets;
+  const requestedTickets =
+    onlyTickets ?? ticketsForCurrentBranch(availableTickets);
   const unknownTickets = requestedTickets.filter(
     (ticket) => !availableTickets.includes(ticket),
   );

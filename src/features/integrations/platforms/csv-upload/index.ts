@@ -8,11 +8,12 @@ import {
   configSchema,
   credentialSchema,
 } from "./config";
+import { CSV_UPLOAD_DISPLAY_NAME } from "./contract";
 
 export const csvUpload: ConnectorModule<CsvUploadConfig, CsvUploadCreds> = {
   definition: {
     platform: PlatformEnum.CSV_UPLOAD,
-    displayName: "CSV Upload",
+    displayName: CSV_UPLOAD_DISPLAY_NAME,
     description:
       "Import devices from a spreadsheet export of your inventory system.",
     categories: ["Hospital Inventory"],

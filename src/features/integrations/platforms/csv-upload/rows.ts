@@ -26,7 +26,10 @@ export interface BuiltRows {
 type TextField = Exclude<AssetImportField, "status">;
 
 const FIRST_DATA_ROW_NUMBER = 2;
-const REQUIRED_FIELDS: readonly TextField[] = ["manufacturer", "product"];
+export const REQUIRED_FIELDS = [
+  "manufacturer",
+  "product",
+] as const satisfies readonly TextField[];
 
 const isConstantField = (field: AssetImportField): field is ConstantField =>
   (CONSTANT_FIELDS as readonly AssetImportField[]).includes(field);

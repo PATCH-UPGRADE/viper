@@ -44,6 +44,7 @@ export const MAX_PREVIEW_ROWS = 5000;
 export const PREVIEW_REQUEST_BYTES = 450 * 1024;
 export const CSV_IMPORT_EVENT = "csv-import/apply.requested" as const;
 export const CSV_EXTERNAL_ID_PREFIX = "csv:";
+export const CSV_UPLOAD_DISPLAY_NAME = "CSV Upload";
 
 export const normalizeNameKey = (name: string): string =>
   name.trim().toLowerCase();

@@ -17,6 +17,7 @@ import {
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { sourceContentHash } from "@/lib/source-hash";
+import { seedProductionData } from "./seeds/production";
 
 // Seed user credentials
 const SEED_USER = {
@@ -2748,15 +2749,38 @@ async function seedCsafIntegration(userId: string) {
   console.log(`✅ Seeded CISA CSAF integration ${integration.id}`);
 }
 
+const SEED_SCOPES = ["all", "production"] as const;
+
+function requestedSeedScope() {
+  const requestedScope = process.env.SEED_SCOPE ?? "all";
+  const knownScope = SEED_SCOPES.find((scope) => scope === requestedScope);
+  if (!knownScope) {
+    throw new Error(
+      `SEED_SCOPE must be one of: ${SEED_SCOPES.join(", ")}. Got "${requestedScope}".`,
+    );
+  }
+  return knownScope;
+}
+
 async function main() {
   console.log("🌱 Starting database seed...\n");
 
   try {
+    const seedScope = requestedSeedScope();
+    if (seedScope === "production") {
+      await seedProductionData();
+      console.log(
+        "\n✅ Production data seeded. Demo data skipped (SEED_SCOPE=production).",
+      );
+      return;
+    }
+
     const shouldClear = process.env.SEED_CLEAR_DB === "true";
     if (shouldClear) {
       await clearDatabase();
     }
 
+    await seedProductionData();
     const user = await createOrGetSeedUser();
 
     await seedDepartments(user.id);

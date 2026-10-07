@@ -108,7 +108,7 @@ describe("applyChunk — adding a device", () => {
     expect(integrationId).toBe("int-csv");
     expect(resource).toBe(ResourceType.Asset);
     expect(newAssetId).toBe("imp-1r2");
-    expect(engineInput.items[0].vendorId).toBe("csv:imp-1r2");
+    expect(engineInput.items[0].externalId).toBe("csv:imp-1r2");
     expect(written.uniqueFieldConditions).toEqual([]);
     expect(result).toEqual({ added: 1, linked: 0, failures: [] });
   });
@@ -185,7 +185,7 @@ describe("applyChunk — linking to a device already in VIPER", () => {
 
     const [, , engineInput] = engineCall();
     const written = await transformedItem();
-    expect(engineInput.items[0].vendorId).toBe("csv:rad-us-001");
+    expect(engineInput.items[0].externalId).toBe("csv:rad-us-001");
     expect(written.uniqueFieldConditions).toEqual([{ id: "rad-us-001" }]);
     expect(result).toEqual({ added: 0, linked: 1, failures: [] });
   });

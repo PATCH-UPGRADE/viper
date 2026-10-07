@@ -35,7 +35,7 @@ type AssetFieldValues = Pick<
 > & { location?: Prisma.InputJsonObject };
 
 interface CsvSyncItem {
-  vendorId: string;
+  externalId: string;
   assetId: string;
   kind: "add" | "link";
   row: StagedRow;
@@ -226,7 +226,7 @@ export async function applyChunk(input: ApplyChunkInput): Promise<ChunkResult> {
         ? addedAssetIdFor(input.importId, row.rowNumber)
         : outcome.assetId;
     const item: CsvSyncItem = {
-      vendorId: csvExternalId(assetId),
+      externalId: csvExternalId(assetId),
       assetId,
       kind: outcome.kind,
       row,

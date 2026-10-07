@@ -40,9 +40,15 @@ const inScope = (departmentId: string): Prisma.AssetTicketWhereInput => ({
 
 const AVAILABILITIES: Availability[] = ["AVAILABLE", "PARTIAL", "UNAVAILABLE"];
 
+// TODO: how availability is determined is undecided. Until then this picks a
+// value from the work order's id, so it is stable but not real.
+const availabilityOf = (workOrder: { id: string }): Availability =>
+  AVAILABILITIES[
+    [...workOrder.id].reduce((sum, c) => sum + c.charCodeAt(0), 0) %
+      AVAILABILITIES.length
+  ];
+
 // Minutes between a work order's start and end, and its availability.
-// TODO: availability is not recorded yet; this stub picks a stable value per
-// work order until the real source exists.
 const timing = (w: {
   id: string;
   scheduledAt: Date | null;
@@ -54,11 +60,7 @@ const timing = (w: {
           (w.scheduledEndTime.getTime() - w.scheduledAt.getTime()) / 60_000,
         )
       : null,
-  availability:
-    AVAILABILITIES[
-      [...w.id].reduce((sum, c) => sum + c.charCodeAt(0), 0) %
-        AVAILABILITIES.length
-    ],
+  availability: availabilityOf(w),
 });
 
 // The list is one row per device ticket. Duration, availability and "unread"

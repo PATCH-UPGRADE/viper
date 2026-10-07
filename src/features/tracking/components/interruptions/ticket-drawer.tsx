@@ -153,7 +153,7 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
           </div>
           <a
             href={`mailto:${data.contact.email}`}
-            className="flex items-center gap-1.5 text-muted-foreground underline"
+            className="flex items-center gap-1.5 text-primary hover:underline"
           >
             <MailIcon className="size-4" aria-hidden />
             {data.contact.email}

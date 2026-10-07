@@ -82,6 +82,12 @@ export const availabilityStyle = (availability: Availability | null) => {
   };
 };
 
+export const UnreadDot = () => (
+  <span className="size-2 shrink-0 rounded-full bg-primary">
+    <span className="sr-only">Not opened by you</span>
+  </span>
+);
+
 export const formatDate = (date: Date | string | null | undefined) => {
   if (!date) return null;
   const d = date instanceof Date ? date : new Date(date);

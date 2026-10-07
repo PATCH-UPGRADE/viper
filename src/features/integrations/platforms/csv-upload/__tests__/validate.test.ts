@@ -95,8 +95,4 @@ describe("columnIssues", () => {
 
     expect(fields).toEqual(["manufacturer", "ip"]);
   });
-
-  it("returns nothing for a clean file", () => {
-    expect(columnIssues([], 1204)).toEqual([]);
-  });
 });

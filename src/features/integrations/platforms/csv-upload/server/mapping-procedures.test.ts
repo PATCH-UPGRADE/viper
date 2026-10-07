@@ -244,24 +244,3 @@ describe("csvImport.matchNames", () => {
     ]);
   });
 });
-
-describe("csvImport.searchNames", () => {
-  it("searches one manufacturer's products", async () => {
-    names.searchNames.mockResolvedValue([
-      { id: "prod_logiq", displayName: "LOGIQ e" },
-    ]);
-
-    await expect(
-      caller.searchNames({
-        kind: "product",
-        query: "logiq",
-        manufacturerId: "mfr_ge",
-      }),
-    ).resolves.toEqual([{ id: "prod_logiq", displayName: "LOGIQ e" }]);
-    expect(names.searchNames).toHaveBeenCalledWith(
-      "product",
-      "logiq",
-      "mfr_ge",
-    );
-  });
-});

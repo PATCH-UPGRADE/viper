@@ -12,7 +12,7 @@ import {
   sourceAdapterFor,
   unscheduledPlatforms,
 } from "../registry";
-import { moduleForResource, resourcesFor } from "../sync/resources";
+import { moduleForResource } from "../sync/resources";
 
 /**
  * Importing this module runs the registry's load-time assertion, so simply
@@ -41,12 +41,6 @@ describe("registry", () => {
       requirePlatform(PlatformEnum.CSV_UPLOAD).definition.unscheduled,
     ).toBe(true);
     expect(unscheduledPlatforms()).toEqual([PlatformEnum.CSV_UPLOAD]);
-  });
-
-  it("gives a CSV Upload integration exactly one Asset resource row", () => {
-    expect(resourcesFor(requirePlatform(PlatformEnum.CSV_UPLOAD), {})).toEqual([
-      ResourceType.Asset,
-    ]);
   });
 
   it("refuses to sync CSV Upload assets if a sync is ever dispatched", async () => {

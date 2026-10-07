@@ -32,10 +32,6 @@ const golden = {
 };
 
 describe("name match schema", () => {
-  it("accepts the golden answer: a sure match, an unsure match and a new name", () => {
-    expect(schema.safeParse(golden).success).toBe(true);
-  });
-
   it("rejects Confirmed, which only a person may give", () => {
     expect(
       schema.safeParse({

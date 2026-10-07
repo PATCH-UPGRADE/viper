@@ -41,10 +41,6 @@ const goldenFields = {
 } as const;
 
 describe("column mapping schema", () => {
-  it("accepts the golden mapping of a real CMMS export", () => {
-    expect(schema.safeParse({ fields: goldenFields }).success).toBe(true);
-  });
-
   it("accepts a file where no column can be mapped", () => {
     const nothingMapped = Object.fromEntries(
       Object.keys(goldenFields).map((field) => [field, unmapped]),

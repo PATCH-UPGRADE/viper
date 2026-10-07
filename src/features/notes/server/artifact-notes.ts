@@ -5,6 +5,7 @@ import type { NoteOp } from "@/features/notes/agent/extract-notes";
 import { requestEntityFilterResolve } from "@/inngest/functions/resolve-entity-filters";
 import prisma from "@/lib/db";
 import { downloadBufferFromS3, keyFromDownloadUrl } from "@/lib/s3";
+import { createNote, updateNote } from "./note-writes";
 
 // Text-chunk sizing. A manufacturer manual can run dozens of pages which as image-based PDF document
 // blocks would swamp the model's window; extracting text and chunking keeps each
@@ -161,11 +162,7 @@ export function planNoteWrites(
 
 /**
  * Persist the planned writes. New notes are scoped to the artifact's device
- * group matching(s): a single matching is attached directly via instanceId (no
- * EntityFilter, so no resolver run is needed), while multiple matchings use an
- * EntityFilter (resolved into matches by the resolve-entity-filters job). All DB
- * work runs in one transaction; the returned filter ids are resolved by the
- * caller in a separate durable step.
+ * group matching(s) via createNote. All DB work runs in one transaction;
  */
 export async function persistArtifactNotes(args: {
   writes: NoteWrite[];
@@ -180,48 +177,25 @@ export async function persistArtifactNotes(args: {
     let created = 0;
     let updated = 0;
 
-    // Single matching: attach directly (cheap, no resolver). Zero matchings
-    // leaves the note scoped to nothing.
-    const directInstanceId = matchingIds.length === 1 ? matchingIds[0] : null;
-
     for (const write of writes) {
       if (write.kind === "update") {
-        await tx.note.update({
-          where: { id: write.noteId },
-          data: { text: write.text },
-        });
+        await updateNote(tx, write.noteId, { text: write.text });
         updated++;
         continue;
       }
 
-      const note = await tx.note.create({
-        data: {
-          text: write.text,
-          status: "SCOPED",
-          userId,
-          ...(directInstanceId
-            ? {
-                targetModel: "DEVICE_GROUP_MATCHING",
-                instanceId: directInstanceId,
-              }
-            : {}),
+      const { filterId } = await createNote(tx, {
+        text: write.text,
+        status: "SCOPED",
+        userId,
+        scope: {
+          targetModel: "DEVICE_GROUP_MATCHING",
+          instanceIds: matchingIds,
+          label,
         },
       });
 
-      // More than one matching can't be expressed by a single instanceId, so
-      // scope via an EntityFilter for the resolver to materialize.
-      if (matchingIds.length > 1) {
-        const filter = await tx.entityFilter.create({
-          data: {
-            noteId: note.id,
-            label,
-            targetModel: "DEVICE_GROUP_MATCHING",
-            filter: { id: { in: matchingIds } },
-          },
-          select: { id: true },
-        });
-        createdFilterIds.push(filter.id);
-      }
+      if (filterId) createdFilterIds.push(filterId);
       created++;
     }
 

@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { createNote } from "@/features/notes/server/note-writes";
 import { inngest } from "@/inngest/client";
 import { sendEscalationEmail } from "@/inngest/functions/send-escalation-email";
 import prisma from "@/lib/db";
@@ -86,15 +87,13 @@ export const questionsRouter = createTRPCRouter({
       const instanceId = question.issue.deviceGroupMatchingId!;
 
       await prisma.$transaction(async (tx) => {
-        const note = await tx.note.create({
-          data: {
-            text: renderQnA(question.title, input.answer!),
-            status: "SCOPED",
-            targetModel,
-            instanceId,
-            userId: ctx.auth.user.id,
-          },
+        const note = await createNote(tx, {
+          text: renderQnA(question.title, input.answer!),
+          status: "SCOPED",
+          userId: ctx.auth.user.id,
+          scope: { targetModel, instanceIds: [instanceId] },
         });
+
         const updated = await tx.question.updateMany({
           where: { id: input.questionId, status: "PENDING" },
           data: {

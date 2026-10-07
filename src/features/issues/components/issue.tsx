@@ -11,7 +11,11 @@ import { StatusFormBase, statusDetails } from "@/components/status-form";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import { AssetItem } from "@/features/assets/components/assets";
 import { locationSchema } from "@/features/assets/types";
-import { type DeviceTypeSource, getAssetTitle } from "@/features/assets/utils";
+import {
+  type DeviceTypeSource,
+  getAssetIdentifier,
+  getAssetTitle,
+} from "@/features/assets/utils";
 import { VulnerabilityItem } from "@/features/vulnerabilities/components/vulnerabilities";
 import { type Issue, IssueStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
@@ -172,7 +176,9 @@ export const IssuesSidebarList = ({
                   <>
                     <div className="flex flex-col gap-1">
                       <p className="font-semibold">
-                        {asset ? getAssetTitle(asset) : "Device Group"}
+                        {asset
+                          ? `${getAssetTitle(asset)} · ${getAssetIdentifier(asset)}`
+                          : "Device Group"}
                       </p>
                       {locationParts.length > 0 && (
                         <p className="text-xs text-muted-foreground">

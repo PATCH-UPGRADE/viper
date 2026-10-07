@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/popover";
 import {
   getAssetDeviceTypeLabel,
-  getAssetDisplayName,
+  getAssetIdentifier,
 } from "@/features/assets/utils";
 import { getSwatchClass } from "@/features/tag-colors/palette";
 import { TicketStatus } from "@/generated/prisma";
@@ -123,7 +123,7 @@ const AttachAssetPopover = ({ ticketId }: { ticketId: string }) => {
             <CommandEmpty>No eligible assets found.</CommandEmpty>
             <CommandGroup>
               {(candidates ?? []).map((a) => {
-                const label = getAssetDisplayName(a);
+                const label = getAssetIdentifier(a);
                 const model = [
                   a.deviceGroup?.manufacturer?.canonicalDisplayName,
                   a.deviceGroup?.product?.canonicalDisplayName,

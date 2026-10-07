@@ -84,6 +84,17 @@ export type AgentNameSource = AssetNameFields & { role?: string | null };
 const firstPresent = (names: (string | null | undefined)[]) =>
   names.find((name) => name?.trim());
 
+/**
+ * The value that tells one asset from another: hostname, IP, serial number,
+ * or id. Labels that show the device type add it, because many assets share
+ * one type.
+ */
+export function getAssetIdentifier(asset: AssetNameFields): string {
+  return (
+    firstPresent([asset.hostname, asset.ip, asset.serialNumber]) ?? asset.id
+  );
+}
+
 export function getAssetDisplayName(asset: AssetNameSource): string {
   return (
     firstPresent([

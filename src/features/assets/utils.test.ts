@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getAssetDeviceTypeLabel,
   getAssetDisplayName,
+  getAssetIdentifier,
   getAssetNameForAgent,
   getAssetTitle,
 } from "./utils";
@@ -63,6 +64,16 @@ describe("getAssetDisplayName", () => {
         deviceGroup: null,
       }),
     ).toBe("ct_63014");
+  });
+});
+
+describe("getAssetIdentifier", () => {
+  it("tells assets of one device type apart, never by type or role", () => {
+    expect(getAssetIdentifier(scannedPump)).toBe("icu-pump-07");
+    expect(getAssetIdentifier(fleetCt)).toBe("63014");
+    expect(getAssetIdentifier({ ...fleetCt, serialNumber: null })).toBe(
+      "ct_63014",
+    );
   });
 });
 

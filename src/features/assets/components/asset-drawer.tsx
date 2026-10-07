@@ -87,12 +87,11 @@ function getProtocolLabel(port: number, transport: "tcp" | "udp"): string {
 }
 
 function getAssetLabel(asset: EnrichedNetworkAsset): string {
-  return (
-    getAssetDeviceTypeLabel(asset.viper_data) ??
-    asset.viper_data?.hostname ??
-    asset.manufacturer ??
-    asset.id.slice(0, 8)
-  );
+  const deviceType = getAssetDeviceTypeLabel(asset.viper_data);
+  const identifier =
+    asset.viper_data?.hostname ?? getAssetIP(asset) ?? asset.id.slice(0, 8);
+  if (deviceType) return `${deviceType} · ${identifier}`;
+  return asset.viper_data?.hostname ?? asset.manufacturer ?? identifier;
 }
 
 function getAssetIP(asset: EnrichedNetworkAsset): string | null {

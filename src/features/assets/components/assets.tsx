@@ -44,6 +44,7 @@ import {
 import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ImportCsvButton } from "@/features/integrations/platforms/csv-upload/components/csv-import-buttons";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
@@ -284,6 +285,23 @@ export const NewVulnerableAssetsAlert = ({
   );
 };
 
+const SourceFilterNotice = () => {
+  const [params, setParams] = useAssetsParams();
+  if (!params.source) return null;
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+      <span>Showing only the devices from one upload.</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setParams({ source: null, page: null })}
+      >
+        Show all devices
+      </Button>
+    </div>
+  );
+};
+
 export const AssetDashboardList = () => {
   const { data, isFetching } = useSuspenseAssetsDashboard();
   const { data: metrics } = useSuspenseAssetIssueMetrics();
@@ -307,6 +325,7 @@ export const AssetDashboardList = () => {
         totalCount={recentVulnData?.totalCount ?? 0}
         onAssetClick={openDrawer}
       />
+      <SourceFilterNotice />
       {asset && (
         <AssetDashboardDrawer
           asset={asset}
@@ -329,11 +348,14 @@ export const AssetDashboardList = () => {
 
 export const AssetsHeader = ({ disabled }: { disabled?: boolean }) => {
   return (
-    <EntityHeader
-      title="Assets"
-      description="Manage your hospital assets and devices"
-      disabled={disabled}
-    />
+    <div className="flex items-center justify-between gap-x-4">
+      <EntityHeader
+        title="Assets"
+        description="Manage your hospital assets and devices"
+        disabled={disabled}
+      />
+      <ImportCsvButton />
+    </div>
   );
 };
 

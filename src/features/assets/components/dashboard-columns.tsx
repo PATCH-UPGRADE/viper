@@ -13,7 +13,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { countAffectedRemediations } from "@/features/assets/utils";
+import {
+  countAffectedRemediations,
+  getSourceToolLabel,
+} from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
 import { deviceGroupLabel } from "@/lib/markdown";
@@ -119,7 +122,7 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
     id: "sourceTool",
     meta: { title: "Source Tool" },
     header: "Source Tool",
-    accessorFn: (row) => row.user.name,
+    accessorFn: getSourceToolLabel,
   },
   {
     id: "remediations",

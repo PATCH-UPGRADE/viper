@@ -134,10 +134,13 @@ export type MatchNamesOutput = z.infer<typeof matchNamesOutputSchema>;
 
 export const searchNamesInputSchema = z.object({
   kind: z.enum(["manufacturer", "product"]),
-  query: z.string().trim().min(1).max(100),
+  query: z.string().trim().max(100),
   manufacturerId: z.string().optional(),
 });
-export const searchNamesOutputSchema = z.array(nameRefSchema).max(20);
+export const MAX_NAME_SEARCH_RESULTS = 50;
+export const searchNamesOutputSchema = z
+  .array(nameRefSchema)
+  .max(MAX_NAME_SEARCH_RESULTS);
 
 export const nameDecisionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("existing"), id: z.string() }),

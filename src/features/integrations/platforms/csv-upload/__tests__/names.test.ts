@@ -136,7 +136,7 @@ describe("listProductCandidates", () => {
 });
 
 describe("searchNames", () => {
-  it("searches manufacturers by either name or an exact alias, 20 at most", async () => {
+  it("searches manufacturers by either name or an exact alias, 50 at most", async () => {
     db.manufacturer.findMany.mockResolvedValue([GE]);
 
     await expect(searchNames("manufacturer", "GE")).resolves.toEqual([
@@ -150,7 +150,28 @@ describe("searchNames", () => {
         { nameMappings: { has: "ge" } },
       ],
     });
-    expect(query.take).toBe(20);
+    expect(query.take).toBe(50);
+  });
+
+  it("lists the first manufacturers by name when nothing is typed yet", async () => {
+    db.manufacturer.findMany.mockResolvedValue([GE]);
+
+    await expect(searchNames("manufacturer", "")).resolves.toEqual([
+      { id: "mfr_ge", displayName: "GE HealthCare" },
+    ]);
+    const query = db.manufacturer.findMany.mock.calls[0][0];
+    expect(query.where).toEqual({});
+    expect(query.orderBy).toEqual({ canonicalDisplayName: "asc" });
+  });
+
+  it("lists one manufacturer's products when nothing is typed yet", async () => {
+    db.product.findMany.mockResolvedValue([LOGIQ]);
+
+    await searchNames("product", "", "mfr_ge");
+
+    expect(db.product.findMany.mock.calls[0][0].where).toEqual({
+      deviceGroups: { some: { manufacturerId: "mfr_ge" } },
+    });
   });
 
   it("searches only one manufacturer's products when given one", async () => {

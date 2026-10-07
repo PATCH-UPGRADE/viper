@@ -6,7 +6,7 @@ import {
   normalizeName,
 } from "@/lib/router-utils";
 import type { NameCandidate, NameKind } from "../agent/match-names/context";
-import type { NameRef } from "../contract";
+import { MAX_NAME_SEARCH_RESULTS, type NameRef } from "../contract";
 
 export interface ExistingName {
   ref: NameRef;
@@ -25,7 +25,6 @@ interface NamedRow {
 }
 
 const MAX_MANUFACTURER_CANDIDATES = 1000;
-const MAX_SEARCH_RESULTS = 20;
 
 const namedSelect = {
   id: true,
@@ -146,12 +145,13 @@ export async function searchNames(
   query: string,
   manufacturerId?: string,
 ): Promise<NameRef[]> {
+  const matchingTheQuery = query ? { OR: nameOrClauses(query) } : {};
   if (kind === "manufacturer") {
     const rows = await prisma.manufacturer.findMany({
-      where: { OR: nameOrClauses(query) },
+      where: matchingTheQuery,
       select: namedSelect,
       orderBy: { canonicalDisplayName: "asc" },
-      take: MAX_SEARCH_RESULTS,
+      take: MAX_NAME_SEARCH_RESULTS,
     });
     return rows.map(toNameRef);
   }
@@ -159,10 +159,10 @@ export async function searchNames(
     ? { deviceGroups: { some: { manufacturerId } } }
     : {};
   const rows = await prisma.product.findMany({
-    where: { OR: nameOrClauses(query), ...madeByThatManufacturer },
+    where: { ...matchingTheQuery, ...madeByThatManufacturer },
     select: namedSelect,
     orderBy: { canonicalDisplayName: "asc" },
-    take: MAX_SEARCH_RESULTS,
+    take: MAX_NAME_SEARCH_RESULTS,
   });
   return rows.map(toNameRef);
 }

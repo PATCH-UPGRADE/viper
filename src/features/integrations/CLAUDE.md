@@ -216,6 +216,15 @@ Outside the directory — **two edits**:
 **Do not touch** for a new platform: the Inngest sync functions, `core/callback.ts`,
 `core/sync/cadence.ts`, `server/routers.ts`, or the UI. They are already generic.
 
+Two UI hooks exist for platforms that are not configured through the generic form. A platform
+whose "Add" button must do something else registers a component in
+`components/platform-add-overrides.ts`; the catalog card renders it instead of
+`CreateIntegrationDialog` (CSV Upload opens its import overlay this way). A platform with
+`definition.unscheduled` gets one Enabled Integrations row for all of its integrations
+(`platform-uploads-row.tsx`): it shows when the latest upload ran, has no enable switch, and expands
+to list each upload. An upload has no "Sync Now" item and its edit form has no sync interval. An
+integration that never started an upload (`lastAttemptAt` is null) is not listed.
+
 Only if you are also introducing a brand-new `ResourceType` do you additionally touch
 `integrationsMapping` (`../types.ts`), `MODULE_FIELDS` (`core/sync/resources.ts`), and
 `ENVELOPE_SCHEMAS` (`core/callback.ts`) — plus add the matching `integrationUpload` procedure.

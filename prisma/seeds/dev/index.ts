@@ -16,13 +16,13 @@ import { seedVulnerabilities } from "./vulnerabilities";
 import { seedWorkOrderTickets } from "./work-orders";
 import { seedWorkflows } from "./workflows";
 
-export { createOrGetSeedUser, SEED_USER } from "./seed-user";
+export { SEED_USER } from "./seed-user";
 
-export async function isBaseDemoDataLoaded() {
+export async function isDemoDataLoaded() {
   return isFleetAdvisoryNotificationSeeded();
 }
 
-export async function seedBaseDemoData() {
+export async function seedDemoData() {
   const seedUser = await createOrGetSeedUser();
 
   await seedDepartments(seedUser.id);
@@ -39,6 +39,4 @@ export async function seedBaseDemoData() {
   await seedWorkOrderTickets(seedUser.id);
   // After the vulnerabilities, whose CPEs create the matchings it links to.
   await seedFleetAdvisoryNotification();
-
-  return seedUser;
 }

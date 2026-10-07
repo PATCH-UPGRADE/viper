@@ -332,8 +332,7 @@ seed data goes into one of the folders below, and the entry point picks it up.
 ```
 prisma/seed.ts                 # entry point only: no data lives here
 prisma/seeds/production/       # data every deployment needs (manufacturers, the CISA CSAF integration)
-prisma/seeds/dev/base/         # shared demo data, one file per feature, plus shared helpers
-prisma/seeds/dev/<TICKET>/     # test data for one ticket, e.g. prisma/seeds/dev/VW-532/
+prisma/seeds/dev/              # demo data for development and testing, one file per feature
 ```
 
 **Production data** (`prisma/seeds/production/`) runs on every Docker boot and on the Neon
@@ -341,58 +340,19 @@ migrations workflow, against databases that already hold real data. A production
 add what is missing: never delete, rename or overwrite. Register it in
 `prisma/seeds/production/index.ts`.
 
-**Ticket test data** (`prisma/seeds/dev/<TICKET>/index.ts`) is how a PR ships the data a reviewer
-needs. The folder name is the ticket code, and `index.ts` exports one function:
+**Demo data** (`prisma/seeds/dev/`) is the seed user and the sample assets, vulnerabilities,
+remediations, workflows and work orders. Each feature has its own file. To add demo data for a
+feature, add it to that feature's file, or add a new file and call it from `seedDemoData()` in
+`prisma/seeds/dev/index.ts`. There are no per-ticket seed folders.
 
-```typescript
-import prisma from "@/lib/db";
-import type { TicketSeedContext } from "../ticket-seeds";
+The demo data loads once. If a database already has it, `npm run db:seed` skips it and runs only
+the production data, without duplicating the demo rows.
 
-export async function seed({ seedUserId }: TicketSeedContext) {
-  await prisma.workflow.upsert({
-    where: { id: "vw-532-night-shift-imaging" },
-    update: {},
-    create: {
-      id: "vw-532-night-shift-imaging",
-      name: "VW-532: Night shift imaging coverage",
-      userId: seedUserId,
-    },
-  });
-}
-```
-
-**Which ticket folder runs.** `npm run db:seed` reads the current Git branch, takes the ticket
-code at the start of its name (`VW-532`, `vw-532` and `VW-532-some-suffix` all mean `VW-532`), and
-runs `prisma/seeds/dev/VW-532/` if that folder exists. With no ticket in the branch name, no
-matching folder, or no Git branch at all (`main`, CI, a Docker image), no ticket folder runs and
-the seed is the plain dev seed. So after checking out a PR, plain `npm run db:seed` loads that
-PR's test data.
-
-The folder name must be the upper-case ticket code (`VW-532`, not `vw-532`). Any other folder
-under `prisma/seeds/dev/`, apart from `base`, stops the seed with an error.
-
-The base demo data loads once. If a database already has it, `npm run db:seed` skips it and runs
-only the production data and the ticket folder, without duplicating the base rows.
-
-A reviewer may run a ticket seed more than once, on a database other tickets have also seeded.
-Each one must:
-
-- be safe to run twice: `upsert` on a stable id you choose, or find before create;
-- leave rows owned by the base demo data or by another ticket alone (do not move the seed user to
-  another department, for example);
-- not depend on another ticket's folder.
-
-Delete the folder when the ticket's PR has merged and reviewers no longer need the data. Move
-anything worth keeping into `prisma/seeds/dev/base/`.
-
-**Switches** (environment variables):
+**Switches** (environment variable `SEED_SCOPE`):
 
 - `SEED_SCOPE=production`: production data only.
-- `SEED_SCOPE=all`: load the base demo data again even if it is already there. Several base seeds
-  use plain `create`, so this duplicates their rows.
-- `SEED_TICKET=VW-532`: run that ticket's folder instead of the current branch's. Takes a
-  comma-separated list (`SEED_TICKET=VW-532,VW-540`). Cannot be combined with
-  `SEED_SCOPE=production`.
+- `SEED_SCOPE=all`: load the demo data again even if it is already there. Several demo seeds use
+  plain `create`, so this duplicates their rows.
 
 Any other value of `SEED_SCOPE`, including an empty one, stops the seed with an error.
 

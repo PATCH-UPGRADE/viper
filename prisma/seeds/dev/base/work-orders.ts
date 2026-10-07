@@ -38,7 +38,7 @@ type SampleTicket = {
 
 type SampleParentTicket = SampleTicket & { children?: SampleTicket[] };
 
-// Tickets generated against the seed vulnerabilities/assets/workflows above.
+// Tickets generated against the seed vulnerabilities, assets and workflows.
 // Scheduled dates are relative to seed run; relative offsets are computed below.
 const dayMs = 24 * 60 * 60 * 1000;
 

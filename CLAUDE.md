@@ -332,7 +332,7 @@ seed data goes into one of the folders below, and the entry point picks it up.
 ```
 prisma/seed.ts                 # entry point only: no data lives here
 prisma/seeds/production/       # reference data every deployment needs (e.g. manufacturers)
-prisma/seeds/dev/base/         # shared demo data, one file per feature
+prisma/seeds/dev/base/         # shared demo data, one file per feature, plus shared helpers
 prisma/seeds/dev/<TICKET>/     # test data for one ticket, e.g. prisma/seeds/dev/VW-532/
 ```
 
@@ -349,26 +349,42 @@ import prisma from "@/lib/db";
 import type { TicketSeedContext } from "../ticket-seeds";
 
 export async function seed({ seedUserId }: TicketSeedContext) {
-  await prisma.department.upsert({
-    where: { name: "Radiology Night Shift" },
+  await prisma.workflow.upsert({
+    where: { id: "vw-532-night-shift-imaging" },
     update: {},
     create: {
-      name: "Radiology Night Shift",
-      users: { connect: { id: seedUserId } },
+      id: "vw-532-night-shift-imaging",
+      name: "VW-532: Night shift imaging coverage",
+      userId: seedUserId,
     },
   });
 }
 ```
 
 Ticket folders are found automatically and run in ticket-number order after the base demo data.
-Every ticket seed runs on every `npm run db:seed`, so each one must be safe to run twice (use
-`upsert`, or find before create) and must not depend on another ticket's folder.
+The folder name must be the upper-case ticket code (`VW-532`, not `vw-532`). Any other folder
+under `prisma/seeds/dev/`, apart from `base`, stops the seed with an error.
+
+Every ticket seed runs on every `npm run db:seed`. That includes CI and the first boot of the
+Docker images, so a ticket seed is not private to your machine. Each one must:
+
+- be safe to run twice: `upsert` on a stable id you choose, or find before create;
+- leave rows owned by the base demo data or by another ticket alone (do not move the seed user to
+  another department, for example);
+- not depend on another ticket's folder.
+
+Delete the folder when the ticket's PR has merged and reviewers no longer need the data. Move
+anything worth keeping into `prisma/seeds/dev/base/`.
 
 **Switches** (environment variables):
 
-- `SEED_SCOPE=production`: production data only. Any other value stops the seed with an error.
-- `SEED_TICKET=VW-532`: production data, base demo data, and only that ticket's folder.
-- `SEED_CLEAR_DB=true`: clear the demo tables before seeding.
+- `SEED_SCOPE=production`: production data only. The only other accepted value is `all`, the
+  default. Anything else, including an empty value, stops the seed with an error.
+- `SEED_TICKET=VW-532`: production data and only that ticket's folder. The base demo data is not
+  run again, so seed the database once with plain `npm run db:seed` first. Cannot be combined with
+  `SEED_SCOPE=production` or `SEED_CLEAR_DB=true`.
+- `SEED_CLEAR_DB=true`: delete every row in the tables the demo seed writes, then seed. This
+  removes your own rows in those tables too. Ignored with `SEED_SCOPE=production`.
 
 The older `scripts/seed-*.ts` files are manual, local-only scripts from before this layout. Do
 not copy that pattern for new work.

@@ -63,17 +63,17 @@ SEED_SCOPE=production npm run db:seed
 
 The Docker images run this on every boot, and the Neon migrations workflow runs it when a merge to `main` changes the schema, a migration or the production seed data. `SEED_SCOPE` accepts `all` (the default) or `production`; anything else, including an empty value, stops the seed with an error.
 
+To add only one ticket's test data to a database that is already seeded, set `SEED_TICKET`. The base demo data is not run again:
+
+```bash
+SEED_TICKET=VW-532 npm run db:seed
+```
+
 If you also want a temporary (24 hour) testing API key, run:
 
 ```bash
 npm run db:create-test-api-key
 ``` 
-
-To load only one ticket's test data on top of the base demo data, set `SEED_TICKET`:
-
-```bash
-SEED_TICKET=VW-532 npm run db:seed
-```
 
 ### Back up and restore manufacturers
 
@@ -97,7 +97,7 @@ SEED_CLEAR_DB=true npm run db:seed
 After seeding, you can log in with:
 
 - Email: `user@example.com`
-- Password: (read the seed script)
+- Password: see `SEED_USER` in `prisma/seeds/dev/base/seed-user.ts`
 
 - In production, only accounts associated with whitelisted domains are able to authenticate. That whitelist exists in Vercel's env vars. 
 

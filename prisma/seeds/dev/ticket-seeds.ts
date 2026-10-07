@@ -8,24 +8,45 @@ export interface TicketSeedContext {
 
 type TicketSeed = (context: TicketSeedContext) => Promise<void>;
 
+interface LoadedTicketSeed {
+  ticket: string;
+  seed: TicketSeed;
+}
+
+const DEV_SEEDS_DIRECTORY = __dirname;
+const SHARED_FOLDERS = ["base"];
 const TICKET_FOLDER_NAME = /^[A-Z]+-\d+$/;
 
 function ticketNumber(ticket: string) {
   return Number(ticket.split("-")[1]);
 }
 
-export function ticketsWithSeeds(devSeedsDirectory: string) {
-  return readdirSync(devSeedsDirectory, { withFileTypes: true })
+function ticketsWithSeeds() {
+  const folderNames = readdirSync(DEV_SEEDS_DIRECTORY, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .filter((folderName) => TICKET_FOLDER_NAME.test(folderName))
-    .sort((left, right) => ticketNumber(left) - ticketNumber(right));
+    .map((entry) => entry.name);
+  const ticketFolderNames = folderNames.filter(
+    (folderName) => !SHARED_FOLDERS.includes(folderName),
+  );
+  const misnamedFolder = ticketFolderNames.find(
+    (folderName) => !TICKET_FOLDER_NAME.test(folderName),
+  );
+  if (misnamedFolder) {
+    throw new Error(
+      `prisma/seeds/dev/${misnamedFolder} is not named like a ticket. Use the upper-case ticket code, for example VW-532.`,
+    );
+  }
+  return ticketFolderNames.sort(
+    (left, right) => ticketNumber(left) - ticketNumber(right),
+  );
 }
 
-async function loadTicketSeed(devSeedsDirectory: string, ticket: string) {
-  const seedFile = join(devSeedsDirectory, ticket, "index.ts");
+async function loadTicketSeed(ticket: string): Promise<LoadedTicketSeed> {
+  const seedFile = join(DEV_SEEDS_DIRECTORY, ticket, "index.ts");
   if (!existsSync(seedFile)) {
-    throw new Error(`${ticket} has no index.ts in ${devSeedsDirectory}.`);
+    throw new Error(
+      `${seedFile} does not exist. Every ticket folder needs an index.ts.`,
+    );
   }
   const seedModule: { seed?: TicketSeed } = await import(
     pathToFileURL(seedFile).href
@@ -33,26 +54,33 @@ async function loadTicketSeed(devSeedsDirectory: string, ticket: string) {
   if (typeof seedModule.seed !== "function") {
     throw new Error(`${seedFile} must export an async function named "seed".`);
   }
-  return seedModule.seed;
+  return { ticket, seed: seedModule.seed };
 }
 
-export async function seedTicketDemoData(
-  devSeedsDirectory: string,
-  context: TicketSeedContext,
-  onlyTicket: string | null,
-) {
-  const availableTickets = ticketsWithSeeds(devSeedsDirectory);
+export async function loadTicketSeeds(onlyTicket: string | null) {
+  const availableTickets = ticketsWithSeeds();
   if (onlyTicket && !availableTickets.includes(onlyTicket)) {
-    const knownTickets = availableTickets.join(", ") || "none yet";
+    const knownTickets =
+      availableTickets.length > 0 ? availableTickets.join(", ") : "none yet";
     throw new Error(
       `No demo seed for ${onlyTicket}. Tickets with a seed folder: ${knownTickets}.`,
     );
   }
 
-  const ticketsToSeed = onlyTicket ? [onlyTicket] : availableTickets;
-  for (const ticket of ticketsToSeed) {
+  const ticketsToLoad = onlyTicket ? [onlyTicket] : availableTickets;
+  const loadedTicketSeeds: LoadedTicketSeed[] = [];
+  for (const ticket of ticketsToLoad) {
+    loadedTicketSeeds.push(await loadTicketSeed(ticket));
+  }
+  return loadedTicketSeeds;
+}
+
+export async function runTicketSeeds(
+  loadedTicketSeeds: LoadedTicketSeed[],
+  context: TicketSeedContext,
+) {
+  for (const { ticket, seed } of loadedTicketSeeds) {
     console.log(`\n🌱 Seeding demo data for ${ticket}...`);
-    const seedTicket = await loadTicketSeed(devSeedsDirectory, ticket);
-    await seedTicket(context);
+    await seed(context);
   }
 }

@@ -17,7 +17,7 @@ import { seedWorkOrderTickets } from "./work-orders";
 import { seedWorkflows } from "./workflows";
 
 export { clearDatabase } from "./clear-database";
-export { SEED_USER } from "./seed-user";
+export { createOrGetSeedUser, SEED_USER } from "./seed-user";
 
 export async function seedBaseDemoData() {
   const seedUser = await createOrGetSeedUser();

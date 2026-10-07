@@ -33,9 +33,8 @@ const scopedDevice = (departmentId: string) =>
   }) satisfies Prisma.AssetTicketWhereInput;
 
 const inScope = (departmentId: string): Prisma.AssetTicketWhereInput => ({
-  asset: managedBy(departmentId),
+  ...scopedDevice(departmentId),
   parentTicket: open,
-  ticket: open,
 });
 
 const AVAILABILITIES: Availability[] = ["AVAILABLE", "PARTIAL", "UNAVAILABLE"];
@@ -43,10 +42,7 @@ const AVAILABILITIES: Availability[] = ["AVAILABLE", "PARTIAL", "UNAVAILABLE"];
 // TODO: how availability is determined is undecided. Until then this picks a
 // value from the work order's id, so it is stable but not real.
 const availabilityOf = (workOrder: { id: string }): Availability =>
-  AVAILABILITIES[
-    [...workOrder.id].reduce((sum, c) => sum + c.charCodeAt(0), 0) %
-      AVAILABILITIES.length
-  ];
+  AVAILABILITIES[workOrder.id.charCodeAt(workOrder.id.length - 1) % 3];
 
 // Minutes between a work order's start and end, and its availability.
 const timing = (w: {

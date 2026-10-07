@@ -1,6 +1,7 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/inngest/client";
 import { analyzeRemediation } from "@/inngest/functions/analyze-remediation";
+import { applyCsvImportFn } from "@/inngest/functions/apply-csv-import";
 import {
   enrichAllVulnerabilities,
   enrichVulnerability,
@@ -46,5 +47,6 @@ export const { GET, POST, PUT } = serve({
     generateAllDebriefs,
     generateDepartmentDebrief,
     submitWorkOrder,
+    applyCsvImportFn,
   ],
 });

@@ -323,6 +323,56 @@ Typical shape: `new ChatOpenAI({ model, useResponsesApi: true, reasoning: { effo
 
 **Schema Location**: `prisma/schema.prisma`
 
+## Seeding
+
+One command seeds everything: `npm run db:seed` (`npx prisma db seed`). **Do not add a
+`db:seed-<thing>` script or a standalone seed file that someone has to remember to run.** New
+seed data goes into one of the folders below, and the entry point picks it up.
+
+```
+prisma/seed.ts                 # entry point only: no data lives here
+prisma/seeds/production/       # reference data every deployment needs (e.g. manufacturers)
+prisma/seeds/dev/base/         # shared demo data, one file per feature
+prisma/seeds/dev/<TICKET>/     # test data for one ticket, e.g. prisma/seeds/dev/VW-532/
+```
+
+**Production data** (`prisma/seeds/production/`) runs on every Docker boot and on the Neon
+migrations workflow, against databases that already hold real data. A production seed must only
+add what is missing: never delete, rename or overwrite. Register it in
+`prisma/seeds/production/index.ts`.
+
+**Ticket test data** (`prisma/seeds/dev/<TICKET>/index.ts`) is how a PR ships the data a reviewer
+needs. The folder name is the ticket code, and `index.ts` exports one function:
+
+```typescript
+import prisma from "@/lib/db";
+import type { TicketSeedContext } from "../ticket-seeds";
+
+export async function seed({ seedUserId }: TicketSeedContext) {
+  await prisma.department.upsert({
+    where: { name: "Radiology Night Shift" },
+    update: {},
+    create: {
+      name: "Radiology Night Shift",
+      users: { connect: { id: seedUserId } },
+    },
+  });
+}
+```
+
+Ticket folders are found automatically and run in ticket-number order after the base demo data.
+Every ticket seed runs on every `npm run db:seed`, so each one must be safe to run twice (use
+`upsert`, or find before create) and must not depend on another ticket's folder.
+
+**Switches** (environment variables):
+
+- `SEED_SCOPE=production`: production data only. Any other value stops the seed with an error.
+- `SEED_TICKET=VW-532`: production data, base demo data, and only that ticket's folder.
+- `SEED_CLEAR_DB=true`: clear the demo tables before seeding.
+
+The older `scripts/seed-*.ts` files are manual, local-only scripts from before this layout. Do
+not copy that pattern for new work.
+
 ## State Management Strategy
 
 - **Server state**: React Query via tRPC (server data, API calls)

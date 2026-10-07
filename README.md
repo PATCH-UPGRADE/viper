@@ -53,7 +53,7 @@ npm run db:seed
 It loads two kinds of data, in this order:
 
 1. **Production data** (`prisma/seeds/production/`): reference data every deployment needs, such as the curated medical device manufacturers in `src/lib/manufacturer-catalog.ts`. These seeds only add what is missing. They never delete or rename anything, so they are safe to run on every deploy.
-2. **Demo data** (the rest of `prisma/seed.ts`): the seed user and sample assets, vulnerabilities, remediations, workflows and work orders for development and testing.
+2. **Demo data** (`prisma/seeds/dev/`): the seed user and sample assets, vulnerabilities, remediations, workflows and work orders for development and testing. Shared demo data lives in `prisma/seeds/dev/base/`, one file per feature. Test data for a single ticket lives in `prisma/seeds/dev/<TICKET>/` and is picked up automatically. See the "Seeding" section of `CLAUDE.md` for how to add one.
 
 To load the production data only, set `SEED_SCOPE=production`:
 
@@ -68,6 +68,12 @@ If you also want a temporary (24 hour) testing API key, run:
 ```bash
 npm run db:create-test-api-key
 ``` 
+
+To load only one ticket's test data on top of the base demo data, set `SEED_TICKET`:
+
+```bash
+SEED_TICKET=VW-532 npm run db:seed
+```
 
 ### Back up and restore manufacturers
 

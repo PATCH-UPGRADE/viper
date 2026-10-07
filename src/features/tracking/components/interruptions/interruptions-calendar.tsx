@@ -568,7 +568,7 @@ export const InterruptionsView = () => {
     }),
   );
   const tabs = (
-    <TabsList variant="line">
+    <TabsList variant="line-primary">
       <TabsTrigger value="calendar">
         <CalendarIcon aria-hidden />
         Calendar

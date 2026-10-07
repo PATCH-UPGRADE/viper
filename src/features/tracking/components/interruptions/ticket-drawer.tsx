@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { MailIcon } from "lucide-react";
+import { ClockIcon, MailIcon } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useEffect } from "react";
 import { ActivityTimelineBody } from "@/components/activity-timeline";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserAvatar } from "@/components/user-avatar";
+import { NotificationReadReceipts } from "@/features/inbox/components/notification-read-receipts";
 import type { TicketStatus } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
@@ -73,10 +74,13 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <Link href={`/tracking/${data.workOrderId}`} className="underline">
+        <Link
+          href={`/tracking/${data.workOrderId}`}
+          className="text-primary hover:underline"
+        >
           View work order
         </Link>
-        <span className="text-muted-foreground">{data.seenBy.length} read</span>
+        <NotificationReadReceipts receipts={data.seenBy} />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <StatusChip status={ticket.status} />
@@ -95,23 +99,26 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 rounded-lg border p-3 text-sm">
-        {[
-          [
-            "Schedule (according to work order)",
-            formatScheduled(ticket.scheduledAt) ?? "No time recorded",
-          ],
-          [
-            "Estimated duration",
-            ticket.durationEstimate
+        <div>
+          <p className="text-xs text-muted-foreground">
+            Schedule (according to work order)
+          </p>
+          <p className="font-medium">
+            {formatScheduled(ticket.scheduledAt) ?? "No time recorded"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Estimated duration</p>
+          <p className="flex items-center gap-1.5 font-medium">
+            <ClockIcon className="size-4 text-muted-foreground" aria-hidden />
+            {ticket.durationEstimate
               ? `${ticket.durationEstimate} min`
-              : "Unknown",
-          ],
-        ].map(([label, value]) => (
-          <div key={label}>
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="font-medium">{value}</p>
-          </div>
-        ))}
+              : "Unknown"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Per device, according to the work order
+          </p>
+        </div>
       </div>
       <Section title="Why this work is needed">
         <p className="whitespace-pre-wrap text-muted-foreground">
@@ -132,7 +139,14 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
                 key={device.id}
                 className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
               >
-                <span className="font-medium">{device.name}</span>
+                <span className="flex flex-col">
+                  <span className="font-medium">{device.name}</span>
+                  {device.place && (
+                    <span className="text-xs text-muted-foreground">
+                      {device.place}
+                    </span>
+                  )}
+                </span>
                 <span className="flex items-center gap-2 text-muted-foreground">
                   {device.scheduledAt
                     ? formatScheduled(device.scheduledAt)

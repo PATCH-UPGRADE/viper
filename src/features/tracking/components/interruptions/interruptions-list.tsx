@@ -115,8 +115,15 @@ export const InterruptionsList = () => {
                         className={`${COLUMNS} w-full py-3 pl-10 text-left text-sm hover:bg-accent`}
                       >
                         <span className="flex min-w-0 flex-col items-start gap-1">
-                          <span className="flex items-center gap-1.5 font-medium">
-                            {item.assetName}
+                          <span className="flex flex-col">
+                            <span className="font-medium">
+                              {item.assetName}
+                            </span>
+                            {item.place && (
+                              <span className="text-xs text-muted-foreground">
+                                {item.place}
+                              </span>
+                            )}
                           </span>
                           <StatusChip status={item.status} />
                         </span>

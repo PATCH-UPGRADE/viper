@@ -37,6 +37,14 @@ const inScope = (departmentId: string): Prisma.AssetTicketWhereInput => ({
   parentTicket: open,
 });
 
+const assetSelect = { ...assetNameSelect, location: true } as const;
+
+// "Medical-Surgical Unit · Bed 18"
+const placeOf = (location: unknown) => {
+  const { building, room } = (location ?? {}) as Record<string, string>;
+  return [building, room].filter(Boolean).join(" · ") || null;
+};
+
 const AVAILABILITIES: Availability[] = ["AVAILABLE", "PARTIAL", "UNAVAILABLE"];
 
 // TODO: how availability is determined is undecided. Until then this picks a
@@ -73,7 +81,7 @@ const itemSelect = (userId: string) =>
         seenBy: { where: { userId }, select: { userId: true } },
       },
     },
-    asset: { select: assetNameSelect },
+    asset: { select: assetSelect },
     ticket: {
       select: {
         id: true,
@@ -101,6 +109,7 @@ const toItem = ({ parentTicketId, parentTicket, asset, ticket }: ItemRow) => ({
   workOrderSummary: parentTicket.summary,
   ...timing(parentTicket),
   assetName: getAssetDisplayName(asset),
+  place: placeOf(asset.location),
 });
 
 // A work order that owns device tickets ("owner ticket") is on the calendar at
@@ -207,12 +216,22 @@ const workOrderFields = (departmentId: string, id: string) =>
     // Only this department's readers; other departments' users stay hidden.
     seenBy: {
       where: { user: { departmentId } },
-      select: { user: { select: { name: true } } },
+      select: {
+        seenAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            department: { select: { name: true } },
+          },
+        },
+      },
     },
     assets: {
       where: { ticketId: { not: id }, ...scopedDevice(departmentId) },
       select: {
-        asset: { select: assetNameSelect },
+        asset: { select: assetSelect },
         ticket: { select: { id: true, status: true, scheduledAt: true } },
       },
     },
@@ -260,7 +279,12 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
   return {
     comments: ticket.comments,
     activities: ticket.activities,
-    seenBy: workOrder.seenBy,
+    // The shape `NotificationReadReceipts` takes.
+    seenBy: workOrder.seenBy.map(({ seenAt, user }) => ({
+      id: user.id,
+      readAt: seenAt,
+      user,
+    })),
     category: ticket.category,
     workOrderId: workOrder.id,
     isDeviceTicket: Boolean(ticket.ticket),
@@ -269,6 +293,7 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
     otherDevices: workOrder.assets.map(({ asset, ticket }) => ({
       id: ticket.id,
       name: getAssetDisplayName(asset),
+      place: placeOf(asset.location),
       status: ticket.status,
       scheduledAt: ticket.scheduledAt ?? workOrder.scheduledAt,
     })),

@@ -94,7 +94,8 @@ const toItem = ({ parentTicketId, parentTicket, asset, ticket }: ItemRow) => ({
   summary: ticket.summary,
   status: ticket.status,
   category: ticket.category,
-  scheduledAt: ticket.scheduledAt,
+  // A device ticket with no time of its own is on its owner's schedule.
+  scheduledAt: ticket.scheduledAt ?? parentTicket.scheduledAt,
   unread: parentTicket.seenBy.length === 0,
   workOrderId: parentTicketId,
   workOrderSummary: parentTicket.summary,
@@ -212,6 +213,7 @@ const workOrderFields = (departmentId: string, id: string) =>
     departments: { select: { id: true, name: true } },
     disruption: true,
     changesAfter: true,
+    scheduledAt: true,
     descriptions: { where: { departmentId }, select: { body: true } },
     // Only this department's readers; other departments' users stay hidden.
     seenBy: {
@@ -293,7 +295,7 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
       id: ticket.id,
       name: getAssetDisplayName(asset),
       status: ticket.status,
-      scheduledAt: ticket.scheduledAt,
+      scheduledAt: ticket.scheduledAt ?? workOrder.scheduledAt,
     })),
   };
 };

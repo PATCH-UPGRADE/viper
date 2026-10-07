@@ -106,7 +106,7 @@ const Details = ({ id }: { id: string }) => {
         </a>
       </MetaField>
       <Tabs defaultValue="comments">
-        <TabsList variant="line">
+        <TabsList variant="line-primary">
           <TabsTrigger value="comments">
             Comments <Count n={data.comments.length} />
           </TabsTrigger>

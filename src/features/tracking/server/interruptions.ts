@@ -153,7 +153,7 @@ export const getInterruptionCalendar = async (
             scheduledEndTime: true,
           },
         },
-        asset: { select: assetNameSelect },
+        asset: { select: assetSelect },
         ticket: {
           select: { id: true, status: true, category: true, scheduledAt: true },
         },
@@ -188,6 +188,7 @@ export const getInterruptionCalendar = async (
         ...timing(parentTicket),
         unread: false,
         assetName: getAssetDisplayName(asset),
+        place: placeOf(asset.location),
       })),
   ];
 };
@@ -282,10 +283,21 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
         },
       })
     : null;
-  if (!ticket) {
+  if (!ticket || !departmentId) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
   }
   const workOrder = ticket.ticket?.parentTicket ?? ticket;
+  // Devices on the work order that this department does not manage.
+  const elsewhere = await prisma.assetTicket.findMany({
+    where: {
+      parentTicketId: workOrder.id,
+      ticket: open,
+      asset: { managedBy: { none: { departmentId } } },
+    },
+    select: {
+      asset: { select: { managedBy: { select: { departmentId: true } } } },
+    },
+  });
   return {
     comments: ticket.comments,
     activities: ticket.activities,
@@ -298,6 +310,12 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
     viewerId: userId,
     disruption: workOrder.disruption,
     changesAfter: workOrder.changesAfter,
+    elsewhere: {
+      devices: elsewhere.length,
+      departments: new Set(
+        elsewhere.flatMap((a) => a.asset.managedBy.map((m) => m.departmentId)),
+      ).size,
+    },
     contact: ticket.assignee ?? ticket.creator,
     why: workOrder.descriptions[0]?.body ?? workOrder.body ?? null,
     otherDevices: workOrder.assets.map(({ asset, ticket }) => ({

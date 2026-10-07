@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserAvatar } from "@/components/user-avatar";
 import type { TicketStatus } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
-import { cn } from "@/lib/utils";
+import { cn, plural } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useMarkTicketSeen } from "../../hooks/use-tracking";
 import type { Availability } from "../../types";
@@ -49,6 +49,7 @@ export type DrawerTicket = {
   status: TicketStatus;
   scheduledAt: Date | null;
   assetName: string;
+  place?: string | null;
   durationEstimate: number | null;
   availability: Availability | null;
 };
@@ -235,7 +236,7 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
             "No changes to the device interface or clinical behavior."}
         </p>
       </Section>
-      {data.otherDevices.length > 0 && (
+      {(data.otherDevices.length > 0 || data.elsewhere.devices > 0) && (
         <Section
           title={
             data.isDeviceTicket
@@ -265,6 +266,16 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
                 </span>
               </li>
             ))}
+            {data.elsewhere.devices > 0 && (
+              <li className="bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                Plus {data.elsewhere.devices}{" "}
+                {plural("device", data.elsewhere.devices)}{" "}
+                {data.elsewhere.departments > 0
+                  ? `in ${data.elsewhere.departments} other ${plural("department", data.elsewhere.departments)}`
+                  : "outside your department"}
+                .
+              </li>
+            )}
           </ul>
         </Section>
       )}
@@ -338,22 +349,27 @@ export const TicketDrawer = ({
 }: {
   ticket: DrawerTicket;
   children: ReactNode;
-}) => {
-  return (
-    <Sheet>
-      <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
-        <SheetHeader>
-          <SheetTitle>{ticket.summary}</SheetTitle>
-          <SheetDescription className="sr-only">
-            Details and comments for this maintenance ticket.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="flex flex-col gap-4 px-4 pb-6">
-          <p className="font-medium">{ticket.assetName}</p>
-          <Details ticket={ticket} />
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-};
+}) => (
+  <Sheet>
+    <SheetTrigger asChild>{children}</SheetTrigger>
+    <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+      <SheetHeader>
+        <SheetTitle>{ticket.summary}</SheetTitle>
+        <SheetDescription className="sr-only">
+          Details and comments for this maintenance ticket.
+        </SheetDescription>
+      </SheetHeader>
+      <div className="flex flex-col gap-4 px-4 pb-6">
+        <p className="font-medium">
+          {ticket.assetName}
+          {ticket.place && (
+            <span className="ml-2 font-normal text-muted-foreground">
+              {ticket.place}
+            </span>
+          )}
+        </p>
+        <Details ticket={ticket} />
+      </div>
+    </SheetContent>
+  </Sheet>
+);

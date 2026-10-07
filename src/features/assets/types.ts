@@ -54,7 +54,7 @@ export const assetInputSchema = z.object({
     .min(1)
     .nullish()
     .describe(
-      "DeviceType slug, for example \"infusion-pump\". Sets the type of the asset's product. Null or no value keeps the product's current type.",
+      'DeviceType slug, for example "infusion-pump". Gives the asset\'s product this type if it has none. A type that the product already has stays.',
     ),
   hostname: z.string().nullish(),
   macAddress: z.string().nullish(),

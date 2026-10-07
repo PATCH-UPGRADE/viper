@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
-import { countAffectedRemediations } from "@/features/assets/utils";
+import {
+  countAffectedRemediations,
+  getAssetDeviceTypeLabel,
+} from "@/features/assets/utils";
 import { prepareDeviceTypeSlugs } from "@/features/device-types/server/apply-device-type";
 import { resolveEffectiveIssuesByAsset } from "@/features/issues/server/effective-issues";
 import {
@@ -74,6 +77,32 @@ const createSearchFilter = (search: string) => {
       }
     : {};
 };
+
+/**
+ * The orderBy for a table sort: comma-separated column ids, each with a "-"
+ * in front for descending. Two ids need their own shape: "issues" sorts by
+ * the issue count, and "deviceType" by the product's device type, which is not
+ * a field of Asset.
+ */
+export function assetOrderBy(
+  sort: string | undefined,
+): Prisma.AssetOrderByWithRelationInput[] {
+  const fields = sort ? sort.split(",").filter(Boolean) : [];
+  return [
+    ...fields.map((field): Prisma.AssetOrderByWithRelationInput => {
+      const direction = field.startsWith("-") ? "desc" : "asc";
+      const key = field.replace("-", "");
+      if (key === "issues") return { issues: { _count: direction } };
+      if (key === "deviceType") {
+        return {
+          deviceGroup: { product: { deviceType: { displayName: direction } } },
+        };
+      }
+      return { [key]: direction };
+    }),
+    { updatedAt: "desc" },
+  ];
+}
 
 export const assetsRouter = createTRPCRouter({
   // GET /api/assets - List all assets (any authenticated user can see all)
@@ -200,25 +229,10 @@ export const assetsRouter = createTRPCRouter({
 
       const where = createSearchFilter(search);
 
-      function getSortValue(sort: string) {
-        const sortValue = sort.startsWith("-") ? "desc" : "asc";
-        if (sort === "issues" || sort === "-issues") {
-          return { _count: sortValue };
-        }
-        return sortValue;
-      }
-
       return fetchPaginated(prisma.asset, input, {
         where: where,
         include: { ...assetInclude, issues: true },
-        orderBy: sort
-          ? [
-              ...sort.split(",").map((s) => {
-                return { [s.replace("-", "")]: getSortValue(s) };
-              }),
-              { updatedAt: "desc" },
-            ]
-          : { updatedAt: "desc" },
+        orderBy: assetOrderBy(sort),
       });
     }),
 
@@ -243,25 +257,10 @@ export const assetsRouter = createTRPCRouter({
       );
 
       if (!hasComputedSort) {
-        function getSortValue(sort: string) {
-          const sortValue = sort.startsWith("-") ? "desc" : "asc";
-          if (sort === "issues" || sort === "-issues") {
-            return { _count: sortValue };
-          }
-          return sortValue;
-        }
-
         const result = await fetchPaginated(prisma.asset, input, {
           where,
           include: assetDashboardInclude,
-          orderBy: sort
-            ? [
-                ...sort.split(",").map((s) => {
-                  return { [s.replace("-", "")]: getSortValue(s) };
-                }),
-                { updatedAt: "desc" },
-              ]
-            : { updatedAt: "desc" },
+          orderBy: assetOrderBy(sort),
         });
         const effectiveIssues = await resolveEffectiveIssuesByAsset(
           result.items,
@@ -310,6 +309,7 @@ export const assetsRouter = createTRPCRouter({
         if (key === "remediations") {
           return countAffectedRemediations(asset.issues);
         }
+        if (key === "deviceType") return getAssetDeviceTypeLabel(asset) ?? "";
         const val = (asset as Record<string, unknown>)[key];
         return typeof val === "string" ? val : String(val ?? "");
       }

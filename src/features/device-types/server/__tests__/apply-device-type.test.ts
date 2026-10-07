@@ -9,12 +9,8 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/db", () => ({ default: db }));
 
-const {
-  deviceTypeIdsBySlug,
-  fillProductDeviceType,
-  prepareDeviceTypeSlugs,
-  setProductDeviceType,
-} = await import("../apply-device-type");
+const { deviceTypeIdsBySlug, fillProductDeviceType, prepareDeviceTypeSlugs } =
+  await import("../apply-device-type");
 
 beforeEach(() => {
   db.deviceType.findMany.mockReset().mockResolvedValue([
@@ -22,7 +18,6 @@ beforeEach(() => {
     { id: "dt-monitor", slug: "patient-monitor" },
   ]);
   db.product.updateMany.mockReset().mockResolvedValue({ count: 1 });
-  vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
 describe("deviceTypeIdsBySlug", () => {
@@ -61,16 +56,18 @@ describe("prepareDeviceTypeSlugs", () => {
     expect(db.product.updateMany).not.toHaveBeenCalled();
   });
 
-  it("writes a product's type one time for repeated slugs", async () => {
+  it("only fills an empty type, never overwrites one", async () => {
     const apply = await prepareDeviceTypeSlugs(["infusion-pump"]);
 
     await apply("p-1", "infusion-pump");
-    await apply("p-1", "infusion-pump");
 
-    expect(db.product.updateMany).toHaveBeenCalledTimes(1);
+    expect(db.product.updateMany).toHaveBeenCalledWith({
+      where: { id: "p-1", deviceTypeId: null, canonicalName: { not: "-" } },
+      data: { deviceTypeId: "dt-pump" },
+    });
   });
 
-  it("writes again when the slug for a product changes", async () => {
+  it("tries each product once, even when its slugs differ", async () => {
     const apply = await prepareDeviceTypeSlugs([
       "infusion-pump",
       "patient-monitor",
@@ -78,11 +75,11 @@ describe("prepareDeviceTypeSlugs", () => {
 
     await apply("p-1", "infusion-pump");
     await apply("p-1", "patient-monitor");
-    await apply("p-1", "infusion-pump");
+    await apply("p-2", "patient-monitor");
 
     expect(
-      db.product.updateMany.mock.calls.map(([arg]) => arg.data.deviceTypeId),
-    ).toEqual(["dt-pump", "dt-monitor", "dt-pump"]);
+      db.product.updateMany.mock.calls.map(([arg]) => arg.where.id),
+    ).toEqual(["p-1", "p-2"]);
   });
 
   it("does nothing with no slug or no product", async () => {
@@ -93,26 +90,6 @@ describe("prepareDeviceTypeSlugs", () => {
     await apply(null, "infusion-pump");
 
     expect(db.product.updateMany).not.toHaveBeenCalled();
-  });
-});
-
-describe("setProductDeviceType", () => {
-  it("overwrites the type, except on the shared unknown product", async () => {
-    await setProductDeviceType("p-1", "dt-pump");
-
-    expect(db.product.updateMany).toHaveBeenCalledWith({
-      where: { id: "p-1", canonicalName: { not: "-" } },
-      data: { deviceTypeId: "dt-pump" },
-    });
-    expect(console.warn).not.toHaveBeenCalled();
-  });
-
-  it("warns if the product is the shared unknown product", async () => {
-    db.product.updateMany.mockResolvedValue({ count: 0 });
-
-    await setProductDeviceType("p-unknown", "dt-pump");
-
-    expect(console.warn).toHaveBeenCalled();
   });
 });
 

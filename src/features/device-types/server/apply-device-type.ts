@@ -33,49 +33,29 @@ export async function deviceTypeIdsBySlug(
   return idBySlug;
 }
 
+// TODO: VW-560
 /**
  * Check every deviceType slug of an API or partner request, then return a
- * function that sets a product's type from one slug. The function overwrites
- * the current type, and skips a write that repeats the last one for that
- * product, because a batch puts many assets on a few products.
+ * function that gives a product a type from one slug, only if it has none.
+ * It tries each product once, because a batch puts many assets on a few
+ * products.
  */
 export async function prepareDeviceTypeSlugs(
   slugs: (string | null | undefined)[],
 ) {
   const idBySlug = await deviceTypeIdsBySlug(slugs);
-  const lastWritten = new Map<string, string>();
+  const triedProductIds = new Set<string>();
   return async (productId: string | null, slug: string | null | undefined) => {
     const deviceTypeId = slug ? idBySlug.get(slug) : undefined;
-    if (!productId || !deviceTypeId) return;
-    if (lastWritten.get(productId) === deviceTypeId) return;
-    lastWritten.set(productId, deviceTypeId);
-    await setProductDeviceType(productId, deviceTypeId);
+    if (!productId || !deviceTypeId || triedProductIds.has(productId)) return;
+    triedProductIds.add(productId);
+    await fillProductDeviceType(productId, deviceTypeId);
   };
 }
 
 /**
- * Overwrite a product's device type. It never types the shared unknown
- * product.
- */
-export async function setProductDeviceType(
-  productId: string,
-  deviceTypeId: string,
-): Promise<void> {
-  const { count } = await prisma.product.updateMany({
-    where: { id: productId, ...notSharedUnknownProduct },
-    data: { deviceTypeId },
-  });
-  if (count === 0) {
-    console.warn("Device type ignored for the unknown product", {
-      productId,
-      deviceTypeId,
-    });
-  }
-}
-
-/**
- * Set a product's device type only if it has none. A sync uses this, so a
- * type from the seed or from API input stays.
+ * Set a product's device type only if it has none, so outside callers cannot
+ * change a type that exists. Only the device type seed overwrites a type.
  */
 export async function fillProductDeviceType(
   productId: string,

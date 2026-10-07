@@ -13,7 +13,9 @@ export const columns: ColumnDef<AssetResponse>[] = [
   {
     id: "deviceType",
     meta: { title: "Device Type" },
-    header: "Device Type",
+    header: ({ column }) => (
+      <SortableHeader header="Device Type" column={column} />
+    ),
     accessorFn: getAssetDeviceTypeLabel,
     cell: ({ getValue }) => <ClampedCell text={getValue<string | null>()} />,
   },

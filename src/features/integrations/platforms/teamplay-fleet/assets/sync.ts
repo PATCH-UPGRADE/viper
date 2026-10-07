@@ -33,6 +33,7 @@ async function equipmentKeysWeMayRegroup(
   return new Set(mappingsToNameDerivedGroups.map((m) => m.externalId));
 }
 
+// TODO: VW-560
 /**
  * Give the product a device type from the Fleet modality label, if it has
  * none. The device type seed sets the type of known products and wins over

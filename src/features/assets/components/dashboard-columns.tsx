@@ -91,7 +91,9 @@ export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
   {
     id: "deviceType",
     meta: { title: "Device Type" },
-    header: "Device Type",
+    header: ({ column }) => (
+      <SortableHeader header="Device Type" column={column} />
+    ),
     accessorFn: getAssetDeviceTypeLabel,
     cell: ({ row, getValue }) => (
       <TooltipProvider>

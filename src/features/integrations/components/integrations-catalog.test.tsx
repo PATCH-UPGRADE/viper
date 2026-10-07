@@ -21,6 +21,7 @@ const entry = (
   description: "",
   categories: ["Notifications"],
   singleton,
+  unscheduled: false,
   configFields: [],
   credentialFields: [],
   credentialsAreAuthShaped: false,

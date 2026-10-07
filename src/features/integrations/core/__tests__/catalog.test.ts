@@ -28,3 +28,13 @@ describe("catalog field kinds", () => {
     ).toMatchObject({ kind: "url", required: true });
   });
 });
+
+describe("catalog scheduling", () => {
+  const entryFor = (platform: PlatformEnum) =>
+    catalogEntries().find((entry) => entry.platform === platform);
+
+  it("marks a platform the cron never schedules", () => {
+    expect(entryFor(PlatformEnum.CSV_UPLOAD)?.unscheduled).toBe(true);
+    expect(entryFor(PlatformEnum.PARTNER)?.unscheduled).toBe(false);
+  });
+});

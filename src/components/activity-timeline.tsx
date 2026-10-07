@@ -101,9 +101,17 @@ const TimelineRow = ({
   </li>
 );
 
-type TimelineProps = { entries: TimelineEntry[]; composer?: ReactNode };
+type TimelineProps = {
+  entries: TimelineEntry[];
+  composer?: ReactNode;
+  empty?: string;
+};
 
-export const ActivityTimelineBody = ({ entries, composer }: TimelineProps) => {
+export const ActivityTimelineBody = ({
+  entries,
+  composer,
+  empty = "No activity yet.",
+}: TimelineProps) => {
   const newestFirst = [...entries].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   );
@@ -123,7 +131,7 @@ export const ActivityTimelineBody = ({ entries, composer }: TimelineProps) => {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-muted-foreground">No activity yet.</p>
+        <p className="text-sm text-muted-foreground">{empty}</p>
       )}
     </div>
   );

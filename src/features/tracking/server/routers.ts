@@ -61,6 +61,10 @@ import {
   snapshotBeforeUpdate,
 } from "./activities";
 import { cascadeDoneStatus, createAssetTicket } from "./asset-tickets";
+import {
+  getInterruptionCalendar,
+  getInterruptionDetail,
+} from "./interruptions";
 
 // A lost create-race (or a retry) surfaces as a P2002 unique violation. Duck-typed
 // on `code` rather than `instanceof`: across Next.js module boundaries the thrown
@@ -1294,6 +1298,29 @@ export const trackingRouter = createTRPCRouter({
         return comment;
       });
     }),
+
+  // The signed-in user's department's scheduled device tickets, for the
+  // clinician calendar at /tracking/interruptions.
+  getInterruptionCalendar: protectedProcedure
+    .input(
+      z
+        .object({ from: z.date(), to: z.date() })
+        // A month view spans at most six weeks; stops an unbounded scan.
+        .refine(
+          ({ from, to }) =>
+            to >= from && to.getTime() - from.getTime() <= 43 * 86_400_000,
+          "Invalid date range",
+        ),
+    )
+    .query(({ input, ctx }) =>
+      getInterruptionCalendar(ctx.auth.user.id, input),
+    ),
+
+  getInterruptionDetail: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(({ input, ctx }) =>
+      getInterruptionDetail(ctx.auth.user.id, input.id),
+    ),
 
   // ─── Work orders proposed by an agent ──────────────────────────────────────
 

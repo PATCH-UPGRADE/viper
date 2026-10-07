@@ -290,7 +290,7 @@ const CommentBody = ({ comment }: { comment: Comment }) => (
   </div>
 );
 
-const activityEntry = (activity: Activity): TimelineEntry => ({
+export const activityEntry = (activity: Activity): TimelineEntry => ({
   id: `a-${activity.id}`,
   kind: `Activity: ${activity.type}`,
   createdAt: new Date(activity.createdAt),
@@ -298,7 +298,7 @@ const activityEntry = (activity: Activity): TimelineEntry => ({
   body: renderActivity(activity),
 });
 
-const commentEntry = (comment: Comment): TimelineEntry => ({
+export const commentEntry = (comment: Comment): TimelineEntry => ({
   id: `c-${comment.id}`,
   kind: "Comment",
   createdAt: new Date(comment.createdAt),

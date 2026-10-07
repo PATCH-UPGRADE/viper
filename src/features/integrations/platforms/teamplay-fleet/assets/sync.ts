@@ -1,6 +1,7 @@
 import "server-only";
 import { fillProductDeviceType } from "@/features/device-types/server/apply-device-type";
 import { resolveDeviceType } from "@/features/device-types/server/resolve-device-type";
+import { computeWeakSerials } from "@/features/integrations/core/sync/serials";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -11,7 +12,6 @@ import type { ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import type { FleetConfig, FleetCreds } from "../config";
 import { syncFleetContracts } from "./contracts";
 import {
-  computeWeakSerials,
   type FleetAssetItem,
   listChanged,
   toCanonical,

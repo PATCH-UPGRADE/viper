@@ -41,6 +41,7 @@ model User {
   notificationReads NotificationRead[]
   matchFeedback     MatchFeedback[]
   fieldCorrections  FieldCorrection[]
+  csvImports        CsvImport[]
 
   departmentId             String?
   department               Department?                      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
@@ -491,6 +492,9 @@ model Asset {
 
   @@index([deviceGroupId])
   @@index([createdAt])
+  @@index([serialNumber])
+  @@index([macAddress])
+  @@index([hostname])
   @@map("asset")
 }
 
@@ -1187,6 +1191,7 @@ model Integration {
   createdAt                DateTime                         @default(now())
   updatedAt                DateTime                         @updatedAt
   medisaoCommentIdentities MedISAOExternalCommentIdentity[]
+  csvImports               CsvImport[]
 
   @@index([userId])
   @@index([integrationUserId])
@@ -1226,6 +1231,40 @@ model IntegrationResourceSync {
   @@unique([integrationId, resource])
   @@index([integrationId])
   @@map("integration_resource_sync")
+}
+
+enum CsvImportStatus {
+  Staging
+  Queued
+  Running
+  Succeeded
+  PartiallyFailed
+  Failed
+}
+
+model CsvImport {
+  id            String          @id @default(cuid())
+  integrationId String
+  integration   Integration     @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName      String
+  headers       String[]
+  plan          Json
+  chunkCount    Int             @default(0)
+  status        CsvImportStatus @default(Staging)
+  totalRows     Int             @default(0)
+  addedCount    Int             @default(0)
+  linkedCount   Int             @default(0)
+  failedCount   Int             @default(0)
+  failures      Json            @default("[]")
+  errorMessage  String?
+  createdAt     DateTime        @default(now())
+  finishedAt    DateTime?
+
+  @@index([userId, status])
+  @@index([integrationId])
+  @@map("csv_import")
 }
 
 model Webhook {
@@ -1278,6 +1317,7 @@ enum ResourceType {
 enum PlatformEnum {
   AI
   CSAF
+  CSV_UPLOAD
   FLEET
   MEDISAO
   PARTNER

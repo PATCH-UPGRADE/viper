@@ -8,7 +8,9 @@ type DeviceGroupWithType = {
   product?: { deviceType?: { displayName: string } | null } | null;
 } | null;
 
-export type DeviceTypeSource = { deviceGroup?: DeviceGroupWithType };
+// deviceGroup is required, so that a caller cannot leave out the device type
+// by mistake. Pass `deviceGroup: null` when an asset has none to give.
+export type DeviceTypeSource = { deviceGroup: DeviceGroupWithType };
 
 /** Selects what getAssetDeviceTypeLabel reads, under a product select. */
 export const deviceTypeLabelSelect = {
@@ -68,11 +70,7 @@ export const assetNameSelect = {
   deviceGroup: { select: { product: { select: deviceTypeLabelSelect } } },
 } as const;
 
-// deviceGroup is required, so that a caller cannot leave out the device type
-// by mistake. Pass `deviceGroup: null` to fall back to the id on purpose.
-export type AssetNameSource = AssetNameFields & {
-  deviceGroup: DeviceGroupWithType;
-};
+export type AssetNameSource = AssetNameFields & DeviceTypeSource;
 
 export const assetAgentNameSelect = {
   ...assetNameFieldsSelect,

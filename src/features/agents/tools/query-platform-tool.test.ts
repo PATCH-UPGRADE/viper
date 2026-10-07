@@ -26,6 +26,7 @@ const DOMAIN_PHRASES: Record<string, string> = {
   vulnerabilities: "vulnerabilities",
   remediations: "remediations",
   deviceGroups: "device groups",
+  deviceTypes: "device type counts",
   workflows: "clinical workflows",
   notifications: "notifications",
   tracking: "work orders",

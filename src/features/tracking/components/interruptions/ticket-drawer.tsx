@@ -33,6 +33,10 @@ export type DrawerTicket = {
   assetName: string;
 };
 
+const Count = ({ n }: { n: number }) => (
+  <span className="rounded-full bg-muted px-1.5 text-xs">{n}</span>
+);
+
 // Only fetched while the drawer is open: the sheet's content mounts on open.
 const Details = ({ id }: { id: string }) => {
   const trpc = useTRPC();
@@ -104,10 +108,10 @@ const Details = ({ id }: { id: string }) => {
       <Tabs defaultValue="comments">
         <TabsList variant="line">
           <TabsTrigger value="comments">
-            Comments ({data.comments.length})
+            Comments <Count n={data.comments.length} />
           </TabsTrigger>
           <TabsTrigger value="activity">
-            Activity ({data.activities.length + data.comments.length})
+            Activity <Count n={data.activities.length + data.comments.length} />
           </TabsTrigger>
         </TabsList>
         <TabsContent value="comments" className="pt-3">

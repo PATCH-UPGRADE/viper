@@ -33,9 +33,8 @@ const scopedDevice = (departmentId: string) =>
   }) satisfies Prisma.AssetTicketWhereInput;
 
 const inScope = (departmentId: string): Prisma.AssetTicketWhereInput => ({
-  asset: managedBy(departmentId),
+  ...scopedDevice(departmentId),
   parentTicket: open,
-  ticket: open,
 });
 
 const AVAILABILITIES: Availability[] = ["AVAILABLE", "PARTIAL", "UNAVAILABLE"];

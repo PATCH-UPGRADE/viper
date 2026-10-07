@@ -42,6 +42,10 @@ export type DrawerTicket = {
   availability: Availability | null;
 };
 
+const Count = ({ n }: { n: number }) => (
+  <span className="rounded-full bg-muted px-1.5 text-xs">{n}</span>
+);
+
 // Only fetched while the drawer is open: the sheet's content mounts on open.
 const Details = ({ ticket }: { ticket: DrawerTicket }) => {
   const { id, availability } = ticket;
@@ -163,10 +167,10 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
       <Tabs defaultValue="comments">
         <TabsList variant="line">
           <TabsTrigger value="comments">
-            Comments ({data.comments.length})
+            Comments <Count n={data.comments.length} />
           </TabsTrigger>
           <TabsTrigger value="activity">
-            Activity ({data.activities.length + data.comments.length})
+            Activity <Count n={data.activities.length + data.comments.length} />
           </TabsTrigger>
         </TabsList>
         <TabsContent value="comments" className="pt-3">

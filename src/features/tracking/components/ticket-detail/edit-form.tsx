@@ -52,7 +52,6 @@ type EditState = {
   descriptionsByDept: Record<string, string>;
   assigneeId: string;
   scheduledAt: string;
-  scheduledEndTime: string;
 };
 
 const buildEditState = (data: TicketDetail): EditState => ({
@@ -67,7 +66,6 @@ const buildEditState = (data: TicketDetail): EditState => ({
   ),
   assigneeId: data.assignee?.id ?? UNASSIGNED,
   scheduledAt: toDateTimeLocal(data.scheduledAt),
-  scheduledEndTime: toDateTimeLocal(data.scheduledEndTime),
 });
 
 const editStateFingerprint = (state: EditState) =>
@@ -170,9 +168,6 @@ export const TicketEditForm = ({
         descriptions,
         assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
         scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
-        scheduledEndTime: form.scheduledEndTime
-          ? new Date(form.scheduledEndTime)
-          : null,
       },
       { onSuccess: () => onCancel() },
     );
@@ -262,21 +257,6 @@ export const TicketEditForm = ({
               }
             />
           </div>
-
-          {/* Device tickets take their end time from their work order. */}
-          {!data.parentId && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="ticket-scheduled-end">Scheduled end</Label>
-              <Input
-                id="ticket-scheduled-end"
-                type="datetime-local"
-                value={form.scheduledEndTime}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, scheduledEndTime: e.target.value }))
-                }
-              />
-            </div>
-          )}
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="ticket-category">Category</Label>

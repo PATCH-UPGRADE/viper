@@ -5,7 +5,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { ChevronDownIcon, ClockIcon, SquareCheckBigIcon } from "lucide-react";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { Badge } from "@/components/ui/badge";
-import { cn, plural } from "@/lib/utils";
+import { plural } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import {
   availabilityStyle,
@@ -14,6 +14,7 @@ import {
   endPassed,
   StatusChip,
   statusLabels,
+  UnreadDot,
 } from "../ticket-detail/shared";
 import { TicketDrawer } from "./ticket-drawer";
 
@@ -60,11 +61,7 @@ export const InterruptionsList = () => {
               className="group border-b last:border-b-0"
             >
               <summary
-                className={cn(
-                  COLUMNS,
-                  "cursor-pointer bg-muted/40 py-3 hover:bg-accent",
-                  group.some((i) => i.unread) && "border-l-4 border-l-primary",
-                )}
+                className={`${COLUMNS} cursor-pointer bg-muted/40 py-3 hover:bg-accent`}
               >
                 <span className="flex min-w-0 items-start gap-2">
                   <ChevronDownIcon
@@ -77,6 +74,7 @@ export const InterruptionsList = () => {
                   />
                   <span className="flex min-w-0 flex-col gap-1">
                     <span className="flex items-center gap-1.5 font-semibold">
+                      {group.some((i) => i.unread) && <UnreadDot />}
                       <span className="truncate">{head.workOrderSummary}</span>
                     </span>
                     <span className="text-xs text-muted-foreground">

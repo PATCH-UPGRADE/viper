@@ -118,7 +118,7 @@ const ItemButton = ({
       className={cn(
         "overflow-hidden rounded border text-left text-[11px] hover:brightness-95",
         availabilityStyle(item.availability).className,
-        item.unread && "border-l-4 border-l-current",
+        item.unread && "border-l-4 border-l-primary",
         className,
       )}
     >
@@ -344,30 +344,31 @@ const Calendar = ({ lead }: { lead: ReactNode }) => {
           align="start"
           className="flex w-72 flex-col gap-2 text-sm"
         >
+          <p className="font-semibold">Legend</p>
+          <p className="text-xs text-muted-foreground">Availability</p>
           {(["AVAILABLE", "PARTIAL", "UNAVAILABLE", null] as const).map(
             (availability) => {
               const style = availabilityStyle(availability);
               return (
-                <span
+                <Badge
                   key={availability ?? "none"}
-                  className="flex items-center gap-2"
+                  variant="outline"
+                  className={cn("self-start", style.className)}
                 >
-                  <span
-                    className={cn(
-                      "flex size-5 items-center justify-center rounded border",
-                      style.className,
-                    )}
-                  >
-                    <style.Icon className="size-3" aria-hidden />
-                  </span>
+                  <style.Icon aria-hidden />
                   {style.label}
-                </span>
+                </Badge>
               );
             },
           )}
+          <hr />
           <span className="flex items-center gap-2">
-            <span className="size-5 rounded border border-l-4" />
-            Left border: not opened by you
+            <span className="h-4 w-6 rounded border border-l-4 border-l-primary" />
+            Not opened by you
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="h-4 w-6 rounded border" />
+            Duration unknown (fades out)
           </span>
         </PopoverContent>
       </Popover>

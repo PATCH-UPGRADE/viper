@@ -1056,6 +1056,23 @@ describe("Assets Endpoint deviceType input", () => {
     });
   });
 
+  it("POST /assets - accepts a null device type and sets no type", async () => {
+    const res = await request(BASE_URL)
+      .post("/assets")
+      .set(authHeader)
+      .send({
+        ip: "10.0.0.54",
+        cpe: `cpe:2.3:h:vitest:device_type_null_${Date.now()}:1.0`,
+        deviceType: null,
+      });
+    onTestFinished(async () => {
+      await request(BASE_URL).delete(`/assets/${res.body.id}`).set(authHeader);
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.deviceGroup.product.deviceType).toBeNull();
+  });
+
   it("POST /assets - rejects an unknown device type with a 400", async () => {
     const before = await prisma.asset.count();
 

@@ -89,6 +89,7 @@ describe("prepareDeviceTypeSlugs", () => {
     const apply = await prepareDeviceTypeSlugs(["infusion-pump"]);
 
     await apply("p-1", undefined);
+    await apply("p-1", null);
     await apply(null, "infusion-pump");
 
     expect(db.product.updateMany).not.toHaveBeenCalled();

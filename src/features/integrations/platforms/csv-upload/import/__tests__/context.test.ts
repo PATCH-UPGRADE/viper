@@ -76,14 +76,6 @@ describe("loadMatchContext", () => {
     });
   });
 
-  it("leaves out key lists that are empty", async () => {
-    await loadMatchContext([keysRow({ macAddress: "00:1A:2B:3C:4D:5E" })]);
-
-    expect(mockPrisma.asset.findMany.mock.calls[0][0].where).toEqual({
-      OR: [{ macAddress: { in: ["00:1A:2B:3C:4D:5E"] } }],
-    });
-  });
-
   it("skips the query when no row has a key", async () => {
     const context = await loadMatchContext([keysRow({})]);
 

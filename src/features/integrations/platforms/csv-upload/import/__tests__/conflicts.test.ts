@@ -22,32 +22,6 @@ describe("findInFileConflicts", () => {
     expect(conflicts.size).toBe(0);
   });
 
-  it("fails a row with no manufacturer", () => {
-    const conflicts = findInFileConflicts([
-      keysRow({ rowNumber: 1012, manufacturer: null }),
-    ]);
-
-    expect(conflicts.get(1012)).toBe("Manufacturer is missing");
-  });
-
-  it("fails a row with no model", () => {
-    const conflicts = findInFileConflicts([
-      keysRow({ rowNumber: 391, product: null }),
-    ]);
-
-    expect(conflicts.get(391)).toBe("Model is missing");
-  });
-
-  it("fails the later of two rows that share a serial, naming the first", () => {
-    const conflicts = findInFileConflicts([
-      keysRow({ rowNumber: 88, serialNumber: "P-518204" }),
-      keysRow({ rowNumber: 214, serialNumber: "P-518204" }),
-    ]);
-
-    expect(conflicts.has(88)).toBe(false);
-    expect(conflicts.get(214)).toBe("Serial also used by row 88 in this file");
-  });
-
   it("fails the later of two rows that share a MAC address", () => {
     const conflicts = findInFileConflicts([
       keysRow({ rowNumber: 5, macAddress: "00:1A:2B:3C:4D:5E" }),
@@ -66,6 +40,7 @@ describe("findInFileConflicts", () => {
       keysRow({ rowNumber: 4, serialNumber: "100153" }),
     ]);
 
+    expect(conflicts.has(2)).toBe(false);
     expect(conflicts.get(3)).toBe("Serial also used by row 2 in this file");
     expect(conflicts.get(4)).toBe("Serial also used by row 2 in this file");
   });

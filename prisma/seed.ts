@@ -1,14 +1,18 @@
+import { join } from "node:path";
 import prisma from "@/lib/db";
 import { clearDatabase, SEED_USER, seedBaseDemoData } from "./seeds/dev/base";
-import { readSeedScope } from "./seeds/options";
+import { seedTicketDemoData } from "./seeds/dev/ticket-seeds";
+import { readSeedOptions } from "./seeds/options";
 import { seedProductionData } from "./seeds/production";
+
+const DEV_SEEDS_DIRECTORY = join(__dirname, "seeds", "dev");
 
 async function main() {
   console.log("🌱 Starting database seed...\n");
 
   try {
-    const seedScope = readSeedScope(process.env);
-    if (seedScope === "production") {
+    const { scope, onlyTicket } = readSeedOptions(process.env);
+    if (scope === "production") {
       await seedProductionData();
       console.log(
         "\n✅ Production data seeded. Demo data skipped (SEED_SCOPE=production).",
@@ -22,7 +26,12 @@ async function main() {
     }
 
     await seedProductionData();
-    await seedBaseDemoData();
+    const seedUser = await seedBaseDemoData();
+    await seedTicketDemoData(
+      DEV_SEEDS_DIRECTORY,
+      { seedUserId: seedUser.id },
+      onlyTicket,
+    );
 
     console.log("\n✅ Database seeding completed successfully!");
     console.log(`\n📧 Login with: ${SEED_USER.email} / ${SEED_USER.password}`);

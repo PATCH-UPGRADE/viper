@@ -2758,17 +2758,14 @@ async function seedCsafIntegration(userId: string) {
   console.log(`✅ Seeded CISA CSAF integration ${integration.id}`);
 }
 
-const SEED_SCOPES = ["all", "production"] as const;
-
 function requestedSeedScope() {
   const requestedScope = process.env.SEED_SCOPE ?? "all";
-  const knownScope = SEED_SCOPES.find((scope) => scope === requestedScope);
-  if (!knownScope) {
-    throw new Error(
-      `SEED_SCOPE must be one of: ${SEED_SCOPES.join(", ")}. Got "${requestedScope}".`,
-    );
+  if (requestedScope === "all" || requestedScope === "production") {
+    return requestedScope;
   }
-  return knownScope;
+  throw new Error(
+    `SEED_SCOPE must be "all" or "production". Got "${requestedScope}".`,
+  );
 }
 
 async function main() {

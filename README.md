@@ -61,7 +61,13 @@ To load the production data only, set `SEED_SCOPE=production`:
 SEED_SCOPE=production npm run db:seed
 ```
 
-The Docker images run this on every boot, and the Neon migrations workflow runs it on merge to `main`. Any other value of `SEED_SCOPE` stops the seed with an error.
+The Docker images run this on every boot, and the Neon migrations workflow runs it when a merge to `main` changes the schema, a migration or the production seed data. `SEED_SCOPE` accepts `all` (the default) or `production`; anything else, including an empty value, stops the seed with an error.
+
+If you also want a temporary (24 hour) testing API key, run:
+
+```bash
+npm run db:create-test-api-key
+``` 
 
 ### Back up and restore manufacturers
 
@@ -71,12 +77,6 @@ npm run db:upsert-manufacturers -- backups/manufacturers.json
 ```
 
 The export writes every manufacturer row to a JSON file. The upsert reads a file in the same format and adds what is missing, with the same add-only rules as the production seed.
-
-If you also want a temporary (24 hour) testing API key, run:
-
-```bash
-npm run db:create-test-api-key
-``` 
 
 ### Optional: Clear database before seeding
 

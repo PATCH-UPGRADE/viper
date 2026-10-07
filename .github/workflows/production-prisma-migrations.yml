@@ -10,6 +10,7 @@ on:
     paths:
       - 'prisma/schema.prisma'
       - 'prisma/migrations/**'
+      - 'prisma/seed.ts'
       - 'prisma/seeds/production/**'
       - 'src/lib/manufacturer-catalog.ts'
       - 'src/lib/manufacturer-upsert.ts'

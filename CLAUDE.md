@@ -331,7 +331,7 @@ seed data goes into one of the folders below, and the entry point picks it up.
 
 ```
 prisma/seed.ts                 # entry point only: no data lives here
-prisma/seeds/production/       # reference data every deployment needs (e.g. manufacturers)
+prisma/seeds/production/       # data every deployment needs (manufacturers, the CISA CSAF integration)
 prisma/seeds/dev/base/         # shared demo data, one file per feature, plus shared helpers
 prisma/seeds/dev/<TICKET>/     # test data for one ticket, e.g. prisma/seeds/dev/VW-532/
 ```

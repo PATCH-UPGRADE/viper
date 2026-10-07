@@ -52,7 +52,7 @@ npm run db:seed
 
 It loads two kinds of data, in this order:
 
-1. **Production data** (`prisma/seeds/production/`): reference data every deployment needs, such as the curated medical device manufacturers in `src/lib/manufacturer-catalog.ts`. These seeds only add what is missing. They never delete or rename anything, so they are safe to run on every deploy.
+1. **Production data** (`prisma/seeds/production/`): data every deployment needs: the curated medical device manufacturers in `src/lib/manufacturer-catalog.ts` and the CISA CSAF advisory integration. These seeds only add what is missing. They never delete or rename anything, so they are safe to run on every deploy.
 2. **Demo data** (`prisma/seeds/dev/`): the seed user and sample assets, vulnerabilities, remediations, workflows and work orders for development and testing. Shared demo data lives in `prisma/seeds/dev/base/`, one file per feature. Test data for a single ticket lives in `prisma/seeds/dev/<TICKET>/`. See the "Seeding" section of `CLAUDE.md` for how to add one.
 
 The command picks the ticket folder from your Git branch: on branch `VW-532` (or `vw-532`, or `VW-532-some-suffix`) it runs `prisma/seeds/dev/VW-532/` if that folder exists. On any other branch, or with no matching folder, it runs no ticket folder.

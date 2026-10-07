@@ -17,7 +17,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { getChipClass } from "@/features/tag-colors/palette";
 import type {
-  MaintenanceAvailability,
   Priority,
   TicketCategory,
   TicketStatus,
@@ -30,14 +29,9 @@ import {
 } from "../../hooks/use-tracking";
 import type { TicketDetail } from "../../types";
 import { DepartmentMultiSelect } from "./department-multi-select";
-import {
-  availabilityLabels,
-  categoryLabels,
-  TicketStatusSelectTrigger,
-} from "./shared";
+import { categoryLabels, TicketStatusSelectTrigger } from "./shared";
 
 const UNASSIGNED = "__unassigned__";
-const UNKNOWN = "__unknown__";
 
 const toDateTimeLocal = (date: Date | string | null | undefined) => {
   if (!date) return "";
@@ -58,9 +52,7 @@ type EditState = {
   descriptionsByDept: Record<string, string>;
   assigneeId: string;
   scheduledAt: string;
-  // Minutes, kept as the raw input text; empty means no estimate.
-  durationEstimate: string;
-  availability: MaintenanceAvailability | typeof UNKNOWN;
+  scheduledEndTime: string;
 };
 
 const buildEditState = (data: TicketDetail): EditState => ({
@@ -75,8 +67,7 @@ const buildEditState = (data: TicketDetail): EditState => ({
   ),
   assigneeId: data.assignee?.id ?? UNASSIGNED,
   scheduledAt: toDateTimeLocal(data.scheduledAt),
-  durationEstimate: data.durationEstimate?.toString() ?? "",
-  availability: data.availability ?? UNKNOWN,
+  scheduledEndTime: toDateTimeLocal(data.scheduledEndTime),
 });
 
 const editStateFingerprint = (state: EditState) =>
@@ -179,10 +170,9 @@ export const TicketEditForm = ({
         descriptions,
         assigneeId: form.assigneeId === UNASSIGNED ? null : form.assigneeId,
         scheduledAt: form.scheduledAt ? new Date(form.scheduledAt) : null,
-        durationEstimate: form.durationEstimate
-          ? Number(form.durationEstimate)
+        scheduledEndTime: form.scheduledEndTime
+          ? new Date(form.scheduledEndTime)
           : null,
-        availability: form.availability === UNKNOWN ? null : form.availability,
       },
       { onSuccess: () => onCancel() },
     );
@@ -273,57 +263,19 @@ export const TicketEditForm = ({
             />
           </div>
 
-          {/* Device tickets take these from their work order. */}
+          {/* Device tickets take their end time from their work order. */}
           {!data.parentId && (
-            <>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="ticket-duration">
-                  Estimated duration (minutes)
-                </Label>
-                <Input
-                  id="ticket-duration"
-                  inputMode="numeric"
-                  value={form.durationEstimate}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      durationEstimate: e.target.value.replace(/\D/g, ""),
-                    }))
-                  }
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="ticket-availability">Availability</Label>
-                <Select
-                  value={form.availability}
-                  onValueChange={(v) =>
-                    setForm((f) => ({
-                      ...f,
-                      availability: v as
-                        | MaintenanceAvailability
-                        | typeof UNKNOWN,
-                    }))
-                  }
-                >
-                  <SelectTrigger id="ticket-availability">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={UNKNOWN}>Not confirmed</SelectItem>
-                    {(
-                      Object.keys(
-                        availabilityLabels,
-                      ) as MaintenanceAvailability[]
-                    ).map((a) => (
-                      <SelectItem key={a} value={a}>
-                        {availabilityLabels[a]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="ticket-scheduled-end">Scheduled end</Label>
+              <Input
+                id="ticket-scheduled-end"
+                type="datetime-local"
+                value={form.scheduledEndTime}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, scheduledEndTime: e.target.value }))
+                }
+              />
+            </div>
           )}
 
           <div className="flex flex-col gap-2">

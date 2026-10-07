@@ -1168,12 +1168,6 @@ enum TicketStatus {
   DONE
 }
 
-enum MaintenanceAvailability {
-  AVAILABLE
-  PARTIAL
-  UNAVAILABLE
-}
-
 enum TicketCategory {
   PATCH
   CONFIG_CHANGE
@@ -1294,11 +1288,7 @@ model WorkOrderTicket {
 
   scheduledAt DateTime?
 
-  // In whole minutes.
-  durationEstimate Int?
-
-  // Null means not confirmed.
-  availability MaintenanceAvailability?
+  scheduledEndTime DateTime?
 
   issues          Issue[]                          @relation("WorkOrderTicketIssues")
   vulnerabilities Vulnerability[]                  @relation("WorkOrderTicketVulns")

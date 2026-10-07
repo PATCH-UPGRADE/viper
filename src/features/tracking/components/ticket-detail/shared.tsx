@@ -24,13 +24,9 @@ import {
 } from "@/features/assets/utils";
 import { useCategoryColor } from "@/features/tag-colors/context";
 import { getChipClass } from "@/features/tag-colors/palette";
-import type {
-  MaintenanceAvailability,
-  TicketCategory,
-  TicketStatus,
-} from "@/generated/prisma";
+import type { TicketCategory, TicketStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
-import type { TicketDetail } from "../../types";
+import type { Availability, TicketDetail } from "../../types";
 
 export const statusLabels: Record<TicketStatus, string> = {
   TO_DO: "To Do",
@@ -61,7 +57,7 @@ export const categoryLabels: Record<TicketCategory, string> = {
   OTHER: "Other",
 };
 
-export const availabilityLabels: Record<MaintenanceAvailability, string> = {
+export const availabilityLabels: Record<Availability, string> = {
   AVAILABLE: "Available during maintenance",
   PARTIAL: "Partially available during maintenance",
   UNAVAILABLE: "Unavailable during maintenance",
@@ -75,9 +71,7 @@ const availabilityLook = {
   UNKNOWN: ["zinc", CircleHelpIcon],
 } as const;
 
-export const availabilityStyle = (
-  availability: MaintenanceAvailability | null,
-) => {
+export const availabilityStyle = (availability: Availability | null) => {
   const [hue, Icon] = availabilityLook[availability ?? "UNKNOWN"];
   return {
     Icon,
@@ -87,12 +81,6 @@ export const availabilityStyle = (
       : "Availability not confirmed",
   };
 };
-
-export const UnreadDot = () => (
-  <span className="size-2 shrink-0 rounded-full bg-primary">
-    <span className="sr-only">Not opened by you</span>
-  </span>
-);
 
 export const formatDate = (date: Date | string | null | undefined) => {
   if (!date) return null;

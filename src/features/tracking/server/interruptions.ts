@@ -4,7 +4,7 @@ import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
 import { type Prisma, TicketStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { plural } from "@/lib/utils";
-import { ticketDetailInclude } from "../types";
+import { type Availability, ticketDetailInclude } from "../types";
 
 // What a clinician sees is decided here, from the signed-in user alone: their
 // department → the assets it manages → those assets' device tickets. Drafts and
@@ -38,6 +38,29 @@ const inScope = (departmentId: string): Prisma.AssetTicketWhereInput => ({
   ticket: open,
 });
 
+const AVAILABILITIES: Availability[] = ["AVAILABLE", "PARTIAL", "UNAVAILABLE"];
+
+// Minutes between a work order's start and end, and its availability.
+// TODO: availability is not recorded yet; this stub picks a stable value per
+// work order until the real source exists.
+const timing = (w: {
+  id: string;
+  scheduledAt: Date | null;
+  scheduledEndTime: Date | null;
+}) => ({
+  durationEstimate:
+    w.scheduledAt && w.scheduledEndTime
+      ? Math.round(
+          (w.scheduledEndTime.getTime() - w.scheduledAt.getTime()) / 60_000,
+        )
+      : null,
+  availability:
+    AVAILABILITIES[
+      [...w.id].reduce((sum, c) => sum + c.charCodeAt(0), 0) %
+        AVAILABILITIES.length
+    ],
+});
+
 // The list is one row per device ticket. Duration, availability and "unread"
 // belong to the owner ticket: a reader opens that, not every device ticket.
 const itemSelect = (userId: string) =>
@@ -45,9 +68,10 @@ const itemSelect = (userId: string) =>
     parentTicketId: true,
     parentTicket: {
       select: {
+        id: true,
         summary: true,
-        durationEstimate: true,
-        availability: true,
+        scheduledAt: true,
+        scheduledEndTime: true,
         seenBy: { where: { userId }, select: { userId: true } },
       },
     },
@@ -76,8 +100,7 @@ const toItem = ({ parentTicketId, parentTicket, asset, ticket }: ItemRow) => ({
   unread: parentTicket.seenBy.length === 0,
   workOrderId: parentTicketId,
   workOrderSummary: parentTicket.summary,
-  durationEstimate: parentTicket.durationEstimate,
-  availability: parentTicket.availability,
+  ...timing(parentTicket),
   assetName: getAssetDisplayName(asset),
 });
 
@@ -105,8 +128,7 @@ export const getInterruptionCalendar = async (
         status: true,
         category: true,
         scheduledAt: true,
-        durationEstimate: true,
-        availability: true,
+        scheduledEndTime: true,
         seenBy: { where: { userId }, select: { userId: true } },
         assets: { where: scopedDevice(departmentId), select: { id: true } },
       },
@@ -117,10 +139,10 @@ export const getInterruptionCalendar = async (
         parentTicketId: true,
         parentTicket: {
           select: {
+            id: true,
             summary: true,
             scheduledAt: true,
-            durationEstimate: true,
-            availability: true,
+            scheduledEndTime: true,
           },
         },
         asset: { select: assetNameSelect },
@@ -139,8 +161,7 @@ export const getInterruptionCalendar = async (
       summary: owner.summary,
       status: owner.status,
       scheduledAt: owner.scheduledAt as Date,
-      durationEstimate: owner.durationEstimate,
-      availability: owner.availability,
+      ...timing(owner),
       unread: owner.seenBy.length === 0,
       assetName: `${owner.assets.length} ${plural("device", owner.assets.length)}`,
     })),
@@ -156,8 +177,7 @@ export const getInterruptionCalendar = async (
         summary: parentTicket.summary,
         status: ticket.status,
         scheduledAt: ticket.scheduledAt as Date,
-        durationEstimate: parentTicket.durationEstimate,
-        availability: parentTicket.availability,
+        ...timing(parentTicket),
         unread: false,
         assetName: getAssetDisplayName(asset),
       })),
@@ -198,6 +218,12 @@ const workOrderFields = (departmentId: string, id: string) =>
     },
   }) satisfies Prisma.WorkOrderTicketSelect;
 
+const contactSelect = {
+  name: true,
+  email: true,
+  department: { select: { name: true } },
+} satisfies Prisma.UserSelect;
+
 // What the drawer shows beyond the card, for an owner ticket or a device ticket
 // in the user's scope. Anything else is NOT_FOUND. A device ticket has no
 // description of its own: it comes from its owner ticket.
@@ -215,8 +241,8 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
         select: {
           ...workOrderFields(departmentId, id),
           category: true,
-          assignee: { select: { name: true, email: true } },
-          creator: { select: { name: true, email: true } },
+          assignee: { select: contactSelect },
+          creator: { select: contactSelect },
           ticket: {
             select: {
               parentTicket: { select: workOrderFields(departmentId, id) },
@@ -237,6 +263,7 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
     seenBy: workOrder.seenBy,
     category: ticket.category,
     workOrderId: workOrder.id,
+    isDeviceTicket: Boolean(ticket.ticket),
     contact: ticket.assignee ?? ticket.creator,
     why: workOrder.descriptions[0]?.body ?? workOrder.body ?? null,
     otherDevices: workOrder.assets.map(({ asset, ticket }) => ({

@@ -37,6 +37,14 @@ const inScope = (departmentId: string): Prisma.AssetTicketWhereInput => ({
   parentTicket: open,
 });
 
+const assetSelect = { ...assetNameSelect, location: true } as const;
+
+// "Medical-Surgical Unit · Bed 18"
+const placeOf = (location: unknown) => {
+  const { building, room } = (location ?? {}) as Record<string, string>;
+  return [building, room].filter(Boolean).join(" · ") || null;
+};
+
 const AVAILABILITIES: Availability[] = ["AVAILABLE", "PARTIAL", "UNAVAILABLE"];
 
 // TODO: how availability is determined is undecided. Until then this picks a
@@ -73,7 +81,7 @@ const itemSelect = (userId: string) =>
         seenBy: { where: { userId }, select: { userId: true } },
       },
     },
-    asset: { select: assetNameSelect },
+    asset: { select: assetSelect },
     ticket: {
       select: {
         id: true,
@@ -101,6 +109,7 @@ const toItem = ({ parentTicketId, parentTicket, asset, ticket }: ItemRow) => ({
   workOrderSummary: parentTicket.summary,
   ...timing(parentTicket),
   assetName: getAssetDisplayName(asset),
+  place: placeOf(asset.location),
 });
 
 // A work order that owns device tickets ("owner ticket") is on the calendar at
@@ -227,7 +236,7 @@ const workOrderFields = (departmentId: string, id: string) =>
     assets: {
       where: { ticketId: { not: id }, ...scopedDevice(departmentId) },
       select: {
-        asset: { select: assetNameSelect },
+        asset: { select: assetSelect },
         ticket: { select: { id: true, status: true, scheduledAt: true } },
       },
     },
@@ -294,6 +303,7 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
     otherDevices: workOrder.assets.map(({ asset, ticket }) => ({
       id: ticket.id,
       name: getAssetDisplayName(asset),
+      place: placeOf(asset.location),
       status: ticket.status,
       scheduledAt: ticket.scheduledAt ?? workOrder.scheduledAt,
     })),

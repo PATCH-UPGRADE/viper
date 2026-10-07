@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserAvatar } from "@/components/user-avatar";
+import { NotificationReadReceipts } from "@/features/inbox/components/notification-read-receipts";
 import type { TicketStatus } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
@@ -89,7 +90,10 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <Link href={`/tracking/${data.workOrderId}`} className="underline">
+        <Link
+          href={`/tracking/${data.workOrderId}`}
+          className="text-primary hover:underline"
+        >
           View work order
         </Link>
         <Popover>
@@ -246,7 +250,14 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
                 key={device.id}
                 className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
               >
-                <span className="font-medium">{device.name}</span>
+                <span className="flex flex-col">
+                  <span className="font-medium">{device.name}</span>
+                  {device.place && (
+                    <span className="text-xs text-muted-foreground">
+                      {device.place}
+                    </span>
+                  )}
+                </span>
                 <span className="flex items-center gap-2 text-muted-foreground">
                   {device.scheduledAt
                     ? formatScheduled(device.scheduledAt)

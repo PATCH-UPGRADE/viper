@@ -19,10 +19,8 @@ import { seedWorkflows } from "./workflows";
 
 export { createOrGetSeedUser, SEED_USER } from "./seed-user";
 
-const isLastBaseStepSeeded = isFleetAdvisoryNotificationSeeded;
-
 export async function isBaseDemoDataLoaded() {
-  return isLastBaseStepSeeded();
+  return isFleetAdvisoryNotificationSeeded();
 }
 
 export async function seedBaseDemoData() {

@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserAvatar } from "@/components/user-avatar";
-import { NotificationReadReceipts } from "@/features/inbox/components/notification-read-receipts";
 import type { TicketStatus } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";

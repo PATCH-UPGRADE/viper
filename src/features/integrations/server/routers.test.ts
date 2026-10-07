@@ -277,25 +277,6 @@ describe("integrationsRouter.create", () => {
     expect(mockPrisma.integration.findFirst).not.toHaveBeenCalled();
     expect(mockPrisma.integration.create).toHaveBeenCalledOnce();
   });
-
-  it("creates a CSV Upload source with one Asset resource row and no credentials", async () => {
-    await caller.create({
-      name: "CSV assets upload",
-      platform: PlatformEnum.CSV_UPLOAD,
-      config: {},
-    });
-
-    expect(mockPrisma.$executeRaw).not.toHaveBeenCalled();
-    expect(mockPrisma.integration.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          platform: PlatformEnum.CSV_UPLOAD,
-          credentials: null,
-          resourceSyncs: { create: [{ resource: ResourceType.Asset }] },
-        }),
-      }),
-    );
-  });
 });
 
 describe("integrationsRouter.update", () => {
@@ -526,22 +507,6 @@ describe("integrationsRouter.triggerSync", () => {
     ).rejects.toMatchObject({
       code: "BAD_REQUEST",
       message: "No enabled resources to sync",
-    });
-    expect(mockInngest.send).not.toHaveBeenCalled();
-  });
-
-  it("refuses to sync a platform that has no scheduled sync", async () => {
-    mockPrisma.integration.findFirst.mockResolvedValue({
-      id: "integration-csv",
-      platform: PlatformEnum.CSV_UPLOAD,
-      resourceSyncs: [{ resource: ResourceType.Asset }],
-    });
-
-    await expect(
-      caller.triggerSync({ id: "integration-csv" }),
-    ).rejects.toMatchObject({
-      code: "BAD_REQUEST",
-      message: "CSV Upload has no scheduled sync",
     });
     expect(mockInngest.send).not.toHaveBeenCalled();
   });

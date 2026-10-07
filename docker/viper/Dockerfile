@@ -27,4 +27,5 @@ CMD if [ ! -f /srv/stamps/.setup_done ]; then \
     else \
         echo "Database already initialized; skipping seed."; \
     fi && \
+    (SEED_SCOPE=production npm run db:seed || echo "Production data seed failed; starting anyway.") && \
     npm start

@@ -44,18 +44,33 @@ Alternatively, use docker: `docker compose -f compose.dev.yml up`
 
 ## Database Seeding
 
-The project includes a seed script to populate the database with sample data for development and testing.
-
-### How to seed:
+One command seeds everything:
 
 ```bash
 npm run db:seed
 ```
 
-The seed script will:
+It loads two kinds of data, in this order:
 
-1. Check if the seed user exists (creates if needed)
-2. Seed 20 realistic hospital assets owned by the seed user
+1. **Production data** (`prisma/seeds/production/`): reference data every deployment needs, such as the curated medical device manufacturers in `src/lib/manufacturer-catalog.ts`. These seeds only add what is missing. They never delete or rename anything, so they are safe to run on every deploy.
+2. **Demo data** (the rest of `prisma/seed.ts`): the seed user and sample assets, vulnerabilities, remediations, workflows and work orders for development and testing.
+
+To load the production data only, set `SEED_SCOPE=production`:
+
+```bash
+SEED_SCOPE=production npm run db:seed
+```
+
+The Docker images run this on every boot, and the Neon migrations workflow runs it on merge to `main`. Any other value of `SEED_SCOPE` stops the seed with an error.
+
+### Back up and restore manufacturers
+
+```bash
+npm run db:export-manufacturers -- backups/manufacturers.json
+npm run db:upsert-manufacturers -- backups/manufacturers.json
+```
+
+The export writes every manufacturer row to a JSON file. The upsert reads a file in the same format and adds what is missing, with the same add-only rules as the production seed.
 
 If you also want a temporary (24 hour) testing API key, run:
 

@@ -5,6 +5,7 @@ import { seedDepartments } from "./departments";
 import { seedDeviceArtifacts } from "./device-artifacts";
 import { seedDeviceGroups } from "./device-groups";
 import {
+  isFleetAdvisoryNotificationSeeded,
   seedFleetAdvisoryNotification,
   seedFleetIntegration,
 } from "./fleet-integration";
@@ -18,6 +19,12 @@ import { seedWorkflows } from "./workflows";
 
 export { clearDatabase } from "./clear-database";
 export { createOrGetSeedUser, SEED_USER } from "./seed-user";
+
+const isLastBaseStepSeeded = isFleetAdvisoryNotificationSeeded;
+
+export async function isBaseDemoDataLoaded() {
+  return isLastBaseStepSeeded();
+}
 
 export async function seedBaseDemoData() {
   const seedUser = await createOrGetSeedUser();

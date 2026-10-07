@@ -57,17 +57,23 @@ async function loadTicketSeed(ticket: string): Promise<LoadedTicketSeed> {
   return { ticket, seed: seedModule.seed };
 }
 
-export async function loadTicketSeeds(onlyTicket: string | null) {
+export async function loadTicketSeeds(onlyTickets: string[] | null) {
   const availableTickets = ticketsWithSeeds();
-  if (onlyTicket && !availableTickets.includes(onlyTicket)) {
+  const requestedTickets = onlyTickets ?? availableTickets;
+  const unknownTickets = requestedTickets.filter(
+    (ticket) => !availableTickets.includes(ticket),
+  );
+  if (unknownTickets.length > 0) {
     const knownTickets =
       availableTickets.length > 0 ? availableTickets.join(", ") : "none yet";
     throw new Error(
-      `No demo seed for ${onlyTicket}. Tickets with a seed folder: ${knownTickets}.`,
+      `No demo seed for ${unknownTickets.join(", ")}. Tickets with a seed folder: ${knownTickets}.`,
     );
   }
 
-  const ticketsToLoad = onlyTicket ? [onlyTicket] : availableTickets;
+  const ticketsToLoad = availableTickets.filter((ticket) =>
+    requestedTickets.includes(ticket),
+  );
   const loadedTicketSeeds: LoadedTicketSeed[] = [];
   for (const ticket of ticketsToLoad) {
     loadedTicketSeeds.push(await loadTicketSeed(ticket));

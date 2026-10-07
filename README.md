@@ -55,18 +55,27 @@ It loads two kinds of data, in this order:
 1. **Production data** (`prisma/seeds/production/`): reference data every deployment needs, such as the curated medical device manufacturers in `src/lib/manufacturer-catalog.ts`. These seeds only add what is missing. They never delete or rename anything, so they are safe to run on every deploy.
 2. **Demo data** (`prisma/seeds/dev/`): the seed user and sample assets, vulnerabilities, remediations, workflows and work orders for development and testing. Shared demo data lives in `prisma/seeds/dev/base/`, one file per feature. Test data for a single ticket lives in `prisma/seeds/dev/<TICKET>/` and is picked up automatically. See the "Seeding" section of `CLAUDE.md` for how to add one.
 
+The demo data loads once. If a database already has it, the command skips it and runs only the production data and the ticket folders, so running it again after checking out a PR picks up that PR's test data without duplicating rows.
+
 To load the production data only, set `SEED_SCOPE=production`:
 
 ```bash
 SEED_SCOPE=production npm run db:seed
 ```
 
-The Docker images run this on every boot, and the Neon migrations workflow runs it when a merge to `main` changes the schema, a migration or the production seed data. `SEED_SCOPE` accepts `all` (the default) or `production`; anything else, including an empty value, stops the seed with an error.
+The Docker images run this on every boot, and the Neon migrations workflow runs it when a merge to `main` changes the schema, a migration or the production seed data. Any other value of `SEED_SCOPE` except `all`, including an empty value, stops the seed with an error.
 
-To add only one ticket's test data to a database that is already seeded, set `SEED_TICKET`. The base demo data is not run again:
+To run only chosen ticket folders, not every one, set `SEED_TICKET` to one ticket or a comma-separated list:
 
 ```bash
 SEED_TICKET=VW-532 npm run db:seed
+SEED_TICKET=VW-532,VW-540 npm run db:seed
+```
+
+To load the demo data again even though it is already there, set `SEED_SCOPE=all`. Several demo seeds use plain `create`, so this duplicates their rows:
+
+```bash
+SEED_SCOPE=all npm run db:seed
 ```
 
 If you also want a temporary (24 hour) testing API key, run:
@@ -90,7 +99,7 @@ The export writes every manufacturer row to a JSON file. The upsert reads a file
 SEED_CLEAR_DB=true npm run db:seed
 ```
 
-⚠️ **Warning:** This will delete all existing assets and asset settings before seeding!
+⚠️ **Warning:** This deletes every row in the tables the demo seed writes, including your own, then loads the demo data from empty.
 
 ### Login after seeding
 

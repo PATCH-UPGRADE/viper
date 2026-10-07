@@ -1,12 +1,15 @@
-type SeedScope = "all" | "production";
+type SeedScope = "auto" | "all" | "production";
 
 interface SeedOptions {
   scope: SeedScope;
-  onlyTicket: string | null;
+  onlyTickets: string[] | null;
   shouldClearDemoTables: boolean;
 }
 
-function requestedSeedScope(requestedScope: string): SeedScope {
+function requestedSeedScope(requestedScope: string | undefined): SeedScope {
+  if (requestedScope === undefined) {
+    return "auto";
+  }
   if (requestedScope === "all" || requestedScope === "production") {
     return requestedScope;
   }
@@ -15,19 +18,25 @@ function requestedSeedScope(requestedScope: string): SeedScope {
   );
 }
 
+function requestedTickets(requestedTicketList: string | undefined) {
+  if (!requestedTicketList) {
+    return null;
+  }
+  const ticketCodes = requestedTicketList
+    .split(",")
+    .map((ticketCode) => ticketCode.trim().toUpperCase());
+  const namedTickets = ticketCodes.filter((ticketCode) => ticketCode !== "");
+  return namedTickets.length > 0 ? namedTickets : null;
+}
+
 export function readSeedOptions(environment: NodeJS.ProcessEnv): SeedOptions {
-  const scope = requestedSeedScope(environment.SEED_SCOPE ?? "all");
-  const onlyTicket = environment.SEED_TICKET?.toUpperCase() ?? null;
+  const scope = requestedSeedScope(environment.SEED_SCOPE);
+  const onlyTickets = requestedTickets(environment.SEED_TICKET);
   const shouldClearDemoTables = environment.SEED_CLEAR_DB === "true";
-  if (scope === "production" && onlyTicket) {
+  if (scope === "production" && onlyTickets) {
     throw new Error(
       "SEED_TICKET seeds demo data, so it cannot be combined with SEED_SCOPE=production.",
     );
   }
-  if (onlyTicket && shouldClearDemoTables) {
-    throw new Error(
-      "SEED_TICKET skips the base demo data, so it cannot be combined with SEED_CLEAR_DB=true.",
-    );
-  }
-  return { scope, onlyTicket, shouldClearDemoTables };
+  return { scope, onlyTickets, shouldClearDemoTables };
 }

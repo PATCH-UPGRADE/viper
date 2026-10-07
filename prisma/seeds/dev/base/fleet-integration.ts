@@ -169,6 +169,21 @@ Until the update is applied, restrict console logins to named technologist
 accounts and review the local account list on each system.
 `;
 
+const FLEET_ADVISORY_RAW = { advisoryId: "SHSA-0000-000 (hypothetical)" };
+
+const fleetAdvisoryNotifications = {
+  sourceLinks: {
+    some: { sourceRecord: { raw: { equals: FLEET_ADVISORY_RAW } } },
+  },
+};
+
+export async function isFleetAdvisoryNotificationSeeded() {
+  const seededAdvisoryCount = await prisma.notification.count({
+    where: fleetAdvisoryNotifications,
+  });
+  return seededAdvisoryCount > 0;
+}
+
 export async function seedFleetAdvisoryNotification() {
   console.log("\n🌱 Seeding the Siemens advisory notification...");
 
@@ -181,15 +196,11 @@ export async function seedFleetAdvisoryNotification() {
     return;
   }
 
-  const raw = { advisoryId: "SHSA-0000-000 (hypothetical)" };
-
   // Rebuilt rather than upserted, as seedVendors does: a Notification has no
   // natural unique key, so a re-seed without SEED_CLEAR_DB would stack a fresh
   // advisory every run. The delete cascades its source record and its mappings.
   await prisma.notification.deleteMany({
-    where: {
-      sourceLinks: { some: { sourceRecord: { raw: { equals: raw } } } },
-    },
+    where: fleetAdvisoryNotifications,
   });
 
   await prisma.notification.create({
@@ -230,9 +241,12 @@ export async function seedFleetAdvisoryNotification() {
             create: {
               channel: SourceChannel.Email,
               tlp: Tlp.AMBER,
-              raw,
+              raw: FLEET_ADVISORY_RAW,
               markdown: FLEET_ADVISORY_MARKDOWN,
-              contentHash: sourceContentHash(raw, FLEET_ADVISORY_MARKDOWN),
+              contentHash: sourceContentHash(
+                FLEET_ADVISORY_RAW,
+                FLEET_ADVISORY_MARKDOWN,
+              ),
             },
           },
         },

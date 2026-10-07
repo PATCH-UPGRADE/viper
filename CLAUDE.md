@@ -365,6 +365,10 @@ Ticket folders are found automatically and run in ticket-number order after the 
 The folder name must be the upper-case ticket code (`VW-532`, not `vw-532`). Any other folder
 under `prisma/seeds/dev/`, apart from `base`, stops the seed with an error.
 
+The base demo data loads once. If a database already has it, `npm run db:seed` skips it and runs
+only the production data and the ticket folders. So after checking out a PR, plain
+`npm run db:seed` picks up that PR's ticket folder without duplicating the base rows.
+
 Every ticket seed runs on every `npm run db:seed`. That includes CI and the first boot of the
 Docker images, so a ticket seed is not private to your machine. Each one must:
 
@@ -378,13 +382,16 @@ anything worth keeping into `prisma/seeds/dev/base/`.
 
 **Switches** (environment variables):
 
-- `SEED_SCOPE=production`: production data only. The only other accepted value is `all`, the
-  default. Anything else, including an empty value, stops the seed with an error.
-- `SEED_TICKET=VW-532`: production data and only that ticket's folder. The base demo data is not
-  run again, so seed the database once with plain `npm run db:seed` first. Cannot be combined with
-  `SEED_SCOPE=production` or `SEED_CLEAR_DB=true`.
-- `SEED_CLEAR_DB=true`: delete every row in the tables the demo seed writes, then seed. This
-  removes your own rows in those tables too. Ignored with `SEED_SCOPE=production`.
+- `SEED_SCOPE=production`: production data only.
+- `SEED_SCOPE=all`: load the base demo data again even if it is already there. Several base seeds
+  use plain `create`, so this duplicates their rows.
+- `SEED_TICKET=VW-532`: run only that ticket's folder, not every folder. Takes a comma-separated
+  list (`SEED_TICKET=VW-532,VW-540`). Cannot be combined with `SEED_SCOPE=production`.
+- `SEED_CLEAR_DB=true`: delete every row in the tables the demo seed writes, then load the base
+  demo data from empty. This removes your own rows in those tables too. Ignored with
+  `SEED_SCOPE=production`.
+
+Any other value of `SEED_SCOPE`, including an empty one, stops the seed with an error.
 
 The older `scripts/seed-*.ts` files are manual, local-only scripts from before this layout. Do
 not copy that pattern for new work.

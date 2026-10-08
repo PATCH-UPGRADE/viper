@@ -89,7 +89,7 @@ export function buildRows(input: BuildRowsInput): BuiltRows {
     const macAsTyped = validatedAddress("macAddress", isValidMac);
     const row: CsvAssetRow = {
       rowNumber,
-      role: cutToCellLength("role"),
+      deviceType: cutToCellLength("deviceType"),
       manufacturer: cutToCellLength("manufacturer"),
       product: cutToCellLength("product"),
       version: cutToCellLength("version"),

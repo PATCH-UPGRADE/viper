@@ -2,7 +2,7 @@ import { z } from "zod";
 import { AssetStatus, CsvImportStatus } from "@/generated/prisma";
 
 export const ASSET_IMPORT_FIELDS = [
-  "role",
+  "deviceType",
   "manufacturer",
   "product",
   "version",
@@ -20,7 +20,7 @@ export const ASSET_IMPORT_FIELDS = [
 export type AssetImportField = (typeof ASSET_IMPORT_FIELDS)[number];
 
 export const CONSTANT_FIELDS = [
-  "role",
+  "deviceType",
   "manufacturer",
   "product",
   "version",
@@ -158,7 +158,7 @@ const cell = z.string().trim().min(1).max(MAX_CELL_LENGTH).nullable();
 
 export const csvAssetRowSchema = z.object({
   rowNumber: z.number().int().min(2),
-  role: cell,
+  deviceType: cell,
   manufacturer: cell,
   product: cell,
   version: cell,

@@ -10,7 +10,7 @@ interface FieldGuide {
 }
 
 export const FIELD_GUIDE: Record<AssetImportField, FieldGuide> = {
-  role: {
+  deviceType: {
     meaning: "What kind of device it is, in plain words.",
     examples: "Infusion pump, Patient monitor, CT scanner",
   },
@@ -95,7 +95,7 @@ Example spreadsheet:
 | BIO-0417 | Infusion pump | Baxter | Sigma Spectrum | 8.00.01 | BX-SS-2021-014 | 10.20.4.15 | Tower A | ICU | Y |
 
 Example answer:
-- role: Device Description, Matched
+- deviceType: Device Description, Matched
 - manufacturer: Mfr, Matched
 - product: Model, Matched
 - version: SW Rev, Matched

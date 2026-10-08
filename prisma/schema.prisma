@@ -849,6 +849,10 @@ model VulnerabilityRecord {
 
   // TODO later: modifiedAt DateTime? — the source's own modified timestamp (OSV `modified`).
   // TODO later: withdrawnAt DateTime? — when the source withdrew / rejected the record.
+  // TODO later: fetchStartedAt DateTime? —  when a fetch of this record from its source (e.g. NVD)
+  // started; null when none is in flight. 
+  // We should add this when we start fetching NVD/GHSA advisories before our LLM processing steps
+  // This is effectively a lock
 
   // TODO later: relatedIds String[] — OSV `related`: IDs of similar-but-different
   // vulnerabilities

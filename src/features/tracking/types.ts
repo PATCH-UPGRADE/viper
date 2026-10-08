@@ -1,5 +1,9 @@
 import { z } from "zod";
 import {
+  deviceTypeLabelSchema,
+  deviceTypeLabelSelect,
+} from "@/features/assets/utils";
+import {
   externalMappingSelect,
   externalMappingWithSyncSelect,
 } from "@/features/integrations/core/urls";
@@ -235,7 +239,7 @@ export const ticketDetailInclude = {
               product: {
                 select: {
                   canonicalDisplayName: true,
-                  deviceType: { select: { displayName: true } },
+                  ...deviceTypeLabelSelect,
                 },
               },
               version: { select: { canonicalName: true } },
@@ -721,7 +725,7 @@ const detailLinkedAssetSchema = linkedAssetSchema.extend({
     product: z
       .object({
         canonicalDisplayName: z.string(),
-        deviceType: z.object({ displayName: z.string() }).nullable(),
+        deviceType: deviceTypeLabelSchema,
       })
       .nullable(),
     version: z.object({ canonicalName: z.string() }).nullable(),

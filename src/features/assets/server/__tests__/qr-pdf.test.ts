@@ -5,11 +5,13 @@ import { renderAssetQrPdf } from "../qr-pdf";
 it("renders a PDF", async () => {
   const pdf = await renderAssetQrPdf({
     id: "asset_123",
-    role: "ICU Monitor",
     serialNumber: "SN-001",
     deviceGroup: {
       manufacturer: { canonicalDisplayName: "Acme" },
-      product: { canonicalDisplayName: "Monitor" },
+      product: {
+        canonicalDisplayName: "Monitor",
+        deviceType: { displayName: "Patient Monitor" },
+      },
     },
   });
 

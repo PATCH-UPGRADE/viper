@@ -1,5 +1,6 @@
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
+import { deviceTypeLabelSelect } from "@/features/assets/utils";
 import { externalMappingSelect } from "@/features/integrations/core/urls";
 import {
   PlatformEnum,
@@ -138,8 +139,14 @@ export const vulnerabilityByPriorityInclude = {
       asset: {
         select: {
           id: true,
-          role: true,
           location: true,
+          deviceGroup: {
+            select: {
+              product: {
+                select: deviceTypeLabelSelect,
+              },
+            },
+          },
         },
       },
     },

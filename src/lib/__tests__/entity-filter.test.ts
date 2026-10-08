@@ -10,11 +10,11 @@ describe("validateEntityFilter", () => {
   describe("ASSET", () => {
     it("accepts a scalar equality filter (shorthand and long form)", () => {
       expect(
-        validateEntityFilter("ASSET", { role: "CT Scanner" }).success,
+        validateEntityFilter("ASSET", { hostname: "CT-BRIGHT-001" }).success,
       ).toBe(true);
       expect(
         validateEntityFilter("ASSET", {
-          role: { equals: "CT Scanner" },
+          hostname: { equals: "CT-BRIGHT-001" },
         }).success,
       ).toBe(true);
     });
@@ -35,6 +35,25 @@ describe("validateEntityFilter", () => {
       expect(result.success).toBe(true);
     });
 
+    it("accepts a device type through deviceGroup.product", () => {
+      expect(
+        validateEntityFilter("ASSET", {
+          deviceGroup: { product: { deviceType: { slug: "infusion-pump" } } },
+        }).success,
+      ).toBe(true);
+      expect(
+        validateEntityFilter("ASSET", {
+          deviceGroup: { product: { deviceTypeId: "dt_infusion_pump" } },
+        }).success,
+      ).toBe(true);
+    });
+
+    it("rejects role, which is free text", () => {
+      expect(
+        validateEntityFilter("ASSET", { role: "CT Scanner" }).success,
+      ).toBe(false);
+    });
+
     it("accepts AND / OR / NOT composition", () => {
       const result = validateEntityFilter("ASSET", {
         OR: [
@@ -51,8 +70,13 @@ describe("validateEntityFilter", () => {
     });
 
     it("returns the parsed where object on success", () => {
-      const result = validateEntityFilter("ASSET", { role: "CT Scanner" });
-      expect(result).toEqual({ success: true, data: { role: "CT Scanner" } });
+      const result = validateEntityFilter("ASSET", {
+        hostname: "CT-BRIGHT-001",
+      });
+      expect(result).toEqual({
+        success: true,
+        data: { hostname: "CT-BRIGHT-001" },
+      });
     });
 
     it("rejects an unknown field", () => {
@@ -62,7 +86,7 @@ describe("validateEntityFilter", () => {
 
     it("rejects an unknown operator", () => {
       const result = validateEntityFilter("ASSET", {
-        role: { startsWithh: "CT" },
+        hostname: { startsWithh: "CT" },
       });
       expect(result.success).toBe(false);
     });
@@ -75,7 +99,7 @@ describe("validateEntityFilter", () => {
     });
 
     it("rejects a wrongly-typed value", () => {
-      const result = validateEntityFilter("ASSET", { role: 42 });
+      const result = validateEntityFilter("ASSET", { hostname: 42 });
       expect(result.success).toBe(false);
     });
 

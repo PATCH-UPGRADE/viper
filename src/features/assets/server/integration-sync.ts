@@ -1,7 +1,10 @@
 import "server-only";
 import type { z } from "zod";
 import { UNKNOWN_CPE_STRING } from "@/config/constants";
-import { prepareDeviceTypeSlugs } from "@/features/device-types/server/apply-device-type";
+import {
+  type ApplyDeviceType,
+  prepareDeviceTypeSlugs,
+} from "@/features/device-types/server/apply-device-type";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -12,15 +15,13 @@ type IntegrationAssetItem = z.infer<
   typeof integrationAssetInputSchema
 >["items"][number];
 
-export async function processAssetIntegrationSync(
+export function processAssetIntegrationSync(
   input: { items: IntegrationAssetItem[] },
   userId: string,
   integrationId: string,
+  applyDeviceType: ApplyDeviceType,
   options: { shouldRecordSyncOutcome?: boolean } = {},
 ) {
-  const applyDeviceType = await prepareDeviceTypeSlugs(
-    input.items.map((item) => item.deviceType),
-  );
   return processIntegrationSync(
     prisma,
     {
@@ -71,5 +72,41 @@ export async function processAssetIntegrationSync(
     userId,
     integrationId,
     ResourceType.Asset,
+  );
+}
+
+/**
+ * The AI crawler's path into processAssetIntegrationSync. The crawler is an
+ * LLM and can invent a deviceType slug, so an unknown slug is dropped with a
+ * warning instead of failing the whole crawl, as it fails a partner batch.
+ */
+export async function processCrawledAssetIntegrationSync(
+  input: { items: IntegrationAssetItem[] },
+  userId: string,
+  integrationId: string,
+  options: { shouldRecordSyncOutcome?: boolean } = {},
+) {
+  const knownSlugs = new Set(
+    (await prisma.deviceType.findMany({ select: { slug: true } })).map(
+      (deviceType) => deviceType.slug,
+    ),
+  );
+  const items = input.items.map((item) => {
+    if (!item.deviceType || knownSlugs.has(item.deviceType)) return item;
+    console.warn("AI crawler sent an unknown deviceType, dropped it", {
+      integrationId,
+      deviceType: item.deviceType,
+    });
+    return { ...item, deviceType: null };
+  });
+  const applyDeviceType = await prepareDeviceTypeSlugs(
+    items.map((item) => item.deviceType),
+  );
+  return processAssetIntegrationSync(
+    { ...input, items },
+    userId,
+    integrationId,
+    applyDeviceType,
+    options,
   );
 }

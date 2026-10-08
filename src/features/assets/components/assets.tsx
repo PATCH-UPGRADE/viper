@@ -34,6 +34,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ClampedCell } from "@/components/ui/clamped-cell";
 import { CopyCode } from "@/components/ui/code";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -64,7 +65,8 @@ import type {
 } from "../types";
 import {
   getAssetDeviceTypeLabel,
-  getAssetRoleLabel,
+  getAssetIdentifier,
+  getAssetTitle,
   UNKNOWN_DEVICE_TYPE_STRING,
 } from "../utils";
 import { AssetDashboardDrawer } from "./asset-drawer";
@@ -246,8 +248,8 @@ export const NewVulnerableAssetsAlert = ({
   const overflow = totalCount - items.length;
 
   return (
-    <Alert className="relative border-orange-200 bg-orange-50">
-      <ShieldAlert className="text-orange-600" />
+    <Alert className="relative border-orange-200 bg-orange-50 dark:border-orange-900/70 dark:bg-orange-950/40">
+      <ShieldAlert className="text-orange-600 dark:text-orange-400" />
       <Button
         variant="ghost"
         size="icon"
@@ -257,11 +259,11 @@ export const NewVulnerableAssetsAlert = ({
       >
         <X className="h-4 w-4" />
       </Button>
-      <AlertTitle className="text-orange-800">
+      <AlertTitle className="text-orange-800 dark:text-orange-200">
         Newly Vulnerable Assets
       </AlertTitle>
       <AlertDescription>
-        <p className="mb-1 text-orange-700">
+        <p className="mb-1 text-orange-700 dark:text-orange-300">
           The following assets were recently discovered and have active
           vulnerabilities:
         </p>
@@ -270,16 +272,16 @@ export const NewVulnerableAssetsAlert = ({
             <li key={asset.id}>
               <button
                 type="button"
-                className="text-orange-800 underline underline-offset-2 hover:text-orange-900"
+                className="text-orange-800 underline underline-offset-2 hover:text-orange-900 dark:text-orange-200 dark:hover:text-orange-100"
                 onClick={() => onAssetClick(asset)}
               >
-                {getAssetRoleLabel(asset)}
+                {getAssetTitle(asset)} · {getAssetIdentifier(asset)}
               </button>
             </li>
           ))}
         </ul>
         {overflow > 0 && (
-          <p className="mt-1 text-orange-700">
+          <p className="mt-1 text-orange-700 dark:text-orange-300">
             and {overflow} other {overflow === 1 ? "asset" : "assets"}
           </p>
         )}
@@ -384,7 +386,7 @@ export const AssetItem = ({ data }: { data: DrawerAsset }) => {
         <ServerIcon className="size-5 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
-        <AssetDrawer asset={data}>{getAssetRoleLabel(data)}</AssetDrawer>
+        <AssetDrawer asset={data}>{getAssetTitle(data)}</AssetDrawer>
         <div className="text-xs text-muted-foreground mt-1">
           {data.ip ? <>{data.ip} &bull; </> : null}
           {deviceGroupLabel(data.deviceGroup)} &bull; Updated{" "}
@@ -436,7 +438,7 @@ export function AssetDrawer({
   return (
     <EntityDrawer trigger={children} {...props}>
       <DrawerHeader className="gap-1">
-        <DrawerTitle>{getAssetRoleLabel(asset)}</DrawerTitle>
+        <DrawerTitle>{getAssetTitle(asset)}</DrawerTitle>
         <DrawerDescription className="flex items-center gap-2">
           <Badge variant="outline">
             <ServerIcon className="size-3 mr-1" />
@@ -467,7 +469,9 @@ export function AssetDrawer({
               <div className="text-xs font-medium text-muted-foreground mb-1">
                 Role
               </div>
-              <div className="text-sm">{getAssetRoleLabel(asset)}</div>
+              <div className="text-sm">
+                <ClampedCell text={asset.role} maxWidthClass="max-w-full" />
+              </div>
             </div>
 
             <div>

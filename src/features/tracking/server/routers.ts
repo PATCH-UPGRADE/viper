@@ -4,7 +4,11 @@ import { dispatchSubmission } from "@/features/work-orders/server/submit";
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { assetNameSelect } from "@/features/assets/utils";
+import {
+  assetNameSearchTerms,
+  assetNameSelect,
+  deviceTypeLabelSelect,
+} from "@/features/assets/utils";
 import { notRejected } from "@/features/inbox/types";
 import {
   Priority,
@@ -1162,12 +1166,7 @@ export const trackingRouter = createTRPCRouter({
       } as const;
       const matchesSearch = input.search
         ? {
-            OR: [
-              { hostname: insensitive },
-              { ip: insensitive },
-              { serialNumber: insensitive },
-              { role: insensitive },
-            ],
+            OR: assetNameSearchTerms(insensitive),
           }
         : {};
       // Only return assets not already attached to this ticket so the picker
@@ -1182,11 +1181,15 @@ export const trackingRouter = createTRPCRouter({
           hostname: true,
           ip: true,
           serialNumber: true,
-          role: true,
           deviceGroup: {
             select: {
               manufacturer: { select: { canonicalDisplayName: true } },
-              product: { select: { canonicalDisplayName: true } },
+              product: {
+                select: {
+                  canonicalDisplayName: true,
+                  ...deviceTypeLabelSelect,
+                },
+              },
             },
           },
         },

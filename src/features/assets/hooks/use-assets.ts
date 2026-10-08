@@ -12,7 +12,7 @@ import {
 } from "@/config/constants";
 import { useTRPC } from "@/trpc/client";
 import type { AssetsVulnsInput } from "../types";
-import { getAssetRoleLabel } from "../utils";
+import { getAssetTitle } from "../utils";
 import { useAssetsParams } from "./use-asset-params";
 
 /**
@@ -75,7 +75,7 @@ export const useCreateAsset = () => {
   return useMutation(
     trpc.assets.create.mutationOptions({
       onSuccess: (data) => {
-        toast.success(`Asset "${getAssetRoleLabel(data)}" created`);
+        toast.success(`Asset "${getAssetTitle(data)}" created`);
         // Invalidate all getMany queries regardless of params (page, search, etc.)
         queryClient.invalidateQueries({
           predicate: (query) => {
@@ -101,7 +101,7 @@ export const useUpdateAsset = () => {
   return useMutation(
     trpc.assets.update.mutationOptions({
       onSuccess: (data) => {
-        toast.success(`Asset "${getAssetRoleLabel(data)}" updated`);
+        toast.success(`Asset "${getAssetTitle(data)}" updated`);
         // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({
           predicate: (query) => {
@@ -131,7 +131,7 @@ export const useRemoveAsset = () => {
   return useMutation(
     trpc.assets.remove.mutationOptions({
       onSuccess: (data) => {
-        toast.success(`Asset "${getAssetRoleLabel(data)}" removed`);
+        toast.success(`Asset "${getAssetTitle(data)}" removed`);
         // Invalidate all getMany and getOne queries regardless of params
         queryClient.invalidateQueries({
           predicate: (query) => {

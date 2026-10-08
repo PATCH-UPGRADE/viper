@@ -1,3 +1,4 @@
+import { deviceTypeLabelSelect } from "@/features/assets/utils";
 import { type Prisma, PrismaClient } from "@/generated/prisma";
 import {
   artifactExtension,
@@ -39,7 +40,13 @@ const deviceGroupSummarySelect = {
   select: {
     id: true,
     manufacturer: canonicalRefSelect,
-    product: canonicalRefSelect,
+    product: {
+      select: {
+        canonicalName: true,
+        canonicalDisplayName: true,
+        ...deviceTypeLabelSelect,
+      },
+    },
     version: canonicalRefSelect,
     versionStatus: true,
     cpe: true,

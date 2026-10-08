@@ -42,6 +42,8 @@ related work, not work filed for that item. "direct" means it was filed for that
 /** Condensed, prompt-injectable catalog of the allowlisted read procedures. */
 export const PLATFORM_CATALOG = `Available read-only procedures for query_platform_data:
 - assets.getMany — list/search hospital device assets. input: { search?, page?, pageSize? }
+  search matches hostname, ip, serial number, device type, manufacturer, product or
+  CPE, never the role. To find an asset you know by its role, search its device type.
 - assets.getOne — one asset by id. input: { id }
   Both carry "managedBy": who services the asset, as a vendor or a department, with
   their responsibilities. An entry whose "workOrderIntegration" is set names the

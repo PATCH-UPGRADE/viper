@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { assetNameSelect } from "@/features/assets/utils";
 
 vi.mock("server-only", () => ({}));
 
@@ -2088,15 +2089,7 @@ describe("trackingRouter.detachAsset", () => {
       },
       select: {
         ticketId: true,
-        asset: {
-          select: {
-            id: true,
-            hostname: true,
-            ip: true,
-            serialNumber: true,
-            role: true,
-          },
-        },
+        asset: { select: assetNameSelect },
       },
     });
     expect(mockPrisma.workOrderTicket.delete).toHaveBeenCalledWith({
@@ -2137,13 +2130,22 @@ describe("trackingRouter.listAttachableAssets", () => {
     await caller.listAttachableAssets({ ticketId: "t1", search: "63014" });
 
     const arg = mockPrisma.asset.findMany.mock.calls[0][0];
+    const insensitive = { contains: "63014", mode: "insensitive" };
     expect(arg.where).toEqual({
       assetTickets: { none: { parentTicketId: "t1" } },
       OR: [
-        { hostname: { contains: "63014", mode: "insensitive" } },
-        { ip: { contains: "63014", mode: "insensitive" } },
-        { serialNumber: { contains: "63014", mode: "insensitive" } },
-        { role: { contains: "63014", mode: "insensitive" } },
+        { hostname: insensitive },
+        { ip: insensitive },
+        { serialNumber: insensitive },
+        {
+          deviceGroup: {
+            is: {
+              product: {
+                is: { deviceType: { is: { displayName: insensitive } } },
+              },
+            },
+          },
+        },
       ],
     });
   });

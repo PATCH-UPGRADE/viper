@@ -1,7 +1,7 @@
 import type { AssetImportField } from "../contract";
 
 export const FIELD_LABELS: Record<AssetImportField, string> = {
-  role: "Role",
+  deviceType: "Device type",
   manufacturer: "Manufacturer",
   product: "Model",
   version: "Version",
@@ -18,7 +18,7 @@ export const FIELD_LABELS: Record<AssetImportField, string> = {
 };
 
 export const FIELD_PLURALS: Record<AssetImportField, string> = {
-  role: "roles",
+  deviceType: "device types",
   manufacturer: "manufacturers",
   product: "models",
   version: "versions",
@@ -60,12 +60,12 @@ export const withArticle = (noun: string): string =>
   /^[aeiou]/i.test(noun) ? `an ${noun}` : `a ${noun}`;
 
 export const rowLabel = (row: {
-  role: string | null;
+  deviceType: string | null;
   manufacturer: string | null;
   product: string | null;
 }): string => {
   const makeAndModel = [row.manufacturer, row.product]
     .filter(Boolean)
     .join(" ");
-  return row.role ?? (makeAndModel || "—");
+  return row.deviceType ?? (makeAndModel || "—");
 };

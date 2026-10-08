@@ -323,6 +323,45 @@ Typical shape: `new ChatOpenAI({ model, useResponsesApi: true, reasoning: { effo
 
 **Schema Location**: `prisma/schema.prisma`
 
+## Seeding
+
+One command seeds everything: `npm run db:seed` (`npx prisma db seed`). **Do not add a
+`db:seed-<thing>` script or a standalone seed file that someone has to remember to run.** New
+seed data goes into one of the folders below, and the entry point picks it up.
+
+```
+prisma/seed.ts                 # entry point only: no data lives here
+prisma/seeds/production/       # data every deployment needs (manufacturers, the CISA CSAF integration)
+prisma/seeds/dev/              # demo data for development and testing, one file per feature
+```
+
+**Production data** (`prisma/seeds/production/`) runs on every Docker boot and on the Neon
+migrations workflow, against databases that already hold real data. A production seed must only
+add what is missing: never delete, rename or overwrite. Register it in
+`prisma/seeds/production/index.ts`.
+
+**Demo data** (`prisma/seeds/dev/`) is the seed user and the sample assets, vulnerabilities,
+remediations, workflows and work orders. Each feature has its own file. To add demo data for a
+feature, add it to that feature's file, or add a new file and call it from `seedDemoData()` in
+`prisma/seeds/dev/index.ts`. There are no per-ticket seed folders.
+
+The demo data loads once. If a database already has it, `npm run db:seed` skips it and runs only
+the production data, without duplicating the demo rows.
+
+**Switches** (environment variable `SEED_SCOPE`):
+
+- `SEED_SCOPE=production`: production data only.
+- `SEED_SCOPE=all`: load the demo data again even if it is already there. Several demo seeds use
+  plain `create`, so this duplicates their rows.
+
+Any other value of `SEED_SCOPE`, including an empty one, stops the seed with an error.
+
+For a clean database, use Prisma's own reset: `npx prisma migrate reset` drops the database,
+re-applies every migration and runs the seed.
+
+The older `scripts/seed-*.ts` files are manual, local-only scripts from before this layout. Do
+not copy that pattern for new work.
+
 ## State Management Strategy
 
 - **Server state**: React Query via tRPC (server data, API calls)

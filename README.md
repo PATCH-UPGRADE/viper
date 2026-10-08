@@ -52,8 +52,10 @@ npm run db:seed
 
 It loads two kinds of data, in this order:
 
-1. **Production data** (`prisma/seeds/production/`): reference data every deployment needs, such as the curated medical device manufacturers in `src/lib/manufacturer-catalog.ts`. These seeds only add what is missing. They never delete or rename anything, so they are safe to run on every deploy.
-2. **Demo data** (the rest of `prisma/seed.ts`): the seed user and sample assets, vulnerabilities, remediations, workflows and work orders for development and testing.
+1. **Production data** (`prisma/seeds/production/`): data every deployment needs: the curated medical device manufacturers in `src/lib/manufacturer-catalog.ts` and the CISA CSAF advisory integration. These seeds only add what is missing. They never delete or rename anything, so they are safe to run on every deploy.
+2. **Demo data** (`prisma/seeds/dev/`): the seed user and sample assets, vulnerabilities, remediations, workflows and work orders for development and testing, one file per feature. See the "Seeding" section of `CLAUDE.md` for how to add to it.
+
+The demo data loads once. If a database already has it, the command skips it, so running it again does not duplicate rows.
 
 To load the production data only, set `SEED_SCOPE=production`:
 
@@ -61,7 +63,13 @@ To load the production data only, set `SEED_SCOPE=production`:
 SEED_SCOPE=production npm run db:seed
 ```
 
-The Docker images run this on every boot, and the Neon migrations workflow runs it when a merge to `main` changes the schema, a migration or the production seed data. `SEED_SCOPE` accepts `all` (the default) or `production`; anything else, including an empty value, stops the seed with an error.
+The Docker images run this on every boot, and the Neon migrations workflow runs it when a merge to `main` changes the schema, a migration or the production seed data. Any other value of `SEED_SCOPE` except `all`, including an empty value, stops the seed with an error.
+
+To load the demo data again even though it is already there, set `SEED_SCOPE=all`. Several demo seeds use plain `create`, so this duplicates their rows:
+
+```bash
+SEED_SCOPE=all npm run db:seed
+```
 
 If you also want a temporary (24 hour) testing API key, run:
 
@@ -78,20 +86,20 @@ npm run db:upsert-manufacturers -- backups/manufacturers.json
 
 The export writes every manufacturer row to a JSON file. The upsert reads a file in the same format and adds what is missing, with the same add-only rules as the production seed.
 
-### Optional: Clear database before seeding
+### Optional: Start from a clean database
 
 ```bash
-SEED_CLEAR_DB=true npm run db:seed
+npx prisma migrate reset
 ```
 
-⚠️ **Warning:** This will delete all existing assets and asset settings before seeding!
+⚠️ **Warning:** This drops the whole database, including your own account and API keys, re-applies every migration and runs the seed.
 
 ### Login after seeding
 
 After seeding, you can log in with:
 
 - Email: `user@example.com`
-- Password: (read the seed script)
+- Password: see `SEED_USER` in `prisma/seeds/dev/seed-user.ts`
 
 - In production, only accounts associated with whitelisted domains are able to authenticate. That whitelist exists in Vercel's env vars. 
 

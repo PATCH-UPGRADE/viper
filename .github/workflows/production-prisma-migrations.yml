@@ -48,6 +48,7 @@ jobs:
           CONNECTION_URL=$(neonctl connection-string "$BRANCH_NAME" \
           --project-id "$NEON_PROJECT_ID" \
           --role-name neondb_owner \
+          --pooled \
           --database-name neondb)
           echo "DATABASE_URL=$CONNECTION_URL" >> $GITHUB_ENV
         

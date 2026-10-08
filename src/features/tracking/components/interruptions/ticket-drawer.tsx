@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { ClockIcon, MailIcon } from "lucide-react";
-import Link from "next/link";
 import { type ReactNode, useEffect } from "react";
 import { ActivityTimelineBody } from "@/components/activity-timeline";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +32,7 @@ import {
   CategoryChip,
   StatusChip,
 } from "../ticket-detail/shared";
+import { WorkOrderModal } from "./work-order-modal";
 
 export type DrawerTicket = {
   id: string;
@@ -76,12 +76,7 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <Link
-          href={`/tracking/${data.workOrderId}`}
-          className="text-primary hover:underline"
-        >
-          View work order
-        </Link>
+        <WorkOrderModal workOrderId={data.workOrderId} />
         <NotificationReadReceipts receipts={data.seenBy} />
       </div>
       <div className="flex flex-wrap items-center gap-2">

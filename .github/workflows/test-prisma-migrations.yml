@@ -70,8 +70,16 @@ jobs:
           echo "Neon branch did not become available within 60 second timeout."
           exit 1
         
+      # A new branch reports a connection string before its compute accepts
+      # connections, so the first connect can fail with P1001.
       - name: Run Prisma Migrate
-        run: npx prisma migrate deploy
+        run: |
+          for i in {1..6}; do
+            npx prisma migrate deploy && exit 0
+            echo "Attempt $i/6 failed. Retrying in 10 seconds..."
+            sleep 10
+          done
+          exit 1
 
       - name: Check for missing migrations
         run: |

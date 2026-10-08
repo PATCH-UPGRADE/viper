@@ -65,10 +65,11 @@ type Block = {
 };
 
 // One block per event on this day. An event that runs past midnight continues
-// at the top of the next day. Blocks that overlap sit in separate lanes.
-const layout = (day: Date, items: Item[]) => {
+// at the top of the next day. Blocks that overlap sit in separate lanes, and
+// each cluster of overlapping blocks shares the width among its own lanes.
+export const layout = (day: Date, items: Item[]) => {
   const dayMinutes = 24 * 60;
-  const blocks = items
+  const starts = items
     .flatMap((item) => {
       const start = minutesOf(item.scheduledAt);
       const length = item.durationEstimate ?? DEFAULT_MINUTES;
@@ -80,15 +81,30 @@ const layout = (day: Date, items: Item[]) => {
         ? [{ item, start: 0, len: spill }]
         : [];
     })
-    .map((block) => ({ ...block, lane: 0 }))
     .sort((a, b) => a.start - b.start);
-  const laneEnds: number[] = [];
-  for (const block of blocks) {
-    const free = laneEnds.findIndex((end) => end <= block.start);
-    block.lane = free < 0 ? laneEnds.length : free;
-    laneEnds[block.lane] = block.start + block.len;
+
+  const blocks: Block[] = [];
+  let cluster: Block[] = [];
+  let laneEnds: number[] = [];
+  const closeCluster = () => {
+    for (const block of cluster) block.lanes = laneEnds.length;
+  };
+  for (const { item, start, len } of starts) {
+    // Nothing in the current cluster is still running: start a new one.
+    if (start >= Math.max(0, ...laneEnds)) {
+      closeCluster();
+      cluster = [];
+      laneEnds = [];
+    }
+    const free = laneEnds.findIndex((end) => end <= start);
+    const lane = free < 0 ? laneEnds.length : free;
+    laneEnds[lane] = start + len;
+    const block = { item, start, len, lane, lanes: 1 };
+    cluster.push(block);
+    blocks.push(block);
   }
-  return blocks.map((block) => ({ ...block, lanes: laneEnds.length }));
+  closeCluster();
+  return blocks;
 };
 
 // The availability-colored button that opens an event's drawer.

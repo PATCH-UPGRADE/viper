@@ -1,6 +1,6 @@
 import prisma from "@/lib/db";
 
-export { upsertSeedProduct as upsertProduct } from "../../device-type-seeding";
+export { upsertSeedProduct as upsertProduct } from "../production/device-types";
 
 // "unknown"/"EOL"-style sentinels and CPE wildcards map to a null (unknown) version.
 export function normalizeVersion(v?: string | null): string | null {

@@ -13,7 +13,7 @@ import {
   VersionStatus,
 } from "@/generated/prisma";
 import { sourceContentHash } from "@/lib/source-hash";
-import { upsertExampleProduct as upsertProduct } from "../prisma/device-type-seeding";
+import { upsertExampleProduct as upsertProduct } from "../prisma/seeds/production/device-types";
 import prisma from "../src/lib/db";
 
 const SEED_USER = {

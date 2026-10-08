@@ -6,7 +6,7 @@ import {
   VersionStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { upsertExampleProduct as upsertProduct } from "../prisma/device-type-seeding";
+import { upsertExampleProduct as upsertProduct } from "../prisma/seeds/production/device-types";
 
 const SEED_USER = {
   email: "user@example.com",

@@ -5,7 +5,7 @@ import { DEVICE_TYPES, FLEET_PRODUCT_DEVICE_TYPES } from "../device-types";
 vi.mock("@/lib/db", () => ({ default: {} }));
 
 const { EXAMPLE_PRODUCT_DEVICE_TYPES } = await import(
-  "../../../../prisma/device-type-seeding"
+  "../../../../prisma/seeds/production/device-types"
 );
 
 describe("DEVICE_TYPES", () => {

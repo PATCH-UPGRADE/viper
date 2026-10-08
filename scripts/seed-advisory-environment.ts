@@ -8,7 +8,7 @@ import {
   deviceGroupWhereForMatching,
   matchingAppliesToDeviceGroup,
 } from "@/lib/device-matching";
-import { upsertExampleProduct as upsertProduct } from "../prisma/device-type-seeding";
+import { upsertExampleProduct as upsertProduct } from "../prisma/seeds/production/device-types";
 import prisma from "../src/lib/db";
 
 const SEED_USER_EMAIL = "user@example.com";

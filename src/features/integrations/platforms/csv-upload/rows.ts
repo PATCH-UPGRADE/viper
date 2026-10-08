@@ -9,11 +9,12 @@ import {
   MAX_CELL_LENGTH,
   type StatusValues,
 } from "./contract";
-import { isValidIp, isValidMac, type RowIssue } from "./validate";
+import { isValidIp, isValidMac, normalizeMac, type RowIssue } from "./validate";
 
 export interface BuildRowsInput {
   headers: string[];
   rawRows: string[][];
+  rowNumbers: number[];
   mapping: ColumnMapping;
   statusValues: StatusValues;
 }
@@ -25,7 +26,6 @@ export interface BuiltRows {
 
 type TextField = Exclude<AssetImportField, "status">;
 
-const FIRST_DATA_ROW_NUMBER = 2;
 export const REQUIRED_FIELDS = [
   "manufacturer",
   "product",
@@ -40,12 +40,12 @@ const blankToNull = (value: string | undefined): string | null => {
 };
 
 export function buildRows(input: BuildRowsInput): BuiltRows {
-  const { headers, rawRows, mapping, statusValues } = input;
+  const { headers, rawRows, rowNumbers, mapping, statusValues } = input;
   const statusByCellValue = new Map(Object.entries(statusValues));
   const issues: RowIssue[] = [];
 
   const rows = rawRows.map((cells, dataIndex): CsvAssetRow => {
-    const rowNumber = dataIndex + FIRST_DATA_ROW_NUMBER;
+    const rowNumber = rowNumbers[dataIndex];
 
     const sourceValue = (field: AssetImportField): string | null => {
       const source = mapping[field];
@@ -86,6 +86,7 @@ export function buildRows(input: BuildRowsInput): BuiltRows {
       return statusByCellValue.get(value) ?? null;
     };
 
+    const macAsTyped = validatedAddress("macAddress", isValidMac);
     const row: CsvAssetRow = {
       rowNumber,
       role: cutToCellLength("role"),
@@ -94,7 +95,7 @@ export function buildRows(input: BuildRowsInput): BuiltRows {
       version: cutToCellLength("version"),
       serialNumber: normalizeSerial(cutToCellLength("serialNumber")),
       ip: validatedAddress("ip", isValidIp),
-      macAddress: validatedAddress("macAddress", isValidMac),
+      macAddress: macAsTyped === null ? null : normalizeMac(macAsTyped),
       hostname: cutToCellLength("hostname"),
       networkSegment: cutToCellLength("networkSegment"),
       status: readStatus(),

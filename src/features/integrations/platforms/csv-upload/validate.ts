@@ -24,7 +24,11 @@ export interface ColumnIssue {
 const IPV4_OCTET = "(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)";
 const IPV4 = new RegExp(`^${IPV4_OCTET}(\\.${IPV4_OCTET}){3}$`);
 const IPV6_GROUP = /^[0-9a-f]{1,4}$/i;
-const MAC = /^[0-9a-f]{2}([:-])[0-9a-f]{2}(\1[0-9a-f]{2}){4}$/i;
+const MAC_IN_PAIRS = /^[0-9a-f]{2}([:-])[0-9a-f]{2}(\1[0-9a-f]{2}){4}$/i;
+const MAC_IN_DOTTED_GROUPS = /^[0-9a-f]{4}(\.[0-9a-f]{4}){2}$/i;
+const MAC_SEPARATORS = /[:.-]/g;
+const TWO_HEX_DIGITS = /.{2}/g;
+const FOUR_HEX_DIGITS = /.{4}/g;
 const IPV6_GROUP_COUNT = 8;
 
 const isBasicIpv6 = (value: string): boolean => {
@@ -41,7 +45,24 @@ const isBasicIpv6 = (value: string): boolean => {
 export const isValidIp = (value: string): boolean =>
   IPV4.test(value) || isBasicIpv6(value);
 
-export const isValidMac = (value: string): boolean => MAC.test(value);
+export const isValidMac = (value: string): boolean =>
+  MAC_IN_PAIRS.test(value) || MAC_IN_DOTTED_GROUPS.test(value);
+
+export const normalizeMac = (validMac: string): string => {
+  const hexDigits = validMac.replace(MAC_SEPARATORS, "").toUpperCase();
+  const pairs = hexDigits.match(TWO_HEX_DIGITS) ?? [];
+  return pairs.join(":");
+};
+
+export const macSpellings = (normalizedMac: string): string[] => {
+  const hexDigits = normalizedMac.replaceAll(":", "");
+  const dottedGroups = hexDigits.match(FOUR_HEX_DIGITS) ?? [];
+  return [
+    normalizedMac,
+    normalizedMac.replaceAll(":", "-"),
+    dottedGroups.join("."),
+  ];
+};
 
 export function columnIssues(
   issues: RowIssue[],

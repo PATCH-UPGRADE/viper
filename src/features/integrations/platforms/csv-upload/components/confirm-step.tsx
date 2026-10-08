@@ -324,7 +324,10 @@ export const ConfirmStep = ({
           {
             header: "Device",
             cell: (row) => (
-              <TwoLineCell title={makeAndModelOf(row)} detail={row.role} />
+              <TwoLineCell
+                title={makeAndModelOf(row)}
+                detail={row.deviceType}
+              />
             ),
           },
           {

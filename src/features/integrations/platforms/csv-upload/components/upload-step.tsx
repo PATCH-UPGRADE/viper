@@ -16,18 +16,19 @@ import {
 import { SAMPLE_ROW_COUNT } from "../contract";
 import {
   type CsvFileProblem,
+  type ParsedCsv,
   parseCsvFile,
   problemBeforeReading,
 } from "../review/csv-file";
 import { formatCount, formatFileSize } from "../review/labels";
 import { ImportFooter, StepHeading, StepLayout } from "./import-frame";
 
-export interface LoadedFile {
+export interface LoadedFile extends ParsedCsv {
   name: string;
   sizeBytes: number;
-  headers: string[];
-  rows: string[][];
 }
+
+const ROW_NUMBERS_NAMED = 5;
 
 const showFileProblem = (fileName: string, problem: CsvFileProblem) => {
   if (problem.kind === "notCsv") {
@@ -38,6 +39,11 @@ const showFileProblem = (fileName: string, problem: CsvFileProblem) => {
     toast.error(`${fileName} has no rows`, {
       description: "The file has a header row but no devices under it.",
     });
+  } else if (problem.kind === "brokenQuote") {
+    toast.error(`${fileName} can't be read past row ${problem.rowNumber}`, {
+      description:
+        "A quote on that row is never closed. Fix the row and upload the file again.",
+    });
   } else {
     toast.error(`${fileName} is ${formatFileSize(problem.sizeBytes)}`, {
       description:
@@ -46,22 +52,48 @@ const showFileProblem = (fileName: string, problem: CsvFileProblem) => {
   }
 };
 
+const warnAboutUnevenRows = (fileName: string, unevenRowNumbers: number[]) => {
+  const namedRowNumbers = unevenRowNumbers
+    .slice(0, ROW_NUMBERS_NAMED)
+    .join(", ");
+  const unnamedRowCount = unevenRowNumbers.length - ROW_NUMBERS_NAMED;
+  const whichRows =
+    unnamedRowCount > 0
+      ? `Rows ${namedRowNumbers} and ${formatCount(unnamedRowCount)} more.`
+      : `Rows ${namedRowNumbers}.`;
+  toast.warning(
+    `Some rows in ${fileName} have more or fewer cells than the header`,
+    {
+      description: `${whichRows} Missing cells are imported empty and extra cells are ignored.`,
+    },
+  );
+};
+
 const readCsvFile = async (browserFile: File): Promise<LoadedFile | null> => {
   const problemFromNameOrSize = problemBeforeReading(browserFile);
   if (problemFromNameOrSize) {
     showFileProblem(browserFile.name, problemFromNameOrSize);
     return null;
   }
-  const { headers, rows } = parseCsvFile(await browserFile.text());
-  if (rows.length === 0) {
+  const parsedFile = parseCsvFile(await browserFile.text());
+  if (parsedFile.brokenQuoteRowNumber !== null) {
+    showFileProblem(browserFile.name, {
+      kind: "brokenQuote",
+      rowNumber: parsedFile.brokenQuoteRowNumber,
+    });
+    return null;
+  }
+  if (parsedFile.rows.length === 0) {
     showFileProblem(browserFile.name, { kind: "noRows" });
     return null;
   }
+  if (parsedFile.unevenRowNumbers.length > 0) {
+    warnAboutUnevenRows(browserFile.name, parsedFile.unevenRowNumbers);
+  }
   return {
+    ...parsedFile,
     name: browserFile.name,
     sizeBytes: browserFile.size,
-    headers,
-    rows,
   };
 };
 

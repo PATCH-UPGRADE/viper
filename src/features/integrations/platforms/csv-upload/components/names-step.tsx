@@ -30,35 +30,41 @@ const NameQuestion = ({
   name: string;
   match: NameMatch["match"];
   decision: NameDecision | undefined;
-  onDecide: (decision: NameDecision) => void;
-}) => (
-  <li className="flex flex-wrap items-center gap-3 border-b py-2 text-sm">
-    <span className="min-w-0 flex-1">
-      <span className="font-medium">{name}</span>
-      <span className="text-muted-foreground">
-        {match ? ` looks like ${match.displayName}` : " is new to VIPER"}
+  onDecide: (decision: NameDecision | null) => void;
+}) => {
+  const isSameAsMatch = decision?.kind === "existing";
+  const isAddedAsNew = decision?.kind === "new";
+  return (
+    <li className="flex flex-wrap items-center gap-3 border-b py-2 text-sm">
+      <span className="min-w-0 flex-1">
+        <span className="font-medium">{name}</span>
+        <span className="text-muted-foreground">
+          {match ? ` looks like ${match.displayName}` : " is new to VIPER"}
+        </span>
       </span>
-    </span>
-    {match && (
+      {match && (
+        <Button
+          size="sm"
+          variant={isSameAsMatch ? "default" : "outline"}
+          aria-pressed={isSameAsMatch}
+          onClick={() =>
+            onDecide(isSameAsMatch ? null : { kind: "existing", id: match.id })
+          }
+        >
+          Same as {match.displayName}
+        </Button>
+      )}
       <Button
         size="sm"
-        variant={decision?.kind === "existing" ? "default" : "outline"}
-        aria-pressed={decision?.kind === "existing"}
-        onClick={() => onDecide({ kind: "existing", id: match.id })}
+        variant={isAddedAsNew ? "default" : "outline"}
+        aria-pressed={isAddedAsNew}
+        onClick={() => onDecide(isAddedAsNew ? null : { kind: "new" })}
       >
-        Same as {match.displayName}
+        Add as new
       </Button>
-    )}
-    <Button
-      size="sm"
-      variant={decision?.kind === "new" ? "default" : "outline"}
-      aria-pressed={decision?.kind === "new"}
-      onClick={() => onDecide({ kind: "new" })}
-    >
-      Add as new
-    </Button>
-  </li>
-);
+    </li>
+  );
+};
 
 export const NamesStep = ({
   review,
@@ -78,7 +84,7 @@ export const NamesStep = ({
   onDecide: (
     kind: NameKind,
     key: string,
-    decision: NameDecision,
+    decision: NameDecision | null,
     pickedName?: string,
   ) => void;
   onBack: () => void;

@@ -9,12 +9,16 @@ import {
 export interface ParsedCsv {
   headers: string[];
   rows: string[][];
+  rowNumbers: number[];
+  unevenRowNumbers: number[];
+  brokenQuoteRowNumber: number | null;
 }
 
 export type CsvFileProblem =
   | { kind: "notCsv" }
   | { kind: "tooLarge"; sizeBytes: number }
-  | { kind: "noRows" };
+  | { kind: "noRows" }
+  | { kind: "brokenQuote"; rowNumber: number };
 
 export const problemBeforeReading = (file: {
   name: string;
@@ -38,13 +42,41 @@ const uniqueHeaders = (headerCells: string[]): string[] => {
   });
 };
 
+const isBlankLine = (cells: string[]): boolean =>
+  cells.every((cell) => cell.trim() === "");
+
+const filledCellCount = (cells: string[]): number =>
+  cells.findLastIndex((cell) => cell.trim() !== "") + 1;
+
 export const parseCsvFile = (text: string): ParsedCsv => {
   const parsed = Papa.parse<string[]>(text, {
     header: false,
-    skipEmptyLines: "greedy",
+    skipEmptyLines: false,
   });
-  const [headerCells = [], ...deviceRows] = parsed.data;
-  return { headers: uniqueHeaders(headerCells), rows: deviceRows };
+  const linesInFileOrder = parsed.data.map((cells, lineIndex) => ({
+    cells,
+    rowNumber: lineIndex + 1,
+  }));
+  const filledLines = linesInFileOrder.filter(
+    (line) => !isBlankLine(line.cells),
+  );
+  const [headerLine, ...deviceLines] = filledLines;
+  const headers = uniqueHeaders(headerLine?.cells ?? []);
+  const unevenLines = deviceLines.filter(
+    (line) =>
+      line.cells.length < headers.length ||
+      filledCellCount(line.cells) > headers.length,
+  );
+  const quoteError = parsed.errors.find((error) => error.type === "Quotes");
+
+  return {
+    headers,
+    rows: deviceLines.map((line) => line.cells),
+    rowNumbers: deviceLines.map((line) => line.rowNumber),
+    unevenRowNumbers: unevenLines.map((line) => line.rowNumber),
+    brokenQuoteRowNumber:
+      quoteError?.row === undefined ? null : quoteError.row + 1,
+  };
 };
 
 const cellAt = (row: string[], columnIndex: number): string =>

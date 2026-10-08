@@ -43,6 +43,7 @@ export const importReviewFor = (
   const rowsWithEveryColumn = buildRows({
     headers: file.headers,
     rawRows: file.rows,
+    rowNumbers: file.rowNumbers,
     mapping,
     statusValues: chosenStatuses,
   });
@@ -58,6 +59,7 @@ export const importReviewFor = (
       : buildRows({
           headers: file.headers,
           rawRows: file.rows,
+          rowNumbers: file.rowNumbers,
           mapping: planMapping,
           statusValues: chosenStatuses,
         }).rows;

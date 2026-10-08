@@ -1,6 +1,6 @@
 import prisma from "@/lib/db";
 import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
-import { requireDeviceTypeId } from "../../device-type-seeding";
+import { requireDeviceTypeId } from "../production/device-types";
 import {
   cpeVersionStatus,
   normalizeVersion,

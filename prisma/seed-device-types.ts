@@ -5,7 +5,10 @@
  * Run:    npm run db:seed-device-types
  */
 import prisma from "@/lib/db";
-import { seedDeviceTypes, seedFleetProducts } from "./device-type-seeding";
+import {
+  seedDeviceTypes,
+  seedFleetProducts,
+} from "./seeds/production/device-types";
 
 async function main() {
   const idBySlug = await seedDeviceTypes();

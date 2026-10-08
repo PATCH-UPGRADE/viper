@@ -1,5 +1,5 @@
-import { seedDeviceTypes, seedFleetProducts } from "../../device-type-seeding";
 import { seedCsafIntegration } from "./csaf-integration";
+import { seedDeviceTypes, seedFleetProducts } from "./device-types";
 import { seedManufacturers } from "./manufacturers";
 
 export async function seedProductionData() {

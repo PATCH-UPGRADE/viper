@@ -272,7 +272,7 @@ export async function seedVulnerabilities(userId: string) {
       },
       { actingUserId: userId },
     );
-    // TODO: VW-540 EPSS and KEV become records from enrichment in PR 2, and priority moves to
+    // TODO: VW-540 EPSS and KEV become records from enrichment in future PR, and priority moves to
     // Issue in VW-541. Until then they live on the vulnerability.
     const created = await prisma.vulnerability.update({
       where: { id: vulnerabilityId },

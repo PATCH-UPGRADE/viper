@@ -905,7 +905,6 @@ model Metric {
 }
 
 /// One upload from a TA3 performer. A vulnerability can have many, through its records.
-/// Who uploaded it is the record's userId.
 model TA3Submission {
   id       String              @id @default(cuid())
   recordId String              @unique

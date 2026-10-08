@@ -38,7 +38,7 @@ export function processVulnerabilityIntegrationSync(
         } = item;
         const connect = cpes ? await cpesToMatchingConnect(cpes) : [];
 
-        // TODO: VW-540 replaced by VulnerabilityRecords in PR 1b. Until then an unmapped item
+        // TODO: VW-540 replaced by VulnerabilityRecords in a future PR. Until then an unmapped item
         // still always creates a vulnerability, as before; it only gets the identifier when no
         // other vulnerability holds it yet, so it can't collide on the unique value.
         const identifier =

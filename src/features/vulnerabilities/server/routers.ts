@@ -41,7 +41,7 @@ import {
 import { processVulnerabilityIntegrationSync } from "./integration-sync";
 import { createVulnerabilityRecord, cvssMetricType } from "./records";
 
-// TODO: VW-540 stop-gap until PR 1b replaces create and createBulk with
+// TODO: VW-540 stop-gap until future PR replaces create and createBulk with
 // POST /vulnerabilityRecords. Maps the old flat input onto one TA3 record. A known cveId now
 // adds the record to that vulnerability instead of creating a second one, and
 // affectedComponents is dropped.

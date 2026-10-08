@@ -1,4 +1,5 @@
 // No "server-only": the dev seed imports this under plain tsx, where that package throws.
+// Helpers to create, update, or remove VulnerabilityRecords, creating Vulnerability as needed
 import { TRPCError } from "@trpc/server";
 import { cvssBand } from "@/features/vulnerabilities/utils";
 import {

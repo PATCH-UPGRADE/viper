@@ -1,4 +1,5 @@
 // No "server-only": the dev seed imports this under plain tsx, where that package throws.
+// Helper functions used to match vulnerabilities or display them based on their identifiers
 import { randomBytes } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import type { TransactionClient } from "@/lib/db";
@@ -61,7 +62,7 @@ export function computeDisplayId(
   return best?.displayValue ?? null;
 }
 
-/** An identifier for a vulnerability that has no public ID yet (a zero-day). */
+/** An identifier for a vulnerability that has no public ID yet (e.g, a TA3 zero-day). */
 export function mintViperIdentifier(): NormalizedIdentifier {
   const value = `${VIPER_PREFIX}${randomBytes(6).toString("hex").toUpperCase()}`;
   return { value, displayValue: value };

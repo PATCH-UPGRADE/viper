@@ -10,6 +10,7 @@ on:
     paths:
       - 'prisma/schema.prisma'
       - 'prisma/migrations/**'
+      - '.github/workflows/test-prisma-migrations.yml'
   workflow_dispatch:
     inputs:
       migrate_neon_preview_branch:

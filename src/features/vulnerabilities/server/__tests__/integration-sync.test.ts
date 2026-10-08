@@ -4,11 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   processIntegrationSync: vi.fn(),
   cpesToMatchingConnect: vi.fn(async () => [{ id: "m-1" }]),
+  findIdentifier: vi.fn(async (): Promise<{ id: string } | null> => null),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({
-  default: { vulnerability: {}, externalVulnerabilityMapping: {} },
+  default: {
+    vulnerability: {},
+    externalVulnerabilityMapping: {},
+    vulnerabilityIdentifier: { findUnique: mocks.findIdentifier },
+  },
 }));
 vi.mock("@/features/integrations/core/sync/upsert", () => ({
   processIntegrationSync: mocks.processIntegrationSync,
@@ -50,5 +55,34 @@ describe("processVulnerabilityIntegrationSync", () => {
     });
     expect(createData.sarif).toBe(sarif);
     expect(updateData.sarif).toBe(sarif);
+  });
+
+  it("creates the vulnerability with its CVE as an identifier", async () => {
+    const { createData } = await transform({
+      externalId: "v-1",
+      cpes: [CPE],
+      cveId: "cve-2024-0001",
+    });
+    expect(createData.displayId).toBe("CVE-2024-0001");
+    expect(createData.identifiers).toEqual({
+      create: { value: "CVE-2024-0001", displayValue: "CVE-2024-0001" },
+    });
+  });
+
+  it("gives a vulnerability with no CVE a VIPER identifier", async () => {
+    const { createData } = await transform({ externalId: "v-1", cpes: [CPE] });
+    expect(createData.displayId).toMatch(/^VIPER-[0-9A-F]{12}$/);
+    expect(createData.identifiers.create.value).toBe(createData.displayId);
+  });
+
+  it("leaves out an identifier another vulnerability already holds", async () => {
+    mocks.findIdentifier.mockResolvedValueOnce({ id: "ident-1" });
+    const { createData } = await transform({
+      externalId: "v-1",
+      cpes: [CPE],
+      cveId: "CVE-2024-0001",
+    });
+    expect(createData.displayId).toBe("CVE-2024-0001");
+    expect(createData.identifiers).toBeUndefined();
   });
 });

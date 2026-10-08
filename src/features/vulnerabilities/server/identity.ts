@@ -1,4 +1,4 @@
-import "server-only";
+// No "server-only": the dev seed imports this under plain tsx, where that package throws.
 import { randomBytes } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import type { TransactionClient } from "@/lib/db";

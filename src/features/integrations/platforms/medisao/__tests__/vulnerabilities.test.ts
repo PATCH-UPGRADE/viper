@@ -71,6 +71,10 @@ describe("resolveOrMintVulnerabilities", () => {
 
     expect(prismaMock.vulnerability.create).toHaveBeenCalledWith({
       data: {
+        displayId: "CVE-2026-0002",
+        identifiers: {
+          create: { value: "CVE-2026-0002", displayValue: "CVE-2026-0002" },
+        },
         cveId: "CVE-2026-0002",
         description: null,
         sarif: {},
@@ -92,6 +96,13 @@ describe("resolveOrMintVulnerabilities", () => {
     const [{ data }] = prismaMock.vulnerability.create.mock.calls[0];
     expect(data.cveId).toBeNull();
     expect(data.description).toBe("GHSA-abcd-efgh-ijkl. Named by MedISAO.");
+    expect(data.displayId).toBe("GHSA-abcd-efgh-ijkl");
+    expect(data.identifiers).toEqual({
+      create: {
+        value: "GHSA-ABCD-EFGH-IJKL",
+        displayValue: "GHSA-abcd-efgh-ijkl",
+      },
+    });
   });
 
   it("finds an earlier stub through its mapping and does not mint it again", async () => {

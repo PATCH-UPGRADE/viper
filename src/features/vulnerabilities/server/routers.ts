@@ -3,7 +3,13 @@ import {
   attachNote,
   attachNotes,
 } from "@/features/notes/server/get-relevant-notes";
-import { type AlohaStatus, Priority, ResourceType } from "@/generated/prisma";
+import {
+  type AlohaStatus,
+  MetricType,
+  Priority,
+  ResourceType,
+  VulnerabilitySource,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import {
@@ -33,6 +39,53 @@ import {
   vulnerabilityUpdateInputSchema,
 } from "../types";
 import { processVulnerabilityIntegrationSync } from "./integration-sync";
+import { createVulnerabilityRecord, cvssMetricType } from "./records";
+
+// TODO: VW-540 stop-gap until PR 1b replaces create and createBulk with
+// POST /vulnerabilityRecords. Maps the old flat input onto one TA3 record. A known cveId now
+// adds the record to that vulnerability instead of creating a second one, and
+// affectedComponents is dropped.
+async function createFromLegacyInput(
+  input: z.infer<typeof vulnerabilityInputSchema>,
+  userId: string,
+) {
+  const connect = await cpesToMatchingConnect(input.cpes);
+  const { cvssScore, cvssVector, severity } = input;
+  const { vulnerabilityId } = await createVulnerabilityRecord(
+    {
+      source: VulnerabilitySource.TA3,
+      identifiers: input.cveId ? [input.cveId] : [],
+      details: input.description,
+      metrics:
+        cvssScore != null
+          ? [
+              {
+                type: cvssMetricType(cvssVector),
+                score: cvssScore,
+                vector: cvssVector,
+                severity,
+              },
+            ]
+          : severity
+            ? [{ type: MetricType.QUALITATIVE, severity }]
+            : [],
+      deviceGroupMatchingIds: connect.map(({ id }) => id),
+      ta3Submission: {
+        sarif: input.sarif ?? {},
+        narrative: input.narrative,
+        impact: input.impact,
+        exploitUri: input.exploitUri,
+        deviceArtifactId: input.deviceArtifactId,
+      },
+      userId,
+    },
+    { actingUserId: userId },
+  );
+  return prisma.vulnerability.findUniqueOrThrow({
+    where: { id: vulnerabilityId },
+    include: vulnerabilityInclude,
+  });
+}
 
 const createSearchFilter = (search: string) => {
   const insensitive = { contains: search, mode: "insensitive" as const };
@@ -202,19 +255,9 @@ export const vulnerabilitiesRouter = createTRPCRouter({
       },
     })
     .output(vulnerabilityResponseSchema)
-    .mutation(async ({ ctx, input }) => {
-      const { cpes, ...dataInput } = input;
-      const connect = await cpesToMatchingConnect(cpes);
-
-      return prisma.vulnerability.create({
-        data: {
-          ...dataInput,
-          deviceGroupMatchings: { connect },
-          userId: ctx.auth.user.id,
-        },
-        include: vulnerabilityInclude,
-      });
-    }),
+    .mutation(({ ctx, input }) =>
+      createFromLegacyInput(input, ctx.auth.user.id),
+    ),
 
   // POST /api/vulnerabilities/bulk - Create one or more vulnerabilities
   createBulk: protectedProcedure
@@ -231,25 +274,12 @@ export const vulnerabilitiesRouter = createTRPCRouter({
     })
     .output(vulnerabilityArrayResponseSchema)
     .mutation(async ({ ctx, input }) => {
-      // resolve shared matchings up-front (each runs its own transaction)
-      const connects = await Promise.all(
-        input.vulnerabilities.map((vuln) => cpesToMatchingConnect(vuln.cpes)),
-      );
-
-      // create all vulns in a transaction
-      return prisma.$transaction(
-        input.vulnerabilities.map((vuln, index) => {
-          const { cpes: _cpes, ...dataInput } = vuln;
-          return prisma.vulnerability.create({
-            data: {
-              ...dataInput,
-              deviceGroupMatchings: { connect: connects[index] },
-              userId: ctx.auth.user.id,
-            },
-            include: vulnerabilityInclude,
-          });
-        }),
-      );
+      // Sequential, and no longer one transaction: each record is created on its own.
+      const created = [];
+      for (const vuln of input.vulnerabilities) {
+        created.push(await createFromLegacyInput(vuln, ctx.auth.user.id));
+      }
+      return created;
     }),
 
   processIntegrationCreate: baseProcedure

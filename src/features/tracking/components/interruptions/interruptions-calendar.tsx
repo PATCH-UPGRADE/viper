@@ -135,6 +135,10 @@ const ItemButton = ({
   </TicketDrawer>
 );
 
+// "7 AM" on the hour, "7:45 AM" otherwise.
+const clock = (date: Date) =>
+  format(date, date.getMinutes() ? "h:mm a" : "h a");
+
 const TicketBlock = ({ block }: { block: Block }) => {
   const { item } = block;
   const { Icon, label } = availabilityStyle(item.availability);
@@ -167,9 +171,9 @@ const TicketBlock = ({ block }: { block: Block }) => {
             <Icon className="size-3 shrink-0" aria-hidden />
             <span className="sr-only">{label}</span>
             <span className="truncate">
-              {format(item.scheduledAt, "h:mm a")}
+              {clock(item.scheduledAt)}
               {item.durationEstimate &&
-                ` – ${format(addMinutes(item.scheduledAt, item.durationEstimate), "h:mm a")}`}
+                ` – ${clock(addMinutes(item.scheduledAt, item.durationEstimate))}`}
             </span>
           </span>
         )}

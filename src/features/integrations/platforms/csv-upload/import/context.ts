@@ -13,6 +13,7 @@ import {
   type NameDecision,
   type NameDecisions,
 } from "../contract";
+import { macSpellings } from "../validate";
 import type { ContextAsset, MatchContext } from "./match-rows";
 
 export interface CanonicalNames {
@@ -104,7 +105,10 @@ export async function loadMatchContext(
   const keyClauses: Prisma.AssetWhereInput[] = [];
   if (serials.length > 0) keyClauses.push({ serialNumber: { in: serials } });
   if (macAddresses.length > 0) {
-    keyClauses.push({ macAddress: { in: macAddresses } });
+    const macsInEverySpelling = macAddresses.flatMap(macSpellings);
+    keyClauses.push({
+      macAddress: { in: macsInEverySpelling, mode: "insensitive" },
+    });
   }
   if (hostnames.length > 0) keyClauses.push({ hostname: { in: hostnames } });
   if (keyClauses.length === 0) return { assets: new Map() };

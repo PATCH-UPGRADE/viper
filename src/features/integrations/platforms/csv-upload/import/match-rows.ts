@@ -1,5 +1,6 @@
 import type { AssetStatus } from "@/generated/prisma";
 import type { MatchKeysRow, RowOutcome } from "../contract";
+import { isValidMac, normalizeMac } from "../validate";
 
 export interface ContextAsset {
   id: string;
@@ -41,13 +42,20 @@ const conflict = (reason: string): DeviceMatch => ({
 
 const device = (assetId: string): DeviceMatch => ({ kind: "device", assetId });
 
+const matchValueOf = (asset: ContextAsset, key: MatchKey): string | null => {
+  const storedValue = asset[key];
+  const isStoredMac =
+    key === "macAddress" && storedValue !== null && isValidMac(storedValue);
+  return isStoredMac ? normalizeMac(storedValue) : storedValue;
+};
+
 function indexAssetsBy(
   assets: ContextAsset[],
   key: MatchKey,
 ): Map<string, string[]> {
   const assetIdsByValue = new Map<string, string[]>();
   for (const asset of assets) {
-    const value = asset[key];
+    const value = matchValueOf(asset, key);
     if (value === null) continue;
     const assetIdsWithValue = assetIdsByValue.get(value) ?? [];
     assetIdsWithValue.push(asset.id);

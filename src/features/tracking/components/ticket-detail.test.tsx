@@ -1092,13 +1092,21 @@ const baseTicketDetail = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const renderDetail = (overrides: Record<string, unknown> = {}) => {
+const renderDetail = (
+  overrides: Record<string, unknown> = {},
+  {
+    embedded,
+    onUrlUpdate,
+  }: { embedded?: boolean; onUrlUpdate?: () => void } = {},
+) => {
   mockUseSuspenseTrackingTicket.mockReturnValue({
     data: baseTicketDetail(overrides),
   });
-  return render(<TicketDetailContent id="ticket-1" />, {
+  return render(<TicketDetailContent id="ticket-1" embedded={embedded} />, {
     wrapper: ({ children }) => (
-      <NuqsTestingAdapter>{children}</NuqsTestingAdapter>
+      <NuqsTestingAdapter onUrlUpdate={onUrlUpdate}>
+        {children}
+      </NuqsTestingAdapter>
     ),
   });
 };
@@ -1369,6 +1377,55 @@ describe("TicketDetailContent — view mode", () => {
     expect(within(entry).getByText("Priority")).toBeInTheDocument();
     expect(within(entry).getByText("High")).toBeInTheDocument();
     expect(within(entry).getByText("Critical")).toBeInTheDocument();
+  });
+});
+
+describe("TicketDetailContent — embedded", () => {
+  it("hides the breadcrumb, Watch and Edit but keeps the title", () => {
+    renderDetail(
+      { parent: { id: "parent-9", summary: "Quarterly patch sweep" } },
+      { embedded: true },
+    );
+
+    expect(
+      screen.getByRole("heading", { name: /patch icu monitors/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", {
+        name: /work orders|quarterly patch sweep/i,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^edit$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^watch/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the tab out of the URL", async () => {
+    const user = userEvent.setup();
+    const onUrlUpdate = vi.fn();
+    renderDetail({}, { embedded: true, onUrlUpdate });
+
+    await user.click(screen.getByRole("tab", { name: /^assets/i }));
+
+    expect(screen.getByRole("tab", { name: /^assets/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(onUrlUpdate).not.toHaveBeenCalled();
+  });
+
+  it("still keeps the tab in the URL on the page", async () => {
+    const user = userEvent.setup();
+    const onUrlUpdate = vi.fn();
+    renderDetail({}, { onUrlUpdate });
+
+    await user.click(screen.getByRole("tab", { name: /^assets/i }));
+
+    expect(onUrlUpdate).toHaveBeenCalledTimes(1);
+    expect(onUrlUpdate.mock.calls[0][0].queryString).toBe("?tab=assets");
   });
 });
 

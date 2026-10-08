@@ -23,7 +23,7 @@ export const WorkOrderModal = ({ workOrderId }: { workOrderId: string }) => (
     </DialogTrigger>
     <DialogContent
       aria-describedby={undefined}
-      className="max-h-[85vh] w-[95vw] max-w-5xl overflow-y-auto sm:max-w-5xl"
+      className="max-h-[85vh] w-[95vw] max-w-5xl overflow-y-auto sm:max-w-5xl [&>[data-slot=dialog-close]]:top-2 [&>[data-slot=dialog-close]]:right-2 [&>[data-slot=dialog-close]]:p-2.5 [&>[data-slot=dialog-close]_svg]:size-6"
     >
       <DialogTitle className="sr-only">Work order</DialogTitle>
       <ReportingErrorBoundary fallback={<TicketDetailError />}>

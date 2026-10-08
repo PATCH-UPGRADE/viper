@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BriefingPanel } from "@/features/mitigation/components/accept-plan-drawer/briefing-panel";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
+import { cn } from "@/lib/utils";
 import {
   useMarkTicketSeen,
   useSetWatching,
@@ -128,7 +129,12 @@ const TicketDetailBody = ({
           )}
 
           <div className="flex items-start gap-3">
-            <h1 className="min-w-0 flex-1 text-xl font-semibold md:text-2xl">
+            <h1
+              className={cn(
+                "min-w-0 flex-1 text-xl font-semibold md:text-2xl",
+                embedded && "pr-10",
+              )}
+            >
               {data.summary}
             </h1>
             {!isEditing && !embedded && (

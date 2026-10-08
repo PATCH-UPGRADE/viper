@@ -9,27 +9,40 @@ import {
   upsertIdentifiers,
 } from "../identity";
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: {} }));
 
-type Row = { value: string; vulnerabilityId: string };
+type Row = { value: string; displayValue?: string; vulnerabilityId: string };
 
-/** An in-memory vulnerabilityIdentifier table with the unique `value` constraint. */
+/**
+ * An in-memory vulnerabilityIdentifier table with the unique `value` constraint, kept in
+ * insertion (createdAt) order.
+ */
 function fakeClient(rows: Row[] = []) {
-  const table = [...rows];
+  const table = rows.map((row) => ({
+    displayValue: row.value,
+    ...row,
+  }));
   const vulnerabilityIdentifier = {
     findMany: vi.fn(
       async ({
         where,
       }: {
-        where: { value: { in: string[] }; vulnerabilityId?: { not: string } };
+        where: {
+          value?: { in: string[] };
+          vulnerabilityId?: string | { not: string };
+        };
       }) =>
         table.filter(
           (row) =>
-            where.value.in.includes(row.value) &&
-            row.vulnerabilityId !== where.vulnerabilityId?.not,
+            (!where.value || where.value.in.includes(row.value)) &&
+            (where.vulnerabilityId === undefined ||
+              (typeof where.vulnerabilityId === "string"
+                ? row.vulnerabilityId === where.vulnerabilityId
+                : row.vulnerabilityId !== where.vulnerabilityId.not)),
         ),
     ),
-    createMany: vi.fn(async ({ data }: { data: Row[] }) => {
+    createMany: vi.fn(async ({ data }: { data: Required<Row>[] }) => {
       for (const row of data) {
         if (!table.some((existing) => existing.value === row.value)) {
           table.push(row);
@@ -37,8 +50,12 @@ function fakeClient(rows: Row[] = []) {
       }
     }),
   };
-  // biome-ignore lint/suspicious/noExplicitAny: a partial fake of the Prisma delegate
-  return { client: { vulnerabilityIdentifier } as any, table };
+  const vulnerability = { updateMany: vi.fn(async () => ({ count: 1 })) };
+  return {
+    // biome-ignore lint/suspicious/noExplicitAny: a partial fake of the Prisma delegates
+    client: { vulnerabilityIdentifier, vulnerability } as any,
+    table,
+  };
 }
 
 describe("normalizeIdentifier", () => {
@@ -159,6 +176,21 @@ describe("upsertIdentifiers", () => {
       "CVE-2024-1234",
       "GHSA-ABCD-EFGH-IJKL",
     ]);
+  });
+
+  it("recomputes displayId when a better identifier arrives", async () => {
+    const { client } = fakeClient([
+      { value: "VIPER-ABC", vulnerabilityId: "v-1" },
+    ]);
+    await upsertIdentifiers(
+      client,
+      "v-1",
+      normalizeIdentifiers(["GHSA-abcd-efgh-ijkl", "CVE-2024-1234"]),
+    );
+    expect(client.vulnerability.updateMany).toHaveBeenCalledWith({
+      where: { id: "v-1", displayId: { not: "CVE-2024-1234" } },
+      data: { displayId: "CVE-2024-1234" },
+    });
   });
 
   it("throws CONFLICT for an identifier another vulnerability holds", async () => {

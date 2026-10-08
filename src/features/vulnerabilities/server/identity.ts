@@ -1,5 +1,5 @@
-// No "server-only": the dev seed imports this under plain tsx, where that package throws.
 // Helper functions used to match vulnerabilities or display them based on their identifiers
+import "server-only";
 import { randomBytes } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import type { TransactionClient } from "@/lib/db";
@@ -17,6 +17,10 @@ export interface NormalizedIdentifier {
 }
 
 type IdentifierReader = Pick<TransactionClient, "vulnerabilityIdentifier">;
+type IdentifierWriter = Pick<
+  TransactionClient,
+  "vulnerabilityIdentifier" | "vulnerability"
+>;
 
 export function normalizeIdentifier(raw: string): NormalizedIdentifier | null {
   const trimmed = raw.trim();
@@ -92,11 +96,11 @@ export async function findVulnerabilityByIdentifiers(
 }
 
 /**
- * Attach identifiers to a vulnerability. Ones it already has are left alone; one that belongs
- * to another vulnerability throws CONFLICT. Does not recompute `displayId`.
+ * Attach identifiers to a vulnerability and recompute its `displayId`. Ones it already has are
+ * left alone; one that belongs to another vulnerability throws CONFLICT.
  */
 export async function upsertIdentifiers(
-  client: IdentifierReader,
+  client: IdentifierWriter,
   vulnerabilityId: string,
   identifiers: NormalizedIdentifier[],
 ): Promise<void> {
@@ -116,6 +120,20 @@ export async function upsertIdentifiers(
     throw new TRPCError({
       code: "CONFLICT",
       message: `Identifiers ${taken.map((row) => row.value).join(", ")} already belong to another vulnerability`,
+    });
+  }
+
+  // Oldest first, so of two IDs of the same kind the first one stays the display ID.
+  const all = await client.vulnerabilityIdentifier.findMany({
+    where: { vulnerabilityId },
+    orderBy: { createdAt: "asc" },
+    select: { value: true, displayValue: true },
+  });
+  const displayId = computeDisplayId(all);
+  if (displayId) {
+    await client.vulnerability.updateMany({
+      where: { id: vulnerabilityId, displayId: { not: displayId } },
+      data: { displayId },
     });
   }
 }

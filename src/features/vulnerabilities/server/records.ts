@@ -1,5 +1,5 @@
-// No "server-only": the dev seed imports this under plain tsx, where that package throws.
 // Helpers to create, update, or remove VulnerabilityRecords, creating Vulnerability as needed
+import "server-only";
 import { TRPCError } from "@trpc/server";
 import { cvssBand } from "@/features/vulnerabilities/utils";
 import {
@@ -9,6 +9,7 @@ import {
   VulnerabilitySource,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { isUniqueViolation } from "@/lib/router-utils";
 import { requireExistence } from "@/trpc/middleware";
 import {
   CVE_PATTERN,
@@ -81,12 +82,6 @@ export type VulnerabilityRecordPatch = Partial<
 
 const isCvss = (type: MetricType) => CVSS_METRIC_TYPES.includes(type);
 
-const isUniqueViolation = (error: unknown) =>
-  typeof error === "object" &&
-  error !== null &&
-  "code" in error &&
-  error.code === "P2002";
-
 function assertSubmissionMatchesSource(
   source: VulnerabilitySource,
   submission: Ta3SubmissionInput | null | undefined,
@@ -129,6 +124,8 @@ function toSubmissionCreate(
  * identifiers, or created when none of them is known yet.
  *
  * `actingUserId` only fills the legacy `Vulnerability.userId` column.
+ * TODO: VW-540 remove `actingUserId` once `Vulnerability.userId` is dropped; ownership is
+ * `data.userId` on the record.
  */
 export async function createVulnerabilityRecord(
   data: VulnerabilityRecordData,
@@ -310,69 +307,31 @@ async function findOrCreateVulnerability(
 
 /**
  * Bring a vulnerability in line with its records: attach new device rules (opening their
- * baseline Issues), recompute displayId, and copy record values onto the legacy columns. Also
- * bumps updatedAt, which ALOHA polls on.
+ * baseline Issues) and recompute its severity from the newest rated metric. Also bumps
+ * updatedAt, which ALOHA polls on.
  */
 async function refreshVulnerability(
   vulnerabilityId: string,
   deviceGroupMatchingIds: string[] = [],
 ) {
-  const onVulnerability = { record: { vulnerabilityId } };
-  const [identifiers, cvss, rated, submission] = await Promise.all([
-    prisma.vulnerabilityIdentifier.findMany({
-      where: { vulnerabilityId },
-      orderBy: { createdAt: "asc" },
-      select: { value: true, displayValue: true },
-    }),
-    prisma.metric.findFirst({
-      where: { ...onVulnerability, type: { in: CVSS_METRIC_TYPES } },
-      orderBy: { updatedAt: "desc" },
-      select: { score: true, vector: true },
-    }),
-    prisma.metric.findFirst({
-      where: {
-        ...onVulnerability,
-        type: { in: [...CVSS_METRIC_TYPES, MetricType.QUALITATIVE] },
-        severity: { not: null },
-      },
-      orderBy: { updatedAt: "desc" },
-      select: { severity: true },
-    }),
-    prisma.tA3Submission.findFirst({
-      where: onVulnerability,
-      orderBy: { updatedAt: "desc" },
-      select: { sarif: true, exploitUri: true, deviceArtifactId: true },
-    }),
-  ]);
-
-  const displayId = computeDisplayId(identifiers);
+  const rated = await prisma.metric.findFirst({
+    where: {
+      record: { vulnerabilityId },
+      type: { in: [...CVSS_METRIC_TYPES, MetricType.QUALITATIVE] },
+      severity: { not: null },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { severity: true },
+  });
   const matchings = [...new Set(deviceGroupMatchingIds)].map((id) => ({ id }));
 
   await prisma.vulnerability.update({
     where: { id: vulnerabilityId },
     data: {
-      ...(displayId ? { displayId } : {}),
       ...(matchings.length > 0
         ? { deviceGroupMatchings: { connect: matchings } }
         : {}),
       ...(rated?.severity ? { severity: rated.severity } : {}),
-      // TODO: VW-540 legacy columns. Written only when a record has the value, so values that
-      // inbox or enrichment wrote straight onto the vulnerability aren't cleared. When records
-      // disagree, the most recent one wins.
-      ...(displayId && CVE_PATTERN.test(displayId) ? { cveId: displayId } : {}),
-      ...(cvss
-        ? {
-            cvssScore: cvss.score?.toNumber() ?? null,
-            cvssVector: cvss.vector,
-          }
-        : {}),
-      ...(submission
-        ? {
-            sarif: (submission.sarif ?? {}) as Prisma.InputJsonValue,
-            exploitUri: submission.exploitUri,
-            deviceArtifactId: submission.deviceArtifactId,
-          }
-        : {}),
     },
   });
 

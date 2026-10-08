@@ -189,7 +189,8 @@ async function seedSyngoPlazaVexScenario(userId: string) {
     (await prisma.vulnerability.create({
       data: {
         cveId: "CVE-2024-52334",
-        // TODO: VW-540 manual script: no VulnerabilityIdentifier, so record lookups miss it.
+        // TODO: VW-540 writes no VulnerabilityIdentifier, so createVulnerabilityRecord can't find this
+        // vulnerability by its CVE and would create a duplicate. Create it through that instead.
         displayId: "CVE-2024-52334",
         severity: Severity.Medium,
         cvssScore: 5.3,
@@ -616,7 +617,8 @@ async function seedDeserializationScenario(userId: string) {
     (await prisma.vulnerability.create({
       data: {
         cveId: "CVE-2022-29875",
-        // TODO: VW-540 manual script: no VulnerabilityIdentifier, so record lookups miss it.
+        // TODO: VW-540 writes no VulnerabilityIdentifier, so createVulnerabilityRecord can't find this
+        // vulnerability by its CVE and would create a duplicate. Create it through that instead.
         displayId: "CVE-2022-29875",
         severity: Severity.Critical,
         cvssScore: 9.8,

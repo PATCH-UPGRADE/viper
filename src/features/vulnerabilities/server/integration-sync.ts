@@ -5,12 +5,13 @@ import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { cpesToMatchingConnect } from "@/lib/router-utils";
 import type { integrationVulnerabilityInputSchema } from "../types";
-import { mintViperIdentifier, normalizeIdentifier } from "./identity";
 
 type IntegrationVulnerabilityItem = z.infer<
   typeof integrationVulnerabilityInputSchema
 >["items"][number];
 
+// TODO: VW-540 broken until it is moved onto VulnerabilityRecord: the create below sets no
+// displayId (now required) or identifiers, so syncing a new vulnerability fails.
 export function processVulnerabilityIntegrationSync(
   input: {
     items: (Omit<IntegrationVulnerabilityItem, "sarif"> & {
@@ -38,22 +39,9 @@ export function processVulnerabilityIntegrationSync(
         } = item;
         const connect = cpes ? await cpesToMatchingConnect(cpes) : [];
 
-        // TODO: VW-540 replaced by VulnerabilityRecords in a future PR. Until then an unmapped item
-        // still always creates a vulnerability, as before; it only gets the identifier when no
-        // other vulnerability holds it yet, so it can't collide on the unique value.
-        const identifier =
-          (itemData.cveId && normalizeIdentifier(itemData.cveId)) ||
-          mintViperIdentifier();
-        const taken = await prisma.vulnerabilityIdentifier.findUnique({
-          where: { value: identifier.value },
-          select: { id: true },
-        });
-
         return {
           createData: {
             ...itemData,
-            displayId: identifier.displayValue,
-            ...(taken ? {} : { identifiers: { create: identifier } }),
             // Vulnerability.sarif is a required Json column, and most sources
             // have no SARIF to give.
             sarif: sarif ?? {},

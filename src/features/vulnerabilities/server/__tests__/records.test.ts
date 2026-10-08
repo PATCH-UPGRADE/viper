@@ -37,6 +37,7 @@ const { db, identifiers } = vi.hoisted(() => {
     },
     vulnerability: {
       create: vi.fn(),
+      updateMany: vi.fn(async () => ({ count: 1 })),
       update: vi.fn(async (_args: { data: Record<string, unknown> }) => ({})),
       deleteMany: vi.fn(async () => ({ count: 0 })),
     },
@@ -60,6 +61,7 @@ const { db, identifiers } = vi.hoisted(() => {
   return { db, identifiers };
 });
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ default: db }));
 
 import {
@@ -241,52 +243,26 @@ describe("createVulnerabilityRecord", () => {
   });
 });
 
-describe("refreshing the legacy columns", () => {
-  it("copies the newest metric and submission onto the vulnerability", async () => {
+describe("refreshing the vulnerability", () => {
+  it("takes its severity from the newest rated metric", async () => {
     createsVulnerability("v-1");
-    db.metric.findFirst
-      .mockResolvedValueOnce({
-        score: { toNumber: () => 5.3 },
-        vector: "CVSS:3.1/AV:N",
-      } as never)
-      .mockResolvedValueOnce({ severity: "Medium" } as never);
-    db.tA3Submission.findFirst.mockResolvedValueOnce({
-      sarif: SARIF,
-      exploitUri: "https://example.com/x",
-      deviceArtifactId: null,
-    } as never);
+    db.metric.findFirst.mockResolvedValueOnce({ severity: "Medium" } as never);
 
     await createVulnerabilityRecord(ta3(), { actingUserId: "user-1" });
 
     const [{ data }] = db.vulnerability.update.mock.calls[0];
-    expect(data).toMatchObject({
-      displayId: "CVE-2024-1234",
-      cveId: "CVE-2024-1234",
-      cvssScore: 5.3,
-      cvssVector: "CVSS:3.1/AV:N",
-      severity: "Medium",
-      sarif: SARIF,
-      exploitUri: "https://example.com/x",
-    });
+    expect(data.severity).toBe("Medium");
   });
 
-  it("leaves legacy values alone when no record has them", async () => {
+  it("leaves the severity alone when no metric is rated", async () => {
     createsVulnerability("v-1");
 
-    await createVulnerabilityRecord(ta3({ identifiers: [] }), {
+    await createVulnerabilityRecord(ta3({ metrics: [] }), {
       actingUserId: "user-1",
     });
 
     const [{ data }] = db.vulnerability.update.mock.calls[0];
-    for (const key of [
-      "cveId",
-      "cvssScore",
-      "cvssVector",
-      "severity",
-      "sarif",
-    ]) {
-      expect(data).not.toHaveProperty(key);
-    }
+    expect(data).not.toHaveProperty("severity");
   });
 });
 

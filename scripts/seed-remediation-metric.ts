@@ -234,7 +234,8 @@ async function seedFixture(userId: string) {
   const vulnerability = await prisma.vulnerability.create({
     data: {
       cveId: FIXTURE_CVE,
-      // TODO: VW-540 manual script: no VulnerabilityIdentifier, so record lookups miss it.
+      // TODO: VW-540 writes no VulnerabilityIdentifier, so createVulnerabilityRecord can't find this
+      // vulnerability by its CVE and would create a duplicate. Create it through that instead.
       displayId: FIXTURE_CVE,
       severity: Severity.High,
       cvssScore: 8.8,

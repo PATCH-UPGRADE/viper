@@ -1,7 +1,7 @@
 import "server-only";
 import prisma from "@/lib/db";
+import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
 import { resolveVendor } from "@/lib/router-utils";
-import { SIEMENS_HEALTHINEERS } from "../config";
 
 export const FLEET_UNCONTRACTED_RESPONSIBILITIES =
   "Serviced by Siemens Healthineers — synced from the teamplay Fleet equipment inventory.";
@@ -10,7 +10,7 @@ export async function connectUncontractedAssets(
   integrationId: string,
   contractedAssetIds: ReadonlySet<string> = new Set(),
 ): Promise<void> {
-  const vendor = await resolveVendor(SIEMENS_HEALTHINEERS);
+  const vendor = await resolveVendor(SIEMENS_HEALTHINEERS.canonicalDisplayName);
 
   const contractBackedRelationships = await prisma.managesRelationship.findMany(
     {

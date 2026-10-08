@@ -10,6 +10,14 @@ on:
     paths:
       - 'prisma/schema.prisma'
       - 'prisma/migrations/**'
+      - 'prisma/seed.ts'
+      - 'prisma/seeds/production/**'
+      - 'src/lib/manufacturer-catalog.ts'
+      - 'src/lib/manufacturer-upsert.ts'
+
+concurrency:
+  group: production-prisma-migrations
+  cancel-in-progress: false
 
 jobs:
   migrate-production:
@@ -44,3 +52,8 @@ jobs:
         
       - name: Run Prisma Migrate
         run: npx prisma migrate deploy
+
+      - name: Seed production data
+        env:
+          SEED_SCOPE: production
+        run: npm run db:seed

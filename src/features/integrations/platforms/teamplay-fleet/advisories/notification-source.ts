@@ -4,7 +4,7 @@ import { aiExtractAndMatch } from "@/features/inbox/link-entities";
 import type { LinkEntities } from "@/features/inbox/pipeline";
 import type { SourceRecordAdapter } from "@/features/inbox/source-adapter";
 import prisma from "@/lib/db";
-import { SIEMENS_HEALTHINEERS } from "../config";
+import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
 import {
   type FleetAdvisoryItem,
   fleetAdvisoryRecordSchema,
@@ -12,7 +12,7 @@ import {
   toCanonical,
 } from "./advisories";
 
-const SOURCE_LABEL = `${SIEMENS_HEALTHINEERS} teamplay Fleet`;
+const SOURCE_LABEL = `${SIEMENS_HEALTHINEERS.canonicalDisplayName} teamplay Fleet`;
 
 export const linkAdvisoryVulnerabilities =
   (advisory: FleetAdvisoryItem): LinkEntities =>
@@ -59,7 +59,8 @@ const withSiemensManufacturer = (extracted: ExtractResult): ExtractResult => ({
   ...extracted,
   deviceGroups: extracted.deviceGroups.map((group) => ({
     ...group,
-    manufacturer: group.manufacturer ?? SIEMENS_HEALTHINEERS,
+    manufacturer:
+      group.manufacturer ?? SIEMENS_HEALTHINEERS.canonicalDisplayName,
   })),
 });
 
@@ -73,7 +74,8 @@ export const advisorySourceAdapter: SourceRecordAdapter = {
         ? `${advisory.raw.advisoryId}` + `: ${advisory.title}`
         : advisory.title,
       markdown:
-        `Manufacturer: ${SIEMENS_HEALTHINEERS}` + `\n\n${advisory.body}`,
+        `Manufacturer: ${SIEMENS_HEALTHINEERS.canonicalDisplayName}` +
+        `\n\n${advisory.body}`,
     };
 
     const extractAndMatch = aiExtractAndMatch(doc, withSiemensManufacturer);

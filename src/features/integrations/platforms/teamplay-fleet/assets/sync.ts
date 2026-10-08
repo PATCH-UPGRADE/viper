@@ -2,14 +2,11 @@ import "server-only";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
 import { resolveDeviceGroup } from "@/lib/router-utils";
 import type { IntegrationResponse } from "@/lib/schemas";
 import type { ResourceSyncCtx, SyncOutcome } from "../../../core/types";
-import {
-  type FleetConfig,
-  type FleetCreds,
-  SIEMENS_HEALTHINEERS,
-} from "../config";
+import type { FleetConfig, FleetCreds } from "../config";
 import { syncFleetContracts } from "./contracts";
 import {
   computeWeakSerials,
@@ -69,7 +66,7 @@ async function ingestFleetAssets(
       shouldRecordSyncOutcome: false,
       transformInputItem: async (item: FleetAssetItem, userId: string) => {
         const deviceGroup = await resolveDeviceGroup({
-          manufacturer: SIEMENS_HEALTHINEERS,
+          manufacturer: SIEMENS_HEALTHINEERS.canonicalDisplayName,
           product: item.productName,
           version: item.softwareVersion,
           hasCpe: false,

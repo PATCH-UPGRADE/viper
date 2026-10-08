@@ -18,7 +18,7 @@ USER node
 
 EXPOSE 3000
 
-# Prevent re-seeding if the container is restarted
+# The full seed runs on first boot only. The production data seed runs on every boot.
 CMD if [ ! -f /srv/stamps/.setup_done ]; then \
         echo "Initializing database" && \
         npx prisma migrate deploy && \
@@ -27,4 +27,5 @@ CMD if [ ! -f /srv/stamps/.setup_done ]; then \
     else \
         echo "Database already initialized; skipping seed."; \
     fi && \
+    (SEED_SCOPE=production npm run db:seed || echo "Production data seed failed; starting anyway.") && \
     npm start

@@ -16,7 +16,9 @@ import {
   Tlp,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
 import { sourceContentHash } from "@/lib/source-hash";
+import { seedProductionData } from "./seeds/production";
 
 // Seed user credentials
 const SEED_USER = {
@@ -127,13 +129,13 @@ const SAMPLE_DEVICE_GROUPS = [
   // ── Siemens Healthineers imaging —
   {
     cpe: "cpe:2.3:h:siemens:magnetom_sola:-:*:*:*:*:*:*:*",
-    manufacturer: "Siemens Healthineers",
+    manufacturer: SIEMENS_HEALTHINEERS.canonicalDisplayName,
     modelName: "MAGNETOM Sola",
     version: "N/A",
   },
   {
     cpe: "cpe:2.3:h:siemens:somatom_go.top:-:*:*:*:*:*:*:*",
-    manufacturer: "Siemens Healthineers",
+    manufacturer: SIEMENS_HEALTHINEERS.canonicalDisplayName,
     modelName: "SOMATOM go.Top",
     version: "N/A",
   },
@@ -1429,8 +1431,14 @@ function cpeVersionStatus(cpe: string): "UNKNOWN" | "NOT_APPLICABLE" | "KNOWN" {
 
 // Canonical resolvers (seed avoids importing the server-only router-utils).
 // canonicalName is @unique so upsert is race-safe.
-function upsertManufacturer(name: string) {
+async function upsertManufacturer(name: string) {
   const canonicalName = name.trim().toLowerCase();
+  const manufacturerByNameOrAlias = await prisma.manufacturer.findFirst({
+    where: {
+      OR: [{ canonicalName }, { nameMappings: { has: canonicalName } }],
+    },
+  });
+  if (manufacturerByNameOrAlias) return manufacturerByNameOrAlias;
   return prisma.manufacturer.upsert({
     where: { canonicalName },
     update: {},
@@ -1659,7 +1667,7 @@ async function seedFleetIntegration(userId: string) {
   // as unmanaged and no work order can be filed against seed data.
   const { count: managingRelationships } =
     await prisma.managesRelationship.updateMany({
-      where: { vendor: { canonicalName: "siemens healthineers" } },
+      where: { vendor: { canonicalName: SIEMENS_HEALTHINEERS.canonicalName } },
       data: { workOrderIntegrationId: integration.id },
     });
 
@@ -2514,14 +2522,16 @@ async function seedRelatedTicketLinks(
 async function seedVendors() {
   console.log("\n🌱 Seeding vendors...");
 
-  const manufacturer = await upsertManufacturer("Siemens Healthineers");
+  const manufacturer = await upsertManufacturer(
+    SIEMENS_HEALTHINEERS.canonicalDisplayName,
+  );
 
   const vendor = await prisma.vendor.upsert({
-    where: { canonicalName: "siemens healthineers" },
+    where: { canonicalName: SIEMENS_HEALTHINEERS.canonicalName },
     update: { manufacturerId: manufacturer.id },
     create: {
-      canonicalName: "siemens healthineers",
-      canonicalDisplayName: "Siemens Healthineers",
+      canonicalName: SIEMENS_HEALTHINEERS.canonicalName,
+      canonicalDisplayName: SIEMENS_HEALTHINEERS.canonicalDisplayName,
       overview: "Manages imaging fleet across radiology and cardiology.",
       partnerSince: new Date("2019-04-01"),
       manufacturerId: manufacturer.id,
@@ -2748,15 +2758,35 @@ async function seedCsafIntegration(userId: string) {
   console.log(`✅ Seeded CISA CSAF integration ${integration.id}`);
 }
 
+function requestedSeedScope() {
+  const requestedScope = process.env.SEED_SCOPE ?? "all";
+  if (requestedScope === "all" || requestedScope === "production") {
+    return requestedScope;
+  }
+  throw new Error(
+    `SEED_SCOPE must be "all" or "production". Got "${requestedScope}".`,
+  );
+}
+
 async function main() {
   console.log("🌱 Starting database seed...\n");
 
   try {
+    const seedScope = requestedSeedScope();
+    if (seedScope === "production") {
+      await seedProductionData();
+      console.log(
+        "\n✅ Production data seeded. Demo data skipped (SEED_SCOPE=production).",
+      );
+      return;
+    }
+
     const shouldClear = process.env.SEED_CLEAR_DB === "true";
     if (shouldClear) {
       await clearDatabase();
     }
 
+    await seedProductionData();
     const user = await createOrGetSeedUser();
 
     await seedDepartments(user.id);

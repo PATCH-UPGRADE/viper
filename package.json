@@ -11,6 +11,8 @@
     "inngest:dev": "inngest-cli dev",
     "dev:all": "mprocs",
     "db:seed": "prisma db seed",
+    "db:export-manufacturers": "tsx scripts/export-manufacturers.ts",
+    "db:upsert-manufacturers": "tsx scripts/upsert-manufacturers.ts",
     "db:create-test-api-key": "tsx scripts/create-test-api-key.ts",
     "db:create-blueflow-integration": "tsx scripts/create-blueflow-integration.ts",
     "db:set-fleet-credentials": "tsx --env-file=.env scripts/set-fleet-credentials.ts",

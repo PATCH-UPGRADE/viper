@@ -18,4 +18,5 @@ CMD mkdir -p /srv/stamps && \
     else \
         echo "Database already initialized; skipping seed."; \
     fi && \
+    (SEED_SCOPE=production npm run db:seed || echo "Production data seed failed; starting anyway.") && \
     npm run dev

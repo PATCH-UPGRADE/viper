@@ -13,6 +13,7 @@ import {
   matchNamesInputSchema,
   matchNamesOutputSchema,
   type NameMatch,
+  type SuggestMappingOutput,
   searchNamesInputSchema,
   searchNamesOutputSchema,
   suggestMappingInputSchema,
@@ -169,6 +170,18 @@ async function matchProducts(
   });
 }
 
+async function statusValuesOrNone(
+  statusHeader: string,
+  statusColumnValues: string[],
+): Promise<SuggestMappingOutput["statusValues"]> {
+  try {
+    return await suggestStatusValues(statusHeader, statusColumnValues);
+  } catch (error) {
+    console.error("Failed to suggest CSV status values:", error);
+    return [];
+  }
+}
+
 export const mappingProcedures = {
   suggestMapping: protectedProcedure
     .input(suggestMappingInputSchema)
@@ -182,7 +195,7 @@ export const mappingProcedures = {
       if (!statusHeader) return { fields, statusValues: [] };
 
       const statusColumnValues = input.distinctValues[statusHeader] ?? [];
-      const statusValues = await suggestStatusValues(
+      const statusValues = await statusValuesOrNone(
         statusHeader,
         statusColumnValues,
       );

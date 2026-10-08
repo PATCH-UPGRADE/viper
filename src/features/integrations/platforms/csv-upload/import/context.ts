@@ -28,11 +28,11 @@ const contextAssetSelect = {
   macAddress: true,
   serialNumber: true,
   networkSegment: true,
-  role: true,
   status: true,
   location: true,
   deviceGroup: {
     select: {
+      productId: true,
       manufacturer: { select: { canonicalDisplayName: true } },
       product: {
         select: { canonicalDisplayName: true, ...deviceTypeLabelSelect },
@@ -78,6 +78,7 @@ function toContextAsset(assetRow: ContextAssetRow): ContextAsset {
   );
   return {
     id: assetRow.id,
+    productId: assetRow.deviceGroup.productId,
     label: deviceLabel(assetRow),
     platforms: [...new Set(reportingPlatforms)],
     serialNumber: assetRow.serialNumber,
@@ -85,7 +86,6 @@ function toContextAsset(assetRow: ContextAssetRow): ContextAsset {
     hostname: assetRow.hostname,
     ip: assetRow.ip,
     networkSegment: assetRow.networkSegment,
-    role: assetRow.role,
     status: assetRow.status,
     location: storedLocation(assetRow.location),
   };

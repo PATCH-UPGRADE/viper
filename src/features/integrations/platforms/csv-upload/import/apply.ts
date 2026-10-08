@@ -1,10 +1,13 @@
 import "server-only";
+import { fillProductDeviceType } from "@/features/device-types/server/apply-device-type";
+import { resolveDeviceType } from "@/features/device-types/server/resolve-device-type";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { resolveDeviceGroup } from "@/lib/router-utils";
 import {
   addedAssetIdFor,
+  CSV_UPLOAD_DISPLAY_NAME,
   csvExternalId,
   type ImportFailure,
   normalizeNameKey,
@@ -21,7 +24,6 @@ const SCALAR_FIELDS = [
   "macAddress",
   "serialNumber",
   "networkSegment",
-  "role",
   "status",
 ] as const;
 
@@ -118,10 +120,40 @@ function fieldsMissingFromDevice(
   return fields;
 }
 
-async function deviceGroupIdFor(
+type FillDeviceType = (
+  productId: string | null,
+  row: StagedRow,
+) => Promise<void>;
+
+function prepareDeviceTypeFill(importId: string): FillDeviceType {
+  const checkedProductTypes = new Set<string>();
+
+  return async (productId, row) => {
+    if (productId === null || row.deviceType === null) return;
+    const productTypeKey = `${productId}::${normalizeNameKey(row.deviceType)}`;
+    if (checkedProductTypes.has(productTypeKey)) return;
+    checkedProductTypes.add(productTypeKey);
+
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { deviceTypeId: true },
+    });
+    const productNeedsType = product !== null && product.deviceTypeId === null;
+    if (!productNeedsType) return;
+
+    const deviceType = await resolveDeviceType(row.deviceType, {
+      integration: CSV_UPLOAD_DISPLAY_NAME,
+      importId,
+      rowNumber: row.rowNumber,
+    });
+    if (deviceType) await fillProductDeviceType(productId, deviceType.id);
+  };
+}
+
+async function deviceGroupFor(
   row: StagedRow,
   canonicalNames: CanonicalNames,
-): Promise<string> {
+): Promise<{ id: string; productId: string | null }> {
   if (row.manufacturer === null || row.product === null) {
     throw new Error("Manufacturer and model are required to add a device");
   }
@@ -131,30 +163,28 @@ async function deviceGroupIdFor(
   const product =
     canonicalNames.products.get(productKey(row.manufacturer, row.product)) ??
     row.product;
-  const deviceGroup = await resolveDeviceGroup({
+  return resolveDeviceGroup({
     manufacturer,
     product,
     version: row.version,
     hasCpe: false,
   });
-  return deviceGroup.id;
 }
 
 async function toAssetWrite(
   item: CsvSyncItem,
   userId: string,
   input: ApplyChunkInput,
+  fillDeviceType: FillDeviceType,
 ): Promise<AssetWrite> {
   if (item.kind === "add") {
-    const deviceGroupId = await deviceGroupIdFor(
-      item.row,
-      input.canonicalNames,
-    );
+    const deviceGroup = await deviceGroupFor(item.row, input.canonicalNames);
+    await fillDeviceType(deviceGroup.productId, item.row);
     return {
       createData: {
         id: item.assetId,
         ...filledRowFields(item.row),
-        deviceGroupId,
+        deviceGroupId: deviceGroup.id,
         userId,
       },
       updateData: {},
@@ -167,6 +197,7 @@ async function toAssetWrite(
   if (!matchedDevice) {
     throw new Error("The matched device is no longer in VIPER");
   }
+  await fillDeviceType(matchedDevice.productId, item.row);
   return {
     createData: {},
     updateData: fieldsMissingFromDevice(item.row, matchedDevice),
@@ -178,6 +209,7 @@ async function toAssetWrite(
 async function writeRow(
   item: CsvSyncItem,
   input: ApplyChunkInput,
+  fillDeviceType: FillDeviceType,
 ): Promise<string | null> {
   try {
     const response = await processIntegrationSync(
@@ -187,7 +219,7 @@ async function writeRow(
         mappingModel: prisma.externalAssetMapping,
         shouldRecordSyncOutcome: false,
         transformInputItem: (syncItem: CsvSyncItem, userId: string) =>
-          toAssetWrite(syncItem, userId, input),
+          toAssetWrite(syncItem, userId, input, fillDeviceType),
       },
       { items: [item] },
       input.userId,
@@ -207,6 +239,7 @@ export async function applyChunk(input: ApplyChunkInput): Promise<ChunkResult> {
     input.outcomes.map((outcome) => [outcome.rowNumber, outcome]),
   );
   const result: ChunkResult = { added: 0, linked: 0, failures: [] };
+  const fillDeviceType = prepareDeviceTypeFill(input.importId);
 
   for (const row of input.rows) {
     const outcome = outcomeByRowNumber.get(row.rowNumber);
@@ -232,7 +265,7 @@ export async function applyChunk(input: ApplyChunkInput): Promise<ChunkResult> {
       row,
     };
 
-    const failureReason = await writeRow(item, input);
+    const failureReason = await writeRow(item, input, fillDeviceType);
     if (failureReason !== null) {
       result.failures.push({ rowNumber: row.rowNumber, reason: failureReason });
       continue;

@@ -4,6 +4,7 @@ import { isValidMac, normalizeMac } from "../validate";
 
 export interface ContextAsset {
   id: string;
+  productId: string | null;
   label: string;
   platforms: string[];
   serialNumber: string | null;
@@ -11,7 +12,6 @@ export interface ContextAsset {
   hostname: string | null;
   ip: string | null;
   networkSegment: string | null;
-  role: string | null;
   status: AssetStatus | null;
   location: Record<string, unknown> | null;
 }

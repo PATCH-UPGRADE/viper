@@ -154,18 +154,22 @@ const TicketBlock = ({ block }: { block: Block }) => {
             "[mask-image:linear-gradient(to_bottom,#000_55%,transparent)]",
         )}
       >
-        <span className="truncate text-xs font-medium">
+        <span className="shrink-0 truncate text-xs font-medium">
           {item.assetName} • {item.summary}
         </span>
-        <span className="flex items-center gap-1">
-          <Icon className="size-3 shrink-0" aria-hidden />
+        {block.len < 45 ? (
           <span className="sr-only">{label}</span>
-          <span className="truncate">
-            {format(item.scheduledAt, "h:mm a")}
-            {item.durationEstimate &&
-              ` – ${format(addMinutes(item.scheduledAt, item.durationEstimate), "h:mm a")}`}
+        ) : (
+          <span className="flex items-center gap-1">
+            <Icon className="size-3 shrink-0" aria-hidden />
+            <span className="sr-only">{label}</span>
+            <span className="truncate">
+              {format(item.scheduledAt, "h:mm a")}
+              {item.durationEstimate &&
+                ` – ${format(addMinutes(item.scheduledAt, item.durationEstimate), "h:mm a")}`}
+            </span>
           </span>
-        </span>
+        )}
       </ItemButton>
     </div>
   );

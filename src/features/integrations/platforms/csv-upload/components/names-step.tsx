@@ -197,7 +197,11 @@ const NewNamesCard = ({
   title: string;
   kind: NameKind;
   items: NewNameItem[];
-  onDecide: (key: string, decision: NameDecision, pickedName?: string) => void;
+  onDecide: (
+    key: string,
+    decision: NameDecision | null,
+    pickedName?: string,
+  ) => void;
 }) => {
   const allAnswered = items.every(
     (item) => item.decision || item.isNewWithItsManufacturer,
@@ -213,6 +217,7 @@ const NewNamesCard = ({
           const addsAsNew =
             item.isNewWithItsManufacturer || item.decision?.kind === "new";
           const picksExisting = item.decision?.kind === "existing";
+          const wasAddedAsNewByTheUser = item.decision?.kind === "new";
           const canPickExisting =
             !item.isNewWithItsManufacturer &&
             (kind === "manufacturer" || Boolean(item.manufacturerId));
@@ -242,7 +247,12 @@ const NewNamesCard = ({
                     size="sm"
                     aria-pressed={addsAsNew}
                     disabled={item.isNewWithItsManufacturer}
-                    onClick={() => onDecide(item.key, { kind: "new" })}
+                    onClick={() =>
+                      onDecide(
+                        item.key,
+                        wasAddedAsNewByTheUser ? null : { kind: "new" },
+                      )
+                    }
                   >
                     <PlusIcon />
                     Add as new
@@ -424,7 +434,7 @@ export const NamesStep = ({
   onDecide: (
     kind: NameKind,
     key: string,
-    decision: NameDecision,
+    decision: NameDecision | null,
     pickedName?: string,
   ) => void;
   onBack: () => void;

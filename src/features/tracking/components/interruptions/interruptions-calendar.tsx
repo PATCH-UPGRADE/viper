@@ -42,6 +42,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { availabilityStyle } from "../ticket-detail/shared";
+import { DeviceBadge } from "./device-badge";
 import { InterruptionsList } from "./interruptions-list";
 import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
 
@@ -55,6 +56,7 @@ type Item = DrawerTicket & {
   scheduledAt: Date;
   workOrderId: string;
   unread: boolean;
+  deviceCount: number;
 };
 type Block = {
   item: Item;
@@ -154,8 +156,9 @@ const TicketBlock = ({ block }: { block: Block }) => {
             "[mask-image:linear-gradient(to_bottom,#000_55%,transparent)]",
         )}
       >
-        <span className="shrink-0 truncate text-xs font-medium">
-          {item.assetName} • {item.summary}
+        <span className="flex shrink-0 items-center gap-1 text-xs font-medium">
+          <DeviceBadge count={item.deviceCount} />
+          <span className="truncate">{item.summary}</span>
         </span>
         {block.len < 45 ? (
           <span className="sr-only">{label}</span>
@@ -179,7 +182,8 @@ const MAX_CHIPS = 3;
 
 const MonthChip = ({ item }: { item: Item }) => (
   <ItemButton item={item} className="truncate px-1">
-    {format(item.scheduledAt, "h:mmaaa")} {item.assetName} • {item.summary}
+    {format(item.scheduledAt, "h:mmaaa")}{" "}
+    <DeviceBadge count={item.deviceCount} /> {item.summary}
   </ItemButton>
 );
 

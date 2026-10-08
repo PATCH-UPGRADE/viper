@@ -171,6 +171,7 @@ export const getInterruptionCalendar = async (
       scheduledAt: owner.scheduledAt as Date,
       ...timing(owner),
       unread: owner.seenBy.length === 0,
+      deviceCount: owner.assets.length,
       assetName: `${owner.assets.length} ${plural("device", owner.assets.length)}`,
     })),
     ...devices
@@ -187,6 +188,7 @@ export const getInterruptionCalendar = async (
         scheduledAt: ticket.scheduledAt as Date,
         ...timing(parentTicket),
         unread: false,
+        deviceCount: 1,
         assetName: getAssetDisplayName(asset),
         place: placeOf(asset.location),
       })),

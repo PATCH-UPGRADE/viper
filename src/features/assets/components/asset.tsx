@@ -42,7 +42,11 @@ import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
 import type { PaginatedResponse } from "@/lib/pagination";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
-import { getAssetRoleLabel } from "../utils";
+import {
+  getAssetDeviceTypeLabel,
+  getAssetRoleLabel,
+  UNKNOWN_DEVICE_TYPE_STRING,
+} from "../utils";
 import { AssetQrPdfLink } from "./asset-qr-pdf-link";
 
 export const AssetContainer = ({ children }: { children: React.ReactNode }) => {
@@ -331,6 +335,16 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
               <h3 className="font-semibold">Device Information</h3>
 
               <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                    Device Type
+                  </div>
+                  <div className="text-sm">
+                    {getAssetDeviceTypeLabel(asset) ??
+                      UNKNOWN_DEVICE_TYPE_STRING}
+                  </div>
+                </div>
+
                 <div>
                   <div className="text-xs font-medium text-muted-foreground mb-1">
                     Role

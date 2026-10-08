@@ -703,7 +703,7 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
   hostname: "host-1",
   ip: "10.0.0.5",
   serialNumber: null,
-  role: "Infusion Pump",
+  role: "ICU Bay Pump",
   location: { building: "A", floor: "3", room: "302" },
   deviceGroupId: "dg-1",
   deviceGroup: {
@@ -712,7 +712,10 @@ const sampleAsset = (overrides: Record<string, unknown> = {}) => ({
     productId: "product-plum",
     versionId: null,
     manufacturer: { canonicalDisplayName: "ICU Medical" },
-    product: { canonicalDisplayName: "Plum 360" },
+    product: {
+      canonicalDisplayName: "Plum 360",
+      deviceType: { displayName: "Infusion Pump" },
+    },
     version: null,
   },
   ...overrides,
@@ -727,7 +730,7 @@ const sampleAssetTicket = (
 });
 
 describe("LinkedAssetsTable", () => {
-  it("renders one row per asset with role, model, IP, location, and an editable status", () => {
+  it("renders one row per asset with device type, model, IP, location, and an editable status", () => {
     render(
       <LinkedAssetsTable
         parentTicketId="t1"
@@ -736,6 +739,7 @@ describe("LinkedAssetsTable", () => {
     );
 
     expect(screen.getByText("Infusion Pump")).toBeInTheDocument();
+    expect(screen.queryByText("ICU Bay Pump")).not.toBeInTheDocument();
     expect(screen.getByText("ICU Medical Plum 360")).toBeInTheDocument();
     expect(screen.getByText("10.0.0.5")).toBeInTheDocument();
     expect(screen.getByText("A · 3 · 302")).toBeInTheDocument();

@@ -232,7 +232,12 @@ export const ticketDetailInclude = {
               productId: true,
               versionId: true,
               manufacturer: { select: { canonicalDisplayName: true } },
-              product: { select: { canonicalDisplayName: true } },
+              product: {
+                select: {
+                  canonicalDisplayName: true,
+                  deviceType: { select: { displayName: true } },
+                },
+              },
               version: { select: { canonicalName: true } },
             },
           },
@@ -713,7 +718,12 @@ const detailLinkedAssetSchema = linkedAssetSchema.extend({
     productId: z.string().nullable(),
     versionId: z.string().nullable(),
     manufacturer: z.object({ canonicalDisplayName: z.string() }).nullable(),
-    product: z.object({ canonicalDisplayName: z.string() }).nullable(),
+    product: z
+      .object({
+        canonicalDisplayName: z.string(),
+        deviceType: z.object({ displayName: z.string() }).nullable(),
+      })
+      .nullable(),
     version: z.object({ canonicalName: z.string() }).nullable(),
   }),
 });

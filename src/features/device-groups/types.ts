@@ -10,10 +10,16 @@ const canonicalRefSchema = z.object({
   canonicalDisplayName: z.string(),
 });
 
+const productRefSchema = canonicalRefSchema.extend({
+  deviceType: z
+    .object({ slug: z.string(), displayName: z.string() })
+    .nullable(),
+});
+
 export const deviceGroupSchema = z.object({
   id: z.string(),
   manufacturer: canonicalRefSchema.nullable(),
-  product: canonicalRefSchema.nullable(),
+  product: productRefSchema.nullable(),
   version: canonicalRefSchema.nullable(),
   versionStatus: versionStatusSchema,
   cpe: z.array(z.string()),
@@ -96,11 +102,19 @@ const canonicalRefSelect = {
   select: { canonicalName: true, canonicalDisplayName: true },
 } as const;
 
+export const productRefSelect = {
+  select: {
+    canonicalName: true,
+    canonicalDisplayName: true,
+    deviceType: { select: { slug: true, displayName: true } },
+  },
+} as const;
+
 export const deviceGroupSelect = {
   select: {
     id: true,
     manufacturer: canonicalRefSelect,
-    product: canonicalRefSelect,
+    product: productRefSelect,
     version: canonicalRefSelect,
     versionStatus: true,
     cpe: true,

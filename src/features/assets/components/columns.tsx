@@ -2,16 +2,22 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
+import { ClampedCell } from "@/components/ui/clamped-cell";
 import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
 import { deviceGroupCpeList } from "@/lib/markdown";
 import type { AssetResponse } from "../types";
+import { getAssetDeviceTypeLabel } from "../utils";
 
 export const columns: ColumnDef<AssetResponse>[] = [
   {
-    id: "role",
-    accessorKey: "role",
-    header: ({ column }) => <SortableHeader header="Role" column={column} />,
+    id: "deviceType",
+    meta: { title: "Device Type" },
+    header: ({ column }) => (
+      <SortableHeader header="Device Type" column={column} />
+    ),
+    accessorFn: getAssetDeviceTypeLabel,
+    cell: ({ getValue }) => <ClampedCell text={getValue<string | null>()} />,
   },
   {
     meta: { title: "IP Address" },

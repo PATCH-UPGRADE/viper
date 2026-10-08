@@ -13,7 +13,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { countAffectedRemediations } from "@/features/assets/utils";
+import {
+  countAffectedRemediations,
+  getAssetDeviceTypeLabel,
+} from "@/features/assets/utils";
 import { IssueStatusForm } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
 import { deviceGroupLabel } from "@/lib/markdown";
@@ -86,14 +89,21 @@ function createSeverityColumn(
 
 export const dashboardColumns: ColumnDef<AssetWithIssueRelations>[] = [
   {
-    id: "role",
-    accessorKey: "role",
-    header: ({ column }) => <SortableHeader header="Role" column={column} />,
-    cell: ({ row }) => (
+    id: "deviceType",
+    meta: { title: "Device Type" },
+    header: ({ column }) => (
+      <SortableHeader header="Device Type" column={column} />
+    ),
+    accessorFn: getAssetDeviceTypeLabel,
+    cell: ({ row, getValue }) => (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="cursor-default">{row.original.role}</span>
+            <span className="cursor-default">
+              {getValue<string | null>() ?? (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </span>
           </TooltipTrigger>
           <TooltipContent>
             {deviceGroupLabel(row.original.deviceGroup)}

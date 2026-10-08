@@ -35,12 +35,20 @@ export async function upsertManufacturer(name: string) {
   });
 }
 
-export function upsertProduct(name: string) {
+export function upsertProduct(
+  name: string,
+  deviceTypeId: string | null = null,
+) {
   const canonicalName = name.trim().toLowerCase();
   return prisma.product.upsert({
     where: { canonicalName },
-    update: {},
-    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
+    update: deviceTypeId ? { deviceTypeId } : {},
+    create: {
+      canonicalName,
+      canonicalDisplayName: name,
+      hasCpe: true,
+      deviceTypeId,
+    },
   });
 }
 

@@ -39,6 +39,7 @@ import {
   sortAssetTicketsByStatus,
   statusHue,
   statusLabels,
+  useReadOnly,
 } from "./shared";
 
 const AssetProgressStrip = ({
@@ -171,6 +172,7 @@ export const LinkedAssetsTabContent = ({
   ticketId: string;
   assetTickets: DetailAssetTicket[];
 }) => {
+  const readOnly = useReadOnly();
   const detach = useDetachAsset(ticketId);
   const sortedAssetTickets = sortAssetTicketsByStatus(assetTickets);
   const { data: otherWorkOrders } = useSuspenseOtherAssetWorkOrders(ticketId);
@@ -185,7 +187,7 @@ export const LinkedAssetsTabContent = ({
               ({assetTickets.length})
             </span>
           </h2>
-          <AttachAssetPopover ticketId={ticketId} />
+          {!readOnly && <AttachAssetPopover ticketId={ticketId} />}
         </div>
         <AssetProgressStrip assetTickets={sortedAssetTickets} />
         <div className="p-2">
@@ -196,7 +198,11 @@ export const LinkedAssetsTabContent = ({
               otherWorkOrderCounts={countOtherWorkOrdersByAsset(
                 otherWorkOrders,
               )}
-              onDetach={(assetId) => detach.mutate({ ticketId, assetId })}
+              onDetach={
+                readOnly
+                  ? undefined
+                  : (assetId) => detach.mutate({ ticketId, assetId })
+              }
               detachPending={detach.isPending}
             />
           ) : (

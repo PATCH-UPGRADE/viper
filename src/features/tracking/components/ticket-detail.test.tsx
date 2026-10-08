@@ -1381,52 +1381,80 @@ describe("TicketDetailContent — view mode", () => {
 });
 
 describe("TicketDetailContent — embedded", () => {
-  it("hides the breadcrumb, Watch and Edit but keeps the title", () => {
+  it("shows every section but no links or write controls", async () => {
+    const user = userEvent.setup();
     renderDetail(
-      { parent: { id: "parent-9", summary: "Quarterly patch sweep" } },
+      {
+        children: [
+          { id: "child-1", summary: "Patch ICU room 301", status: "TO_DO" },
+        ],
+        relatedTickets: [
+          {
+            source: "manual",
+            linkId: "link-1",
+            ticket: {
+              id: "rt-1",
+              summary: "Patch PACS Server",
+              status: "TO_DO",
+              departments: [],
+              externalMappings: [],
+            },
+          },
+        ],
+        assets: [sampleAssetTicket({ hostname: "linked-host" })],
+        notification: { id: "n-1", title: "Advisory for ICU monitors" },
+      },
       { embedded: true },
     );
-
-    expect(
-      screen.getByRole("heading", { name: /patch icu monitors/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("link", {
-        name: /work orders|quarterly patch sweep/i,
-      }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^edit$/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^watch/i }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("keeps the tab out of the URL", async () => {
-    const user = userEvent.setup();
-    const onUrlUpdate = vi.fn();
-    renderDetail({}, { embedded: true, onUrlUpdate });
-
-    await user.click(screen.getByRole("tab", { name: /^assets/i }));
-
-    expect(screen.getByRole("tab", { name: /^assets/i })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    await user.click(
+      screen.getByRole("button", { name: /related tickets\s*\(1\)/i }),
     );
-    expect(onUrlUpdate).not.toHaveBeenCalled();
-  });
 
-  it("still keeps the tab in the URL on the page", async () => {
-    const user = userEvent.setup();
-    const onUrlUpdate = vi.fn();
-    renderDetail({}, { onUrlUpdate });
-
+    for (const text of [
+      "Patch ICU room 301",
+      "Patch PACS Server",
+      "Advisory for ICU monitors",
+      "Activity",
+    ]) {
+      expect(screen.getByText(text)).toBeInTheDocument();
+    }
     await user.click(screen.getByRole("tab", { name: /^assets/i }));
+    expect(screen.getByText("linked-host")).toBeInTheDocument();
 
-    expect(onUrlUpdate).toHaveBeenCalledTimes(1);
-    expect(onUrlUpdate.mock.calls[0][0].queryString).toBe("?tab=assets");
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    for (const name of [
+      /^edit$/i,
+      /^watch/i,
+      /add sub-ticket/i,
+      /link ticket/i,
+      /add asset/i,
+      /detach|unlink/i,
+    ]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
   });
+
+  it.each([
+    { embedded: true, urlUpdates: 0 },
+    { embedded: false, urlUpdates: 1 },
+  ])(
+    "embedded=$embedded changes the tab with $urlUpdates URL update(s)",
+    async ({ embedded, urlUpdates }) => {
+      const user = userEvent.setup();
+      const onUrlUpdate = vi.fn();
+      renderDetail({}, { embedded, onUrlUpdate });
+
+      await user.click(screen.getByRole("tab", { name: /^assets/i }));
+
+      expect(screen.getByRole("tab", { name: /^assets/i })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(onUrlUpdate).toHaveBeenCalledTimes(urlUpdates);
+    },
+  );
 });
 
 describe("TicketDetailContent — edit mode", () => {

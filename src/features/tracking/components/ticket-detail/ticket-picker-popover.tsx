@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import type { TicketStatus } from "@/generated/prisma";
-import { StatusChip } from "./shared";
+import { StatusChip, useReadOnly } from "./shared";
 
 export type TicketPickerCandidate = {
   id: string;
@@ -54,6 +54,7 @@ export const TicketPickerPopover = <T extends TicketPickerCandidate>({
   // instead of submitting at once.
   confirmWithReason?: boolean;
 }) => {
+  const readOnly = useReadOnly();
   const [open, setOpen] = useState(false);
   const [chosen, setChosen] = useState<T | null>(null);
   const [reason, setReason] = useState("");
@@ -80,6 +81,8 @@ export const TicketPickerPopover = <T extends TicketPickerCandidate>({
     const trimmed = reason.trim();
     onSelect(chosen, close, trimmed.length > 0 ? trimmed : null);
   };
+
+  if (readOnly) return null;
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>

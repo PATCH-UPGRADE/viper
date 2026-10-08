@@ -34,6 +34,7 @@ import { LinkedAssetsTabContent } from "./linked-assets";
 import { OverviewCard } from "./overview-card";
 import { RawJsonListCard } from "./raw-json-list-card";
 import { RelatedTicketsSection } from "./related-tickets";
+import { ReadOnlyProvider } from "./shared";
 import { SubTicketsSection } from "./sub-tickets";
 
 // Re-exports so existing import sites (`./ticket-detail`) keep working.
@@ -60,7 +61,7 @@ const TabCount = ({ n }: { n: number }) => (
   </Badge>
 );
 
-export const TicketDetailContent = ({
+const TicketDetailBody = ({
   id,
   embedded,
 }: {
@@ -179,7 +180,7 @@ export const TicketDetailContent = ({
         >
           <TabsList variant="line-primary">
             <TabsTrigger value="details">Details</TabsTrigger>
-            {data.mitigationPlanId && (
+            {data.mitigationPlanId && !embedded && (
               <TabsTrigger value="briefing">Briefing</TabsTrigger>
             )}
             <TabsTrigger value="assets">
@@ -250,6 +251,15 @@ export const TicketDetailContent = ({
     </EntityContainer>
   );
 };
+
+export const TicketDetailContent = (props: {
+  id: string;
+  embedded?: boolean;
+}) => (
+  <ReadOnlyProvider value={!!props.embedded}>
+    <TicketDetailBody {...props} />
+  </ReadOnlyProvider>
+);
 
 export const TicketDetailPage = ({
   id,

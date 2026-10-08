@@ -21,7 +21,7 @@ import type {
 } from "@/generated/prisma";
 import type { TicketDetail } from "../../types";
 import { AddCommentForm } from "./add-comment-form";
-import { categoryLabels, StatusChip } from "./shared";
+import { categoryLabels, StatusChip, useReadOnly } from "./shared";
 
 type Comment = TicketDetail["comments"][number];
 type Activity = TicketDetail["activities"][number];
@@ -315,6 +315,7 @@ export const TicketActivityTimeline = ({
   comments: Comment[];
   activities: Activity[];
 }) => {
+  const readOnly = useReadOnly();
   const entries = [
     ...activities.map(activityEntry),
     ...comments.map(commentEntry),
@@ -323,7 +324,7 @@ export const TicketActivityTimeline = ({
   return (
     <ActivityTimeline
       entries={entries}
-      composer={<AddCommentForm ticketId={ticketId} />}
+      composer={readOnly ? undefined : <AddCommentForm ticketId={ticketId} />}
     />
   );
 };

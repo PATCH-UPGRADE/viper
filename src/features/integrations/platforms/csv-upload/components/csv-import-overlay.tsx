@@ -108,6 +108,18 @@ const NO_MATCHES: MatchNamesOutput = { manufacturers: [], products: [] };
 const REVIEW_ORDER: ReviewStep[] = ["columns", "names", "issues"];
 const UNTIL_DISMISSED = Number.POSITIVE_INFINITY;
 
+const withNameDecision = (
+  decisionsByKey: Record<string, NameDecision>,
+  key: string,
+  decision: NameDecision | null,
+): Record<string, NameDecision> => {
+  if (decision !== null) return { ...decisionsByKey, [key]: decision };
+  const decisionsForOtherNames = Object.entries(decisionsByKey).filter(
+    ([decidedKey]) => decidedKey !== key,
+  );
+  return Object.fromEntries(decisionsForOtherNames);
+};
+
 const stepFor = (stage: Stage): ImportStep => {
   if (stage === "upload") return 1;
   if (stage === "previewing" || stage === "confirm") return 3;
@@ -470,16 +482,23 @@ export const CsvImportOverlay = ({
   const decideName = (
     kind: NameKind,
     key: string,
-    decision: NameDecision,
+    decision: NameDecision | null,
     pickedName?: string,
   ) => {
     setNameDecisions((previous) =>
       kind === "manufacturer"
         ? {
             ...previous,
-            manufacturers: { ...previous.manufacturers, [key]: decision },
+            manufacturers: withNameDecision(
+              previous.manufacturers,
+              key,
+              decision,
+            ),
           }
-        : { ...previous, products: { ...previous.products, [key]: decision } },
+        : {
+            ...previous,
+            products: withNameDecision(previous.products, key, decision),
+          },
     );
     if (pickedName) {
       setPickedNames((previous) => ({

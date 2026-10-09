@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeSerial } from "../../../core/sync/serials";
 import type { Cursor, Page, Session } from "../../../core/types";
 import { EQUIPMENTS_URL } from "../urls";
 
@@ -49,33 +50,12 @@ const blank = (value: string | null | undefined): string | null =>
 const code = (value: string | number | null | undefined): string | null =>
   value == null ? null : blank(String(value));
 
-// Fleet records carry placeholders in the serial field. Treating them as real
-// would match every placeholder-carrying machine onto one asset.
-const PLACEHOLDER_SERIALS = new Set(["n/a", "na", "none", "unknown", "-", "0"]);
-
-const serialNumberOf = (raw: string | null | undefined): string | null => {
-  const trimmed = raw?.trim();
-  if (!trimmed || PLACEHOLDER_SERIALS.has(trimmed.toLowerCase())) return null;
-  return trimmed;
-};
-
 async function fetchEquipments(session: Session): Promise<FleetEquipment[]> {
   const res = await session.request(EQUIPMENTS_URL);
   if (!res.ok) {
     throw new Error(`Fleet /equipments returned ${res.status}`);
   }
   return z.array(fleetEquipmentSchema).parse(await res.json());
-}
-
-export function computeWeakSerials(items: FleetAssetItem[]): Set<string> {
-  const seen = new Set<string>();
-  const weak = new Set<string>();
-  for (const item of items) {
-    if (!item.serialNumber) continue;
-    if (seen.has(item.serialNumber)) weak.add(item.serialNumber);
-    seen.add(item.serialNumber);
-  }
-  return weak;
 }
 
 export async function* listChanged(
@@ -109,7 +89,7 @@ export function toCanonical(raw: FleetEquipment): FleetAssetItem {
     .join(", ");
   return {
     externalId: raw.equipmentKey,
-    serialNumber: serialNumberOf(raw.serialNumber),
+    serialNumber: normalizeSerial(raw.serialNumber),
     modality: blank(raw.modalityTranslation),
     location: {
       ...(blank(raw.customerName)

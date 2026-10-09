@@ -1,14 +1,6 @@
-/**
- * A demo week for the clinician calendar at /tracking/interruptions. Needs the
- * seed user (npm run db:seed). Re-running replaces only its own work orders.
- *
- * Run:   npm run db:seed-calendar-demo
- * Reset: npm run db:seed-calendar-demo -- --reset
- */
 import { addDays, addMinutes, startOfWeek } from "date-fns";
 import prisma from "@/lib/db";
-
-const MARK = "calendar-demo-";
+import { SEED_USER_DEPARTMENT } from "./departments";
 
 // [day (0 = Sunday), start, minutes, devices, summary, day the last device moves to]
 const DEMO: [number, string, number, number, string, number?][] = [
@@ -31,22 +23,15 @@ const timeOf = (day: number, start: string) => {
   return time;
 };
 
-async function main() {
-  await prisma.workOrderTicket.deleteMany({
-    where: { chatToolCallId: { startsWith: MARK } },
-  });
-  if (process.argv.includes("--reset")) return;
+export async function seedCalendarWorkOrders(userId: string) {
+  console.log("\n🌱 Seeding calendar work orders...");
 
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { email: "user@example.com" },
-    select: { id: true, departmentId: true },
-  });
   const assets = await prisma.asset.findMany({
-    where: { managedBy: { some: { departmentId: user.departmentId ?? "" } } },
+    where: {
+      managedBy: { some: { department: { name: SEED_USER_DEPARTMENT } } },
+    },
     select: { id: true },
   });
-  if (assets.length < 6)
-    throw new Error("The seed user's department needs 6+ assets.");
 
   let next = 0;
   for (const [day, start, minutes, devices, summary, movedTo] of DEMO) {
@@ -54,15 +39,11 @@ async function main() {
     const base = {
       summary,
       scheduledAt,
-      creatorId: user.id,
+      creatorId: userId,
       category: "MAINTENANCE",
     } as const;
     const owner = await prisma.workOrderTicket.create({
-      data: {
-        ...base,
-        scheduledEndTime: addMinutes(scheduledAt, minutes),
-        chatToolCallId: MARK + summary,
-      },
+      data: { ...base, scheduledEndTime: addMinutes(scheduledAt, minutes) },
     });
     for (let i = 0; i < devices; i++) {
       const moved = movedTo !== undefined && i === devices - 1;
@@ -82,12 +63,6 @@ async function main() {
       });
     }
   }
-  console.log(`Seeded ${DEMO.length} work orders.`);
-}
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+  console.log(`✅ Seeded ${DEMO.length} calendar work orders`);
+}

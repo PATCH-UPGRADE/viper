@@ -1,6 +1,12 @@
+import { MonitorIcon } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 import { UNKNOWN_FLEET_PRODUCT } from "@/features/integrations/platforms/teamplay-fleet/assets/equipments";
-import { DEVICE_TYPES, FLEET_PRODUCT_DEVICE_TYPES } from "../device-types";
+import { iconFor } from "@/lib/icon-map";
+import {
+  DEVICE_TYPE_ICONS,
+  DEVICE_TYPES,
+  FLEET_PRODUCT_DEVICE_TYPES,
+} from "../device-types";
 
 vi.mock("@/lib/db", () => ({ default: {} }));
 
@@ -9,6 +15,14 @@ const { EXAMPLE_PRODUCT_DEVICE_TYPES } = await import(
 );
 
 describe("DEVICE_TYPES", () => {
+  it("gives icons only to device types, and only ones in the icon map", () => {
+    const slugs = DEVICE_TYPES.map((t) => t.slug);
+    for (const [slug, icon] of Object.entries(DEVICE_TYPE_ICONS)) {
+      expect(slugs, slug).toContain(slug);
+      if (icon !== "Monitor") expect(iconFor(icon), slug).not.toBe(MonitorIcon);
+    }
+  });
+
   it("has unique slugs", () => {
     const slugs = DEVICE_TYPES.map((t) => t.slug);
     expect(new Set(slugs).size).toBe(slugs.length);

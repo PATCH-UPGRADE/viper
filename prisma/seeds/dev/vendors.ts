@@ -94,6 +94,18 @@ export async function seedVendors() {
     },
   });
 
+  const monitors = await prisma.asset.findMany({
+    where: { id: { startsWith: "rad-mon-" } },
+    select: { id: true },
+  });
+  await prisma.managesRelationship.create({
+    data: {
+      responsibilities: "IT patches and monitors the bedside patient monitors.",
+      departmentId: itDepartment.id,
+      assets: { connect: monitors },
+    },
+  });
+
   console.log(
     `✅ Seeded vendor ${vendor.canonicalDisplayName} with 1 contract covering ${assets.length} assets, co-managed by ${itDepartment.name}`,
   );

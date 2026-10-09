@@ -1,4 +1,5 @@
 import { seedAssets } from "./assets";
+import { seedCalendarWorkOrders } from "./calendar";
 import { seedCategoryColors } from "./category-colors";
 import { seedDepartments } from "./departments";
 import { seedDeviceArtifacts } from "./device-artifacts";
@@ -37,6 +38,7 @@ export async function seedDemoData() {
   await seedWorkflows(seedUser.id);
   await seedNotes(seedUser.id);
   await seedWorkOrderTickets(seedUser.id);
+  await seedCalendarWorkOrders(seedUser.id);
   // After the vulnerabilities, whose CPEs create the matchings it links to.
   await seedFleetAdvisoryNotification();
 }

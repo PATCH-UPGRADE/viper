@@ -1074,16 +1074,18 @@ describe("Assets Endpoint deviceType input", () => {
   });
 
   it("POST /assets - rejects an unknown device type with a 400", async () => {
-    const before = await prisma.asset.count();
+    // Other test files create assets in parallel, so count only this IP.
+    const where = { ip: "10.0.0.51" };
+    const before = await prisma.asset.count({ where });
 
     const res = await request(BASE_URL)
       .post("/assets")
       .set(authHeader)
-      .send({ ip: "10.0.0.51", deviceType: "no-such-device-type" });
+      .send({ ip: where.ip, deviceType: "no-such-device-type" });
 
     expect(res.status).toBe(400);
     expect(res.body.message).toContain("no-such-device-type");
-    expect(await prisma.asset.count()).toBe(before);
+    expect(await prisma.asset.count({ where })).toBe(before);
   });
 
   it("GET /assets - searches by device type, not by role", async () => {

@@ -451,6 +451,7 @@ describe("integrationsRouter.triggerSync", () => {
   it("enqueues one event for each enabled resource feed", async () => {
     mockPrisma.integration.findFirst.mockResolvedValue({
       id: "integration-1",
+      platform: PlatformEnum.PARTNER,
       resourceSyncs: [
         { resource: ResourceType.Asset },
         { resource: ResourceType.WorkOrder },
@@ -497,6 +498,7 @@ describe("integrationsRouter.triggerSync", () => {
   it("does not report success when every resource feed is disabled", async () => {
     mockPrisma.integration.findFirst.mockResolvedValue({
       id: "integration-1",
+      platform: PlatformEnum.PARTNER,
       resourceSyncs: [],
     });
 

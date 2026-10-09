@@ -40,6 +40,7 @@ const { mockStrategy, mockRequirePlatform, mockModuleForResource } = vi.hoisted(
 vi.mock("@/features/integrations/core/registry", () => ({
   requirePlatform: mockRequirePlatform,
   defaultSyncEveryFor: () => null,
+  unscheduledPlatforms: () => ["CSV_UPLOAD"],
 }));
 
 vi.mock("@/features/integrations/core/sync/resources", () => ({
@@ -444,7 +445,7 @@ describe("syncAllIntegrations", () => {
     ]);
   });
 
-  it("only considers rows that are enabled at both levels and actually due", async () => {
+  it("only considers rows that are enabled at both levels, actually due, and of a scheduled platform", async () => {
     mockPrisma.integrationResourceSync.findMany.mockResolvedValue([]);
     // biome-ignore lint/suspicious/noExplicitAny: the handler's Inngest ctx is stubbed
     await (syncAllIntegrations as any)({ step: makeStep() });
@@ -453,7 +454,10 @@ describe("syncAllIntegrations", () => {
       mockPrisma.integrationResourceSync.findMany.mock.calls[0][0].where,
     ).toEqual({
       enabled: true,
-      integration: { enabled: true },
+      integration: {
+        enabled: true,
+        platform: { notIn: ["CSV_UPLOAD"] },
+      },
       OR: [{ nextSyncAt: null }, { nextSyncAt: { lte: expect.any(Date) } }],
     });
   });

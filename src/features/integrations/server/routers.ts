@@ -396,6 +396,7 @@ export const integrationsRouter = createTRPCRouter({
         where: { id: input.id, enabled: true },
         select: {
           id: true,
+          platform: true,
           resourceSyncs: {
             where: { enabled: true },
             select: { resource: true },
@@ -404,6 +405,13 @@ export const integrationsRouter = createTRPCRouter({
       });
       if (!integration) {
         throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      const { definition } = requirePlatform(integration.platform);
+      if (definition.unscheduled) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `${definition.displayName} has no scheduled sync`,
+        });
       }
       if (integration.resourceSyncs.length === 0) {
         throw new TRPCError({

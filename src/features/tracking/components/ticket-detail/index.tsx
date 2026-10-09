@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BriefingPanel } from "@/features/mitigation/components/accept-plan-drawer/briefing-panel";
 import { CategoryColorProvider } from "@/features/tag-colors/context";
+import { cn } from "@/lib/utils";
 import {
   useMarkTicketSeen,
   useSetWatching,
@@ -34,6 +35,7 @@ import { LinkedAssetsTabContent } from "./linked-assets";
 import { OverviewCard } from "./overview-card";
 import { RawJsonListCard } from "./raw-json-list-card";
 import { RelatedTicketsSection } from "./related-tickets";
+import { ReadOnlyProvider } from "./shared";
 import { SubTicketsSection } from "./sub-tickets";
 
 // Re-exports so existing import sites (`./ticket-detail`) keep working.
@@ -60,15 +62,25 @@ const TabCount = ({ n }: { n: number }) => (
   </Badge>
 );
 
-export const TicketDetailContent = ({ id }: { id: string }) => {
+const TicketDetailBody = ({
+  id,
+  embedded,
+}: {
+  id: string;
+  embedded?: boolean;
+}) => {
   const { data } = useSuspenseTrackingTicket(id);
   const [isEditing, setIsEditing] = useState(false);
   const setWatching = useSetWatching();
   const { mutate: markSeen } = useMarkTicketSeen();
-  const [tab, setTab] = useQueryState(
+  // Inside the dashboard's modal the tab stays local, so it can't overwrite
+  // the dashboard's own ?tab= in the URL.
+  const urlTab = useQueryState(
     "tab",
     parseAsStringLiteral(TAB_VALUES).withDefault("details"),
   );
+  const localTab = useState<(typeof TAB_VALUES)[number]>("details");
+  const [tab, setTab] = embedded ? localTab : urlTab;
 
   // Viewing a ticket marks its comments as seen for the current user, clearing
   // the unread-comments indicator. Upserts on (userId, ticketId) per mount.
@@ -83,41 +95,49 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
 
   return (
     <EntityContainer
+      className={embedded ? "p-0 md:p-0" : undefined}
       header={
         <div className="flex flex-col gap-3">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/tracking">Work Orders</BreadcrumbLink>
-              </BreadcrumbItem>
-              {data.parent && (
-                <>
-                  <BreadcrumbSeparator>
-                    <SlashIcon className="size-3" />
-                  </BreadcrumbSeparator>
-                  <BreadcrumbItem>
-                    <BreadcrumbLink href={`/tracking/${data.parent.id}`}>
-                      {data.parent.summary}
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
-                </>
-              )}
-              <BreadcrumbSeparator>
-                <SlashIcon className="size-3" />
-              </BreadcrumbSeparator>
-              <BreadcrumbItem>
-                <BreadcrumbPage className="max-w-md truncate">
-                  {data.summary}
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+          {!embedded && (
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/tracking">Work Orders</BreadcrumbLink>
+                </BreadcrumbItem>
+                {data.parent && (
+                  <>
+                    <BreadcrumbSeparator>
+                      <SlashIcon className="size-3" />
+                    </BreadcrumbSeparator>
+                    <BreadcrumbItem>
+                      <BreadcrumbLink href={`/tracking/${data.parent.id}`}>
+                        {data.parent.summary}
+                      </BreadcrumbLink>
+                    </BreadcrumbItem>
+                  </>
+                )}
+                <BreadcrumbSeparator>
+                  <SlashIcon className="size-3" />
+                </BreadcrumbSeparator>
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="max-w-md truncate">
+                    {data.summary}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          )}
 
           <div className="flex items-start gap-3">
-            <h1 className="min-w-0 flex-1 text-xl font-semibold md:text-2xl">
+            <h1
+              className={cn(
+                "min-w-0 flex-1 text-xl font-semibold md:text-2xl",
+                embedded && "pr-10",
+              )}
+            >
               {data.summary}
             </h1>
-            {!isEditing && (
+            {!isEditing && !embedded && (
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"
@@ -166,7 +186,7 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
         >
           <TabsList variant="line-primary">
             <TabsTrigger value="details">Details</TabsTrigger>
-            {data.mitigationPlanId && (
+            {data.mitigationPlanId && !embedded && (
               <TabsTrigger value="briefing">Briefing</TabsTrigger>
             )}
             <TabsTrigger value="assets">
@@ -238,10 +258,25 @@ export const TicketDetailContent = ({ id }: { id: string }) => {
   );
 };
 
-export const TicketDetailPage = ({ id }: { id: string }) => {
+export const TicketDetailContent = (props: {
+  id: string;
+  embedded?: boolean;
+}) => (
+  <ReadOnlyProvider value={!!props.embedded}>
+    <TicketDetailBody {...props} />
+  </ReadOnlyProvider>
+);
+
+export const TicketDetailPage = ({
+  id,
+  embedded,
+}: {
+  id: string;
+  embedded?: boolean;
+}) => {
   return (
     <CategoryColorProvider>
-      <TicketDetailContent id={id} />
+      <TicketDetailContent id={id} embedded={embedded} />
     </CategoryColorProvider>
   );
 };

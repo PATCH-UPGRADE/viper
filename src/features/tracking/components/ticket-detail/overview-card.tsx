@@ -16,7 +16,7 @@ import { Card } from "@/components/ui/card";
 import { getChipClass } from "@/features/tag-colors/palette";
 import { formatScheduled } from "@/lib/date-utils";
 import type { TicketDetail } from "../../types";
-import { CategoryChip, formatDate, StatusChip } from "./shared";
+import { CategoryChip, formatDate, StatusChip, useReadOnly } from "./shared";
 
 const FieldLabel = ({ children }: { children: React.ReactNode }) => (
   <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -38,6 +38,7 @@ const MetaField = ({
 );
 
 const SourceHeader = ({ data }: { data: TicketDetail }) => {
+  const readOnly = useReadOnly();
   const mapping = data.externalMappings[0];
   const source = data.sourceLinks[0]?.sourceRecord;
   const label = data.sourceLabel ?? mapping?.integration.name;
@@ -68,23 +69,30 @@ const SourceHeader = ({ data }: { data: TicketDetail }) => {
             </p>
           )}
         </div>
-        {externalRef && referenceUrl && (
-          <Link
-            href={referenceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex shrink-0 items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 font-mono text-xs hover:bg-muted"
-          >
-            {externalRef}
-            <ExternalLinkIcon className="size-3.5 text-muted-foreground" />
-          </Link>
-        )}
+        {externalRef &&
+          referenceUrl &&
+          (readOnly ? (
+            <span className="shrink-0 font-mono text-xs text-muted-foreground">
+              {externalRef}
+            </span>
+          ) : (
+            <Link
+              href={referenceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex shrink-0 items-center gap-1.5 rounded-md border bg-background px-2.5 py-1 font-mono text-xs hover:bg-muted"
+            >
+              {externalRef}
+              <ExternalLinkIcon className="size-3.5 text-muted-foreground" />
+            </Link>
+          ))}
       </div>
     </div>
   );
 };
 
 const CreatedFooter = ({ data }: { data: TicketDetail }) => {
+  const readOnly = useReadOnly();
   // An integration work order belongs to the automation. Do not show the
   // integration user that created the record.
   const fromAutomation =
@@ -110,12 +118,18 @@ const CreatedFooter = ({ data }: { data: TicketDetail }) => {
         <>
           <span>·</span>
           <span>from</span>
-          <Link
-            href={`/inbox/${data.notification.id}`}
-            className="font-medium text-foreground hover:underline"
-          >
-            {data.notification.title ?? "advisory"}
-          </Link>
+          {readOnly ? (
+            <span className="font-medium text-foreground">
+              {data.notification.title ?? "advisory"}
+            </span>
+          ) : (
+            <Link
+              href={`/inbox/${data.notification.id}`}
+              className="font-medium text-foreground hover:underline"
+            >
+              {data.notification.title ?? "advisory"}
+            </Link>
+          )}
         </>
       )}
     </div>

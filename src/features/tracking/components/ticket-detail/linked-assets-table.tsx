@@ -20,7 +20,9 @@ import {
   assetLabel,
   type DetailAssetTicket,
   formatLocation,
+  StatusChip,
   TicketStatusSelectTrigger,
+  useReadOnly,
 } from "./shared";
 
 const AssetTicketStatusSelect = ({
@@ -62,6 +64,7 @@ export const LinkedAssetsTable = ({
   onDetach?: (assetId: string) => void;
   detachPending?: boolean;
 }) => {
+  const readOnly = useReadOnly();
   return (
     <Table>
       <TableHeader>
@@ -89,20 +92,30 @@ export const LinkedAssetsTable = ({
           return (
             <TableRow key={ticket.id} className="hover:bg-muted/40">
               <TableCell>
-                <Link
-                  href={`/tracking/${ticket.id}`}
-                  className="font-mono text-xs font-medium text-primary hover:underline"
-                >
-                  {assetLabel(asset)}
-                </Link>
+                {readOnly ? (
+                  <span className="font-mono text-xs font-medium">
+                    {assetLabel(asset)}
+                  </span>
+                ) : (
+                  <Link
+                    href={`/tracking/${ticket.id}`}
+                    className="font-mono text-xs font-medium text-primary hover:underline"
+                  >
+                    {assetLabel(asset)}
+                  </Link>
+                )}
               </TableCell>
               <TableCell>
-                <AssetTicketStatusSelect
-                  parentTicketId={parentTicketId}
-                  assetId={asset.id}
-                  ticketId={ticket.id}
-                  status={ticket.status}
-                />
+                {readOnly ? (
+                  <StatusChip status={ticket.status} />
+                ) : (
+                  <AssetTicketStatusSelect
+                    parentTicketId={parentTicketId}
+                    assetId={asset.id}
+                    ticketId={ticket.id}
+                    status={ticket.status}
+                  />
+                )}
               </TableCell>
               <TableCell className="text-sm">
                 <ClampedCell text={getAssetDeviceTypeLabel(asset)} />

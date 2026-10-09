@@ -23,7 +23,7 @@ import {
   NO_TEAM_LABEL,
   type WorkOrderGroup,
 } from "./other-work-order-groups";
-import { type DetailAssetTicket, StatusChip } from "./shared";
+import { type DetailAssetTicket, StatusChip, useReadOnly } from "./shared";
 
 const VISIBLE_ROWS = 5;
 // A work order can span every linked asset. Past a handful the chips wrap into
@@ -46,6 +46,7 @@ const WorkOrderRow = ({
   assetId?: string;
   assetLabels?: Record<string, string>;
 }) => {
+  const readOnly = useReadOnly();
   const teams =
     workOrder.departments.map((d) => d.name).join(", ") || NO_TEAM_LABEL;
   const assetIds = workOrder.assetTickets.map((link) => link.assetId);
@@ -61,13 +62,22 @@ const WorkOrderRow = ({
   return (
     <div className="flex items-start gap-3 border-t px-4 py-3 first:border-t-0 hover:bg-muted/40">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <Link
-          href={`/tracking/${link?.ticketId ?? workOrder.id}`}
-          title={workOrder.summary}
-          className="truncate text-sm font-medium hover:underline"
-        >
-          {workOrder.summary}
-        </Link>
+        {readOnly ? (
+          <span
+            title={workOrder.summary}
+            className="truncate text-sm font-medium"
+          >
+            {workOrder.summary}
+          </span>
+        ) : (
+          <Link
+            href={`/tracking/${link?.ticketId ?? workOrder.id}`}
+            title={workOrder.summary}
+            className="truncate text-sm font-medium hover:underline"
+          >
+            {workOrder.summary}
+          </Link>
+        )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span className="font-medium text-foreground/70">{teams}</span>
           <span className="inline-flex items-center gap-1.5">

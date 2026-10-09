@@ -97,12 +97,24 @@ const GOLDEN: Record<CrawlerResource, unknown> = {
   },
   [ResourceType.Vulnerability]: {
     externalId: "vuln-77",
-    cveId: "CVE-2024-12345",
-    cpes: ["cpe:2.3:a:baxter:sigma_spectrum:8.00.01:*:*:*:*:*:*:*"],
-    description: "Hard-coded credentials in the pump web service.",
-    severity: "High",
-    cvssScore: 8.1,
-    cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
+    identifiers: ["CVE-2024-12345"],
+    summary: "Hard-coded credentials in the Sigma Spectrum web service",
+    details: "Hard-coded credentials in the pump web service.",
+    devices: [
+      {
+        manufacturer: "Baxter",
+        product: "Sigma Spectrum",
+        versionRange: "vers:semver/<8.02",
+      },
+    ],
+    metrics: [
+      {
+        type: "CVSS_V3_1",
+        score: 8.1,
+        vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
+        severity: "High",
+      },
+    ],
   },
   [ResourceType.Remediation]: {
     externalId: "rem-12",
@@ -147,7 +159,8 @@ describe("crawler item schemas", () => {
   it("leaves out fields that hold VIPER ids", () => {
     const vuln = CRAWLER_ITEM_SCHEMAS[ResourceType.Vulnerability].shape;
     const rem = CRAWLER_ITEM_SCHEMAS[ResourceType.Remediation].shape;
-    expect(vuln).not.toHaveProperty("deviceArtifactId");
+    expect(vuln).not.toHaveProperty("ta3Submission");
+    expect(vuln).not.toHaveProperty("source");
     expect(rem).not.toHaveProperty("vulnerabilityIds");
   });
 });

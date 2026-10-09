@@ -328,6 +328,9 @@ async function refreshVulnerability(
   await prisma.vulnerability.update({
     where: { id: vulnerabilityId },
     data: {
+      // Explicit: with no new devices or severity the update is otherwise empty, and ALOHA and
+      // the lastUpdated filters rely on the bump.
+      updatedAt: new Date(),
       ...(matchings.length > 0
         ? { deviceGroupMatchings: { connect: matchings } }
         : {}),

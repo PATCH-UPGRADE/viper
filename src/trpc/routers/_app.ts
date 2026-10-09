@@ -17,7 +17,9 @@ import { tagColorsRouter } from "@/features/tag-colors/server/routers";
 import { trackingRouter } from "@/features/tracking/server/routers";
 import { userRouter } from "@/features/user/server/routers";
 import { vendorsRouter } from "@/features/vendors/server/routers";
+import { vulnerabilityRecordsRouter } from "@/features/vulnerabilities/server/records-router";
 import { vulnerabilitiesRouter } from "@/features/vulnerabilities/server/routers";
+import { ta3SubmissionsRouter } from "@/features/vulnerabilities/server/ta3-submissions-router";
 import { webhooksRouter } from "@/features/webhooks/server/routers";
 import { workflowsRouter } from "@/features/workflows/server/routers";
 import { createTRPCRouter } from "../init";
@@ -28,6 +30,8 @@ export const appRouter = createTRPCRouter({
   workflows: workflowsRouter,
   assets: assetsRouter,
   vulnerabilities: vulnerabilitiesRouter,
+  vulnerabilityRecords: vulnerabilityRecordsRouter,
+  ta3Submissions: ta3SubmissionsRouter,
   remediations: remediationsRouter,
   deviceArtifacts: deviceArtifactsRouter,
   user: userRouter,

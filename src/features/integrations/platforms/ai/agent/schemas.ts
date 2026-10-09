@@ -1,7 +1,7 @@
 import { assetInputSchema } from "@/features/assets/types";
 import { deviceArtifactInputSchema } from "@/features/device-artifacts/types";
 import { remediationInputSchema } from "@/features/remediations/types";
-import { vulnerabilityInputSchema } from "@/features/vulnerabilities/types";
+import { vulnerabilityRecordInputSchema } from "@/features/vulnerabilities/types";
 import { ResourceType } from "@/generated/prisma";
 import { createIntegrationItemSchema } from "@/lib/schemas";
 
@@ -12,12 +12,9 @@ import { createIntegrationItemSchema } from "@/lib/schemas";
  */
 export const CRAWLER_ITEM_SCHEMAS = {
   [ResourceType.Asset]: createIntegrationItemSchema(assetInputSchema),
+  // The crawler's records are always source AI, and never TA3 submissions.
   [ResourceType.Vulnerability]: createIntegrationItemSchema(
-    vulnerabilityInputSchema.omit({ deviceArtifactId: true }).extend({
-      // Zod 4 makes a bare z.any() key required, so the model would have to
-      // invent a SARIF value for every vulnerability. The ingest fills {}.
-      sarif: vulnerabilityInputSchema.shape.sarif.optional(),
-    }),
+    vulnerabilityRecordInputSchema.omit({ source: true, ta3Submission: true }),
   ),
   [ResourceType.Remediation]: createIntegrationItemSchema(
     remediationInputSchema.omit({

@@ -16,8 +16,10 @@ const RESOURCE_GUIDANCE: Record<CrawlerResource, string> = {
 - Put the vendor, product, and version of the device in cpe.
 - hostname, macAddress, and serialNumber identify the device. Give each one that the source has.`,
   [ResourceType.Vulnerability]: `You collect vulnerabilities.
-- cpes is required: one CPE for each affected product. Skip a vulnerability that names no affected product.
-- Give cveId (for example "CVE-2024-12345"), description, severity, cvssScore, and cvssVector when the source has them.`,
+- devices is required: one entry for each affected product, with its manufacturer, and its product and version when the source names them. For a range of versions, put a VERS range such as "vers:semver/<12.3" in versionRange instead of version. Skip a vulnerability that names no affected product.
+- Put every ID the source gives it in identifiers: CVE (for example "CVE-2024-12345"), GHSA, or the source's advisory ID.
+- summary is a one-line title, and details holds the description.
+- Put each CVSS score in metrics, with its vector and a type that matches the vector's version (CVSS_V3_1 for "CVSS:3.1/..."). A severity with no score is a QUALITATIVE metric.`,
   [ResourceType.Remediation]: `You collect remediations: patches, updates, and mitigations.
 - artifacts is required, with at least one entry. An artifact is a file or document: set artifactType, and set downloadUrl when the source links to it.
 - Put the products that the remediation applies to in cpes.

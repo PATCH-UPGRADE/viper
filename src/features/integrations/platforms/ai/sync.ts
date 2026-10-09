@@ -4,7 +4,7 @@ import { processDeviceArtifactIntegrationSync } from "@/features/device-artifact
 import type { SyncCtx, SyncOutcome } from "@/features/integrations/core/types";
 import { processRemediationIntegrationSync } from "@/features/remediations/server/integration-sync";
 import { processVulnerabilityIntegrationSync } from "@/features/vulnerabilities/server/integration-sync";
-import { ResourceType } from "@/generated/prisma";
+import { ResourceType, VulnerabilitySource } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import type { IntegrationResponse } from "@/lib/schemas";
 import { type CrawledItem, runAiCrawler } from "./agent";
@@ -40,8 +40,12 @@ const CRAWLER_RESOURCES: {
   },
   [ResourceType.Vulnerability]: {
     recentExternalIds: (query) =>
-      prisma.externalVulnerabilityMapping.findMany(query),
-    ingest: processVulnerabilityIntegrationSync,
+      prisma.externalVulnerabilityRecordMapping.findMany(query),
+    ingest: (input, userId, integrationId, options) =>
+      processVulnerabilityIntegrationSync(input, userId, integrationId, {
+        ...options,
+        source: VulnerabilitySource.AI,
+      }),
   },
   [ResourceType.Remediation]: {
     recentExternalIds: (query) =>

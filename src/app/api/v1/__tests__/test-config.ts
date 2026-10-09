@@ -17,6 +17,13 @@ export const AUTH_TOKEN = `Bearer ${process.env.API_KEY}`;
 export const generateCPE = (suffix: string) =>
   `cpe:2.3:o:vendor:product:${suffix}`;
 
+/** The device generateCPE(suffix) names, as a vulnerability record's `devices` entry. */
+export const generateDevice = (suffix: string) => ({
+  manufacturer: "vendor",
+  product: "product",
+  version: suffix,
+});
+
 describe("Configuration Tests", () => {
   it("dummy test", async () => {
     expect(true).toBeTruthy();

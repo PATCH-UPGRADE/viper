@@ -23,7 +23,6 @@ import {
 import { ExternalMappingList } from "@/components/external-mappings";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -47,7 +46,6 @@ import { useEntitySearch } from "@/hooks/use-entity-search";
 import { deviceGroupMatchingsSummary } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import {
-  useRemoveVulnerability,
   useSuspenseVulnerabilities,
   useSuspenseVulnerabilitiesByPriority,
   useSuspenseVulnerabilityPriorityMetrics,
@@ -332,12 +330,6 @@ export const VulnerabilityItem = ({
 }: {
   data: VulnerabilityResponse;
 }) => {
-  const removeVulnerability = useRemoveVulnerability();
-
-  const handleRemove = () => {
-    removeVulnerability.mutate({ id: data.id });
-  };
-
   return (
     <div className="flex items-center gap-3 p-4 border rounded-lg">
       <div className="size-8 flex items-center justify-center">
@@ -353,14 +345,6 @@ export const VulnerabilityItem = ({
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
         </div>
       </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleRemove}
-        disabled={removeVulnerability.isPending}
-      >
-        {removeVulnerability.isPending ? "Removing..." : "Remove"}
-      </Button>
     </div>
   );
 };

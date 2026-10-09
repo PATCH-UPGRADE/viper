@@ -2,13 +2,13 @@ import request from "supertest";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { authHeader, BASE_URL, generateCPE } from "./test-config";
+import { authHeader, BASE_URL, generateDevice } from "./test-config";
 
 describe("Aloha Endpoints", () => {
   const vulnPayload = {
-    sarif: { tool: { driver: { name: "TestScanner" } } },
-    cpes: [generateCPE("aloha_vuln_v1")],
-    description: "Mock -- Aloha test vulnerability",
+    devices: [generateDevice("aloha_vuln_v1")],
+    details: "Mock -- Aloha test vulnerability",
+    ta3Submission: { sarif: { tool: { driver: { name: "TestScanner" } } } },
   };
 
   const remPayload = {
@@ -22,10 +22,10 @@ describe("Aloha Endpoints", () => {
     ],
   };
 
-  describe("Vulnerability Aloha (/vulnerabilities/{id}/aloha)", () => {
+  describe("TA3 Submission Aloha (/ta3Submissions/{id}/aloha)", () => {
     it("GET without auth returns 401", async () => {
       const res = await request(BASE_URL).get(
-        "/vulnerabilities/nonexistent/aloha",
+        "/ta3Submissions/nonexistent/aloha",
       );
       expect(res.status).toBe(401);
       expect(res.body.code).toBe("UNAUTHORIZED");
@@ -33,7 +33,7 @@ describe("Aloha Endpoints", () => {
 
     it("PUT without auth returns 401", async () => {
       const res = await request(BASE_URL)
-        .put("/vulnerabilities/nonexistent/aloha")
+        .put("/ta3Submissions/nonexistent/aloha")
         .send({ data: { status: "Confirmed" } });
       expect(res.status).toBe(401);
       expect(res.body.code).toBe("UNAUTHORIZED");
@@ -41,7 +41,7 @@ describe("Aloha Endpoints", () => {
 
     it("GET with nonexistant id returns 404", async () => {
       const res = await request(BASE_URL)
-        .get("/vulnerabilities/nonexistent/aloha")
+        .get("/ta3Submissions/nonexistent/aloha")
         .set(authHeader);
       expect(res.status).toBe(404);
       expect(res.body.code).toBe("NOT_FOUND");
@@ -49,7 +49,7 @@ describe("Aloha Endpoints", () => {
 
     it("PUT with nonexistant id returns 404", async () => {
       const res = await request(BASE_URL)
-        .put("/vulnerabilities/nonexistent/aloha")
+        .put("/ta3Submissions/nonexistent/aloha")
         .set(authHeader)
         .send({ data: { status: "Unsure" } });
       expect(res.status).toBe(404);
@@ -57,46 +57,59 @@ describe("Aloha Endpoints", () => {
     });
 
     it("GET/PUT aloha integration test", async () => {
+      const startedAt = new Date().toISOString();
       const createRes = await request(BASE_URL)
-        .post("/vulnerabilities")
+        .post("/vulnerabilityRecords")
         .set(authHeader)
         .send(vulnPayload);
 
       expect(createRes.status).toBe(200);
-      const vulnId = createRes.body.id;
+      const { vulnerabilityId } = createRes.body;
+      const submissionId = createRes.body.ta3Submission.id;
 
       onTestFinished(async () => {
         await prisma.vulnerability
-          .delete({ where: { id: vulnId } })
+          .delete({ where: { id: vulnerabilityId } })
           .catch(() => {});
       });
 
+      // ALOHA finds new submissions by listing the ones changed since a webhook fired.
+      const listRes = await request(BASE_URL)
+        .get("/ta3Submissions")
+        .query({ page: 1, pageSize: 100, lastUpdatedStartTime: startedAt })
+        .set(authHeader);
+      expect(listRes.status).toBe(200);
+      expect(listRes.body.items).toContainEqual(
+        expect.objectContaining({ id: submissionId, vulnerabilityId }),
+      );
+
       // GET aloha - default state
       const getDefault = await request(BASE_URL)
-        .get(`/vulnerabilities/${vulnId}/aloha`)
+        .get(`/ta3Submissions/${submissionId}/aloha`)
         .set(authHeader);
 
       expect(getDefault.status).toBe(200);
-      expect(getDefault.body).toHaveProperty("vulnerability");
-      expect(getDefault.body).toHaveProperty("aloha");
-      expect(getDefault.body.vulnerability.id).toBe(vulnId);
+      expect(getDefault.body.ta3Submission.id).toBe(submissionId);
+      expect(getDefault.body.ta3Submission.vulnerabilityId).toBe(
+        vulnerabilityId,
+      );
       expect(getDefault.body.aloha.status).toBeNull();
       expect(getDefault.body.aloha.log).toEqual({});
 
       // PUT aloha - update to Confirmed
       const putRes = await request(BASE_URL)
-        .put(`/vulnerabilities/${vulnId}/aloha`)
+        .put(`/ta3Submissions/${submissionId}/aloha`)
         .set(authHeader)
         .send({ data: { status: "Confirmed", log: { note: "verified" } } });
 
       expect(putRes.status).toBe(200);
-      expect(putRes.body.vulnerability.id).toBe(vulnId);
+      expect(putRes.body.ta3Submission.id).toBe(submissionId);
       expect(putRes.body.aloha.status).toBe("Confirmed");
       expect(putRes.body.aloha.log).toEqual({ note: "verified" });
 
       // GET aloha - reflects update
       const getUpdated = await request(BASE_URL)
-        .get(`/vulnerabilities/${vulnId}/aloha`)
+        .get(`/ta3Submissions/${submissionId}/aloha`)
         .set(authHeader);
 
       expect(getUpdated.status).toBe(200);

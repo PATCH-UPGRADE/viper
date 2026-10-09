@@ -13,8 +13,7 @@ type OwnableModel =
   | "deviceArtifact"
   | "remediation"
   | "webhook"
-  | "asset"
-  | "vulnerability";
+  | "asset";
 
 /**
  * Verifies that a resource belongs to the current user
@@ -50,6 +49,28 @@ export async function requireOwnership(
   }
 
   return resource;
+}
+
+/**
+ * Verifies the current user may change a vulnerability record. A record with an owner can only
+ * be changed by that user; one without (integration and feed records) by anyone.
+ * Throws NOT_FOUND if the record doesn't exist, FORBIDDEN if someone else owns it.
+ */
+export async function requireRecordOwnership(recordId: string, userId: string) {
+  const record = requireExistence(
+    await prisma.vulnerabilityRecord.findUnique({
+      where: { id: recordId },
+      select: { userId: true },
+    }),
+    "VulnerabilityRecord",
+  );
+  if (record.userId !== null && record.userId !== userId) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "You can only modify vulnerability records that you created",
+    });
+  }
+  return record;
 }
 
 export function requireExistence<T>(item: T | null, modelName: string): T {

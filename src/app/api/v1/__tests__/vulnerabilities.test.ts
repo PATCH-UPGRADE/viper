@@ -13,19 +13,32 @@ import {
   BASE_URL,
   createIntegrationToken,
   generateCPE,
+  generateDevice,
   jsonHeader,
   setupMockIntegration,
 } from "./test-config";
 
-describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
+/** Delete the vulnerability a test created, with its records and Issues. */
+function cleanUpVulnerability(vulnerabilityId: string) {
+  onTestFinished(async () => {
+    await prisma.vulnerability
+      .delete({ where: { id: vulnerabilityId } })
+      .catch(() => {});
+  });
+}
+
+describe("Vulnerability Records Endpoint (/vulnerabilityRecords)", () => {
+  const sarif = { tool: { driver: { name: "TestScanner" } } };
   const payload = {
-    sarif: { tool: { driver: { name: "TestScanner" } } },
-    cpes: [generateCPE("vuln_v1")],
-    exploitUri: "https://exploit-db.com/1234",
-    upstreamApi: "https://nvd.nist.gov/api",
-    description: "Mock -- Buffer overflow in device X",
-    narrative: "Found during routine scan.",
-    impact: "High",
+    devices: [generateDevice("vuln_v1")],
+    details: "Mock -- Buffer overflow in device X",
+    metrics: [{ type: "CVSS_V3_1", score: 8.1 }],
+    ta3Submission: {
+      sarif,
+      exploitUri: "https://exploit-db.com/1234",
+      narrative: "Found during routine scan.",
+      impact: "High",
+    },
   };
 
   const assetPayload = {
@@ -53,23 +66,21 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     vendor: "mockVulnIntegrationVendor",
     items: [
       {
-        sarif: { tool: { driver: { name: "MockScanner" } } },
-        cpes: [generateCPE("vuln_integration_v10")],
-        exploitUri: "https://mock-exploit-db.com/vuln-001",
+        devices: [generateDevice("vuln_integration_v10")],
         upstreamApi: "https://mock-vuln-upstream-api.com/",
-        description: `${descDeleteKeyWord} -- Critical buffer overflow in imaging device`,
-        narrative: "Discovered during security audit",
-        impact: "Critical",
+        details: `${descDeleteKeyWord} -- Critical buffer overflow in imaging device`,
+        ta3Submission: {
+          sarif: { tool: { driver: { name: "MockScanner" } } },
+          exploitUri: "https://mock-exploit-db.com/vuln-001",
+          narrative: "Discovered during security audit",
+          impact: "Critical",
+        },
         externalId: "mockVuln-1",
       },
       {
-        sarif: { tool: { driver: { name: "MockScanner" } } },
-        cpes: [generateCPE("vuln_integration_v11")],
-        exploitUri: "https://mock-exploit-db.com/vuln-002",
+        devices: [generateDevice("vuln_integration_v11")],
         upstreamApi: "https://mock-vuln-upstream-api.com/",
-        description: `${descDeleteKeyWord} -- Authentication bypass vulnerability`,
-        narrative: "Found in network scan",
-        impact: "High",
+        details: `${descDeleteKeyWord} -- Authentication bypass vulnerability`,
         externalId: "mockVuln-2",
       },
     ],
@@ -81,8 +92,10 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     previous: null,
   };
 
-  it("POST /vulnerabilities - Without auth, should get a 401", async () => {
-    const res = await request(BASE_URL).post("/vulnerabilities").send(payload);
+  it("POST /vulnerabilityRecords - Without auth, should get a 401", async () => {
+    const res = await request(BASE_URL)
+      .post("/vulnerabilityRecords")
+      .send(payload);
 
     expect(res.status).toBe(401);
     expect(res.body.code).toBe("UNAUTHORIZED");
@@ -111,7 +124,7 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     expect(res.body.code).toBe("UNAUTHORIZED");
   });
 
-  it("/vulnerabilities - Integration test", async () => {
+  it("/vulnerabilityRecords - Integration test", async () => {
     const postAssetRes = await request(BASE_URL)
       .post("/assets")
       .set(authHeader)
@@ -127,57 +140,190 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
     });
 
     const res = await request(BASE_URL)
-      .post("/vulnerabilities")
+      .post("/vulnerabilityRecords")
       .set(authHeader)
       .send(payload);
 
     expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty("id");
-    const vulnerabilityId = res.body.id;
+    const { id: recordId, vulnerabilityId } = res.body;
+    cleanUpVulnerability(vulnerabilityId);
+
+    // Omitted source with a TA3 submission is a TA3 record, owned by the caller.
+    expect(res.body.source).toBe("TA3");
+    expect(res.body.userId).not.toBeNull();
+    expect(res.body.metrics).toEqual([
+      expect.objectContaining({
+        type: "CVSS_V3_1",
+        score: 8.1,
+        severity: "High",
+      }),
+    ]);
+    expect(res.body.ta3Submission).toMatchObject({
+      recordId,
+      vulnerabilityId,
+      sarif,
+      exploitUri: payload.ta3Submission.exploitUri,
+    });
 
     const detailRes = await request(BASE_URL)
       .get(`/vulnerabilities/${vulnerabilityId}`)
       .set(authHeader);
 
     expect(detailRes.status).toBe(200);
-    expect(detailRes.body.id).toBe(vulnerabilityId);
+    // No identifiers given, so the vulnerability gets a VIPER ID.
+    expect(detailRes.body.displayId).toMatch(/^VIPER-/);
+    expect(detailRes.body.description).toBe(payload.details);
 
+    // One issue per affected device group, not one per asset.
     const foundIssue = await prisma.issue.findMany({
-      where: {
-        vulnerabilityId: detailRes.body.id,
-      },
+      where: { vulnerabilityId },
     });
-
     expect(foundIssue.length).toBe(1);
     expect(foundIssue[0].assetId).toBeNull();
-    expect(foundIssue[0].vulnerabilityId).toBe(res.body.id);
 
-    expect(Array.isArray(detailRes.body.deviceGroupMatchings)).toBe(true);
-
-    // Check that the array has one element
     expect(detailRes.body.deviceGroupMatchings.length).toBe(1);
-
-    // The single issue should be scoped to that one device group matching,
-    // not to the individual asset (one issue per affected device group, not
-    // one per asset).
-    expect(foundIssue[0].deviceGroupMatchingId).toBe(
-      detailRes.body.deviceGroupMatchings[0].id,
-    );
-
-    // Check that the single object in the array has the correct match values
-    // (resolved from the uploaded CPE: cpe:2.3:<part>:<vendor>:<product>:<version>)
-    const [, , , cpeManufacturer, cpeProduct, cpeVersion] =
-      payload.cpes[0].split(":");
     const matching = detailRes.body.deviceGroupMatchings[0];
-    expect(matching.manufacturer.canonicalName).toBe(cpeManufacturer);
-    expect(matching.product?.canonicalName).toBe(cpeProduct);
-    expect(matching.version?.canonicalName).toBe(cpeVersion);
+    expect(foundIssue[0].deviceGroupMatchingId).toBe(matching.id);
 
+    const [device] = payload.devices;
+    expect(matching.manufacturer.canonicalName).toBe(device.manufacturer);
+    expect(matching.product?.canonicalName).toBe(device.product);
+    expect(matching.version?.canonicalName).toBe(device.version);
+
+    const updateRes = await request(BASE_URL)
+      .put(`/vulnerabilityRecords/${recordId}`)
+      .set(authHeader)
+      .send({
+        data: {
+          summary: "Mock -- updated summary",
+          metrics: [{ type: "CVSS_V3_1", score: 4.2 }],
+        },
+      });
+
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.summary).toBe("Mock -- updated summary");
+    expect(updateRes.body.metrics).toEqual([
+      expect.objectContaining({ score: 4.2, severity: "Medium" }),
+    ]);
+
+    // The vulnerability's last record: deleting it deletes the vulnerability.
     const deleteRes = await request(BASE_URL)
-      .delete(`/vulnerabilities/${vulnerabilityId}`)
+      .delete(`/vulnerabilityRecords/${recordId}`)
       .set(authHeader);
 
     expect(deleteRes.status).toBe(200);
+    expect(deleteRes.body).toEqual({
+      id: recordId,
+      vulnerabilityId,
+      vulnerabilityDeleted: true,
+    });
+
+    const goneRes = await request(BASE_URL)
+      .get(`/vulnerabilities/${vulnerabilityId}`)
+      .set(authHeader);
+    expect(goneRes.status).toBe(404);
+  });
+
+  it("POST /vulnerabilityRecords - A known identifier joins its vulnerability", async () => {
+    const cve = `CVE-2099-${Date.now()}`;
+    const first = await request(BASE_URL)
+      .post("/vulnerabilityRecords")
+      .set(authHeader)
+      .send({ ...payload, identifiers: [cve] });
+    expect(first.status).toBe(200);
+    cleanUpVulnerability(first.body.vulnerabilityId);
+
+    const second = await request(BASE_URL)
+      .post("/vulnerabilityRecords")
+      .set(authHeader)
+      .send({
+        devices: [generateDevice("vuln_v1_other")],
+        identifiers: [cve.toLowerCase()],
+        details: "Mock -- the same vulnerability, from another source",
+      });
+
+    expect(second.status).toBe(200);
+    expect(second.body.source).toBe("OTHER");
+    expect(second.body.ta3Submission).toBeNull();
+    expect(second.body.vulnerabilityId).toBe(first.body.vulnerabilityId);
+
+    const detailRes = await request(BASE_URL)
+      .get(`/vulnerabilities/${first.body.vulnerabilityId}`)
+      .set(authHeader);
+    expect(detailRes.body.displayId).toBe(cve);
+    expect(detailRes.body.deviceGroupMatchings.length).toBe(2);
+
+    // Not the last record any more: the vulnerability stays.
+    const deleteRes = await request(BASE_URL)
+      .delete(`/vulnerabilityRecords/${second.body.id}`)
+      .set(authHeader);
+    expect(deleteRes.body.vulnerabilityDeleted).toBe(false);
+  });
+
+  it("POST /vulnerabilityRecords - Source and TA3 submission must agree", async () => {
+    const otherWithSubmission = await request(BASE_URL)
+      .post("/vulnerabilityRecords")
+      .set(authHeader)
+      .send({ ...payload, source: "OTHER" });
+    expect(otherWithSubmission.status).toBe(400);
+
+    const { ta3Submission: _ta3Submission, ...withoutSubmission } = payload;
+    const ta3WithoutSubmission = await request(BASE_URL)
+      .post("/vulnerabilityRecords")
+      .set(authHeader)
+      .send({ ...withoutSubmission, source: "TA3" });
+    expect(ta3WithoutSubmission.status).toBe(400);
+
+    const feedSource = await request(BASE_URL)
+      .post("/vulnerabilityRecords")
+      .set(authHeader)
+      .send({ ...payload, source: "CISA_KEV" });
+    expect(feedSource.status).toBe(400);
+  });
+
+  it("PUT/DELETE /vulnerabilityRecords/{id} - Only the owner may change a record", async () => {
+    const res = await request(BASE_URL)
+      .post("/vulnerabilityRecords")
+      .set(authHeader)
+      .send(payload);
+    expect(res.status).toBe(200);
+    cleanUpVulnerability(res.body.vulnerabilityId);
+
+    const otherUser = await prisma.user.create({
+      data: {
+        id: `vuln-record-owner-${Date.now()}`,
+        name: "Another user",
+      },
+    });
+    onTestFinished(async () => {
+      await prisma.user.delete({ where: { id: otherUser.id } });
+    });
+    await prisma.vulnerabilityRecord.update({
+      where: { id: res.body.id },
+      data: { userId: otherUser.id },
+    });
+
+    const forbiddenUpdate = await request(BASE_URL)
+      .put(`/vulnerabilityRecords/${res.body.id}`)
+      .set(authHeader)
+      .send({ data: { summary: "Not mine" } });
+    expect(forbiddenUpdate.status).toBe(403);
+
+    const forbiddenDelete = await request(BASE_URL)
+      .delete(`/vulnerabilityRecords/${res.body.id}`)
+      .set(authHeader);
+    expect(forbiddenDelete.status).toBe(403);
+
+    // A record with no owner can be changed by anyone.
+    await prisma.vulnerabilityRecord.update({
+      where: { id: res.body.id },
+      data: { userId: null },
+    });
+    const allowedUpdate = await request(BASE_URL)
+      .put(`/vulnerabilityRecords/${res.body.id}`)
+      .set(authHeader)
+      .send({ data: { summary: "Anyone's" } });
+    expect(allowedUpdate.status).toBe(200);
   });
 
   it("empty Vulnerabilities uploadIntegration endpoint int test", async () => {
@@ -206,22 +352,20 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       mockIntegrationPayload,
     );
 
-    const createToken = await createIntegrationToken(
-      createdIntegration.integrationUserId,
-      ResourceType.Vulnerability,
-    );
-    const integrationRes = await request(BASE_URL)
-      .post(`/vulnerabilities/integrationUpload/${createToken}`)
-      .set(jsonHeader)
-      .send(vulnerabilityIntegrationPayload);
+    const upload = async () => {
+      const token = await createIntegrationToken(
+        createdIntegration.integrationUserId,
+        ResourceType.Vulnerability,
+      );
+      return request(BASE_URL)
+        .post(`/vulnerabilities/integrationUpload/${token}`)
+        .set(jsonHeader)
+        .send(vulnerabilityIntegrationPayload);
+    };
 
     onTestFinished(async () => {
       await prisma.vulnerability.deleteMany({
-        where: {
-          description: {
-            contains: descDeleteKeyWord,
-          },
-        },
+        where: { description: { contains: descDeleteKeyWord } },
       });
       await prisma.deviceGroup.deleteMany({
         where: {
@@ -235,82 +379,58 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
       });
     });
 
+    const integrationRes = await upload();
+
     expect(integrationRes.status).toBe(200);
     expect(integrationRes.body.createdItemsCount).toBe(2);
     expect(integrationRes.body.updatedItemsCount).toBe(0);
     expect(integrationRes.body.shouldRetry).toBe(false);
     expect(integrationRes.body.message).toBe("success");
 
-    const vulnPayload1 = vulnerabilityIntegrationPayload.items[0];
-    const mapping1 = await prisma.externalVulnerabilityMapping.findFirstOrThrow(
-      {
-        where: {
-          externalId: vulnPayload1.externalId,
+    const findMapped = (externalId: string) =>
+      prisma.externalVulnerabilityRecordMapping.findFirstOrThrow({
+        where: { integrationId: createdIntegration.id, externalId },
+        include: {
+          item: {
+            include: {
+              ta3Submission: true,
+              vulnerability: {
+                include: {
+                  deviceGroupMatchings: { include: { version: true } },
+                },
+              },
+            },
+          },
         },
-      },
+      });
+
+    const [item1, item2] = vulnerabilityIntegrationPayload.items;
+    const mapping1 = await findMapped(item1.externalId);
+    const mapping2 = await findMapped(item2.externalId);
+
+    // Integration records have no owner, and follow the API's source rules.
+    expect(mapping1.item.userId).toBeNull();
+    expect(mapping1.item.source).toBe("TA3");
+    expect(mapping1.item.details).toBe(item1.details);
+    expect(mapping1.item.ta3Submission?.sarif).toStrictEqual(
+      item1.ta3Submission?.sarif,
     );
-
-    const foundVuln1 = await prisma.vulnerability.findFirstOrThrow({
-      where: {
-        id: mapping1.itemId,
-      },
-      include: {
-        deviceGroupMatchings: { include: { version: true } },
-      },
-    });
-
-    expect(mapping1.integrationId).toBe(createdIntegration.id);
-    expect(mapping1.externalId).toBe(vulnPayload1.externalId);
-
-    expect(foundVuln1.description).toBe(vulnPayload1.description);
-    expect(foundVuln1.narrative).toBe(vulnPayload1.narrative);
-    expect(foundVuln1.impact).toBe(vulnPayload1.impact);
-    expect(foundVuln1.exploitUri).toBe(vulnPayload1.exploitUri);
-    expect(foundVuln1.sarif).toStrictEqual(vulnPayload1.sarif);
-    expect(foundVuln1.deviceGroupMatchings.length).toBe(
-      vulnPayload1.cpes.length,
+    expect(mapping1.item.ta3Submission?.exploitUri).toBe(
+      item1.ta3Submission?.exploitUri,
     );
-    expect(foundVuln1.deviceGroupMatchings[0].version?.canonicalName).toBe(
-      vulnPayload1.cpes[0].split(":")[5],
-    );
+    expect(mapping1.item.vulnerability.description).toBe(item1.details);
+    expect(mapping1.item.vulnerability.deviceGroupMatchings.length).toBe(1);
+    expect(
+      mapping1.item.vulnerability.deviceGroupMatchings[0].version
+        ?.canonicalName,
+    ).toBe(item1.devices[0].version);
 
-    const vulnPayload2 = vulnerabilityIntegrationPayload.items[1];
-    const mapping2 = await prisma.externalVulnerabilityMapping.findFirstOrThrow(
-      {
-        where: {
-          externalId: vulnPayload2.externalId,
-        },
-      },
-    );
-
-    const foundVuln2 = await prisma.vulnerability.findFirstOrThrow({
-      where: {
-        id: mapping2.itemId,
-      },
-      include: {
-        deviceGroupMatchings: { include: { version: true } },
-      },
-    });
-
-    expect(mapping2.integrationId).toBe(createdIntegration.id);
-    expect(mapping2.externalId).toBe(vulnPayload2.externalId);
-
-    expect(foundVuln2.description).toBe(vulnPayload2.description);
-    expect(foundVuln2.narrative).toBe(vulnPayload2.narrative);
-    expect(foundVuln2.impact).toBe(vulnPayload2.impact);
-    expect(foundVuln2.exploitUri).toBe(vulnPayload2.exploitUri);
-    expect(foundVuln2.sarif).toStrictEqual(vulnPayload2.sarif);
-    expect(foundVuln2.deviceGroupMatchings.length).toBe(
-      vulnPayload2.cpes.length,
-    );
-    expect(foundVuln2.deviceGroupMatchings[0].version?.canonicalName).toBe(
-      vulnPayload2.cpes[0].split(":")[5],
-    );
+    expect(mapping2.item.source).toBe("OTHER");
+    expect(mapping2.item.ta3Submission).toBeNull();
 
     if (!mapping1.lastSynced || !mapping2.lastSynced) {
       fail("lastSynced values should not be null");
     }
-
     expect(mapping1.lastSynced).toStrictEqual(mapping2.lastSynced);
 
     const foundSync = await prisma.integrationResourceSync.findFirstOrThrow({
@@ -319,10 +439,19 @@ describe("Vulnerabilities Endpoint (/vulnerabilities)", () => {
         resource: mockIntegrationPayload.config.resource,
       },
     });
-
-    expect(foundSync.integrationId).toBe(createdIntegration.id);
     expect(foundSync.status).toBe(SyncStatusEnum.Success);
     expect(foundSync.errorMessage).toBeNullable();
     expect(foundSync.lastSuccessfulSync).toStrictEqual(mapping2.lastSynced);
+
+    // Uploading the same items again updates their records.
+    const resyncRes = await upload();
+    expect(resyncRes.status).toBe(200);
+    expect(resyncRes.body.createdItemsCount).toBe(0);
+    expect(resyncRes.body.updatedItemsCount).toBe(2);
+    expect(
+      await prisma.vulnerabilityRecord.count({
+        where: { id: { in: [mapping1.itemId, mapping2.itemId] } },
+      }),
+    ).toBe(2);
   });
 });

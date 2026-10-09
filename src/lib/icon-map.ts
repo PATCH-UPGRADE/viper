@@ -1,8 +1,14 @@
 import {
   ActivityIcon,
+  DatabaseIcon,
+  FlaskConicalIcon,
   MonitorIcon,
+  NetworkIcon,
+  ScanLineIcon,
+  ShieldIcon,
   SyringeIcon,
   ThermometerIcon,
+  WindIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -15,6 +21,12 @@ const icons: Record<string, IconComponent> = {
   Syringe: SyringeIcon,
   Activity: ActivityIcon,
   Thermometer: ThermometerIcon,
+  Wind: WindIcon,
+  FlaskConical: FlaskConicalIcon,
+  ScanLine: ScanLineIcon,
+  Database: DatabaseIcon,
+  Shield: ShieldIcon,
+  Network: NetworkIcon,
 };
 
 export const iconFor = (name?: string | null): IconComponent =>

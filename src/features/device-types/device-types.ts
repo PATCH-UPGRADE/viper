@@ -52,6 +52,27 @@ export const DEVICE_TYPES: DeviceTypeSeed[] = [
   { slug: "network-switch", displayName: "Network Switch", nameMappings: [] },
 ];
 
+/** The calendar's badge icon for a device type, by slug: a name from src/lib/icon-map.ts. */
+export const DEVICE_TYPE_ICONS: Record<string, string> = {
+  "infusion-pump": "Syringe",
+  "patient-monitor": "Activity",
+  ventilator: "Wind",
+  "lab-equipment": "FlaskConical",
+  "x-ray": "ScanLine",
+  "computed-tomography": "ScanLine",
+  "magnetic-resonance-imaging": "ScanLine",
+  ultrasound: "ScanLine",
+  mammography: "ScanLine",
+  angiography: "ScanLine",
+  "molecular-imaging": "ScanLine",
+  "imaging-workstation": "Monitor",
+  "image-viewer": "Monitor",
+  "imaging-platform": "Monitor",
+  "image-archive-pacs": "Database",
+  firewall: "Shield",
+  "network-switch": "Network",
+};
+
 /**
  * teamplay Fleet product names, as Fleet sends them in `productName`, and the
  * slug of their device type. A seeded type overwrites the type that a sync

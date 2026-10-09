@@ -1,4 +1,5 @@
 import {
+  DEVICE_TYPE_ICONS,
   DEVICE_TYPES,
   FLEET_PRODUCT_DEVICE_TYPES,
 } from "@/features/device-types/device-types";
@@ -18,10 +19,11 @@ export function requireDeviceTypeId(
 export async function seedDeviceTypes() {
   const idBySlug = new Map<string, string>();
   for (const { slug, displayName, nameMappings } of DEVICE_TYPES) {
+    const icon = DEVICE_TYPE_ICONS[slug] ?? null;
     const row = await prisma.deviceType.upsert({
       where: { slug },
-      create: { slug, displayName, nameMappings },
-      update: { displayName, nameMappings },
+      create: { slug, displayName, icon, nameMappings },
+      update: { displayName, icon, nameMappings },
     });
     idBySlug.set(slug, row.id);
   }

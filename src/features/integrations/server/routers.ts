@@ -1,24 +1,14 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import {
-  AuthType,
-  type Prisma,
-  ResourceType,
-  SubmissionState,
-} from "@/generated/prisma";
+import { type Prisma, ResourceType, SubmissionState } from "@/generated/prisma";
 import { inngest } from "@/inngest/client";
 import prisma from "@/lib/db";
 import { paginationInputSchema } from "@/lib/pagination";
 import { fetchPaginated } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { requireExistence } from "@/trpc/middleware";
-import type { AuthCredential } from "../core/credentials";
-import {
-  decryptCredentials,
-  encryptCredentials,
-  usesGenericAuth,
-} from "../core/credentials";
+import { decryptCredentials } from "../core/credentials";
 import {
   categoriesFor,
   defaultSyncEveryFor,
@@ -29,28 +19,14 @@ import { effectiveSyncEvery } from "../core/sync/cadence";
 import { resourcesFor } from "../core/sync/resources";
 import type { AnyConnectorModule } from "../core/types";
 import { type IntegrationFormValues, integrationInputSchema } from "../types";
-
-/** Encrypted credentials must never reach the browser. */
-const omitCredentials = { credentials: true } as const;
-
-const integrationsInclude = {
-  resourceSyncs: {
-    select: {
-      integrationId: true,
-      resource: true,
-      status: true,
-      errorMessage: true,
-      lastAttemptAt: true,
-      lastSuccessfulSync: true,
-      nextSyncAt: true,
-      enabled: true,
-      syncEvery: true,
-    },
-    orderBy: {
-      resource: "asc",
-    },
-  },
-} as const;
+import {
+  asBadRequest,
+  createIntegration,
+  integrationsInclude,
+  omitCredentials,
+  toCredentialBlob,
+  toRowShape,
+} from "./create-integration";
 
 const integrationListSelect = {
   id: true,
@@ -65,38 +41,6 @@ const integrationListSelect = {
 type IntegrationListRow = Prisma.IntegrationGetPayload<{
   select: typeof integrationListSelect;
 }>;
-
-const toRowShape = (input: IntegrationFormValues) => {
-  const module = requirePlatform(input.platform);
-  const { definition } = module;
-
-  const config = definition.configSchema.parse(input.config);
-
-  return {
-    row: {
-      name: input.name,
-      platform: input.platform,
-      // Omitted means "keep what's stored" (null = inherit the platform default) — same as credentials below.
-      ...(input.syncEvery !== undefined && { syncEvery: input.syncEvery }),
-      config,
-    },
-    module,
-    config,
-  };
-};
-
-/** AuthType.None means "nothing to protect" only for generic-auth platforms. */
-const toCredentialBlob = (
-  module: AnyConnectorModule,
-  credentials: IntegrationFormValues["credentials"],
-) => {
-  if (!credentials) return null;
-  const parsed = module.definition.credentialSchema.parse(credentials);
-  const isNoneAuth =
-    usesGenericAuth(module.definition.credentialSchema) &&
-    (parsed as AuthCredential).authType === AuthType.None;
-  return isNoneAuth ? null : encryptCredentials(parsed);
-};
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -134,18 +78,6 @@ const credentialsPatch = (
   const existing = existingBlob ? decryptCredentials(existingBlob) : null;
   const merged = mergeCredentialPatch(existing, data.credentials);
   return { credentials: toCredentialBlob(module, merged) };
-};
-
-const asBadRequest = <T>(fn: () => T): T => {
-  try {
-    return fn();
-  } catch (error) {
-    if (error instanceof TRPCError) throw error;
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: error instanceof Error ? error.message : "Invalid integration",
-    });
-  }
 };
 
 const requireIntegration = async (id: string) => {
@@ -199,61 +131,7 @@ export const integrationsRouter = createTRPCRouter({
 
   create: protectedProcedure
     .input(integrationInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const { name } = input;
-      const { row, module, config } = asBadRequest(() => toRowShape(input));
-      const credentials = asBadRequest(() =>
-        toCredentialBlob(module, input.credentials),
-      );
-      const resources = asBadRequest(() => resourcesFor(module, config));
-
-      const integration = await prisma.$transaction(async (tx) => {
-        if (module.definition.singleton) {
-          // No unique constraint backs the singleton rule, so serialize concurrent creates of the same platform before the existence check.
-          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`integration:${row.platform}`}))`;
-          const existing = await tx.integration.findFirst({
-            where: { platform: row.platform },
-            select: { id: true },
-          });
-          if (existing) {
-            throw new TRPCError({
-              code: "CONFLICT",
-              message: `A ${module.definition.displayName} integration already exists.`,
-            });
-          }
-        }
-
-        const integrationUser = await tx.user.create({
-          data: {
-            id: crypto.randomUUID(),
-            name,
-          },
-        });
-
-        return tx.integration.create({
-          data: {
-            ...row,
-            credentials,
-            userId: ctx.auth.user.id,
-            integrationUserId: integrationUser.id,
-            resourceSyncs: {
-              create: resources.map((resource) => ({ resource })),
-            },
-          },
-          include: integrationsInclude,
-          omit: omitCredentials,
-        });
-      });
-      try {
-        await module.onCreate?.();
-      } catch (err) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: err instanceof Error ? err.message : "Invalid integration",
-        });
-      }
-      return integration;
-    }),
+    .mutation(({ ctx, input }) => createIntegration(input, ctx.auth.user.id)),
 
   update: protectedProcedure
     .input(

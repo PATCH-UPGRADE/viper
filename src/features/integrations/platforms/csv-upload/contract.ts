@@ -52,6 +52,9 @@ export const productKey = (manufacturer: string, product: string): string =>
   `${normalizeNameKey(manufacturer)}::${normalizeNameKey(product)}`;
 export const csvExternalId = (assetId: string): string =>
   `${CSV_EXTERNAL_ID_PREFIX}${assetId}`;
+export const addedAssetIdPrefix = (importId: string): string => `${importId}r`;
+export const addedAssetIdFor = (importId: string, rowNumber: number): string =>
+  `${addedAssetIdPrefix(importId)}${rowNumber}`;
 
 export const assetStatusSchema = z.enum(Object.values(AssetStatus));
 export const csvImportStatusSchema = z.enum(Object.values(CsvImportStatus));

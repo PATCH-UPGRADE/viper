@@ -110,8 +110,24 @@ export const aggregateTiming = (
   };
 };
 
-const TimingText = ({ timing }: { timing: TimingInput }) => {
-  const { text, isError } = timingLine(timing);
+export type StatusTone = "error" | "ok" | "idle";
+
+const STATUS_DOT_STYLES: Record<StatusTone, string> = {
+  error: "bg-destructive",
+  ok: "bg-emerald-500",
+  idle: "bg-muted-foreground/40",
+};
+
+export const StatusLine = ({
+  text,
+  tone,
+  errorMessage,
+}: {
+  text: string;
+  tone: StatusTone;
+  errorMessage?: string | null;
+}) => {
+  const isError = tone === "error";
   const label = (
     <span
       className={cn(
@@ -122,25 +138,34 @@ const TimingText = ({ timing }: { timing: TimingInput }) => {
       <span
         className={cn(
           "inline-block size-1.5 rounded-full mr-1.5",
-          timing.status === SyncStatusEnum.Error
-            ? "bg-destructive"
-            : timing.lastSuccessfulSync
-              ? "bg-emerald-500"
-              : "bg-muted-foreground/40",
+          STATUS_DOT_STYLES[tone],
         )}
       />
       {text}
     </span>
   );
 
-  if (!isError || !timing.errorMessage) return label;
+  if (!isError || !errorMessage) return label;
   return (
     <Tooltip>
       <TooltipTrigger asChild>{label}</TooltipTrigger>
-      <TooltipContent>{timing.errorMessage}</TooltipContent>
+      <TooltipContent>{errorMessage}</TooltipContent>
     </Tooltip>
   );
 };
+
+const timingToneOf = (timing: TimingInput): StatusTone => {
+  if (timing.status === SyncStatusEnum.Error) return "error";
+  return timing.lastSuccessfulSync ? "ok" : "idle";
+};
+
+const TimingText = ({ timing }: { timing: TimingInput }) => (
+  <StatusLine
+    text={timingLine(timing).text}
+    tone={timingToneOf(timing)}
+    errorMessage={timing.errorMessage}
+  />
+);
 
 const ResourceStatus = ({
   sync,
@@ -164,7 +189,19 @@ const ResourceStatus = ({
   );
 };
 
-const IntegrationActionsMenu = ({
+const INTEGRATION_MENU_LABELS = {
+  edit: "Edit Integration",
+  remove: "Remove Integration",
+  confirmTitle: "Remove integration?",
+};
+
+const UPLOAD_MENU_LABELS = {
+  edit: "Edit Name",
+  remove: "Remove",
+  confirmTitle: "Remove upload?",
+};
+
+export const IntegrationActionsMenu = ({
   integration,
   catalogEntry,
 }: {
@@ -177,12 +214,14 @@ const IntegrationActionsMenu = ({
   const [editOpen, setEditOpen] = useState(false);
   const canSync =
     integration.enabled && integration.resourceSyncs.some((s) => s.enabled);
+  const syncsOnSchedule = !catalogEntry?.unscheduled;
+  const labels = syncsOnSchedule ? INTEGRATION_MENU_LABELS : UPLOAD_MENU_LABELS;
 
   return (
     <>
       <MoreVerticalDropdownMenu
         items={[
-          {
+          syncsOnSchedule && {
             label: triggerSync.isPending ? "Syncing..." : "Sync Now",
             icon: (
               <RefreshCw
@@ -193,12 +232,12 @@ const IntegrationActionsMenu = ({
             disabled: triggerSync.isPending || !canSync,
           },
           catalogEntry && {
-            label: "Edit Integration",
+            label: labels.edit,
             icon: <PencilIcon />,
             onClick: () => setEditOpen(true),
           },
           {
-            label: "Remove Integration",
+            label: labels.remove,
             icon: <TrashIcon />,
             onClick: () => setConfirmOpen(true),
             variant: "destructive",
@@ -219,11 +258,19 @@ const IntegrationActionsMenu = ({
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove integration?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This stops <strong>{integration.name}</strong> from syncing and
-              removes it entirely. This can&apos;t be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{labels.confirmTitle}</AlertDialogTitle>
+            {syncsOnSchedule ? (
+              <AlertDialogDescription>
+                This stops <strong>{integration.name}</strong> from syncing and
+                removes it entirely. This can&apos;t be undone.
+              </AlertDialogDescription>
+            ) : (
+              <AlertDialogDescription>
+                This removes <strong>{integration.name}</strong> from your
+                uploads. The devices it added stay in VIPER, but are no longer
+                linked to this upload. This can&apos;t be undone.
+              </AlertDialogDescription>
+            )}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>

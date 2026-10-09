@@ -26,6 +26,7 @@ import { useSuspenseIntegrations } from "../hooks/use-integrations";
 import { CATEGORIES, type Category } from "../types";
 import { IntegrationCard } from "./integration-row";
 import { IntegrationsCatalog } from "./integrations-catalog";
+import { enabledRowsFor, PlatformUploadsCard } from "./platform-uploads-row";
 
 const SECTION_ICONS: Record<Category, LucideIcon> = {
   "Hospital Inventory": ArchiveIcon,
@@ -71,28 +72,30 @@ const useScrollSpy = () => {
 };
 
 const ConnectorsSidebar = ({
+  catalog,
   active,
   onSelect,
 }: {
+  catalog: CatalogEntry[];
   active: Category;
   onSelect: (section: Category) => void;
 }) => {
   const { data } = useSuspenseIntegrations();
   const { data: webhooks } = useSuspenseWebhooks();
 
-  const countBySection = useMemo(
-    () =>
-      data.items.reduce(
-        (counts, item) => {
-          for (const category of item.categories) {
-            counts[category] = (counts[category] ?? 0) + 1;
-          }
-          return counts;
-        },
-        {} as Record<Category, number>,
-      ),
-    [data.items],
-  );
+  const countBySection = useMemo(() => {
+    const counts = {} as Record<Category, number>;
+    for (const row of enabledRowsFor(data.items, catalog)) {
+      const categories =
+        row.kind === "uploads"
+          ? row.catalogEntry.categories
+          : row.integration.categories;
+      for (const category of categories) {
+        counts[category] = (counts[category] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [data.items, catalog]);
 
   return (
     <nav className="flex flex-col gap-1 w-56 shrink-0 sticky top-4 self-start">
@@ -133,6 +136,10 @@ const ConnectorsSidebar = ({
 
 const EnabledIntegrations = ({ catalog }: { catalog: CatalogEntry[] }) => {
   const { data } = useSuspenseIntegrations();
+  const rows = useMemo(
+    () => enabledRowsFor(data.items, catalog),
+    [data.items, catalog],
+  );
 
   return (
     <div className="flex flex-col gap-4 flex-1 min-w-0">
@@ -140,19 +147,25 @@ const EnabledIntegrations = ({ catalog }: { catalog: CatalogEntry[] }) => {
         title="Enabled Integrations"
         description="Currently active connections syncing data into VIPER."
       />
-      {data.items.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyView message="No integrations enabled yet." />
       ) : (
         <Card className="p-0 gap-0 overflow-hidden divide-y">
-          {data.items.map((integration) => (
-            <IntegrationCard
-              key={integration.id}
-              integration={integration}
-              catalogEntry={catalog.find(
-                (entry) => entry.platform === integration.platform,
-              )}
-            />
-          ))}
+          {rows.map((row) =>
+            row.kind === "uploads" ? (
+              <PlatformUploadsCard
+                key={row.catalogEntry.platform}
+                catalogEntry={row.catalogEntry}
+                uploads={row.uploads}
+              />
+            ) : (
+              <IntegrationCard
+                key={row.integration.id}
+                integration={row.integration}
+                catalogEntry={row.catalogEntry}
+              />
+            ),
+          )}
         </Card>
       )}
     </div>
@@ -164,7 +177,11 @@ export const IntegrationsList = ({ catalog }: { catalog: CatalogEntry[] }) => {
 
   return (
     <div className="flex gap-6">
-      <ConnectorsSidebar active={active} onSelect={scrollTo} />
+      <ConnectorsSidebar
+        catalog={catalog}
+        active={active}
+        onSelect={scrollTo}
+      />
       <div className="flex flex-col gap-10 flex-1 min-w-0">
         <EnabledIntegrations catalog={catalog} />
         <IntegrationsCatalog catalog={catalog} register={register} />

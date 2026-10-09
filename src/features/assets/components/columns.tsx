@@ -7,7 +7,7 @@ import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
 import { deviceGroupCpeList } from "@/lib/markdown";
 import type { AssetResponse } from "../types";
-import { getAssetDeviceTypeLabel } from "../utils";
+import { getAssetDeviceTypeLabel, getSourceToolLabel } from "../utils";
 
 export const columns: ColumnDef<AssetResponse>[] = [
   {
@@ -38,7 +38,7 @@ export const columns: ColumnDef<AssetResponse>[] = [
     accessorKey: "userId",
     meta: { title: "Source Tool" },
     header: "Source Tool",
-    accessorFn: (row) => row.user.name,
+    accessorFn: getSourceToolLabel,
   },
   {
     accessorKey: "updatedAt",

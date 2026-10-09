@@ -3,16 +3,22 @@
 import { formatDistanceToNow } from "date-fns";
 import { ExternalLinkIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
 import type { UrlBearingMapping } from "@/features/integrations/core/urls";
+import { PlatformEnum } from "@/generated/prisma";
 
 /**
  * The common shape of every `External*Mapping` select in the app.
  */
 export interface ExternalMappingLike extends UrlBearingMapping {
   externalId: string;
-  integration: { id: string; name: string };
+  integration: { id: string; name: string; platform?: PlatformEnum };
   lastSynced?: Date | null;
 }
+
+const PLATFORM_TAGS: Partial<Record<PlatformEnum, string>> = {
+  [PlatformEnum.CSV_UPLOAD]: "CSV",
+};
 
 const MappingLink = ({ label, href }: { label: string; href: string }) => (
   <>
@@ -51,13 +57,18 @@ export const ExternalMappingList = ({
     <ul className="space-y-3">
       {mappings.map((mapping) => {
         const { webUrl, upstreamApi } = mapping;
+        const platform = mapping.integration.platform;
+        const platformTag = platform ? PLATFORM_TAGS[platform] : undefined;
 
         return (
           <li
             key={`${mapping.integration.id}:${mapping.externalId}`}
             className="text-sm flex flex-col gap-1"
           >
-            <span className="font-medium">{mapping.integration.name}</span>
+            <span className="flex flex-wrap items-center gap-2 font-medium">
+              {mapping.integration.name}
+              {platformTag && <Badge variant="outline">{platformTag}</Badge>}
+            </span>
             {mapping.lastSynced && (
               <span className="text-xs text-muted-foreground">
                 Last synced{" "}

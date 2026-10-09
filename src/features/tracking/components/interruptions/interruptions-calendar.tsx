@@ -67,6 +67,18 @@ type Block = {
   lanes: number;
 };
 
+// Puts each block in the first lane that is free when it starts.
+const assignLanes = (cluster: Omit<Block, "lane" | "lanes">[]): Block[] => {
+  const laneEnds: number[] = [];
+  const placed = cluster.map((block) => {
+    const free = laneEnds.findIndex((end) => end <= block.start);
+    const lane = free < 0 ? laneEnds.length : free;
+    laneEnds[lane] = block.start + block.len;
+    return { ...block, lane };
+  });
+  return placed.map((block) => ({ ...block, lanes: laneEnds.length }));
+};
+
 // One block per event on this day. An event that runs past midnight continues
 // at the top of the next day. Blocks that overlap sit in separate lanes, and
 // each cluster of overlapping blocks shares the width among its own lanes.
@@ -86,28 +98,15 @@ export const layout = (day: Date, items: Item[]) => {
     })
     .sort((a, b) => a.start - b.start);
 
-  const blocks: Block[] = [];
-  let cluster: Block[] = [];
-  let laneEnds: number[] = [];
-  const closeCluster = () => {
-    for (const block of cluster) block.lanes = laneEnds.length;
-  };
-  for (const { item, start, len } of starts) {
-    // Nothing in the current cluster is still running: start a new one.
-    if (start >= Math.max(0, ...laneEnds)) {
-      closeCluster();
-      cluster = [];
-      laneEnds = [];
-    }
-    const free = laneEnds.findIndex((end) => end <= start);
-    const lane = free < 0 ? laneEnds.length : free;
-    laneEnds[lane] = start + len;
-    const block = { item, start, len, lane, lanes: 1 };
-    cluster.push(block);
-    blocks.push(block);
+  // A new cluster starts once nothing in the current one is still running.
+  const clusters: (typeof starts)[] = [];
+  let end = 0;
+  for (const block of starts) {
+    if (block.start >= end) clusters.push([]);
+    clusters[clusters.length - 1].push(block);
+    end = Math.max(end, block.start + block.len);
   }
-  closeCluster();
-  return blocks;
+  return clusters.flatMap(assignLanes);
 };
 
 // The availability-colored button that opens an event's drawer.

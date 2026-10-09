@@ -53,7 +53,7 @@ model User {
   notes                    Note[]
   answeredQuestions        Question[]
   medisaoCommentIdentities MedISAOExternalCommentIdentity[]
-  ta3Submissions           TA3Submission[]
+  vulnerabilityRecords     VulnerabilityRecord[]
 
   @@unique([email])
   @@index([departmentId])
@@ -741,24 +741,24 @@ enum AlohaStatus {
 }
 
 model Vulnerability {
-  id                   String                @id @default(cuid())
+  id          String   @id @default(cuid())
   /// Best human-facing ID: CVE > GHSA > other public ID > VIPER. Written alongside
   /// identifiers
-  displayId            String? // TODO VW-540: make this non-nullable after create paths
-  cveId                String? // TODO VW_540: remove this
-  description          String?               @db.Text // description of vulnerability
-  narrative            String?               @db.Text // how a vulnerability could be exploited
-  impact               String?               @db.Text // clinical impact
-  severity             Severity              @default(Medium)
+  displayId   String
+  cveId       String? // TODO VW_540: remove this
+  description String?  @db.Text // description of vulnerability
+  narrative   String?  @db.Text // how a vulnerability could be exploited
+  impact      String?  @db.Text // clinical impact
+  severity    Severity @default(Medium)
 
   // <Getting removed in VW-540>
-  cvssScore            Float? 
-  cvssVector           String?
-  sarif                Json
-  affectedComponents   String[]              @default([])
-  exploitUri           String?               @map("exploit-uri")
-  alohaStatus AlohaStatus?
-  alohaLog    Json         @default("{}")
+  cvssScore          Float?
+  cvssVector         String?
+  sarif              Json
+  affectedComponents String[]     @default([])
+  exploitUri         String?      @map("exploit-uri")
+  alohaStatus        AlohaStatus?
+  alohaLog           Json         @default("{}")
 
   deviceArtifactId String?
   deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
@@ -808,6 +808,8 @@ enum VulnerabilitySource {
   VENDOR_ADVISORY // an advisory or VEX document
   FIRST_EPSS // EPSS scores only
   CISA_KEV // known-exploited flag only
+  AI // the AI crawler integration
+  OTHER // an API client that isn't a TA3 performer
   // TODO VW-516: Add GHSA
   // Future TODO: Add MANUAL when we support human changes
 }
@@ -827,7 +829,6 @@ enum MetricType {
 /// (or any other ID) resolve to exactly one Vulnerability. The kind of ID comes from its prefix
 /// (CVE-, GHSA-, VIPER- for zero-days), so a value must be globally unique on its own: prefix a
 /// vendor-local ID with its vendor, e.g. "BD:2024-001".
-// TODO VW-540: Actually use this in code (just in db for now)
 model VulnerabilityIdentifier {
   id           String @id @default(cuid())
   value        String @unique // trimmed + upper-cased, for lookup: "GHSA-JFH8-C2JP-5V3Q"
@@ -844,7 +845,6 @@ model VulnerabilityIdentifier {
 
 /// One source's statement about one vulnerability: a TA3 submission, a vendor advisory, a
 /// or a feed's entry
-// TODO VW-540: Actually use this in code (just in db for now)
 model VulnerabilityRecord {
   id     String              @id @default(cuid())
   source VulnerabilitySource
@@ -860,6 +860,11 @@ model VulnerabilityRecord {
   vulnerabilityId String
   vulnerability   Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
 
+  /// Who created this record through the API. When set, only this user may update or delete
+  /// it; when null (integration and feed records), anyone may.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   /// The raw payload this record was parsed from.
   raw Json?
 
@@ -869,6 +874,10 @@ model VulnerabilityRecord {
 
   // TODO later: modifiedAt DateTime? — the source's own modified timestamp (OSV `modified`).
   // TODO later: withdrawnAt DateTime? — when the source withdrew / rejected the record.
+  // TODO later: fetchStartedAt DateTime? —  when a fetch of this record from its source (e.g. NVD)
+  // started; null when none is in flight. 
+  // We should add this when we start fetching NVD/GHSA advisories before our LLM processing steps
+  // This is effectively a lock
 
   // TODO later: relatedIds String[] — OSV `related`: IDs of similar-but-different
   // vulnerabilities
@@ -883,12 +892,12 @@ model VulnerabilityRecord {
   // Postgres treats NULLs as distinct, so TA3 and manual records never collide.
   @@unique([source, externalId, vulnerabilityId])
   @@index([vulnerabilityId])
+  @@index([userId])
   @@map("vulnerability_record")
 }
 
 /// One value a record asserts: a CVSS score, an EPSS probability, a KEV listing
 /// decision. Applies to the whole vulnerability.
-/// TODO VW-540: None of this code is used currently 
 model Metric {
   id String @id @default(cuid())
 
@@ -916,15 +925,10 @@ model Metric {
 }
 
 /// One upload from a TA3 performer. A vulnerability can have many, through its records.
-/// TODO VW-540: unused currently
 model TA3Submission {
   id       String              @id @default(cuid())
   recordId String              @unique
   record   VulnerabilityRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
-
-  // integration shadow user for partner uploads
-  submittedById String
-  submittedBy   User   @relation(fields: [submittedById], references: [id], onDelete: Cascade)
 
   deviceArtifactId String?
   deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
@@ -944,7 +948,6 @@ model TA3Submission {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([submittedById])
   @@index([deviceArtifactId])
   @@map("ta3_submission")
 }

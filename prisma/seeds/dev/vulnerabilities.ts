@@ -1,4 +1,8 @@
-import { Priority, Severity } from "@/generated/prisma";
+import {
+  createVulnerabilityRecord,
+  cvssMetricType,
+} from "@/features/vulnerabilities/server/records";
+import { Priority, Severity, VulnerabilitySource } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { matchingForGroup } from "./canonical-identity";
 
@@ -211,7 +215,20 @@ export async function seedVulnerabilities(userId: string) {
   // Sequential so shared DeviceGroupMatching find-or-create is race-free.
   const vulnerabilities = [];
   for (const vulnerability of SAMPLE_VULNERABILITIES) {
-    const { cpes, ...data } = vulnerability;
+    const {
+      cpes,
+      cveId,
+      severity,
+      cvssScore,
+      epss,
+      inKEV,
+      priority,
+      sarif,
+      exploitUri,
+      description,
+      narrative,
+      impact,
+    } = vulnerability;
 
     const deviceGroups = (
       await Promise.all(
@@ -243,14 +260,23 @@ export async function seedVulnerabilities(userId: string) {
       await Promise.all(uniqueGroups.map(matchingForGroup))
     ).filter((id): id is string => id !== null);
 
-    const created = await prisma.vulnerability.create({
-      data: {
-        ...data,
+    const { vulnerabilityId } = await createVulnerabilityRecord(
+      {
+        source: VulnerabilitySource.TA3,
+        identifiers: [cveId],
+        details: description,
+        metrics: [{ type: cvssMetricType(), score: cvssScore, severity }],
+        deviceGroupMatchingIds: matchingIds,
+        ta3Submission: { sarif, narrative, impact, exploitUri },
         userId,
-        deviceGroupMatchings: {
-          connect: matchingIds.map((id) => ({ id })),
-        },
       },
+      { actingUserId: userId },
+    );
+    // TODO: VW-540 EPSS and KEV become records from enrichment in future PR, and priority moves to
+    // Issue in VW-541. Until then they live on the vulnerability.
+    const created = await prisma.vulnerability.update({
+      where: { id: vulnerabilityId },
+      data: { epss, inKEV, priority },
     });
     vulnerabilities.push(created);
   }

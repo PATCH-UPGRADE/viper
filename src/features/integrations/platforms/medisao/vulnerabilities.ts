@@ -1,8 +1,10 @@
 import "server-only";
+import {
+  CVE_PATTERN,
+  normalizeIdentifier as normalizeVulnerabilityIdentifier,
+} from "@/features/vulnerabilities/server/identity";
 import prisma from "@/lib/db";
 import { isUniqueViolation } from "@/lib/router-utils";
-
-const CVE_PATTERN = /^CVE-\d{4}-\d{4,}$/i;
 
 /** Trimmed, and a CVE upper-cased, so one identifier has one spelling. */
 export const normalizeIdentifier = (name: string): string => {
@@ -28,6 +30,9 @@ interface ResolveOrMintResult {
   created: number;
 }
 
+// TODO: VW-540 resolve and mint through VulnerabilityIdentifier + VulnerabilityRecord
+// (VENDOR_ADVISORY) instead of ExternalVulnerabilityMapping and cveId. Until then a second
+// integration minting the same non-CVE name hits the identifier's unique key and throws.
 /**
  * Resolve every identifier to a Vulnerability, and mint the ones Viper does not
  * hold.
@@ -78,9 +83,13 @@ export async function resolveOrMintVulnerabilities({
   let created = 0;
   for (const name of wanted.filter((name) => !ids.has(name))) {
     const isCve = CVE_PATTERN.test(name);
+    const identifier = normalizeVulnerabilityIdentifier(name);
+    if (!identifier) continue; // unreachable: blank names are filtered above
     try {
       const row = await prisma.vulnerability.create({
         data: {
+          displayId: identifier.displayValue,
+          identifiers: { create: identifier },
           cveId: isCve ? name : null,
           description: isCve ? null : `${name}. ${context}`,
           sarif: {},

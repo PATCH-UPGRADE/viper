@@ -321,6 +321,9 @@ async function seedSyngoPlazaEnvironment(userId: string) {
   const vulnerability = await prisma.vulnerability.create({
     data: {
       cveId: SYNGO_PLAZA_CVE,
+      // TODO: VW-540 writes no VulnerabilityIdentifier, so createVulnerabilityRecord can't find this
+      // vulnerability by its CVE and would create a duplicate. Create it through that instead.
+      displayId: SYNGO_PLAZA_CVE,
       severity: Severity.Medium,
       cvssScore: 5.3,
       cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
@@ -488,6 +491,9 @@ async function seedDeserializationEnvironment(userId: string) {
   const vulnerability = await prisma.vulnerability.create({
     data: {
       cveId: DESERIALIZATION_CVE,
+      // TODO: VW-540 writes no VulnerabilityIdentifier, so createVulnerabilityRecord can't find this
+      // vulnerability by its CVE and would create a duplicate. Create it through that instead.
+      displayId: DESERIALIZATION_CVE,
       severity: Severity.Critical,
       cvssScore: 9.8,
       cvssVector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/E:P/RL:O/RC:C",

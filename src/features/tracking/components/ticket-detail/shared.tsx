@@ -9,7 +9,7 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -118,6 +118,12 @@ export const StatusChip = ({
   </Badge>
 );
 
+// True inside the clinician dashboard's modal: links show as plain text and
+// the controls that change a ticket are left out.
+const ReadOnlyContext = createContext(false);
+export const ReadOnlyProvider = ReadOnlyContext.Provider;
+export const useReadOnly = () => useContext(ReadOnlyContext);
+
 // Row linking to another ticket. `action` is the optional hover-reveal button
 // (see RowHoverAction). `leading` sits before the summary on the first line;
 // `details` is an optional second line. `assigneeName` undefined hides the
@@ -142,21 +148,26 @@ export const TicketRefRow = ({
   leading?: ReactNode;
   details?: ReactNode;
   action?: ReactNode;
-}) => (
-  <li className="group relative flex items-center py-2.5">
-    <Link
-      href={`/tracking/${id}`}
-      className={cn(
-        "flex min-w-0 flex-1 items-center gap-3",
-        action &&
-          "transition-[padding] group-hover:pr-8 group-focus-within:pr-8",
-      )}
-    >
+}) => {
+  const readOnly = useReadOnly();
+  const rowClass = cn(
+    "flex min-w-0 flex-1 items-center gap-3",
+    action &&
+      !readOnly &&
+      "transition-[padding] group-hover:pr-8 group-focus-within:pr-8",
+  );
+  const content = (
+    <>
       {icon}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-w-0 items-center gap-2">
           {leading}
-          <span className="min-w-0 flex-1 truncate text-sm font-medium group-hover:underline">
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate text-sm font-medium",
+              !readOnly && "group-hover:underline",
+            )}
+          >
             {summary}
           </span>
         </div>
@@ -172,10 +183,22 @@ export const TicketRefRow = ({
         )}
         <StatusChip status={status} />
       </div>
-    </Link>
-    {action}
-  </li>
-);
+    </>
+  );
+
+  return (
+    <li className="group relative flex items-center py-2.5">
+      {readOnly ? (
+        <div className={rowClass}>{content}</div>
+      ) : (
+        <Link href={`/tracking/${id}`} className={rowClass}>
+          {content}
+        </Link>
+      )}
+      {action}
+    </li>
+  );
+};
 
 // Icon button for TicketRefRow's `action` slot. It hides until hover or focus,
 // but only where a pointer can hover. On a touch screen it stays visible,
@@ -190,18 +213,19 @@ export const RowHoverAction = ({
   onClick: () => void;
   disabled?: boolean;
   children: ReactNode;
-}) => (
-  <Button
-    variant="ghost"
-    size="icon"
-    className="absolute right-0 top-1/2 size-7 -translate-y-1/2 transition [@media(hover:hover)]:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
-    onClick={onClick}
-    disabled={disabled}
-    aria-label={label}
-  >
-    {children}
-  </Button>
-);
+}) =>
+  useReadOnly() ? null : (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="absolute right-0 top-1/2 size-7 -translate-y-1/2 transition [@media(hover:hover)]:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+    >
+      {children}
+    </Button>
+  );
 
 // Trigger + option list for a ticket-status Select. Callers still own the
 // <Select value={...} onValueChange={...}> wrapper — this only standardizes

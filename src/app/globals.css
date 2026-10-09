@@ -65,6 +65,27 @@
   --shadow-opacity: var(--shadow-opacity);
   --color-shadow-color: var(--shadow-color);
   --color-destructive-foreground: var(--destructive-foreground);
+  --animate-attention-glow: attention-glow 1.8s ease-out infinite;
+  --animate-attention-glow-brief: attention-glow 1s ease-out 2;
+  --animate-attention-glow-arrival: attention-glow 1.2s ease-out 0.5s 4;
+
+  @keyframes attention-glow {
+    0% {
+      box-shadow:
+        0 0 0 0 color-mix(in oklch, var(--primary) 60%, transparent),
+        0 0 0 0 color-mix(in oklch, var(--primary) 35%, transparent);
+    }
+    70% {
+      box-shadow:
+        0 0 8px 8px color-mix(in oklch, var(--primary) 0%, transparent),
+        0 0 14px 18px color-mix(in oklch, var(--primary) 0%, transparent);
+    }
+    100% {
+      box-shadow:
+        0 0 0 0 color-mix(in oklch, var(--primary) 0%, transparent),
+        0 0 0 0 color-mix(in oklch, var(--primary) 0%, transparent);
+    }
+  }
 }
 
 :root {

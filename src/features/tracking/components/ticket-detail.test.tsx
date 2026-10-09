@@ -1381,10 +1381,12 @@ describe("TicketDetailContent — view mode", () => {
 });
 
 describe("TicketDetailContent — embedded", () => {
-  it("shows every section but no links or write controls", async () => {
+  it("shows every section, read-only except for comments", async () => {
     const user = userEvent.setup();
     renderDetail(
       {
+        descriptions: [],
+        body: "See [the advisory](https://example.test/advisory)",
         children: [
           { id: "child-1", summary: "Patch ICU room 301", status: "TO_DO" },
         ],
@@ -1414,16 +1416,25 @@ describe("TicketDetailContent — embedded", () => {
       "Patch ICU room 301",
       "Patch PACS Server",
       "Advisory for ICU monitors",
+      "See the advisory",
       "Activity",
     ]) {
       expect(screen.getByText(text)).toBeInTheDocument();
     }
+    // Comments are the one thing the modal lets you change.
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    await user.type(screen.getByPlaceholderText(/write a comment/i), "Noted");
+    await user.click(screen.getByRole("button", { name: /^comment$/i }));
+    expect(mockAddCommentMutate.mock.calls[0][0]).toMatchObject({
+      ticketId: "ticket-1",
+      body: "Noted",
+    });
+
     await user.click(screen.getByRole("tab", { name: /^assets/i }));
     expect(screen.getByText("linked-host")).toBeInTheDocument();
 
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     for (const name of [
       /^edit$/i,
       /^watch/i,

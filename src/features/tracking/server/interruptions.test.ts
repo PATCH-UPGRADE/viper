@@ -40,6 +40,23 @@ describe("interruptions scope", () => {
       code: "NOT_FOUND",
     });
   });
+
+  it("gives the contact's phone", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValue({
+      id: "wo-1",
+      assignee: { phone: "Ext. 3104" },
+      ticket: null,
+      seenBy: [],
+      departments: [],
+      assets: [],
+      descriptions: [],
+    });
+    const detail = await getInterruptionDetail("u1", "wo-1");
+    const { select } = mockPrisma.workOrderTicket.findFirst.mock.calls[0][0];
+    expect(select.assignee.select.phone).toBe(true);
+    expect(detail.contact.phone).toBe("Ext. 3104");
+  });
 });
 
 describe("interruption calendar", () => {

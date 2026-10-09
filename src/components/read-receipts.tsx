@@ -1,6 +1,6 @@
 "use client";
 
-import { format } from "date-fns";
+import { format, startOfDay } from "date-fns";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   HoverCard,
@@ -9,10 +9,9 @@ import {
 } from "@/components/ui/hover-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { UserAvatar } from "@/components/user-avatar";
+import { dayGroupLabel } from "@/lib/date-utils";
 import { initialsOf } from "@/lib/string-utils";
 import { cn } from "@/lib/utils";
-import type { NotificationReadReceipt } from "../types";
-import { groupReceiptsByDay } from "./shared";
 
 /** Avatars shown in the trigger before the rest collapse into a "+N" chip. */
 const VISIBLE_AVATARS = 3;
@@ -21,12 +20,54 @@ const VISIBLE_AVATARS = 3;
 const STACK_ITEM = "-ml-2 size-7 shrink-0 ring-2 ring-background";
 const STACK_FILL = "bg-accent text-[10px] text-accent-foreground";
 
+export type ReadReceipt = {
+  readAt: Date;
+  user: {
+    id: string;
+    name: string;
+    image: string | null;
+    department: { name: string } | null;
+  };
+};
+
+type ReadReceiptDayGroup = {
+  /** Start of the calendar day, in milliseconds. Days cannot collide on it. */
+  dayStart: number;
+  label: string;
+  receipts: ReadReceipt[];
+};
+
+/**
+ * Rows inside a group keep the order they arrive in, which the server sorts
+ * newest first.
+ */
+export function groupReceiptsByDay(
+  receipts: ReadReceipt[],
+): ReadReceiptDayGroup[] {
+  const byDay = new Map<number, ReadReceipt[]>();
+
+  for (const receipt of receipts) {
+    const dayStart = startOfDay(receipt.readAt).getTime();
+    const list = byDay.get(dayStart) ?? [];
+    list.push(receipt);
+    byDay.set(dayStart, list);
+  }
+
+  return [...byDay.entries()]
+    .sort(([a], [b]) => b - a)
+    .map(([dayStart, dayReceipts]) => ({
+      dayStart,
+      label: dayGroupLabel(dayStart),
+      receipts: dayReceipts,
+    }));
+}
+
 type Props = {
-  receipts: NotificationReadReceipt[];
+  receipts: ReadReceipt[];
   className?: string;
 };
 
-export function NotificationReadReceipts({ receipts, className }: Props) {
+export function ReadReceipts({ receipts, className }: Props) {
   if (receipts.length === 0) return null;
 
   const visible = receipts.slice(0, VISIBLE_AVATARS);
@@ -47,7 +88,10 @@ export function NotificationReadReceipts({ receipts, className }: Props) {
         >
           <span className="flex items-center">
             {visible.map((receipt) => (
-              <Avatar key={receipt.id} className={cn(STACK_ITEM, "first:ml-0")}>
+              <Avatar
+                key={receipt.user.id}
+                className={cn(STACK_ITEM, "first:ml-0")}
+              >
                 {receipt.user.image && (
                   <AvatarImage
                     src={receipt.user.image}
@@ -95,7 +139,10 @@ export function NotificationReadReceipts({ receipts, className }: Props) {
                   {group.label}
                 </p>
                 {group.receipts.map((receipt) => (
-                  <div key={receipt.id} className="flex items-center gap-2">
+                  <div
+                    key={receipt.user.id}
+                    className="flex items-center gap-2"
+                  >
                     <UserAvatar
                       user={receipt.user}
                       className="size-7 shrink-0 text-xs"

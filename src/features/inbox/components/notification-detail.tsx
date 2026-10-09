@@ -7,6 +7,7 @@ import { BadgeSelect } from "@/components/badge-select";
 import { CorrectionDialog } from "@/components/correction-dialog";
 import { ErrorView, LoadingView } from "@/components/entity-components";
 import { PriorityBadge } from "@/components/priority-badge";
+import { ReadReceipts } from "@/components/read-receipts";
 import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
@@ -38,7 +39,6 @@ import type { NotificationDetailSource } from "../types";
 import { NotificationAffectedAssetsTab } from "./notification-affected-assets-tab";
 import { NotificationDetailsTab } from "./notification-details-tab";
 import { NotificationQuestionTab } from "./notification-questions-tab";
-import { NotificationReadReceipts } from "./notification-read-receipts";
 import { NotificationRespondTab } from "./notification-respond-tab";
 import { NotificationTypeBadge } from "./notification-type-badge";
 
@@ -272,7 +272,7 @@ export const NotificationDetailPage = ({ id }: { id: string }) => {
             onPendingChanges={setPendingPriority}
           />
         )}
-        <NotificationReadReceipts
+        <ReadReceipts
           receipts={notification.readReceipts}
           className="ml-auto"
         />

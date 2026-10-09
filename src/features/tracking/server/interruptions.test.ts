@@ -42,6 +42,45 @@ describe("interruptions scope", () => {
   });
 });
 
+describe("interruption detail contact", () => {
+  const person = (phone: string | null) => ({
+    name: "Dana",
+    email: "dana@example.com",
+    phone,
+    department: null,
+  });
+  const detailFor = async (assignee: ReturnType<typeof person>) => {
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
+    mockPrisma.workOrderTicket.findFirst.mockResolvedValue({
+      id: "wo-1",
+      assignee,
+      creator: person(null),
+      ticket: null,
+      seenBy: [],
+      departments: [],
+      assets: [],
+      descriptions: [],
+      comments: [],
+      activities: [],
+    });
+    return getInterruptionDetail("u1", "wo-1");
+  };
+
+  it("returns the contact's phone, or null without one", async () => {
+    expect((await detailFor(person("Ext. 3104"))).contact.phone).toBe(
+      "Ext. 3104",
+    );
+    expect((await detailFor(person(null))).contact.phone).toBeNull();
+  });
+
+  it("selects the phone of the assignee and the creator", async () => {
+    await detailFor(person(null));
+    const { select } = mockPrisma.workOrderTicket.findFirst.mock.calls[0][0];
+    expect(select.assignee.select.phone).toBe(true);
+    expect(select.creator.select.phone).toBe(true);
+  });
+});
+
 describe("interruption list", () => {
   it("puts a device ticket without a time on its owner's schedule", async () => {
     const ownerTime = new Date(2026, 2, 3, 9);

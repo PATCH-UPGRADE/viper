@@ -242,6 +242,7 @@ const workOrderFields = (departmentId: string, id: string) =>
 const contactSelect = {
   name: true,
   email: true,
+  phone: true,
   department: { select: { name: true } },
 } satisfies Prisma.UserSelect;
 

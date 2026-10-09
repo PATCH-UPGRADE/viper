@@ -6,6 +6,7 @@ export const SEED_USER = {
   email: "user@example.com",
   password: "1337_gone_jolene",
   name: "Seed User",
+  phone: "Ext. 3104",
 };
 
 export async function createOrGetSeedUser() {
@@ -17,7 +18,10 @@ export async function createOrGetSeedUser() {
 
   if (user) {
     console.log(`✅ Seed user already exists: ${SEED_USER.email}`);
-    return user;
+    return prisma.user.update({
+      where: { id: user.id },
+      data: { phone: SEED_USER.phone },
+    });
   }
 
   const hashedPassword = await hashPassword(SEED_USER.password);
@@ -27,6 +31,7 @@ export async function createOrGetSeedUser() {
       id: crypto.randomUUID(),
       email: SEED_USER.email,
       name: SEED_USER.name,
+      phone: SEED_USER.phone,
       emailVerified: true,
       accounts: {
         create: {

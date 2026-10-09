@@ -359,6 +359,8 @@ model DeviceType {
   id           String   @id @default(cuid())
   slug         String   @unique
   displayName  String
+  // A name from src/lib/icon-map.ts, for example "Syringe". Null shows the generic icon.
+  icon         String?
   // Lowercase only: Prisma `has` is an exact, case-sensitive match.
   nameMappings String[] @default([])
 

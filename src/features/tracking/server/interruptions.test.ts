@@ -7,7 +7,7 @@ const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
     user: { findUnique: vi.fn() },
     assetTicket: { findMany: vi.fn() },
-    workOrderTicket: { findFirst: vi.fn() },
+    workOrderTicket: { findFirst: vi.fn(), findMany: vi.fn() },
   },
 }));
 
@@ -39,6 +39,91 @@ describe("interruptions scope", () => {
     await expect(getInterruptionDetail("u1", "other")).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
+  });
+});
+
+describe("interruption calendar", () => {
+  const ownerTime = new Date(2026, 2, 3, 9);
+  const otherDay = new Date(2026, 2, 4, 9);
+  // An asset with a device type that has this icon, or none.
+  const asset = (icon: string | null) => ({
+    id: "a",
+    hostname: "pump",
+    deviceGroup: {
+      product: icon ? { deviceType: { displayName: "Pump", icon } } : null,
+    },
+  });
+  const ownerEvent = (devices: { at: Date | null; icon: string | null }[]) => ({
+    id: "owner",
+    summary: "Patch pumps",
+    status: "TO_DO",
+    category: "PATCH",
+    scheduledAt: ownerTime,
+    scheduledEndTime: null,
+    seenBy: [],
+    assets: devices.map(({ at, icon }) => ({
+      asset: asset(icon),
+      ticket: { scheduledAt: at },
+    })),
+  });
+
+  beforeEach(() => {
+    mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
+  });
+
+  it("counts only the devices on the owner's time, and gives a rescheduled device its own event", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      ownerEvent([
+        { at: null, icon: "Syringe" },
+        { at: ownerTime, icon: "Syringe" },
+        { at: otherDay, icon: "Activity" },
+      ]),
+    ]);
+    mockPrisma.assetTicket.findMany.mockResolvedValue([
+      {
+        parentTicketId: "owner",
+        parentTicket: {
+          id: "owner",
+          summary: "Patch pumps",
+          scheduledAt: ownerTime,
+          scheduledEndTime: null,
+        },
+        asset: asset("Activity"),
+        ticket: {
+          id: "t3",
+          status: "TO_DO",
+          category: "PATCH",
+          scheduledAt: otherDay,
+        },
+      },
+    ]);
+    const events = await getInterruptionCalendar("u1", range);
+    expect(events.map((event) => event.deviceCount)).toEqual([2, 1]);
+    expect(events[0].assetName).toBe("2 devices");
+    // The rescheduled device's icon is its own, and not the owner event's.
+    expect(events.map((event) => event.icon)).toEqual(["Syringe", "Activity"]);
+  });
+
+  it("shows no icon when the devices differ in type, or one has none", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      ownerEvent([
+        { at: null, icon: "Syringe" },
+        { at: null, icon: "Activity" },
+      ]),
+      ownerEvent([
+        { at: null, icon: "Syringe" },
+        { at: null, icon: null },
+      ]),
+    ]);
+    const events = await getInterruptionCalendar("u1", range);
+    expect(events.map((event) => event.icon)).toEqual([null, null]);
+  });
+
+  it("drops the owner's event when every device is on another day", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      ownerEvent([{ at: otherDay, icon: null }]),
+    ]);
+    await expect(getInterruptionCalendar("u1", range)).resolves.toEqual([]);
   });
 });
 

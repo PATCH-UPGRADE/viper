@@ -37,13 +37,33 @@ const inScope = (departmentId: string): Prisma.AssetTicketWhereInput => ({
   parentTicket: open,
 });
 
-const assetSelect = { ...assetNameSelect, location: true } as const;
+// assetNameSelect already reaches the device type for the name; this adds its icon.
+const assetSelect = {
+  ...assetNameSelect,
+  location: true,
+  deviceGroup: {
+    select: {
+      product: {
+        select: { deviceType: { select: { displayName: true, icon: true } } },
+      },
+    },
+  },
+} as const;
+
+type SelectedAsset = Prisma.AssetGetPayload<{ select: typeof assetSelect }>;
+
+const iconOf = (asset: SelectedAsset) =>
+  asset.deviceGroup.product?.deviceType?.icon ?? null;
 
 // "Medical-Surgical Unit · Bed 18"
 const placeOf = (location: unknown) => {
   const { building, room } = (location ?? {}) as Record<string, string>;
   return [building, room].filter(Boolean).join(" · ") || null;
 };
+
+// The icon for a group of devices: their shared icon, or none if they differ.
+const sharedIcon = (icons: (string | null)[]) =>
+  icons.every((icon) => icon === icons[0]) ? (icons[0] ?? null) : null;
 
 const AVAILABILITIES: Availability[] = ["AVAILABLE", "PARTIAL", "UNAVAILABLE"];
 
@@ -138,7 +158,13 @@ export const getInterruptionCalendar = async (
         scheduledAt: true,
         scheduledEndTime: true,
         seenBy: { where: { userId }, select: { userId: true } },
-        assets: { where: scopedDevice(departmentId), select: { id: true } },
+        assets: {
+          where: scopedDevice(departmentId),
+          select: {
+            asset: { select: assetSelect },
+            ticket: { select: { scheduledAt: true } },
+          },
+        },
       },
     }),
     prisma.assetTicket.findMany({
@@ -162,17 +188,28 @@ export const getInterruptionCalendar = async (
   ]);
   // Both queries only return tickets with a time.
   return [
-    ...owners.map((owner) => ({
-      id: owner.id,
-      workOrderId: owner.id,
-      category: owner.category,
-      summary: owner.summary,
-      status: owner.status,
-      scheduledAt: owner.scheduledAt as Date,
-      ...timing(owner),
-      unread: owner.seenBy.length === 0,
-      assetName: `${owner.assets.length} ${plural("device", owner.assets.length)}`,
-    })),
+    ...owners.flatMap((owner) => {
+      // A device with its own time is on the calendar at that time instead.
+      const here = owner.assets.filter(
+        ({ ticket }) =>
+          !ticket.scheduledAt ||
+          ticket.scheduledAt.getTime() === owner.scheduledAt?.getTime(),
+      );
+      if (here.length === 0) return [];
+      return {
+        id: owner.id,
+        workOrderId: owner.id,
+        category: owner.category,
+        summary: owner.summary,
+        status: owner.status,
+        scheduledAt: owner.scheduledAt as Date,
+        ...timing(owner),
+        unread: owner.seenBy.length === 0,
+        deviceCount: here.length,
+        icon: sharedIcon(here.map(({ asset }) => iconOf(asset))),
+        assetName: `${here.length} ${plural("device", here.length)}`,
+      };
+    }),
     ...devices
       .filter(
         ({ ticket, parentTicket }) =>
@@ -187,6 +224,8 @@ export const getInterruptionCalendar = async (
         scheduledAt: ticket.scheduledAt as Date,
         ...timing(parentTicket),
         unread: false,
+        deviceCount: 1,
+        icon: iconOf(asset),
         assetName: getAssetDisplayName(asset),
         place: placeOf(asset.location),
       })),

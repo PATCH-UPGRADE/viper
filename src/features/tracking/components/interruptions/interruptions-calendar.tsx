@@ -42,6 +42,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { availabilityStyle } from "../ticket-detail/shared";
+import { DeviceBadge } from "./device-badge";
 import { InterruptionsList } from "./interruptions-list";
 import { type DrawerTicket, TicketDrawer } from "./ticket-drawer";
 
@@ -55,6 +56,8 @@ type Item = DrawerTicket & {
   scheduledAt: Date;
   workOrderId: string;
   unread: boolean;
+  deviceCount: number;
+  icon: string | null;
 };
 type Block = {
   item: Item;
@@ -64,11 +67,24 @@ type Block = {
   lanes: number;
 };
 
+// Puts each block in the first lane that is free when it starts.
+const assignLanes = (cluster: Omit<Block, "lane" | "lanes">[]): Block[] => {
+  const laneEnds: number[] = [];
+  const placed = cluster.map((block) => {
+    const free = laneEnds.findIndex((end) => end <= block.start);
+    const lane = free < 0 ? laneEnds.length : free;
+    laneEnds[lane] = block.start + block.len;
+    return { ...block, lane };
+  });
+  return placed.map((block) => ({ ...block, lanes: laneEnds.length }));
+};
+
 // One block per event on this day. An event that runs past midnight continues
-// at the top of the next day. Blocks that overlap sit in separate lanes.
-const layout = (day: Date, items: Item[]) => {
+// at the top of the next day. Blocks that overlap sit in separate lanes, and
+// each cluster of overlapping blocks shares the width among its own lanes.
+export const layout = (day: Date, items: Item[]) => {
   const dayMinutes = 24 * 60;
-  const blocks = items
+  const starts = items
     .flatMap((item) => {
       const start = minutesOf(item.scheduledAt);
       const length = item.durationEstimate ?? DEFAULT_MINUTES;
@@ -80,15 +96,17 @@ const layout = (day: Date, items: Item[]) => {
         ? [{ item, start: 0, len: spill }]
         : [];
     })
-    .map((block) => ({ ...block, lane: 0 }))
     .sort((a, b) => a.start - b.start);
-  const laneEnds: number[] = [];
-  for (const block of blocks) {
-    const free = laneEnds.findIndex((end) => end <= block.start);
-    block.lane = free < 0 ? laneEnds.length : free;
-    laneEnds[block.lane] = block.start + block.len;
+
+  // A new cluster starts once nothing in the current one is still running.
+  const clusters: (typeof starts)[] = [];
+  let end = 0;
+  for (const block of starts) {
+    if (block.start >= end) clusters.push([]);
+    clusters[clusters.length - 1].push(block);
+    end = Math.max(end, block.start + block.len);
   }
-  return blocks.map((block) => ({ ...block, lanes: laneEnds.length }));
+  return clusters.flatMap(assignLanes);
 };
 
 // The availability-colored button that opens an event's drawer.
@@ -117,6 +135,10 @@ const ItemButton = ({
   </TicketDrawer>
 );
 
+// "7 AM" on the hour, "7:45 AM" otherwise.
+const clock = (date: Date) =>
+  format(date, date.getMinutes() ? "h:mm a" : "h a");
+
 const TicketBlock = ({ block }: { block: Block }) => {
   const { item } = block;
   const { Icon, label } = availabilityStyle(item.availability);
@@ -138,18 +160,23 @@ const TicketBlock = ({ block }: { block: Block }) => {
             "[mask-image:linear-gradient(to_bottom,#000_55%,transparent)]",
         )}
       >
-        <span className="truncate text-xs font-medium">
-          {item.assetName} • {item.summary}
+        <span className="flex shrink-0 items-center gap-1 text-xs font-medium">
+          <DeviceBadge count={item.deviceCount} icon={item.icon} />
+          <span className="truncate">{item.summary}</span>
         </span>
-        <span className="flex items-center gap-1">
-          <Icon className="size-3 shrink-0" aria-hidden />
+        {block.len < 45 ? (
           <span className="sr-only">{label}</span>
-          <span className="truncate">
-            {format(item.scheduledAt, "h:mm a")}
-            {item.durationEstimate &&
-              ` – ${format(addMinutes(item.scheduledAt, item.durationEstimate), "h:mm a")}`}
+        ) : (
+          <span className="flex items-center gap-1">
+            <Icon className="size-3 shrink-0" aria-hidden />
+            <span className="sr-only">{label}</span>
+            <span className="truncate">
+              {clock(item.scheduledAt)}
+              {item.durationEstimate &&
+                ` – ${clock(addMinutes(item.scheduledAt, item.durationEstimate))}`}
+            </span>
           </span>
-        </span>
+        )}
       </ItemButton>
     </div>
   );
@@ -159,7 +186,8 @@ const MAX_CHIPS = 3;
 
 const MonthChip = ({ item }: { item: Item }) => (
   <ItemButton item={item} className="truncate px-1">
-    {format(item.scheduledAt, "h:mmaaa")} {item.assetName} • {item.summary}
+    {clock(item.scheduledAt)}{" "}
+    <DeviceBadge count={item.deviceCount} icon={item.icon} /> {item.summary}
   </ItemButton>
 );
 

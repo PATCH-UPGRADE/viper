@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ClockIcon, MailIcon, PhoneIcon } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { ActivityTimelineBody } from "@/components/activity-timeline";
+import { ReadReceipts } from "@/components/read-receipts";
 import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
@@ -15,7 +16,6 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserAvatar } from "@/components/user-avatar";
-import { NotificationReadReceipts } from "@/features/inbox/components/notification-read-receipts";
 import type { TicketStatus } from "@/generated/prisma";
 import { formatScheduled } from "@/lib/date-utils";
 import { cn, plural } from "@/lib/utils";
@@ -77,7 +77,7 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
     <>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <WorkOrderModal workOrderId={data.workOrderId} />
-        <NotificationReadReceipts receipts={data.seenBy} />
+        <ReadReceipts receipts={data.seenBy} />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <StatusChip status={ticket.status} />

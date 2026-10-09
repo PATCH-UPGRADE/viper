@@ -1,10 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { NotificationReadReceipt } from "../types";
-import { groupReceiptsByDay } from "./shared";
+import { groupReceiptsByDay, type ReadReceipt } from "./read-receipts";
 
-const receipt = (id: string, readAt: string): NotificationReadReceipt => ({
-  id,
+const receipt = (id: string, readAt: string): ReadReceipt => ({
   readAt: new Date(readAt),
   user: { id: `user-${id}`, name: `User ${id}`, image: null, department: null },
 });
@@ -33,7 +31,10 @@ describe("groupReceiptsByDay", () => {
     ]);
 
     expect(groups).toHaveLength(1);
-    expect(groups[0].receipts.map((r) => r.id)).toEqual(["a", "b"]);
+    expect(groups[0].receipts.map((r) => r.user.id)).toEqual([
+      "user-a",
+      "user-b",
+    ]);
   });
 
   it("orders the groups newest day first", () => {
@@ -56,7 +57,10 @@ describe("groupReceiptsByDay", () => {
       receipt("early", "2026-09-16T08:00:00"),
     ]);
 
-    expect(groups[0].receipts.map((r) => r.id)).toEqual(["late", "early"]);
+    expect(groups[0].receipts.map((r) => r.user.id)).toEqual([
+      "user-late",
+      "user-early",
+    ]);
   });
 
   it("does not merge the same calendar day from different years", () => {

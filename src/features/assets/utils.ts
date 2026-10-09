@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { IssueStatus, type Prisma } from "@/generated/prisma";
+import { CSV_UPLOAD_DISPLAY_NAME } from "@/features/integrations/platforms/csv-upload/contract";
+import { IssueStatus, PlatformEnum, type Prisma } from "@/generated/prisma";
 
 const UNKNOWN_ASSET_STRING = "Unknown Asset";
 export const UNKNOWN_DEVICE_TYPE_STRING = "Unknown";
@@ -109,6 +110,27 @@ export function getAssetNameForAgent(asset: AgentNameSource): string {
     firstPresent([asset.hostname, asset.ip, asset.serialNumber, asset.role]) ??
     asset.id
   );
+}
+
+export type SourceToolSource = {
+  user: { name: string };
+  externalMappings: ReadonlyArray<{ integration: { platform: PlatformEnum } }>;
+};
+
+export function getSourceToolLabel(asset: SourceToolSource): string {
+  const reportingPlatforms = asset.externalMappings.map(
+    (mapping) => mapping.integration.platform,
+  );
+  const isReportedByCsvUpload = reportingPlatforms.includes(
+    PlatformEnum.CSV_UPLOAD,
+  );
+  const isReportedByAnotherPlatform = reportingPlatforms.some(
+    (platform) => platform !== PlatformEnum.CSV_UPLOAD,
+  );
+  if (isReportedByCsvUpload && !isReportedByAnotherPlatform) {
+    return CSV_UPLOAD_DISPLAY_NAME;
+  }
+  return asset.user.name;
 }
 
 // One remediation can fix several of the asset's vulnerabilities, so count

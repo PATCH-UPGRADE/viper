@@ -30,7 +30,7 @@ export type ReadReceipt = {
   };
 };
 
-export type ReadReceiptDayGroup = {
+type ReadReceiptDayGroup = {
   /** Start of the calendar day, in milliseconds. Days cannot collide on it. */
   dayStart: number;
   label: string;

@@ -332,7 +332,6 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
   return {
     comments: ticket.comments,
     activities: ticket.activities,
-    // The `ReadReceipt` shape.
     seenBy: workOrder.seenBy.map(({ seenAt, user }) => ({
       readAt: seenAt,
       user,

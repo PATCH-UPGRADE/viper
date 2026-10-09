@@ -166,7 +166,9 @@ export async function createVulnerabilityRecord(
   } catch (error) {
     // Don't leave behind a vulnerability with no records.
     if (created) {
-      await prisma.vulnerability.deleteMany({ where: { id: vulnerabilityId } });
+      await prisma.vulnerability
+        .deleteMany({ where: { id: vulnerabilityId } })
+        .catch(() => undefined);
     }
     throw error;
   }

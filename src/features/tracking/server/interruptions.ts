@@ -138,7 +138,10 @@ export const getInterruptionCalendar = async (
         scheduledAt: true,
         scheduledEndTime: true,
         seenBy: { where: { userId }, select: { userId: true } },
-        assets: { where: scopedDevice(departmentId), select: { id: true } },
+        assets: {
+          where: scopedDevice(departmentId),
+          select: { ticket: { select: { scheduledAt: true } } },
+        },
       },
     }),
     prisma.assetTicket.findMany({
@@ -162,18 +165,27 @@ export const getInterruptionCalendar = async (
   ]);
   // Both queries only return tickets with a time.
   return [
-    ...owners.map((owner) => ({
-      id: owner.id,
-      workOrderId: owner.id,
-      category: owner.category,
-      summary: owner.summary,
-      status: owner.status,
-      scheduledAt: owner.scheduledAt as Date,
-      ...timing(owner),
-      unread: owner.seenBy.length === 0,
-      deviceCount: owner.assets.length,
-      assetName: `${owner.assets.length} ${plural("device", owner.assets.length)}`,
-    })),
+    ...owners.flatMap((owner) => {
+      // A device with its own time is on the calendar at that time instead.
+      const count = owner.assets.filter(
+        ({ ticket }) =>
+          !ticket.scheduledAt ||
+          ticket.scheduledAt.getTime() === owner.scheduledAt?.getTime(),
+      ).length;
+      if (count === 0) return [];
+      return {
+        id: owner.id,
+        workOrderId: owner.id,
+        category: owner.category,
+        summary: owner.summary,
+        status: owner.status,
+        scheduledAt: owner.scheduledAt as Date,
+        ...timing(owner),
+        unread: owner.seenBy.length === 0,
+        deviceCount: count,
+        assetName: `${count} ${plural("device", count)}`,
+      };
+    }),
     ...devices
       .filter(
         ({ ticket, parentTicket }) =>

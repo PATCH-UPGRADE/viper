@@ -43,20 +43,26 @@ describe("interruptions scope", () => {
 });
 
 describe("interruption calendar", () => {
-  it("counts the devices on an owner event and gives a device event one", async () => {
-    const ownerTime = new Date(2026, 2, 3, 9);
+  const ownerTime = new Date(2026, 2, 3, 9);
+  const otherDay = new Date(2026, 2, 4, 9);
+  const ownerEvent = (deviceTimes: (Date | null)[]) => ({
+    id: "owner",
+    summary: "Patch pumps",
+    status: "TO_DO",
+    category: "PATCH",
+    scheduledAt: ownerTime,
+    scheduledEndTime: null,
+    seenBy: [],
+    assets: deviceTimes.map((scheduledAt) => ({ ticket: { scheduledAt } })),
+  });
+
+  beforeEach(() => {
     mockPrisma.user.findUnique.mockResolvedValue({ departmentId: "dept-A" });
+  });
+
+  it("counts only the devices on the owner's time, and gives a rescheduled device its own event", async () => {
     mockPrisma.workOrderTicket.findMany.mockResolvedValue([
-      {
-        id: "owner",
-        summary: "Patch pumps",
-        status: "TO_DO",
-        category: "PATCH",
-        scheduledAt: ownerTime,
-        scheduledEndTime: null,
-        seenBy: [],
-        assets: [{ id: "a1" }, { id: "a2" }],
-      },
+      ownerEvent([null, ownerTime, otherDay]),
     ]);
     mockPrisma.assetTicket.findMany.mockResolvedValue([
       {
@@ -72,12 +78,20 @@ describe("interruption calendar", () => {
           id: "t3",
           status: "TO_DO",
           category: "PATCH",
-          scheduledAt: new Date(2026, 2, 4, 9),
+          scheduledAt: otherDay,
         },
       },
     ]);
     const events = await getInterruptionCalendar("u1", range);
     expect(events.map((event) => event.deviceCount)).toEqual([2, 1]);
+    expect(events[0].assetName).toBe("2 devices");
+  });
+
+  it("drops the owner's event when every device is on another day", async () => {
+    mockPrisma.workOrderTicket.findMany.mockResolvedValue([
+      ownerEvent([otherDay]),
+    ]);
+    await expect(getInterruptionCalendar("u1", range)).resolves.toEqual([]);
   });
 });
 

@@ -186,8 +186,8 @@ const MAX_CHIPS = 3;
 
 const MonthChip = ({ item }: { item: Item }) => (
   <ItemButton item={item} className="truncate px-1">
-    {format(item.scheduledAt, "h:mmaaa")}{" "}
-    <DeviceBadge count={item.deviceCount} /> {item.summary}
+    {clock(item.scheduledAt)} <DeviceBadge count={item.deviceCount} />{" "}
+    {item.summary}
   </ItemButton>
 );
 

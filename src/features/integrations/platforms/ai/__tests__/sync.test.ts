@@ -36,7 +36,7 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("../agent", () => ({ runAiCrawler: mocks.runAiCrawler }));
 vi.mock("@/features/assets/server/integration-sync", () => ({
-  processAssetIntegrationSync: mocks.asset,
+  processCrawledAssetIntegrationSync: mocks.asset,
 }));
 vi.mock("@/features/vulnerabilities/server/integration-sync", () => ({
   processVulnerabilityIntegrationSync: mocks.vulnerability,

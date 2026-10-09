@@ -1,5 +1,7 @@
 import prisma from "@/lib/db";
 
+export { upsertSeedProduct as upsertProduct } from "../production/device-types";
+
 // "unknown"/"EOL"-style sentinels and CPE wildcards map to a null (unknown) version.
 export function normalizeVersion(v?: string | null): string | null {
   if (!v || v === "unknown" || v === "-" || v === "*") return null;
@@ -29,15 +31,6 @@ export async function upsertManufacturer(name: string) {
   });
   if (manufacturerByNameOrAlias) return manufacturerByNameOrAlias;
   return prisma.manufacturer.upsert({
-    where: { canonicalName },
-    update: {},
-    create: { canonicalName, canonicalDisplayName: name, hasCpe: true },
-  });
-}
-
-export function upsertProduct(name: string) {
-  const canonicalName = name.trim().toLowerCase();
-  return prisma.product.upsert({
     where: { canonicalName },
     update: {},
     create: { canonicalName, canonicalDisplayName: name, hasCpe: true },

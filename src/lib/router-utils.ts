@@ -326,6 +326,9 @@ export async function resolveDeviceGroup(identity: DeviceGroupIdentityInput) {
 
 const CPE_UNKNOWN_TOKENS = new Set(["", "-", "*"]);
 
+/** The manufacturer and product name that parseCpe gives an unknown token. */
+export const UNKNOWN_CPE_NAME = "-";
+
 /**
  * Map a CPE 2.3 version token to a DeviceGroup `versionStatus`:
  * - "-"        => NOT_APPLICABLE (the CPE's NA marker)
@@ -351,14 +354,14 @@ export function parseCpe(cpe: string): {
   versionStatus: VersionStatus;
 } {
   const parts = cpe.split(":");
-  const manufacturerRaw = parts[3] ?? "-";
-  const productRaw = parts[4] ?? "-";
+  const manufacturerRaw = parts[3] ?? UNKNOWN_CPE_NAME;
+  const productRaw = parts[4] ?? UNKNOWN_CPE_NAME;
   const versionRaw = parts[5] ?? "";
   const norm = (value: string, fallback: string) =>
     CPE_UNKNOWN_TOKENS.has(value) ? fallback : value;
   return {
-    manufacturer: norm(manufacturerRaw, "-"),
-    product: norm(productRaw, "-"),
+    manufacturer: norm(manufacturerRaw, UNKNOWN_CPE_NAME),
+    product: norm(productRaw, UNKNOWN_CPE_NAME),
     version: CPE_UNKNOWN_TOKENS.has(versionRaw) ? null : versionRaw,
     versionStatus: cpeVersionStatus(versionRaw),
   };

@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getAssetDeviceTypeLabel } from "@/features/assets/utils";
 import { useUpdateTicket } from "@/features/tracking/hooks/use-tracking";
 import type { TicketStatus } from "@/generated/prisma";
 import {
@@ -67,7 +68,7 @@ export const LinkedAssetsTable = ({
         <TableRow>
           <TableHead>Asset ID</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Role</TableHead>
+          <TableHead>Device Type</TableHead>
           <TableHead>Model</TableHead>
           <TableHead>IP Address</TableHead>
           <TableHead>Location</TableHead>
@@ -104,7 +105,7 @@ export const LinkedAssetsTable = ({
                 />
               </TableCell>
               <TableCell className="text-sm">
-                <ClampedCell text={asset.role} />
+                <ClampedCell text={getAssetDeviceTypeLabel(asset)} />
               </TableCell>
               <TableCell className="text-sm">
                 <ClampedCell text={model} />

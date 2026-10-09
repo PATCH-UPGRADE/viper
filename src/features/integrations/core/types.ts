@@ -223,6 +223,7 @@ export interface ConnectorDefinition<TConfig, TCreds> {
   categories: Category[];
   /** At most one Integration of this platform can exist. */
   singleton?: boolean;
+  unscheduled?: boolean;
   /** Validates `Integration.config`. */
   configSchema: z.ZodType<TConfig>;
   /** Validates the decrypted `Integration.credentials`. */

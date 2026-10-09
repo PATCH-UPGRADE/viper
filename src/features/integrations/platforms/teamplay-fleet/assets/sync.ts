@@ -1,4 +1,7 @@
 import "server-only";
+import { fillProductDeviceType } from "@/features/device-types/server/apply-device-type";
+import { resolveDeviceType } from "@/features/device-types/server/resolve-device-type";
+import { computeWeakSerials } from "@/features/integrations/core/sync/serials";
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -9,10 +12,10 @@ import type { ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import type { FleetConfig, FleetCreds } from "../config";
 import { syncFleetContracts } from "./contracts";
 import {
-  computeWeakSerials,
   type FleetAssetItem,
   listChanged,
   toCanonical,
+  UNKNOWN_FLEET_PRODUCT,
 } from "./equipments";
 import { connectUncontractedAssets } from "./manages-relationship";
 
@@ -30,6 +33,32 @@ async function equipmentKeysWeMayRegroup(
   return new Set(mappingsToNameDerivedGroups.map((m) => m.externalId));
 }
 
+// TODO: VW-560
+/**
+ * Give the product a device type from the Fleet modality label, if it has
+ * none. The device type seed sets the type of known products and wins over
+ * this guess.
+ */
+async function typeProductFromModality(
+  productId: string,
+  item: FleetAssetItem,
+) {
+  if (item.productName === UNKNOWN_FLEET_PRODUCT) return;
+  const product = await prisma.product.findUniqueOrThrow({
+    where: { id: productId },
+    select: { deviceTypeId: true },
+  });
+  if (product.deviceTypeId) return;
+
+  const deviceType = await resolveDeviceType(item.modality, {
+    integration: "teamplay Fleet",
+    productName: item.productName,
+    materialNumber: item.materialNumber,
+    modalityCode: item.modalityCode,
+  });
+  if (deviceType) await fillProductDeviceType(productId, deviceType.id);
+}
+
 async function ingestFleetAssets(
   items: FleetAssetItem[],
   integrationId: string,
@@ -41,6 +70,7 @@ async function ingestFleetAssets(
   const weakSerials = computeWeakSerials(items);
   const regroupableEquipmentKeys =
     await equipmentKeysWeMayRegroup(integrationId);
+  const checkedProductIds = new Set<string>();
 
   const assetsAlreadyMapped = await prisma.asset.findMany({
     where: {
@@ -71,9 +101,13 @@ async function ingestFleetAssets(
           version: item.softwareVersion,
           hasCpe: false,
         });
+        const { productId } = deviceGroup;
+        if (productId && item.modality && !checkedProductIds.has(productId)) {
+          checkedProductIds.add(productId);
+          await typeProductFromModality(productId, item);
+        }
         const fields = {
           serialNumber: item.serialNumber,
-          role: item.role,
           location: item.location,
         };
         return {

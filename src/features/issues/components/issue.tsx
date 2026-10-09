@@ -11,7 +11,11 @@ import { StatusFormBase, statusDetails } from "@/components/status-form";
 import { MoreVerticalDropdownMenu } from "@/components/ui/dropdown-menu";
 import { AssetItem } from "@/features/assets/components/assets";
 import { locationSchema } from "@/features/assets/types";
-import { getAssetRoleLabel } from "@/features/assets/utils";
+import {
+  type DeviceTypeSource,
+  getAssetIdentifier,
+  getAssetTitle,
+} from "@/features/assets/utils";
 import { VulnerabilityItem } from "@/features/vulnerabilities/components/vulnerabilities";
 import { type Issue, IssueStatus } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
@@ -131,7 +135,11 @@ export const IssuesSidebarList = ({
         {visibleIssues.map((issue) => {
           const issueData = issuesMap[issue.id];
           if (!issueData) return null;
-          const asset = issueData.asset;
+          // issues.getManyByIds loads the asset's device group for type
+          // "assets", but its conditional include drops it from the type.
+          const asset = issueData.asset as
+            | (NonNullable<typeof issueData.asset> & DeviceTypeSource)
+            | null;
           const locationResult = asset?.location
             ? locationSchema.safeParse(asset.location)
             : null;
@@ -168,7 +176,9 @@ export const IssuesSidebarList = ({
                   <>
                     <div className="flex flex-col gap-1">
                       <p className="font-semibold">
-                        {asset ? getAssetRoleLabel(asset) : "Device Group"}
+                        {asset
+                          ? `${getAssetTitle(asset)} · ${getAssetIdentifier(asset)}`
+                          : "Device Group"}
                       </p>
                       {locationParts.length > 0 && (
                         <p className="text-xs text-muted-foreground">

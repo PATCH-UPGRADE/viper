@@ -1,8 +1,8 @@
 import "server-only";
 import {
-  type AssetNameSource,
-  assetNameSelect,
-  getAssetDisplayName,
+  type AgentNameSource,
+  assetAgentNameSelect,
+  getAssetNameForAgent,
 } from "@/features/assets/utils";
 import type { PlatformEnum } from "@/generated/prisma";
 import prisma from "@/lib/db";
@@ -46,8 +46,8 @@ export interface ResolvedTargets {
   unknownIds: string[];
 }
 
-/** How an asset is named to a person: the shared rule in `getAssetDisplayName`. */
-export const labelFor = (a: AssetNameSource) => getAssetDisplayName(a);
+/** How an asset is named to the agent tool and to the platform's payload. */
+export const labelFor = (a: AgentNameSource) => getAssetNameForAgent(a);
 
 export async function resolveWorkOrderTargets(
   assetIds: string[],
@@ -71,7 +71,7 @@ export async function resolveWorkOrderTargets(
       assets: {
         where: { id: { in: unique } },
         select: {
-          ...assetNameSelect,
+          ...assetAgentNameSelect,
           externalMappings: {
             select: { integrationId: true, externalId: true },
           },
@@ -124,7 +124,7 @@ export async function resolveWorkOrderTargets(
   const rows = missing.length
     ? await prisma.asset.findMany({
         where: { id: { in: missing } },
-        select: assetNameSelect,
+        select: assetAgentNameSelect,
       })
     : [];
 

@@ -34,6 +34,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ClampedCell } from "@/components/ui/clamped-cell";
 import { CopyCode } from "@/components/ui/code";
 import { DataTable } from "@/components/ui/data-table";
 import {
@@ -44,6 +45,7 @@ import {
 import { QuestionTooltip } from "@/components/ui/question-tooltip";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ImportCsvButton } from "@/features/integrations/platforms/csv-upload/components/csv-import-buttons";
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
@@ -62,7 +64,12 @@ import type {
   AssetWithIssueRelations,
   AssetWithRelations,
 } from "../types";
-import { getAssetRoleLabel } from "../utils";
+import {
+  getAssetDeviceTypeLabel,
+  getAssetIdentifier,
+  getAssetTitle,
+  UNKNOWN_DEVICE_TYPE_STRING,
+} from "../utils";
 import { AssetDashboardDrawer } from "./asset-drawer";
 import { columns } from "./columns";
 import { assetIssueColumns, dashboardColumns } from "./dashboard-columns";
@@ -242,8 +249,8 @@ export const NewVulnerableAssetsAlert = ({
   const overflow = totalCount - items.length;
 
   return (
-    <Alert className="relative border-orange-200 bg-orange-50">
-      <ShieldAlert className="text-orange-600" />
+    <Alert className="relative border-orange-200 bg-orange-50 dark:border-orange-900/70 dark:bg-orange-950/40">
+      <ShieldAlert className="text-orange-600 dark:text-orange-400" />
       <Button
         variant="ghost"
         size="icon"
@@ -253,11 +260,11 @@ export const NewVulnerableAssetsAlert = ({
       >
         <X className="h-4 w-4" />
       </Button>
-      <AlertTitle className="text-orange-800">
+      <AlertTitle className="text-orange-800 dark:text-orange-200">
         Newly Vulnerable Assets
       </AlertTitle>
       <AlertDescription>
-        <p className="mb-1 text-orange-700">
+        <p className="mb-1 text-orange-700 dark:text-orange-300">
           The following assets were recently discovered and have active
           vulnerabilities:
         </p>
@@ -266,21 +273,38 @@ export const NewVulnerableAssetsAlert = ({
             <li key={asset.id}>
               <button
                 type="button"
-                className="text-orange-800 underline underline-offset-2 hover:text-orange-900"
+                className="text-orange-800 underline underline-offset-2 hover:text-orange-900 dark:text-orange-200 dark:hover:text-orange-100"
                 onClick={() => onAssetClick(asset)}
               >
-                {getAssetRoleLabel(asset)}
+                {getAssetTitle(asset)} · {getAssetIdentifier(asset)}
               </button>
             </li>
           ))}
         </ul>
         {overflow > 0 && (
-          <p className="mt-1 text-orange-700">
+          <p className="mt-1 text-orange-700 dark:text-orange-300">
             and {overflow} other {overflow === 1 ? "asset" : "assets"}
           </p>
         )}
       </AlertDescription>
     </Alert>
+  );
+};
+
+const SourceFilterNotice = () => {
+  const [params, setParams] = useAssetsParams();
+  if (!params.source) return null;
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+      <span>Showing only the devices from one upload.</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setParams({ source: null, page: null })}
+      >
+        Show all devices
+      </Button>
+    </div>
   );
 };
 
@@ -307,6 +331,7 @@ export const AssetDashboardList = () => {
         totalCount={recentVulnData?.totalCount ?? 0}
         onAssetClick={openDrawer}
       />
+      <SourceFilterNotice />
       {asset && (
         <AssetDashboardDrawer
           asset={asset}
@@ -329,11 +354,14 @@ export const AssetDashboardList = () => {
 
 export const AssetsHeader = ({ disabled }: { disabled?: boolean }) => {
   return (
-    <EntityHeader
-      title="Assets"
-      description="Manage your hospital assets and devices"
-      disabled={disabled}
-    />
+    <div className="flex items-center justify-between gap-x-4">
+      <EntityHeader
+        title="Assets"
+        description="Manage your hospital assets and devices"
+        disabled={disabled}
+      />
+      <ImportCsvButton />
+    </div>
   );
 };
 
@@ -380,7 +408,7 @@ export const AssetItem = ({ data }: { data: DrawerAsset }) => {
         <ServerIcon className="size-5 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
-        <AssetDrawer asset={data}>{getAssetRoleLabel(data)}</AssetDrawer>
+        <AssetDrawer asset={data}>{getAssetTitle(data)}</AssetDrawer>
         <div className="text-xs text-muted-foreground mt-1">
           {data.ip ? <>{data.ip} &bull; </> : null}
           {deviceGroupLabel(data.deviceGroup)} &bull; Updated{" "}
@@ -432,7 +460,7 @@ export function AssetDrawer({
   return (
     <EntityDrawer trigger={children} {...props}>
       <DrawerHeader className="gap-1">
-        <DrawerTitle>{getAssetRoleLabel(asset)}</DrawerTitle>
+        <DrawerTitle>{getAssetTitle(asset)}</DrawerTitle>
         <DrawerDescription className="flex items-center gap-2">
           <Badge variant="outline">
             <ServerIcon className="size-3 mr-1" />
@@ -452,9 +480,20 @@ export function AssetDrawer({
           <div className="grid grid-cols-1 gap-3">
             <div>
               <div className="text-xs font-medium text-muted-foreground mb-1">
+                Device Type
+              </div>
+              <div className="text-sm">
+                {getAssetDeviceTypeLabel(asset) ?? UNKNOWN_DEVICE_TYPE_STRING}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">
                 Role
               </div>
-              <div className="text-sm">{getAssetRoleLabel(asset)}</div>
+              <div className="text-sm">
+                <ClampedCell text={asset.role} maxWidthClass="max-w-full" />
+              </div>
             </div>
 
             <div>

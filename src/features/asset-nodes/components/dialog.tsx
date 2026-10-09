@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getAssetRoleLabel } from "@/features/assets/utils";
+import { getAssetTitle } from "@/features/assets/utils";
 import type { Vulnerability } from "@/generated/prisma";
 import type { AssetWithDeviceGroup } from "@/lib/db";
 import { deviceGroupLabel } from "@/lib/markdown";
@@ -316,7 +316,7 @@ export const AssetDialog = ({
               <ul className="pl-4">
                 {assets.map((asset, idx) => (
                   <li className="list-disc" key={idx}>
-                    {getAssetRoleLabel(asset)} &bull;{" "}
+                    {getAssetTitle(asset)} &bull;{" "}
                     {deviceGroupLabel(asset.deviceGroup)} &bull; {asset.id}
                   </li>
                 ))}

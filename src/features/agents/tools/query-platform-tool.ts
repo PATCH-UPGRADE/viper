@@ -24,6 +24,7 @@ export const PLATFORM_QUERY_PROCEDURES = [
   "remediations.getOne",
   "deviceGroups.getMany",
   "deviceGroups.getOne",
+  "deviceTypes.getMany",
   "workflows.getManyByAsset",
   "workflows.getManyForLlm",
   "notifications.getMany",
@@ -42,6 +43,8 @@ related work, not work filed for that item. "direct" means it was filed for that
 /** Condensed, prompt-injectable catalog of the allowlisted read procedures. */
 export const PLATFORM_CATALOG = `Available read-only procedures for query_platform_data:
 - assets.getMany — list/search hospital device assets. input: { search?, page?, pageSize? }
+  search matches hostname, ip, serial number, device type, manufacturer, product or
+  CPE, never the role. To find an asset you know by its role, search its device type.
 - assets.getOne — one asset by id. input: { id }
   Both carry "managedBy": who services the asset, as a vendor or a department, with
   their responsibilities. An entry whose "workOrderIntegration" is set names the
@@ -59,6 +62,7 @@ export const PLATFORM_CATALOG = `Available read-only procedures for query_platfo
 - remediations.getOne — one remediation by id. input: { id }
 - deviceGroups.getMany — list/search device groups (make/model classes). input: { search?, page?, pageSize? }
 - deviceGroups.getOne — one device group by id. input: { id }
+- deviceTypes.getMany — every device type with its assetCount, the hospital's number of assets of that type (decommissioned ones are not counted). untypedAssetCount is the assets with no device type; while it is above 0, a count is only a minimum. input: {}
 - workflows.getManyByAsset — clinical workflows that use an asset. input: { id } (asset id)
 - workflows.getManyForLlm — list/search all clinical workflows. input: { search?, page?, pageSize? }
 - notifications.getMany — list/search inbox notifications. input: { search?, page?, pageSize?, priority?, type? } — priority and type are optional arrays; omit them for everything. priority values: Critical, High, Monitor, Defer, Unsorted. type values: Advisory, Recall, UpdateAvailable, Other. pageSize is capped at 10 here and a larger request is clamped, so read totalCount and step through with page.
@@ -414,7 +418,7 @@ export function makeQueryPlatformDataTool(
     },
     {
       name: "query_platform_data",
-      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device groups, clinical workflows, inbox notifications, work orders) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here. Returned objects may carry a "_links" map of follow-up calls — call this tool again with a link's procedure and input to navigate (e.g. from an asset's device group to all its assets or vulnerabilities).
+      description: `Read-only lookup of Viper platform data (assets, vulnerabilities, remediations, device groups, device type counts, clinical workflows, inbox notifications, work orders) on demand. Never invent data (ids, CVSS scores, versions, hostnames); if you need a value, look it up here. Returned objects may carry a "_links" map of follow-up calls — call this tool again with a link's procedure and input to navigate (e.g. from an asset's device group to all its assets or vulnerabilities).
 
 ${PLATFORM_CATALOG}`,
       schema: z.object({

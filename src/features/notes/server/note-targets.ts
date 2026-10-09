@@ -1,5 +1,8 @@
 import "server-only";
-import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
+import {
+  assetAgentNameSelect,
+  getAssetNameForAgent,
+} from "@/features/assets/utils";
 import type { ScopeTargetModel } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { deviceGroupMatchingLabel } from "@/lib/markdown";
@@ -18,9 +21,9 @@ export async function resolveNoteTargetLabel(
     case "ASSET": {
       const asset = await prisma.asset.findUnique({
         where: { id: instanceId },
-        select: assetNameSelect,
+        select: assetAgentNameSelect,
       });
-      return asset ? getAssetDisplayName(asset) : null;
+      return asset ? getAssetNameForAgent(asset) : null;
     }
     case "VULNERABILITY": {
       const vuln = await prisma.vulnerability.findUnique({

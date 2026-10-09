@@ -175,7 +175,9 @@ export function MatchingAssetTable({
       cellClassName: "font-mono text-xs",
       cell: (asset) => (
         <span className="inline-flex items-center gap-1">
-          {getAssetDisplayName(asset)}
+          {/* Every row is one device group, so the id names a row better
+              than the shared device type does. */}
+          {getAssetDisplayName({ ...asset, deviceGroup: null })}
           {asset.statusNotes && (
             <QuestionTooltip>
               <span className="whitespace-pre-line">{asset.statusNotes}</span>

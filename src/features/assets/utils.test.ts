@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { getAssetDisplayName } from "./utils";
+import {
+  getAssetDeviceTypeLabel,
+  getAssetDisplayName,
+  getAssetIdentifier,
+  getAssetNameForAgent,
+  getAssetTitle,
+} from "./utils";
 
 const fleetCt = {
   id: "ct_63014",
   hostname: null,
   ip: null,
   serialNumber: "63014",
-  role: "Computed Tomography (CT)",
+  role: "CT Acquisition Workstation",
+  deviceGroup: {
+    product: { deviceType: { displayName: "Computed Tomography (CT)" } },
+  },
 };
 
 const scannedPump = {
@@ -14,7 +23,7 @@ const scannedPump = {
   hostname: "icu-pump-07",
   ip: "10.20.0.7",
   serialNumber: "SN-PUMP-7",
-  role: "Infusion Pump",
+  deviceGroup: null,
 };
 
 describe("getAssetDisplayName", () => {
@@ -32,10 +41,17 @@ describe("getAssetDisplayName", () => {
     expect(getAssetDisplayName(fleetCt)).toBe("63014");
   });
 
-  it("falls back to the role when the serial number is missing", () => {
+  it("falls back to the device type, never the role", () => {
     expect(getAssetDisplayName({ ...fleetCt, serialNumber: null })).toBe(
       "Computed Tomography (CT)",
     );
+    expect(
+      getAssetDisplayName({
+        ...fleetCt,
+        serialNumber: null,
+        deviceGroup: null,
+      }),
+    ).toBe("ct_63014");
   });
 
   it("falls back to the id when every name is missing or blank", () => {
@@ -45,8 +61,58 @@ describe("getAssetDisplayName", () => {
         hostname: "  ",
         ip: null,
         serialNumber: "",
-        role: undefined,
+        deviceGroup: null,
       }),
     ).toBe("ct_63014");
+  });
+});
+
+describe("getAssetIdentifier", () => {
+  it("tells assets of one device type apart, never by type or role", () => {
+    expect(getAssetIdentifier(scannedPump)).toBe("icu-pump-07");
+    expect(getAssetIdentifier(fleetCt)).toBe("63014");
+    expect(getAssetIdentifier({ ...fleetCt, serialNumber: null })).toBe(
+      "ct_63014",
+    );
+  });
+});
+
+describe("getAssetNameForAgent", () => {
+  it("falls back to the role, for agents and external platforms", () => {
+    expect(getAssetNameForAgent({ ...fleetCt, serialNumber: null })).toBe(
+      "CT Acquisition Workstation",
+    );
+  });
+});
+
+describe("getAssetTitle", () => {
+  it("is the device type, never the role", () => {
+    expect(getAssetTitle(fleetCt)).toBe("Computed Tomography (CT)");
+  });
+
+  it("is Unknown Asset when the product has no device type", () => {
+    expect(getAssetTitle({ deviceGroup: { product: null } })).toBe(
+      "Unknown Asset",
+    );
+  });
+});
+
+describe("getAssetDeviceTypeLabel", () => {
+  it("reads the device type of the asset's product", () => {
+    expect(
+      getAssetDeviceTypeLabel({
+        deviceGroup: {
+          product: { deviceType: { displayName: "Infusion Pump" } },
+        },
+      }),
+    ).toBe("Infusion Pump");
+  });
+
+  it.each([
+    ["no device type", { product: { deviceType: null } }],
+    ["no product", { product: null }],
+    ["no device group", null],
+  ])("returns null for %s", (_, deviceGroup) => {
+    expect(getAssetDeviceTypeLabel({ deviceGroup })).toBeNull();
   });
 });

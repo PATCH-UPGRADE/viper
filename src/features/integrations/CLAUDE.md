@@ -115,6 +115,12 @@ puller loops and returns the cursor it reached; a pusher fires one request and r
 Set `definition.singleton: true` if a hospital needs only one Integration of the platform. The
 `create` procedure rejects a second one with `CONFLICT`, and the catalog disables its "Add" button.
 
+Set `definition.unscheduled: true` for a platform whose records arrive only when someone imports
+them (CSV Upload). The cron never schedules its resource rows, "Sync Now" refuses it with
+`BAD_REQUEST`, and it needs no `createSession` even though it declares a resource module. Its
+`IntegrationResourceSync` rows are still created, and its resource module's `sync` throws if anyone
+ever dispatches it.
+
 ## Resource modules
 
 A **resource module** is the per-resource half of a platform whose protocol *we* speak — where we
@@ -209,6 +215,20 @@ Outside the directory — **two edits**:
 
 **Do not touch** for a new platform: the Inngest sync functions, `core/callback.ts`,
 `core/sync/cadence.ts`, `server/routers.ts`, or the UI. They are already generic.
+
+The UI has two special cases, for platforms that the generic "Add" form and the generic row do
+not fit. CSV Upload is the only platform that uses them today.
+
+1. **A platform with its own "Add" button.** Register a component for the platform in
+   `components/platform-add-overrides.ts`. The catalog card shows that component in place of the
+   generic `CreateIntegrationDialog`. CSV Upload uses this to open its import overlay.
+2. **A platform that never syncs on a schedule** (`definition.unscheduled: true`). The Enabled
+   Integrations list shows one row for the whole platform, not one row per integration
+   (`components/platform-uploads-row.tsx`):
+   - The row shows when the latest upload ran. It has no enable switch.
+   - The row expands to list each upload. An upload's menu has "Edit Name" and "Remove", and no
+     "Sync Now". "Edit Name" only renames the upload; there is no sync interval to set.
+   - An integration that never started an upload (`lastAttemptAt` is null) is left out.
 
 Only if you are also introducing a brand-new `ResourceType` do you additionally touch
 `integrationsMapping` (`../types.ts`), `MODULE_FIELDS` (`core/sync/resources.ts`), and

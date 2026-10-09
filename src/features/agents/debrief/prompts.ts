@@ -10,14 +10,25 @@ import {
   type DebriefBullet,
 } from "@/features/debrief/types";
 
+const deviceAbsolutesRule = (when: string, then: string) =>
+  `Write "only", "all", "every", "none", "sole", or "single" about the hospital's devices only
+when ${when}. ${then} In every other case, give the count of the records you
+have instead, such as "1 SOMATOM go.Top".`;
+
 /**
- * No tool counts assets by device type, so "the only CT scanner" cannot be
- * checked. Both prompts forbid the claim until a count procedure exists.
+ * deviceTypes.getMany proves "the only CT scanner" only when no asset is
+ * untyped: an untyped asset can be a second CT scanner. The writer has no
+ * tools, so it may repeat such a word only from a finding that states the count.
  */
-const DEVICE_ABSOLUTES_RULE = `Never write "only", "all", "every", "none", "sole", or "single" about the
-hospital's devices, such as "the hospital's only CT scanner". No tool counts
-the hospital's devices by type, so such a claim cannot be checked. Give the
-count of the records you have instead, such as "1 SOMATOM go.Top".`;
+const SCOUT_DEVICE_ABSOLUTES_RULE = deviceAbsolutesRule(
+  "deviceTypes.getMany, called in this run, proves it: the device type's assetCount supports the word, and untypedAssetCount is 0",
+  'Then put the count in the finding, such as "the hospital\'s only CT scanner (1 of 1)".',
+);
+
+const WRITER_DEVICE_ABSOLUTES_RULE = deviceAbsolutesRule(
+  'a finding states the hospital-wide count for that device type, such as "(1 of 1)"',
+  "Do not copy such a word from a finding that gives no count.",
+);
 
 /**
  * The scout runs once a day, fleet-wide, with no user present. It reads the
@@ -72,7 +83,7 @@ Do not describe work orders, tickets, or their status in summary or
 whyItMatters. The platform adds them from the database, and your wording can
 contradict it.
 
-${DEVICE_ABSOLUTES_RULE}
+${SCOUT_DEVICE_ABSOLUTES_RULE}
 
 Do not rank into a top 3. Give the writer more than it needs and let it choose.
 </output>`;
@@ -183,7 +194,7 @@ the reader can get by following its link.
 
 Say what is true and no more. Never invent a device count, a date, or an id.
 
-${DEVICE_ABSOLUTES_RULE} Do not copy such a word from the findings.
+${WRITER_DEVICE_ABSOLUTES_RULE}
 
 Say that a work order exists only if it appears in the department's list or in
 the findings. ${WORK_ORDER_STATUS_GUIDE}

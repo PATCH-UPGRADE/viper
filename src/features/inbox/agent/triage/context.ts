@@ -1,4 +1,5 @@
 import "server-only";
+import { deviceTypeLabelSelect } from "@/features/assets/utils";
 import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
 import {
   workflowSerializeInclude,
@@ -147,7 +148,9 @@ export async function gatherTriageContext(
           where: { OR: matchings.map(deviceGroupWhereForMatching) },
           include: {
             manufacturer: true,
-            product: true,
+            product: {
+              include: deviceTypeLabelSelect,
+            },
             version: true,
             assets: true,
           },
@@ -161,7 +164,7 @@ export async function gatherTriageContext(
   const seenAssets = new Set<string>();
   const affectedAssets: AffectedAsset[] = [];
   for (const g of groups) {
-    const label = deviceGroupLabel(g);
+    const label = careAreaGroupLabel(g);
     for (const asset of g.assets) {
       if (seenAssets.has(asset.id)) continue;
       seenAssets.add(asset.id);
@@ -366,6 +369,18 @@ function plainEnum(value: string, labels: Record<string, string>): string {
   return labels[value] ?? value.toLowerCase().replaceAll("_", " ");
 }
 
+/** The device group label, with the product's device type when it has one. */
+export function careAreaGroupLabel(
+  g: Parameters<typeof deviceGroupLabel>[0] & {
+    product?: { deviceType?: { displayName: string } | null } | null;
+  },
+): string {
+  const deviceType = g.product?.deviceType?.displayName;
+  return deviceType
+    ? `${deviceGroupLabel(g)} (${deviceType})`
+    : deviceGroupLabel(g);
+}
+
 function careAreaLocation(raw: unknown): string {
   if (!raw || typeof raw !== "object") return "";
   const loc = raw as { facility?: string; building?: string; floor?: string };
@@ -378,7 +393,7 @@ function careAreaLocation(raw: unknown): string {
     .join(" / ");
 }
 
-function renderTriagePrompt(args: RenderArgs): string {
+export function renderTriagePrompt(args: RenderArgs): string {
   const sections: string[] = [];
 
   if (args.vulnerabilities.length > 0) {
@@ -454,11 +469,9 @@ function renderTriagePrompt(args: RenderArgs): string {
     const careLines = [
       ...new Set(
         args.affectedAssets.map(({ asset, groupLabel }) => {
-          const role = asset.role ?? "unknown role";
+          const role = asset.role ? ` — ${asset.role}` : "";
           const area = careAreaLocation(asset.location);
-          return area
-            ? `- ${groupLabel} — ${role} @ ${area}`
-            : `- ${groupLabel} — ${role}`;
+          return `- ${groupLabel}${role}${area ? ` @ ${area}` : ""}`;
         }),
       ),
     ];

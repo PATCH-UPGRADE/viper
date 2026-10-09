@@ -19,6 +19,7 @@ import {
 } from "@/components/dashboard-drawers";
 import { ExternalMappingList } from "@/components/external-mappings";
 import { Badge } from "@/components/ui/badge";
+import { ClampedCell } from "@/components/ui/clamped-cell";
 import { CopyCode } from "@/components/ui/code";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AIChat } from "@/features/chat/components/chat";
@@ -37,7 +38,11 @@ import { RemediationCard } from "@/features/remediations/components/remediations
 import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
 import { useTRPC } from "@/trpc/client";
 import { type AssetWithIssueRelations, locationSchema } from "../types";
-import { getAssetRoleLabel } from "../utils";
+import {
+  getAssetDeviceTypeLabel,
+  getAssetTitle,
+  UNKNOWN_DEVICE_TYPE_STRING,
+} from "../utils";
 import { AssetQrPdfLink } from "./asset-qr-pdf-link";
 import { AssetUtilizationHeatMapGridVertical } from "./asset-utilization-grid";
 
@@ -82,12 +87,11 @@ function getProtocolLabel(port: number, transport: "tcp" | "udp"): string {
 }
 
 function getAssetLabel(asset: EnrichedNetworkAsset): string {
-  return (
-    asset.viper_data?.role ??
-    asset.viper_data?.hostname ??
-    asset.manufacturer ??
-    asset.id.slice(0, 8)
-  );
+  const deviceType = getAssetDeviceTypeLabel(asset.viper_data);
+  const identifier =
+    asset.viper_data?.hostname ?? getAssetIP(asset) ?? asset.id.slice(0, 8);
+  if (deviceType) return `${deviceType} · ${identifier}`;
+  return asset.viper_data?.hostname ?? asset.manufacturer ?? identifier;
 }
 
 function getAssetIP(asset: EnrichedNetworkAsset): string | null {
@@ -284,7 +288,7 @@ function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
   const sections: Section[] = [
     {
       header: "Device Overview",
-      text: `${getAssetRoleLabel(asset)} — ${deviceGroupLabel(asset.deviceGroup)}`,
+      text: `${getAssetTitle(asset)} — ${deviceGroupLabel(asset.deviceGroup)}`,
     },
     ...(location
       ? [
@@ -433,8 +437,20 @@ function AssetInfoColumn({ asset }: { asset: AssetWithIssueRelations }) {
       header: "Device Information",
       items: [
         {
+          header: "Device Type",
+          content: (
+            <div className="text-sm">
+              {getAssetDeviceTypeLabel(asset) ?? UNKNOWN_DEVICE_TYPE_STRING}
+            </div>
+          ),
+        },
+        {
           header: "Role",
-          content: <div className="text-sm">{getAssetRoleLabel(asset)}</div>,
+          content: (
+            <div className="text-sm">
+              <ClampedCell text={asset.role} maxWidthClass="max-w-full" />
+            </div>
+          ),
         },
         {
           header: "CPE",
@@ -708,7 +724,7 @@ export function AssetDashboardDrawer({
     <DashboardDrawerShell
       open={open}
       setOpen={setOpen}
-      title={getAssetRoleLabel(asset)}
+      title={getAssetTitle(asset)}
       description={description}
       tabs={tabs}
       infoColumn={<AssetInfoColumn asset={asset} />}

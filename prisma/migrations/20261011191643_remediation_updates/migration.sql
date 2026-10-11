@@ -5,7 +5,7 @@
 
 */
 -- CreateEnum
-CREATE TYPE "RemediationMechanism" AS ENUM ('REMOTE_DEPLOYMENT', 'ON_SITE', 'USB_STICK', 'OTHER');
+CREATE TYPE "RemediationMechanism" AS ENUM ('REMOTE_DEPLOYMENT', 'ON_SITE', 'REMOVABLE_MEDIA', 'OTHER');
 
 -- CreateEnum
 CREATE TYPE "ImpactPhase" AS ENUM ('DURING_APPLY', 'AFTER_APPLY');
@@ -23,15 +23,15 @@ ADD COLUMN     "mechanism" "RemediationMechanism",
 ADD COLUMN     "requiresDowntime" BOOLEAN,
 ADD COLUMN     "restartRequired" BOOLEAN,
 ADD COLUMN     "reversible" BOOLEAN,
-ADD COLUMN     "verificationRequired" BOOLEAN,
-ADD COLUMN     "verificatoinNotes" TEXT;
+ADD COLUMN     "verificationNotes" TEXT,
+ADD COLUMN     "verificationRequired" BOOLEAN;
 
 -- CreateTable
 CREATE TABLE "remediation_impact" (
     "id" TEXT NOT NULL,
     "remediationId" TEXT NOT NULL,
     "phase" "ImpactPhase" NOT NULL,
-    "affectedFunction" TEXT NOT NULL,
+    "feature" TEXT NOT NULL,
     "effect" "ImpactEffect" NOT NULL,
     "clinicalWorkflowImpact" BOOLEAN,
     "notes" TEXT,

@@ -1074,8 +1074,8 @@ model EntityFilterMatch {
 
 enum RemediationMechanism {
   REMOTE_DEPLOYMENT
-  ON_SITE
-  USB_STICK
+  ON_SITE         
+  REMOVABLE_MEDIA // USB stick, DVD, SD card
   OTHER
 }
 
@@ -1121,7 +1121,7 @@ model Remediation {
   disablesFeatures         Boolean?
   reversible               Boolean?
   verificationRequired     Boolean?
-  verificatoinNotes        String?
+  verificationNotes        String?   @db.Text 
   impacts                  RemediationImpact[]
 
   createdAt DateTime @default(now())
@@ -1141,7 +1141,7 @@ model RemediationImpact {
   remediationId          String
   remediation            Remediation  @relation(fields: [remediationId], references: [id], onDelete: Cascade)
   phase                  ImpactPhase
-  affectedFunction       String // nurse call button, UI color 
+  feature                String // nurse call button, UI color 
   effect                 ImpactEffect
   clinicalWorkflowImpact Boolean? // clinicians must be told in advance
   notes                  String?      @db.Text

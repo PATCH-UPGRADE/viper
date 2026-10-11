@@ -1,6 +1,11 @@
 "use client";
 
-import type { SourceImpact } from "../types";
+import type {
+  ImpactEffect,
+  ImpactPhase,
+  RemediationMechanism,
+} from "@/generated/prisma";
+import type { RemediationResponse } from "../types";
 
 /** Seconds are what the source sends; hours are what someone plans around. */
 export function formatDowntime(seconds: number): string {
@@ -15,30 +20,60 @@ export function formatDowntime(seconds: number): string {
 const yesNo = (value: boolean | null | undefined) =>
   value === null || value === undefined ? "Not stated" : value ? "Yes" : "No";
 
-/** Whether a source answered any of it. Nothing to show if none of it did. */
-export const hasStatedImpact = (impact: SourceImpact): boolean =>
-  Object.values(impact).some(
-    (value) => value !== null && value !== undefined && value !== "",
-  );
+const duration = (seconds: number | null | undefined) =>
+  typeof seconds === "number" ? formatDowntime(seconds) : " Not stated";
+
+const MECHANISM_LABEL: Record<RemediationMechanism, string> = {
+  REMOTE_DEPLOYMENT: "Remote deployment",
+  ON_SITE: "On-site technician",
+  REMOVABLE_MEDIA: "Removable media (e.g. USB)",
+  OTHER: "Other",
+};
+
+const EFFECT_LABEL: Record<ImpactEffect, string> = {
+  UNAVAILABLE: "unavilable",
+  DEGRADED: "degraded",
+  CHANGED: "changed",
+};
+
+const PHASE_LABEL: Record<ImpactPhase, string> = {
+  DURING_APPLY: "While it is applied",
+  AFTER_APPLY: "After it is applied",
+};
 
 /**
- * What the manufacturer said about applying this remediation, rather than what
- * a model estimated. Every field is optional, because no source is obliged to
- * answer, so each says "Not stated" instead of implying a no.
+ * What a source said about applying this remediation, rather than what a model
+ * estimated. Every field is optional, so each says "Not stated" instead of implying
+ * a no.
  */
-export function MedIsaoRemediationImpact({ impact }: { impact: SourceImpact }) {
+export function MedIsaoRemediationImpact({
+  remediation: r,
+}: {
+  remediation: RemediationResponse;
+}) {
   const rows: { label: string; value: string }[] = [
-    { label: "Requires downtime", value: yesNo(impact.requiresDowntime) },
+    {
+      label: "How it is applied",
+      value: r.mechanism ? MECHANISM_LABEL[r.mechanism] : "Not stated",
+    },
+    { label: "Time to apply", value: duration(r.estimatedDurationSeconds) },
+    { label: "Requires downtime", value: yesNo(r.requiresDowntime) },
     {
       label: "Estimated downtime",
-      value:
-        typeof impact.estimatedDowntimeSeconds === "number"
-          ? formatDowntime(impact.estimatedDowntimeSeconds)
-          : "Not stated",
+      value: duration(r.estimatedDowntimeSeconds),
     },
-    { label: "Restart required", value: yesNo(impact.restartRequired) },
-    { label: "Disables features", value: yesNo(impact.disablesFeatures) },
+    { label: "Restart required", value: yesNo(r.restartRequired) },
+    { label: "Disables features", value: yesNo(r.disablesFeatures) },
+    { label: "Can be rolled back", value: yesNo(r.reversible) },
+    { label: "Verification required", value: yesNo(r.verificationRequired) },
   ];
+
+  const phases = (["DURING_APPLY", "AFTER_APPLY"] as const)
+    .map((phase) => ({
+      phase,
+      impacts: r.impacts.filter((impact) => impact.phase === phase),
+    }))
+    .filter((group) => group.impacts.length > 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -50,22 +85,34 @@ export function MedIsaoRemediationImpact({ impact }: { impact: SourceImpact }) {
           </div>
         ))}
       </dl>
-      {impact.workflowImpact && (
-        <div>
+      {phases.map(({ phase, impacts }) => (
+        <div key={phase}>
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            Workflow impact
+            {PHASE_LABEL[phase]}
           </p>
-          <p className="text-sm whitespace-pre-wrap">{impact.workflowImpact}</p>
+          <ul className="flex flex-col gap-1 text-sm">
+            {impacts.map((impact) => (
+              <li key={impact.id}>
+                <span className="font-medium">{impact.feature}</span>{" "}
+                {EFFECT_LABEL[impact.effect]}
+                {impact.clinicalWorkflowImpact &&
+                  " (tell clinicians in advance)"}
+                {impact.notes && (
+                  <span className="text-muted-foreground">
+                    : {impact.notes}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
-      )}
-      {impact.clinicalImpactNotes && (
+      ))}
+      {r.verificationNotes && (
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            Clinical impact
+            Verification
           </p>
-          <p className="text-sm whitespace-pre-wrap">
-            {impact.clinicalImpactNotes}
-          </p>
+          <p className="text-sm whitespace-pre-wrap">{r.verificationNotes}</p>
         </div>
       )}
     </div>

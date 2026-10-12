@@ -31,7 +31,7 @@ const MECHANISM_LABEL: Record<RemediationMechanism, string> = {
 };
 
 const EFFECT_LABEL: Record<ImpactEffect, string> = {
-  UNAVAILABLE: "unavilable",
+  UNAVAILABLE: "unavailable",
   DEGRADED: "degraded",
   CHANGED: "changed",
 };

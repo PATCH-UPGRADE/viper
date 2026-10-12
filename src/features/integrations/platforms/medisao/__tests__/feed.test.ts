@@ -112,17 +112,22 @@ describe("toCanonical", () => {
     expect(item.webUrl).toBeNull();
   });
 
-  it("collects the manufacturer impact fields", () => {
-    expect(item.sourceImpact).toEqual({
-      category: "mitigation",
-      mechanism: "firmware_patch",
+  it("normalizes the manufacturer impact fields", () => {
+    expect(item.impact).toEqual({
       requiresDowntime: false,
       estimatedDowntimeSeconds: null,
       restartRequired: false,
       disablesFeatures: false,
-      workflowImpact: "",
-      clinicalImpactNotes: "",
     });
+  });
+
+  it("does not read categroy or mechanism as how the fix is applied", () => {
+    expect(item.impact).not.toHaveProperty("mechanism");
+  });
+
+  it("does not store the free-text workflow and clinical notes yet", () => {
+    expect(item.impact).not.toHaveProperty("workflowImpact");
+    expect(item.impact).not.toHaveProperty("clinicalImpactNotes");
   });
 });
 

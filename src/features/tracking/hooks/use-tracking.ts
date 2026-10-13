@@ -550,3 +550,54 @@ export const useAddTicketComment = (ticketId: string) => {
     }),
   );
 };
+
+// A new time moves the ticket in the drawer, the calendar and the list.
+const useInvalidateInterruptions = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return () => {
+    queryClient.invalidateQueries(
+      trpc.tracking.getInterruptionDetail.pathFilter(),
+    );
+    queryClient.invalidateQueries(
+      trpc.tracking.getInterruptionCalendar.pathFilter(),
+    );
+    queryClient.invalidateQueries(
+      trpc.tracking.getInterruptionList.queryFilter(),
+    );
+  };
+};
+
+export const useRequestReschedule = () => {
+  const trpc = useTRPC();
+  const invalidate = useInvalidateInterruptions();
+  return useMutation(
+    trpc.tracking.requestReschedule.mutationOptions({
+      onSuccess: () => {
+        invalidate();
+        toast.success("Request sent");
+      },
+      onError: (error) => {
+        toast.error(`Could not send the request: ${error.message}`);
+      },
+    }),
+  );
+};
+
+export const useDecideReschedule = () => {
+  const trpc = useTRPC();
+  const invalidate = useInvalidateInterruptions();
+  return useMutation(
+    trpc.tracking.decideReschedule.mutationOptions({
+      onSuccess: (_data, { decision }) => {
+        invalidate();
+        toast.success(
+          decision === "approve" ? "New time approved" : "Request declined",
+        );
+      },
+      onError: (error) => {
+        toast.error(`Could not save the decision: ${error.message}`);
+      },
+    }),
+  );
+};

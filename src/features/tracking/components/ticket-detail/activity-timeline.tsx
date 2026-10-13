@@ -19,6 +19,7 @@ import type {
   TicketCategory,
   TicketStatus,
 } from "@/generated/prisma";
+import { formatScheduled } from "@/lib/date-utils";
 import type { TicketDetail } from "../../types";
 import { AddCommentForm } from "./add-comment-form";
 import { categoryLabels, StatusChip } from "./shared";
@@ -257,6 +258,26 @@ const renderActivity = (a: Activity): React.ReactNode => {
             {(data.assetLabel as string) ?? data.assetId}
           </span>
         </>
+      );
+    case "RESCHEDULE_REQUESTED":
+      return (
+        <>
+          asked to move this to {formatScheduled(data.to)}
+          {data.reason ? (
+            <span className="text-muted-foreground"> — {data.reason}</span>
+          ) : null}
+        </>
+      );
+    case "RESCHEDULE_APPROVED":
+      return (
+        <>
+          approved the new time, {formatScheduled(data.to)}, asked for by{" "}
+          {data.requestedBy.name}
+        </>
+      );
+    case "RESCHEDULE_DECLINED":
+      return (
+        <>declined the request to move this to {formatScheduled(data.to)}</>
       );
     case "TICKET_LINKED":
     case "TICKET_UNLINKED":

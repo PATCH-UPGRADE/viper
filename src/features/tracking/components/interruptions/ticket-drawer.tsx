@@ -32,6 +32,7 @@ import {
   CategoryChip,
   StatusChip,
 } from "../ticket-detail/shared";
+import { RescheduleRequest } from "./reschedule-request";
 import { WorkOrderModal } from "./work-order-modal";
 
 export type DrawerTicket = {
@@ -122,6 +123,7 @@ const Details = ({ ticket }: { ticket: DrawerTicket }) => {
           </p>
         </div>
       </div>
+      <RescheduleRequest ticketId={id} pending={data.reschedule} />
       <Section title="Why this work is needed">
         <p className="whitespace-pre-wrap text-muted-foreground">
           {data.why ?? "Not provided"}

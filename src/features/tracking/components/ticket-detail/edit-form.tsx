@@ -33,7 +33,7 @@ import { categoryLabels, TicketStatusSelectTrigger } from "./shared";
 
 const UNASSIGNED = "__unassigned__";
 
-const toDateTimeLocal = (date: Date | string | null | undefined) => {
+export const toDateTimeLocal = (date: Date | string | null | undefined) => {
   if (!date) return "";
   const d = date instanceof Date ? date : new Date(date);
   const offsetMs = d.getTimezoneOffset() * 60_000;

@@ -17,6 +17,7 @@ import {
 } from "../artifacts/types";
 import { scopedNoteSchema } from "../notes/schemas";
 import {
+  featureImpactSchema,
   remediationImpactFieldsSchema,
   remediationImpactRowSchema,
   remediationImpactRowSelect,
@@ -50,6 +51,8 @@ export const remediationInputSchema = z.object({
   vulnerabilityId: removedVulnerabilityIdSchema,
   description: z.string().nullish(),
   narrative: z.string().nullish(),
+  ...remediationImpactFieldsSchema.shape,
+  impacts: z.array(featureImpactSchema).optional(),
   artifacts: z
     .array(artifactInputSchema)
     .min(1, "at least one artifact is required"),
@@ -67,6 +70,8 @@ export const remediationUpdateSchema = z.object({
   vulnerabilityId: removedVulnerabilityIdSchema,
   description: z.string().nullish(),
   narrative: z.string().nullish(),
+  ...remediationImpactFieldsSchema.shape,
+  impacts: z.array(featureImpactSchema).optional(),
   artifacts: z.array(artifactInputSchema).optional(),
 });
 

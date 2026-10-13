@@ -24,4 +24,10 @@ export async function applyReschedule(
         }),
     },
   });
+  // Device tickets still on the old time move with it. The calendar shows a
+  // device on its own only when its time differs from its work order's.
+  await tx.workOrderTicket.updateMany({
+    where: { parentId: ticketId, scheduledAt: from },
+    data: { scheduledAt },
+  });
 }

@@ -10,6 +10,7 @@ const { mockPrisma } = vi.hoisted(() => {
       count: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     rescheduleRequest: {
       count: vi.fn(),
@@ -134,7 +135,7 @@ describe("decideReschedule", () => {
     });
   });
 
-  it("approving moves the ticket and keeps its duration", async () => {
+  it("approving moves the ticket, its duration and its devices", async () => {
     await caller.decideReschedule({ requestId: "r1", decision: "approve" });
 
     expect(mockPrisma.workOrderTicket.update).toHaveBeenCalledWith({
@@ -143,6 +144,10 @@ describe("decideReschedule", () => {
         scheduledAt: proposedAt,
         scheduledEndTime: new Date("2099-01-02T14:30:00Z"),
       },
+    });
+    expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
+      where: { parentId: "t1", scheduledAt: from },
+      data: { scheduledAt: proposedAt },
     });
     expect(mockPrisma.ticketActivity.create.mock.calls[0][0].data).toEqual({
       ticketId: "t1",
@@ -161,6 +166,7 @@ describe("decideReschedule", () => {
     await caller.decideReschedule({ requestId: "r1", decision: "decline" });
 
     expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
+    expect(mockPrisma.workOrderTicket.updateMany).not.toHaveBeenCalled();
     expect(mockPrisma.ticketActivity.create.mock.calls[0][0].data.type).toBe(
       "RESCHEDULE_DECLINED",
     );

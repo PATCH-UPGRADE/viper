@@ -19,7 +19,6 @@ const { mockPrisma } = vi.hoisted(() => {
       updateMany: vi.fn(),
     },
     ticketActivity: { create: vi.fn() },
-    $queryRaw: vi.fn(),
     // biome-ignore lint/suspicious/noExplicitAny: callback shape varies
     $transaction: vi.fn(async (cb: (tx: any) => Promise<unknown>) =>
       cb(prisma),

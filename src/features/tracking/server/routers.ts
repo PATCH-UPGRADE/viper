@@ -1353,8 +1353,6 @@ export const trackingRouter = createTRPCRouter({
         });
       }
       return prisma.$transaction(async (tx) => {
-        // Lock the ticket so two requests cannot both see "nothing pending".
-        await tx.$queryRaw`SELECT id FROM work_order_ticket WHERE id = ${ticketId} FOR UPDATE`;
         const ticket = await tx.workOrderTicket.findUniqueOrThrow({
           where: { id: ticketId },
           select: { scheduledAt: true },

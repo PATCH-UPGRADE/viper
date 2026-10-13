@@ -34,16 +34,24 @@ export type ReadReceipt = {
  * Rows inside a group keep the order they arrive in, which the server sorts
  * newest first.
  */
-export const groupReceiptsByDay = (receipts: ReadReceipt[]) =>
-  Object.entries(
-    Object.groupBy(receipts, (r) => startOfDay(r.readAt).getTime()),
-  )
-    .map(([day, group]) => ({
-      dayStart: Number(day),
-      label: dayGroupLabel(Number(day)),
-      receipts: group ?? [],
-    }))
-    .sort((a, b) => b.dayStart - a.dayStart);
+export function groupReceiptsByDay(receipts: ReadReceipt[]) {
+  const byDay = new Map<number, ReadReceipt[]>();
+
+  for (const receipt of receipts) {
+    const dayStart = startOfDay(receipt.readAt).getTime();
+    const list = byDay.get(dayStart) ?? [];
+    list.push(receipt);
+    byDay.set(dayStart, list);
+  }
+
+  return [...byDay.entries()]
+    .sort(([a], [b]) => b - a)
+    .map(([dayStart, dayReceipts]) => ({
+      dayStart,
+      label: dayGroupLabel(dayStart),
+      receipts: dayReceipts,
+    }));
+}
 
 type Props = {
   receipts: ReadReceipt[];

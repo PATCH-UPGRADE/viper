@@ -1425,6 +1425,7 @@ export const trackingRouter = createTRPCRouter({
         });
       }
       const approve = input.decision === "approve";
+      const declineReason = approve ? null : input.reason || null;
       return prisma.$transaction(async (tx) => {
         const { count } = await tx.rescheduleRequest.updateMany({
           where: { id: request.id, status: RescheduleStatus.PENDING },
@@ -1434,7 +1435,7 @@ export const trackingRouter = createTRPCRouter({
               : RescheduleStatus.DECLINED,
             decidedById: userId,
             decidedAt: new Date(),
-            declineReason: approve ? null : input.reason || null,
+            declineReason,
           },
         });
         if (count !== 1) {
@@ -1456,7 +1457,7 @@ export const trackingRouter = createTRPCRouter({
               from: request.fromScheduledAt,
               to: request.proposedAt,
               requestedBy: request.requestedBy,
-              reason: approve ? null : input.reason || null,
+              reason: declineReason,
             },
           },
         });

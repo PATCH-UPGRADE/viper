@@ -741,24 +741,24 @@ enum AlohaStatus {
 }
 
 model Vulnerability {
-  id                   String                @id @default(cuid())
+  id          String   @id @default(cuid())
   /// Best human-facing ID: CVE > GHSA > other public ID > VIPER. Written alongside
   /// identifiers
-  displayId            String? // TODO VW-540: make this non-nullable after create paths
-  cveId                String? // TODO VW_540: remove this
-  description          String?               @db.Text // description of vulnerability
-  narrative            String?               @db.Text // how a vulnerability could be exploited
-  impact               String?               @db.Text // clinical impact
-  severity             Severity              @default(Medium)
+  displayId   String? // TODO VW-540: make this non-nullable after create paths
+  cveId       String? // TODO VW_540: remove this
+  description String?  @db.Text // description of vulnerability
+  narrative   String?  @db.Text // how a vulnerability could be exploited
+  impact      String?  @db.Text // clinical impact
+  severity    Severity @default(Medium)
 
   // <Getting removed in VW-540>
-  cvssScore            Float? 
-  cvssVector           String?
-  sarif                Json
-  affectedComponents   String[]              @default([])
-  exploitUri           String?               @map("exploit-uri")
-  alohaStatus AlohaStatus?
-  alohaLog    Json         @default("{}")
+  cvssScore          Float?
+  cvssVector         String?
+  sarif              Json
+  affectedComponents String[]     @default([])
+  exploitUri         String?      @map("exploit-uri")
+  alohaStatus        AlohaStatus?
+  alohaLog           Json         @default("{}")
 
   deviceArtifactId String?
   deviceArtifact   DeviceArtifact? @relation(fields: [deviceArtifactId], references: [id], onDelete: SetNull)
@@ -1072,6 +1072,26 @@ model EntityFilterMatch {
   @@map("entity_filter_match")
 }
 
+enum RemediationMechanism {
+  REMOTE_DEPLOYMENT
+  ON_SITE         
+  REMOVABLE_MEDIA // USB stick, DVD, SD card
+  OTHER
+}
+
+// when a remediationImpact applies
+enum ImpactPhase {
+  DURING_APPLY // only while the remediation is being applied
+  AFTER_APPLY // persists once it is complete
+}
+
+// what happens to the affected function
+enum ImpactEffect {
+  UNAVAILABLE // does not work
+  DEGRADED // works, with limits
+  CHANGED // works differently, e.g. a moved menu, UI updates
+}
+
 model Remediation {
   id        String            @id @default(cuid())
   artifacts ArtifactWrapper[]
@@ -1092,7 +1112,17 @@ model Remediation {
   alohaStatus AlohaStatus?
   alohaLog    Json         @default("{}")
 
-  sourceImpact Json @default("{}")
+  category                 String?
+  mechanism                RemediationMechanism?
+  requiresDowntime         Boolean?
+  restartRequired          Boolean?
+  estimatedDowntimeSeconds Int?
+  estimatedDurationSeconds Int?
+  disablesFeatures         Boolean?
+  reversible               Boolean?
+  verificationRequired     Boolean?
+  verificationNotes        String?   @db.Text 
+  impacts                  RemediationImpact[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1104,6 +1134,23 @@ model Remediation {
 
   @@index([userId])
   @@map("remediation")
+}
+
+model RemediationImpact {
+  id                     String       @id @default(cuid())
+  remediationId          String
+  remediation            Remediation  @relation(fields: [remediationId], references: [id], onDelete: Cascade)
+  phase                  ImpactPhase
+  feature                String // nurse call button, UI color 
+  effect                 ImpactEffect
+  clinicalWorkflowImpact Boolean? // clinicians must be told in advance
+  notes                  String?      @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([remediationId])
+  @@map("remediation_impact")
 }
 
 model IssueRemediation {

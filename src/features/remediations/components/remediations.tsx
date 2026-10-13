@@ -38,15 +38,13 @@ import {
   useSuspenseRemediations,
 } from "../hooks/use-remediations";
 import { useRemediationsParams } from "../hooks/use-remediations-params";
+import { hasStatedImpact } from "../impact";
 import type {
   RemediationCard as RemediationCardType,
   RemediationResponse,
 } from "../types";
 import { MedIsaoRemediationComments } from "./medisao-remediation-comments";
-import {
-  hasStatedImpact,
-  MedIsaoRemediationImpact,
-} from "./medisao-remediation-impact";
+import { MedIsaoRemediationImpact } from "./medisao-remediation-impact";
 import { MedIsaoRemediationInquiries } from "./medisao-remediation-inquiries";
 
 export const RemediationsSearch = () => {
@@ -286,8 +284,19 @@ function RemediationDrawer({
               </div>
             </div>
           </div>
-
           <Separator />
+          {hasStatedImpact(remediation) && (
+            <>
+              <div className="flex flex-col gap-2">
+                <h3 className="font-semibold">Impact</h3>
+                <p className="text-xs text-muted-foreground">
+                  What applying this remediation does to the device
+                </p>
+                <MedIsaoRemediationImpact remediation={remediation} />
+              </div>
+              <Separator />
+            </>
+          )}
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1">
               <h3 className="font-semibold">MedISAO</h3>
@@ -297,15 +306,6 @@ function RemediationDrawer({
             </div>
 
             <div className="flex flex-col gap-4 border-l pl-4">
-              {hasStatedImpact(remediation.sourceImpact ?? {}) && (
-                <div className="flex flex-col gap-2">
-                  <h4 className="text-sm font-medium">Manufacturer impact</h4>
-                  <MedIsaoRemediationImpact
-                    impact={remediation.sourceImpact ?? {}}
-                  />
-                </div>
-              )}
-
               <div className="flex flex-col gap-2">
                 <h4 className="text-sm font-medium">
                   Comments from other hospitals

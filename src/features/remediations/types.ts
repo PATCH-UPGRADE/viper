@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { externalMappingSelect } from "@/features/integrations/core/urls";
-import type { MedIsaoSourceImpact } from "@/features/integrations/platforms/medisao/remediations/feed";
 import { PlatformEnum, type Prisma } from "@/generated/prisma";
 import { createPaginatedResponseSchema } from "@/lib/pagination";
 import {
@@ -17,6 +16,11 @@ import {
   artifactWrapperWithUrlsSchema,
 } from "../artifacts/types";
 import { scopedNoteSchema } from "../notes/schemas";
+import {
+  remediationImpactFieldsSchema,
+  remediationImpactRowSchema,
+  remediationImpactRowSelect,
+} from "./impact";
 
 const canonicalRefInclude = {
   select: { canonicalName: true, canonicalDisplayName: true },
@@ -71,39 +75,6 @@ export const vulnerabilitySchema = z.object({
   url: z.string(),
 });
 
-/**
- * Pins the schema below to `MedIsaoSourceImpact`, field for field. A key added
- * to one and not the other, or a field whose type changes, fails to compile.
- * Each field admits `undefined` as well, because `{}` is what a remediation
- * from any other origin carries in this column.
- */
-type SourceImpactShape = {
-  [K in keyof MedIsaoSourceImpact]: z.ZodType<
-    MedIsaoSourceImpact[K] | undefined
-  >;
-};
-
-/**
- * The manufacturer impact MedISAO states for a remediation, as its sync stores
- * it. MedISAO is the only source that writes this column.
- *
- * Loose on purpose: MedISAO's category and mechanism enums are still in flux,
- * so an unrecognised value is kept rather than rejected.
- */
-export const sourceImpactSchema = z
-  .object({
-    category: z.string().nullish(),
-    mechanism: z.string().nullish(),
-    requiresDowntime: z.boolean().nullish(),
-    estimatedDowntimeSeconds: z.number().nullish(),
-    restartRequired: z.boolean().nullish(),
-    disablesFeatures: z.boolean().nullish(),
-    workflowImpact: z.string().nullish(),
-    clinicalImpactNotes: z.string().nullish(),
-  } satisfies SourceImpactShape)
-  .loose();
-export type SourceImpact = z.infer<typeof sourceImpactSchema>;
-
 export const remediationResponseSchema = z.object({
   id: z.string(),
   deviceGroupMatchings: z.array(deviceGroupMatchingResponseSchema),
@@ -121,7 +92,8 @@ export const remediationResponseSchema = z.object({
   ),
   description: z.string().nullish(),
   narrative: z.string().nullish(),
-  sourceImpact: sourceImpactSchema,
+  ...remediationImpactFieldsSchema.shape,
+  impacts: z.array(remediationImpactRowSchema),
   vulnerabilities: z.array(vulnerabilitySchema),
   user: userSchema,
   artifacts: z.array(artifactWrapperWithUrlsSchema),
@@ -159,6 +131,7 @@ export const remediationInclude = {
   vulnerabilities: remediationVulnerabilitySelect,
   artifacts: artifactWrapperSelect,
   externalMappings: externalMappingSelect,
+  impacts: remediationImpactRowSelect,
 };
 
 export const remediationCardInclude = {

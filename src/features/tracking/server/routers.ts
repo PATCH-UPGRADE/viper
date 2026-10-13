@@ -1402,6 +1402,7 @@ export const trackingRouter = createTRPCRouter({
       z.object({
         requestId: z.string(),
         decision: z.enum(["approve", "decline"]),
+        reason: z.string().trim().max(1000).optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
@@ -1433,6 +1434,7 @@ export const trackingRouter = createTRPCRouter({
               : RescheduleStatus.DECLINED,
             decidedById: userId,
             decidedAt: new Date(),
+            declineReason: approve ? null : input.reason || null,
           },
         });
         if (count !== 1) {
@@ -1454,6 +1456,7 @@ export const trackingRouter = createTRPCRouter({
               from: request.fromScheduledAt,
               to: request.proposedAt,
               requestedBy: request.requestedBy,
+              reason: approve ? null : input.reason || null,
             },
           },
         });

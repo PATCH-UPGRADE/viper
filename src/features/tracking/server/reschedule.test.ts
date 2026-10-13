@@ -157,18 +157,31 @@ describe("decideReschedule", () => {
         from,
         to: proposedAt,
         requestedBy: { id: "someone", name: "Sam" },
+        reason: null,
       },
     });
   });
 
   it("declining leaves the time alone", async () => {
-    await caller.decideReschedule({ requestId: "r1", decision: "decline" });
+    await caller.decideReschedule({
+      requestId: "r1",
+      decision: "decline",
+      reason: "Analyzer tech is only on site in the morning",
+    });
 
     expect(mockPrisma.workOrderTicket.update).not.toHaveBeenCalled();
     expect(mockPrisma.workOrderTicket.updateMany).not.toHaveBeenCalled();
-    expect(mockPrisma.ticketActivity.create.mock.calls[0][0].data.type).toBe(
-      "RESCHEDULE_DECLINED",
-    );
+    expect(
+      mockPrisma.rescheduleRequest.updateMany.mock.calls[0][0].data,
+    ).toMatchObject({
+      declineReason: "Analyzer tech is only on site in the morning",
+    });
+    expect(
+      mockPrisma.ticketActivity.create.mock.calls[0][0].data,
+    ).toMatchObject({
+      type: "RESCHEDULE_DECLINED",
+      data: { reason: "Analyzer tech is only on site in the morning" },
+    });
   });
 
   it("does not let the requester decide", async () => {

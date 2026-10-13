@@ -1,11 +1,14 @@
 "use client";
 
+import { CalendarClockIcon, ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import type { RescheduleStatus } from "@/generated/prisma";
 import { authClient } from "@/lib/auth-client";
-import { formatScheduled, toDateTimeLocal } from "@/lib/date-utils";
+import { formatSlot, toDateTimeLocal } from "@/lib/date-utils";
+import { plural } from "@/lib/utils";
 import {
   useDecideReschedule,
   useRequestReschedule,
@@ -18,27 +21,55 @@ type Pending = {
   requestedBy: { id: string; name: string };
 };
 
+type Past = { id: string; status: RescheduleStatus; proposedAt: Date };
+
+// Sits in the drawer's schedule card, under the schedule and duration.
 export const RescheduleRequest = ({
   ticketId,
   pending,
+  past,
 }: {
   ticketId: string;
   pending: Pending | null;
+  past: Past[];
 }) => {
   const [open, setOpen] = useState(false);
   const [proposedAt, setProposedAt] = useState("");
   const [reason, setReason] = useState("");
+  const [declining, setDeclining] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
   const request = useRequestReschedule();
   const decide = useDecideReschedule();
   const { data: session } = authClient.useSession();
 
+  const decideWith = (decision: "approve" | "decline") =>
+    decide.mutate(
+      { requestId: pending?.id ?? "", decision, reason: declineReason },
+      {
+        onSuccess: () => {
+          setDeclining(false);
+          setDeclineReason("");
+        },
+      },
+    );
+
+  let content = (
+    <Button
+      size="sm"
+      variant="outline"
+      className="w-fit"
+      onClick={() => setOpen(true)}
+    >
+      <CalendarClockIcon className="size-4" aria-hidden />
+      Request reschedule
+    </Button>
+  );
+
   if (pending) {
-    const time = formatScheduled(pending.proposedAt);
+    const time = formatSlot(pending.proposedAt);
     const mine = pending.requestedBy.id === session?.user.id;
-    const decideWith = (decision: "approve" | "decline") =>
-      decide.mutate({ requestId: pending.id, decision });
-    return (
-      <div className="flex flex-col gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
+    content = (
+      <>
         <p>
           {mine
             ? `You asked for ${time}. Waiting for approval.`
@@ -47,7 +78,34 @@ export const RescheduleRequest = ({
         {pending.reason && (
           <p className="text-muted-foreground">{pending.reason}</p>
         )}
-        {session && !mine && (
+        {session && !mine && declining && (
+          <>
+            <Textarea
+              aria-label="Reason"
+              placeholder="Reason (optional)"
+              value={declineReason}
+              onChange={(e) => setDeclineReason(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={decide.isPending}
+                onClick={() => decideWith("decline")}
+              >
+                Decline
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setDeclining(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </>
+        )}
+        {session && !mine && !declining && (
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -59,74 +117,87 @@ export const RescheduleRequest = ({
             <Button
               size="sm"
               variant="outline"
-              disabled={decide.isPending}
-              onClick={() => decideWith("decline")}
+              onClick={() => setDeclining(true)}
             >
               Decline
             </Button>
           </div>
         )}
-      </div>
+      </>
     );
-  }
-
-  if (!open) {
-    return (
-      <Button
-        size="sm"
-        variant="outline"
-        className="w-fit"
-        onClick={() => setOpen(true)}
+  } else if (open) {
+    content = (
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          request.mutate(
+            { ticketId, proposedAt: new Date(proposedAt), reason },
+            {
+              onSuccess: () => {
+                setOpen(false);
+                setProposedAt("");
+                setReason("");
+              },
+            },
+          );
+        }}
       >
-        Request a new time
-      </Button>
+        <Input
+          type="datetime-local"
+          aria-label="New time"
+          required
+          min={toDateTimeLocal(new Date())}
+          value={proposedAt}
+          onChange={(e) => setProposedAt(e.target.value)}
+        />
+        <Textarea
+          aria-label="Why?"
+          placeholder="Why? (optional)"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+        <div className="flex gap-2">
+          <Button size="sm" type="submit" disabled={request.isPending}>
+            Send
+          </Button>
+          <Button
+            size="sm"
+            type="button"
+            variant="ghost"
+            onClick={() => setOpen(false)}
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
     );
   }
 
   return (
-    <form
-      className="flex flex-col gap-2 rounded-lg border p-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        request.mutate(
-          { ticketId, proposedAt: new Date(proposedAt), reason },
-          {
-            onSuccess: () => {
-              setOpen(false);
-              setProposedAt("");
-              setReason("");
-            },
-          },
-        );
-      }}
-    >
-      <Input
-        type="datetime-local"
-        aria-label="New time"
-        required
-        min={toDateTimeLocal(new Date())}
-        value={proposedAt}
-        onChange={(e) => setProposedAt(e.target.value)}
-      />
-      <Textarea
-        aria-label="Why?"
-        placeholder="Why? (optional)"
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-      />
-      <div className="flex gap-2">
-        <Button size="sm" type="submit" disabled={request.isPending}>
-          Send
-        </Button>
-        <Button
-          size="sm"
-          type="button"
-          variant="ghost"
-          onClick={() => setOpen(false)}
-        >
-          Cancel
-        </Button>
-      </div>
-    </form>
+    <>
+      <div className="flex flex-col gap-2 border-t p-3">{content}</div>
+      {past.length > 0 && (
+        <details className="group border-t bg-muted/40">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-muted-foreground [&::-webkit-details-marker]:hidden">
+            {past.length} past reschedule {plural("request", past.length)}
+            <ChevronDownIcon
+              className="size-4 transition-transform group-open:rotate-180"
+              aria-hidden
+            />
+          </summary>
+          <ul className="divide-y border-t">
+            {past.map((r) => (
+              <li key={r.id} className="flex justify-between px-3 py-2">
+                {formatSlot(r.proposedAt)}
+                <span className="text-muted-foreground">
+                  {r.status === "APPROVED" ? "Approved" : "Declined"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </>
   );
 };

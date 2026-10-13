@@ -332,12 +332,12 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
           comments: ticketDetailInclude.comments,
           activities: ticketDetailInclude.activities,
           rescheduleRequests: {
-            where: { status: RescheduleStatus.PENDING },
+            orderBy: { createdAt: "desc" },
             select: {
               id: true,
+              status: true,
               proposedAt: true,
               reason: true,
-              createdAt: true,
               requestedBy: { select: { id: true, name: true } },
             },
           },
@@ -379,7 +379,13 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
       ).size,
     },
     contact: ticket.assignee ?? ticket.creator,
-    reschedule: ticket.rescheduleRequests[0] ?? null,
+    reschedule:
+      ticket.rescheduleRequests.find(
+        (r) => r.status === RescheduleStatus.PENDING,
+      ) ?? null,
+    pastReschedules: ticket.rescheduleRequests.filter(
+      (r) => r.status !== RescheduleStatus.PENDING,
+    ),
     why: workOrder.descriptions[0]?.body ?? workOrder.body ?? null,
     otherDevices: workOrder.assets.map(({ asset, ticket }) => ({
       id: ticket.id,

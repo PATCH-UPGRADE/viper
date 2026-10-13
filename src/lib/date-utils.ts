@@ -19,6 +19,12 @@ export const toDateTimeLocal = (date: Date | string | null | undefined) => {
   return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16);
 };
 
+// "Fri, Oct 2 · 2 PM", or "Fri, Oct 2 · 2:30 PM" off the hour.
+export const formatSlot = (date: Date | string) => {
+  const d = date instanceof Date ? date : new Date(date);
+  return format(d, `EEE, MMM d · ${d.getMinutes() ? "h:mm" : "h"} a`);
+};
+
 /** Heading for a group of items that share a calendar day */
 export const dayGroupLabel = (date: Date | string | number): string => {
   if (isToday(date)) return "Today";

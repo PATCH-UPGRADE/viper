@@ -1394,7 +1394,6 @@ export const trackingRouter = createTRPCRouter({
             },
           },
         });
-        return { ticketId };
       });
     }),
 
@@ -1458,7 +1457,6 @@ export const trackingRouter = createTRPCRouter({
             },
           },
         });
-        return { ticketId: request.ticketId };
       });
     }),
 

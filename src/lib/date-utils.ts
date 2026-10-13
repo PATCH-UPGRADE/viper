@@ -11,6 +11,14 @@ export const formatScheduled = (
   return format(d, `MMM d, yyyy '${separator}' h:mm a`);
 };
 
+/** Value for a datetime-local input, in the viewer's timezone */
+export const toDateTimeLocal = (date: Date | string | null | undefined) => {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
+  const offsetMs = d.getTimezoneOffset() * 60_000;
+  return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16);
+};
+
 /** Heading for a group of items that share a calendar day */
 export const dayGroupLabel = (date: Date | string | number): string => {
   if (isToday(date)) return "Today";

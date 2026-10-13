@@ -551,11 +551,13 @@ export const useAddTicketComment = (ticketId: string) => {
   );
 };
 
-// A new time moves the ticket in the drawer, the calendar and the list.
+// A reschedule shows in the drawer, the calendar, the list and the ticket page.
 const useInvalidateInterruptions = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   return () => {
+    queryClient.invalidateQueries(trpc.tracking.getOne.pathFilter());
+    queryClient.invalidateQueries(trpc.tracking.getMany.queryFilter());
     queryClient.invalidateQueries(
       trpc.tracking.getInterruptionDetail.pathFilter(),
     );

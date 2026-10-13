@@ -5,12 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { authClient } from "@/lib/auth-client";
-import { formatScheduled } from "@/lib/date-utils";
+import { formatScheduled, toDateTimeLocal } from "@/lib/date-utils";
 import {
   useDecideReschedule,
   useRequestReschedule,
 } from "../../hooks/use-tracking";
-import { toDateTimeLocal } from "../ticket-detail/edit-form";
 
 type Pending = {
   id: string;

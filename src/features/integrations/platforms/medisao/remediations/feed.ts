@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { RemediationImpactInput } from "@/features/remediations/impact";
-import { RemediationImpact } from "@/generated/prisma";
 import type { Session } from "../../../core/types";
 import { walkPages, withSince } from "../paginate";
 import { channelRemediationsUrl } from "../urls";

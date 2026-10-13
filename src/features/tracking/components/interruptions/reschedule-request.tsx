@@ -47,7 +47,7 @@ export const RescheduleRequest = ({
         {pending.reason && (
           <p className="text-muted-foreground">{pending.reason}</p>
         )}
-        {!mine && (
+        {session && !mine && (
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -90,7 +90,13 @@ export const RescheduleRequest = ({
         e.preventDefault();
         request.mutate(
           { ticketId, proposedAt: new Date(proposedAt), reason },
-          { onSuccess: () => setOpen(false) },
+          {
+            onSuccess: () => {
+              setOpen(false);
+              setProposedAt("");
+              setReason("");
+            },
+          },
         );
       }}
     >

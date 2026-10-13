@@ -145,7 +145,7 @@ describe("decideReschedule", () => {
       },
     });
     expect(mockPrisma.workOrderTicket.updateMany).toHaveBeenCalledWith({
-      where: { parentId: "t1", scheduledAt: from },
+      where: { parentId: "t1", ticket: { isNot: null }, scheduledAt: from },
       data: { scheduledAt: proposedAt },
     });
     expect(mockPrisma.ticketActivity.create.mock.calls[0][0].data).toEqual({
@@ -179,6 +179,14 @@ describe("decideReschedule", () => {
     await expect(
       caller.decideReschedule({ requestId: "r1", decision: "approve" }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("does not decide a request on a ticket the user cannot open", async () => {
+    mockPrisma.workOrderTicket.count.mockResolvedValue(0);
+    await expect(
+      caller.decideReschedule({ requestId: "r1", decision: "approve" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(mockPrisma.rescheduleRequest.updateMany).not.toHaveBeenCalled();
   });
 
   it("fails when someone else decided first", async () => {

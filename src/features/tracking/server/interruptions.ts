@@ -1,7 +1,11 @@
 import "server-only";
 import { TRPCError } from "@trpc/server";
 import { assetNameSelect, getAssetDisplayName } from "@/features/assets/utils";
-import { type Prisma, TicketStatus } from "@/generated/prisma";
+import {
+  type Prisma,
+  RescheduleStatus,
+  TicketStatus,
+} from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { plural } from "@/lib/utils";
 import { type Availability, ticketDetailInclude } from "../types";
@@ -284,6 +288,29 @@ const contactSelect = {
   department: { select: { name: true } },
 } satisfies Prisma.UserSelect;
 
+// An owner ticket or a device ticket in the user's scope: the ones the drawer opens.
+const openable = (departmentId: string, id: string) =>
+  ({
+    id,
+    OR: [
+      { ticket: inScope(departmentId) },
+      { ...open, assets: { some: scopedDevice(departmentId) } },
+    ],
+  }) satisfies Prisma.WorkOrderTicketWhereInput;
+
+// NOT_FOUND unless the user may open this ticket in the drawer.
+export const assertCanOpen = async (userId: string, id: string) => {
+  const departmentId = await departmentOf(userId);
+  const found =
+    departmentId &&
+    (await prisma.workOrderTicket.count({
+      where: openable(departmentId, id),
+    }));
+  if (!found) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Ticket not found" });
+  }
+};
+
 // What the drawer shows beyond the card, for an owner ticket or a device ticket
 // in the user's scope. Anything else is NOT_FOUND. A device ticket has no
 // description of its own: it comes from its owner ticket.
@@ -291,13 +318,7 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
   const departmentId = await departmentOf(userId);
   const ticket = departmentId
     ? await prisma.workOrderTicket.findFirst({
-        where: {
-          id,
-          OR: [
-            { ticket: inScope(departmentId) },
-            { ...open, assets: { some: scopedDevice(departmentId) } },
-          ],
-        },
+        where: openable(departmentId, id),
         select: {
           ...workOrderFields(departmentId, id),
           category: true,
@@ -310,6 +331,16 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
           },
           comments: ticketDetailInclude.comments,
           activities: ticketDetailInclude.activities,
+          rescheduleRequests: {
+            where: { status: RescheduleStatus.PENDING },
+            select: {
+              id: true,
+              proposedAt: true,
+              reason: true,
+              createdAt: true,
+              requestedBy: { select: { id: true, name: true } },
+            },
+          },
         },
       })
     : null;
@@ -348,6 +379,7 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
       ).size,
     },
     contact: ticket.assignee ?? ticket.creator,
+    reschedule: ticket.rescheduleRequests[0] ?? null,
     why: workOrder.descriptions[0]?.body ?? workOrder.body ?? null,
     otherDevices: workOrder.assets.map(({ asset, ticket }) => ({
       id: ticket.id,

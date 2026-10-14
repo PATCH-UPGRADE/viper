@@ -305,6 +305,9 @@ const withRowFlags = <
   };
 };
 
+const badRequest = (message: string) =>
+  new TRPCError({ code: "BAD_REQUEST", message });
+
 export const trackingRouter = createTRPCRouter({
   getMany: protectedProcedure
     .input(trackingInputSchema)
@@ -1347,10 +1350,7 @@ export const trackingRouter = createTRPCRouter({
       const userId = ctx.auth.user.id;
       await assertCanOpen(userId, ticketId);
       if (proposedAt <= new Date()) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Pick a time in the future",
-        });
+        throw badRequest("Pick a time in the future");
       }
       return prisma.$transaction(async (tx) => {
         const ticket = await tx.workOrderTicket.findUniqueOrThrow({
@@ -1358,19 +1358,13 @@ export const trackingRouter = createTRPCRouter({
           select: { scheduledAt: true },
         });
         if (proposedAt.getTime() === ticket.scheduledAt?.getTime()) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "That is already the scheduled time",
-          });
+          throw badRequest("That is already the scheduled time");
         }
         const pending = await tx.rescheduleRequest.count({
           where: { ticketId, status: RescheduleStatus.PENDING },
         });
         if (pending > 0) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "A request is already waiting for a decision",
-          });
+          throw badRequest("A request is already waiting for a decision");
         }
         const request = await tx.rescheduleRequest.create({
           data: {
@@ -1425,7 +1419,7 @@ export const trackingRouter = createTRPCRouter({
         });
       }
       const approve = input.decision === "approve";
-      const declineReason = approve ? null : input.reason || null;
+      const reason = approve ? null : input.reason || null;
       return prisma.$transaction(async (tx) => {
         const { count } = await tx.rescheduleRequest.updateMany({
           where: { id: request.id, status: RescheduleStatus.PENDING },
@@ -1435,14 +1429,10 @@ export const trackingRouter = createTRPCRouter({
               : RescheduleStatus.DECLINED,
             decidedById: userId,
             decidedAt: new Date(),
-            declineReason,
           },
         });
         if (count !== 1) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "This request was already decided",
-          });
+          throw badRequest("This request was already decided");
         }
         if (approve) {
           await applyReschedule(tx, request.ticketId, request.proposedAt);
@@ -1457,7 +1447,7 @@ export const trackingRouter = createTRPCRouter({
               from: request.fromScheduledAt,
               to: request.proposedAt,
               requestedBy: request.requestedBy,
-              reason: declineReason,
+              reason,
             },
           },
         });

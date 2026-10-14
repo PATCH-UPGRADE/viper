@@ -82,32 +82,40 @@ const RequestForm = ({ ticketId }: { ticketId: string }) => {
 };
 
 const PendingRequest = ({ pending }: { pending: Pending }) => {
-  const [declining, setDeclining] = useState(false);
-  const [declineReason, setDeclineReason] = useState("");
+  const [reason, setReason] = useState("");
   const decide = useDecideReschedule();
   const { data: session } = authClient.useSession();
   const time = formatSlot(pending.proposedAt);
-  const canDecide = session && pending.requestedBy.id !== session.user.id;
+  const mine = pending.requestedBy.id === session?.user.id;
 
   return (
     <>
       <p>
-        {session && !canDecide
+        {mine
           ? `You asked for ${time}. Waiting for approval.`
           : `${pending.requestedBy.name} asked to move this to ${time}`}
       </p>
       {pending.reason && (
         <p className="text-muted-foreground">{pending.reason}</p>
       )}
-      {canDecide && declining && (
+      {session && !mine && (
         <>
           <Textarea
             aria-label="Reason"
-            placeholder="Reason (optional)"
-            value={declineReason}
-            onChange={(e) => setDeclineReason(e.target.value)}
+            placeholder="Reason, if you decline (optional)"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
           />
           <div className="flex gap-2">
+            <Button
+              size="sm"
+              disabled={decide.isPending}
+              onClick={() =>
+                decide.mutate({ requestId: pending.id, decision: "approve" })
+              }
+            >
+              Approve
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -116,41 +124,14 @@ const PendingRequest = ({ pending }: { pending: Pending }) => {
                 decide.mutate({
                   requestId: pending.id,
                   decision: "decline",
-                  reason: declineReason,
+                  reason,
                 })
               }
             >
               Decline
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setDeclining(false)}
-            >
-              Cancel
-            </Button>
           </div>
         </>
-      )}
-      {canDecide && !declining && (
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            disabled={decide.isPending}
-            onClick={() =>
-              decide.mutate({ requestId: pending.id, decision: "approve" })
-            }
-          >
-            Approve
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setDeclining(true)}
-          >
-            Decline
-          </Button>
-        </div>
       )}
     </>
   );

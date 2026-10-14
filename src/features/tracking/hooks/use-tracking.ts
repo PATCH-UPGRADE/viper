@@ -575,10 +575,7 @@ export const useRequestReschedule = () => {
   const invalidate = useInvalidateInterruptions();
   return useMutation(
     trpc.tracking.requestReschedule.mutationOptions({
-      onSuccess: () => {
-        invalidate();
-        toast.success("Request sent");
-      },
+      onSuccess: invalidate,
       onError: (error) => {
         toast.error(`Could not send the request: ${error.message}`);
       },
@@ -591,12 +588,7 @@ export const useDecideReschedule = () => {
   const invalidate = useInvalidateInterruptions();
   return useMutation(
     trpc.tracking.decideReschedule.mutationOptions({
-      onSuccess: (_data, { decision }) => {
-        invalidate();
-        toast.success(
-          decision === "approve" ? "New time approved" : "Request declined",
-        );
-      },
+      onSuccess: invalidate,
       onError: (error) => {
         toast.error(`Could not save the decision: ${error.message}`);
       },

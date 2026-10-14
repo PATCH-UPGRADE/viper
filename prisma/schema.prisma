@@ -1725,7 +1725,6 @@ model RescheduleRequest {
   decidedById     String?
   decidedBy       User?            @relation("RescheduleDecidedBy", fields: [decidedById], references: [id])
   decidedAt       DateTime?
-  declineReason   String?          @db.Text
   createdAt       DateTime         @default(now())
 
   @@index([ticketId, status])

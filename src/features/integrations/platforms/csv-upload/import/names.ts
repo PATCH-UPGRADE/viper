@@ -120,24 +120,15 @@ export async function listProductCandidates(
   manufacturerIds: string[],
 ): Promise<ProductCandidate[]> {
   if (manufacturerIds.length === 0) return [];
-  const underTheseManufacturers = { manufacturerId: { in: manufacturerIds } };
   const rows = await prisma.product.findMany({
-    where: { deviceGroups: { some: underTheseManufacturers } },
-    select: {
-      ...namedSelect,
-      deviceGroups: {
-        where: underTheseManufacturers,
-        select: { manufacturerId: true },
-      },
-    },
+    where: { manufacturerId: { in: manufacturerIds } },
+    select: { ...namedSelect, manufacturerId: true },
     orderBy: { canonicalName: "asc" },
   });
-  return rows.map((row) => {
-    const madeBy = row.deviceGroups.flatMap((group) =>
-      group.manufacturerId ? [group.manufacturerId] : [],
-    );
-    return { ...toCandidate(row), manufacturerIds: [...new Set(madeBy)] };
-  });
+  return rows.map((row) => ({
+    ...toCandidate(row),
+    manufacturerIds: [row.manufacturerId],
+  }));
 }
 
 export async function searchNames(
@@ -155,9 +146,7 @@ export async function searchNames(
     });
     return rows.map(toNameRef);
   }
-  const madeByThatManufacturer = manufacturerId
-    ? { deviceGroups: { some: { manufacturerId } } }
-    : {};
+  const madeByThatManufacturer = manufacturerId ? { manufacturerId } : {};
   const rows = await prisma.product.findMany({
     where: { ...matchingTheQuery, ...madeByThatManufacturer },
     select: namedSelect,

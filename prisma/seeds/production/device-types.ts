@@ -79,7 +79,6 @@ export function upsertSeedProduct(
     create: {
       canonicalName,
       canonicalDisplayName: name,
-      hasCpe: true,
       deviceTypeId,
     },
   });

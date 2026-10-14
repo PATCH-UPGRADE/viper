@@ -83,8 +83,6 @@ async function ingestRemediations(
             product: item.product,
             version: item.version,
             versionRange: item.versionRange,
-            // Nothing here came from a CPE; the channel is the identity.
-            hasCpe: false,
           });
           matchingIdCache.set(identity, matchingId);
         }

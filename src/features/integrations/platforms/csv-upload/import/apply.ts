@@ -167,7 +167,6 @@ async function deviceGroupFor(
     manufacturer,
     product,
     version: row.version,
-    hasCpe: false,
   });
 }
 

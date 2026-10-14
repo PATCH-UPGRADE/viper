@@ -5,7 +5,6 @@ import { paginationInputSchema } from "@/lib/pagination";
 import {
   createArtifactWrappers,
   fetchPaginated,
-  findMatchingIdsForDeviceGroup,
   processIntegrationToken,
   resolveMatchingIdFromCpe,
   transformArtifactWrapper,
@@ -73,58 +72,6 @@ export const deviceArtifactsRouter = createTRPCRouter({
 
       const result = await fetchPaginated(prisma.deviceArtifact, input, {
         where: searchFilter,
-        include: deviceArtifactInclude,
-      });
-
-      return {
-        ...result,
-        items: result.items.map(transformArtifactWrapper),
-      };
-    }),
-
-  // GET /api/deviceGroups/{deviceGroupId}/deviceArtifacts - List deviceArtifacts for a device group
-  getManyByDeviceGroup: protectedProcedure
-    .input(
-      paginationInputSchema.extend({
-        deviceGroupId: z.string(),
-      }),
-    )
-    .meta({
-      openapi: {
-        method: "GET",
-        path: "/deviceGroups/{deviceGroupId}/deviceArtifacts",
-        tags: ["DeviceArtifacts", "DeviceGroups"],
-        summary: "List DeviceArtifacts by Device Group",
-        description:
-          "Get all DeviceArtifacts affecting a specific device group. Any authenticated user can view all DeviceArtifacts.",
-      },
-    })
-    .output(paginatedDeviceArtifactResponseSchema)
-    .query(async ({ input }) => {
-      const { search, deviceGroupId } = input;
-      const searchFilter = createSearchFilter(search);
-
-      // Artifacts "for" a device group are those whose identity matching applies.
-      const group = await prisma.deviceGroup.findUnique({
-        where: { id: deviceGroupId },
-        select: {
-          id: true,
-          manufacturerId: true,
-          productId: true,
-          versionId: true,
-          version: { select: { canonicalName: true } },
-        },
-      });
-      const matchingIds = group
-        ? await findMatchingIdsForDeviceGroup(group)
-        : [];
-      const idFilter = {
-        deviceGroupMatchings: { some: { id: { in: matchingIds } } },
-      };
-      const whereFilter = search ? { AND: [searchFilter, idFilter] } : idFilter;
-
-      const result = await fetchPaginated(prisma.deviceArtifact, input, {
-        where: whereFilter,
         include: deviceArtifactInclude,
       });
 

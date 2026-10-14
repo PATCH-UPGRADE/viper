@@ -18,8 +18,8 @@ import {
   streamGraphToUI,
   writeRecommendationMarker,
 } from "@/features/agents/shared/stream-bridge";
+import { assetDeviceInclude } from "@/features/assets/types";
 import { USER_ROLES, type UserRole } from "@/features/chat/utils";
-import { deviceGroupSelect } from "@/features/device-groups/types";
 import { deviceGroupMatchingInclude } from "@/features/vulnerabilities/types";
 import { getSession } from "@/lib/auth-utils";
 import prisma from "@/lib/db";
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       const openAsset = assetId
         ? await prisma.asset.findUnique({
             where: { id: assetId },
-            include: { deviceGroup: deviceGroupSelect },
+            include: assetDeviceInclude,
           })
         : null;
       const openVulnerability = vulnerabilityId

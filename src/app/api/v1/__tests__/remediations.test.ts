@@ -759,7 +759,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     requiresDowntime: false,
     reversible: true,
     verificationRequired: true,
-    verificationNotes: "Run the omnitor self-test",
+    verificationNotes: "Run the monitor self-test",
     impacts: [
       {
         phase: "DURING_APPLY",

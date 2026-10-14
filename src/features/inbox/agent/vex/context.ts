@@ -6,11 +6,7 @@
 import "server-only";
 import { getRelevantNotes } from "@/features/notes/server/get-relevant-notes";
 import prisma from "@/lib/db";
-import {
-  deviceGroupWhereForMatching,
-  type MatchingLike,
-  matchingAppliesToDevice,
-} from "@/lib/device-matching";
+import type { MatchingLike } from "@/lib/device-matching";
 import {
   deviceGroupMatchingLabel,
   deviceLabel,
@@ -19,6 +15,7 @@ import {
   renderNoteTarget,
 } from "@/lib/markdown";
 import { notRejected } from "../../types";
+import { deviceAssetGroupsForMatchings } from "../device-asset-groups";
 
 /** A baseline (device-group-matching-level) issue the agent may refine. */
 export type VexIssueContext = {
@@ -103,37 +100,17 @@ export async function gatherVexContext(
   }
   const matchings = [...matchingsById.values()];
 
-  // Resolve matchings → concrete device groups (with their assets) in one query.
-  // TODO: if there's a device group with unknown version, that needs to create
+  // Resolve matchings → the owned assets, grouped by device, in one query.
+  // TODO: if there's an asset with unknown version, that needs to create
   // an UNDER_INVESTIGATION issue
-  const candidateGroups =
-    matchings.length > 0
-      ? await prisma.deviceGroup.findMany({
-          where: { OR: matchings.map(deviceGroupWhereForMatching) },
-          select: {
-            id: true,
-            manufacturerId: true,
-            productId: true,
-            versionId: true,
-            cpe: true,
-            manufacturer: { select: { canonicalDisplayName: true } },
-            product: { select: { canonicalDisplayName: true } },
-            version: {
-              select: { canonicalName: true, canonicalDisplayName: true },
-            },
-            assets: {
-              select: { id: true, hostname: true, ip: true },
-            },
-          },
-        })
-      : [];
+  const candidateGroups = await deviceAssetGroupsForMatchings(matchings);
 
   // matchingId → resolved device groups
   const groupsByMatching = new Map<string, typeof candidateGroups>();
   for (const matching of matchings) {
     groupsByMatching.set(
       matching.id,
-      candidateGroups.filter((g) => matchingAppliesToDevice(matching, g)),
+      candidateGroups.filter((g) => g.matchingIds.includes(matching.id)),
     );
   }
 
@@ -229,7 +206,6 @@ function renderVexPrompt(args: {
   }>;
   candidateGroups: Array<{
     id: string;
-    cpe: string[];
     manufacturer?: { canonicalDisplayName: string } | null;
     product?: { canonicalDisplayName: string } | null;
     version?: { canonicalDisplayName: string } | null;
@@ -374,24 +350,7 @@ export async function gatherVexContextForIssue(
 
   if (!matching) return null;
 
-  const candiateGroups = await prisma.deviceGroup.findMany({
-    where: deviceGroupWhereForMatching(matching),
-    select: {
-      id: true,
-      cpe: true,
-      manufacturerId: true,
-      productId: true,
-      versionId: true,
-      manufacturer: { select: { canonicalDisplayName: true } },
-      product: { select: { canonicalDisplayName: true } },
-      version: { select: { canonicalName: true, canonicalDisplayName: true } },
-      assets: { select: { id: true, hostname: true, ip: true } },
-    },
-  });
-
-  const groups = candiateGroups.filter((g) =>
-    matchingAppliesToDevice(matching, g),
-  );
+  const groups = await deviceAssetGroupsForMatchings([matching]);
   const assetIds = [
     ...new Set(groups.flatMap((g) => g.assets.map((a) => a.id))),
   ];

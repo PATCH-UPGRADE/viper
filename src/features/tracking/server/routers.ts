@@ -1181,15 +1181,11 @@ export const trackingRouter = createTRPCRouter({
           hostname: true,
           ip: true,
           serialNumber: true,
-          deviceGroup: {
+          manufacturer: { select: { canonicalDisplayName: true } },
+          product: {
             select: {
-              manufacturer: { select: { canonicalDisplayName: true } },
-              product: {
-                select: {
-                  canonicalDisplayName: true,
-                  ...deviceTypeLabelSelect,
-                },
-              },
+              canonicalDisplayName: true,
+              ...deviceTypeLabelSelect,
             },
           },
         },

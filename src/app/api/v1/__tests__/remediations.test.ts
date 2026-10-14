@@ -754,7 +754,7 @@ describe("Remediations Endpoint (/remediations)", () => {
     );
   });
   const bedsideMonitorImpact = {
-    mechanism: "REMOTE",
+    mechanism: "REMOTE_DEPLOYMENT",
     estimatedDurationSeconds: 1800,
     requiresDowntime: false,
     reversible: true,
@@ -904,7 +904,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       });
     });
     const createToken = await createIntegrationToken(
-      createdIntegration.integrationId,
+      createdIntegration.integrationUserId,
       ResourceType.Remediation,
     );
     const item = {
@@ -928,7 +928,7 @@ describe("Remediations Endpoint (/remediations)", () => {
       include: { impacts: true },
     });
 
-    expect(found.mechanism).toBe("");
+    expect(found.mechanism).toBe("REMOTE_DEPLOYMENT");
     expect(found.reversible).toBe(true);
     expect(found.impacts).toHaveLength(1);
     expect(found.impacts[0].feature).toBe("nurse call button");

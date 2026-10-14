@@ -6,6 +6,7 @@ import {
   VersionStatus,
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { upsertVersion } from "../prisma/seeds/dev/canonical-identity";
 import { upsertExampleProduct as upsertProduct } from "../prisma/seeds/production/device-types";
 
 const SEED_USER = {
@@ -107,15 +108,6 @@ function upsertManufacturer(name: string) {
   });
 }
 
-function upsertVersion(name: string) {
-  const canonicalName = name.trim().toLowerCase();
-  return prisma.version.upsert({
-    where: { canonicalName },
-    update: {},
-    create: { canonicalName, canonicalDisplayName: name },
-  });
-}
-
 function createAssetNote(userId: string, assetId: string, text: string) {
   return prisma.note.create({
     data: {
@@ -182,8 +174,8 @@ async function teardownFixture() {
 
 async function seedFixture(userId: string) {
   const manufacturer = await upsertManufacturer(MANUFACTURER);
-  const product = await upsertProduct(PRODUCT);
-  const version = await upsertVersion(VERSION);
+  const product = await upsertProduct(manufacturer.id, PRODUCT);
+  const version = await upsertVersion(product.id, VERSION);
 
   const matchingIdentity = {
     manufacturerId: manufacturer.id,
@@ -195,22 +187,19 @@ async function seedFixture(userId: string) {
     (await prisma.deviceGroupMatching.findFirst({ where: matchingIdentity })) ??
     (await prisma.deviceGroupMatching.create({ data: matchingIdentity }));
 
-  const groupIdentity = {
+  const device = {
     manufacturerId: manufacturer.id,
     productId: product.id,
     versionId: version.id,
     versionStatus: VersionStatus.KNOWN,
   };
-  const deviceGroup =
-    (await prisma.deviceGroup.findFirst({ where: groupIdentity })) ??
-    (await prisma.deviceGroup.create({ data: groupIdentity }));
 
   for (const spec of ASSET_SPECS) {
     const data = {
       ...spec,
       upstreamApi: ADVISORY_URL,
       status: "Active" as AssetStatus,
-      deviceGroupId: deviceGroup.id,
+      ...device,
       userId,
     };
     const existing = await prisma.asset.findFirst({
@@ -263,7 +252,7 @@ async function seedFixture(userId: string) {
   });
   await createAssetNote(userId, excludedAsset.id, EXCLUSION_NOTE);
 
-  return { matching, deviceGroup, vulnerability };
+  return { matching, device, vulnerability };
 }
 
 async function printSummaryAndAssert() {

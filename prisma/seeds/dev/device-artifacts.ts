@@ -1,7 +1,7 @@
 import type { ArtifactType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
-  matchingForGroup,
+  matchingForDevice,
   upsertManufacturer,
   upsertProduct,
   upsertVersion,
@@ -25,10 +25,15 @@ export async function seedDeviceArtifacts(userId: string) {
       const parts = deviceArtifact.cpe.split(":");
       const norm = (v?: string) => (!v || v === "-" || v === "*" ? null : v);
       const manufacturer = await upsertManufacturer(norm(parts[3]) ?? "-");
-      const product = await upsertProduct(norm(parts[4]) ?? "-");
+      const product = await upsertProduct(
+        manufacturer.id,
+        norm(parts[4]) ?? "-",
+      );
       const versionName = norm(parts[5]);
-      const version = versionName ? await upsertVersion(versionName) : null;
-      const identityMatchingId = await matchingForGroup({
+      const version = versionName
+        ? await upsertVersion(product.id, versionName)
+        : null;
+      const identityMatchingId = await matchingForDevice({
         manufacturerId: manufacturer.id,
         productId: product.id,
         versionId: version?.id ?? null,

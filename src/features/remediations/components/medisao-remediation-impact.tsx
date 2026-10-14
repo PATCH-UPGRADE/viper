@@ -21,7 +21,7 @@ const yesNo = (value: boolean | null | undefined) =>
   value === null || value === undefined ? "Not stated" : value ? "Yes" : "No";
 
 const duration = (seconds: number | null | undefined) =>
-  typeof seconds === "number" ? formatDowntime(seconds) : " Not stated";
+  typeof seconds === "number" ? formatDowntime(seconds) : "Not stated";
 
 const MECHANISM_LABEL: Record<RemediationMechanism, string> = {
   REMOTE_DEPLOYMENT: "Remote deployment",

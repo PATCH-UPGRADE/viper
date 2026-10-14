@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { BugIcon, ExternalLinkIcon, ServerIcon, SlashIcon } from "lucide-react";
+import { BugIcon, ServerIcon, SlashIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -39,7 +39,7 @@ import {
   IssueStatus,
   type Vulnerability,
 } from "@/generated/prisma";
-import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
+import { deviceGroupLabel } from "@/lib/markdown";
 import type { PaginatedResponse } from "@/lib/pagination";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
@@ -372,30 +372,6 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
                   </div>
                   <CopyCode>{deviceGroupLabel(asset.deviceGroup)}</CopyCode>
                 </div>
-
-                <div>
-                  <div className="text-xs font-medium text-muted-foreground mb-1">
-                    CPE
-                  </div>
-                  <CopyCode>{deviceGroupCpeList(asset.deviceGroup)}</CopyCode>
-                </div>
-
-                {asset.deviceGroup.sbomUrl && (
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      SBOM
-                    </div>
-                    <a
-                      href={asset.deviceGroup.sbomUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-                    >
-                      View SBOM
-                      <ExternalLinkIcon className="size-3 flex-shrink-0" />
-                    </a>
-                  </div>
-                )}
               </div>
             </div>
           </Card>

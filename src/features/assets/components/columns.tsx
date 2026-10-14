@@ -3,9 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDistanceToNow } from "date-fns";
 import { ClampedCell } from "@/components/ui/clamped-cell";
-import { CopyCode } from "@/components/ui/code";
 import { SortableHeader } from "@/components/ui/data-table";
-import { deviceGroupCpeList } from "@/lib/markdown";
 import type { AssetResponse } from "../types";
 import { getAssetDeviceTypeLabel, getSourceToolLabel } from "../utils";
 
@@ -23,16 +21,6 @@ export const columns: ColumnDef<AssetResponse>[] = [
     meta: { title: "IP Address" },
     accessorKey: "ip",
     header: "IP Address",
-  },
-  {
-    accessorKey: "deviceGroupId",
-    meta: { title: "CPE" },
-    header: ({ column }) => <SortableHeader header="CPE" column={column} />,
-    cell: ({ row }) => {
-      return (
-        <CopyCode>{deviceGroupCpeList(row.original.deviceGroup)}</CopyCode>
-      );
-    },
   },
   {
     accessorKey: "userId",

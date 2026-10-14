@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import {
   BugIcon,
-  ExternalLinkIcon,
   FileText,
   MessageSquare,
   ServerIcon,
@@ -35,7 +34,7 @@ import type {
   NetworkConnection,
 } from "@/features/network/types";
 import { RemediationCard } from "@/features/remediations/components/remediations";
-import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
+import { deviceGroupLabel } from "@/lib/markdown";
 import { useTRPC } from "@/trpc/client";
 import { type AssetWithIssueRelations, locationSchema } from "../types";
 import {
@@ -452,28 +451,6 @@ function AssetInfoColumn({ asset }: { asset: AssetWithIssueRelations }) {
             </div>
           ),
         },
-        {
-          header: "CPE",
-          content: <CopyCode>{deviceGroupCpeList(asset.deviceGroup)}</CopyCode>,
-        },
-        ...(asset.deviceGroup.sbomUrl
-          ? [
-              {
-                header: "SBOM",
-                content: (
-                  <a
-                    href={asset.deviceGroup.sbomUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline flex items-center gap-1 break-all"
-                  >
-                    View SBOM
-                    <ExternalLinkIcon className="size-3 flex-shrink-0" />
-                  </a>
-                ),
-              },
-            ]
-          : []),
         ...(asset.serialNumber
           ? [
               {

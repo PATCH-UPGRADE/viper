@@ -123,7 +123,6 @@ export async function findDeviceGroupMatching(
       product: productName,
       version,
       versionRange,
-      hasCpe: false,
     });
     return { found: true, id };
   }

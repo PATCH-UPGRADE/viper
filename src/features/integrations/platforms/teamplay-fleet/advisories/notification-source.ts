@@ -1,5 +1,5 @@
 import "server-only";
-import { type ExtractResult } from "@/features/inbox/agent/extract";
+import type { ExtractResult } from "@/features/inbox/agent/extract";
 import { aiExtractAndMatch } from "@/features/inbox/link-entities";
 import type { LinkEntities } from "@/features/inbox/pipeline";
 import type { SourceRecordAdapter } from "@/features/inbox/source-adapter";

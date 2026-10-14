@@ -8,7 +8,7 @@ import {
 import { processIntegrationSync } from "@/features/integrations/core/sync/upsert";
 import { type Prisma, ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
-import { cpeToDeviceGroup } from "@/lib/router-utils";
+import { cpeToDevice } from "@/lib/router-utils";
 import type { integrationAssetInputSchema } from "../types";
 
 type IntegrationAssetItem = z.infer<
@@ -31,6 +31,8 @@ export function processAssetIntegrationSync(
       transformInputItem: async (item, userId) => {
         const {
           cpe,
+          version,
+          versionStatus,
           externalId: _externalId,
           utilization,
           upstreamApi: _upstreamApi,
@@ -38,8 +40,11 @@ export function processAssetIntegrationSync(
           deviceType,
           ...itemData
         } = item;
-        const deviceGroup = await cpeToDeviceGroup(cpe ?? UNKNOWN_CPE_STRING);
-        await applyDeviceType(deviceGroup.productId, deviceType);
+        const device = await cpeToDevice(cpe ?? UNKNOWN_CPE_STRING, {
+          version,
+          versionStatus,
+        });
+        await applyDeviceType(device.productId, deviceType);
 
         const uniqueFields = [
           "hostname",
@@ -54,13 +59,13 @@ export function processAssetIntegrationSync(
           createData: {
             ...itemData,
             utilization: utilization as Prisma.InputJsonValue | undefined,
-            deviceGroupId: deviceGroup.id,
+            ...device,
             userId,
           },
           updateData: {
             ...itemData,
             utilization: utilization as Prisma.InputJsonValue | undefined,
-            deviceGroupId: deviceGroup.id,
+            ...device,
           },
           uniqueFieldConditions,
           artifactsData: undefined,

@@ -14,16 +14,10 @@ export async function fetchUtilizationGrids(where: Prisma.AssetWhereInput) {
       id: true,
       hostname: true,
       utilization: true,
-      deviceGroup: {
-        select: {
-          product: {
-            select: deviceTypeLabelSelect,
-          },
-        },
-      },
+      product: { select: deviceTypeLabelSelect },
     },
     orderBy: [
-      { deviceGroup: { product: { deviceType: { displayName: "asc" } } } },
+      { product: { deviceType: { displayName: "asc" } } },
       { hostname: "asc" },
     ],
     take: limit + 1,

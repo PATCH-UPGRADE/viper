@@ -13,10 +13,10 @@ type DeviceGroupDisplay = {
 };
 
 /**
- * Human-readable label for a device group, e.g. "Acme InfusionPump".
+ * Human-readable label for a device, e.g. "Acme InfusionPump".
  * Falls back to "Unknown device" when manufacturer/product are unknown.
  */
-export function deviceGroupLabel(dg: DeviceGroupDisplay): string {
+export function deviceLabel(dg: DeviceGroupDisplay): string {
   const parts = [displayName(dg.manufacturer), displayName(dg.product)].filter(
     Boolean,
   );
@@ -29,21 +29,21 @@ export function deviceGroupCpeList(dg: DeviceGroupDisplay): string {
 }
 
 /**
- * Markdown block for a canonical device group, e.g.
+ * Markdown block for a device, e.g.
  * ```
  * ### Acme InfusionPump (2.1.3)
  * - **CPE**: cpe:2.3:...
  * ```
  */
-export function deviceGroupToMarkdown(dg: DeviceGroupDisplay): string {
+export function deviceToMarkdown(dg: DeviceGroupDisplay): string {
   const version = displayName(dg.version);
-  const heading = `### ${deviceGroupLabel(dg)}${version ? ` (${version})` : ""}`;
+  const heading = `### ${deviceLabel(dg)}${version ? ` (${version})` : ""}`;
   const cpe = deviceGroupCpeList(dg);
   return cpe ? `${heading}\n- **CPE**: ${cpe}` : heading;
 }
 
 /** A loosely-typed device identity (as extracted from a notification, etc.). */
-export interface DeviceIdentity {
+export interface ExtractedDeviceIdentity {
   cpe?: string[] | string | null;
   manufacturer?: string | null;
   modelName?: string | null;
@@ -57,7 +57,7 @@ export interface DeviceIdentity {
  * "cpe=… | manufacturer=Acme | modelName=Pump | version=2.1 | versionRange=?".
  * Missing fields render as "?".
  */
-export function deviceIdentityInline(fields: DeviceIdentity): string {
+export function deviceIdentityInline(fields: ExtractedDeviceIdentity): string {
   const cpe = Array.isArray(fields.cpe)
     ? fields.cpe.join(", ") || "(none)"
     : (fields.cpe ?? "?");

@@ -4,7 +4,7 @@ import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
   type MatchingLike,
-  matchingAppliesToDeviceGroup,
+  matchingAppliesToDevice,
 } from "@/lib/device-matching";
 import {
   deviceGroupMatchingLabel,
@@ -231,9 +231,7 @@ export async function gatherQuestionContext(
   for (const matching of matchings) {
     groupsByMatching.set(
       matching.id,
-      candidateGroups.filter((grp) =>
-        matchingAppliesToDeviceGroup(matching, grp),
-      ),
+      candidateGroups.filter((grp) => matchingAppliesToDevice(matching, grp)),
     );
   }
 
@@ -352,7 +350,7 @@ export async function gatherQuestionContextForIssue(
   });
 
   const groups = candidateGroups.filter((g) =>
-    matchingAppliesToDeviceGroup(matching, g),
+    matchingAppliesToDevice(matching, g),
   );
   const assetIds = [
     ...new Set(groups.flatMap((g) => g.assets.map((a) => a.id))),

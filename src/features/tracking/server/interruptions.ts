@@ -285,6 +285,7 @@ const workOrderFields = (departmentId: string, id: string) =>
 const contactSelect = {
   name: true,
   email: true,
+  phone: true,
   department: { select: { name: true } },
 } satisfies Prisma.UserSelect;
 
@@ -362,9 +363,7 @@ export const getInterruptionDetail = async (userId: string, id: string) => {
   return {
     comments: ticket.comments,
     activities: ticket.activities,
-    // The shape `NotificationReadReceipts` takes.
     seenBy: workOrder.seenBy.map(({ seenAt, user }) => ({
-      id: user.id,
       readAt: seenAt,
       user,
     })),

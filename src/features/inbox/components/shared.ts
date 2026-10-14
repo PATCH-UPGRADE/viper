@@ -1,7 +1,5 @@
-import { startOfDay } from "date-fns";
 import type { SourceChannel, SourceLinkType } from "@/generated/prisma";
-import { dayGroupLabel } from "@/lib/date-utils";
-import type { NotificationReadReceipt, RawEmailPayload } from "../types";
+import type { RawEmailPayload } from "../types";
 
 export function emailSenderName(raw: unknown): string | null {
   const from = (raw as RawEmailPayload | null)?.data?.from;
@@ -108,38 +106,6 @@ export function notificationActivityRows(notification: {
   const sourceRows = notification.sourceLinks.map(sourceRow);
   const fieldChangeRows = notification.fieldCorrections.map(fieldChangeRow);
   return [...sourceRows, ...fieldChangeRows];
-}
-
-export type ReadReceiptDayGroup = {
-  /** Start of the calendar day, in milliseconds. Days cannot collide on it. */
-  dayStart: number;
-  label: string;
-  receipts: NotificationReadReceipt[];
-};
-
-/**
- * Rows inside a group keep the order they arrive in, which the server sorts
- * newest first.
- */
-export function groupReceiptsByDay(
-  receipts: NotificationReadReceipt[],
-): ReadReceiptDayGroup[] {
-  const byDay = new Map<number, NotificationReadReceipt[]>();
-
-  for (const receipt of receipts) {
-    const dayStart = startOfDay(receipt.readAt).getTime();
-    const list = byDay.get(dayStart) ?? [];
-    list.push(receipt);
-    byDay.set(dayStart, list);
-  }
-
-  return [...byDay.entries()]
-    .sort(([a], [b]) => b - a)
-    .map(([dayStart, dayReceipts]) => ({
-      dayStart,
-      label: dayGroupLabel(dayStart),
-      receipts: dayReceipts,
-    }));
 }
 
 export function sourceLabel(source: LabelSource) {

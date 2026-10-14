@@ -1,5 +1,6 @@
 import type { EmailReceivedEvent } from "resend";
 import { z } from "zod";
+import type { ReadReceipt } from "@/components/read-receipts";
 import { externalMappingSelect } from "@/features/integrations/core/urls";
 import {
   type AssetStatus,
@@ -161,7 +162,6 @@ export type NotificationFieldCorrection = Prisma.FieldCorrectionGetPayload<{
 
 /** Every reader of a notification, for the header read receipts. */
 export const readReceiptSelect = {
-  id: true,
   readAt: true,
   user: {
     select: {
@@ -173,10 +173,6 @@ export const readReceiptSelect = {
   },
 } satisfies Prisma.NotificationReadSelect;
 
-export type NotificationReadReceipt = Prisma.NotificationReadGetPayload<{
-  select: typeof readReceiptSelect;
-}>;
-
 export type NotificationDetailWithRelations = Omit<
   NotificationDetailBasePayload,
   "deviceGroupsMatchings"
@@ -186,7 +182,7 @@ export type NotificationDetailWithRelations = Omit<
   })[];
   affectedAssets: AffectedAssetsSummary;
   fieldCorrections: NotificationFieldCorrection[];
-  readReceipts: NotificationReadReceipt[];
+  readReceipts: ReadReceipt[];
 };
 
 export type NotificationDetailSource =

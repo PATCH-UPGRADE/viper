@@ -21,7 +21,6 @@ const DOMAIN_PHRASES: Record<string, string> = {
   assets: "assets",
   vulnerabilities: "vulnerabilities",
   remediations: "remediations",
-  deviceGroups: "device groups",
   deviceTypes: "device type counts",
   workflows: "clinical workflows",
   notifications: "notifications",
@@ -35,8 +34,8 @@ const prefixes = () => [
 /**
  * The prose blocks, excluding the pasted catalog, which lists everything.
  *
- * Whitespace is collapsed because the prompt is hand-wrapped: "device groups"
- * really appears as "device\n  groups", so a raw substring check reports drift
+ * Whitespace is collapsed because the prompt is hand-wrapped: "device type
+ * counts" can appear as "device\n  type counts", so a raw substring check reports drift
  * that is only a line break.
  */
 function proseBlocks(prompt: string) {

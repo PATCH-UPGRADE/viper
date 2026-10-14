@@ -2138,13 +2138,7 @@ describe("trackingRouter.listAttachableAssets", () => {
         { ip: insensitive },
         { serialNumber: insensitive },
         {
-          deviceGroup: {
-            is: {
-              product: {
-                is: { deviceType: { is: { displayName: insensitive } } },
-              },
-            },
-          },
+          product: { is: { deviceType: { is: { displayName: insensitive } } } },
         },
       ],
     });

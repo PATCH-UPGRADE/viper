@@ -65,13 +65,10 @@ describe("assetIdsForMatchings", () => {
 
   const candidate = (id: string, version: string) => ({
     id,
-    deviceGroup: {
-      id: `dg-${id}`,
-      manufacturerId: "man-1",
-      productId: "prod-1",
-      versionId: null,
-      version: { canonicalName: version },
-    },
+    manufacturerId: "man-1",
+    productId: "prod-1",
+    versionId: null,
+    version: { canonicalName: version },
   });
 
   it("returns nothing for no matchings", async () => {

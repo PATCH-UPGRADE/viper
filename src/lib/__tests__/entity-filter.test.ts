@@ -28,24 +28,41 @@ describe("validateEntityFilter", () => {
       ).toBe(true);
     });
 
-    it("accepts a single relation hop through deviceGroup", () => {
+    it("accepts the device ids on the asset", () => {
       const result = validateEntityFilter("ASSET", {
-        deviceGroup: { productId: "prod_infusion_pump" },
+        productId: "prod_infusion_pump",
+        versionStatus: "UNKNOWN",
       });
       expect(result.success).toBe(true);
     });
 
-    it("accepts a device type through deviceGroup.product", () => {
+    it("accepts a device type through product", () => {
       expect(
         validateEntityFilter("ASSET", {
-          deviceGroup: { product: { deviceType: { slug: "infusion-pump" } } },
+          product: { deviceType: { slug: "infusion-pump" } },
         }).success,
       ).toBe(true);
       expect(
         validateEntityFilter("ASSET", {
-          deviceGroup: { product: { deviceTypeId: "dt_infusion_pump" } },
+          product: { deviceTypeId: "dt_infusion_pump" },
         }).success,
       ).toBe(true);
+    });
+
+    it("accepts a UDI through version", () => {
+      expect(
+        validateEntityFilter("ASSET", {
+          version: { udiDi: "00843197100156" },
+        }).success,
+      ).toBe(true);
+    });
+
+    it("rejects the removed deviceGroup hop", () => {
+      expect(
+        validateEntityFilter("ASSET", {
+          deviceGroup: { productId: "prod_infusion_pump" },
+        }).success,
+      ).toBe(false);
     });
 
     it("rejects role, which is free text", () => {
@@ -58,7 +75,7 @@ describe("validateEntityFilter", () => {
       const result = validateEntityFilter("ASSET", {
         OR: [
           { networkSegment: { contains: "ICU" } },
-          { deviceGroup: { manufacturerId: "manufacturer_1" } },
+          { manufacturerId: "manufacturer_1" },
         ],
         NOT: { status: "Decommissioned" },
       });

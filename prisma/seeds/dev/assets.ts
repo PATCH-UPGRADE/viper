@@ -1,5 +1,6 @@
 import type { AssetStatus } from "@/generated/prisma";
 import prisma from "@/lib/db";
+import { deviceForSampleCpe } from "./device-groups";
 
 // Used to simulate imaging device utilization throughout the week
 // Mainly for work order scheduling
@@ -438,12 +439,9 @@ export async function seedAssets(userId: string) {
 
   const assets = await Promise.all(
     SAMPLE_ASSETS.map(async (asset) => {
-      const deviceGroup = await prisma.deviceGroup.findFirst({
-        where: { cpe: { has: asset.cpe } },
-      });
-
-      if (!deviceGroup) {
-        console.warn(`⚠️  No device group found for CPE: ${asset.cpe}`);
+      const device = await deviceForSampleCpe(asset.cpe);
+      if (!device) {
+        console.warn(`⚠️  No sample device found for CPE: ${asset.cpe}`);
         return null;
       }
 
@@ -463,7 +461,7 @@ export async function seedAssets(userId: string) {
           location: asset.location,
           status: asset.status as AssetStatus,
           utilization: asset.utilization,
-          deviceGroupId: deviceGroup.id,
+          ...device,
           userId,
         },
       });

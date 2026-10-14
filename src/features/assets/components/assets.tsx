@@ -49,7 +49,7 @@ import { ImportCsvButton } from "@/features/integrations/platforms/csv-upload/co
 import { IssuesSidebarList } from "@/features/issues/components/issue";
 import { IssueStatus, Severity } from "@/generated/prisma";
 import { useEntitySearch } from "@/hooks/use-entity-search";
-import { deviceGroupCpeList, deviceGroupLabel } from "@/lib/markdown";
+import { deviceGroupLabel } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useAssetsParams } from "../hooks/use-asset-params";
 import {
@@ -505,13 +505,6 @@ export function AssetDrawer({
               ) : (
                 <div className="text-sm text-muted-foreground">—</div>
               )}
-            </div>
-
-            <div>
-              <div className="text-xs font-medium text-muted-foreground mb-1">
-                CPE
-              </div>
-              <CopyCode>{deviceGroupCpeList(asset.deviceGroup)}</CopyCode>
             </div>
           </div>
         </div>

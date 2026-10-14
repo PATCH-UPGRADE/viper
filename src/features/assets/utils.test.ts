@@ -13,9 +13,7 @@ const fleetCt = {
   ip: null,
   serialNumber: "63014",
   role: "CT Acquisition Workstation",
-  deviceGroup: {
-    product: { deviceType: { displayName: "Computed Tomography (CT)" } },
-  },
+  product: { deviceType: { displayName: "Computed Tomography (CT)" } },
 };
 
 const scannedPump = {
@@ -23,7 +21,7 @@ const scannedPump = {
   hostname: "icu-pump-07",
   ip: "10.20.0.7",
   serialNumber: "SN-PUMP-7",
-  deviceGroup: null,
+  product: null,
 };
 
 describe("getAssetDisplayName", () => {
@@ -49,7 +47,7 @@ describe("getAssetDisplayName", () => {
       getAssetDisplayName({
         ...fleetCt,
         serialNumber: null,
-        deviceGroup: null,
+        product: null,
       }),
     ).toBe("ct_63014");
   });
@@ -61,7 +59,7 @@ describe("getAssetDisplayName", () => {
         hostname: "  ",
         ip: null,
         serialNumber: "",
-        deviceGroup: null,
+        product: null,
       }),
     ).toBe("ct_63014");
   });
@@ -90,10 +88,8 @@ describe("getAssetTitle", () => {
     expect(getAssetTitle(fleetCt)).toBe("Computed Tomography (CT)");
   });
 
-  it("is Unknown Asset when the product has no device type", () => {
-    expect(getAssetTitle({ deviceGroup: { product: null } })).toBe(
-      "Unknown Asset",
-    );
+  it("is Unknown Asset when the asset has no product", () => {
+    expect(getAssetTitle({ product: null })).toBe("Unknown Asset");
   });
 });
 
@@ -101,9 +97,7 @@ describe("getAssetDeviceTypeLabel", () => {
   it("reads the device type of the asset's product", () => {
     expect(
       getAssetDeviceTypeLabel({
-        deviceGroup: {
-          product: { deviceType: { displayName: "Infusion Pump" } },
-        },
+        product: { deviceType: { displayName: "Infusion Pump" } },
       }),
     ).toBe("Infusion Pump");
   });
@@ -111,8 +105,8 @@ describe("getAssetDeviceTypeLabel", () => {
   it.each([
     ["no device type", { product: { deviceType: null } }],
     ["no product", { product: null }],
-    ["no device group", null],
-  ])("returns null for %s", (_, deviceGroup) => {
-    expect(getAssetDeviceTypeLabel({ deviceGroup })).toBeNull();
+    ["no asset", null],
+  ])("returns null for %s", (_, asset) => {
+    expect(getAssetDeviceTypeLabel(asset)).toBeNull();
   });
 });

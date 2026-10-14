@@ -25,7 +25,6 @@ const DOMAIN_PHRASES: Record<string, string> = {
   assets: "assets",
   vulnerabilities: "vulnerabilities",
   remediations: "remediations",
-  deviceGroups: "device groups",
   deviceTypes: "device type counts",
   workflows: "clinical workflows",
   notifications: "notifications",
@@ -68,18 +67,17 @@ describe("PLATFORM_CATALOG stays in sync with PLATFORM_QUERY_PROCEDURES", () => 
     expect(missing).toEqual([]);
   });
 
-  // A matching id sent as deviceGroupId returns an empty page rather than an
-  // error, so the model reports "no assets affected" against a real count. The
-  // catalog is the only thing standing between the agent and that answer today.
+  // A matching id sent as an asset id finds nothing, so the model reports "no
+  // assets affected" against a real count. The catalog is the only thing
+  // standing between the agent and that answer today.
   //
   // Anchored on the two emphasised phrases, which appear once each and only in
-  // that paragraph. Bare identifiers do not work: `deviceGroupId` appears three
-  // times in the catalog and `deviceGroups.getMany` twice, both via ordinary
-  // procedure bullets, so asserting them passes even with the warning deleted.
-  // Rewording this guidance will fail here, which is the intent.
-  it("keeps the warning that matching ids are not device group ids", () => {
+  // that paragraph. Bare identifiers do not work: `assets.getMany` appears in
+  // ordinary procedure bullets too, so asserting it passes even with the
+  // warning deleted. Rewording this guidance will fail here, which is the intent.
+  it("keeps the warning that matching ids are not asset ids", () => {
     expect(PLATFORM_CATALOG).toContain("matching RULES");
-    expect(PLATFORM_CATALOG).toContain("NOT device group ids");
+    expect(PLATFORM_CATALOG).toContain("NOT asset ids");
   });
 
   // A typo in a dot-path, or a procedure later renamed in its router, is
@@ -264,6 +262,7 @@ describe("addNavigationLinks — notifications", () => {
     expect(Object.keys(result._links).sort()).toEqual([
       "detail",
       "utilization",
+      "vulnerabilities",
       "workOrders",
       "workflows",
     ]);
@@ -337,7 +336,6 @@ describe("addNavigationLinks — canonical record trimming", () => {
     id: "mfr_1",
     canonicalName: "siemens healthineers",
     canonicalDisplayName: "Siemens Healthineers",
-    hasCpe: true,
     nameMappings: [],
     versScheme: null,
     createdAt: "2026-08-13T14:23:04.179Z",
@@ -351,7 +349,6 @@ describe("addNavigationLinks — canonical record trimming", () => {
     >;
 
     for (const key of [
-      "hasCpe",
       "nameMappings",
       "versScheme",
       "createdAt",
@@ -359,7 +356,7 @@ describe("addNavigationLinks — canonical record trimming", () => {
     ]) {
       expect(result).not.toHaveProperty(key);
     }
-    // The catalog tells the model to find a device group by these names.
+    // The catalog tells the model to find assets by these names.
     expect(result.id).toBe("mfr_1");
     expect(result.canonicalName).toBe("siemens healthineers");
     expect(result.canonicalDisplayName).toBe("Siemens Healthineers");
@@ -382,7 +379,9 @@ describe("addNavigationLinks — canonical record trimming", () => {
     };
 
     for (const m of result.deviceGroupsMatchings) {
-      expect(m.deviceGroupMatching.manufacturer).not.toHaveProperty("hasCpe");
+      expect(m.deviceGroupMatching.manufacturer).not.toHaveProperty(
+        "nameMappings",
+      );
       expect(m.deviceGroupMatching.manufacturer.canonicalDisplayName).toBe(
         "Siemens Healthineers",
       );
@@ -410,27 +409,15 @@ describe("addNavigationLinks — existing behaviour is preserved", () => {
 
     expect(result.utilization).toBeUndefined();
     expect(result._links.workflows.procedure).toBe("workflows.getManyByAsset");
+    expect(result._links.vulnerabilities).toEqual({
+      procedure: "vulnerabilities.getManyByAsset",
+      input: { id: "a_1" },
+    });
     expect(result._links.utilization.procedure).toBe("assets.getUtilization");
     expect(result._links.workOrders).toEqual({
       procedure: "tracking.getManyForLlm",
       input: { assetId: "a_1" },
     });
-  });
-
-  it("still linkifies device groups and strips their href keys", () => {
-    const deviceGroup = {
-      id: "dg_1",
-      assetsUrl: "https://example.test/dg/1/assets",
-      vulnerabilitiesUrl: "https://example.test/dg/1/vulns",
-    };
-
-    const result = addNavigationLinks(deviceGroup) as {
-      assetsUrl?: string;
-      _links: Record<string, { procedure: string }>;
-    };
-
-    expect(result.assetsUrl).toBeUndefined();
-    expect(result._links.assets.procedure).toBe("assets.getManyByDeviceGroup");
   });
 });
 

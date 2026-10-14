@@ -5,14 +5,15 @@ vi.mock("server-only", () => ({}));
 
 const db = vi.hoisted(() => ({
   deviceType: { findMany: vi.fn() },
-  deviceGroup: { findMany: vi.fn() },
+  product: { findMany: vi.fn() },
+  asset: { count: vi.fn() },
 }));
 vi.mock("@/lib/db", () => ({ default: db }));
 
 const { countAssetsByDeviceType } = await import("../routers");
 
-const group = (deviceTypeId: string | null, assets: number) => ({
-  product: { deviceTypeId },
+const product = (deviceTypeId: string | null, assets: number) => ({
+  deviceTypeId,
   _count: { assets },
 });
 
@@ -22,15 +23,16 @@ beforeEach(() => {
     { id: "dt-pump", slug: "infusion-pump", displayName: "Infusion Pump" },
     { id: "dt-vent", slug: "ventilator", displayName: "Ventilator" },
   ]);
-  db.deviceGroup.findMany.mockReset();
+  db.product.findMany.mockReset().mockResolvedValue([]);
+  db.asset.count.mockReset().mockResolvedValue(0);
 });
 
 describe("countAssetsByDeviceType", () => {
-  it("sums the assets of every device group of a type", async () => {
-    db.deviceGroup.findMany.mockResolvedValue([
-      group("dt-pump", 20),
-      group("dt-pump", 3),
-      group("dt-ct", 1),
+  it("sums the assets of every product of a type", async () => {
+    db.product.findMany.mockResolvedValue([
+      product("dt-pump", 20),
+      product("dt-pump", 3),
+      product("dt-ct", 1),
     ]);
 
     const { items } = await countAssetsByDeviceType();
@@ -43,11 +45,11 @@ describe("countAssetsByDeviceType", () => {
   });
 
   it("counts assets whose product has no type, or no product, as untyped", async () => {
-    db.deviceGroup.findMany.mockResolvedValue([
-      group(null, 4),
-      { product: null, _count: { assets: 2 } },
-      group("dt-ct", 1),
+    db.product.findMany.mockResolvedValue([
+      product(null, 4),
+      product("dt-ct", 1),
     ]);
+    db.asset.count.mockResolvedValue(2);
 
     const { untypedAssetCount } = await countAssetsByDeviceType();
 
@@ -55,13 +57,15 @@ describe("countAssetsByDeviceType", () => {
   });
 
   it("counts every asset but a decommissioned one, also with no status", async () => {
-    db.deviceGroup.findMany.mockResolvedValue([]);
-
     await countAssetsByDeviceType();
 
-    const [{ select }] = db.deviceGroup.findMany.mock.calls[0];
-    expect(select._count.select.assets.where).toEqual({
+    const counted = {
       OR: [{ status: null }, { status: { not: "Decommissioned" } }],
+    };
+    const [{ select }] = db.product.findMany.mock.calls[0];
+    expect(select._count.select.assets.where).toEqual(counted);
+    expect(db.asset.count).toHaveBeenCalledWith({
+      where: { ...counted, productId: null },
     });
   });
 });

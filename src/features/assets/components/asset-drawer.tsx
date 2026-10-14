@@ -34,7 +34,7 @@ import type {
   NetworkConnection,
 } from "@/features/network/types";
 import { RemediationCard } from "@/features/remediations/components/remediations";
-import { deviceGroupLabel } from "@/lib/markdown";
+import { deviceLabel } from "@/lib/markdown";
 import { useTRPC } from "@/trpc/client";
 import { type AssetWithIssueRelations, locationSchema } from "../types";
 import {
@@ -287,7 +287,7 @@ function DetailsSection({ asset }: { asset: AssetWithIssueRelations }) {
   const sections: Section[] = [
     {
       header: "Device Overview",
-      text: `${getAssetTitle(asset)} — ${deviceGroupLabel(asset.deviceGroup)}`,
+      text: `${getAssetTitle(asset)} — ${deviceLabel(asset.deviceGroup)}`,
     },
     ...(location
       ? [

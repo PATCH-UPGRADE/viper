@@ -121,7 +121,7 @@ export type MatchingLike = {
   versionRange: string | null;
 };
 
-export type DeviceGroupIdentity = {
+export type DeviceIdentity = {
   id: string;
   manufacturerId: string | null;
   productId: string | null;
@@ -131,13 +131,13 @@ export type DeviceGroupIdentity = {
 };
 
 /**
- * Whether a matching applies to a concrete device group. Manufacturer/product/exact-
- * version comparisons use canonical FK ids; version-range checks use the
- * version's canonical string.
+ * Whether a matching applies to a concrete device, that is, any row with a
+ * DeviceIdentity. Manufacturer/product/exact-version comparisons use canonical
+ * FK ids; version-range checks use the version's canonical string.
  */
-export function matchingAppliesToDeviceGroup(
+export function matchingAppliesToDevice(
   matching: MatchingLike,
-  deviceGroup: DeviceGroupIdentity,
+  deviceGroup: DeviceIdentity,
 ): boolean {
   if (
     !deviceGroup.manufacturerId ||
@@ -169,7 +169,7 @@ export function matchingAppliesToDeviceGroup(
 /**
  * Prisma `where` selecting device groups a matching could apply to (manufacturer +
  * optional product). Version filtering is done in memory via
- * matchingAppliesToDeviceGroup.
+ * matchingAppliesToDevice.
  */
 export function deviceGroupWhereForMatching(
   matching: MatchingLike,
@@ -197,11 +197,11 @@ export function unknownVersionDeviceGroupWhere(
 }
 
 /**
- * Prisma `where` selecting matchings that could apply to a device group: same
+ * Prisma `where` selecting matchings that could apply to a device: same
  * manufacturer, and either a wildcard product or the same product (the naive
- * same-manufacturer/product scan). Caller must pass a group that has a manufacturerId.
+ * same-manufacturer/product scan). Caller must pass a device that has a manufacturerId.
  */
-export function matchingWhereForDeviceGroup(deviceGroup: {
+export function matchingWhereForDevice(deviceGroup: {
   manufacturerId: string;
   productId: string | null;
 }): Prisma.DeviceGroupMatchingWhereInput {
@@ -212,10 +212,10 @@ export function matchingWhereForDeviceGroup(deviceGroup: {
 }
 
 /**
- * Resolve a set of matchings against candidate device groups, returning the
- * groups that any matching applies to (deduped by group id).
+ * Resolve a set of matchings against candidate devices, returning the
+ * devices that any matching applies to (deduped by id).
  */
-export function resolveMatches<T extends DeviceGroupIdentity>(
+export function resolveMatches<T extends DeviceIdentity>(
   matchings: MatchingLike[],
   deviceGroups: T[],
 ): T[] {
@@ -223,7 +223,7 @@ export function resolveMatches<T extends DeviceGroupIdentity>(
 
   for (const matching of matchings) {
     for (const deviceGroup of deviceGroups) {
-      if (matchingAppliesToDeviceGroup(matching, deviceGroup)) {
+      if (matchingAppliesToDevice(matching, deviceGroup)) {
         matched.set(deviceGroup.id, deviceGroup);
       }
     }

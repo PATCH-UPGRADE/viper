@@ -9,12 +9,12 @@ import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
   type MatchingLike,
-  matchingAppliesToDeviceGroup,
+  matchingAppliesToDevice,
 } from "@/lib/device-matching";
 import {
-  deviceGroupLabel,
   deviceGroupMatchingLabel,
-  deviceGroupToMarkdown,
+  deviceLabel,
+  deviceToMarkdown,
   type NoteRow,
   renderNoteTarget,
 } from "@/lib/markdown";
@@ -133,7 +133,7 @@ export async function gatherVexContext(
   for (const matching of matchings) {
     groupsByMatching.set(
       matching.id,
-      candidateGroups.filter((g) => matchingAppliesToDeviceGroup(matching, g)),
+      candidateGroups.filter((g) => matchingAppliesToDevice(matching, g)),
     );
   }
 
@@ -190,7 +190,7 @@ export async function gatherVexContext(
     for (const a of g.assets) assetLabel.set(a.id, a.hostname ?? a.ip ?? a.id);
   }
   const groupLabel = new Map(
-    candidateGroups.map((g) => [g.id, deviceGroupLabel(g)]),
+    candidateGroups.map((g) => [g.id, deviceLabel(g)]),
   );
   const matchingLabel = new Map(
     matchings.map((m) => [m.id, deviceGroupMatchingLabel(m)]),
@@ -306,7 +306,7 @@ function renderVexPrompt(args: {
         ? args.candidateGroups
             .map(
               (g) =>
-                `${deviceGroupToMarkdown(g)}\n- **Assets in this group**: ${g.assets.length}`,
+                `${deviceToMarkdown(g)}\n- **Assets in this group**: ${g.assets.length}`,
             )
             .join("\n\n")
         : "_No device groups resolved._"),
@@ -390,7 +390,7 @@ export async function gatherVexContextForIssue(
   });
 
   const groups = candiateGroups.filter((g) =>
-    matchingAppliesToDeviceGroup(matching, g),
+    matchingAppliesToDevice(matching, g),
   );
   const assetIds = [
     ...new Set(groups.flatMap((g) => g.assets.map((a) => a.id))),
@@ -416,7 +416,7 @@ export async function gatherVexContextForIssue(
   for (const g of groups) {
     for (const a of g.assets) assetLabel.set(a.id, a.hostname ?? a.ip ?? a.id);
   }
-  const groupLabel = new Map(groups.map((g) => [g.id, deviceGroupLabel(g)]));
+  const groupLabel = new Map(groups.map((g) => [g.id, deviceLabel(g)]));
   const matchingLabel = new Map<string, string>();
   matchingLabel.set(matching.id, deviceGroupMatchingLabel(matching));
 

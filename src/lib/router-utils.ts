@@ -10,11 +10,11 @@ import {
 import prisma, { type TransactionClient } from "@/lib/db";
 import { requireExistence } from "@/trpc/middleware";
 import {
-  type DeviceGroupIdentity,
+  type DeviceIdentity,
   deviceGroupWhereForMatching,
   type MatchingLike,
-  matchingAppliesToDeviceGroup,
-  matchingWhereForDeviceGroup,
+  matchingAppliesToDevice,
+  matchingWhereForDevice,
   resolveMatches,
 } from "./device-matching";
 import {
@@ -446,10 +446,10 @@ export async function cpesToMatchingConnect(cpes: string[]) {
  * wildcard) are loaded, then confirmed in memory (handles version + VERS ranges).
  */
 export async function findVulnerabilitiesMatchingDeviceGroups(
-  deviceGroups: DeviceGroupIdentity[],
+  deviceGroups: DeviceIdentity[],
 ) {
   const groups = deviceGroups.filter(
-    (g): g is DeviceGroupIdentity & { manufacturerId: string } =>
+    (g): g is DeviceIdentity & { manufacturerId: string } =>
       g.manufacturerId !== null,
   );
   if (groups.length === 0) return [];
@@ -457,7 +457,7 @@ export async function findVulnerabilitiesMatchingDeviceGroups(
   const matchings = await prisma.deviceGroupMatching.findMany({
     where: {
       OR: groups.map((g) =>
-        matchingWhereForDeviceGroup({
+        matchingWhereForDevice({
           manufacturerId: g.manufacturerId,
           productId: g.productId,
         }),
@@ -492,9 +492,9 @@ const matchingIdentitySelect = {
 // fall back to manufacturer (+product) — per the spec's "same manufacturer/product" rule.
 function identityAppliesToGroup(
   matching: MatchingLike,
-  group: DeviceGroupIdentity,
+  group: DeviceIdentity,
 ): boolean {
-  if (matchingAppliesToDeviceGroup(matching, group)) return true;
+  if (matchingAppliesToDevice(matching, group)) return true;
   if (
     group.versionId === null &&
     group.manufacturerId === matching.manufacturerId
@@ -513,11 +513,11 @@ function identityAppliesToGroup(
  * identify which of an artifact's matchings represent the device itself.
  */
 export async function findMatchingIdsForDeviceGroup(
-  group: DeviceGroupIdentity,
+  group: DeviceIdentity,
 ): Promise<string[]> {
   if (!group.manufacturerId) return [];
   const candidates = await prisma.deviceGroupMatching.findMany({
-    where: matchingWhereForDeviceGroup({
+    where: matchingWhereForDevice({
       manufacturerId: group.manufacturerId,
       productId: group.productId,
     }),
@@ -531,7 +531,7 @@ export async function findMatchingIdsForDeviceGroup(
 /**
  * Inverse of {@link findMatchingIdsForDeviceGroup}: resolve a set of device-group
  * matchings to the concrete device-group ids they apply to. Coarse manufacturer/product
- * DB filter, then the in-memory VERS-range check (matchingAppliesToDeviceGroup).
+ * DB filter, then the in-memory VERS-range check (matchingAppliesToDevice).
  */
 export async function findDeviceGroupIdsForMatchings(
   matchings: MatchingLike[],
@@ -570,7 +570,7 @@ export async function resolvedDeviceGroupAssetCount(
     },
   });
   return candidates
-    .filter((dg) => matchingAppliesToDeviceGroup(matching, dg))
+    .filter((dg) => matchingAppliesToDevice(matching, dg))
     .reduce((sum, dg) => sum + dg._count.assets, 0);
 }
 

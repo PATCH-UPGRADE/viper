@@ -4,7 +4,7 @@ import {
   getAssetNameForAgent,
   UNKNOWN_DEVICE_TYPE_STRING,
 } from "@/features/assets/utils";
-import { deviceGroupCpeList, deviceGroupLabel } from "./device-group";
+import { deviceGroupCpeList, deviceLabel } from "./device-group";
 import type { CanonicalRef } from "./shared";
 
 // ─── Utilization rendering ────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ export function assetToMarkdown(
     `- **Status**: ${a.status ?? "Unknown"}`,
     `- **Serial Number**: ${a.serialNumber ?? "N/A"}`,
     `- **Location**: ${parseLocation(a.location)}`,
-    `- **Device Group**: ${deviceGroupLabel(a.deviceGroup)}${a.deviceGroup.cpe?.length ? ` (CPE: ${deviceGroupCpeList(a.deviceGroup)})` : ""}`.trim(),
+    `- **Device Group**: ${deviceLabel(a.deviceGroup)}${a.deviceGroup.cpe?.length ? ` (CPE: ${deviceGroupCpeList(a.deviceGroup)})` : ""}`.trim(),
     `- **Device Group Version**: ${a.deviceGroup.version?.canonicalDisplayName ?? "N/A"}`,
   ];
 

@@ -13,7 +13,7 @@ import { AUTOMATION_USER_ID } from "@/lib/automation-user";
 import prisma from "@/lib/db";
 import {
   deviceGroupWhereForMatching,
-  matchingAppliesToDeviceGroup,
+  matchingAppliesToDevice,
   unknownVersionDeviceGroupWhere,
 } from "@/lib/device-matching";
 import { recordFieldCorrections } from "@/lib/field-correction";
@@ -112,7 +112,7 @@ async function resolveMatchedDeviceGroupIds(
     },
   });
   return candidates
-    .filter((dg) => matchingAppliesToDeviceGroup(matching, dg))
+    .filter((dg) => matchingAppliesToDevice(matching, dg))
     .map((dg) => dg.id);
 }
 
@@ -244,7 +244,7 @@ async function buildMatchingContexts(
   ] of displayMatchings) {
     const overrides = overrideAssets
       .filter((a) =>
-        matchingAppliesToDeviceGroup(deviceGroupMatching, {
+        matchingAppliesToDevice(deviceGroupMatching, {
           id: a.id,
           ...a.deviceGroup,
         }),

@@ -35,7 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { getAssetTitle } from "@/features/assets/utils";
 import type { Vulnerability } from "@/generated/prisma";
 import type { AssetWithDeviceGroup } from "@/lib/db";
-import { deviceGroupLabel } from "@/lib/markdown";
+import { deviceLabel } from "@/lib/markdown";
 import { DeviceIconType, getIconByType } from "../types";
 import type { AssetNodeData } from "./node";
 
@@ -317,7 +317,7 @@ export const AssetDialog = ({
                 {assets.map((asset, idx) => (
                   <li className="list-disc" key={idx}>
                     {getAssetTitle(asset)} &bull;{" "}
-                    {deviceGroupLabel(asset.deviceGroup)} &bull; {asset.id}
+                    {deviceLabel(asset.deviceGroup)} &bull; {asset.id}
                   </li>
                 ))}
               </ul>

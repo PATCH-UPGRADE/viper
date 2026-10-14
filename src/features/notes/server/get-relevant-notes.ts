@@ -161,8 +161,8 @@ export async function getNotesForDeviceGroup(
   _deviceGroupId: string,
 ): Promise<RelevantNote[]> {
   // TODO(device-group-matching): resolve the DeviceGroupMatchings that match
-  // this device group (reuse matchingWhereForDeviceGroup +
-  // matchingAppliesToDeviceGroup from @/lib/device-matching), then
+  // this device group (reuse matchingWhereForDevice +
+  // matchingAppliesToDevice from @/lib/device-matching), then
   // `return getNotesForInstance("DEVICE_GROUP_MATCHING", matchingIds)`.
   return [];
 }

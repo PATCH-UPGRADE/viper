@@ -8,11 +8,11 @@ import {
 } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import {
-  type DeviceGroupIdentity,
+  type DeviceIdentity,
   type MatchingLike,
   resolveMatches,
 } from "@/lib/device-matching";
-import { deviceGroupLabel } from "@/lib/markdown/device-group";
+import { deviceLabel } from "@/lib/markdown/device-group";
 import { findDeviceGroupIdsForMatchings } from "@/lib/router-utils";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 
@@ -39,7 +39,7 @@ async function notificationAssetCount(
 }
 
 /** A device group that currently has assets, plus how many. */
-type InventoryDeviceGroup = DeviceGroupIdentity & {
+type InventoryDeviceGroup = DeviceIdentity & {
   _count: { assets: number };
 };
 
@@ -103,7 +103,7 @@ const activitiesToWorkOrders = (statusChanges: StatusChangeRow[]) => {
 };
 
 type NewAssetRow = {
-  deviceGroup: Parameters<typeof deviceGroupLabel>[0] & { id: string };
+  deviceGroup: Parameters<typeof deviceLabel>[0] & { id: string };
   externalMappings: { integration: { name: string } }[];
 };
 
@@ -122,7 +122,7 @@ const assetsToRows = (newAssets: NewAssetRow[]) => {
     } else {
       rows.set(key, {
         key,
-        label: deviceGroupLabel(asset.deviceGroup),
+        label: deviceLabel(asset.deviceGroup),
         source,
         count: 1,
       });

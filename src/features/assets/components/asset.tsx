@@ -39,7 +39,7 @@ import {
   IssueStatus,
   type Vulnerability,
 } from "@/generated/prisma";
-import { deviceGroupLabel } from "@/lib/markdown";
+import { deviceLabel } from "@/lib/markdown";
 import type { PaginatedResponse } from "@/lib/pagination";
 import { useAssetDetailParams } from "../hooks/use-asset-params";
 import { useSuspenseAsset } from "../hooks/use-assets";
@@ -370,7 +370,7 @@ export const AssetDetailPage = ({ assetId }: AssetDetailProps) => {
                   <div className="text-xs font-medium text-muted-foreground mb-1">
                     Class
                   </div>
-                  <CopyCode>{deviceGroupLabel(asset.deviceGroup)}</CopyCode>
+                  <CopyCode>{deviceLabel(asset.deviceGroup)}</CopyCode>
                 </div>
               </div>
             </div>

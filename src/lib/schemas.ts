@@ -52,7 +52,7 @@ export const versionStatusSchema = z.enum(Object.values(VersionStatus));
 export const versSchemeSchema = z.enum(Object.values(VersScheme));
 
 /** A canonical manufacturer/product/version reference as returned by the API. */
-const canonicalRefSchema = z.object({
+export const canonicalRefSchema = z.object({
   canonicalName: z.string(),
   canonicalDisplayName: z.string(),
 });

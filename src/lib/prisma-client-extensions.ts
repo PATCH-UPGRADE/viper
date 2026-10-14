@@ -16,48 +16,6 @@ import prisma from "./db";
 import { getBaseUrl } from "./url-utils";
 import { sendWebhook } from "./utils";
 
-// add more helper urls for device group
-export const deviceGroupExtension = Prisma.defineExtension({
-  name: "deviceGroupUrls",
-  result: {
-    deviceGroup: {
-      url: {
-        needs: { id: true },
-        compute(deviceGroup) {
-          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}`;
-        },
-      },
-      sbomUrl: {
-        needs: { id: true, helmSbomId: true },
-        compute(deviceGroup) {
-          if (!deviceGroup.helmSbomId) {
-            return null;
-          }
-          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.helmSbomId}/sbom`;
-        },
-      },
-      vulnerabilitiesUrl: {
-        needs: { id: true },
-        compute(deviceGroup) {
-          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/vulnerabilities`;
-        },
-      },
-      deviceArtifactsUrl: {
-        needs: { id: true },
-        compute(deviceGroup) {
-          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/emulators`;
-        },
-      },
-      assetsUrl: {
-        needs: { id: true },
-        compute(deviceGroup) {
-          return `${getBaseUrl()}/api/v1/deviceGroups/${deviceGroup.id}/assets`;
-        },
-      },
-    },
-  },
-});
-
 // add more helper urls for artifacts
 export const artifactExtension = Prisma.defineExtension({
   name: "artifactUrls",
@@ -219,10 +177,6 @@ export const sendWebhooksExtension = Prisma.defineExtension({
     deviceArtifact: createWebhookHandlers(
       TriggerEnum.DeviceArtifact_Created,
       TriggerEnum.DeviceArtifact_Updated,
-    ),
-    deviceGroup: createWebhookHandlers(
-      TriggerEnum.DeviceGroup_Created,
-      TriggerEnum.DeviceGroup_Updated,
     ),
     remediation: createWebhookHandlers(
       TriggerEnum.Remediation_Created,

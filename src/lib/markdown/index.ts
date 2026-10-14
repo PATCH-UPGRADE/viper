@@ -7,7 +7,6 @@ export {
   renderUtilization,
 } from "./asset";
 export {
-  deviceGroupCpeList,
   deviceGroupMatchingLabel,
   deviceGroupMatchingsSummary,
   deviceIdentityInline,

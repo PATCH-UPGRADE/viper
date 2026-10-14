@@ -6,7 +6,7 @@ import { processIntegrationSync } from "@/features/integrations/core/sync/upsert
 import { ResourceType } from "@/generated/prisma";
 import prisma from "@/lib/db";
 import { SIEMENS_HEALTHINEERS } from "@/lib/manufacturer-catalog";
-import { resolveDeviceGroup } from "@/lib/router-utils";
+import { resolveDevice } from "@/lib/router-utils";
 import type { IntegrationResponse } from "@/lib/schemas";
 import type { ResourceSyncCtx, SyncOutcome } from "../../../core/types";
 import type { FleetConfig, FleetCreds } from "../config";
@@ -19,18 +19,19 @@ import {
 } from "./equipments";
 import { connectUncontractedAssets } from "./manages-relationship";
 
-async function equipmentKeysWeMayRegroup(
+/**
+ * The equipment whose device ids an update may change: the assets that Fleet
+ * created. An asset that another source created keeps that source's device.
+ */
+async function fleetCreatedEquipmentKeys(
   integrationId: string,
+  integrationUserId: string,
 ): Promise<Set<string>> {
-  const mappingsToNameDerivedGroups =
-    await prisma.externalAssetMapping.findMany({
-      where: {
-        integrationId,
-        item: { deviceGroup: { cpe: { isEmpty: true } } },
-      },
-      select: { externalId: true },
-    });
-  return new Set(mappingsToNameDerivedGroups.map((m) => m.externalId));
+  const mappingsToFleetAssets = await prisma.externalAssetMapping.findMany({
+    where: { integrationId, item: { userId: integrationUserId } },
+    select: { externalId: true },
+  });
+  return new Set(mappingsToFleetAssets.map((m) => m.externalId));
 }
 
 // TODO: VW-560
@@ -68,8 +69,10 @@ async function ingestFleetAssets(
     select: { integrationUserId: true },
   });
   const weakSerials = computeWeakSerials(items);
-  const regroupableEquipmentKeys =
-    await equipmentKeysWeMayRegroup(integrationId);
+  const fleetCreatedKeys = await fleetCreatedEquipmentKeys(
+    integrationId,
+    integrationUserId,
+  );
   const checkedProductIds = new Set<string>();
 
   const assetsAlreadyMapped = await prisma.asset.findMany({
@@ -95,12 +98,12 @@ async function ingestFleetAssets(
       // finalize-sync already records this attempt; a second write double-counts consecutiveFailures.
       shouldRecordSyncOutcome: false,
       transformInputItem: async (item: FleetAssetItem, userId: string) => {
-        const deviceGroup = await resolveDeviceGroup({
+        const device = await resolveDevice({
           manufacturer: SIEMENS_HEALTHINEERS.canonicalDisplayName,
           product: item.productName,
           version: item.softwareVersion,
         });
-        const { productId } = deviceGroup;
+        const { productId } = device;
         if (productId && item.modality && !checkedProductIds.has(productId)) {
           checkedProductIds.add(productId);
           await typeProductFromModality(productId, item);
@@ -110,9 +113,9 @@ async function ingestFleetAssets(
           location: item.location,
         };
         return {
-          createData: { ...fields, deviceGroupId: deviceGroup.id, userId },
-          updateData: regroupableEquipmentKeys.has(item.externalId)
-            ? { ...fields, deviceGroupId: deviceGroup.id }
+          createData: { ...fields, ...device, userId },
+          updateData: fleetCreatedKeys.has(item.externalId)
+            ? { ...fields, ...device }
             : fields,
           uniqueFieldConditions:
             item.serialNumber && !weakSerials.has(item.serialNumber)

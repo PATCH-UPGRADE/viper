@@ -40,11 +40,8 @@ const inWindow = (entry: FeedEntry, now: number): boolean =>
 
 const checkInventory = async (names: string[]): Promise<boolean> => {
   if (names.length === 0) return false;
-  const count = await prisma.deviceGroup.count({
-    where: {
-      assets: { some: {} },
-      manufacturer: { OR: names.map(canonicalNameWhere) },
-    },
+  const count = await prisma.asset.count({
+    where: { manufacturer: { OR: names.map(canonicalNameWhere) } },
   });
   return count > 0;
 };

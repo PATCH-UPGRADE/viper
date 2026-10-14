@@ -51,6 +51,7 @@ describe("interruptions scope", () => {
       departments: [],
       assets: [],
       descriptions: [],
+      rescheduleRequests: [],
     });
     const detail = await getInterruptionDetail("u1", "wo-1");
     const { select } = mockPrisma.workOrderTicket.findFirst.mock.calls[0][0];

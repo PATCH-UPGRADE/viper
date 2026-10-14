@@ -411,7 +411,7 @@ export const AssetItem = ({ data }: { data: DrawerAsset }) => {
         <AssetDrawer asset={data}>{getAssetTitle(data)}</AssetDrawer>
         <div className="text-xs text-muted-foreground mt-1">
           {data.ip ? <>{data.ip} &bull; </> : null}
-          {deviceLabel(data.deviceGroup)} &bull; Updated{" "}
+          {deviceLabel(data)} &bull; Updated{" "}
           {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
           {hasIssues && data.issues.length >= 1 && (
             <>
